@@ -2127,7 +2127,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             solid color is invisible. This spacer keeps the top bar's icons and
             text below the status-bar's vibrancy band, like a native app. */}
         {isMobile && (
-          <div aria-hidden style={{ height: 20, background: "var(--bg-panel)", flexShrink: 0 }} />
+          <div aria-hidden style={{ height: 14, background: "var(--bg-panel)", flexShrink: 0 }} />
         )}
         <div ref={topBarRef} style={{ flexShrink: 0, background: "var(--bg-panel)" }}>
         <div style={{ display: "flex", alignItems: "center", position: "relative", borderBottom: "1px solid var(--border)", height: "calc(36px + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
