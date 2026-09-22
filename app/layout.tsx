@@ -33,16 +33,15 @@ export const metadata: Metadata = {
       },
     ],
   },
-  // No appleWebApp config: when capable is set, Next.js always emits
-  // apple-mobile-web-app-status-bar-style (defaulting to "default"), and any
-  // value of that meta triggers the iOS 26.1+ status-bar scrim that blurs the
-  // top of standalone PWAs (WebKit #317153/#301994). With no meta at all the
-  // status bar is opaque, tinted from the page, and sits above the viewport;
-  // standalone mode comes from manifest.ts display:"standalone" (the capable
-  // meta is deprecated on iOS 17.4+ but emitted below for older Safari).
+  // Explicit black status bar (as Discourse does): with this meta the system
+  // renders an opaque black bar with no vibrancy glass. With NO meta, iOS 26.1+
+  // falls back to the new "tinted from the page" glass status bar whose
+  // vibrancy blur bleeds into the viewport top and blurs the toolbar — which
+  // no amount of page-side CSS could remove (WebKit #317153/#301994).
   other: {
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-title": "Pi Web",
+    "apple-mobile-web-app-status-bar-style": "black",
   },
   formatDetection: {
     telephone: false,
