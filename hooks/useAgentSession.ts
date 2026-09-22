@@ -179,6 +179,7 @@ const PROMPT_SETTLE_POLL_MS = 600;
 const PROMPT_SETTLE_MAX_MS = 20_000;
 const EVENT_STREAM_IDLE_GRACE_MS = 30_000;
 const AGENT_STATE_RECONCILE_MS = 15_000;
+const IDLE_FOLLOW_POLL_MS = 5_000;
 const BASH_STATE_RECONCILE_MS = 1_000;
 const EVENT_STREAM_READY_TIMEOUT_MS = 60_000;
 const EVENT_STREAM_RECONNECT_DELAY_MS = 1_000;
@@ -351,6 +352,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const eventStreamGraceActiveRef = useRef(false);
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
   const sessionPropIdRef = useRef<string | null>(session?.id ?? null);
+  const entryIdsRef = useRef<string[]>([]);
+  const browsingHistoryRef = useRef(false);
+  const followProbeInFlightRef = useRef(false);
   const agentRunningRef = useRef(false);
   const sdkAgentActiveRef = useRef(false);
   const rpcPromptPendingRef = useRef(false);
@@ -498,9 +502,15 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } satisfies SessionStatsInfo;
   }, [messages, sessionStatsOverride, contextUsage, data?.context.messages, data?.filePath, data?.totalActiveMs, data?.stats, session?.id, session?.name]);
 
+  useEffect(() => {
+    entryIdsRef.current = entryIds;
+  }, [entryIds]);
+
   const loadSession = useCallback(async (sid: string, showLoading = false, includeState = false, options?: { force?: boolean }) => {
     let messagesLoaded = false;
     try {
+      // A full load re-renders the leaf path, ending any paged-back history view.
+      browsingHistoryRef.current = false;
       if (showLoading) setLoading(true);
       const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1" });
       if (options?.force) params.set("force", "1");
@@ -602,6 +612,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       });
       if (before) {
         // Older page: prepend so scroll position stays anchored.
+        browsingHistoryRef.current = true;
         setMessages((prev) => [...d.context.messages, ...prev]);
         setEntryIds((prev) => [...d.context.entryIds, ...prev]);
       } else {
@@ -1141,6 +1152,48 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       window.removeEventListener("online", reconcile);
     };
   }, [agentRunning, reconcileAgentState]);
+
+  // Idle follow: a read-only open session must track appends made by another
+  // pi process (the TUI) writing the same file. Probe cheaply with tail=1 and
+  // only reload on a changed latest entry id; ?force=1 reuses the server's
+  // evictIfDiskAhead() so a live wrapper lagging behind disk is rebuilt.
+  // Runs only while the tab is visible and no web-side run owns the session
+  // (SSE/reconcile covers that); paused while the user pages back through
+  // history so a reload cannot yank the viewport to the leaf path.
+  useEffect(() => {
+    if (!session || agentRunning) return;
+    const sid = session.id;
+    const probe = async () => {
+      if (document.visibilityState !== "visible") return;
+      if (followProbeInFlightRef.current || browsingHistoryRef.current) return;
+      if (sessionIdRef.current !== sid) return;
+      followProbeInFlightRef.current = true;
+      try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?tail=1&deferThinking=1&deferMedia=1&force=1`);
+        if (!res.ok) return;
+        const d = await res.json() as SessionData;
+        if (sessionIdRef.current !== sid) return;
+        const ids = d.context.entryIds ?? [];
+        const latest = ids[ids.length - 1];
+        const current = entryIdsRef.current;
+        if (!latest || latest === current[current.length - 1]) return;
+        await loadSession(sid);
+      } catch {
+        // Transient fetch failure; the next tick retries.
+      } finally {
+        followProbeInFlightRef.current = false;
+      }
+    };
+    const interval = setInterval(() => void probe(), IDLE_FOLLOW_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void probe();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [session, agentRunning, loadSession]);
 
   useEffect(() => {
     agentRunningRef.current = agentRunning;
