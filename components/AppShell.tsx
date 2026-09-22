@@ -2029,7 +2029,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       overflow: "hidden",
       background: "var(--bg)",
     }}>
-      {/* Mobile overlay backdrop */}
+      {/* Mobile overlay backdrop. The tint lives on an absolute child because
+          Safari 26 samples the background-color of full-viewport fixed elements
+          (even at opacity 0) to tint the Liquid Glass status bar, which blurs
+          the whole top strip of the PWA. */}
       <div
         className={`sidebar-overlay-backdrop${mobileSidebarReady ? "" : " sidebar-mobile-pending"}`}
         onClick={() => setSidebarOpen(false)}
@@ -2037,12 +2040,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           position: "fixed",
           inset: 0,
           zIndex: 199,
-          background: "rgba(0,0,0,0.4)",
           opacity: sidebarOpen ? 1 : 0,
           pointerEvents: sidebarOpen ? "auto" : "none",
           transition: "opacity 0.25s ease",
         }}
-      />
+      >
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)" }} />
+      </div>
 
       {/* Left sidebar */}
       <div
