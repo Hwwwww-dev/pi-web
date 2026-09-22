@@ -71,12 +71,12 @@ test("keeps language selection in General settings", () => {
 
 test("groups chat display controls together without row backgrounds", () => {
   const appearanceSection = panelSource.slice(
-    panelSource.indexOf('{t("settings.appearance")}'),
-    panelSource.indexOf('{t("settings.chat")}'),
+    panelSource.indexOf('{detail === "appearance"'),
+    panelSource.indexOf('{detail === "chat"'),
   );
   const chatSection = panelSource.slice(
-    panelSource.indexOf('{t("settings.chat")}'),
-    panelSource.indexOf("{shellSettings?.isWindows"),
+    panelSource.indexOf('{detail === "chat"'),
+    panelSource.indexOf('{detail === "shell"'),
   );
 
   assert.doesNotMatch(appearanceSection, /settings-chat-content/);

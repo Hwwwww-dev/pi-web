@@ -919,42 +919,16 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
-  /* Scroll on the full-width host so the scrollbar hugs the dialog's
-     right edge instead of the centered 680px content column. */
+  /* Scroll on the full-width host; each embedded tab owns its internal
+     scrolling so the scrollbar hugs the dialog's right edge. */
   overflow-y: auto;
 }
 
-.settings-general {
-  width: 100%;
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 26px clamp(18px, 4vw, 40px) 40px;
-}
-
-.settings-general-title {
-  margin: 0;
-  color: var(--text);
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.settings-general-section {
-  margin-top: 30px;
-}
-
-.settings-general-section:first-of-type {
-  margin-top: 24px;
-}
-
-.settings-general-heading {
-  margin: 0 0 5px;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 650;
-}
+/* The general tab reuses the same split-view shell as the other tabs;
+   section content below is styled against .config-detail typography. */
 
 .settings-general-description {
-  margin: 0 0 12px;
+  margin: 0;
   color: var(--text-dim);
   font-size: 11px;
   line-height: 1.5;
@@ -963,9 +937,8 @@
 .settings-theme-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
+  gap: 6px;
   width: 100%;
-  max-width: 420px;
   padding: 3px;
 }
 
@@ -1012,7 +985,6 @@
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  max-width: 420px;
 }
 
 .settings-chat-option {
@@ -1064,7 +1036,6 @@
   flex-direction: column;
   gap: 3px;
   width: 100%;
-  max-width: 420px;
 }
 
 .settings-language-option {
@@ -1129,7 +1100,6 @@
   justify-content: space-between;
   gap: 16px;
   width: 100%;
-  max-width: 420px;
   min-height: 44px;
   padding: 0 10px;
   border-radius: 5px;
@@ -1142,6 +1112,10 @@
   margin: 8px 0 0;
   color: #ef4444;
   font-size: 11px;
+}
+
+.settings-logout-error {
+  padding: 0 8px;
 }
 
 @media (max-width: 640px) {
