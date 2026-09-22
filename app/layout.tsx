@@ -49,7 +49,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  viewportFit: "cover",
+  // No viewportFit: "cover" — in standalone PWA mode iOS 26 blends a Liquid
+  // Glass material over the status bar strip and blurs web content that
+  // extends under it (Safari itself is unaffected). Keeping the viewport
+  // inside the safe area keeps the top strip clean.
   interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
