@@ -431,6 +431,9 @@ html.dark .web-login-error {
   background-color: #111318;
 }
 
+/* Overlay-style scrollbars: hidden until the pointer rests on the scroll
+   container, matching the macOS native behavior that custom scrollbars
+   would otherwise disable. */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -439,8 +442,11 @@ html.dark .web-login-error {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: transparent;
   border-radius: 2px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--border);
 }
 
 
