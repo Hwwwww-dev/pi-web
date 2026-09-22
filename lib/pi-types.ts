@@ -132,6 +132,8 @@ export interface AgentSessionLike {
   readonly sessionFile: string | undefined;
   readonly isStreaming: boolean;
   readonly isCompacting: boolean;
+  /** Current effective system prompt (pi >= 0.86). Undefined on pi 0.85. */
+  readonly systemPrompt?: string;
   readonly autoCompactionEnabled: boolean;
   readonly autoRetryEnabled: boolean;
   readonly model: ModelLike | undefined;

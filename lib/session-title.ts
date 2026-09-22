@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { Agent, AgentMessage, ThinkingLevel } from "@earendil-works/pi-agent-core";
 import {
   getSupportedThinkingLevels,
+  normalizeContext,
   type Api,
   type AssistantMessage,
-  type Context,
   type Model,
   type SimpleStreamOptions,
+  type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 
@@ -59,7 +60,7 @@ export interface GeneratedSessionTitle {
 
 export interface TitleRequest {
   model: Model<Api>;
-  context: Context;
+  context: TranscriptContext;
   options: SimpleStreamOptions;
 }
 
@@ -89,14 +90,14 @@ export function buildTitleRequest(source: Agent, transcript: string): TitleReque
   const thinkingLevel = resolveTitleThinkingLevel(model);
   return {
     model,
-    context: {
+    context: normalizeContext({
       systemPrompt: TITLE_SYSTEM_PROMPT,
       messages: [{
         role: "user",
         content: [{ type: "text", text: `${transcript}\n\n${TITLE_PROMPT}` }],
         timestamp: Date.now(),
       }],
-    },
+    }),
     options: {
       maxTokens: TITLE_MAX_TOKENS,
       cacheRetention: "none",
