@@ -22,7 +22,7 @@ Lint: `npm run lint`
 
 ## Architecture
 
-```
+```text
 Browser                Next.js Server              AgentSession (in-process)
   │                        │                               │
   ├─ GET /api/sessions ────▶ reads ~/.pi/agent/sessions/   │
@@ -45,7 +45,7 @@ Browser                Next.js Server              AgentSession (in-process)
 
 ## File Map
 
-```
+```text
 app/api/
   sessions/route.ts               GET  list all sessions
   sessions/[id]/route.ts          GET/PATCH/DELETE session
@@ -253,9 +253,36 @@ Location: `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`
 
 ## CSS Variables (`app/globals.css`)
 
-```
+```css
 --bg --bg-panel --bg-hover --bg-selected --border
 --text --text-muted --text-dim
 --accent --user-bg --tool-bg
 --font-mono
 ```
+
+---
+
+## Publishing (production)
+
+The main clone (`~/Projects/ai-project/pi-web`, branch `dev`) is for development only: edit, commit, push. The production server runs from the dedicated worktree `~/Projects/ai-project/pi-web-run` (branch `run`, tracking `origin/dev`).
+
+```bash
+# 1. From the main clone: push dev
+git push origin dev
+
+# 2. Sync the run worktree and build production bundle
+bash ~/run-pi-web-build.sh   # cd pi-web-run; git fetch; git reset --hard origin/dev; npm ci; npm run build
+
+# 3. Start/restart the production server
+bash ~/run-pi-web.sh         # next start -H 127.0.0.1 -p 30141 (allowed hosts set inside the script)
+
+# 4. Verify
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:30141/   # expect 200
+cat ~/.pi-web/logdir/pi-web.pid
+```
+
+- pid file: `~/.pi-web/logdir/pi-web.pid`; logs: `~/.pi-web/logdir/pi-web.log` (append-only, survives restarts)
+- Never "publish" by running `next build` / `next start` in the main clone — it pollutes `.next/` and serves the wrong checkout.
+- Keep the run worktree clean; the build script hard-resets it to `origin/dev`.
+- If `npm ci` fails with spurious sync errors while another build is running, rerun it once both builds have stopped (concurrent installs corrupt the tree).
+- iOS PWA verification: fully close and reopen the PWA first, or the old JS bundle stays cached.
