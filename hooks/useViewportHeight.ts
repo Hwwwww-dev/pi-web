@@ -4,19 +4,28 @@ import { useEffect } from "react";
 
 interface ViewportHeightState {
   hasFocusedEditable: boolean;
-  innerHeight: number;
-  viewportHeight: number;
+  /** Tallest on-screen viewport height seen so far, i.e. the no-keyboard height. */
+  fullHeight: number;
+  /** Current on-screen viewport height. */
+  visibleHeight: number;
   viewportScale: number;
 }
 
 export function shouldUseVisualViewportHeight({
   hasFocusedEditable,
-  innerHeight,
-  viewportHeight,
+  fullHeight,
+  visibleHeight,
   viewportScale,
 }: ViewportHeightState): boolean {
   const isUnscaled = Math.abs(viewportScale - 1) < 0.01;
-  return hasFocusedEditable && isUnscaled && innerHeight - viewportHeight > 1;
+  // iOS PWAs shrink window.innerHeight, documentElement.clientHeight, and
+  // visualViewport.height together when the keyboard opens, so a live delta
+  // between any two of them is always ~0 and never fires. Comparing against
+  // the tallest height observed with no keyboard open is the only signal that
+  // survives. Android with interactive-widget=resizes-content shrinks the
+  // layout viewport itself and needs no override; its visible height equals
+  // its full height there, so this check stays false as well.
+  return hasFocusedEditable && isUnscaled && fullHeight - visibleHeight > 1;
 }
 
 function hasFocusedEditableElement(): boolean {
@@ -27,6 +36,13 @@ function hasFocusedEditableElement(): boolean {
     || activeElement.tagName === "INPUT"
     || activeElement.tagName === "SELECT"
     || activeElement.tagName === "TEXTAREA";
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && (target.isContentEditable
+      || target.tagName === "INPUT"
+      || target.tagName === "TEXTAREA");
 }
 
 /**
@@ -41,17 +57,22 @@ export function useViewportHeight(): void {
 
     const root = document.documentElement;
     let frameId: number | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    // High-water mark of the on-screen viewport height: the no-keyboard height.
+    let fullHeight = 0;
 
     const update = () => {
       frameId = null;
+      const visibleHeight = Math.min(document.documentElement.clientHeight, viewport.height);
+      if (visibleHeight > fullHeight) fullHeight = visibleHeight;
       const keyboardOpen = shouldUseVisualViewportHeight({
         hasFocusedEditable: hasFocusedEditableElement(),
-        innerHeight: window.innerHeight,
-        viewportHeight: viewport.height,
+        fullHeight,
+        visibleHeight,
         viewportScale: viewport.scale,
       });
       if (keyboardOpen) {
-        root.style.setProperty("--app-viewport-height", `${viewport.height}px`);
+        root.style.setProperty("--app-viewport-height", `${visibleHeight}px`);
       } else {
         root.style.removeProperty("--app-viewport-height");
       }
@@ -72,21 +93,51 @@ export function useViewportHeight(): void {
       frameId = window.requestAnimationFrame(update);
     };
 
+    // iOS PWAs can settle the keyboard layout without ever dispatching the
+    // trailing visualViewport events, so nothing recomputes until the next
+    // user gesture shifts the viewport. Poll briefly after an editable gains
+    // focus: the keyboard animation finishes within ~300ms, so a few checks
+    // catch the shrunken viewport without waiting for events that may never come.
+    const stopKeyboardPoll = () => {
+      if (pollTimer !== null) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    };
+    const startKeyboardPoll = () => {
+      stopKeyboardPoll();
+      let checks = 0;
+      pollTimer = setInterval(() => {
+        scheduleUpdate();
+        if (++checks >= 12) stopKeyboardPoll();
+      }, 50);
+    };
+
+    const handleFocusIn = (event: FocusEvent) => {
+      if (isEditableTarget(event.target)) startKeyboardPoll();
+      scheduleUpdate();
+    };
+    const handleFocusOut = () => {
+      stopKeyboardPoll();
+      scheduleUpdate();
+    };
+
     scheduleUpdate();
     viewport.addEventListener("resize", scheduleUpdate);
     viewport.addEventListener("scroll", scheduleUpdate);
     window.addEventListener("resize", scheduleUpdate);
-    window.addEventListener("focusin", scheduleUpdate);
-    window.addEventListener("focusout", scheduleUpdate);
+    window.addEventListener("focusin", handleFocusIn);
+    window.addEventListener("focusout", handleFocusOut);
     window.addEventListener("pageshow", scheduleUpdate);
 
     return () => {
       viewport.removeEventListener("resize", scheduleUpdate);
       viewport.removeEventListener("scroll", scheduleUpdate);
       window.removeEventListener("resize", scheduleUpdate);
-      window.removeEventListener("focusin", scheduleUpdate);
-      window.removeEventListener("focusout", scheduleUpdate);
+      window.removeEventListener("focusin", handleFocusIn);
+      window.removeEventListener("focusout", handleFocusOut);
       window.removeEventListener("pageshow", scheduleUpdate);
+      stopKeyboardPoll();
       if (frameId !== null) window.cancelAnimationFrame(frameId);
       root.style.removeProperty("--app-viewport-height");
     };
