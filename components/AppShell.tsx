@@ -53,6 +53,7 @@ import {
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
 } from "@/lib/panel-layout";
+import { skillExpansionToCommand } from "@/lib/slash-display";
 import type { BlockingExtensionUiRequest, SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { ProjectTrustStatus } from "@/lib/api-types";
 import type { ChatInputHandle } from "./ChatInput";
@@ -1136,8 +1137,19 @@ export function AppShell() {
   }, [projectTrustBusy, projectTrustCwd]);
 
   const activeFileTab = fileTabs.find((tab) => tab.id === activeFileTabId) ?? null;
-  const activeCwdName = activeCwd ? getFileName(activeCwd) || activeCwd : null;
-  const windowTitle = activeCwdName ? `${activeCwdName} - Pi Web` : "Pi Web";
+  // Tab title mirrors the active session's sidebar name (truncated to 10 chars);
+  // with no active session it falls back to "Pi Web".
+  const activeSessionTitle = selectedSession
+    ? (selectedSession.name
+        || skillExpansionToCommand(selectedSession.firstMessage)
+        || selectedSession.firstMessage
+        || selectedSession.id.slice(0, 12)).trim()
+    : null;
+  const windowTitle = (() => {
+    if (!activeSessionTitle) return "Pi Web";
+    const chars = Array.from(activeSessionTitle);
+    return chars.length > 10 ? `${chars.slice(0, 10).join("")}…` : activeSessionTitle;
+  })();
 
   useEffect(() => {
     const syncWindowTitle = () => {

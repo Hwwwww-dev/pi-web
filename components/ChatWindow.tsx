@@ -1711,9 +1711,9 @@ function ExtensionDialog({
               {request.options.map((option, index) => {
                 const tone = extensionOptionTone(option);
                 const toneStyle = tone === "affirmative"
-                  ? { border: "1px solid rgba(22,163,74,0.45)", borderLeft: "3px solid #16a34a", color: "#16a34a" }
+                  ? { color: "#16a34a" }
                   : tone === "negative"
-                    ? { border: "1px solid rgba(239,68,68,0.4)", borderLeft: "3px solid #ef4444", color: "#ef4444" }
+                    ? { color: "#ef4444" }
                     : undefined;
                 return (
                 <div
@@ -1721,7 +1721,7 @@ function ExtensionDialog({
                   role="button"
                   tabIndex={0}
                   data-extension-option
-                  className="extension-option"
+                  className={`extension-option${tone === "neutral" ? "" : ` tone-${tone}`}`}
                   aria-label={option}
                   ref={index === 0 ? focusFirstOption : undefined}
                   onClick={() => onRespond(request, { value: option })}
