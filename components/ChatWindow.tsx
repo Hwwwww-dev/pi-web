@@ -1522,6 +1522,15 @@ function ExtensionDialogTitle({ title }: { title: string }) {
   );
 }
 
+// Permission-style options read as approve/deny; tint them so the choice
+// is recognizable at a glance. Only matches at the start of the option text.
+function extensionOptionTone(option: string): "affirmative" | "negative" | "neutral" {
+  const text = option.trim().toLowerCase();
+  if (/^(yes|y|ok|okay|allow|approve|accept|continue|always)\b/.test(text) || /^[是允禄确认同意好的]/.test(option.trim())) return "affirmative";
+  if (/^(no|n|deny|reject|cancel|never|stop|don'?t)\b/.test(text) || /^[否不拒绝取消]/.test(option.trim())) return "negative";
+  return "neutral";
+}
+
 function ExtensionDialog({
   request,
   onRespond,
@@ -1699,7 +1708,14 @@ function ExtensionDialog({
               }}
               style={{ display: "grid", gap: 8 }}
             >
-              {request.options.map((option, index) => (
+              {request.options.map((option, index) => {
+                const tone = extensionOptionTone(option);
+                const toneStyle = tone === "affirmative"
+                  ? { border: "1px solid rgba(22,163,74,0.45)", borderLeft: "3px solid #16a34a", color: "#16a34a" }
+                  : tone === "negative"
+                    ? { border: "1px solid rgba(239,68,68,0.4)", borderLeft: "3px solid #ef4444", color: "#ef4444" }
+                    : undefined;
+                return (
                 <div
                   key={option}
                   role="button"
@@ -1724,18 +1740,21 @@ function ExtensionDialog({
                     cursor: "pointer",
                     textAlign: "left",
                     fontSize: 13,
+                    fontWeight: tone === "neutral" ? undefined : 600,
                     overflowWrap: "anywhere",
                     // Match the scroller's padding so keyboard navigation never parks the
                     // option flush against the edge, where whole-pixel scroll snapping and
                     // overflow clipping cut off its focus ring.
                     scrollMargin: 14,
+                    ...toneStyle,
                   }}
                 >
                   <div inert>
                     <MarkdownBody>{option}</MarkdownBody>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
           {request.method === "input" && (
