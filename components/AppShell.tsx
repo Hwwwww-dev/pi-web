@@ -1125,11 +1125,13 @@ export function AppShell() {
 
   const handleViewFullHistory = useCallback(() => {
     if (!selectedSession) return;
-    // selectedSession.id is a server-generated uuid; encode it and validate the
-    // result so the opened URL is always our internal export route.
+    // selectedSession.id is a server-generated uuid; enforce the internal
+    // export route so the redirect target can never leave this origin.
     const id = encodeURIComponent(selectedSession.id);
     if (!/^[A-Za-z0-9-]+$/.test(id)) return;
-    window.open(`/api/sessions/${id}/export?inline=1`, "_blank", "noopener,noreferrer");
+    const url = `/api/sessions/${id}/export?inline=1`;
+    if (!url.startsWith("/api/sessions/")) return;
+    window.open(url, "_blank", "noopener,noreferrer");
   }, [selectedSession]);
 
   // Show chat area if a session is selected, or if we have a cwd to start a new session in
@@ -1710,19 +1712,19 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                         <span className="keepalive-menu-name">{slot.session.name || slot.session.firstMessage || slot.session.id}</span>
                         <span className="keepalive-menu-cwd">{slot.session.cwd}</span>
                       </button>
-                      <button
-                        type="button"
-                        className="keepalive-menu-close"
-                        title={isSelected ? translate("keepalive.closeActiveDisabled") : translate("keepalive.close")}
-                        aria-label={`${translate("keepalive.close")}: ${slot.session.name || slot.session.id}`}
-                        disabled={isSelected}
-                        style={isSelected ? { opacity: 0.35, cursor: "not-allowed" } : undefined}
-                        onClick={() => setKeepAliveSlots((slots) => slots.filter((item) => item.session.id !== slot.session.id))}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M18 6 6 18M6 6l12 12" />
-                        </svg>
-                      </button>
+                      {!isSelected && (
+                        <button
+                          type="button"
+                          className="keepalive-menu-close"
+                          title={translate("keepalive.close")}
+                          aria-label={`${translate("keepalive.close")}: ${slot.session.name || slot.session.id}`}
+                          onClick={() => setKeepAliveSlots((slots) => slots.filter((item) => item.session.id !== slot.session.id))}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M18 6 6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   );
                 })}
