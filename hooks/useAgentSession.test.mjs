@@ -76,7 +76,7 @@ test("opening System or Tools lazily starts a dormant session without sending a 
     source.indexOf("  const loadSlashCommands = useCallback"),
   );
   const loaderEffectSource = source.slice(
-    source.indexOf("  useEffect(() => {\n    onSystemInfoLoaderChange"),
+    source.indexOf("  useEffect(() => {\n    if (background) return;\n    onSystemInfoLoaderChange"),
     source.indexOf("  useEffect(() => {\n    if (!onBranchDataChange) return;"),
   );
 
@@ -86,6 +86,7 @@ test("opening System or Tools lazily starts a dormant session without sending a 
   assert.match(loadSystemInfoSource, /loadTools\(sid\)/);
   assert.doesNotMatch(loadSystemInfoSource, /type: "prompt"/);
   assert.match(loadSystemInfoSource, /setSystemPrompt\(state\.systemPrompt \?\? ""\)/);
+  assert.match(loaderEffectSource, /if \(background\) return;/);
   assert.match(loaderEffectSource, /onSystemInfoLoaderChange\?\.\(loadSystemInfo\)/);
   assert.match(loaderEffectSource, /onSystemInfoLoaderChange\?\.\(null\)/);
   assert.match(appShellSource, /onClick=\{\(\) => handleSystemInfoToggle\("system", mobile\)\}/);
@@ -353,7 +354,7 @@ test("keeps the selected session warm while idle and renews its lease", () => {
   assert.doesNotMatch(source, /void connectEvents\(/);
   assert.match(chatWindowSource, /sessionRunning\?: boolean/);
   assert.match(chatWindowSource, /session, sessionRunning, newSessionCwd/);
-  assert.match(appShellSource, /runningSessionIds\.has\(selectedSession\.id\)/);
+  assert.match(appShellSource, /runningSessionIds\.has\(activeChatSession\.id\)/);
   assert.match(appShellSource, /onRunningSessionIdsChange=\{handleRunningSessionIdsChange\}/);
 });
 

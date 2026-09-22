@@ -37,6 +37,14 @@ import { getInitialNavigation, withTabOpen } from "@/lib/initial-navigation";
 import { clearTabOpenSession, getTabOpen, setTabOpenNewSession, setTabOpenSession } from "@/lib/tab-session";
 import { rekeyDraft } from "@/lib/draft-store";
 import {
+  DEFAULT_KEEP_ALIVE_CONFIG,
+  loadKeepAliveConfig,
+  saveKeepAliveConfig,
+  upsertKeepAliveSlot,
+  type ChatKeepAliveConfig,
+  type KeepAliveSlot,
+} from "@/lib/chat-keepalive";
+import {
   clearLastOpen,
   getLastOpenSession,
   setLastOpenSession,
@@ -116,6 +124,9 @@ export function AppShell() {
       // Keep the current page usable when storage is unavailable.
     }
   }, []);
+  const handleKeepAliveConfigChange = useCallback((config: ChatKeepAliveConfig) => {
+    setKeepAliveConfig(saveKeepAliveConfig(config));
+  }, []);
   const notifiedAttentionRequestIdsRef = useRef(new Set<string>());
   const handleBackgroundTaskDone = useCallback(() => {
     if (soundEnabledRef.current) playDoneSound();
@@ -154,6 +165,37 @@ export function AppShell() {
   const [initialCwdError, setInitialCwdError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [sessionKey, setSessionKey] = useState(0);
+  // Keep-alive chat slots: previously selected sessions stay mounted hidden so
+  // switching back is instant and their runs keep updating in the background.
+  const [keepAliveSlots, setKeepAliveSlots] = useState<KeepAliveSlot[]>([]);
+  const [keepAliveConfig, setKeepAliveConfig] = useState<ChatKeepAliveConfig>(DEFAULT_KEEP_ALIVE_CONFIG);
+  const [keepAliveMenuOpen, setKeepAliveMenuOpen] = useState(false);
+  useEffect(() => {
+    setKeepAliveConfig(loadKeepAliveConfig());
+  }, []);
+  /** Forces a keep-alive slot's ChatWindow to remount (trust change, session reload). */
+  const bumpKeepAliveSlot = useCallback((sessionId: string | null | undefined) => {
+    if (!sessionId) return;
+    setKeepAliveSlots((slots) => slots.map((slot) => (slot.session.id === sessionId ? { ...slot, epoch: slot.epoch + 1, lastActiveAt: Date.now() } : slot)));
+  }, []);
+  // Evict keep-alive slots after the idle timeout; the visible session is immune.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setKeepAliveSlots((slots) => {
+        const cutoff = Date.now() - keepAliveConfig.idleTimeoutMinutes * 60_000;
+        const next = slots.filter((slot) => slot.session.id === selectedSession?.id || slot.lastActiveAt >= cutoff);
+        return next.length === slots.length ? slots : next;
+      });
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [keepAliveConfig.idleTimeoutMinutes, selectedSession?.id]);
+  // Apply a reduced maxSessions setting immediately (keep most-recent slots).
+  useEffect(() => {
+    setKeepAliveSlots((slots) => {
+      if (slots.length <= keepAliveConfig.maxSessions) return slots;
+      return [...slots].sort((a, b) => b.lastActiveAt - a.lastActiveAt).slice(0, keepAliveConfig.maxSessions);
+    });
+  }, [keepAliveConfig.maxSessions]);
   const sessionScrollPositionsRef = useRef(new Map<string, ChatScrollPosition>());
   const handleSessionScrollPositionChange = useCallback((sessionId: string, position: ChatScrollPosition) => {
     sessionScrollPositionsRef.current.set(sessionId, position);
@@ -633,6 +675,9 @@ export function AppShell() {
         // the restored session's messages.
         setSelectedSession(s);
         setSessionKey((k) => k + 1);
+        // Keep-alive: a cwd move needs the slot remounted so useAgentSession
+        // reloads content from the new location in its mount-only effect.
+        setKeepAliveSlots((slots) => upsertKeepAliveSlot(slots, s, Date.now(), keepAliveConfig.maxSessions, true));
         if (new URLSearchParams(window.location.search).get("session") !== s.id) {
           router.replace(`?session=${encodeURIComponent(s.id)}`, { scroll: false });
         }
@@ -640,7 +685,7 @@ export function AppShell() {
       .catch(() => {
         // Network hiccup: keep the remembered session for a later retry.
       });
-  }, [router]);
+  }, [router, keepAliveConfig.maxSessions]);
 
   const handleCwdChange = useCallback((
     cwd: string | null,
@@ -749,7 +794,15 @@ export function AppShell() {
     }
     setNewSessionCwd(null);
     setSelectedSession(session);
-    setSessionKey((k) => k + 1);
+    // Keep-alive: switching sessions must not remount the chat. The selected
+    // session gets/keeps a slot; a remount epoch is only bumped for paths that
+    // must reload from disk (URL restore flow, cwd move on the same session).
+    const now = Date.now();
+    const needsRemount = isRestore || selectedSession?.id === session.id;
+    setKeepAliveSlots((slots) => {
+      const touched = slots.map((slot) => (slot.session.id === selectedSession?.id ? { ...slot, lastActiveAt: now } : slot));
+      return upsertKeepAliveSlot(touched, session, now, keepAliveConfig.maxSessions, needsRemount);
+    });
     setBranchTree([]);
     setBranchActiveLeafId(null);
     branchLeafChangeFnRef.current = null;
@@ -771,7 +824,7 @@ export function AppShell() {
     if (!isRestore || new URLSearchParams(window.location.search).get("session") !== session.id) {
       router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
     }
-  }, [activeCwd, activeFileTabId, invalidateWorkspaceRestore, router, isMobile, newSessionCwd, selectedSession]);
+  }, [activeCwd, activeFileTabId, invalidateWorkspaceRestore, router, isMobile, newSessionCwd, selectedSession, keepAliveConfig.maxSessions]);
 
   const handleNewSession = useCallback((sessionId: string, cwd: string) => {
     invalidateWorkspaceRestore();
@@ -987,6 +1040,7 @@ export function AppShell() {
   const handleSessionDeleted = useCallback((sessionId: string) => {
     invalidateWorkspaceRestore();
     setRefreshKey((k) => k + 1);
+    setKeepAliveSlots((slots) => slots.filter((slot) => slot.session.id !== sessionId));
     if (selectedSession?.id === sessionId) {
       clearTabOpenSession(sessionId);
       const cwd = selectedSession.cwd;
@@ -1087,6 +1141,12 @@ export function AppShell() {
     activeNewSessionDraftKeyRef.current = newSessionDraftKey;
   }, [newSessionDraftKey]);
   const showChat = selectedSession !== null || effectiveNewSessionCwd !== null;
+  // The visible session renders from its keep-alive slot when it has one; the
+  // slot keeps the instance mounted across switches so re-selecting is instant.
+  const activeSlot = selectedSession
+    ? keepAliveSlots.find((slot) => slot.session.id === selectedSession.id) ?? null
+    : null;
+  const activeChatSession = activeSlot ? activeSlot.session : selectedSession;
   const projectTrustCwd = selectedSession?.cwd ?? effectiveNewSessionCwd;
   // While restoring initial session from URL, don't show the placeholder
   const showPlaceholder = initialSessionRestored && !showChat;
@@ -1129,12 +1189,13 @@ export function AppShell() {
       setProjectTrustDialogOpen(false);
       setModelsRefreshKey((key) => key + 1);
       setSessionKey((key) => key + 1);
+      bumpKeepAliveSlot(selectedSession?.id);
     } catch (error) {
       setProjectTrustError(error instanceof Error ? error.message : String(error));
     } finally {
       setProjectTrustBusy(false);
     }
-  }, [projectTrustBusy, projectTrustCwd]);
+  }, [projectTrustBusy, projectTrustCwd, bumpKeepAliveSlot, selectedSession?.id]);
 
   const activeFileTab = fileTabs.find((tab) => tab.id === activeFileTabId) ?? null;
 // Tab title truncation: budget measured in CJK character widths (1 per full-width
@@ -1588,6 +1649,85 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           </svg>
           {!mobile && <span>{translate("tools.label")}</span>}
         </button>
+        <div style={{ position: "relative", display: "flex", height: "100%" }}>
+          <button
+            type="button"
+            onClick={() => setKeepAliveMenuOpen((open) => !open)}
+            title={translate("keepalive.title")}
+            aria-label={translate("keepalive.title")}
+            aria-expanded={keepAliveMenuOpen}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
+              height: "100%", padding: mobile ? 0 : "0 12px",
+              background: keepAliveMenuOpen ? "var(--bg-selected)" : "none",
+              border: "none",
+              borderTop: keepAliveMenuOpen ? "2px solid var(--accent)" : "2px solid transparent",
+              borderRight: "1px solid var(--border)",
+              cursor: "pointer",
+              color: keepAliveMenuOpen ? "var(--text)" : "var(--text-muted)",
+              fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: keepAliveSlots.length > 0 ? "var(--accent)" : "var(--text-dim)", flexShrink: 0 }} aria-hidden="true">
+              <path d="M12 2 2 7l10 5 10-5-10-5z" />
+              <path d="m2 17 10 5 10-5" />
+              <path d="m2 12 10 5 10-5" />
+            </svg>
+            {!mobile && <span>{translate("keepalive.label")}</span>}
+            {keepAliveSlots.length > 0 && (
+              <span style={{
+                minWidth: 14, height: 14, padding: "0 3px",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 7, background: "var(--accent)", color: "#fff",
+                fontSize: 9, fontWeight: 700, lineHeight: 1,
+              }}>{keepAliveSlots.length}</span>
+            )}
+          </button>
+          {keepAliveMenuOpen && (
+            <>
+              <div
+                aria-hidden="true"
+                onClick={() => setKeepAliveMenuOpen(false)}
+                style={{ position: "fixed", inset: 0, zIndex: 60 }}
+              />
+              <div className="keepalive-menu" role="menu" style={{ zIndex: 61 }}>
+                {keepAliveSlots.length === 0 ? (
+                  <div className="keepalive-menu-empty">{translate("keepalive.empty")}</div>
+                ) : keepAliveSlots.map((slot) => {
+                  const isSelected = slot.session.id === selectedSession?.id;
+                  return (
+                    <div key={slot.session.id} className={`keepalive-menu-row${isSelected ? " is-active" : ""}`}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="keepalive-menu-open"
+                        onClick={() => {
+                          setKeepAliveMenuOpen(false);
+                          if (!isSelected) handleSelectSession(slot.session);
+                        }}
+                      >
+                        <span className="keepalive-menu-name">{slot.session.name || slot.session.firstMessage || slot.session.id}</span>
+                        <span className="keepalive-menu-cwd">{slot.session.cwd}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="keepalive-menu-close"
+                        title={translate("keepalive.close")}
+                        aria-label={`${translate("keepalive.close")}: ${slot.session.name || slot.session.id}`}
+                        onClick={() => setKeepAliveSlots((slots) => slots.filter((item) => item.session.id !== slot.session.id))}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     );
   };
@@ -2304,13 +2444,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
           {showChat ? (
             <ChatWindow
-              key={sessionKey}
-              session={selectedSession}
-              searchTarget={searchTarget?.sessionId === selectedSession?.id ? searchTarget : null}
+              key={activeSlot ? `${activeSlot.session.id}:${activeSlot.epoch}` : sessionKey}
+              session={activeChatSession}
+              searchTarget={searchTarget?.sessionId === activeChatSession?.id ? searchTarget : null}
               onSearchTargetHandled={handleSearchTargetHandled}
-              initialScrollPosition={selectedSession ? sessionScrollPositionsRef.current.get(selectedSession.id) ?? null : null}
+              initialScrollPosition={activeChatSession ? sessionScrollPositionsRef.current.get(activeChatSession.id) ?? null : null}
               onScrollPositionChange={handleSessionScrollPositionChange}
-              sessionRunning={Boolean(selectedSession && runningSessionIds.has(selectedSession.id))}
+              sessionRunning={Boolean(activeChatSession && runningSessionIds.has(activeChatSession.id))}
               newSessionCwd={effectiveNewSessionCwd}
               newSessionDraftKey={newSessionDraftKey}
               onAgentEnd={handleAgentEnd}
@@ -2330,7 +2470,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               onOpenSession={handleOpenSession}
               onAskInNewChat={handleAskInNewChat}
               quoteSelectionEnabled={quoteSelectionEnabled}
-              initialPrompt={pendingQuotePrompt?.sessionId === selectedSession?.id ? pendingQuotePrompt?.text : undefined}
+              initialPrompt={pendingQuotePrompt?.sessionId === activeChatSession?.id ? pendingQuotePrompt?.text : undefined}
               onInitialPromptConsumed={() => setPendingQuotePrompt(null)}
               soundEnabled={soundEnabled}
               onSoundToggle={onSoundToggle}
@@ -2378,6 +2518,33 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               </div>
             )
           ) : null}
+          {/* Keep-alive background slots: hidden but fully mounted so their
+              runs keep updating and switching back is instant. */}
+          {keepAliveSlots.filter((slot) => slot.session.id !== selectedSession?.id).map((slot) => (
+            <div key={slot.session.id} aria-hidden="true" style={{ display: "none" }}>
+              <ChatWindow
+                key={`${slot.session.id}:${slot.epoch}`}
+                session={slot.session}
+                background
+                sessionRunning={runningSessionIds.has(slot.session.id)}
+                newSessionCwd={null}
+                newSessionDraftKey={null}
+                onAgentEnd={handleAgentEnd}
+                onAttentionNeeded={handleAttentionNeeded}
+                onSessionCreated={handleSessionCreated}
+                onSessionForked={handleSessionForked}
+                modelsRefreshKey={modelsRefreshKey}
+                onOpenFile={handleOpenLinkedFile}
+                onOpenSession={handleOpenSession}
+                onAskInNewChat={handleAskInNewChat}
+                quoteSelectionEnabled={quoteSelectionEnabled}
+                soundEnabled={soundEnabled}
+                onSoundToggle={onSoundToggle}
+                playDoneSound={playDoneSound}
+                unlockAudio={unlockAudio}
+              />
+            </div>
+          ))}
         </div>
       </div>
 
@@ -2517,11 +2684,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         initialSection={settingsSection}
         quoteSelectionEnabled={quoteSelectionEnabled}
         onQuoteSelectionChange={handleQuoteSelectionChange}
+        keepAliveConfig={keepAliveConfig}
+        onKeepAliveConfigChange={handleKeepAliveConfigChange}
         onClose={() => {
           setSettingsSection(null);
           setModelsRefreshKey((key) => key + 1);
         }}
-        onSessionReloaded={() => setSessionKey((key) => key + 1)}
+        onSessionReloaded={() => { setSessionKey((key) => key + 1); bumpKeepAliveSlot(selectedSession?.id); }}
       />
     )}
     {projectTrustDialogOpen && projectTrustCwd && (

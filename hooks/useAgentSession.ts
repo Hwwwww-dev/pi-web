@@ -161,6 +161,8 @@ export interface UseAgentSessionOptions {
   onSystemToolsChange?: (tools: ToolEntry[] | null) => void;
   /** Registers an action that lazily starts the session and loads its prompt and tools. */
   onSystemInfoLoaderChange?: (loader: (() => Promise<void>) | null) => void;
+  /** Keep-alive background slot: skips AppShell-wide state reporting (branch tree, system info panel, stats) so background instances cannot overwrite the visible session's state. */
+  background?: boolean;
   onSessionStatsPanelOpen?: () => void;
   setToolPreset?: (preset: ToolPreset) => void;
   deferInitialScroll?: boolean;
@@ -290,7 +292,7 @@ type SlashCommandsResponse = {
 export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked,
-    modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen,
+    modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen, background = false,
   } = opts;
 
   const isNew = session === null && newSessionCwd !== null;
@@ -631,13 +633,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (!tools || !sessionHookMountedRef.current || sessionIdRef.current !== sid) return null;
       const { getPresetFromTools } = await import("@/lib/tool-presets");
       setToolPresetState(getPresetFromTools(tools));
-      onSystemToolsChange?.(tools);
+      if (!background) onSystemToolsChange?.(tools);
       return tools;
     } catch (e) {
       console.error("Failed to load tools:", e);
       return null;
     }
-  }, [onSystemToolsChange, setToolPresetState]);
+  }, [background, onSystemToolsChange, setToolPresetState]);
 
   const promoteNewSession = useCallback((messageCount = 0, firstMessage = "(no messages)") => {
     const sid = sessionIdRef.current;
@@ -2179,18 +2181,20 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, []);
 
   useEffect(() => {
+    if (background) return;
     onSystemPromptChange?.(systemPrompt);
-  }, [systemPrompt, onSystemPromptChange]);
+  }, [background, systemPrompt, onSystemPromptChange]);
 
   useEffect(() => {
+    if (background) return;
     onSystemInfoLoaderChange?.(loadSystemInfo);
     return () => onSystemInfoLoaderChange?.(null);
-  }, [loadSystemInfo, onSystemInfoLoaderChange]);
+  }, [background, loadSystemInfo, onSystemInfoLoaderChange]);
 
   useEffect(() => {
-    if (!onBranchDataChange) return;
+    if (!onBranchDataChange || background) return;
     onBranchDataChange(data?.tree ?? [], activeLeafId, handleLeafChange);
-  }, [data?.tree, activeLeafId, handleLeafChange, onBranchDataChange]);
+  }, [background, data?.tree, activeLeafId, handleLeafChange, onBranchDataChange]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;

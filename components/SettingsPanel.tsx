@@ -16,6 +16,7 @@ import {
 } from "@/hooks/useChatAppearance";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ShellToolSettingsResponse } from "@/lib/api-types";
+import { KEEP_ALIVE_CONFIG_LIMITS, type ChatKeepAliveConfig } from "@/lib/chat-keepalive";
 import {
   setLastSettingsSection,
   type SettingsSection,
@@ -48,6 +49,8 @@ import {
 interface Props {
   cwd: string | null;
   sessionId: string | null;
+  keepAliveConfig: ChatKeepAliveConfig;
+  onKeepAliveConfigChange: (config: ChatKeepAliveConfig) => void;
   initialSection: SettingsSection;
   onClose: () => void;
   onSessionReloaded: () => void;
@@ -78,7 +81,7 @@ export function SettingsSectionIcon({ section, size = 16, strokeWidth = 1.8 }: {
 
 type GeneralDetail = "appearance" | "chat" | "shell" | "push" | "language";
 
-function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange }: Pick<Props, "sessionId" | "onClose" | "onSessionReloaded" | "quoteSelectionEnabled" | "onQuoteSelectionChange">) {
+function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange, keepAliveConfig, onKeepAliveConfigChange }: Pick<Props, "sessionId" | "onClose" | "onSessionReloaded" | "quoteSelectionEnabled" | "onQuoteSelectionChange" | "keepAliveConfig" | "onKeepAliveConfigChange">) {
   const { locale, setLocale, supportedLocales, t } = useI18n();
   const { preference, setThemePreference } = useTheme();
   const { width: chatContentWidth, setWidth: setChatContentWidth, fontSize, setFontSize } = useChatAppearance();
@@ -323,6 +326,37 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                     onChange={onQuoteSelectionChange}
                   />
                 </div>
+                <div className="settings-keepalive">
+                  <p className="settings-general-description">{t("settings.keepAliveDescription")}</p>
+                  <div className="settings-shell-option">
+                    <label htmlFor="settings-keepalive-max-sessions">{t("settings.keepAliveMaxSessions")}</label>
+                    <input
+                      id="settings-keepalive-max-sessions"
+                      type="number"
+                      min={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.min}
+                      max={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.max}
+                      value={keepAliveConfig.maxSessions}
+                      onChange={(event) => {
+                        const value = Number(event.target.value);
+                        if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, maxSessions: value });
+                      }}
+                    />
+                  </div>
+                  <div className="settings-shell-option">
+                    <label htmlFor="settings-keepalive-idle-timeout">{t("settings.keepAliveIdleTimeout")}</label>
+                    <input
+                      id="settings-keepalive-idle-timeout"
+                      type="number"
+                      min={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.min}
+                      max={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.max}
+                      value={keepAliveConfig.idleTimeoutMinutes}
+                      onChange={(event) => {
+                        const value = Number(event.target.value);
+                        if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, idleTimeoutMinutes: value });
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -398,7 +432,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   );
 }
 
-export function SettingsPanel({ cwd, sessionId, initialSection, onClose, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange }: Props) {
+export function SettingsPanel({ cwd, sessionId, initialSection, onClose, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange, keepAliveConfig, onKeepAliveConfigChange }: Props) {
   const { t } = useI18n();
   const [section, setSection] = useState<SettingsSection>(initialSection);
   const [mountedSections, setMountedSections] = useState<ReadonlySet<SettingsSection>>(
@@ -494,7 +528,7 @@ export function SettingsPanel({ cwd, sessionId, initialSection, onClose, onSessi
         </div>
 
         <main className="settings-dialog-main">
-          {sectionHost("general", <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} />)}
+          {sectionHost("general", <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} keepAliveConfig={keepAliveConfig} onKeepAliveConfigChange={onKeepAliveConfigChange} />)}
           {sectionHost("models", <ModelsConfig embedded onClose={onClose} />)}
           {cwd && sectionHost("skills", <SkillsConfig embedded key={cwd} cwd={cwd} onClose={onClose} />)}
           {cwd && sectionHost("agents", <AgentsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} onClose={onClose} onReloaded={onSessionReloaded} />)}
