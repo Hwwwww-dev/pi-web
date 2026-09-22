@@ -15,13 +15,14 @@ test("configures iOS standalone mode to use the full screen", () => {
   assert.match(cssSource, /@media \(display-mode: standalone\) \{[\s\S]*?--app-viewport-height: 100vh;/);
 });
 
-test("avoids the iOS 26.1+ status-bar scrim in standalone mode", () => {
-  // Any apple-mobile-web-app-status-bar-style value makes iOS 26.1+ draw an
-  // unremovable scrim that blurs the top of the PWA (WebKit #317153/#301994),
-  // and viewport-fit: cover extends web content under that strip. Standalone
-  // mode comes from manifest.ts display:"standalone" instead.
+test("uses the Discourse status-bar route in standalone mode", () => {
+  // Discourse (app/views/layouts/_head.html.erb) ships viewport-fit=cover and
+  // NO apple-mobile-web-app-status-bar-style meta at all. With that combo iOS
+  // 26 renders the status bar opaque, tinted from the page top edge, and
+  // outside the viewport, so no vibrancy glass blurs web content. Contain-mode
+  // variants (no cover, bar-style metas, spacers) all kept the blur.
+  assert.match(layoutSource, /viewportFit: "cover"/);
   assert.doesNotMatch(layoutSource, /(^|\n)\s*statusBarStyle:/);
-  assert.doesNotMatch(layoutSource, /(^|\n)\s*viewportFit:/);
 });
 
 test("tracks the visual viewport while the software keyboard is open", () => {
