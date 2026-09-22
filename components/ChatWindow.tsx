@@ -1735,7 +1735,6 @@ function ExtensionDialog({
                     padding: "11px 12px",
                     borderRadius: 8,
                     border: "1px solid var(--border)",
-                    background: "var(--bg-panel)",
                     color: "var(--text)",
                     cursor: "pointer",
                     textAlign: "left",

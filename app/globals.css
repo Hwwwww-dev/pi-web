@@ -1889,6 +1889,7 @@ span.token.table {
 
 @keyframes extension-drawer-in { from { transform: translateY(16px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
 .extension-drawer-in { animation: extension-drawer-in 0.22s ease-out }
+.extension-option { background: var(--bg-panel) }
 .extension-option:not(:disabled):hover { background: var(--bg-hover) }
 .extension-option.tone-affirmative { background: rgba(22, 163, 74, 0.12) }
 .extension-option.tone-affirmative:not(:disabled):hover { background: rgba(22, 163, 74, 0.22) }
