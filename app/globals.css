@@ -1880,3 +1880,9 @@ span.token.table {
     font-size: max(16px, var(--chat-content-font-size, 14px)) !important;
   }
 }
+
+@keyframes extension-drawer-in { from { transform: translateY(16px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+@keyframes extension-overlay-in { from { opacity: 0 } to { opacity: 1 } }
+.extension-drawer-in { animation: extension-drawer-in 0.22s ease-out }
+.extension-overlay-in { animation: extension-overlay-in 0.18s ease-out }
+.extension-option:not(:disabled):hover { background: var(--bg-hover) }

@@ -1533,7 +1533,7 @@ function ExtensionDialog({
         inset: 0,
         zIndex: 90,
         display: "flex",
-        alignItems: collapsed ? "flex-start" : "center",
+        alignItems: collapsed ? "flex-start" : "flex-end",
         justifyContent: "center",
         padding: 20,
         pointerEvents: "none",
@@ -1578,17 +1578,30 @@ function ExtensionDialog({
           </span>
         </button>
       ) : (
+      <>
+      <div
+        aria-hidden
+        className="extension-overlay-in"
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(0,0,0,0.25)",
+        }}
+      />
       <div
         role="dialog"
         aria-label={request.title}
+        className="extension-drawer-in"
         style={{
           pointerEvents: "auto",
-          width: "min(560px, 100%)",
+          position: "relative",
+          width: "min(680px, 100%)",
           maxHeight: "min(760px, 100%)",
+          margin: "0 auto",
           display: "flex",
           flexDirection: "column",
           border: "1px solid var(--border)",
-          borderRadius: 8,
+          borderRadius: "12px 12px 0 0",
           background: "var(--bg)",
           boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
           overflow: "hidden",
@@ -1636,7 +1649,9 @@ function ExtensionDialog({
           }}
         >
           {request.method === "confirm" && (
-            <MarkdownBody>{request.message}</MarkdownBody>
+            <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+              <MarkdownBody>{request.message}</MarkdownBody>
+            </div>
           )}
           {request.method === "select" && (
             <div
@@ -1660,6 +1675,7 @@ function ExtensionDialog({
                   role="button"
                   tabIndex={0}
                   data-extension-option
+                  className="extension-option"
                   aria-label={option}
                   ref={index === 0 ? focusFirstOption : undefined}
                   onClick={() => onRespond(request, { value: option })}
@@ -1670,8 +1686,8 @@ function ExtensionDialog({
                   }}
                   style={{
                     width: "100%",
-                    padding: "9px 10px",
-                    borderRadius: 7,
+                    padding: "11px 12px",
+                    borderRadius: 8,
                     border: "1px solid var(--border)",
                     background: "var(--bg-panel)",
                     color: "var(--text)",
@@ -1744,7 +1760,8 @@ function ExtensionDialog({
             autoFocus={request.method === "confirm" || (request.method === "select" && request.options.length === 0)}
             onClick={() => onRespond(request, { cancelled: true })}
             style={{
-              padding: "6px 10px",
+              padding: "8px 14px",
+              fontSize: 13,
               borderRadius: 6,
               border: "1px solid var(--border)",
               background: "var(--bg)",
@@ -1758,7 +1775,8 @@ function ExtensionDialog({
             <button
               onClick={submitValue}
               style={{
-                padding: "6px 10px",
+                padding: "8px 14px",
+                fontSize: 13,
                 borderRadius: 6,
                 border: "1px solid var(--accent)",
                 background: "var(--accent)",
@@ -1772,7 +1790,8 @@ function ExtensionDialog({
             <button
               onClick={submitValue}
               style={{
-                padding: "6px 10px",
+                padding: "8px 14px",
+                fontSize: 13,
                 borderRadius: 6,
                 border: "1px solid var(--accent)",
                 background: "var(--accent)",
@@ -1785,6 +1804,7 @@ function ExtensionDialog({
           ) : null}
         </div>
       </div>
+      </>
       )}
     </div>
   );

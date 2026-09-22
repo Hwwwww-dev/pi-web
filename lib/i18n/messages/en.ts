@@ -36,7 +36,7 @@ export const enLocale: LocalePlugin = {
     "settings.languageDescription": "Choose the language used throughout the interface.",
     "settings.shellTool": "Shell tool",
     "settings.shellToolDescription": "Choose which shell the model uses for commands. Direct ! and !! commands still use Bash.",
-    "settings.pushPermission": "Background push (iOS home-screen app)",
+    "settings.pushPermission": "Background push",
     "settings.pushPermissionDescription": "After adding this site to your home screen (iOS 16.4+), a system notification is shown on the lock screen when a session finishes while no window is visible. If notifications stop arriving, re-register here. Registration needs a user gesture, so it is never triggered automatically.",
     "settings.pushRegister": "Register push",
     "settings.pushRegisterLoading": "Registering…",
