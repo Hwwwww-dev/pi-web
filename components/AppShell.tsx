@@ -2443,40 +2443,97 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         {/* Chat content */}
         <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
           {showChat ? (
-            <ChatWindow
-              key={activeSlot ? `${activeSlot.session.id}:${activeSlot.epoch}` : sessionKey}
-              session={activeChatSession}
-              searchTarget={searchTarget?.sessionId === activeChatSession?.id ? searchTarget : null}
-              onSearchTargetHandled={handleSearchTargetHandled}
-              initialScrollPosition={activeChatSession ? sessionScrollPositionsRef.current.get(activeChatSession.id) ?? null : null}
-              onScrollPositionChange={handleSessionScrollPositionChange}
-              sessionRunning={Boolean(activeChatSession && runningSessionIds.has(activeChatSession.id))}
-              newSessionCwd={effectiveNewSessionCwd}
-              newSessionDraftKey={newSessionDraftKey}
-              onAgentEnd={handleAgentEnd}
-              onAttentionNeeded={handleAttentionNeeded}
-              onSessionCreated={handleSessionCreated}
-              onSessionForked={handleSessionForked}
-              modelsRefreshKey={modelsRefreshKey}
-              chatInputRef={chatInputRef}
-              onBranchDataChange={handleBranchDataChange}
-              onSystemPromptChange={handleSystemPromptChange}
-              onSystemToolsChange={handleSystemToolsChange}
-              onSystemInfoLoaderChange={handleSystemInfoLoaderChange}
-              onSessionStatsChange={handleSessionStatsChange}
-              onSessionStatsPanelOpen={openSessionStatsPanel}
-              onContextUsageChange={handleContextUsageChange}
-              onOpenFile={handleOpenLinkedFile}
-              onOpenSession={handleOpenSession}
-              onAskInNewChat={handleAskInNewChat}
-              quoteSelectionEnabled={quoteSelectionEnabled}
-              initialPrompt={pendingQuotePrompt?.sessionId === activeChatSession?.id ? pendingQuotePrompt?.text : undefined}
-              onInitialPromptConsumed={() => setPendingQuotePrompt(null)}
-              soundEnabled={soundEnabled}
-              onSoundToggle={onSoundToggle}
-              playDoneSound={playDoneSound}
-              unlockAudio={unlockAudio}
-            />
+            <>
+              {/* All keep-alive slots (including the selected one) live in the
+                  same position list so switching only toggles visibility —
+                  remounting here would drop the warm instance and reload. */}
+              {keepAliveSlots.map((slot) => {
+                const isActive = activeSlot?.session.id === slot.session.id;
+                return (
+                  <div
+                    key={slot.session.id}
+                    aria-hidden={!isActive}
+                    style={{ width: "100%", height: "100%", display: isActive ? "block" : "none" }}
+                  >
+                    <ChatWindow
+                      key={`${slot.session.id}:${slot.epoch}`}
+                      session={slot.session}
+                      background={!isActive}
+                      sessionRunning={runningSessionIds.has(slot.session.id)}
+                      searchTarget={isActive && searchTarget?.sessionId === slot.session.id ? searchTarget : null}
+                      onSearchTargetHandled={handleSearchTargetHandled}
+                      initialScrollPosition={isActive ? sessionScrollPositionsRef.current.get(slot.session.id) ?? null : null}
+                      onScrollPositionChange={handleSessionScrollPositionChange}
+                      newSessionCwd={null}
+                      newSessionDraftKey={null}
+                      onAgentEnd={handleAgentEnd}
+                      onAttentionNeeded={handleAttentionNeeded}
+                      onSessionCreated={handleSessionCreated}
+                      onSessionForked={handleSessionForked}
+                      modelsRefreshKey={modelsRefreshKey}
+                      chatInputRef={isActive ? chatInputRef : undefined}
+                      onBranchDataChange={isActive ? handleBranchDataChange : undefined}
+                      onSystemPromptChange={isActive ? handleSystemPromptChange : undefined}
+                      onSystemToolsChange={isActive ? handleSystemToolsChange : undefined}
+                      onSystemInfoLoaderChange={isActive ? handleSystemInfoLoaderChange : undefined}
+                      onSessionStatsChange={isActive ? handleSessionStatsChange : undefined}
+                      onSessionStatsPanelOpen={isActive ? openSessionStatsPanel : undefined}
+                      onContextUsageChange={isActive ? handleContextUsageChange : undefined}
+                      onOpenFile={handleOpenLinkedFile}
+                      onOpenSession={handleOpenSession}
+                      onAskInNewChat={handleAskInNewChat}
+                      quoteSelectionEnabled={quoteSelectionEnabled}
+                      initialPrompt={isActive && pendingQuotePrompt?.sessionId === slot.session.id ? pendingQuotePrompt?.text : undefined}
+                      onInitialPromptConsumed={() => setPendingQuotePrompt(null)}
+                      soundEnabled={soundEnabled}
+                      onSoundToggle={onSoundToggle}
+                      playDoneSound={playDoneSound}
+                      unlockAudio={unlockAudio}
+                    />
+                  </div>
+                );
+              })}
+              {/* Selected session without a slot yet (transient/restore) or
+                  the new-session composer. */}
+              {!activeSlot && (
+                <div style={{ width: "100%", height: "100%" }}>
+                  <ChatWindow
+                    key={sessionKey}
+                    session={activeChatSession}
+                    searchTarget={searchTarget?.sessionId === activeChatSession?.id ? searchTarget : null}
+                    onSearchTargetHandled={handleSearchTargetHandled}
+                    initialScrollPosition={activeChatSession ? sessionScrollPositionsRef.current.get(activeChatSession.id) ?? null : null}
+                    onScrollPositionChange={handleSessionScrollPositionChange}
+                    sessionRunning={Boolean(activeChatSession && runningSessionIds.has(activeChatSession.id))}
+                    newSessionCwd={effectiveNewSessionCwd}
+                    newSessionDraftKey={newSessionDraftKey}
+                    onAgentEnd={handleAgentEnd}
+                    onAttentionNeeded={handleAttentionNeeded}
+                    onSessionCreated={handleSessionCreated}
+                    onSessionForked={handleSessionForked}
+                    modelsRefreshKey={modelsRefreshKey}
+                    chatInputRef={chatInputRef}
+                    onBranchDataChange={handleBranchDataChange}
+                    onSystemPromptChange={handleSystemPromptChange}
+                    onSystemToolsChange={handleSystemToolsChange}
+                    onSystemInfoLoaderChange={handleSystemInfoLoaderChange}
+                    onSessionStatsChange={handleSessionStatsChange}
+                    onSessionStatsPanelOpen={openSessionStatsPanel}
+                    onContextUsageChange={handleContextUsageChange}
+                    onOpenFile={handleOpenLinkedFile}
+                    onOpenSession={handleOpenSession}
+                    onAskInNewChat={handleAskInNewChat}
+                    quoteSelectionEnabled={quoteSelectionEnabled}
+                    initialPrompt={pendingQuotePrompt?.sessionId === activeChatSession?.id ? pendingQuotePrompt?.text : undefined}
+                    onInitialPromptConsumed={() => setPendingQuotePrompt(null)}
+                    soundEnabled={soundEnabled}
+                    onSoundToggle={onSoundToggle}
+                    playDoneSound={playDoneSound}
+                    unlockAudio={unlockAudio}
+                  />
+                </div>
+              )}
+            </>
           ) : initialCwdStatus === "validating" ? (
             <div
               role="status"
@@ -2518,33 +2575,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               </div>
             )
           ) : null}
-          {/* Keep-alive background slots: hidden but fully mounted so their
-              runs keep updating and switching back is instant. */}
-          {keepAliveSlots.filter((slot) => slot.session.id !== selectedSession?.id).map((slot) => (
-            <div key={slot.session.id} aria-hidden="true" style={{ display: "none" }}>
-              <ChatWindow
-                key={`${slot.session.id}:${slot.epoch}`}
-                session={slot.session}
-                background
-                sessionRunning={runningSessionIds.has(slot.session.id)}
-                newSessionCwd={null}
-                newSessionDraftKey={null}
-                onAgentEnd={handleAgentEnd}
-                onAttentionNeeded={handleAttentionNeeded}
-                onSessionCreated={handleSessionCreated}
-                onSessionForked={handleSessionForked}
-                modelsRefreshKey={modelsRefreshKey}
-                onOpenFile={handleOpenLinkedFile}
-                onOpenSession={handleOpenSession}
-                onAskInNewChat={handleAskInNewChat}
-                quoteSelectionEnabled={quoteSelectionEnabled}
-                soundEnabled={soundEnabled}
-                onSoundToggle={onSoundToggle}
-                playDoneSound={playDoneSound}
-                unlockAudio={unlockAudio}
-              />
-            </div>
-          ))}
         </div>
       </div>
 
