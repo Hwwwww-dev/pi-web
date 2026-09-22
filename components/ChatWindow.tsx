@@ -1631,13 +1631,6 @@ function ExtensionDialog({
     }
   };
 
-  // Short single-line options (permission Yes/No lists) render as compact chips
-  // in a wrapping row instead of full-width blocks. Multi-line or long options
-  // (markdown previews) keep the block layout so their content is never squeezed
-  // into a truncated single line.
-  const compactSelectOptions = request.method === "select"
-    && request.options.every((option) => !option.includes("\n") && option.length <= 40);
-
   return (
     <div
       onKeyDown={(event) => {
@@ -1779,7 +1772,7 @@ function ExtensionDialog({
                 buttons[next].focus({ preventScroll: true });
                 buttons[next].scrollIntoView({ block: "nearest" });
               }}
-              style={compactSelectOptions ? { display: "flex", flexWrap: "wrap", gap: 6 } : { display: "grid", gap: 6 }}
+              style={{ display: "grid", gap: 6 }}
             >
               {request.options.map((option, index) => {
                 const tone = extensionOptionTone(option);
@@ -1804,8 +1797,8 @@ function ExtensionDialog({
                     onRespond(request, { value: option });
                   }}
                   style={{
-                    width: compactSelectOptions ? "auto" : "100%",
-                    padding: compactSelectOptions ? "6px 12px" : "7px 10px",
+                    width: "100%",
+                    padding: "7px 10px",
                     borderRadius: 8,
                     border: "1px solid var(--border)",
                     color: "var(--text)",
@@ -1813,7 +1806,6 @@ function ExtensionDialog({
                     textAlign: "left",
                     fontSize: 12.5,
                     fontWeight: tone === "neutral" ? undefined : 600,
-                    whiteSpace: compactSelectOptions ? "nowrap" : undefined,
                     overflowWrap: "anywhere",
                     // Match the scroller's padding so keyboard navigation never parks the
                     // option flush against the edge, where whole-pixel scroll snapping and
