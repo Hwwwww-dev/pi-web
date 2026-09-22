@@ -1888,7 +1888,9 @@ span.token.table {
 }
 
 @keyframes extension-drawer-in { from { transform: translateY(16px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
-@keyframes extension-overlay-in { from { opacity: 0 } to { opacity: 1 } }
 .extension-drawer-in { animation: extension-drawer-in 0.22s ease-out }
-.extension-overlay-in { animation: extension-overlay-in 0.18s ease-out }
 .extension-option:not(:disabled):hover { background: var(--bg-hover) }
+.extension-kv-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12px; line-height: 1.5; }
+.extension-kv-table td { padding: 3px 0; vertical-align: top; overflow-wrap: anywhere; }
+.extension-kv-table td:first-child { width: 1%; padding-right: 14px; color: var(--text-muted); white-space: nowrap; }
+.extension-kv-table td:last-child { font-family: var(--font-mono); color: var(--text); }

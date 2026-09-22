@@ -1482,6 +1482,46 @@ function getExtensionDialogSummary(request: ExtensionDialogRequest): string | un
   return undefined;
 }
 
+// Extensions pack structured details (e.g. permission prompts: tool/command/paths)
+// into the dialog title as "key : value" lines. Render those lines as a two-column
+// table so the values align; anything else stays plain text.
+function ExtensionDialogTitle({ title }: { title: string }) {
+  const [heading, ...rest] = title.split("\n");
+  const rows: Array<{ label: string; value: string }> = [];
+  const plain: string[] = [];
+  for (const line of rest) {
+    const match = /^\s*([^:\n]{1,48}?)\s*:\s*(.+)$/.exec(line);
+    if (match) rows.push({ label: match[1].trim(), value: match[2].trim() });
+    else plain.push(line.trim());
+  }
+  const headingStyle = { color: "var(--text)", fontSize: 14, fontWeight: 650, lineHeight: 1.45 } as const;
+  if (rows.length === 0) {
+    return (
+      <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+        <div style={headingStyle}>{heading}</div>
+        {plain.map((line, index) => (
+          <div key={index} style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{line}</div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div style={headingStyle}>{heading}</div>
+      <table className="extension-kv-table">
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label + row.value}>
+              <td>{row.label}</td>
+              <td>{row.value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ExtensionDialog({
   request,
   onRespond,
@@ -1578,16 +1618,6 @@ function ExtensionDialog({
           </span>
         </button>
       ) : (
-      <>
-      <div
-        aria-hidden
-        className="extension-overlay-in"
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "rgba(0,0,0,0.25)",
-        }}
-      />
       <div
         role="dialog"
         aria-label={request.title}
@@ -1601,7 +1631,7 @@ function ExtensionDialog({
           display: "flex",
           flexDirection: "column",
           border: "1px solid var(--border)",
-          borderRadius: "12px 12px 0 0",
+          borderRadius: 12,
           background: "var(--bg)",
           boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
           overflow: "hidden",
@@ -1611,7 +1641,7 @@ function ExtensionDialog({
           <div style={{ flex: 1, minWidth: 0 }}>
             {/* Pi's TUI shows the title verbatim, newlines included; select/input have no
                 separate message field, so extensions put multi-line text here. */}
-            <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 650, lineHeight: 1.45, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{request.title}</div>
+            <ExtensionDialogTitle title={request.title} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
               <span>{t("chat.extensionRequest")}</span>
               {countdown}
@@ -1804,7 +1834,6 @@ function ExtensionDialog({
           ) : null}
         </div>
       </div>
-      </>
       )}
     </div>
   );

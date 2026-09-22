@@ -37,8 +37,8 @@ test("renders extension confirmation and options as markdown", () => {
 
 test("preserves title newlines like pi's TUI and keeps long titles from hiding the body", () => {
   const header = dialogSource.slice(dialogSource.indexOf('role="dialog"'), dialogSource.indexOf("{request.method === \"confirm\""));
-  assert.match(header, /whiteSpace: "pre-wrap", overflowWrap: "anywhere" \}\}>\{request\.title\}/);
-  assert.match(header, /maxHeight: "50%", overflowY: "auto" \}\}>[\s\S]*?\{request\.title\}/);
+  assert.match(header, /<ExtensionDialogTitle title=\{request\.title\} \/>/);
+  assert.match(header, /maxHeight: "50%", overflowY: "auto" \}\}>/);
 });
 
 test("resets collapse state when a new extension request arrives", () => {
