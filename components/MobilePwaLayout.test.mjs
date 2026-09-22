@@ -11,10 +11,17 @@ const chatInputSource = await readFile(new URL("./ChatInput.tsx", import.meta.ur
 const viewportHookSource = await readFile(new URL("../hooks/useViewportHeight.ts", import.meta.url), "utf8");
 
 test("configures iOS standalone mode to use the full screen", () => {
-  assert.match(layoutSource, /statusBarStyle: "black-translucent"/);
-  assert.match(layoutSource, /viewportFit: "cover"/);
   assert.match(layoutSource, /interactiveWidget: "resizes-content"/);
   assert.match(cssSource, /@media \(display-mode: standalone\) \{[\s\S]*?--app-viewport-height: 100vh;/);
+});
+
+test("avoids the iOS 26.1+ status-bar scrim in standalone mode", () => {
+  // Any apple-mobile-web-app-status-bar-style value makes iOS 26.1+ draw an
+  // unremovable scrim that blurs the top of the PWA (WebKit #317153/#301994),
+  // and viewport-fit: cover extends web content under that strip. Standalone
+  // mode comes from manifest.ts display:"standalone" instead.
+  assert.doesNotMatch(layoutSource, /(^|\n)\s*statusBarStyle:/);
+  assert.doesNotMatch(layoutSource, /(^|\n)\s*viewportFit:/);
 });
 
 test("tracks the visual viewport while the software keyboard is open", () => {

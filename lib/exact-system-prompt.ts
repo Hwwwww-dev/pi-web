@@ -1,19 +1,26 @@
 import type { InlineExtension } from "@earendil-works/pi-coding-agent";
 
-const EXTENSION_NAME = "pi-web-exact-system-prompt";
+export const EXACT_SYSTEM_PROMPT_EXTENSION_NAME = "pi-web-exact-system-prompt";
 
 /**
- * Force an exact system prompt on every provider request.
+ * Replace the whole system prompt of every agent run with the text `getPrompt` returns.
  *
- * Since pi 0.87 `agent.state.systemPrompt` is a read-only replay of the
- * transcript's system messages, so the prompt can no longer be assigned
- * directly. The SDK's supported path is a `before_agent_start` handler that
- * returns `systemPrompt`: the session projects that exact text onto the
- * request head (with the current tools) without touching the transcript.
+ * Pi 0.86 moved the prompt into the session transcript: `agent.state.systemPrompt` is
+ * replayed from persisted system messages and can no longer be assigned, and the agent
+ * loop's request context carries no `systemPrompt` field. The one supported way for a
+ * host to send an exact prompt is a `before_agent_start` handler returning
+ * `systemPrompt`: the SDK projects that text as the provider's leading system prompt
+ * for the run while the transcript keeps recording Pi's structured sections.
+ *
+ * Used for Chat-only sessions (context files only) and subagent profiles whose prompt
+ * mode replaces Pi's prompt. `getPrompt` is read on every run, so a session that reloads
+ * its context files sends the new contents on its next prompt.
  */
-export function createExactSystemPromptExtension(getPrompt: () => string | undefined): InlineExtension {
+export function createExactSystemPromptExtension(
+  getPrompt: () => string | undefined,
+): InlineExtension {
   return {
-    name: EXTENSION_NAME,
+    name: EXACT_SYSTEM_PROMPT_EXTENSION_NAME,
     hidden: true,
     factory: (pi) => {
       pi.on("before_agent_start", () => {
