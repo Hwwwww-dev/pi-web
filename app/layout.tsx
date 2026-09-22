@@ -35,7 +35,10 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    // "black" keeps the web viewport below the status bar. "black-translucent"
+    // lets the page slide under the status bar, and iOS 26 composites its
+    // Liquid Glass material over that strip, blurring the top of the app.
+    statusBarStyle: "black",
     title: "Pi Web",
   },
   formatDetection: {
