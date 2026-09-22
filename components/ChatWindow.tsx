@@ -1484,9 +1484,46 @@ function getExtensionDialogSummary(request: ExtensionDialogRequest): string | un
 
 // Extensions pack structured details (e.g. permission prompts: tool/command/paths)
 // into the dialog title as "key : value" lines. Render those lines as a two-column
-// table so the values align; anything else stays plain text.
-function ExtensionDialogTitle({ title }: { title: string }) {
-  const [heading, ...rest] = title.split("\n");
+// table so the values align. ask_user_question's RPC path appends per-option
+// preview blocks as "--- N. label preview ---" followed by raw markdown; those
+// blocks render through MarkdownBody so the preview shows fully formatted.
+const PREVIEW_HEADING_RE = /^--- (.+) preview ---$/;
+
+type DialogTitleSegment =
+  | { kind: "plain"; text: string }
+  | { kind: "preview"; heading: string; markdown: string };
+
+function parseDialogTitleSegments(title: string): DialogTitleSegment[] {
+  const segments: DialogTitleSegment[] = [];
+  let plain: string[] = [];
+  let preview: { heading: string; lines: string[] } | null = null;
+  const flushPlain = () => {
+    if (plain.length > 0) segments.push({ kind: "plain", text: plain.join("\n") });
+    plain = [];
+  };
+  const flushPreview = () => {
+    if (preview) segments.push({ kind: "preview", heading: preview.heading, markdown: preview.lines.join("\n") });
+    preview = null;
+  };
+  for (const line of title.split("\n")) {
+    const match = PREVIEW_HEADING_RE.exec(line.trim());
+    if (match) {
+      flushPlain();
+      flushPreview();
+      preview = { heading: match[1], lines: [] };
+    } else if (preview) {
+      preview.lines.push(line);
+    } else {
+      plain.push(line);
+    }
+  }
+  flushPlain();
+  flushPreview();
+  return segments;
+}
+
+function DialogTitlePlainText({ text }: { text: string }) {
+  const [heading, ...rest] = text.split("\n");
   const rows: Array<{ label: string; value: string }> = [];
   const plain: string[] = [];
   for (const line of rest) {
@@ -1518,6 +1555,26 @@ function ExtensionDialogTitle({ title }: { title: string }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function ExtensionDialogTitle({ title }: { title: string }) {
+  const segments = parseDialogTitleSegments(title);
+  return (
+    <div style={{ minWidth: 0 }}>
+      {segments.map((segment, index) =>
+        segment.kind === "preview" ? (
+          <div key={index} style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 650, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>
+              {segment.heading}
+            </div>
+            <MarkdownBody>{segment.markdown}</MarkdownBody>
+          </div>
+        ) : (
+          <DialogTitlePlainText key={index} text={segment.text} />
+        ),
+      )}
     </div>
   );
 }
@@ -1743,7 +1800,7 @@ function ExtensionDialog({
                   }}
                   style={{
                     width: compactSelectOptions ? "auto" : "100%",
-                    padding: compactSelectOptions ? "6px 12px" : "8px 11px",
+                    padding: compactSelectOptions ? "6px 12px" : "7px 10px",
                     borderRadius: 8,
                     border: "1px solid var(--border)",
                     color: "var(--text)",

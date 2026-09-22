@@ -41,6 +41,11 @@ test("preserves title newlines like pi's TUI and keeps long titles from hiding t
   assert.match(header, /maxHeight: 180, overflowY: "auto" \}\}>/);
 });
 
+test("renders option preview blocks in the dialog title as markdown", () => {
+  assert.match(source, /PREVIEW_HEADING_RE = \/\^--- \(\.\+\) preview ---\$\//);
+  assert.match(source, /<MarkdownBody>\{segment\.markdown\}<\/MarkdownBody>/);
+});
+
 test("resets collapse state when a new extension request arrives", () => {
   assert.match(source, /<ExtensionDialog key=\{extensionDialog.id\}/);
   assert.match(source, /<ExtensionCustomPanel key=\{extensionCustomUi.id\}/);

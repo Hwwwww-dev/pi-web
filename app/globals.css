@@ -1891,6 +1891,23 @@ span.token.table {
 .extension-drawer-in { animation: extension-drawer-in 0.22s ease-out }
 .extension-option { background: var(--bg-panel) }
 .extension-option:not(:disabled):hover { background: var(--bg-hover) }
+/* Compact typography for option bodies rendered through MarkdownBody: keep
+   previews fully readable without the message-body heading/paragraph sizing. */
+.extension-option .markdown-body { font-size: 12px; line-height: 1.45; }
+.extension-option .markdown-body > :first-child { margin-top: 0; }
+.extension-option .markdown-body > :last-child { margin-bottom: 0; }
+.extension-option .markdown-body p { margin: 0 0 3px; }
+.extension-option .markdown-body h1, .extension-option .markdown-body h2,
+.extension-option .markdown-body h3, .extension-option .markdown-body h4,
+.extension-option .markdown-body h5, .extension-option .markdown-body h6 {
+  font-size: 12px; font-weight: 650; margin: 4px 0 2px; }
+.extension-option .markdown-body ul, .extension-option .markdown-body ol { margin: 2px 0 3px; padding-left: 16px; }
+.extension-option .markdown-body li { margin: 0; }
+.extension-option .markdown-body pre { margin: 3px 0; font-size: 11px; line-height: 1.4; }
+.extension-option .markdown-body code { font-size: 11px; }
+.extension-option .markdown-body table { font-size: 11px; }
+.extension-option .markdown-body hr { margin: 4px 0; }
+.extension-option .markdown-body blockquote { margin: 3px 0; padding-left: 8px; }
 .extension-option.tone-affirmative { background: rgba(22, 163, 74, 0.12) }
 .extension-option.tone-affirmative:not(:disabled):hover { background: rgba(22, 163, 74, 0.22) }
 .extension-option.tone-negative { background: rgba(239, 68, 68, 0.1) }
