@@ -1635,7 +1635,11 @@ function ExtensionDialog({
           pointerEvents: "auto",
           position: "relative",
           width: "min(680px, 100%)",
-          maxHeight: "min(760px, 100%)",
+          // dvh instead of a parent percentage: the absolute-positioned wrapper's
+          // height chain makes min(760px, 100%) unreliable, and an unresolvable
+          // percentage invalidates the whole declaration, letting huge option
+          // previews stretch the drawer far past the viewport.
+          maxHeight: "min(760px, calc(var(--app-viewport-height, 100dvh) - 40px))",
           margin: "0 auto",
           display: "flex",
           flexDirection: "column",
@@ -1646,7 +1650,7 @@ function ExtensionDialog({
           overflow: "hidden",
         }}
       >
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border)", maxHeight: "50%", overflowY: "auto" }}>
+        <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border)", maxHeight: 180, overflowY: "auto" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {/* Pi's TUI shows the title verbatim, newlines included; select/input have no
                 separate message field, so extensions put multi-line text here. */}
@@ -1937,7 +1941,7 @@ function ExtensionCustomPanel({
           pointerEvents: "auto",
           position: "relative",
           width: "min(920px, 100%)",
-          maxHeight: "min(760px, 100%)",
+          maxHeight: "min(760px, calc(var(--app-viewport-height, 100dvh) - 40px))",
           display: "flex",
           flexDirection: "column",
           border: "1px solid var(--border)",

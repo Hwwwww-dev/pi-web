@@ -18,7 +18,7 @@ test("confines extension overlays to the content region above the composer", () 
   assert.match(customSource, /position: "absolute"[\s\S]*?inset: 0/);
   assert.match(customSource, /pointerEvents: "none"/);
   assert.doesNotMatch(source, /z-\[100\]|zIndex: 100/);
-  assert.match(customSource, /maxHeight: "min\(760px, 100%\)"/);
+  assert.match(customSource, /maxHeight: "min\(760px, calc\(var\(--app-viewport-height, 100dvh\) - 40px\)\)"/);
 });
 
 test("adds collapse without replacing cancel", () => {
@@ -38,7 +38,7 @@ test("renders extension confirmation and options as markdown", () => {
 test("preserves title newlines like pi's TUI and keeps long titles from hiding the body", () => {
   const header = dialogSource.slice(dialogSource.indexOf('role="dialog"'), dialogSource.indexOf("{request.method === \"confirm\""));
   assert.match(header, /<ExtensionDialogTitle title=\{request\.title\} \/>/);
-  assert.match(header, /maxHeight: "50%", overflowY: "auto" \}\}>/);
+  assert.match(header, /maxHeight: 180, overflowY: "auto" \}\}>/);
 });
 
 test("resets collapse state when a new extension request arrives", () => {
