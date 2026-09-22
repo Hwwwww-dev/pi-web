@@ -1137,19 +1137,26 @@ export function AppShell() {
   }, [projectTrustBusy, projectTrustCwd]);
 
   const activeFileTab = fileTabs.find((tab) => tab.id === activeFileTabId) ?? null;
-  // Tab title mirrors the active session's sidebar name (truncated to 10 chars);
-  // with no active session it falls back to "Pi Web".
+// Tab title truncation: budget measured in CJK character widths (1 per full-width
+// char, 0.5 per half-width char like letters and digits).
+function truncateSessionTitle(title: string, maxWidth = 20): string {
+  let width = 0;
+  let result = "";
+  for (const char of Array.from(title)) {
+    const charWidth = (char.codePointAt(0) ?? 0) > 0xff ? 1 : 0.5;
+    if (width + charWidth > maxWidth) return `${result}…`;
+    width += charWidth;
+    result += char;
+  }
+  return result;
+}
   const activeSessionTitle = selectedSession
     ? (selectedSession.name
         || skillExpansionToCommand(selectedSession.firstMessage)
         || selectedSession.firstMessage
         || selectedSession.id.slice(0, 12)).trim()
     : null;
-  const windowTitle = (() => {
-    if (!activeSessionTitle) return "Pi Web";
-    const chars = Array.from(activeSessionTitle);
-    return chars.length > 10 ? `${chars.slice(0, 10).join("")}…` : activeSessionTitle;
-  })();
+  const windowTitle = activeSessionTitle ? truncateSessionTitle(activeSessionTitle) : "Pi Web";
 
   useEffect(() => {
     const syncWindowTitle = () => {
