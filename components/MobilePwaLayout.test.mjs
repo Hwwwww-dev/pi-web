@@ -11,18 +11,10 @@ const chatInputSource = await readFile(new URL("./ChatInput.tsx", import.meta.ur
 const viewportHookSource = await readFile(new URL("../hooks/useViewportHeight.ts", import.meta.url), "utf8");
 
 test("configures iOS standalone mode to use the full screen", () => {
+  assert.match(layoutSource, /statusBarStyle: "black-translucent"/);
+  assert.match(layoutSource, /viewportFit: "cover"/);
   assert.match(layoutSource, /interactiveWidget: "resizes-content"/);
   assert.match(cssSource, /@media \(display-mode: standalone\) \{[\s\S]*?--app-viewport-height: 100vh;/);
-});
-
-test("uses the Discourse status-bar route in standalone mode", () => {
-  // Discourse (app/views/layouts/_head.html.erb) ships viewport-fit=cover and
-  // NO apple-mobile-web-app-status-bar-style meta at all. With that combo iOS
-  // 26 renders the status bar opaque, tinted from the page top edge, and
-  // outside the viewport, so no vibrancy glass blurs web content. Contain-mode
-  // variants (no cover, bar-style metas, spacers) all kept the blur.
-  assert.match(layoutSource, /viewportFit: "cover"/);
-  assert.doesNotMatch(layoutSource, /(^|\n)\s*statusBarStyle:/);
 });
 
 test("tracks the visual viewport while the software keyboard is open", () => {

@@ -33,18 +33,10 @@ export const metadata: Metadata = {
       },
     ],
   },
-  // Discourse's exact standalone-PWA combination (verified against
-  // discourse/discourse app/views/layouts/_head.html.erb): viewport-fit=cover
-  // in the viewport meta and NO apple-mobile-web-app-status-bar-style meta at
-  // all. With cover + no bar-style meta, iOS 26 renders the status bar opaque,
-  // tinted from the page's top edge, and OUTSIDE the viewport (it squeezes the
-  // layout down instead of floating over it), so no vibrancy glass ever blurs
-  // web content. Every contain-mode variant (no meta, black, spacers) kept the
-  // blur because the glass bleeds into the viewport top only when the viewport
-  // excludes the status bar. LINUX DO (a Discourse instance) is the reference.
-  other: {
-    "apple-mobile-web-app-capable": "yes",
-    "apple-mobile-web-app-title": "Pi Web",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Pi Web",
   },
   formatDetection: {
     telephone: false,
@@ -54,9 +46,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  // viewport-fit=cover is required for the Discourse status-bar route: the
-  // viewport must include the status-bar strip so iOS 26 squeezes the layout
-  // below the opaque status bar instead of blending glass over our top edge.
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
   themeColor: [
