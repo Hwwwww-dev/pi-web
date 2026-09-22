@@ -2122,7 +2122,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       {/* Center: chat */}
       <div inert={rightPanelFullWidth} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Top bar with sidebar toggle */}
-        <div ref={topBarRef} style={{ flexShrink: 0, background: "var(--bg-panel)" }}>
+        {/* translateZ(0) promotes the bar to its own composited layer: iOS 26.1's
+            status-bar vibrancy samples non-composited content at the viewport
+            top edge (blurrying the whole strip) but exempts composited layers,
+            which is why the sidebar drawer and overlay are always clean. */}
+        <div ref={topBarRef} style={{ flexShrink: 0, background: "var(--bg-panel)", transform: "translateZ(0)" }}>
         <div style={{ display: "flex", alignItems: "center", position: "relative", borderBottom: "1px solid var(--border)", height: "calc(36px + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
           <button
             onClick={handleSidebarToggle}
