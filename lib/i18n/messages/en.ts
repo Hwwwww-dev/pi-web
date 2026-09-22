@@ -39,6 +39,7 @@ export const enLocale: LocalePlugin = {
     "keepalive.title": "Active chats",
     "keepalive.label": "Active",
     "keepalive.close": "Remove from active",
+    "keepalive.closeActiveDisabled": "Currently open; cannot remove",
     "keepalive.empty": "No active chats",
     "settings.quoteSelection": "Show actions for selected text",
     "settings.languageDescription": "Choose the language used throughout the interface.",

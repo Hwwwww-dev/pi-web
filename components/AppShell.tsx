@@ -1125,11 +1125,11 @@ export function AppShell() {
 
   const handleViewFullHistory = useCallback(() => {
     if (!selectedSession) return;
-    window.open(
-      `/api/sessions/${encodeURIComponent(selectedSession.id)}/export?inline=1`,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    // selectedSession.id is a server-generated uuid; encode it and validate the
+    // result so the opened URL is always our internal export route.
+    const id = encodeURIComponent(selectedSession.id);
+    if (!/^[A-Za-z0-9-]+$/.test(id)) return;
+    window.open(`/api/sessions/${id}/export?inline=1`, "_blank", "noopener,noreferrer");
   }, [selectedSession]);
 
   // Show chat area if a session is selected, or if we have a cwd to start a new session in
@@ -1713,8 +1713,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       <button
                         type="button"
                         className="keepalive-menu-close"
-                        title={translate("keepalive.close")}
+                        title={isSelected ? translate("keepalive.closeActiveDisabled") : translate("keepalive.close")}
                         aria-label={`${translate("keepalive.close")}: ${slot.session.name || slot.session.id}`}
+                        disabled={isSelected}
+                        style={isSelected ? { opacity: 0.35, cursor: "not-allowed" } : undefined}
                         onClick={() => setKeepAliveSlots((slots) => slots.filter((item) => item.session.id !== slot.session.id))}
                       >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
