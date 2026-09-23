@@ -1949,10 +1949,13 @@ span.token.table {
 .extension-option.tone-affirmative:not(:disabled):hover { background: rgba(22, 163, 74, 0.22) }
 .extension-option.tone-negative { background: rgba(239, 68, 68, 0.1) }
 .extension-option.tone-negative:not(:disabled):hover { background: rgba(239, 68, 68, 0.2) }
-.extension-kv-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12px; line-height: 1.5; }
-.extension-kv-table td { padding: 3px 0; vertical-align: top; overflow-wrap: anywhere; }
-.extension-kv-table td:first-child { width: 1%; padding-right: 14px; color: var(--text-muted); white-space: nowrap; }
-.extension-kv-table td:last-child { font-family: var(--font-mono); color: var(--text); }
+/* Flex rows, not a table: WebKit's auto table layout gives the value column
+   only its min-content when overflow-wrap: anywhere is set, crushing values
+   like "external_directory" into one character per line on narrow screens. */
+.extension-kv-table { margin-top: 6px; font-size: 12px; line-height: 1.5; }
+.extension-kv-row { display: flex; align-items: baseline; gap: 14px; padding: 3px 0; }
+.extension-kv-label { flex-shrink: 0; color: var(--text-muted); white-space: nowrap; }
+.extension-kv-value { flex: 1; min-width: 0; font-family: var(--font-mono); color: var(--text); overflow-wrap: anywhere; }
 
 /* Keep-alive session menu (top toolbar); the panel itself renders in the
    shared top-panel dropdown container — only row styles live here. */

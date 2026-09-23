@@ -1552,16 +1552,14 @@ function DialogTitlePlainText({ text }: { text: string }) {
   return (
     <div>
       <div style={headingStyle}>{heading}</div>
-      <table className="extension-kv-table">
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.label + row.value}>
-              <td>{row.label}</td>
-              <td>{row.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="extension-kv-table">
+        {rows.map((row) => (
+          <div key={row.label + row.value} className="extension-kv-row">
+            <div className="extension-kv-label">{row.label}</div>
+            <div className="extension-kv-value">{row.value}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
