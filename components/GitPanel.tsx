@@ -413,7 +413,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
         <button type="button" onClick={() => setView({ type: "log" })} style={buttonStyle}>
           ‹ {t("gitPanel.back")}
         </button>
-        <span style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, minWidth: 0, wordBreak: "break-word" }}>
           {commit.subject}
         </span>
       </div>
