@@ -10,11 +10,11 @@ const chatWindowSource = await readFile(new URL("./ChatWindow.tsx", import.meta.
 const chatInputSource = await readFile(new URL("./ChatInput.tsx", import.meta.url), "utf8");
 const viewportHookSource = await readFile(new URL("../hooks/useViewportHeight.ts", import.meta.url), "utf8");
 
-test("configures iOS standalone mode to use the full screen", () => {
+test("configures iOS standalone mode to use the visible viewport below the status bar", () => {
   assert.match(layoutSource, /statusBarStyle: "black"/);
   assert.match(layoutSource, /viewportFit: "cover"/);
   assert.match(layoutSource, /interactiveWidget: "resizes-content"/);
-  assert.match(cssSource, /@media \(display-mode: standalone\) \{[\s\S]*?--app-viewport-height: 100vh;/);
+  assert.match(cssSource, /@media \(display-mode: standalone\) \{[\s\S]*?--app-viewport-height: 100dvh;/);
 });
 
 test("tracks the visual viewport while the software keyboard is open", () => {
