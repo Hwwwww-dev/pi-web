@@ -2101,7 +2101,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       {/* Center: chat */}
       <div inert={rightPanelFullWidth} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Top bar with sidebar toggle */}
-        <div ref={topBarRef} style={{ flexShrink: 0, background: "var(--bg-panel)" }}>
+        {/* position: sticky — GRPace's finding from r/iOSBeta: Safari treats a
+            sticky/fixed top bar as "the app has its own top bar" and skips the
+            iOS 26+ scroll-edge progressive blur over the status-bar strip
+            entirely. Visually a no-op: the bar is already the first element. */}
+        <div ref={topBarRef} style={{ position: "sticky", top: 0, zIndex: 5, flexShrink: 0, background: "var(--bg-panel)" }}>
         <div style={{ display: "flex", alignItems: "center", position: "relative", borderBottom: "1px solid var(--border)", height: "calc(36px + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
           <button
             onClick={handleSidebarToggle}
