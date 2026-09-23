@@ -39,7 +39,6 @@ export const zhCNLocale: LocalePlugin = {
     "keepalive.title": "活跃会话",
     "keepalive.label": "活跃会话",
     "keepalive.close": "移出活跃会话",
-    "keepalive.empty": "暂无活跃会话",
     "settings.quoteSelection": "选中文字时显示提问浮窗",
     "settings.languageDescription": "选择整个界面使用的语言。",
     "settings.shellTool": "Shell 工具",

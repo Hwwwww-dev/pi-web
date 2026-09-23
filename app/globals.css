@@ -1673,6 +1673,27 @@ span.token.table {
   }
 }
 
+/* Manual dismiss button on notice toasts; layout mirrors keepalive-sidebar-close */
+.notice-shelf-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  align-self: flex-start;
+  margin-left: 2px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.notice-shelf-close:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
 /* Keep the panel border as the idle separator; this element only expands the hit target. */
 .panel-resize-handle {
   position: relative;
@@ -1974,44 +1995,46 @@ span.token.table {
 .extension-kv-label { flex-shrink: 0; color: var(--text-muted); white-space: nowrap; }
 .extension-kv-value { flex: 1; min-width: 0; font-family: var(--font-mono); color: var(--text); overflow-wrap: anywhere; }
 
-/* Keep-alive session menu (top toolbar); the panel itself renders in the
-   shared top-panel dropdown container — only row styles live here. */
-.keepalive-menu-empty {
-  padding: 10px 12px;
-  font-size: 12px;
-  color: var(--text-dim);
-  text-align: center;
+/* Keep-alive sidebar section (collapsible, like the file explorer); the
+   header renders inline in SessionSidebar — only row styles live here. */
+.keepalive-sidebar-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0 4px 6px;
 }
-.keepalive-menu-row {
+.keepalive-sidebar-row {
   display: flex;
   align-items: stretch;
   gap: 2px;
   border-radius: 7px;
+  flex-shrink: 0;
 }
-.keepalive-menu-row:hover { background: var(--bg-hover); }
-.keepalive-menu-row.is-active { background: var(--bg-selected); }
-.keepalive-menu-open {
+.keepalive-sidebar-row:hover { background: var(--bg-hover); }
+.keepalive-sidebar-row.is-active { background: var(--bg-selected); }
+.keepalive-sidebar-open {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 1px;
-  padding: 7px 8px;
+  padding: 6px 8px;
   background: none;
   border: none;
   border-radius: 7px;
   text-align: left;
   cursor: pointer;
 }
-.keepalive-menu-name {
+.keepalive-sidebar-name {
   font-size: 12px;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.keepalive-menu-cwd {
+.keepalive-sidebar-cwd {
   font-size: 10px;
   font-family: var(--font-mono);
   color: var(--text-dim);
@@ -2019,18 +2042,18 @@ span.token.table {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.keepalive-menu-close {
+.keepalive-sidebar-close {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
+  width: 24px;
   background: none;
   border: none;
   border-radius: 7px;
   color: var(--text-dim);
   cursor: pointer;
 }
-.keepalive-menu-close:hover { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+.keepalive-sidebar-close:hover { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
 
 /* Keep-alive settings (SettingsPanel → Chat) */
 .settings-keepalive {

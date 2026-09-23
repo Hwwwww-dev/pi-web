@@ -369,7 +369,7 @@ export function AppShell() {
   }, []);
 
   // Single active panel — only one dropdown open at a time
-  const [activeTopPanel, setActiveTopPanel] = useState<"agents" | "branches" | "system" | "tools" | "session" | "keepalive" | null>(null);
+  const [activeTopPanel, setActiveTopPanel] = useState<"agents" | "branches" | "system" | "tools" | "session" | null>(null);
   const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
@@ -389,7 +389,7 @@ export function AppShell() {
   }, [rightPanelFullWidth]);
 
   const toggleTopPanel = useCallback((
-    panel: "agents" | "branches" | "system" | "tools" | "session" | "keepalive",
+    panel: "agents" | "branches" | "system" | "tools" | "session",
     keepMobileToolbarOpen = false,
   ) => {
     if (isMobile) setSidebarOpen(false);
@@ -1285,6 +1285,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         onBackgroundTaskDone={handleBackgroundTaskDone}
         onRunningSessionIdsChange={handleRunningSessionIdsChange}
         onSessionsChange={handleSessionsChange}
+        keepAliveSlots={keepAliveSlots}
+        onKeepAliveSelect={handleSelectSession}
+        onKeepAliveDismiss={handleKeepAliveDismiss}
       />
       <div style={{ padding: "8px", flexShrink: 0, display: "flex", justifyContent: "space-between", gap: 4 }}>
         {([
@@ -1682,43 +1685,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           </svg>
           {!mobile && <span>{translate("tools.label")}</span>}
         </button>
-        <div style={{ position: "relative", display: "flex", height: "100%" }}>
-          <button
-            type="button"
-            onClick={() => toggleTopPanel("keepalive")}
-            title={translate("keepalive.title")}
-            aria-label={translate("keepalive.title")}
-            aria-pressed={activeTopPanel === "keepalive"}
-            aria-expanded={activeTopPanel === "keepalive"}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
-              height: "100%", padding: mobile ? 0 : "0 12px",
-              background: activeTopPanel === "keepalive" ? "var(--bg-selected)" : "none",
-              border: "none",
-              borderTop: activeTopPanel === "keepalive" ? "2px solid var(--accent)" : "2px solid transparent",
-              borderRight: "1px solid var(--border)",
-              cursor: "pointer",
-              color: activeTopPanel === "keepalive" ? "var(--text)" : "var(--text-muted)",
-              fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: keepAliveSlots.length > 0 ? "var(--accent)" : "var(--text-dim)", flexShrink: 0 }} aria-hidden="true">
-              <path d="M12 2 2 7l10 5 10-5-10-5z" />
-              <path d="m2 17 10 5 10-5" />
-              <path d="m2 12 10 5 10-5" />
-            </svg>
-            {!mobile && <span>{translate("keepalive.label")}</span>}
-            {keepAliveSlots.length > 0 && (
-              <span style={{
-                minWidth: 14, height: 14, padding: "0 3px",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                borderRadius: 7, background: "var(--accent)", color: "#fff",
-                fontSize: 9, fontWeight: 700, lineHeight: 1,
-              }}>{keepAliveSlots.length}</span>
-            )}
-          </button>
-        </div>
       </div>
     );
   };
@@ -2223,49 +2189,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   tools={systemTools}
                   translate={translate}
                 />
-              )}
-              {activeTopPanel === "keepalive" && (
-                <div role="menu" style={{
-                  background: "var(--bg-panel)",
-                  borderBottom: "1px solid var(--border)",
-                  boxShadow: "0 10px 28px rgba(0,0,0,0.10)",
-                  padding: 4,
-                }}>
-                  {keepAliveSlots.length === 0 ? (
-                    <div className="keepalive-menu-empty">{translate("keepalive.empty")}</div>
-                  ) : keepAliveSlots.map((slot) => {
-                    const isSelected = slot.session.id === selectedSession?.id;
-                    return (
-                      <div key={slot.session.id} className={`keepalive-menu-row${isSelected ? " is-active" : ""}`}>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="keepalive-menu-open"
-                          onClick={() => {
-                            setActiveTopPanel(null);
-                            if (!isSelected) handleSelectSession(slot.session);
-                          }}
-                        >
-                          <span className="keepalive-menu-name">{slot.session.name || slot.session.firstMessage || slot.session.id}</span>
-                          <span className="keepalive-menu-cwd">{slot.session.cwd}</span>
-                        </button>
-                        {!isSelected && (
-                          <button
-                            type="button"
-                            className="keepalive-menu-close"
-                            title={translate("keepalive.close")}
-                            aria-label={`${translate("keepalive.close")}: ${slot.session.name || slot.session.id}`}
-                            onClick={() => handleKeepAliveDismiss(slot.session.id)}
-                          >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M18 6 6 18M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
               )}
               {activeTopPanel === "session" && (
                 <div className="session-info-popover" style={{

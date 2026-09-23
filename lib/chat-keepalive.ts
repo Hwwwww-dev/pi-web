@@ -85,3 +85,23 @@ export function upsertKeepAliveSlot(slots: KeepAliveSlot[], session: SessionInfo
   }
   return next;
 }
+
+const SIDEBAR_OPEN_STORAGE_KEY = "pi-web:keepalive-sidebar:open";
+
+export function loadKeepAliveSidebarOpen(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+export function saveKeepAliveSidebarOpen(open: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, String(open));
+  } catch {
+    // Persistence is best-effort; privacy mode and storage quotas must not break the sidebar.
+  }
+}

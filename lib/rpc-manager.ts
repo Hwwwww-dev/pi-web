@@ -317,6 +317,11 @@ export class AgentSessionWrapper {
       if (event.type === "agent_start") this.agentRunNeedsCompletion = true;
       if (event.type === "agent_end") {
         invalidateSessionListCache();
+        this.refreshExtensionWidgets();
+      }
+      if (event.type === "agent_settled") {
+        this.refreshExtensionWidgets();
+        this.notifyAgentRunCompleteIfIdle();
       }
       const toolCallId = event.toolCallId;
       if (typeof toolCallId === "string") {
@@ -698,7 +703,10 @@ export class AgentSessionWrapper {
           systemPrompt: this.exactSystemPrompt?.() ?? this.inner.agent.state?.systemPrompt ?? "",
           thinkingLevel: this.inner.agent.state?.thinkingLevel ?? "off",
           extensionStatuses: this.getExtensionStatuses(),
-          extensionWidgets: this.getExtensionWidgets(),
+          // Push fresh widget lines before snapshotting: extensions like pi-goal-x
+          // only mutate the registered component (never re-registering it), so the
+          // stored lines would stay stale without an explicit re-render here.
+          extensionWidgets: (this.refreshExtensionWidgets(), this.getExtensionWidgets()),
         };
       }
 
@@ -1098,6 +1106,16 @@ export class AgentSessionWrapper {
 
   private getExtensionWidgets(): ExtensionWidgetItem[] {
     return Array.from(this.extensionWidgets.values());
+  }
+
+  /** Re-render factory widgets and push fresh line snapshots.
+   *  Extensions like pi-goal-x drive updates through `tui.requestRender()`, which a
+   *  real TUI satisfies on every frame; a headless component only re-renders when
+   *  this is called, so snapshots would otherwise stay stale forever. */
+  private refreshExtensionWidgets(): void {
+    for (const active of [...this.activeExtensionWidgets.values()]) {
+      this.renderExtensionWidget(active);
+    }
   }
 
   private nextExtensionWidgetGeneration(key: string): number {

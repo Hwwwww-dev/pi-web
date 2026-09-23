@@ -282,7 +282,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
     slashCommands, slashCommandsLoading, queuedMessages,
-    notices, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused,
+    notices, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused, dismissNotice,
     isAutoModelSelection,
     isAutoThinkingSelection,
     agentPhase,
@@ -982,7 +982,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           pointerEvents: "none",
         }}
       >
-        <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} />
+        <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} onDismiss={dismissNotice} />
       </div>
 
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -1384,7 +1384,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 const NOTICE_MAX_HEIGHT_PX = 500;
 const NOTICE_TEXT_MAX_HEIGHT_PX = NOTICE_MAX_HEIGHT_PX - 30;
 
-function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: NoticeItem[]; floating?: boolean; onPauseChange?: (id: string | null) => void }) {
+function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { notices: NoticeItem[]; floating?: boolean; onPauseChange?: (id: string | null) => void; onDismiss?: (id: string) => void }) {
   if (notices.length === 0) return null;
   return (
     <div
@@ -1473,6 +1473,21 @@ function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: No
             >
               {notice.message}
             </span>
+            {onDismiss && (
+              <button
+                type="button"
+                className="notice-shelf-close"
+                aria-label="Dismiss notification"
+                title="Dismiss notification"
+                onClick={() => onDismiss(notice.id)}
+                // Align with the first text line's optical center (see the dot above)
+                style={{ marginTop: 14, flexShrink: 0 }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
         );
       })}

@@ -39,7 +39,6 @@ export const zhTWLocale: LocalePlugin = {
     "keepalive.title": "活躍會話",
     "keepalive.label": "活躍會話",
     "keepalive.close": "移出活躍會話",
-    "keepalive.empty": "暫無活躍會話",
     "settings.quoteSelection": "選取文字時顯示提問浮窗",
     "settings.languageDescription": "選擇整個介面使用的語言。",
     "settings.shellTool": "Shell 工具",

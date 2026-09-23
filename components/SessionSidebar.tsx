@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, typ
 import type { SessionInfo } from "@/lib/types";
 import { listSessionFamilies } from "@/lib/session-family";
 import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
+import { loadKeepAliveSidebarOpen, saveKeepAliveSidebarOpen, type KeepAliveSlot } from "@/lib/chat-keepalive";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
 import { skillExpansionToCommand } from "@/lib/slash-display";
 import { getProjectActivity, getRecentProjects, sessionsForProject } from "@/lib/project-groups";
@@ -131,6 +132,10 @@ interface Props {
   onBackgroundTaskDone?: () => void;
   onRunningSessionIdsChange?: (ids: Set<string>) => void;
   onSessionsChange?: (sessions: SessionInfo[]) => void;
+  /** Live keep-alive slots; rendered as a collapsible sidebar section when non-empty. */
+  keepAliveSlots?: KeepAliveSlot[];
+  onKeepAliveSelect?: (session: SessionInfo) => void;
+  onKeepAliveDismiss?: (sessionId: string) => void;
 }
 
 interface WorktreeEntry {
@@ -382,7 +387,7 @@ function PiWebTitle() {
   );
 }
 
-export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange }: Props) {
+export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange, keepAliveSlots, onKeepAliveSelect, onKeepAliveDismiss }: Props) {
   const { t } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   // Tracked in a ref only: the version is compared against the polled value to
@@ -414,6 +419,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const wtDropdownRef = useRef<HTMLDivElement>(null);
   const wtNewInputRef = useRef<HTMLInputElement>(null);
   const [explorerOpen, setExplorerOpen] = useState(true);
+  const [keepAliveOpen, setKeepAliveOpen] = useState(true);
   const [explorerKey, setExplorerKey] = useState(0);
   const [explorerUploadBusy, setExplorerUploadBusy] = useState(false);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
@@ -583,6 +589,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // preference after hydration so a collapsed explorer stays collapsed on reload.
   useEffect(() => {
     setExplorerOpen(loadExplorerOpen());
+    setKeepAliveOpen(loadKeepAliveSidebarOpen());
   }, []);
 
   // Persist unread markers so they survive a browser refresh before the user
@@ -1764,6 +1771,76 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           </button>
         )}
       </div>
+
+      {/* Active keep-alive chats */}
+      {keepAliveSlots && keepAliveSlots.length > 0 && (
+        <div style={{ flex: "0 0 auto", borderTop: "1px solid var(--border)", overflow: "hidden" }}>
+          <button
+            type="button"
+            onClick={() => setKeepAliveOpen((open) => {
+              const next = !open;
+              saveKeepAliveSidebarOpen(next);
+              return next;
+            })}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, width: "100%",
+              padding: "6px 10px", background: "none", border: "none",
+              color: "var(--text-muted)", cursor: "pointer",
+              fontSize: 11, fontWeight: 600, letterSpacing: "0.05em",
+              textTransform: "uppercase", textAlign: "left",
+            }}
+          >
+            <svg
+              width="9" height="9" viewBox="0 0 10 10" fill="none"
+              stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: keepAliveOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}
+            >
+              <polyline points="3 2 7 5 3 8" />
+            </svg>
+            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("keepalive.title")}</span>
+            <span style={{
+              minWidth: 14, height: 14, padding: "0 3px",
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              borderRadius: 7, background: "var(--accent)", color: "#fff",
+              fontSize: 9, fontWeight: 700, lineHeight: 1, flexShrink: 0,
+            }}>{keepAliveSlots.length}</span>
+          </button>
+          {keepAliveOpen && (
+            <div className="keepalive-sidebar-list">
+              {keepAliveSlots.map((slot) => {
+                const isSelected = slot.session.id === selectedSessionId;
+                return (
+                  <div key={slot.session.id} className={`keepalive-sidebar-row${isSelected ? " is-active" : ""}`}>
+                    <button
+                      type="button"
+                      className="keepalive-sidebar-open"
+                      onClick={() => {
+                        if (!isSelected) onKeepAliveSelect?.(slot.session);
+                      }}
+                    >
+                      <span className="keepalive-sidebar-name">{slot.session.name || slot.session.firstMessage || slot.session.id}</span>
+                      <span className="keepalive-sidebar-cwd">{slot.session.cwd}</span>
+                    </button>
+                    {!isSelected && (
+                      <button
+                        type="button"
+                        className="keepalive-sidebar-close"
+                        title={t("keepalive.close")}
+                        aria-label={`${t("keepalive.close")}: ${slot.session.name || slot.session.id}`}
+                        onClick={() => onKeepAliveDismiss?.(slot.session.id)}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Session list */}
       <div
