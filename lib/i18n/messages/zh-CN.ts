@@ -393,6 +393,8 @@ export const zhCNLocale: LocalePlugin = {
     "chat.shell": "Shell",
     "gitPanel.title": "Git",
     "gitPanel.selectRepository": "选择仓库",
+    "gitPanel.selectBranch": "选择分支",
+    "gitPanel.branch": "分支",
     "gitPanel.refresh": "重新扫描仓库",
     "gitPanel.loading": "加载中…",
     "gitPanel.loadMore": "加载更多",

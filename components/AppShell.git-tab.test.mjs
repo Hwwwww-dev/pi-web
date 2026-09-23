@@ -6,11 +6,11 @@ const appShellSource = await readFile(new URL("./AppShell.tsx", import.meta.url)
 const tabBarSource = await readFile(new URL("./TabBar.tsx", import.meta.url), "utf8");
 const sidebarSource = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
 
-test("the Git tab is a persistent, non-closable panel tab", () => {
+test("the Git tab is persistent and closing it returns to chat", () => {
   assert.match(appShellSource, /const GIT_TAB_ID = "git";/);
   assert.match(appShellSource, /const GIT_PANEL_TAB: Tab = \{ id: GIT_TAB_ID, label: "", filePath: "", kind: "git" \};/);
   assert.match(appShellSource, /const panelTabs: Tab\[\] = \[GIT_PANEL_TAB, \.\.\.fileTabs/);
-  assert.match(appShellSource, /if \(tabId === GIT_TAB_ID\) return;/);
+  assert.match(appShellSource, /if \(tabId === GIT_TAB_ID\) \{\s*setActiveFileTabId\(\(current\) => current === GIT_TAB_ID \? null : current\);\s*return;\s*\}/);
 });
 
 test("the Git tab renders GitPanel and file tabs keep rendering FileViewer", () => {
@@ -25,8 +25,11 @@ test("the explorer header button opens the right panel on the Git tab", () => {
   assert.match(sidebarSource, /\{onOpenGitPanel && \(\s*<ToolbarIconButton\s*onClick=\{onOpenGitPanel\}/);
 });
 
-test("the tab bar renders the Git tab with a branch icon and no close button", () => {
+test("the tab bar renders the Git tab with a localized title and a close button", () => {
   assert.match(tabBarSource, /kind\?: "terminal" \| "git";/);
   assert.match(tabBarSource, /tab\.kind === "git" \? \(\s*<svg[\s\S]*?<circle cx="18" cy="6" r="3" \/>/);
-  assert.match(tabBarSource, /\{tab\.kind !== "git" && \(\s*<button[\s\S]*?onCloseTab\(tab\.id\);/);
+  assert.match(tabBarSource, /\{tab\.kind === "git" \? t\("gitPanel\.title"\) : tab\.label\}/);
+  // No git close-button guard: every tab (including Git) shows the close button.
+  assert.doesNotMatch(tabBarSource, /kind !== "git"/);
+  assert.match(tabBarSource, /onClick=\{\(e\) => \{ e\.stopPropagation\(\); onCloseTab\(tab\.id\); \}\}/);
 });

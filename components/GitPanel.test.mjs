@@ -40,6 +40,8 @@ test("all copy goes through i18n gitPanel keys", () => {
   const keys = [...source.matchAll(/t\("(gitPanel\.[a-zA-Z]+)"/g)].map((match) => match[1]);
   assert.ok(keys.length >= 10, `expected gitPanel keys, got ${keys.join(",")}`);
   assert.ok(keys.includes("gitPanel.selectRepository"));
+  assert.ok(keys.includes("gitPanel.selectBranch"));
+  assert.ok(keys.includes("gitPanel.branch"));
   assert.ok(keys.includes("gitPanel.emptyLog"));
   assert.ok(keys.includes("gitPanel.loadMore"));
   assert.ok(keys.includes("gitPanel.back"));
@@ -50,7 +52,7 @@ test("all copy goes through i18n gitPanel keys", () => {
 test("log layer shows empty state and a load-more control", () => {
   assert.match(source, /gitPanel\.emptyLog/);
   assert.match(source, /gitPanel\.loadMore/);
-  assert.match(source, /void loadCommits\(selectedRepo, commits\.length\)/);
+  assert.match(source, /void loadCommits\(selectedRepo, selectedBranch \?\? "", commits\.length\)/);
 });
 
 test("commit rows and controls keep 36px touch targets", () => {
@@ -65,10 +67,11 @@ test("diff layer scrolls horizontally without wrapping", () => {
   assert.match(source, /data-gitpanel-diff-path\b[\s\S]*?wordBreak: "break-all"/);
 });
 
-test("narrow mobile stretches the toolbar select to full row width", () => {
+test("narrow mobile stretches the toolbar pickers to full row width", () => {
   assert.match(source, /const narrowMobile = useIsNarrowMobile\(\);/);
   assert.match(source, /data-gitpanel-narrow=\{narrowMobile \? "true" : "false"\}/);
-  assert.match(source, /flex: narrowMobile \? "1 1 100%" : 1/);
+  assert.match(source, /flex: stretch \? "1 1 100%" : 1/);
+  assert.match(source, /stretch=\{narrowMobile\}/);
   assert.doesNotMatch(source, /max-width: 640|max-width: 480/);
 });
 
@@ -80,10 +83,37 @@ test("back navigation stays in-panel: no gesture routing, no new breakpoints", a
   }
 });
 
-test("repository options show relative path and current branch", () => {
-  assert.match(source, /repo\.relativePath === "\." \|\| repo\.relativePath === ""/);
-  assert.match(source, /`\$\{repo\.name\} \(\$\{repo\.relativePath\} · \$\{repo\.branch\}\)`/);
-  assert.match(source, /`\$\{repo\.name\} \(\$\{repo\.branch\}\)`/);
+test("repository and branch pickers are custom dropdowns, not native selects", () => {
+  assert.doesNotMatch(source, /<select/);
+  assert.match(source, /function GitDropdown/);
+  assert.match(source, /role="listbox"/);
+  assert.match(source, /document\.addEventListener\("mousedown", handler\)/);
+  assert.match(source, /event\.key === "Escape"/);
+  assert.match(source, /options=\{repositories\.map\(\(repo\) => \(\{\s*value: repo\.repositoryRoot,\s*primary: repo\.name,\s*secondary: repo\.relativePath === "\." \|\| repo\.relativePath === "" \? undefined : repo\.relativePath,\s*\}\)\)\}/);
+  assert.match(source, /options=\{branches\.map\(\(branch\) => \(\{ value: branch, primary: branch \}\)\)\}/);
+});
+
+test("branch selection: branches API feeds the picker, log follows the selected ref", () => {
+  assert.match(source, /\/api\/git\/branches\?repo=\$\{encodeURIComponent\(selectedRepo\)\}/);
+  assert.match(source, /setSelectedBranch\(data\.current \?\? data\.branches\[0\] \?\? null\)/);
+  assert.match(source, /\/api\/git\/log\?repo=\$\{encodeURIComponent\(repo\)\}&ref=\$\{encodeURIComponent\(ref\)\}/);
+  assert.match(source, /void loadCommits\(selectedRepo, selectedBranch \?\? "", 0\)/);
+  const branchHandler = source.match(/const selectBranch = \(branch: string\) => \{[\s\S]*?\n  \};/)?.[0];
+  assert.ok(branchHandler);
+  assert.match(branchHandler, /setSelectedBranch\(branch\)/);
+  assert.match(branchHandler, /setView\(\{ type: "log" \}\)/);
+});
+
+test("commit rows render full subject and body with a hash/author/time meta row", () => {
+  const rows = source.match(/\{commits\.map\(\(commit\) => \([\s\S]*?\n          \)\)\}/)?.[0];
+  assert.ok(rows);
+  const prewrap = rows.match(/whiteSpace: "pre-wrap", wordBreak: "break-word"/g) ?? [];
+  assert.ok(prewrap.length >= 2, "subject and body must wrap fully");
+  assert.match(rows, /commit\.body !== "" &&/);
+  assert.match(rows, /commit\.subject/);
+  assert.match(rows, /commit\.shortHash/);
+  assert.match(rows, /commit\.author/);
+  assert.match(rows, /formatRelativeTime/);
 });
 
 test("manual rescan bypasses the discovery cache with refresh=1", () => {

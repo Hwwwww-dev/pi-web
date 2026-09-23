@@ -20,6 +20,13 @@ interface CommitSummary {
   author: string;
   timestamp: number;
   subject: string;
+  body: string;
+}
+
+/** One row of `GET /api/git/branches`. */
+interface RepositoryBranches {
+  branches: string[];
+  current: string | null;
 }
 
 /** One row of `GET /api/git/commit` (without `path`). */
@@ -47,6 +54,128 @@ const STATUS_COLORS: Record<string, string> = {
 
 const LIST_ROW_MIN_HEIGHT = 36;
 const CONTROL_MIN_HEIGHT = 36;
+
+interface DropdownOption {
+  value: string;
+  primary: string;
+  secondary?: string;
+}
+
+/** Custom dropdown (no native select), modeled after the sidebar branch switcher. */
+function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, stretch, disabled = false }: {
+  value: string | null;
+  options: DropdownOption[];
+  onSelect: (value: string) => void;
+  ariaLabel: string;
+  placeholder: string;
+  icon: React.ReactNode;
+  stretch: boolean;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const keyHandler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", keyHandler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", keyHandler);
+    };
+  }, [open]);
+
+  const selected = options.find((option) => option.value === value) ?? null;
+  return (
+    <div ref={rootRef} style={{ position: "relative", flex: stretch ? "1 1 100%" : 1, minWidth: 0 }}>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        style={{
+          width: "100%", minHeight: CONTROL_MIN_HEIGHT,
+          display: "flex", alignItems: "center", gap: 6, padding: "0 10px",
+          background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 6,
+          color: "var(--text)", fontSize: 12, cursor: disabled ? "default" : "pointer", textAlign: "left",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", flexShrink: 0, color: "var(--text-dim)" }} aria-hidden="true">{icon}</span>
+        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {selected ? selected.primary : placeholder}
+        </span>
+        {selected?.secondary && (
+          <span style={{
+            flexShrink: 0, maxWidth: "45%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)",
+          }}>{selected.secondary}</span>
+        )}
+        <svg
+          width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor"
+          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+          style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
+        >
+          <polyline points="2 3.5 5 6.5 8 3.5" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 100,
+            background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8,
+            boxShadow: "0 6px 20px rgba(0,0,0,0.10)", overflow: "hidden",
+          }}
+        >
+          <div style={{ maxHeight: "min(40vh, 300px)", overflowY: "auto" }}>
+            {options.map((option) => {
+              const isSelected = option.value === value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => { setOpen(false); onSelect(option.value); }}
+                  style={{
+                    display: "flex", width: "100%", alignItems: "center", gap: 7,
+                    minHeight: LIST_ROW_MIN_HEIGHT, padding: "6px 10px",
+                    background: "var(--bg)", border: "none", borderBottom: "1px solid var(--border)",
+                    color: isSelected ? "var(--text)" : "var(--text-muted)",
+                    cursor: "pointer", textAlign: "left", fontSize: 12,
+                  }}
+                >
+                  {isSelected ? (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
+                      <polyline points="1.5 5 4 7.5 8.5 2.5" />
+                    </svg>
+                  ) : (
+                    <span style={{ width: 10, flexShrink: 0 }} />
+                  )}
+                  <span style={{ flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{option.primary}</span>
+                  {option.secondary && (
+                    <span style={{
+                      flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", textAlign: "right",
+                    }}>{option.secondary}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function trimTrailingSlash(value: string): string {
   return value.length > 1 ? value.replace(/\/+$/, "") : value;
@@ -81,6 +210,10 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   const [reposLoading, setReposLoading] = useState(false);
   const [reposError, setReposError] = useState<string | null>(null);
+
+  const [branches, setBranches] = useState<string[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
+  const [branchesLoading, setBranchesLoading] = useState(false);
 
   const [view, setView] = useState<GitView>({ type: "log" });
 
@@ -125,6 +258,8 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
   useEffect(() => {
     setRepositories([]);
     setSelectedRepo(null);
+    setBranches([]);
+    setSelectedBranch(null);
     setView({ type: "log" });
     setCommits([]);
     setHasMore(false);
@@ -132,12 +267,40 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
     void loadRepositories();
   }, [loadRepositories]);
 
-  const loadCommits = useCallback(async (repo: string, offset: number) => {
+  // Branch list follows the selected repository; the checked-out branch is the default.
+  useEffect(() => {
+    if (!selectedRepo) {
+      setBranches([]);
+      setSelectedBranch(null);
+      return;
+    }
+    let cancelled = false;
+    setBranchesLoading(true);
+    fetchJson<RepositoryBranches>(`/api/git/branches?repo=${encodeURIComponent(selectedRepo)}`)
+      .then((data) => {
+        if (cancelled) return;
+        setBranches(data.branches);
+        setSelectedBranch(data.current ?? data.branches[0] ?? null);
+      })
+      .catch(() => {
+        // No branch list (e.g. a non-branch checkout): the log falls back to HEAD.
+        if (!cancelled) {
+          setBranches([]);
+          setSelectedBranch(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBranchesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedRepo]);
+
+  const loadCommits = useCallback(async (repo: string, ref: string, offset: number) => {
     setCommitsLoading(true);
     setCommitsError(null);
     try {
       const data = await fetchJson<{ commits: CommitSummary[]; hasMore: boolean }>(
-        `/api/git/log?repo=${encodeURIComponent(repo)}&limit=${LOG_PAGE_SIZE}&offset=${offset}`,
+        `/api/git/log?repo=${encodeURIComponent(repo)}&ref=${encodeURIComponent(ref)}&limit=${LOG_PAGE_SIZE}&offset=${offset}`,
       );
       setCommits((current) => offset === 0 ? data.commits : [...current, ...data.commits]);
       setHasMore(data.hasMore);
@@ -149,11 +312,11 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
   }, []);
 
   useEffect(() => {
-    if (view.type !== "log" || !selectedRepo) return;
+    if (view.type !== "log" || !selectedRepo || branchesLoading) return;
     setCommits([]);
     setHasMore(false);
-    void loadCommits(selectedRepo, 0);
-  }, [selectedRepo, view.type, loadCommits]);
+    void loadCommits(selectedRepo, selectedBranch ?? "", 0);
+  }, [selectedRepo, selectedBranch, branchesLoading, view.type, loadCommits]);
 
   useEffect(() => {
     if ((view.type !== "files" && view.type !== "diff") || !selectedRepo) return;
@@ -197,6 +360,14 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
   const selectRepository = (repositoryRoot: string) => {
     if (repositoryRoot === selectedRepo) return;
     setSelectedRepo(repositoryRoot);
+    setBranches([]);
+    setSelectedBranch(null);
+    setView({ type: "log" });
+  };
+
+  const selectBranch = (branch: string) => {
+    if (branch === selectedBranch) return;
+    setSelectedBranch(branch);
     setView({ type: "log" });
   };
 
@@ -204,6 +375,8 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
     display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
     minHeight: CONTROL_MIN_HEIGHT,
     padding: "0 10px",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
     background: "transparent",
     border: "1px solid var(--border)",
     borderRadius: 6,
@@ -227,10 +400,10 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
         <button type="button" onClick={() => setView({ type: "log" })} style={buttonStyle}>
           ‹ {t("gitPanel.back")}
         </button>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)" }}>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", flexShrink: 0 }}>
           {commit.shortHash}
         </span>
-        <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
           {commit.subject}
         </span>
       </div>
@@ -310,7 +483,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
       data-gitpanel-narrow={narrowMobile ? "true" : "false"}
       style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", color: "var(--text)" }}
     >
-      {/* Toolbar: repository select + rescan */}
+      {/* Toolbar: repository picker + branch picker + rescan */}
       <div
         data-gitpanel-toolbar
         style={{
@@ -318,32 +491,41 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
           flexShrink: 0, padding: 8, borderBottom: "1px solid var(--border)",
         }}
       >
-        <select
-          value={selectedRepo ?? ""}
-          onChange={(event) => selectRepository(event.target.value)}
-          aria-label={t("gitPanel.selectRepository")}
+        <GitDropdown
+          stretch={narrowMobile}
+          value={selectedRepo}
           disabled={repositories.length === 0}
-          style={{
-            flex: narrowMobile ? "1 1 100%" : 1,
-            minWidth: 0,
-            minHeight: CONTROL_MIN_HEIGHT,
-            background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            color: "var(--text)",
-            fontSize: 12,
-            padding: "0 8px",
-          }}
-        >
-          {repositories.length === 0 && <option value="">{t("gitPanel.noRepositories")}</option>}
-          {repositories.map((repo) => (
-            <option key={repo.repositoryRoot} value={repo.repositoryRoot}>
-              {repo.relativePath === "." || repo.relativePath === ""
-                ? `${repo.name} (${repo.branch})`
-                : `${repo.name} (${repo.relativePath} · ${repo.branch})`}
-            </option>
-          ))}
-        </select>
+          ariaLabel={t("gitPanel.selectRepository")}
+          placeholder={reposLoading ? t("gitPanel.loading") : t("gitPanel.noRepositories")}
+          icon={
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            </svg>
+          }
+          options={repositories.map((repo) => ({
+            value: repo.repositoryRoot,
+            primary: repo.name,
+            secondary: repo.relativePath === "." || repo.relativePath === "" ? undefined : repo.relativePath,
+          }))}
+          onSelect={selectRepository}
+        />
+        <GitDropdown
+          stretch={narrowMobile}
+          value={selectedBranch}
+          disabled={branches.length === 0}
+          ariaLabel={t("gitPanel.selectBranch")}
+          placeholder={t("gitPanel.branch")}
+          icon={
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="6" y1="3" x2="6" y2="15" />
+              <circle cx="18" cy="6" r="3" />
+              <circle cx="6" cy="18" r="3" />
+              <path d="M18 9a9 9 0 0 1-9 9" />
+            </svg>
+          }
+          options={branches.map((branch) => ({ value: branch, primary: branch }))}
+          onSelect={selectBranch}
+        />
         <button
           type="button"
           onClick={() => { void loadRepositories(true); }}
@@ -366,7 +548,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
           {reposLoading && repositories.length === 0 && (
             <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>
           )}
-          {commitsError && renderError(commitsError, () => { void loadCommits(selectedRepo, 0); })}
+          {commitsError && renderError(commitsError, () => { void loadCommits(selectedRepo, selectedBranch ?? "", 0); })}
           {!commitsError && !commitsLoading && commits.length === 0 && (
             <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.emptyLog")}</div>
           )}
@@ -378,21 +560,29 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
               style={{
                 display: "block", width: "100%", textAlign: "left",
                 minHeight: LIST_ROW_MIN_HEIGHT,
-                padding: "6px 12px",
+                padding: "8px 12px",
                 background: "transparent", border: "none", borderBottom: "1px solid var(--border)",
                 color: "var(--text)", cursor: "pointer",
               }}
             >
-              <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", flexShrink: 0 }}>
-                  {commit.shortHash}
-                </span>
-                <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {commit.subject}
-                </span>
+              <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                {commit.subject}
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
-                {commit.author} · {formatRelativeTime(new Date(commit.timestamp * 1000), locale)}
+              {commit.body !== "" && (
+                <div style={{
+                  fontSize: 11, color: "var(--text-muted)", lineHeight: 1.45, marginTop: 3,
+                  whiteSpace: "pre-wrap", wordBreak: "break-word",
+                }}>
+                  {commit.body}
+                </div>
+              )}
+              <div style={{
+                display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "2px 6px",
+                marginTop: 4, fontSize: 11, color: "var(--text-dim)",
+              }}>
+                <span style={{ fontFamily: "var(--font-mono)", flexShrink: 0 }}>{commit.shortHash}</span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{commit.author}</span>
+                <span style={{ flexShrink: 0 }}>{formatRelativeTime(new Date(commit.timestamp * 1000), locale)}</span>
               </div>
             </button>
           ))}
@@ -400,7 +590,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
             <div style={{ padding: 8 }}>
               <button
                 type="button"
-                onClick={() => { void loadCommits(selectedRepo, commits.length); }}
+                onClick={() => { void loadCommits(selectedRepo, selectedBranch ?? "", commits.length); }}
                 disabled={commitsLoading}
                 style={{ ...buttonStyle, width: "100%" }}
               >

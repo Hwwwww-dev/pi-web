@@ -1,22 +1,13 @@
 import fs from "node:fs";
 import { NextRequest, NextResponse } from "next/server";
 import { getAllowedFileRoots, isExistingFilePathAllowed, isFilePathAllowed, isWindowsAbsolutePath } from "@/lib/file-access";
-import { isEmptyRepositoryError, parseLogLimit, parseLogOffset, parseLogRef, readCommitLog } from "@/lib/git-history";
+import { readBranches } from "@/lib/git-history";
 
 export async function GET(request: NextRequest) {
   try {
     const repo = request.nextUrl.searchParams.get("repo")?.trim() ?? "";
     if (!repo || (!repo.startsWith("/") && !isWindowsAbsolutePath(repo))) {
       return NextResponse.json({ error: "repo must be an absolute path" }, { status: 400 });
-    }
-    const limit = parseLogLimit(request.nextUrl.searchParams.get("limit"));
-    const offset = parseLogOffset(request.nextUrl.searchParams.get("offset"));
-    if (limit === null || offset === null) {
-      return NextResponse.json({ error: "limit must be 1-100 and offset must be >= 0" }, { status: 400 });
-    }
-    const ref = parseLogRef(request.nextUrl.searchParams.get("ref"));
-    if (ref === null) {
-      return NextResponse.json({ error: "Invalid ref" }, { status: 400 });
     }
 
     const allowedRoots = await getAllowedFileRoots();
@@ -37,13 +28,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    const result = await readCommitLog(repo, limit, offset, ref);
+    const result = await readBranches(repo);
     return NextResponse.json(result);
   } catch (error) {
-    // A repository without commits is a normal empty state, not a failure.
-    if (isEmptyRepositoryError(error)) {
-      return NextResponse.json({ commits: [], hasMore: false });
-    }
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }

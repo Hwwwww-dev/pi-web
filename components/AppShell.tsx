@@ -82,7 +82,7 @@ type AutoNameStatus =
 
 const TOP_BAR_ICON_BUTTON_SIZE = 36;
 
-/** Persistent right-panel Git tab id; it is not closable and owns no FileViewer. */
+/** Right-panel Git tab id; closing it returns to chat, the sidebar entry reopens it. It owns no FileViewer. */
 const GIT_TAB_ID = "git";
 const GIT_PANEL_TAB: Tab = { id: GIT_TAB_ID, label: "", filePath: "", kind: "git" };
 const AGENT_PANEL_WIDTH = 420;
@@ -1149,7 +1149,10 @@ export function AppShell() {
   };
 
   const handleCloseFileTab = useCallback((tabId: string) => {
-    if (tabId === GIT_TAB_ID) return;
+    if (tabId === GIT_TAB_ID) {
+      setActiveFileTabId((current) => current === GIT_TAB_ID ? null : current);
+      return;
+    }
     if (terminalTabs.some((tab) => tab.id === tabId)) {
       setTerminalTabs((tabs) => tabs.map((tab) => tab.id === tabId && !tab.closing ? { ...tab, closing: "close" } : tab));
       return;

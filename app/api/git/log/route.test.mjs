@@ -65,6 +65,30 @@ test("paginates with limit and offset", async (t) => {
   assert.equal(shiftedData.hasMore, false);
 });
 
+test("follows the ref query parameter for branch selection", async (t) => {
+  const repo = await makeAllowedRepo(t);
+  await execFileAsync("git", ["-C", repo, "checkout", "-q", "-b", "feature/x"]);
+  await writeFile(path.join(repo, "branch.txt"), "b");
+  await execFileAsync("git", ["-C", repo, "add", "branch.txt"]);
+  await execFileAsync("git", ["-C", repo, "commit", "-q", "-m", "on branch"]);
+
+  const branchPage = await GET(makeRequest({ repo, ref: "feature/x" }));
+  const branchData = await branchPage.json();
+  assert.equal(branchData.commits[0].subject, "on branch");
+
+  const mainPage = await GET(makeRequest({ repo, ref: "main" }));
+  const mainData = await mainPage.json();
+  assert.equal(mainData.commits[0].subject, "commit 2");
+});
+
+test("rejects an invalid ref with 400", async (t) => {
+  const repo = await makeAllowedRepo(t);
+  for (const ref of ["-upload-pack=x", "a..b", "a.lock", "a b"]) {
+    const response = await GET(makeRequest({ repo, ref }));
+    assert.equal(response.status, 400, ref);
+  }
+});
+
 test("an empty repository yields an empty page, not an error", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "pi-web-git-log-route-empty-"));
   t.after(() => {

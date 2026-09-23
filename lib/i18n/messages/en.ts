@@ -393,6 +393,8 @@ export const enLocale: LocalePlugin = {
     "chat.shell": "Shell",
     "gitPanel.title": "Git",
     "gitPanel.selectRepository": "Select repository",
+    "gitPanel.selectBranch": "Select branch",
+    "gitPanel.branch": "Branch",
     "gitPanel.refresh": "Rescan repositories",
     "gitPanel.loading": "Loading…",
     "gitPanel.loadMore": "Load more",

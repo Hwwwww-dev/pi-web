@@ -18,11 +18,19 @@ export interface CommitSummary {
   /** Commit time as a UNIX timestamp (seconds). */
   timestamp: number;
   subject: string;
+  /** Commit message body (everything after the subject line), trimmed; empty when absent. */
+  body: string;
 }
 
 export interface CommitLogPage {
   commits: CommitSummary[];
   hasMore: boolean;
+}
+
+export interface BranchList {
+  branches: string[];
+  /** The checked-out branch; null on a detached HEAD. */
+  current: string | null;
 }
 
 export interface CommitFileChange {
@@ -56,6 +64,17 @@ export function parseLogOffset(raw: string | null): number | null {
   return Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+/**
+ * A `git log` ref from the query string: empty string means HEAD, null means
+ * rejected. Only plain branch-shaped names pass — no option injection (`-`),
+ * no range separators (`..`), no `.lock` suffix.
+ */
+export function parseLogRef(raw: string | null): string | null {
+  if (raw === null || raw === "") return "";
+  if (raw.length > 200) return null;
+  return /^[A-Za-z0-9._][A-Za-z0-9./_-]*$/.test(raw) && !raw.includes("..") && !raw.endsWith(".lock") ? raw : null;
+}
+
 async function git(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync("git", ["-C", cwd, ...args], {
     timeout: GIT_TIMEOUT_MS,
@@ -69,12 +88,13 @@ export function isEmptyRepositoryError(error: unknown): boolean {
   return error instanceof Error && /does not have any commits yet/.test(error.message);
 }
 
-export async function readCommitLog(repoRoot: string, limit: number, offset: number): Promise<CommitLogPage> {
+export async function readCommitLog(repoRoot: string, limit: number, offset: number, ref = ""): Promise<CommitLogPage> {
   let stdout: string;
   try {
     stdout = await git(repoRoot, [
       "log",
-      "--pretty=format:%H%x1f%h%x1f%an%x1f%at%x1f%s%x1e",
+      ...(ref ? [ref] : []),
+      "--pretty=format:%H%x1f%h%x1f%an%x1f%at%x1f%s%x1f%b%x1e",
       `--max-count=${limit + 1}`,
       `--skip=${offset}`,
     ]);
@@ -84,11 +104,22 @@ export async function readCommitLog(repoRoot: string, limit: number, offset: num
   }
   const records = stdout.split("\x1e").filter((record) => record.trim() !== "");
   const commits = records.map((record) => {
-    const [hash, shortHash, author, timestamp, subject] = record.trim().split("\x1f");
-    return { hash, shortHash, author, timestamp: Number(timestamp), subject };
+    const [hash, shortHash, author, timestamp, subject, body] = record.trim().split("\x1f");
+    return { hash, shortHash, author, timestamp: Number(timestamp), subject, body: (body ?? "").trim() };
   });
   const hasMore = commits.length > limit;
   return { commits: hasMore ? commits.slice(0, limit) : commits, hasMore };
+}
+
+/** Local branches of the repository plus the currently checked-out one. */
+export async function readBranches(repoRoot: string): Promise<BranchList> {
+  const [heads, current] = await Promise.all([
+    git(repoRoot, ["for-each-ref", "refs/heads", "--format=%(refname:short)"]),
+    git(repoRoot, ["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => ""),
+  ]);
+  const branches = heads.split("\n").map((line) => line.trim()).filter((line) => line !== "");
+  const checkedOut = current.trim();
+  return { branches, current: checkedOut !== "" ? checkedOut : null };
 }
 
 export async function readCommitFiles(repoRoot: string, hash: string): Promise<CommitFileChange[]> {

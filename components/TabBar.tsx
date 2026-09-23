@@ -48,7 +48,8 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
           <div
             key={tab.id}
             role="tab"
-            aria-label={tab.kind === "terminal" ? t("terminal.tabLabel", { name: tab.label }) : tab.kind === "git" ? t("gitPanel.title") : tab.label}            aria-selected={isActive}
+            aria-label={tab.kind === "terminal" ? t("terminal.tabLabel", { name: tab.label }) : tab.kind === "git" ? t("gitPanel.title") : tab.label}
+            aria-selected={isActive}
             tabIndex={isActive || (!activeTabId && tabs[0].id === tab.id) ? 0 : -1}
             onKeyDown={(event) => {
               if (event.target !== event.currentTarget) return;
@@ -117,14 +118,13 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               }}
               title={tab.filePath}
             >
-              {tab.label}
+              {tab.kind === "git" ? t("gitPanel.title") : tab.label}
             </span>
-            {tab.kind !== "git" && (
-              <button
-                disabled={tab.closing}
-                onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
-                onMouseEnter={() => setHoveredClose(tab.id)}
-                onMouseLeave={() => setHoveredClose(null)}
+            <button
+              disabled={tab.closing}
+              onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
+              onMouseEnter={() => setHoveredClose(tab.id)}
+              onMouseLeave={() => setHoveredClose(null)}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 24, height: 24,
@@ -137,15 +137,14 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
                 flexShrink: 0,
                 transition: "background 0.1s, color 0.1s",
               }}
-               title={t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")}
-               aria-label={`${t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")} ${tab.label}`}
+              title={t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")}
+              aria-label={`${t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")} ${tab.kind === "git" ? t("gitPanel.title") : tab.label}`}
             >
               <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
                 <line x1="2" y1="2" x2="8" y2="8" />
                 <line x1="8" y1="2" x2="2" y2="8" />
               </svg>
             </button>
-            )}
           </div>
         );
       })}
