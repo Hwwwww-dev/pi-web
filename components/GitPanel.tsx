@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsNarrowMobile } from "@/hooks/useIsMobile";
 import { formatRelativeTime } from "@/lib/i18n/format";
+import { DiffView } from "./DiffView";
 
 /** One row of `GET /api/git/repos`. */
 interface GitRepository {
@@ -511,19 +512,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
         {patchLoading && <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>}
         {patchError && renderError(patchError, () => setView({ type: "diff", commit, file }))}
-        {!patchError && !patchLoading && patch !== null && (
-          <pre
-            data-gitpanel-diff
-            style={{
-              margin: 0, padding: 8,
-              fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.5,
-              whiteSpace: "pre", overflowX: "auto",
-              color: "var(--text-muted)",
-            }}
-          >
-            {patch}
-          </pre>
-        )}
+        {!patchError && !patchLoading && patch !== null && <DiffView patch={patch} />}
       </div>
     </div>
   );

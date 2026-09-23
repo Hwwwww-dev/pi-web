@@ -62,8 +62,9 @@ test("commit rows and controls keep 36px touch targets", () => {
   assert.match(source, /minHeight: CONTROL_MIN_HEIGHT/);
 });
 
-test("diff layer scrolls horizontally without wrapping", () => {
-  assert.match(source, /data-gitpanel-diff\b[\s\S]*?whiteSpace: "pre", overflowX: "auto"/);
+test("diff layer reuses the shared DiffView renderer", () => {
+  assert.match(source, /import \{ DiffView \} from "\.\/DiffView";/);
+  assert.match(source, /patch !== null && <DiffView patch=\{patch\} \/>/);
   assert.match(source, /data-gitpanel-diff-path\b[\s\S]*?wordBreak: "break-all"/);
 });
 
