@@ -1055,6 +1055,14 @@ export function AppShell() {
     handleSessionForked(result.newSessionId);
   }, [handleSessionForked, translate]);
 
+  // Dismissing a keep-alive slot must leave nothing behind: the ChatWindow
+  // unmounts with the slot, and its parked scroll position goes too, so the
+  // next open is a full reload instead of a half-restored session.
+  const handleKeepAliveDismiss = useCallback((sessionId: string) => {
+    sessionScrollPositionsRef.current.delete(sessionId);
+    setKeepAliveSlots((slots) => slots.filter((slot) => slot.session.id !== sessionId));
+  }, []);
+
   const handleInitialRestoreDone = useCallback(() => {
     setInitialSessionRestored(true);
   }, []);
@@ -1062,6 +1070,7 @@ export function AppShell() {
   const handleSessionDeleted = useCallback((sessionId: string) => {
     invalidateWorkspaceRestore();
     setRefreshKey((k) => k + 1);
+    sessionScrollPositionsRef.current.delete(sessionId);
     setKeepAliveSlots((slots) => slots.filter((slot) => slot.session.id !== sessionId));
     if (selectedSession?.id === sessionId) {
       clearTabOpenSession(sessionId);
@@ -2246,7 +2255,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                             className="keepalive-menu-close"
                             title={translate("keepalive.close")}
                             aria-label={`${translate("keepalive.close")}: ${slot.session.name || slot.session.id}`}
-                            onClick={() => setKeepAliveSlots((slots) => slots.filter((item) => item.session.id !== slot.session.id))}
+                            onClick={() => handleKeepAliveDismiss(slot.session.id)}
                           >
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <path d="M18 6 6 18M6 6l12 12" />
