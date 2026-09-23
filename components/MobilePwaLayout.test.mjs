@@ -11,7 +11,7 @@ const chatInputSource = await readFile(new URL("./ChatInput.tsx", import.meta.ur
 const viewportHookSource = await readFile(new URL("../hooks/useViewportHeight.ts", import.meta.url), "utf8");
 
 test("configures iOS standalone mode to use the full screen", () => {
-  assert.match(layoutSource, /statusBarStyle: "black-translucent"/);
+  assert.match(layoutSource, /statusBarStyle: "black"/);
   assert.match(layoutSource, /viewportFit: "cover"/);
   assert.match(layoutSource, /interactiveWidget: "resizes-content"/);
   assert.match(cssSource, /@media \(display-mode: standalone\) \{[\s\S]*?--app-viewport-height: 100vh;/);
