@@ -339,6 +339,7 @@ export const zhTWLocale: LocalePlugin = {
     "chat.cancel": "取消",
     "chat.confirm": "確認",
     "chat.submit": "送出",
+    "chat.extensionCustomAnswer": "自訂答案（不勾選選項時提交此項）",
     "chat.extensionInput": "擴充功能終端輸入",
     "chat.extensionPanel": "擴充功能面板",
     "chat.extensionWidgets": "擴充功能小工具",

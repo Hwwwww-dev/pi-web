@@ -1593,6 +1593,25 @@ function extensionOptionTone(option: string): "affirmative" | "negative" | "neut
   return "neutral";
 }
 
+// pi has no toggle RPC for multi-select questions: the host sends an
+// input-method dialog whose title carries a numbered option list and asks
+// for comma-separated numbers ("1,3") in the text field. Detect that shape
+// so the web UI can offer real checkboxes instead of typed digits.
+function parseMultiSelectPrompt(title: string): { question: string; options: Array<{ id: string; label: string }> } | null {
+  const lines = title.split("\n");
+  const hintIndex = lines.findIndex((line) => /enter the numbers/i.test(line));
+  if (hintIndex < 0) return null;
+  const options: Array<{ id: string; label: string }> = [];
+  const question: string[] = [];
+  for (let i = 0; i < hintIndex; i++) {
+    const match = /^\s*(\d+)[.、)]\s*(.+)$/.exec(lines[i]);
+    if (match) options.push({ id: match[1], label: match[2].trim() });
+    else question.push(lines[i]);
+  }
+  if (options.length < 2) return null;
+  return { question: question.join("\n"), options };
+}
+
 function ExtensionDialog({
   request,
   onRespond,
@@ -1602,6 +1621,12 @@ function ExtensionDialog({
 }) {
   const { t } = useI18n();
   const [value, setValue] = useState(request.method === "editor" ? request.prefill ?? "" : "");
+  const multiSelect = request.method === "input" ? parseMultiSelectPrompt(request.title) : null;
+  const [checkedIds, setCheckedIds] = useState<readonly string[]>([]);
+  const [customAnswer, setCustomAnswer] = useState("");
+  const toggleMultiOption = (id: string) => {
+    setCheckedIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
+  };
   const [collapsed, setCollapsed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const focusFirstOption = useCallback((element: HTMLDivElement | null) => element?.focus(), []);
@@ -1626,6 +1651,11 @@ function ExtensionDialog({
   const submitValue = () => {
     if (request.method === "confirm") {
       onRespond(request, { confirmed: true });
+    } else if (multiSelect) {
+      const value = checkedIds.length > 0
+        ? checkedIds.slice().sort((a, b) => Number(a) - Number(b)).join(",")
+        : customAnswer;
+      onRespond(request, { value });
     } else {
       onRespond(request, { value });
     }
@@ -1716,7 +1746,7 @@ function ExtensionDialog({
           <div style={{ flex: 1, minWidth: 0 }}>
             {/* Pi's TUI shows the title verbatim, newlines included; select/input have no
                 separate message field, so extensions put multi-line text here. */}
-            <ExtensionDialogTitle title={request.title} />
+            <ExtensionDialogTitle title={multiSelect ? multiSelect.question || request.title : request.title} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
               <span>{t("chat.extensionRequest")}</span>
               {countdown}
@@ -1822,7 +1852,87 @@ function ExtensionDialog({
               })}
             </div>
           )}
-          {request.method === "input" && (
+          {request.method === "input" && (multiSelect ? (
+            <div style={{ display: "grid", gap: 6 }}>
+              {multiSelect.options.map((option, index) => {
+                const checked = checkedIds.includes(option.id);
+                return (
+                  <div
+                    key={option.id}
+                    role="checkbox"
+                    aria-checked={checked}
+                    tabIndex={0}
+                    className="extension-multi-option"
+                    aria-label={option.label}
+                    ref={index === 0 ? focusFirstOption : undefined}
+                    onClick={() => toggleMultiOption(option.id)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      toggleMultiOption(option.id);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 8,
+                      padding: "7px 10px",
+                      borderRadius: 8,
+                      border: `1px solid ${checked ? "var(--accent)" : "var(--border)"}`,
+                      background: checked ? "var(--bg-selected)" : undefined,
+                      color: "var(--text)",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontSize: 12.5,
+                      overflowWrap: "anywhere",
+                      scrollMargin: 14,
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      style={{
+                        flexShrink: 0,
+                        display: "grid",
+                        placeItems: "center",
+                        width: 15,
+                        height: 15,
+                        marginTop: 1,
+                        borderRadius: 4,
+                        border: `1px solid ${checked ? "var(--accent)" : "var(--border)"}`,
+                        background: checked ? "var(--accent)" : "transparent",
+                        color: "var(--accent-contrast)",
+                        fontSize: 10,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {checked ? "✓" : ""}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontWeight: 600, marginRight: 6 }}>{option.id}.</span>
+                      {option.label}
+                    </span>
+                  </div>
+                );
+              })}
+              <input
+                value={customAnswer}
+                placeholder={t("chat.extensionCustomAnswer")}
+                onChange={(e) => setCustomAnswer(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
+                }}
+                style={{
+                  width: "100%",
+                  padding: "9px 10px",
+                  borderRadius: 7,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-panel)",
+                  color: "var(--text)",
+                  outline: "none",
+                  fontSize: 13,
+                }}
+              />
+            </div>
+          ) : (
             <input
               autoFocus
               value={value}
@@ -1842,7 +1952,7 @@ function ExtensionDialog({
                 fontSize: 13,
               }}
             />
-          )}
+          ))}
           {request.method === "editor" && (
             <textarea
               autoFocus

@@ -1949,6 +1949,8 @@ span.token.table {
 .extension-option.tone-affirmative:not(:disabled):hover { background: rgba(22, 163, 74, 0.22) }
 .extension-option.tone-negative { background: rgba(239, 68, 68, 0.1) }
 .extension-option.tone-negative:not(:disabled):hover { background: rgba(239, 68, 68, 0.2) }
+.extension-multi-option { user-select: none; }
+.extension-multi-option:hover { background: var(--bg-hover); }
 /* Flex rows, not a table: WebKit's auto table layout gives the value column
    only its min-content when overflow-wrap: anywhere is set, crushing values
    like "external_directory" into one character per line on narrow screens. */

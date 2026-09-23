@@ -339,6 +339,7 @@ export const enLocale: LocalePlugin = {
     "chat.cancel": "Cancel",
     "chat.confirm": "Confirm",
     "chat.submit": "Submit",
+    "chat.extensionCustomAnswer": "Custom answer (submitted when nothing is checked)",
     "chat.extensionInput": "Extension terminal input",
     "chat.extensionPanel": "Extension panel",
     "chat.extensionWidgets": "Extension widgets",

@@ -37,7 +37,7 @@ test("renders extension confirmation and options as markdown", () => {
 
 test("preserves title newlines like pi's TUI and keeps long titles from hiding the body", () => {
   const header = dialogSource.slice(dialogSource.indexOf('role="dialog"'), dialogSource.indexOf("{request.method === \"confirm\""));
-  assert.match(header, /<ExtensionDialogTitle title=\{request\.title\} \/>/);
+  assert.match(header, /<ExtensionDialogTitle title=\{multiSelect \? multiSelect\.question \|\| request\.title : request\.title\} \/>/);
   assert.match(header, /maxHeight: 180, overflowY: "auto" \}\}>/);
 });
 
