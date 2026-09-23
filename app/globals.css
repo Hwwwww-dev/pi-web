@@ -1954,19 +1954,8 @@ span.token.table {
 .extension-kv-table td:first-child { width: 1%; padding-right: 14px; color: var(--text-muted); white-space: nowrap; }
 .extension-kv-table td:last-child { font-family: var(--font-mono); color: var(--text); }
 
-/* Keep-alive session menu (top toolbar) */
-.keepalive-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  min-width: 260px;
-  max-width: 340px;
-  padding: 4px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-}
+/* Keep-alive session menu (top toolbar); the panel itself renders in the
+   shared top-panel dropdown container — only row styles live here. */
 .keepalive-menu-empty {
   padding: 10px 12px;
   font-size: 12px;
