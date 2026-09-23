@@ -438,7 +438,9 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
             </span>
             {!filesLoading && files.length > 0 && (
               <span style={{ flexShrink: 0, fontFamily: "var(--font-mono)" }}>
-                {t("gitPanel.filesChanged", { count: files.length })}{` +${totals.additions} −${totals.deletions}`}
+                {t("gitPanel.filesChanged", { count: files.length })}
+                <span style={{ color: "var(--diff-add)" }}>{` +${totals.additions}`}</span>
+                <span style={{ color: "var(--diff-del)" }}>{` −${totals.deletions}`}</span>
               </span>
             )}
           </div>
@@ -482,8 +484,9 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
               {file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}
             </span>
             {file.additions !== null && file.deletions !== null && (
-              <span style={{ flexShrink: 0, fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}>
-                +{file.additions} −{file.deletions}
+              <span style={{ flexShrink: 0, fontSize: 10, fontFamily: "var(--font-mono)" }}>
+                <span style={{ color: "var(--diff-add)" }}>+{file.additions}</span>{" "}
+                <span style={{ color: "var(--diff-del)" }}>−{file.deletions}</span>
               </span>
             )}
           </button>
@@ -600,7 +603,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
           {!commitsError && !commitsLoading && commits.length === 0 && (
             <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.emptyLog")}</div>
           )}
-          {commits.map((commit) => (
+          {commits.map((commit, index) => (
             <button
               key={commit.hash}
               type="button"
@@ -620,13 +623,15 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                   {commit.subject}
                 </span>
-                <span style={{
-                  flexShrink: 0, fontSize: 10, fontWeight: 400, padding: "0 6px", borderRadius: 8,
-                  border: `1px solid ${commit.pushed ? "var(--border)" : "#e2b93d"}`,
-                  color: commit.pushed ? "var(--text-dim)" : "#e2b93d",
-                }}>
-                  {t(commit.pushed ? "gitPanel.pushed" : "gitPanel.notPushed")}
-                </span>
+                {(index === 0 || commits[index - 1].pushed !== commit.pushed) && (
+                  <span style={{
+                    flexShrink: 0, fontSize: 10, fontWeight: 400, padding: "0 6px", borderRadius: 8,
+                    border: `1px solid ${commit.pushed ? "var(--border)" : "#e2b93d"}`,
+                    color: commit.pushed ? "var(--text-dim)" : "#e2b93d",
+                  }}>
+                    {t(commit.pushed ? "gitPanel.pushed" : "gitPanel.notPushed")}
+                  </span>
+                )}
               </div>
               <div style={{
                 display: "flex", alignItems: "baseline", gap: 6,

@@ -104,11 +104,13 @@ test("branch selection: branches API feeds the picker, log follows the selected 
   assert.match(branchHandler, /setView\(\{ type: "log" \}\)/);
 });
 
-test("commit rows are summary lines: subject, pushed badge, hash/author/time", () => {
-  const rows = source.match(/\{commits\.map\(\(commit\) => \([\s\S]*?\n          \)\)\}/)?.[0];
+test("commit rows are summary lines: subject, boundary pushed badge, hash/author/time", () => {
+  const rows = source.match(/\{commits\.map\(\(commit, index\) => \([\s\S]*?\n          \)\)\}/)?.[0];
   assert.ok(rows);
   // Single-line subject; no body in the list (it lives in the detail layer).
   assert.match(rows, /overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1/);
+  // Remote badge only at state boundaries: first row and pushed-state transitions.
+  assert.match(rows, /\(index === 0 \|\| commits\[index - 1\]\.pushed !== commit\.pushed\) && \(/);
   assert.match(rows, /commit\.pushed \? "gitPanel\.pushed" : "gitPanel\.notPushed"/);
   assert.doesNotMatch(rows, /commit\.body/);
   assert.match(rows, /commit\.shortHash/);
@@ -122,10 +124,14 @@ test("detail layer shows full commit info, totals and per-file line counts", () 
   assert.match(detailLayer, /\{commit\.hash\}/);
   assert.match(detailLayer, /commit\.pushed \? "gitPanel\.pushed" : "gitPanel\.notPushed"/);
   assert.match(detailLayer, /gitPanel\.filesChanged/);
-  assert.match(detailLayer, /\+\$\{totals\.additions\} −\$\{totals\.deletions\}/);
+  assert.match(detailLayer, /\+\$\{totals\.additions\}/);
+  assert.match(detailLayer, /−\$\{totals\.deletions\}/);
   assert.match(detailLayer, /whiteSpace: "pre-wrap", wordBreak: "break-word"/);
-  // Per-file counts on each row; binary files (null counts) render no counts.
-  assert.match(detailLayer, /\+\{file\.additions\} −\{file\.deletions\}/);
+  // Per-file counts colored per theme; binary files (null counts) render no counts.
+  assert.match(detailLayer, /color: "var\(--diff-add\)" \}\}>\+\{file\.additions\}/);
+  assert.match(detailLayer, /color: "var\(--diff-del\)" \}\}>−\{file\.deletions\}/);
+  assert.match(source, /var\(--diff-add\)/g);
+  assert.match(source, /var\(--diff-del\)/g);
   assert.match(detailLayer, /file\.additions !== null && file\.deletions !== null/);
   assert.match(source, /interface CommitDetailFile \{[\s\S]*?additions: number \| null;[\s\S]*?deletions: number \| null;/);
   assert.match(source, /\{ files: CommitDetailFile\[\]; totalAdditions: number; totalDeletions: number \}/);
