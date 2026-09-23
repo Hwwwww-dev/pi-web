@@ -20,6 +20,8 @@ export interface CommitSummary {
   subject: string;
   /** Commit message body (everything after the subject line), trimmed; empty when absent. */
   body: string;
+  /** True when the commit is reachable from at least one remote branch. */
+  pushed: boolean;
 }
 
 export interface CommitLogPage {
@@ -108,7 +110,21 @@ export async function readCommitLog(repoRoot: string, limit: number, offset: num
     return { hash, shortHash, author, timestamp: Number(timestamp), subject, body: (body ?? "").trim() };
   });
   const hasMore = commits.length > limit;
-  return { commits: hasMore ? commits.slice(0, limit) : commits, hasMore };
+  const page = hasMore ? commits.slice(0, limit) : commits;
+  const pushed = await computeRemoteStatus(repoRoot, page.map((commit) => commit.hash));
+  return { commits: page.map((commit, index) => ({ ...commit, pushed: pushed[index] })), hasMore };
+}
+
+/** Whether each commit is reachable from any remote branch (`git branch -r --contains`). */
+async function computeRemoteStatus(repoRoot: string, hashes: string[]): Promise<boolean[]> {
+  return Promise.all(hashes.map(async (hash) => {
+    try {
+      const out = await git(repoRoot, ["branch", "-r", "--contains", hash]);
+      return out.trim() !== "";
+    } catch {
+      return false;
+    }
+  }));
 }
 
 /** Local branches of the repository plus the currently checked-out one. */
@@ -143,6 +159,54 @@ export async function readCommitFiles(repoRoot: string, hash: string): Promise<C
     }
   }
   return files;
+}
+
+export interface CommitDetailFile extends CommitFileChange {
+  /** Added lines; null for binary files. */
+  additions: number | null;
+  /** Deleted lines; null for binary files. */
+  deletions: number | null;
+}
+
+export interface CommitDetail {
+  files: CommitDetailFile[];
+  totalAdditions: number;
+  totalDeletions: number;
+}
+
+/** One commit's changed files with per-file and total line counts. */
+export async function readCommitDetail(repoRoot: string, hash: string): Promise<CommitDetail> {
+  const [files, numstat] = await Promise.all([
+    readCommitFiles(repoRoot, hash),
+    git(repoRoot, ["show", hash, "--format=", "--numstat", "-z", "--no-color"]),
+  ]);
+  const records = numstat.split("\0");
+  const counts = new Map<string, { additions: number | null; deletions: number | null }>();
+  for (let i = 0; i < records.length; i++) {
+    const match = records[i].match(/^(\d+|-)\t(\d+|-)\t([\s\S]*)$/);
+    if (!match) continue;
+    let dest = match[3];
+    if (dest === "") {
+      // Rename/copy record: `counts\t\0old\0new\0` — the new path is the second next field.
+      dest = records[i + 2] ?? "";
+      i += 2;
+    }
+    if (dest === "") continue;
+    counts.set(dest, {
+      additions: match[1] === "-" ? null : Number(match[1]),
+      deletions: match[2] === "-" ? null : Number(match[2]),
+    });
+  }
+  const detailFiles: CommitDetailFile[] = files.map((file) => ({
+    ...file,
+    additions: counts.get(file.path)?.additions ?? null,
+    deletions: counts.get(file.path)?.deletions ?? null,
+  }));
+  return {
+    files: detailFiles,
+    totalAdditions: detailFiles.reduce((sum, file) => sum + (file.additions ?? 0), 0),
+    totalDeletions: detailFiles.reduce((sum, file) => sum + (file.deletions ?? 0), 0),
+  };
 }
 
 /** The unified diff of one file within a commit, or null when unchanged there. */

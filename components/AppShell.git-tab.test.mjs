@@ -6,11 +6,15 @@ const appShellSource = await readFile(new URL("./AppShell.tsx", import.meta.url)
 const tabBarSource = await readFile(new URL("./TabBar.tsx", import.meta.url), "utf8");
 const sidebarSource = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
 
-test("the Git tab is persistent and closing it returns to chat", () => {
+test("the Git tab is opened from the sidebar and removed by its close button", () => {
   assert.match(appShellSource, /const GIT_TAB_ID = "git";/);
   assert.match(appShellSource, /const GIT_PANEL_TAB: Tab = \{ id: GIT_TAB_ID, label: "", filePath: "", kind: "git" \};/);
-  assert.match(appShellSource, /const panelTabs: Tab\[\] = \[GIT_PANEL_TAB, \.\.\.fileTabs/);
-  assert.match(appShellSource, /if \(tabId === GIT_TAB_ID\) \{\s*setActiveFileTabId\(\(current\) => current === GIT_TAB_ID \? null : current\);\s*return;\s*\}/);
+  // The tab only exists in the bar while open; × removes it instead of deactivating it.
+  assert.match(appShellSource, /const \[gitPanelOpen, setGitPanelOpen\] = useState\(false\);/);
+  assert.match(appShellSource, /const panelTabs: Tab\[\] = \[\.\.\.\(gitPanelOpen \? \[GIT_PANEL_TAB\] : \[\]\), \.\.\.fileTabs/);
+  assert.match(appShellSource, /if \(tabId === GIT_TAB_ID\) \{\s*setGitPanelOpen\(false\);\s*setActiveFileTabId\(\(current\) => current === GIT_TAB_ID \? null : current\);\s*if \(!fileTabs\.length && !terminalTabs\.length\) setRightPanelOpen\(false\);\s*return;\s*\}/);
+  // A page refresh with the Git tab active restores it (sessionStorage activeId).
+  assert.match(appShellSource, /if \(saved\.activeId === GIT_TAB_ID\) setGitPanelOpen\(true\);/);
 });
 
 test("the Git tab renders GitPanel and file tabs keep rendering FileViewer", () => {
@@ -19,7 +23,7 @@ test("the Git tab renders GitPanel and file tabs keep rendering FileViewer", () 
 });
 
 test("the explorer header button opens the right panel on the Git tab", () => {
-  assert.match(appShellSource, /const handleOpenGitPanel = useCallback\(\(\) => \{\s*setActiveFileTabId\(GIT_TAB_ID\);\s*setRightPanelOpen\(true\);/);
+  assert.match(appShellSource, /const handleOpenGitPanel = useCallback\(\(\) => \{\s*setGitPanelOpen\(true\);\s*setActiveFileTabId\(GIT_TAB_ID\);\s*setRightPanelOpen\(true\);/);
   assert.match(appShellSource, /onOpenGitPanel=\{handleOpenGitPanel\}/);
   assert.match(sidebarSource, /onOpenGitPanel\?: \(\) => void;/);
   assert.match(sidebarSource, /\{onOpenGitPanel && \(\s*<ToolbarIconButton\s*onClick=\{onOpenGitPanel\}/);

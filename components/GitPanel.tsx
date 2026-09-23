@@ -21,6 +21,8 @@ interface CommitSummary {
   timestamp: number;
   subject: string;
   body: string;
+  /** Reachable from at least one remote branch. */
+  pushed: boolean;
 }
 
 /** One row of `GET /api/git/branches`. */
@@ -29,17 +31,21 @@ interface RepositoryBranches {
   current: string | null;
 }
 
-/** One row of `GET /api/git/commit` (without `path`). */
-interface CommitFileChange {
+/** One row of `GET /api/git/commit` (without `path`): changed file with line counts. */
+interface CommitDetailFile {
   path: string;
   status: string;
   previousPath?: string;
+  /** Added lines; null for binary files. */
+  additions: number | null;
+  /** Deleted lines; null for binary files. */
+  deletions: number | null;
 }
 
 type GitView =
   | { type: "log" }
-  | { type: "files"; commit: CommitSummary }
-  | { type: "diff"; commit: CommitSummary; file: CommitFileChange };
+  | { type: "detail"; commit: CommitSummary }
+  | { type: "diff"; commit: CommitSummary; file: CommitDetailFile };
 
 const LOG_PAGE_SIZE = 20;
 
@@ -222,7 +228,8 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
   const [commitsLoading, setCommitsLoading] = useState(false);
   const [commitsError, setCommitsError] = useState<string | null>(null);
 
-  const [files, setFiles] = useState<CommitFileChange[]>([]);
+  const [files, setFiles] = useState<CommitDetailFile[]>([]);
+  const [totals, setTotals] = useState<{ additions: number; deletions: number }>({ additions: 0, deletions: 0 });
   const [filesLoading, setFilesLoading] = useState(false);
   const [filesError, setFilesError] = useState<string | null>(null);
   // Commit hash whose file list is already loaded; shared by the files layer and the split diff view.
@@ -319,18 +326,23 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
   }, [selectedRepo, selectedBranch, branchesLoading, view.type, loadCommits]);
 
   useEffect(() => {
-    if ((view.type !== "files" && view.type !== "diff") || !selectedRepo) return;
+    if ((view.type !== "detail" && view.type !== "diff") || !selectedRepo) return;
     const { commit } = view;
     if (filesLoadedForRef.current === commit.hash) return;
     filesLoadedForRef.current = commit.hash;
     setFiles([]);
+    setTotals({ additions: 0, deletions: 0 });
     setFilesLoading(true);
     setFilesError(null);
     let cancelled = false;
-    fetchJson<{ files: CommitFileChange[] }>(
+    fetchJson<{ files: CommitDetailFile[]; totalAdditions: number; totalDeletions: number }>(
       `/api/git/commit?repo=${encodeURIComponent(selectedRepo)}&hash=${encodeURIComponent(commit.hash)}`,
     )
-      .then((data) => { if (!cancelled) setFiles(data.files); })
+      .then((data) => {
+        if (cancelled) return;
+        setFiles(data.files);
+        setTotals({ additions: data.totalAdditions, deletions: data.totalDeletions });
+      })
       .catch((error: unknown) => {
         if (!cancelled) {
           filesLoadedForRef.current = null;
@@ -394,22 +406,53 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
     </div>
   );
 
-  const renderFilesLayer = (commit: CommitSummary) => (
+  const renderDetailLayer = (commit: CommitSummary) => (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
         <button type="button" onClick={() => setView({ type: "log" })} style={buttonStyle}>
           ‹ {t("gitPanel.back")}
         </button>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", flexShrink: 0 }}>
-          {commit.shortHash}
-        </span>
-        <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
           {commit.subject}
         </span>
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <div style={{
+          padding: "8px 12px", borderBottom: "1px solid var(--border)",
+          display: "flex", flexDirection: "column", gap: 5,
+        }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", wordBreak: "break-all" }}>
+            {commit.hash}
+          </span>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "2px 8px", fontSize: 11, color: "var(--text-dim)" }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{commit.author}</span>
+            <span title={new Date(commit.timestamp * 1000).toLocaleString()} style={{ flexShrink: 0 }}>
+              {formatRelativeTime(new Date(commit.timestamp * 1000), locale)}
+            </span>
+            <span style={{
+              flexShrink: 0, fontSize: 10, padding: "1px 6px", borderRadius: 8,
+              border: `1px solid ${commit.pushed ? "var(--border)" : "#e2b93d"}`,
+              color: commit.pushed ? "var(--text-dim)" : "#e2b93d",
+            }}>
+              {t(commit.pushed ? "gitPanel.pushed" : "gitPanel.notPushed")}
+            </span>
+            {!filesLoading && files.length > 0 && (
+              <span style={{ flexShrink: 0, fontFamily: "var(--font-mono)" }}>
+                {t("gitPanel.filesChanged", { count: files.length })}{` +${totals.additions} −${totals.deletions}`}
+              </span>
+            )}
+          </div>
+          {commit.body !== "" && (
+            <div style={{
+              fontSize: 11, color: "var(--text-muted)", lineHeight: 1.45,
+              whiteSpace: "pre-wrap", wordBreak: "break-word",
+            }}>
+              {commit.body}
+            </div>
+          )}
+        </div>
         {filesLoading && <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>}
-        {filesError && renderError(filesError, () => setView({ type: "files", commit }))}
+        {filesError && renderError(filesError, () => setView({ type: "detail", commit }))}
         {!filesError && !filesLoading && files.length === 0 && (
           <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.emptyFiles")}</div>
         )}
@@ -435,19 +478,24 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
             }}>
               {file.status}
             </span>
-            <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}
             </span>
+            {file.additions !== null && file.deletions !== null && (
+              <span style={{ flexShrink: 0, fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}>
+                +{file.additions} −{file.deletions}
+              </span>
+            )}
           </button>
         ))}
       </div>
     </div>
   );
 
-  const renderDiffLayer = (commit: CommitSummary, file: CommitFileChange) => (
+  const renderDiffLayer = (commit: CommitSummary, file: CommitDetailFile) => (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-        <button type="button" onClick={() => setView({ type: "files", commit })} style={{ ...buttonStyle, flexShrink: 0 }}>
+        <button type="button" onClick={() => setView({ type: "detail", commit })} style={{ ...buttonStyle, flexShrink: 0 }}>
           ‹ {t("gitPanel.back")}
         </button>
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", flexShrink: 0 }}>
@@ -556,32 +604,36 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
             <button
               key={commit.hash}
               type="button"
-              onClick={() => setView({ type: "files", commit })}
+              onClick={() => setView({ type: "detail", commit })}
               style={{
                 display: "block", width: "100%", textAlign: "left",
                 minHeight: LIST_ROW_MIN_HEIGHT,
-                padding: "8px 12px",
+                padding: "7px 12px",
                 background: "transparent", border: "none", borderBottom: "1px solid var(--border)",
                 color: "var(--text)", cursor: "pointer",
               }}
             >
-              <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {commit.subject}
-              </div>
-              {commit.body !== "" && (
-                <div style={{
-                  fontSize: 11, color: "var(--text-muted)", lineHeight: 1.45, marginTop: 3,
-                  whiteSpace: "pre-wrap", wordBreak: "break-word",
-                }}>
-                  {commit.body}
-                </div>
-              )}
               <div style={{
-                display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "2px 6px",
-                marginTop: 4, fontSize: 11, color: "var(--text-dim)",
+                display: "flex", alignItems: "center", gap: 8,
+                fontSize: 12, fontWeight: 600, minWidth: 0,
+              }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                  {commit.subject}
+                </span>
+                <span style={{
+                  flexShrink: 0, fontSize: 10, fontWeight: 400, padding: "0 6px", borderRadius: 8,
+                  border: `1px solid ${commit.pushed ? "var(--border)" : "#e2b93d"}`,
+                  color: commit.pushed ? "var(--text-dim)" : "#e2b93d",
+                }}>
+                  {t(commit.pushed ? "gitPanel.pushed" : "gitPanel.notPushed")}
+                </span>
+              </div>
+              <div style={{
+                display: "flex", alignItems: "baseline", gap: 6,
+                marginTop: 3, fontSize: 11, color: "var(--text-dim)", minWidth: 0,
               }}>
                 <span style={{ fontFamily: "var(--font-mono)", flexShrink: 0 }}>{commit.shortHash}</span>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{commit.author}</span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{commit.author}</span>
                 <span style={{ flexShrink: 0 }}>{formatRelativeTime(new Date(commit.timestamp * 1000), locale)}</span>
               </div>
             </button>
@@ -601,14 +653,14 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
         </div>
       )}
 
-      {/* Files layer */}
-      {view.type === "files" && renderFilesLayer(view.commit)}
+      {/* Detail layer: full commit info + changed files with line counts */}
+      {view.type === "detail" && renderDetailLayer(view.commit)}
 
       {/* Diff layer: desktop full-width splits list above patch, otherwise single column */}
       {view.type === "diff" && fullWidth && (
         <div data-gitpanel-split style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", borderBottom: "1px solid var(--border)" }}>
-            {renderFilesLayer(view.commit)}
+            {renderDetailLayer(view.commit)}
           </div>
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             {renderDiffLayer(view.commit, view.file)}

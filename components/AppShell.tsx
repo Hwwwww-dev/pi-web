@@ -82,7 +82,7 @@ type AutoNameStatus =
 
 const TOP_BAR_ICON_BUTTON_SIZE = 36;
 
-/** Right-panel Git tab id; closing it returns to chat, the sidebar entry reopens it. It owns no FileViewer. */
+/** Right-panel Git tab id; closing it removes the tab, the sidebar entry reopens it. It owns no FileViewer. */
 const GIT_TAB_ID = "git";
 const GIT_PANEL_TAB: Tab = { id: GIT_TAB_ID, label: "", filePath: "", kind: "git" };
 const AGENT_PANEL_WIDTH = 420;
@@ -509,7 +509,9 @@ export function AppShell() {
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const [terminalTabs, setTerminalTabs] = useState<TerminalTab[]>([]);
   const [terminalsRestored, setTerminalsRestored] = useState(false);
-  const panelTabs: Tab[] = [GIT_PANEL_TAB, ...fileTabs, ...terminalTabs.map((tab) => ({
+  // The Git tab is opened from the sidebar entry and removed by its × like any other tab.
+  const [gitPanelOpen, setGitPanelOpen] = useState(false);
+  const panelTabs: Tab[] = [...(gitPanelOpen ? [GIT_PANEL_TAB] : []), ...fileTabs, ...terminalTabs.map((tab) => ({
     id: tab.id,
     label: getFileName(tab.cwd) || tab.cwd,
     filePath: tab.cwd,
@@ -524,6 +526,7 @@ export function AppShell() {
       if (saved.activeId) {
         setActiveFileTabId(saved.activeId);
         setRightPanelOpen(saved.open);
+        if (saved.activeId === GIT_TAB_ID) setGitPanelOpen(true);
       }
     } catch { /* storage is optional */ }
     setTerminalsRestored(true);
@@ -1135,6 +1138,7 @@ export function AppShell() {
   }, [terminalTabs, isMobile]);
 
   const handleOpenGitPanel = useCallback(() => {
+    setGitPanelOpen(true);
     setActiveFileTabId(GIT_TAB_ID);
     setRightPanelOpen(true);
     if (isMobile) setSidebarOpen(false);
@@ -1150,7 +1154,9 @@ export function AppShell() {
 
   const handleCloseFileTab = useCallback((tabId: string) => {
     if (tabId === GIT_TAB_ID) {
+      setGitPanelOpen(false);
       setActiveFileTabId((current) => current === GIT_TAB_ID ? null : current);
+      if (!fileTabs.length && !terminalTabs.length) setRightPanelOpen(false);
       return;
     }
     if (terminalTabs.some((tab) => tab.id === tabId)) {

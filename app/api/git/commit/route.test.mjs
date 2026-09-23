@@ -46,15 +46,17 @@ async function makeAllowedRepo(t) {
   return { root, head, headParent };
 }
 
-test("lists changed files of a commit", async (t) => {
+test("lists changed files of a commit with line counts", async (t) => {
   const { root, head } = await makeAllowedRepo(t);
   const response = await GET(makeRequest({ repo: root, hash: head }));
   assert.equal(response.status, 200);
-  const { files } = await response.json();
-  assert.deepEqual(files, [
-    { path: "a.txt", status: "M" },
-    { path: "b.txt", status: "A" },
+  const detail = await response.json();
+  assert.deepEqual(detail.files, [
+    { path: "a.txt", status: "M", additions: 1, deletions: 0 },
+    { path: "b.txt", status: "A", additions: 1, deletions: 0 },
   ]);
+  assert.equal(detail.totalAdditions, 2);
+  assert.equal(detail.totalDeletions, 0);
 });
 
 test("returns the unified diff of one file within a commit", async (t) => {

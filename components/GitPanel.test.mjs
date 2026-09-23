@@ -14,18 +14,18 @@ test("exports a component", () => {
   assert.equal(typeof GitPanel, "function");
 });
 
-test("renders the four push-navigation layers behind data-gitpanel-view", () => {
+test("renders the three push-navigation layers behind data-gitpanel-view", () => {
   assert.match(source, /data-gitpanel-view=\{view\.type\}/);
-  for (const layer of ["log", "files", "diff"]) {
+  for (const layer of ["log", "detail", "diff"]) {
     assert.match(source, new RegExp(`view\\.type === "${layer}"`));
   }
-  assert.match(source, /setView\(\{ type: "files", commit \}\)/);
+  assert.match(source, /setView\(\{ type: "detail", commit \}\)/);
   assert.match(source, /setView\(\{ type: "diff", commit, file \}\)/);
 });
 
 test("back navigation pops one layer and repository switch resets to the log layer", () => {
   assert.match(source, /onClick=\{\(\) => setView\(\{ type: "log" \}\)\}/);
-  assert.match(source, /onClick=\{\(\) => setView\(\{ type: "files", commit \}\)\}/);
+  assert.match(source, /onClick=\{\(\) => setView\(\{ type: "detail", commit \}\)\}/);
   const selectHandler = source.match(/const selectRepository = \(repositoryRoot: string\) => \{[\s\S]*?\n  \};/)?.[0];
   assert.ok(selectHandler);
   assert.match(selectHandler, /setView\(\{ type: "log" \}\)/);
@@ -104,16 +104,31 @@ test("branch selection: branches API feeds the picker, log follows the selected 
   assert.match(branchHandler, /setView\(\{ type: "log" \}\)/);
 });
 
-test("commit rows render full subject and body with a hash/author/time meta row", () => {
+test("commit rows are summary lines: subject, pushed badge, hash/author/time", () => {
   const rows = source.match(/\{commits\.map\(\(commit\) => \([\s\S]*?\n          \)\)\}/)?.[0];
   assert.ok(rows);
-  const prewrap = rows.match(/whiteSpace: "pre-wrap", wordBreak: "break-word"/g) ?? [];
-  assert.ok(prewrap.length >= 2, "subject and body must wrap fully");
-  assert.match(rows, /commit\.body !== "" &&/);
-  assert.match(rows, /commit\.subject/);
+  // Single-line subject; no body in the list (it lives in the detail layer).
+  assert.match(rows, /overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1/);
+  assert.match(rows, /commit\.pushed \? "gitPanel\.pushed" : "gitPanel\.notPushed"/);
+  assert.doesNotMatch(rows, /commit\.body/);
   assert.match(rows, /commit\.shortHash/);
   assert.match(rows, /commit\.author/);
   assert.match(rows, /formatRelativeTime/);
+});
+
+test("detail layer shows full commit info, totals and per-file line counts", () => {
+  const detailLayer = source.match(/const renderDetailLayer = \(commit: CommitSummary\) => \([\s\S]*?\n  \);/)?.[0];
+  assert.ok(detailLayer);
+  assert.match(detailLayer, /\{commit\.hash\}/);
+  assert.match(detailLayer, /commit\.pushed \? "gitPanel\.pushed" : "gitPanel\.notPushed"/);
+  assert.match(detailLayer, /gitPanel\.filesChanged/);
+  assert.match(detailLayer, /\+\$\{totals\.additions\} −\$\{totals\.deletions\}/);
+  assert.match(detailLayer, /whiteSpace: "pre-wrap", wordBreak: "break-word"/);
+  // Per-file counts on each row; binary files (null counts) render no counts.
+  assert.match(detailLayer, /\+\{file\.additions\} −\{file\.deletions\}/);
+  assert.match(detailLayer, /file\.additions !== null && file\.deletions !== null/);
+  assert.match(source, /interface CommitDetailFile \{[\s\S]*?additions: number \| null;[\s\S]*?deletions: number \| null;/);
+  assert.match(source, /\{ files: CommitDetailFile\[\]; totalAdditions: number; totalDeletions: number \}/);
 });
 
 test("manual rescan bypasses the discovery cache with refresh=1", () => {
@@ -139,8 +154,9 @@ test("commit rows show author and locale-aware relative time (story 6)", () => {
 });
 
 test("diff layer header keeps the commit hash (story 10)", () => {
-  const diffLayer = source.match(/const renderDiffLayer = \(commit: CommitSummary, file: CommitFileChange\) => \([\s\S]*?\n  \);/)?.[0];
+  const diffLayer = source.match(/const renderDiffLayer = \(commit: CommitSummary, file: CommitDetailFile\) => \([\s\S]*?\n  \);/)?.[0];
   assert.ok(diffLayer);
   assert.match(diffLayer, /\{commit\.shortHash\}/);
   assert.match(diffLayer, /data-gitpanel-diff-path/);
+  assert.match(diffLayer, /onClick=\{\(\) => setView\(\{ type: "detail", commit \}\)\}/);
 });

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { NextRequest, NextResponse } from "next/server";
 import { getAllowedFileRoots, isExistingFilePathAllowed, isFilePathAllowed, isWindowsAbsolutePath } from "@/lib/file-access";
-import { isSafeCommitFilePath, isValidCommitHash, readCommitFilePatch, readCommitFiles } from "@/lib/git-history";
+import { isSafeCommitFilePath, isValidCommitHash, readCommitDetail, readCommitFilePatch } from "@/lib/git-history";
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ patch });
     }
 
-    const files = await readCommitFiles(repo, hash);
-    return NextResponse.json({ files });
+    const detail = await readCommitDetail(repo, hash);
+    return NextResponse.json(detail);
   } catch (error) {
     // A well-formed hash that git rejects means the object does not exist here.
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
