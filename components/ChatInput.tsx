@@ -411,6 +411,9 @@ export function getUserMessageDraftImages(message: UserMessage): ChatDraftImage[
     if (block.type !== "image") return [];
 
     // Support both the current nested image format and older flat pi-ai entries.
+    // SAFETY: an older pi release persisted image blocks with top-level
+    // `data`/`mimeType` instead of `source`, so the flat shape is asserted and
+    // then validated by the typeof checks below.
     const flat = block as unknown as { data?: unknown; mimeType?: unknown };
     const data = block.source?.type === "base64" ? block.source.data : flat.data;
     const mimeType = block.source?.type === "base64" ? block.source.media_type : flat.mimeType;
@@ -2267,17 +2270,12 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               transition: "background 0.15s, box-shadow 0.15s, color 0.15s",
             }}
           >
-            {isStreaming ? (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="20" x2="12" y2="5" />
-                <polyline points="6 11 12 5 18 11" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="2" y1="7" x2="11" y2="7" />
-                <polyline points="7.5 3 12 7 7.5 11" />
-              </svg>
-            )}
+            {/* Send and queue differ by color and tooltip, not by glyph: an up
+                arrow reads as "send" in both states. */}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="20" x2="12" y2="5" />
+              <polyline points="6 11 12 5 18 11" />
+            </svg>
           </button>
           </div>
         </div>
