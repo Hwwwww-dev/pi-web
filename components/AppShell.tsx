@@ -1185,6 +1185,14 @@ export function AppShell() {
   const activeFileTab = fileTabs.find((tab) => tab.id === activeFileTabId) ?? null;
 // Tab title truncation: budget measured in CJK character widths (1 per full-width
 // char, 0.5 per half-width char like letters and digits).
+/** pi estimates the projected context by character count whenever a compaction
+ *  invalidated the last usage, so the reading can pass the window; a percentage
+ *  above 100 is not a meaningful measurement and is shown as over budget. */
+function formatContextPercent(percent: number, fractionDigits: number): string {
+  if (percent > 100) return "100%+";
+  return `${percent.toFixed(fractionDigits)}%`;
+}
+
 function truncateSessionTitle(title: string, maxWidth = 20): string {
   let width = 0;
   let result = "";
@@ -1662,9 +1670,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       if (percent !== null && percent > 90) contextColor = "#ef4444";
       else if (percent !== null && percent > 70) contextColor = "rgba(234,179,8,0.95)";
       desktopContextText = percent !== null
-        ? `${percent.toFixed(0)}% / ${formatCompact(contextUsage.contextWindow)}`
+        ? `${formatContextPercent(percent, 0)} / ${formatCompact(contextUsage.contextWindow)}`
         : `? / ${formatCompact(contextUsage.contextWindow)}`;
-      mobileContextText = percent !== null ? `${percent.toFixed(0)}%` : null;
+      mobileContextText = percent !== null ? formatContextPercent(percent, 0) : null;
     }
 
     const tooltipParts: string[] = [];
@@ -1677,7 +1685,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     }
     if (contextUsage?.contextWindow) {
       const percent = contextUsage.percent;
-      tooltipParts.push(`context: ${percent !== null ? percent.toFixed(1) + "%" : "unknown"} of ${contextUsage.contextWindow.toLocaleString()} tokens`);
+      tooltipParts.push(`context: ${percent !== null ? formatContextPercent(percent, 1) : "unknown"} of ${contextUsage.contextWindow.toLocaleString()} tokens`);
     }
     const tooltip = tooltipParts.join("  |  ");
     const covered = mobile && isNarrowMobile && mobileToolbarMoreOpen;
@@ -2192,7 +2200,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     const formatCompact = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
                     const extraTokenRows = [
                        ...(sessionStats.cost > 0 ? [[translate("session.cost"), `$${sessionStats.cost.toFixed(4)}`]] : []),
-                       ...(ctx?.contextWindow ? [[translate("session.context"), `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} / ${formatCompact(ctx.contextWindow)}`]] : []),
+                       ...(ctx?.contextWindow ? [[translate("session.context"), `${ctx.percent !== null ? formatContextPercent(ctx.percent, 1) : "?"} / ${formatCompact(ctx.contextWindow)}`]] : []),
                        // Cache hit rate = cache reads / (input + cache writes + cache reads) — the denominator covers all input-class tokens.
                        ...(sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite > 0 && sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input > 0
                          ? [[translate("session.cacheHitRate"), `${(sessionStats.tokens.cacheRead / (sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input) * 100).toFixed(1)}%`]]

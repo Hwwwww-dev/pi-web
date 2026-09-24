@@ -45,6 +45,25 @@ export function emptyQueuedMessages(): QueuedMessages {
   return { steering: [], followUp: [] };
 }
 
+/**
+ * When the first record pi no longer lists leaves the grace window, or null when
+ * every record is still queued. pi's snapshots stop arriving once the queue is
+ * empty, so the caller needs the clock as well as the events.
+ */
+export function queuedGraceDeadline(
+  records: QueuedSubmission[],
+  queue: QueuedMessages,
+  graceMs: number = QUEUE_SUBMISSION_GRACE_MS,
+): number | null {
+  let deadline: number | null = null;
+  for (const record of records) {
+    if (textsFor(queue, record.behavior).includes(record.text)) continue;
+    const expiresAt = record.createdAt + graceMs;
+    deadline = deadline === null ? expiresAt : Math.min(deadline, expiresAt);
+  }
+  return deadline;
+}
+
 export function createQueuedSubmission(
   text: string,
   behavior: QueuedBehavior,

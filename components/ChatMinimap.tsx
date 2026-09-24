@@ -24,6 +24,8 @@ const MINIMAP_WIDTH = 36;
 // Turns sit in one tight rail: a wide cap left the dashes stranded at the top of
 // an otherwise empty column.
 const MAX_NODE_GAP = 12;
+// Below this pitch the 3px dashes would touch, so turns fold into buckets first.
+const MIN_SLOT_PITCH = 7;
 const MINIMAP_PADDING = 12;
 const PREVIEW_SHOW_DELAY = 200;
 const PREVIEW_HIDE_DELAY = 250;
@@ -40,6 +42,9 @@ interface TurnInfo {
   scrollTop: number | null;
   /** Tool calls issued anywhere in this turn's assistant replies. */
   toolCount: number;
+  /** Tokens and cost the whole turn's assistant replies reported, when the model sent usage. */
+  usageTokens: number | null;
+  usageCost: number | null;
 }
 
 interface NodeInfo {
@@ -65,6 +70,13 @@ export function countToolCalls(message: AgentMessage | Partial<AgentMessage>): n
     (total, block) => total + (block.type === "toolCall" ? 1 : 0),
     0,
   );
+}
+
+/** Compact token count for the preview card's meta line: 1234 → 1.2k. */
+function formatTurnTokens(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return String(value);
 }
 
 function getAssistantAnswerMarkdown(message: AgentMessage | Partial<AgentMessage>): string {
@@ -209,22 +221,48 @@ function createTurnNodes(turns: TurnInfo[]): NodeInfo[] {
   }));
 }
 
-interface NodeLayout {
-  nodes: NodeInfo[];
+interface MinimapSlot {
+  topRatio: number;
+  /** The turn a click on this dash jumps to. */
+  target: NodeInfo;
+  /** Turn indexes this dash stands for; more than one once turns are folded. */
+  indexes: number[];
+}
+
+interface SlotLayout {
+  slots: MinimapSlot[];
   gap: number;
   fillsHeight: boolean;
 }
 
-function layoutNodes(allNodes: NodeInfo[], minimapHeight: number): NodeLayout {
+function layoutSlots(allNodes: NodeInfo[], minimapHeight: number): SlotLayout {
   if (allNodes.length === 0) {
-    return { nodes: [], gap: MAX_NODE_GAP, fillsHeight: false };
+    return { slots: [], gap: MAX_NODE_GAP, fillsHeight: false };
   }
 
   const height = Math.max(1, minimapHeight);
   const usableHeight = Math.max(0, height - MINIMAP_PADDING * 2);
+  const maxSlots = Math.max(1, Math.floor(usableHeight / MIN_SLOT_PITCH));
+
+  // Long sessions fold turns into buckets: one dash per bucket keeps the rail
+  // readable instead of collapsing into a solid line once the 3px dashes meet.
+  if (allNodes.length > maxSlots && maxSlots > 1) {
+    const gap = usableHeight / (maxSlots - 1);
+    const slots = Array.from({ length: maxSlots }, (_, slotIndex) => {
+      const from = Math.floor((slotIndex * allNodes.length) / maxSlots);
+      const to = Math.floor(((slotIndex + 1) * allNodes.length) / maxSlots);
+      return {
+        topRatio: (MINIMAP_PADDING + slotIndex * gap) / height,
+        target: allNodes[from + Math.floor((to - from - 1) / 2)],
+        indexes: allNodes.slice(from, to).map((node) => node.index),
+      };
+    });
+    return { slots, gap, fillsHeight: true };
+  }
+
   if (allNodes.length === 1) {
     return {
-      nodes: [{ ...allNodes[0], topRatio: 0.5 }],
+      slots: [{ topRatio: 0.5, target: allNodes[0], indexes: [allNodes[0].index] }],
       gap: MAX_NODE_GAP,
       fillsHeight: false,
     };
@@ -235,9 +273,10 @@ function layoutNodes(allNodes: NodeInfo[], minimapHeight: number): NodeLayout {
   // A short session keeps one tight block instead of spreading across the rail.
   const top = MINIMAP_PADDING + Math.max(0, (usableHeight - gap * (allNodes.length - 1)) / 2);
   return {
-    nodes: allNodes.map((node, index) => ({
-      ...node,
+    slots: allNodes.map((node, index) => ({
       topRatio: (top + index * gap) / height,
+      target: node,
+      indexes: [node.index],
     })),
     gap,
     fillsHeight: naturalGap <= MAX_NODE_GAP,
@@ -261,8 +300,8 @@ export function ChatMinimap({
   const draggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const allNodesRef = useRef<NodeInfo[]>([]);
-  const nodeLayoutRef = useRef<NodeLayout>({
-    nodes: [],
+  const slotLayoutRef = useRef<SlotLayout>({
+    slots: [],
     gap: MAX_NODE_GAP,
     fillsHeight: false,
   });
@@ -285,12 +324,15 @@ export function ChatMinimap({
   const allMessagesRef = useRef(allMessages);
   allMessagesRef.current = allMessages;
 
-  const nodeLayout = useMemo(
-    () => layoutNodes(allNodes, minimapHeight),
+  const slotLayout = useMemo(
+    () => layoutSlots(allNodes, minimapHeight),
     [allNodes, minimapHeight],
   );
-  const { nodes: positionedNodes, gap: nodeGap } = nodeLayout;
-  nodeLayoutRef.current = nodeLayout;
+  const { slots: positionedSlots, gap: slotGap } = slotLayout;
+  slotLayoutRef.current = slotLayout;
+  const activeSlot =
+    positionedSlots.find((slot) => activeIndex !== null && slot.indexes.includes(activeIndex))
+    ?? null;
 
   const lockActiveNode = useCallback((index: number) => {
     activeNodeLockRef.current = {
@@ -363,6 +405,8 @@ export function ChatMinimap({
               ? elementRect.top - containerRect.top + scrollEl.scrollTop
               : null,
             toolCount: 0,
+            usageTokens: null,
+            usageCost: null,
           };
           turns.push(currentTurn);
           continue;
@@ -370,6 +414,14 @@ export function ChatMinimap({
 
         if (!currentTurn) continue;
         currentTurn.toolCount += countToolCalls(message);
+        const usage = (message as AssistantMessage).usage;
+        if (usage) {
+          const tokens = (usage.input ?? 0) + (usage.output ?? 0)
+            + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);
+          if (tokens > 0) currentTurn.usageTokens = (currentTurn.usageTokens ?? 0) + tokens;
+          const cost = usage.cost?.total;
+          if (typeof cost === "number") currentTurn.usageCost = (currentTurn.usageCost ?? 0) + cost;
+        }
         const answerMarkdown = getAssistantAnswerMarkdown(message);
         if (answerMarkdown) {
           currentTurn.assistantPreviews.push({
@@ -498,23 +550,23 @@ export function ChatMinimap({
     scrollEl.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
   }, [lockActiveNode, onRevealHistory, scrollContainer]);
 
-  const findNearestNode = useCallback((ratio: number): NodeInfo | null => {
-    const { nodes, gap, fillsHeight } = nodeLayoutRef.current;
+  const findNearestSlot = useCallback((ratio: number): MinimapSlot | null => {
+    const { slots, gap, fillsHeight } = slotLayoutRef.current;
     const height = containerRef.current?.clientHeight ?? 0;
-    if (nodes.length === 0 || height <= 0) return null;
+    if (slots.length === 0 || height <= 0) return null;
 
     const pointerY = Math.max(0, Math.min(height, ratio * height));
-    const firstNodeY = nodes[0].topRatio * height;
-    const rawIndex = gap > 0 ? Math.round((pointerY - firstNodeY) / gap) : 0;
-    const nodeIndex = Math.max(0, Math.min(nodes.length - 1, rawIndex));
-    const nearestNode = nodes[nodeIndex];
+    const firstSlotY = slots[0].topRatio * height;
+    const rawIndex = gap > 0 ? Math.round((pointerY - firstSlotY) / gap) : 0;
+    const slotIndex = Math.max(0, Math.min(slots.length - 1, rawIndex));
+    const slot = slots[slotIndex];
 
     if (!fillsHeight) {
-      const nodeY = nearestNode.topRatio * height;
+      const slotY = slot.topRatio * height;
       const hitRadius = Math.max(10, gap / 2);
-      if (Math.abs(pointerY - nodeY) > hitRadius) return null;
+      if (Math.abs(pointerY - slotY) > hitRadius) return null;
     }
-    return nearestNode;
+    return slot;
   }, []);
 
   const scrollToHeading = useCallback((
@@ -592,9 +644,9 @@ export function ChatMinimap({
     setMouseYRatio(pointerRatio);
     const jumpToPointer = (clientY: number, behavior: ScrollBehavior) => {
       const ratio = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
-      const node = findNearestNode(ratio);
-      if (node) {
-        scrollToNode(node, behavior);
+      const slot = findNearestSlot(ratio);
+      if (slot) {
+        scrollToNode(slot.target, behavior);
       }
     };
 
@@ -610,17 +662,20 @@ export function ChatMinimap({
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [findNearestNode, scrollToNode, showPreview, visible]);
+  }, [findNearestSlot, scrollToNode, showPreview, visible]);
 
   // The overlay covers the chat's right edge, so wheel events over it would be
   // swallowed; forward them so scrolling keeps working under the trigger zone.
+  // The preview card scrolls itself, and forwarding its wheel events on top of
+  // that scrolled the chat at the same time.
   const handleZoneWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    if (previewBoxRef.current?.contains(event.target as Node)) return;
     const container = scrollContainer.current;
     if (container) container.scrollTop += event.deltaY;
   }, [scrollContainer]);
 
-  const nearestNode = mouseYRatio === null ? null : findNearestNode(mouseYRatio);
-  const nearestNodeIndex = nearestNode?.index ?? null;
+  const nearestSlot = mouseYRatio === null ? null : findNearestSlot(mouseYRatio);
+  const nearestNodeIndex = nearestSlot?.target.index ?? null;
 
   useEffect(() => {
     if (!minimapHovered || nearestNodeIndex === null) return;
@@ -638,12 +693,18 @@ export function ChatMinimap({
     <div
       ref={containerRef}
       onMouseDown={handleMouseDown}
-      onMouseEnter={showPreview}
       onMouseLeave={schedulePreviewHide}
       onWheel={handleZoneWheel}
       onMouseMove={(event) => {
+        // The card belongs to a node: hovering empty rail keeps it hidden, and
+        // events inside the card (which can sit anywhere vertically) must not
+        // hide the card the pointer is already on.
+        if (previewBoxRef.current?.contains(event.target as Node)) return;
         const rect = event.currentTarget.getBoundingClientRect();
-        setMouseYRatio((event.clientY - rect.top) / rect.height);
+        const ratio = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+        setMouseYRatio(ratio);
+        if (findNearestSlot(ratio)) showPreview();
+        else if (!draggingRef.current) schedulePreviewHide();
       }}
       style={{
         position: "absolute",
@@ -659,9 +720,9 @@ export function ChatMinimap({
         overflow: "visible",
       }}
     >
-      {positionedNodes.map((node) => {
-        const isNearest = minimapHovered && nearestNode?.index === node.index;
-        const isActive = activeIndex === node.index;
+      {positionedSlots.map((slot) => {
+        const isNearest = minimapHovered && nearestSlot === slot;
+        const isActive = activeSlot === slot;
         // The dashes are the minimap when nothing is hovered: without them the
         // trigger zone is invisible, so there is nothing to aim for.
         const width = isNearest ? 18 : minimapHovered || isActive ? 12 : 8;
@@ -675,16 +736,17 @@ export function ChatMinimap({
 
         return (
           <div
-            key={node.index}
-            data-minimap-node-index={node.index}
+            key={slot.indexes[0]}
+            data-minimap-node-index={slot.indexes[0]}
+            data-minimap-node-span={slot.indexes.length > 1 ? slot.indexes.length : undefined}
             data-minimap-node-active={isActive ? "" : undefined}
             style={{
               position: "absolute",
-              top: `${node.topRatio * 100}%`,
+              top: `${slot.topRatio * 100}%`,
               transform: "translateY(-50%)",
               left: 0,
               right: 0,
-              height: Math.max(1, nodeGap),
+              height: Math.max(1, slotGap),
               display: "flex",
               alignItems: "center",
               justifyContent: "flex-end",
@@ -706,7 +768,7 @@ export function ChatMinimap({
         );
       })}
 
-      {minimapHovered && allNodes.length > 0 && (
+      {minimapHovered && nearestSlot !== null && allNodes.length > 0 && (
         <div
           ref={previewBoxRef}
           className={styles.preview}
@@ -717,6 +779,17 @@ export function ChatMinimap({
         >
           {allNodes.map((node) => {
             const isLocated = nearestNodeIndex === node.index;
+            const turn = node.targetTurn;
+            const metaParts: string[] = [];
+            if (turn.toolCount > 0) {
+              metaParts.push(t("chatMinimap.toolCalls", { count: turn.toolCount }));
+            }
+            if (turn.usageTokens !== null) {
+              metaParts.push(t("chatMinimap.turnTokens", { tokens: formatTurnTokens(turn.usageTokens) }));
+            }
+            if (turn.usageCost !== null && turn.usageCost > 0) {
+              metaParts.push(`$${turn.usageCost.toFixed(4)}`);
+            }
             return (
               <div
                 key={node.index}
@@ -728,20 +801,8 @@ export function ChatMinimap({
                 data-minimap-preview-index={node.index}
                 data-located={isLocated ? "true" : undefined}
               >
-                <span className={styles.number}>
-                  <span aria-hidden="true">
-                    {String(node.index + 1).padStart(2, "0")}
-                  </span>
-                  {node.targetTurn.toolCount > 0 && (
-                    <span
-                      className={styles.toolBadge}
-                      role="img"
-                      title={t("chatMinimap.toolCalls", { count: node.targetTurn.toolCount })}
-                      aria-label={t("chatMinimap.toolCalls", { count: node.targetTurn.toolCount })}
-                    >
-                      {node.targetTurn.toolCount > 99 ? "99+" : node.targetTurn.toolCount}
-                    </span>
-                  )}
+                <span className={styles.number} aria-hidden="true">
+                  {String(node.index + 1).padStart(2, "0")}
                 </span>
                 <div className={styles.content}>
                   <button
@@ -781,6 +842,9 @@ export function ChatMinimap({
                       />
                     </div>
                   ))}
+                  {metaParts.length > 0 && (
+                    <div className={styles.meta}>{metaParts.join(" · ")}</div>
+                  )}
                 </div>
               </div>
             );

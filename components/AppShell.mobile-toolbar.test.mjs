@@ -91,7 +91,7 @@ test("prioritizes context and cost when the mobile statistics area narrows", () 
   assert.match(source, /\.mobile-session-stats \{[\s\S]*?container-type: inline-size/);
   assert.match(source, /@container \(max-width: 158px\)[\s\S]*?\.mobile-session-stat-io/);
   assert.match(source, /@container \(max-width: 88px\)[\s\S]*?\.mobile-session-stat-cost/);
-  assert.match(source, /mobileContextText = percent !== null \? `\$\{percent\.toFixed\(0\)\}%` : null/);
+  assert.match(source, /mobileContextText = percent !== null \? formatContextPercent\(percent, 0\) : null/);
 });
 
 test("places trust warnings below the mobile toolbar and the file toggle in toolbar flow", () => {

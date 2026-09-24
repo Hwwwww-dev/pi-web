@@ -376,6 +376,10 @@ export const zhTWLocale: LocalePlugin = {
     "chat.queueBehaviorSteer": "引導",
     "chat.queueBehaviorFollowUp": "排隊",
 
+    "chatMinimap.locateAssistant": "跳轉到這則回覆",
+    "chatMinimap.toolCalls": "{count} 工具",
+    "chatMinimap.turnTokens": "{tokens} Token",
+
     "chat.inputHistory": "輸入紀錄",
     "chat.modelError": "模型錯誤",
     "chat.modelScopeWarning": "模型範圍警告",

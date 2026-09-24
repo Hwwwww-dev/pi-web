@@ -29,6 +29,7 @@ import { userMessageKey } from "@/lib/prompt-recovery";
 import {
   createQueuedSubmission,
   emptyQueuedMessages,
+  queuedGraceDeadline,
   reconcileQueuedSubmissions,
   splitClearedQueue,
   type QueuedBehavior,
@@ -365,14 +366,31 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [extensionWidgets, setExtensionWidgets] = useState<ExtensionWidgetItem[]>([]);
   const [queuedSubmissions, setQueuedSubmissions] = useState<QueuedSubmission[]>([]);
   const queuedSubmissionsRef = useRef<QueuedSubmission[]>([]);
+  // Lets the SSE handlers (declared above the callback) refresh the
+  // authoritative stats snapshot once a run ends.
+  const refreshStatsRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     queuedSubmissionsRef.current = queuedSubmissions;
   }, [queuedSubmissions]);
   // pi reports the queue as texts. Rows are folded from those snapshots so the
   // local records keep their thumbnails while pi still lists their text.
+  const lastQueueSnapshotRef = useRef<QueuedMessages>(emptyQueuedMessages());
   const applyQueueSnapshot = useCallback((snapshot: QueuedMessages) => {
+    lastQueueSnapshotRef.current = snapshot;
     setQueuedSubmissions((records) => reconcileQueuedSubmissions(records, snapshot));
   }, []);
+
+  // Reconciliation also runs on the clock: pi's snapshots stop arriving once the
+  // queue is empty, so a row whose message was already delivered would keep
+  // showing as queued until the page is reloaded.
+  useEffect(() => {
+    const deadline = queuedGraceDeadline(queuedSubmissions, lastQueueSnapshotRef.current);
+    if (deadline === null) return;
+    const timer = setTimeout(() => {
+      setQueuedSubmissions((records) => reconcileQueuedSubmissions(records, lastQueueSnapshotRef.current));
+    }, Math.max(0, deadline - Date.now()));
+    return () => clearTimeout(timer);
+  }, [queuedSubmissions]);
 
   const eventConnectionRef = useRef<AgentEventConnection | null>(null);
   const eventStreamGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1392,6 +1410,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setIsCompacting(false);
         if (sid) {
           void loadSession(sid);
+          // The disk read behind loadSession is the slow path; take the live
+          // reading now so the toolbar is right before the next turn starts.
+          refreshStatsRef.current?.();
           scheduleEventStreamClose(sid);
         }
         if (wasRunning) onAgentEnd?.(sessionIdRef.current);
@@ -1408,6 +1429,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
           const sid = sessionIdRef.current;
           if (sid) void loadSession(sid);
+          refreshStatsRef.current?.();
           // An extension-injected agent may already have started before the
           // command's prompt_done. Keep that active stage visible and let its
           // agent_settled event perform the next completion transition.
@@ -2128,11 +2150,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!sid) return;
     try {
       const stats = await sendAgentCommand<SessionStatsInfo>(sid, { type: "get_session_stats" });
-      if (stats && sessionIdRef.current === sid) setSessionStatsOverride(stats);
+      if (stats && sessionIdRef.current === sid) {
+        setSessionStatsOverride(stats);
+        // One reading feeds the toolbar and the panel: the projection is the
+        // same value get_state reports, just read on a fresher schedule.
+        if (stats.contextUsage) setContextUsage(stats.contextUsage);
+      }
     } catch (e) {
       console.error("Failed to refresh session stats:", e);
     }
   }, []);
+  refreshStatsRef.current = refreshSessionStats;
 
   // Drop the authoritative snapshot once nothing keeps it current: it is a
   // point-in-time reading, so any later turn would otherwise sit behind stale
@@ -2173,6 +2201,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     ));
     queuedSubmissionsRef.current = nextRecords;
     setQueuedSubmissions(nextRecords);
+    // The rows just replaced the queue pi had, and no snapshot confirms that
+    // until the re-sends land: a stale one must not resurrect the taken entry.
+    const snapshot: QueuedMessages = { steering: [], followUp: [] };
+    for (const record of nextRecords) {
+      (record.behavior === "steer" ? snapshot.steering : snapshot.followUp).push(record.text);
+    }
+    lastQueueSnapshotRef.current = snapshot;
     if (action === "edit") {
       opts.chatInputRef?.current?.prependQueuedMessage(target.text, target.images);
     }
