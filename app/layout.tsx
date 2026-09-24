@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Mono } from "next/font/google";
 import { PwaRegistration } from "@/components/PwaRegistration";
+import { CHUNK_RECOVERY_SCRIPT } from "@/lib/chunk-recovery";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "katex/dist/katex.min.css";
 import "./globals.css";
@@ -70,6 +71,14 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: THEME_INIT_SCRIPT,
+          }}
+        />
+        {/* Inline so a page bundle that this deployment already replaced can
+            still be recovered: reload with the new chunk map instead of
+            staying stuck on ChunkLoadError. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: CHUNK_RECOVERY_SCRIPT,
           }}
         />
       </head>
