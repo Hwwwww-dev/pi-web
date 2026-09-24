@@ -137,6 +137,17 @@ test("lifecycle refreshes bypass the cache while cross-window polling reuses it"
   assert.match(source, /loadSessions\(false, true\);[\s\S]*?onBackgroundTaskDone/);
 });
 
+test("a polled summary row never blanks the details already on screen", () => {
+  assert.match(source, /import \{ mergePolledRow \} from "\.\/session-catalog-helpers"/);
+  assert.match(source, /polled\.map\(\(session\) => mergePolledRow\(previousById\.get\(session\.id\), session\)\)/);
+  // A row first seen in a poll has no details to keep: ask for a full listing
+  // instead of printing a placeholder count until the page is reloaded.
+  assert.match(
+    source,
+    /polled\.some\(\(session\) => session\.detailsPending[\s\S]{0,80}knownById\.get\(session\.id\)\?\.detailsPending !== false\)/,
+  );
+});
+
 test("does not expose disk-backed actions for transient sessions", () => {
   assert.match(sessionItemSource, /if \(session\.transient\) return;/);
   assert.match(sessionItemSource, /\{hovered && !session\.transient && \(/);

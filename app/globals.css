@@ -586,6 +586,20 @@ html.dark .web-login-error {
   flex: 1 1 240px;
 }
 
+/* Narrow shelves wrap the status line onto its own row, so the divider that
+  separates the two columns on a wide shelf would hang in empty space, and the
+  row that holds it keeps its box instead of sizing to its last chip. */
+@media (max-width: 640px) {
+  .extension-status-shelf.has-widgets.has-status .extension-widget-triggers,
+  .extension-status-shelf.has-widgets.has-status .extension-status-line {
+    flex: 1 1 100%;
+  }
+
+  .extension-status-shelf.has-widgets.has-status .extension-widget-triggers {
+    border-right: 0;
+  }
+}
+
 .extension-widget-trigger {
   position: relative;
   display: flex;
@@ -603,6 +617,11 @@ html.dark .web-login-error {
   font-family: var(--font-mono);
   font-size: 11px;
   text-align: left;
+}
+
+.extension-widget-trigger:last-child {
+  /* The trailing divider would sit at the end of the row with nothing after it. */
+  border-right: 0;
 }
 
 .extension-widget-update-pulse {

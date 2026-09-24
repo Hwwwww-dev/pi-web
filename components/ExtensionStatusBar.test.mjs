@@ -140,6 +140,18 @@ test("status text keeps its share of the shelf beside widget triggers", async ()
   assert.match(statusRule, /flex:\s*1 1 240px/);
 });
 
+test("a narrow shelf gives both rows the full width and drops the trailing divider", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  // Stacked on a phone, the divider between the two columns would hang in empty
+  // space beside a single chip, and that chip's own divider would sit at the end
+  // of its row with nothing after it.
+  assert.match(
+    css,
+    /@media \(max-width: 640px\) \{\n  \.extension-status-shelf\.has-widgets\.has-status \.extension-widget-triggers,\n  \.extension-status-shelf\.has-widgets\.has-status \.extension-status-line \{\n    flex: 1 1 100%;\n  \}/,
+  );
+  assert.match(css, /\.extension-widget-trigger:last-child \{[\s\S]{0,120}border-right: 0;/);
+});
+
 test("widget panels keep box drawing intact instead of wrapping it", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   // Widget output is monospace art (tables, progress bars, frames); wrapping

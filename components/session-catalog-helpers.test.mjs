@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createJiti } from "jiti";
-
-const jiti = createJiti(import.meta.url, { tsconfigPaths: true });
-const { mergeCatalogRow } = await jiti.import("./session-catalog-helpers.ts");
+import { mergeCatalogRow, mergePolledRow } from "./session-catalog-helpers.ts";
 
 function row(overrides = {}) {
   return {
@@ -50,4 +47,30 @@ test("values the catalogue does carry always win", () => {
   assert.equal(merged.modified, "2026-06-01");
   assert.equal(merged.messageCount, 99);
   assert.deepEqual(merged.relation, { kind: "subagent", parentSessionId: "p1" });
+});
+
+test("a summary-grade poll row never blanks the details already on screen", () => {
+  // The running-state poll defers details for just-changed files; taking such a
+  // row as-is printed "…" for the count on every tick of the active session.
+  const onScreen = row({ name: "busy session", firstMessage: "hello", messageCount: 2384, modified: "2026-01-02" });
+  const polled = row({ name: undefined, firstMessage: "", messageCount: 0, modified: "2026-01-03", detailsPending: true });
+  const merged = mergePolledRow(onScreen, polled);
+  assert.equal(merged.messageCount, 2384);
+  assert.equal(merged.firstMessage, "hello");
+  assert.equal(merged.name, "busy session");
+  assert.equal(merged.modified, "2026-01-03");
+  assert.equal(merged.detailsPending, undefined);
+});
+
+test("a poll row that carries details hydrates the row on screen", () => {
+  const merged = mergePolledRow(row({ detailsPending: true, messageCount: 0 }), row({ messageCount: 7, firstMessage: "later" }));
+  assert.equal(merged.messageCount, 7);
+  assert.equal(merged.firstMessage, "later");
+  assert.equal(merged.detailsPending, undefined);
+});
+
+test("a row seen for the first time passes through still pending", () => {
+  // Its details are unknown, so the caller can ask for a full listing.
+  const polled = row({ detailsPending: true, messageCount: 0 });
+  assert.equal(mergePolledRow(undefined, polled).detailsPending, true);
 });

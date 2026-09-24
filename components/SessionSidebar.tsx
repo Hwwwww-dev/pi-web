@@ -15,6 +15,7 @@ import { useResizablePanel } from "@/hooks/useResizablePanel";
 import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import { DirectoryPicker } from "./DirectoryPicker";
 import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
+import { mergePolledRow } from "./session-catalog-helpers";
 import { SessionSearch } from "./SessionSearch";
 
 // Fixed row height for the session list. SessionItem renders at exactly this
@@ -394,6 +395,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // Tracked in a ref only: the version is compared against the polled value to
   // decide whether the list needs reloading, and no render reads it.
   const sessionListVersionRef = useRef<number | null>(null);
+  const allSessionsRef = useRef<SessionInfo[]>([]);
   const sessionLoadIdRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -639,23 +641,21 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         );
         setRunningSessionIds(new Set(data.runningSessionIds ?? []));
         if (data.sessions) {
-          // The poll now carries a summary-grade catalogue, so rows (keep-alive
-          // section included) refresh counts, timing, and names every tick.
-          // Deferred details can drop name/firstMessage for just-changed files —
-          // keep the previous values in that case.
+          // The poll carries a summary-grade catalogue, so rows (the keep-alive
+          // section included) refresh timing and names every tick. It must not
+          // blank what it omits: mergePolledRow keeps the details already on
+          // screen, and a row we have never listed in full asks for a listing
+          // instead of printing a placeholder count until the next page load.
           sessionListVersionRef.current = data.sessionListVersion;
+          const polled = data.sessions;
+          const knownById = new Map(allSessionsRef.current.map((session) => [session.id, session]));
           setAllSessions((previous) => {
             const previousById = new Map(previous.map((session) => [session.id, session]));
-            return data.sessions!.map((session) => {
-              const old = previousById.get(session.id);
-              if (!old) return session;
-              return {
-                ...session,
-                name: session.name ?? old.name,
-                firstMessage: session.firstMessage || old.firstMessage,
-              };
-            });
+            return polled.map((session) => mergePolledRow(previousById.get(session.id), session));
           });
+          if (polled.some((session) => session.detailsPending && knownById.get(session.id)?.detailsPending !== false)) {
+            await loadSessions();
+          }
         } else if (data.sessionListVersion !== sessionListVersionRef.current) {
           // Reuse the invalidated cache; forcing a scan would change the version again.
           await loadSessions();
@@ -695,6 +695,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   useEffect(() => {
     onSessionsChange?.(allSessions);
   }, [allSessions, onSessionsChange]);
+
+  // Mirror for the running-state poll, which inspects the rows already on screen
+  // on every tick and must not re-subscribe to the list to do it.
+  useEffect(() => {
+    allSessionsRef.current = allSessions;
+  }, [allSessions]);
 
   useEffect(() => {
     const previous = previousRunningSessionIdsRef.current;

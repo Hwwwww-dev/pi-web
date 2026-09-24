@@ -166,7 +166,7 @@ test("streaming turns the composer's main button into stop", () => {
     })),
   );
 
-  // Stop owns the circle while streaming; the standalone pill is gone and
+  // An empty composer leaves stop in the circle; the standalone pill is gone and
   // follow-ups stay keyboard-only (Enter).
   assert.match(streamingHtml, /aria-label="Stop agent"/);
   assert.doesNotMatch(streamingHtml, /aria-label="Follow-up"/);
@@ -178,6 +178,15 @@ test("streaming turns the composer's main button into stop", () => {
     })),
   );
   assert.match(idleHtml, /aria-label="Send"/);
+});
+
+test("a message waiting in the composer keeps the main button on send", () => {
+  // Mobile has no Enter key: while a run streams, a typed message must leave a
+  // send affordance (which queues a follow-up) instead of only stop.
+  const source = readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8");
+  assert.match(source, /const canSubmit = hasInputText \|\| attachedImages\.length > 0;/);
+  assert.match(source, /\{isStreaming && !canSubmit \? \(/);
+  assert.match(source, /onClick=\{isStreaming \? queueFollowUp : handleSend\}/);
 });
 
 test("renders the upstream model error", () => {

@@ -2248,7 +2248,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             }}
           />
 
-          {isStreaming ? (
+          {/* The composer's main button follows the input: a message waiting to be
+              sent is always the primary action — while a turn runs that queues a
+              follow-up, the same thing Enter does — and only an empty composer
+              leaves it as stop. */}
+          {isStreaming && !canSubmit ? (
             <button
               onClick={onAbort}
               title={t("chat.stopAgent")}
@@ -2272,15 +2276,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; }}
             >
-              {/* While the run streams it owns the composer's main button: the
-                  circle becomes stop, and follow-ups stay on Enter. */}
+              {/* While the run streams the circle stops it, until the user types
+                  something to send. */}
               <svg width="12" height="12" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                 <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
               </svg>
             </button>
           ) : (
           <button
-            onClick={handleSend}
+            onClick={isStreaming ? queueFollowUp : handleSend}
             disabled={!canSubmit}
             title={t("chat.send")}
             aria-label={t("chat.send")}
