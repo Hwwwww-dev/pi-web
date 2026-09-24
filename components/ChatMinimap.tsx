@@ -623,11 +623,6 @@ export function ChatMinimap({
 
   if (!visible) return null;
 
-  const lastNodeTop = positionedNodes.length > 0
-    ? positionedNodes[positionedNodes.length - 1].topRatio * minimapHeight
-    : MINIMAP_PADDING;
-  const railHeight = Math.max(1, lastNodeTop - MINIMAP_PADDING);
-
   return (
     <div
       ref={containerRef}
@@ -644,24 +639,9 @@ export function ChatMinimap({
         position: "relative",
         cursor: "pointer",
         userSelect: "none",
-        borderLeft: "1px solid var(--border)",
-        background: "var(--bg-panel)",
         overflow: "visible",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: MINIMAP_PADDING,
-          height: railHeight,
-          width: 1,
-          background: "var(--border)",
-          transform: "translateX(-50%)",
-          zIndex: 0,
-        }}
-      />
-
       {positionedNodes.map((node) => {
         const isNearest = minimapHovered && nearestNode?.index === node.index;
         const isActive = activeIndex === node.index;
@@ -680,21 +660,19 @@ export function ChatMinimap({
               height: Math.max(1, nodeGap),
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
+              justifyContent: "flex-end",
+              paddingRight: 9,
               pointerEvents: "none",
               zIndex: 2,
             }}
           >
             <div
               style={{
-                width: 8,
-                height: 8,
-                borderRadius: 2,
-                background: isActive ? "rgba(128,128,128,0.42)" : "rgba(128,128,128,0.16)",
-                border: `1.5px solid ${isActive ? "rgba(128,128,128,0.95)" : "rgba(128,128,128,0.58)"}`,
-                boxShadow: isActive ? "0 0 0 2px var(--bg-panel)" : "none",
-                transition: "transform 0.1s, background 0.1s",
-                transform: isNearest ? "scale(1.25)" : "scale(1)",
+                width: isActive || isNearest ? 18 : 12,
+                height: 3,
+                borderRadius: 999,
+                background: isActive ? "var(--accent)" : isNearest ? "color-mix(in srgb, var(--accent) 55%, transparent)" : "color-mix(in srgb, var(--text-muted) 38%, transparent)",
+                transition: "width 0.12s ease, background 0.12s ease",
               }}
             />
           </div>

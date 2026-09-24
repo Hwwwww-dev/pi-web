@@ -1,21 +1,38 @@
 .preview {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  right: calc(100% + 10px);
   z-index: 100;
   width: 320px;
+  max-height: calc(100% - 24px);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
   background: var(--bg);
-  border-left: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  box-shadow: -10px 0 26px rgba(0, 0, 0, 0.07);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 14px;
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 6px;
   pointer-events: auto;
   cursor: default;
   user-select: text;
+  animation: minimap-preview-in 160ms ease both;
+}
+
+@keyframes minimap-preview-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
 }
 
 .turn {
