@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, UserMessage } from "@/lib/types";
-import { normalizeCustomPanelLines } from "@/lib/ansi";
+import { isTuiText, normalizeCustomPanelLines } from "@/lib/ansi";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { countToolCallBlocks, getAssistantErrorMessage, getDisplayableAssistantBlocks, isAssistantTruncated, isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
 import { extractTurnWrittenFiles, type WrittenFile } from "@/lib/turn-written-files";
@@ -15,6 +15,7 @@ import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
+import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
 import { useAgentSession, type AgentPhase, type NoticeItem } from "@/hooks/useAgentSession";
 import { useDragDrop } from "@/hooks/useDragDrop";
@@ -1463,12 +1464,20 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
             {/* Full text by default: pre-line preserves \n (nowrap/normal collapse
                 newlines into spaces) and long lines wrap instead of truncating;
                 content taller than the cap scrolls inside the text area */}
-            <span
-              tabIndex={0}
-              style={{ padding: "14px 0", minWidth: 0, maxWidth: "100%", maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX, overflowY: "auto", scrollbarWidth: "thin", whiteSpace: "pre-line", wordBreak: "break-word" }}
-            >
-              {notice.message}
-            </span>
+            {isTuiText(notice.message) ? (
+              <TuiText
+                tabIndex={0}
+                text={notice.message}
+                style={{ padding: "14px 0", minWidth: 0, maxWidth: "100%", maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
+              />
+            ) : (
+              <span
+                tabIndex={0}
+                style={{ padding: "14px 0", minWidth: 0, maxWidth: "100%", maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX, overflowY: "auto", scrollbarWidth: "thin", whiteSpace: "pre-line", wordBreak: "break-word" }}
+              >
+                {notice.message}
+              </span>
+            )}
             {onDismiss && (
               <button
                 type="button"
@@ -1544,6 +1553,18 @@ function parseDialogTitleSegments(title: string): DialogTitleSegment[] {
 
 function DialogTitlePlainText({ text }: { text: string }) {
   const [heading, ...rest] = text.split("\n");
+  const headingStyle = { color: "var(--text)", fontSize: 14, fontWeight: 650, lineHeight: 1.45 } as const;
+  // Terminal text is laid out for a fixed width: render it verbatim so box
+  // drawing, tables and progress bars keep their shape (see TuiText).
+  const body = rest.join("\n").replace(/^\n+|\n+$/g, "");
+  if (isTuiText(body)) {
+    return (
+      <div style={{ minWidth: 0 }}>
+        <div style={headingStyle}>{heading}</div>
+        <TuiText text={body} style={{ marginTop: 4, fontSize: 12, lineHeight: 1.45, color: "var(--text-muted)" }} />
+      </div>
+    );
+  }
   const rows: Array<{ label: string; value: string }> = [];
   const plain: string[] = [];
   for (const line of rest) {
@@ -1551,7 +1572,6 @@ function DialogTitlePlainText({ text }: { text: string }) {
     if (match) rows.push({ label: match[1].trim(), value: match[2].trim() });
     else plain.push(line.trim());
   }
-  const headingStyle = { color: "var(--text)", fontSize: 14, fontWeight: 650, lineHeight: 1.45 } as const;
   if (rows.length === 0) {
     return (
       <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
@@ -1587,7 +1607,14 @@ function ExtensionDialogTitle({ title }: { title: string }) {
             <div style={{ fontSize: 11, fontWeight: 650, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>
               {segment.heading}
             </div>
-            <MarkdownBody>{segment.markdown}</MarkdownBody>
+            {isTuiText(segment.markdown) ? (
+              <TuiText
+                text={segment.markdown}
+                style={{ fontSize: 11, lineHeight: 1.4, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", color: "var(--text-muted)" }}
+              />
+            ) : (
+              <MarkdownBody>{segment.markdown}</MarkdownBody>
+            )}
           </div>
         ) : (
           <DialogTitlePlainText key={index} text={segment.text} />

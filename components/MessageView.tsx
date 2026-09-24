@@ -10,6 +10,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { getAssistantErrorMessage, getThinkingPreview, isAssistantTruncated, isEmptyThinkingBlock } from "@/lib/message-display";
 import { parseUnifiedPatch, type SplitDiffCell, type SplitDiffFile } from "@/lib/patch";
+import { isTuiText } from "@/lib/ansi";
 import { applyPatchPreviewToFiles, applyPatchResultHasFailures, extractApplyPatchPaths, getApplyPatchInputText, parseApplyPatchInput } from "@/lib/apply-patch";
 import { isApplyPatchToolName, isEditToolName } from "@/lib/tool-names";
 import { isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansion";
@@ -358,8 +359,9 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   const imageBlocksNode = imageBlocks.length > 0 && (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: content ? 8 : 0 }}>
       {imageBlocks.map((img, i) => {
-        // lib/types.ts ImageContent uses {source:{type,data,media_type,url}}
-        // pi-ai on-disk format uses flat {data, mimeType} — handle both
+        // SAFETY: pi-ai's on-disk format stores images flat ({data, mimeType}) while
+        // lib/types.ts ImageContent nests them under {source:{type,data,media_type,url}};
+        // the fields are read defensively below, so the cast only relaxes the shape.
         const flat = img as unknown as { data?: string; mimeType?: string };
         const src = img.source
           ? img.source.type === "base64"
@@ -1499,6 +1501,9 @@ function PairedResult({ text, isEmpty, isError }: {
   isError: boolean;
 }) {
   const { t } = useI18n();
+  // Terminal output keeps its own layout: box art, tables and progress bars
+  // must not reflow to the container width.
+  const tui = isTuiText(text);
   return (
     <div
       style={{
@@ -1516,8 +1521,8 @@ function PairedResult({ text, isEmpty, isError }: {
           overflow: "auto",
           maxHeight: 400,
           background: "var(--bg)",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-all",
+          whiteSpace: tui ? "pre" : "pre-wrap",
+          wordBreak: tui ? "normal" : "break-all",
           fontStyle: isEmpty ? "italic" : "normal",
           opacity: isEmpty ? 0.6 : 1,
         }}
@@ -1789,6 +1794,7 @@ function getMessageImages(content: CustomMessage["content"] | UserMessage["conte
 }
 
 function imageSource(img: ImageContent): string {
+  // SAFETY: same flat-vs-nested image shape split as above; both fields are optional.
   const flat = img as unknown as { data?: string; mimeType?: string };
   if (img.source) {
     return img.source.type === "base64"

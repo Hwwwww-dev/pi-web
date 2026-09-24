@@ -1101,6 +1101,19 @@ pre, code {
   color: var(--text);
 }
 
+/* Terminal output is laid out for a fixed width: reflowing box art, tables and
+   progress bars destroys their structure, so these blocks scroll instead. */
+.tui-text {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre;
+  tab-size: 4;
+  font-family: var(--font-mono);
+  scrollbar-width: thin;
+}
+
 .mermaid-block {
   padding: 12px;
   overflow-x: auto;
