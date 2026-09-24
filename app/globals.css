@@ -1089,6 +1089,12 @@ pre, code {
   gap: 5px;
   max-width: 100%;
   overflow: hidden;
+  /* Cancel the first chip's left padding against the preview origin so its
+    icon — not its hover pill — lines up with plain preview text. Shifting the
+    container (not margining the chips) keeps the chips' own sizing intact:
+    per-chip negative margins would shrink the container's max-content and
+    re-squeeze the file names inside. */
+  margin-left: -6px;
 }
 .activity-row-preview .tool-row-more {
   color: var(--text-dim);
