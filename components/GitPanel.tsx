@@ -689,9 +689,10 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
           }))}
           onSelect={selectRepository}
         />
-        <GitDropdown
-          stretch={narrowMobile}
-          value={selectedBranch}
+        <div style={{ display: "flex", flex: narrowMobile ? "1 1 100%" : 1, minWidth: 0, gap: 8, alignItems: "center" }}>
+          <GitDropdown
+            stretch={false}
+            value={selectedBranch}
           disabled={branches.length === 0}
           ariaLabel={t("gitPanel.selectBranch")}
           placeholder={t("gitPanel.branch")}
@@ -705,19 +706,20 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
           }
           options={branches.map((branch) => ({ value: branch, primary: branch }))}
           onSelect={selectBranch}
-        />
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={reposLoading}
-          title={t("gitPanel.refresh")}
-          aria-label={t("gitPanel.refresh")}
-          style={{ ...buttonStyle, flexShrink: 0, width: narrowMobile ? undefined : 36, padding: 0 }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" /><polyline points="21 3 21 9 15 9" />
-          </svg>
-        </button>
+          />
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={reposLoading}
+            title={t("gitPanel.refresh")}
+            aria-label={t("gitPanel.refresh")}
+            style={{ ...buttonStyle, flexShrink: 0, width: 36, padding: 0 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" /><polyline points="21 3 21 9 15 9" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {reposError && renderError(reposError, refresh)}
