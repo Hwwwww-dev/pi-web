@@ -441,6 +441,7 @@ export const enLocale: LocalePlugin = {
     "chat.changeReasoning": "Change reasoning level: {level}",
     "chat.changeReasoningLabel": "Change reasoning level",
     "chat.currentReasoning": "Reasoning level for this turn: {level}",
+    "chat.currentToolPreset": "Tools used for this turn: {preset}",
     "chat.changeToolPreset": "Change tool preset",
     "chat.stopCompaction": "Stop compaction",
     "chat.compactContext": "Compact context",

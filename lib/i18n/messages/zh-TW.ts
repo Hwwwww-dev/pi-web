@@ -441,6 +441,7 @@ export const zhTWLocale: LocalePlugin = {
     "chat.changeReasoning": "變更推理層級：{level}",
     "chat.changeReasoningLabel": "變更推理層級",
     "chat.currentReasoning": "本輪使用的推理層級：{level}",
+    "chat.currentToolPreset": "本輪使用的工具預設：{preset}",
     "chat.changeToolPreset": "更改工具預設",
     "chat.stopCompaction": "停止壓縮",
     "chat.compactContext": "壓縮上下文",
