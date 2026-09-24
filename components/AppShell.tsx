@@ -2376,6 +2376,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       session={slot.session}
                       background={!isActive}
                       sessionRunning={runningSessionIds.has(slot.session.id)}
+                      statsPanelOpen={isActive && activeTopPanel === "session"}
                       searchTarget={isActive && searchTarget?.sessionId === slot.session.id ? searchTarget : null}
                       onSearchTargetHandled={handleSearchTargetHandled}
                       initialScrollPosition={isActive ? sessionScrollPositionsRef.current.get(slot.session.id) ?? null : null}
@@ -2421,6 +2422,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     initialScrollPosition={activeChatSession ? sessionScrollPositionsRef.current.get(activeChatSession.id) ?? null : null}
                     onScrollPositionChange={handleSessionScrollPositionChange}
                     sessionRunning={Boolean(activeChatSession && runningSessionIds.has(activeChatSession.id))}
+                    statsPanelOpen={activeTopPanel === "session"}
                     newSessionCwd={effectiveNewSessionCwd}
                     newSessionDraftKey={newSessionDraftKey}
                     onAgentEnd={handleAgentEnd}

@@ -157,9 +157,7 @@ test("active-session rows show live status, message count and time", () => {
   assert.match(source, /keepalive\.statusDone/);
   assert.match(source, /t\("sidebar\.messagesCount", \{ count: info\.messageCount \}\)/);
   assert.match(source, /formatRelativeTime\(info\.modified, locale\)/);
-  // The clipped path slides on hover instead of being truncated.
-  assert.match(source, /<span className="keepalive-sidebar-cwd-track">\{info\.cwd\}<\/span>/);
-  assert.match(globalStyles, /\.keepalive-sidebar-cwd \{[\s\S]*?container-type: inline-size;/);
-  assert.match(globalStyles, /\.keepalive-sidebar-cwd-track \{[\s\S]*?padding-right: 18px;[\s\S]*?transition: transform 1\.2s ease-out;/);
-  assert.match(globalStyles, /\.keepalive-sidebar-row:hover \.keepalive-sidebar-cwd-track \{[\s\S]*?translateX\(min\(0px, calc\(100cqw - 100%\)\)\)/);
+  // Tail-first clipping, same as the project rows: the head gets the ellipsis,
+  // the specific tail stays readable.
+  assert.match(source, /<PathLabel\n?\s*text=\{info\.cwd\}/s);
 });

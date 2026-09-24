@@ -72,7 +72,7 @@ interface Props {
   queuedSubmissions?: QueuedSubmission[];
   inputHistory?: string[];
   /** Steer a pending message into the running turn, or take it back for editing. */
-  onQueuedAction?: (id: string, action: "steer" | "edit") => void;
+  onQueuedAction?: (id: string, action: "toggle" | "edit") => void;
   slashCommands?: SlashCommandInfo[];
   slashCommandsLoading?: boolean;
   onLoadSlashCommands?: () => Promise<SlashCommandInfo[]> | SlashCommandInfo[];
@@ -470,10 +470,19 @@ function QueuedMessageRow({
   onAction,
 }: {
   item: QueuedSubmission;
-  onAction?: (id: string, action: "steer" | "edit") => void;
+  onAction?: (id: string, action: "toggle" | "edit") => void;
 }) {
   const { t } = useI18n();
   const isSteer = item.behavior === "steer";
+  const behaviorChipStyle = {
+    flexShrink: 0,
+    fontSize: 10,
+    fontFamily: "var(--font-mono)",
+    padding: "1px 7px",
+    borderRadius: 999,
+    border: `1px solid ${isSteer ? "color-mix(in srgb, var(--accent) 45%, transparent)" : "var(--border)"}`,
+    color: isSteer ? "var(--accent)" : "var(--text-dim)",
+  } as const;
   return (
     <div
       title={item.text}
@@ -487,19 +496,18 @@ function QueuedMessageRow({
         minWidth: 0,
       }}
     >
-      <span
-        style={{
-          flexShrink: 0,
-          fontSize: 10,
-          fontFamily: "var(--font-mono)",
-          padding: "1px 7px",
-          borderRadius: 999,
-          border: `1px solid ${isSteer ? "color-mix(in srgb, var(--accent) 45%, transparent)" : "var(--border)"}`,
-          color: isSteer ? "var(--accent)" : "var(--text-dim)",
-        }}
-      >
-        {isSteer ? "steer" : "follow-up"}
-      </span>
+      {onAction ? (
+        <button
+          type="button"
+          title={t("chat.queueBehaviorHint")}
+          onClick={() => onAction(item.id, "toggle")}
+          style={{ ...behaviorChipStyle, background: "transparent", cursor: "pointer" }}
+        >
+          {isSteer ? "steer" : "follow-up"}
+        </button>
+      ) : (
+        <span style={behaviorChipStyle}>{isSteer ? "steer" : "follow-up"}</span>
+      )}
       {item.images.length > 0 && (
         <span style={{ display: "flex", gap: 3, flexShrink: 0 }}>
           {item.images.map((image, index) => {
@@ -520,12 +528,6 @@ function QueuedMessageRow({
       <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.text}</span>
       {onAction && (
         <span style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: "auto" }}>
-          <QueueActionButton label={t("chat.steer")} title={t("chat.steerHint")} onClick={() => onAction(item.id, "steer")}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 1 L9 5 L5 9" />
-              <line x1="1" y1="5" x2="9" y2="5" />
-            </svg>
-          </QueueActionButton>
           <QueueActionButton label={t("chat.editQueued")} title={t("chat.editQueuedTitle")} onClick={() => onAction(item.id, "edit")}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 20h9" />
@@ -1695,7 +1697,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         border: 0,
         background: "transparent",
         padding: compact ? 0 : "0 16px 8px",
-        paddingRight: compact ? 0 : isMobile ? 16 : 52, // desktop: 16px base + 36px for ChatMinimap alignment
         opacity: builtinCommandPending ? 0.5 : 1,
         transition: "opacity 0.15s",
       }}
@@ -2246,12 +2247,42 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             }}
           />
 
+          {isStreaming ? (
+            <button
+              onClick={onAbort}
+              title={t("chat.stopAgent")}
+              aria-label={t("chat.stopAgent")}
+              style={{
+                flexShrink: 0,
+                alignSelf: "flex-end",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 36,
+                height: 36,
+                padding: 0,
+                borderRadius: "50%",
+                background: "rgba(239,68,68,0.1)",
+                border: "1px solid rgba(239,68,68,0.35)",
+                color: "#ef4444",
+                cursor: "pointer",
+                transition: "background 0.15s, border-color 0.15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; }}
+            >
+              {/* While the run streams it owns the composer's main button: the
+                  circle becomes stop, and follow-ups stay on Enter. */}
+              <svg width="12" height="12" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
+              </svg>
+            </button>
+          ) : (
           <button
-            onClick={isStreaming ? queueFollowUp : handleSend}
+            onClick={handleSend}
             disabled={!canSubmit}
-            title={isStreaming ? `${t("chat.followUpHint")} (${isMobile ? "Ctrl/Cmd+" : ""}Alt/Option+Enter)` : t("chat.send")}
-            aria-label={isStreaming ? t("chat.followUp") : t("chat.send")}
-            aria-keyshortcuts={isStreaming ? (isMobile ? "Control+Alt+Enter Meta+Alt+Enter" : "Alt+Enter") : undefined}
+            title={t("chat.send")}
+            aria-label={t("chat.send")}
             style={{
               flexShrink: 0,
               alignSelf: "flex-end",
@@ -2262,21 +2293,20 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               height: 36,
               padding: 0,
               borderRadius: "50%",
-              background: !canSubmit ? "var(--bg-panel)" : isStreaming ? "rgba(129,140,248,0.12)" : "var(--accent)",
-              border: canSubmit && isStreaming ? "1px solid rgba(129,140,248,0.35)" : "none",
-              color: !canSubmit ? "var(--text-dim)" : isStreaming ? "rgba(99,102,241,1)" : "var(--accent-contrast)",
+              background: !canSubmit ? "var(--bg-panel)" : "var(--accent)",
+              border: "none",
+              color: !canSubmit ? "var(--text-dim)" : "var(--accent-contrast)",
               cursor: canSubmit ? "pointer" : "not-allowed",
-              boxShadow: canSubmit && !isStreaming ? "0 1px 3px color-mix(in srgb, var(--accent) 25%, transparent)" : "none",
+              boxShadow: canSubmit ? "0 1px 3px color-mix(in srgb, var(--accent) 25%, transparent)" : "none",
               transition: "background 0.15s, box-shadow 0.15s, color 0.15s",
             }}
           >
-            {/* Send and queue differ by color and tooltip, not by glyph: an up
-                arrow reads as "send" in both states. */}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="20" x2="12" y2="5" />
               <polyline points="6 11 12 5 18 11" />
             </svg>
           </button>
+          )}
           </div>
         </div>
 
@@ -2639,33 +2669,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 </button>
               </div>
             )} */}
-
-            {isStreaming && (
-              <button
-                onClick={onAbort}
-                 title={t("chat.stopAgent")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "8px 14px",
-                  height: 32,
-                  background: "rgba(239,68,68,0.08)",
-                  border: "1px solid rgba(239,68,68,0.3)",
-                  borderRadius: 9,
-                  color: "#ef4444",
-                  cursor: "pointer",
-                  fontSize: 12, fontWeight: 600,
-                  whiteSpace: "nowrap", letterSpacing: "-0.01em",
-                  transition: "background 0.12s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.16)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
-                </svg>
-                 {t("chat.stop")}
-              </button>
-            )}
 
             {onSoundToggle !== undefined && (
               <button

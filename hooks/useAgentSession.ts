@@ -31,6 +31,7 @@ import {
   emptyQueuedMessages,
   reconcileQueuedSubmissions,
   splitClearedQueue,
+  type QueuedBehavior,
   type QueuedMessages,
   type QueuedSubmission,
 } from "@/lib/queued-submissions";
@@ -2119,7 +2120,21 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, []);
 
-  const handleQueuedAction = useCallback(async (id: string, action: "steer" | "edit") => {
+  // Fresh numbers for the top bar: same source as the /session command, minus
+  // the panel open. The override self-clears when messages or usage move, so a
+  // refresh never freezes later updates.
+  const refreshSessionStats = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    try {
+      const stats = await sendAgentCommand<SessionStatsInfo>(sid, { type: "get_session_stats" });
+      if (stats && sessionIdRef.current === sid) setSessionStatsOverride(stats);
+    } catch (e) {
+      console.error("Failed to refresh session stats:", e);
+    }
+  }, []);
+
+  const handleQueuedAction = useCallback(async (id: string, action: "toggle" | "edit") => {
     const sid = sessionIdRef.current;
     if (!sid) return;
     const records = queuedSubmissionsRef.current;
@@ -2137,18 +2152,24 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
     // clear_queue also emits an empty queue_update, but that only reaches us
     // while SSE is connected — update the rows locally, and synchronously, so a
-    // second click cannot act on the queue this one just replaced.
-    const remaining = splitClearedQueue(cleared, records, id);
-    const nextRecords = remaining
-      .map((item) => createQueuedSubmission(item.text, item.behavior, item.images));
+    // second click cannot act on the queue this one just replaced. pi's lists
+    // are authoritative: entries consumed mid-run must not be resurrected, so
+    // the rebuild starts from `cleared`, not from the local records.
+    const remaining = splitClearedQueue(cleared, records, action === "edit" ? id : undefined);
+    const toggledBehavior: QueuedBehavior = target.behavior === "steer" ? "followUp" : "steer";
+    const nextRecords = remaining.map((item) => createQueuedSubmission(
+      item.text,
+      action === "toggle" && item.text === target.text && item.behavior === target.behavior
+        ? toggledBehavior
+        : item.behavior,
+      item.images,
+    ));
     queuedSubmissionsRef.current = nextRecords;
     setQueuedSubmissions(nextRecords);
-    if (action === "steer") {
-      await sendStreamingPrompt(target.text, "steer", target.images);
-    } else {
+    if (action === "edit") {
       opts.chatInputRef?.current?.prependQueuedMessage(target.text, target.images);
     }
-    for (const item of remaining) {
+    for (const item of nextRecords) {
       await sendStreamingPrompt(item.text, item.behavior, item.images);
     }
   }, [addNotice, opts.chatInputRef, sendStreamingPrompt]);
@@ -2546,7 +2567,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // Actions
     handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
     handleCompact, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
-    handleQueuedAction,
+    handleQueuedAction, refreshSessionStats,
     handleBuiltinSlashCommand,
     setNoticePaused: setPausedNoticeId,
     handleToolPresetChange, handleThinkingLevelChange, loadTools, loadSlashCommands, setActiveLeafId, setData, setMessages, loadContext,

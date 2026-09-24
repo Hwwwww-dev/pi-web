@@ -675,3 +675,44 @@ test("auto-compact slash command toggles session auto-compaction", () => {
   assert.match(source, /setAutoCompactionEnabled\(state\?\.autoCompactionEnabled \?\? true\)/);
   assert.match(source, /setAutoCompactionEnabled\(liveState\.autoCompactionEnabled \?\? true\)/);
 });
+
+test("queued rows toggle behavior in place and edit through the authoritative cleared queue", async () => {
+  const actionSource = source.slice(
+    source.indexOf("  const handleQueuedAction = useCallback"),
+    source.indexOf("  const handleThinkingLevelChange"),
+  );
+  const libSource = await jitiSource(new URL("../lib/queued-submissions.ts", import.meta.url));
+
+  assert.match(actionSource, /action: "toggle" \| "edit"/);
+  assert.match(actionSource, /type: "clear_queue"/);
+  // pi's lists are authoritative; edit takes one entry out, toggle takes none.
+  assert.match(actionSource, /splitClearedQueue\(cleared, records, action === "edit" \? id : undefined\)/);
+  assert.match(actionSource, /target\.behavior === "steer" \? "followUp" : "steer"/);
+  // The requeue replays the rebuilt rows, so the flip reaches pi too.
+  assert.match(actionSource, /for \(const item of nextRecords\)/);
+  assert.match(actionSource, /sendStreamingPrompt\(item\.text, item\.behavior, item\.images\)/);
+  assert.doesNotMatch(actionSource, /action === "steer"/);
+  assert.match(libSource, /takenId\?: string/);
+  // The wire type stays steer/followUp; the toggle is a requeue with the other behavior.
+  assert.match(actionSource, /action: "toggle" \| "edit"[\s\S]*?type: "clear_queue"/);
+});
+
+test("top-bar session stats refresh on demand and while running", () => {
+  const refreshSource = source.slice(
+    source.indexOf("  const refreshSessionStats = useCallback"),
+    source.indexOf("  const handleQueuedAction = useCallback"),
+  );
+
+  assert.match(refreshSource, /type: "get_session_stats"/);
+  assert.match(refreshSource, /setSessionStatsOverride\(stats\)/);
+  assert.match(source, /handleQueuedAction, refreshSessionStats,/);
+
+  assert.match(chatWindowSource, /statsPanelOpen\?: boolean/);
+  assert.match(chatWindowSource, /if \(background \|\| !statsPanelOpen\) return;/);
+  assert.match(chatWindowSource, /void refreshSessionStats\(\);/);
+  assert.match(chatWindowSource, /const timer = setInterval\(\(\) => \{ void refreshSessionStats\(\); \}, 15_000\);/);
+
+  // Slots report only when their own panel is open; the transient chat follows the active panel.
+  assert.match(appShellSource, /statsPanelOpen=\{isActive && activeTopPanel === "session"\}/);
+  assert.match(appShellSource, /statsPanelOpen=\{activeTopPanel === "session"\}/);
+});

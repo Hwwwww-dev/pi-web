@@ -110,7 +110,7 @@ export interface RequeuedSubmission {
 export function splitClearedQueue(
   cleared: QueuedMessages,
   records: QueuedSubmission[],
-  takenId: string,
+  takenId?: string,
 ): RequeuedSubmission[] {
   const taken = records.find((record) => record.id === takenId);
   let takenConsumed = false;

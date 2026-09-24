@@ -159,15 +159,25 @@ test("cycleListIndex wraps in both directions", () => {
   assert.equal(cycleListIndex(-1, 4, 1), 0);
 });
 
-test("shows the follow-up shortcut in the button tooltip", () => {
-  const html = renderToStaticMarkup(
+test("streaming turns the composer's main button into stop", () => {
+  const streamingHtml = renderToStaticMarkup(
     React.createElement(I18nProvider, null, React.createElement(ChatInput, {
       onSend() {}, onAbort() {}, onFollowUp() {}, isStreaming: true,
     })),
   );
 
-  assert.match(html, /title="Queue this message after the agent finishes \(Alt\/Option\+Enter\)"/);
-  assert.match(html, /aria-keyshortcuts="Alt\+Enter"/);
+  // Stop owns the circle while streaming; the standalone pill is gone and
+  // follow-ups stay keyboard-only (Enter).
+  assert.match(streamingHtml, /aria-label="Stop agent"/);
+  assert.doesNotMatch(streamingHtml, /aria-label="Follow-up"/);
+  assert.doesNotMatch(streamingHtml, />Stop</);
+
+  const idleHtml = renderToStaticMarkup(
+    React.createElement(I18nProvider, null, React.createElement(ChatInput, {
+      onSend() {}, onAbort() {}, isStreaming: false,
+    })),
+  );
+  assert.match(idleHtml, /aria-label="Send"/);
 });
 
 test("renders the upstream model error", () => {

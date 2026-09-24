@@ -630,6 +630,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           sessionListVersion: number;
           runningSessionIds?: string[];
           completionNotificationSuppressedSessionIds?: string[];
+          sessions?: SessionInfo[];
         };
         if (stopped || controller !== current) return;
         runningPollAuthoritativeRef.current = true;
@@ -637,7 +638,25 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           data.completionNotificationSuppressedSessionIds ?? [],
         );
         setRunningSessionIds(new Set(data.runningSessionIds ?? []));
-        if (data.sessionListVersion !== sessionListVersionRef.current) {
+        if (data.sessions) {
+          // The poll now carries a summary-grade catalogue, so rows (keep-alive
+          // section included) refresh counts, timing, and names every tick.
+          // Deferred details can drop name/firstMessage for just-changed files —
+          // keep the previous values in that case.
+          sessionListVersionRef.current = data.sessionListVersion;
+          setAllSessions((previous) => {
+            const previousById = new Map(previous.map((session) => [session.id, session]));
+            return data.sessions!.map((session) => {
+              const old = previousById.get(session.id);
+              if (!old) return session;
+              return {
+                ...session,
+                name: session.name ?? old.name,
+                firstMessage: session.firstMessage || old.firstMessage,
+              };
+            });
+          });
+        } else if (data.sessionListVersion !== sessionListVersionRef.current) {
           // Reuse the invalidated cache; forcing a scan would change the version again.
           await loadSessions();
         }
@@ -1936,11 +1955,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                         <span>{info.detailsPending ? "…" : t("sidebar.messagesCount", { count: info.messageCount })}</span>
                         <span title={info.modified}>{formatRelativeTime(info.modified, locale)}</span>
                       </span>
-                      {/* The path is clipped, not truncated: hovering slides the
-                          track so the whole path can be read without a tooltip. */}
-                      <span className="keepalive-sidebar-cwd" title={info.cwd}>
-                        <span className="keepalive-sidebar-cwd-track">{info.cwd}</span>
-                      </span>
+                      {/* Same tail-first clipping as the project rows: when the path
+                          is too long, the head gets the ellipsis and the specific
+                          tail stays readable. */}
+                      <PathLabel
+                        text={info.cwd}
+                        style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}
+                      />
                     </button>
                     {!isSelected && (
                       <button
