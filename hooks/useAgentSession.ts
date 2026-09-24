@@ -365,7 +365,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [slashCommandsLoading, setSlashCommandsLoading] = useState(false);
   const [noticeState, dispatchNotice] = useReducer(noticeReducer, { visible: [], pending: [] });
   const [sessionStatsOverride, setSessionStatsOverride] = useState<SessionStatsInfo | null>(null);
-  const [extensionDialog, setExtensionDialog] = useState<ExtensionUiDialogRequest | null>(null);
+  // A queue, not a single slot: concurrent sources (permission prompts, ask
+  // tools, subagents) append instead of silently overwriting an unanswered
+  // request, and the dialog renders a pager over the pending ones.
+  const [extensionDialogQueue, setExtensionDialogQueue] = useState<ExtensionUiDialogRequest[]>([]);
+  const extensionDialog = extensionDialogQueue[0] ?? null;
   const [extensionCustomUi, setExtensionCustomUi] = useState<ExtensionUiCustomRequest | null>(null);
   const [extensionStatuses, setExtensionStatuses] = useState<ExtensionStatusItem[]>([]);
   const [extensionWidgets, setExtensionWidgets] = useState<ExtensionWidgetItem[]>([]);
@@ -1043,7 +1047,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     response: { value: string } | { confirmed: boolean } | { cancelled: true },
   ) => {
     const sid = sessionIdRef.current;
-    setExtensionDialog((current) => current?.id === request.id ? null : current);
+    setExtensionDialogQueue((current) => current.filter((item) => item.id !== request.id));
     if (!sid) return;
     try {
       await sendAgentCommand(sid, {
@@ -1095,7 +1099,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       case "confirm":
       case "input":
       case "editor":
-        setExtensionDialog(request);
+        setExtensionDialogQueue((current) => current.some((item) => item.id === request.id) ? current : [...current, request]);
         break;
       case "notify": {
         addNotice({
@@ -1669,7 +1673,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         handleExtensionUiRequest(event as ExtensionUiRequest);
         break;
       case "extension_ui_closed":
-        setExtensionDialog((current) => current?.id === event.id ? null : current);
+        setExtensionDialogQueue((current) => current.filter((item) => item.id !== event.id));
         break;
     }
   }, [addNotice, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, handleExtensionUiRequest, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, scrollToBottom, settleUiStage, syncLiveModel]);
@@ -2674,7 +2678,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     retryInfo, contextUsage: displayContextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats, autoCompactionEnabled,
     slashCommands, slashCommandsLoading, queuedSubmissions,
-    notices: noticeState.visible, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, dismissNotice,
+    notices: noticeState.visible, extensionDialog, extensionDialogQueue, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, dismissNotice,
     isAutoModelSelection: isNew && newSessionModel === null,
     isAutoThinkingSelection: isNew && newSessionThinkingLevel === null,
     agentPhase,

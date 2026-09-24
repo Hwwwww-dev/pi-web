@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
+const hookSource = await readFile(new URL("../hooks/useAgentSession.ts", import.meta.url), "utf8");
 const dialogSource = source.slice(source.indexOf("function ExtensionDialog"));
 const customSource = source.slice(source.indexOf("function ExtensionCustomPanel"));
 
@@ -49,7 +50,25 @@ test("renders option preview blocks in the dialog title as markdown", () => {
 });
 
 test("resets collapse state when a new extension request arrives", () => {
-  assert.match(source, /<ExtensionDialog key=\{extensionDialog.id\}/);
+  assert.match(source, /<ExtensionDialog\s+key=\{extensionDialog\.id\}/);
   assert.match(source, /<ExtensionCustomPanel key=\{extensionCustomUi.id\}/);
   assert.match(customSource, /if \(!collapsed\) inputRef.current\?\.focus\(\);\s*}, \[collapsed\]\)/);
+});
+
+test("queues concurrent requests and pages over pending ones", () => {
+  // Requests append to a queue; responses and ui_closed remove by id.
+  assert.match(hookSource, /extensionDialogQueue, setExtensionDialogQueue\] = useState<ExtensionUiDialogRequest\[\]>\(\[\]\)/);
+  assert.match(hookSource, /current\.some\(\(item\) => item\.id === request\.id\) \? current : \[\.\.\.current, request\]/);
+  assert.match(hookSource, /current\.filter\(\(item\) => item\.id !== request\.id\)/);
+  assert.match(hookSource, /current\.filter\(\(item\) => item\.id !== event\.id\)/);
+  // Pager + answered review in the dialog header.
+  assert.match(dialogSource, /chat\.question\.pager/);
+  assert.match(dialogSource, /answered\.map\(\(entry, answerIndex\)/);
+});
+
+test("select answers are two-step: click selects, confirm sends", () => {
+  assert.match(dialogSource, /const \[selectedOption, setSelectedOption\] = useState<string \| null>\(null\)/);
+  assert.match(dialogSource, /onClick=\{\(\) => setSelectedOption\(\(current\) => current === option \? null : option\)\}/);
+  assert.match(dialogSource, /onDoubleClick=\{\(\) => \{\s*\n\s*setSelectedOption\(option\);\s*\n\s*onRespond\(request, \{ value: option \}\);\s*\n\s*\}\}/);
+  assert.match(dialogSource, /request\.method === "select" \? \([\s\S]{0,400}disabled=\{selectedOption === null\}/);
 });

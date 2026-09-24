@@ -365,7 +365,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
     slashCommands, slashCommandsLoading, queuedSubmissions,
-    notices, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused, dismissNotice,
+    notices, extensionDialog, extensionDialogQueue, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused, dismissNotice,
     isAutoModelSelection,
     isAutoThinkingSelection,
     agentPhase,
@@ -386,6 +386,24 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     deferInitialScroll: Boolean(pendingScrollRestore),
   });
   const sessionBusy = agentRunning || bashRunning;
+  // Read-only record of this run's answered dialogs, shown in the dialog header
+  // so sequential questions ("问题 1/2") keep their earlier answers visible.
+  const [answeredDialogs, setAnsweredDialogs] = useState<Array<{ id: string; question: string; answer: string; cancelled?: boolean }>>([]);
+  const handleDialogRespond = useCallback((request: ExtensionDialogRequest, response: { value: string } | { confirmed: boolean } | { cancelled: true }) => {
+    const question = (request.title.split("\n").find((line: string) => line.trim()) ?? request.title).trim().slice(0, 80);
+    let answer: string;
+    let cancelled = false;
+    if ("cancelled" in response) {
+      answer = t("chat.cancel");
+      cancelled = true;
+    } else if ("confirmed" in response) {
+      answer = t("chat.confirm");
+    } else {
+      answer = response.value;
+    }
+    setAnsweredDialogs((prev) => [...prev.slice(-9), { id: request.id, question, answer, cancelled }]);
+    respondToExtensionUi(request, response);
+  }, [respondToExtensionUi, t]);
   const [quotedSelection, setQuotedSelection] = useState<{
     text: string;
     top: number;
@@ -1005,6 +1023,10 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     );
   }
 
+  // Set by the message-list IIFE when the running turn already renders its own
+  // activity rows with spinners; the phase text line then stays out of the way.
+  let liveActivityRendered = false;
+
   return (
     <div
       className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden"
@@ -1065,7 +1087,14 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {extensionDialog && (
-          <ExtensionDialog key={extensionDialog.id} request={extensionDialog} onRespond={respondToExtensionUi} />
+          <ExtensionDialog
+            key={extensionDialog.id}
+            request={extensionDialog}
+            queueIndex={1}
+            queueTotal={extensionDialogQueue.length}
+            answered={answeredDialogs}
+            onRespond={handleDialogRespond}
+          />
         )}
         {extensionCustomUi && (
           <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} onInput={sendExtensionCustomInput} />
@@ -1196,6 +1225,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                     searchBlock,
                   });
                   if (liveItems.length > 0) {
+                    liveActivityRendered = true;
                     rendered.push(
                       <TurnActivityBody
                         key={`live-activity-${entryIds[userIdx] ?? userIdx}`}
@@ -1346,7 +1376,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
               <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSession={onOpenSession} />
             )}
 
-            {agentRunning && !hasStreamingContent && agentPhase && (
+            {agentRunning && !hasStreamingContent && agentPhase && !liveActivityRendered && (
               <div className="break-words py-2 text-[13px] text-text-muted">
                 <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t)}</span>
               </div>
@@ -1799,15 +1829,24 @@ function parseMultiSelectPrompt(title: string): { question: string; options: Arr
 function ExtensionDialog({
   request,
   onRespond,
+  queueIndex,
+  queueTotal,
+  answered,
 }: {
   request: ExtensionDialogRequest;
   onRespond: (request: ExtensionDialogRequest, response: { value: string } | { confirmed: boolean } | { cancelled: true }) => void;
+  queueIndex?: number;
+  queueTotal?: number;
+  answered?: Array<{ id: string; question: string; answer: string; cancelled?: boolean }>;
 }) {
   const { t } = useI18n();
   const [value, setValue] = useState(request.method === "editor" ? request.prefill ?? "" : "");
   const multiSelect = request.method === "input" ? parseMultiSelectPrompt(request.title) : null;
   const [checkedIds, setCheckedIds] = useState<readonly string[]>([]);
   const [customAnswer, setCustomAnswer] = useState("");
+  // Select is two-step: a click only marks the choice; the Confirm button (or
+  // double-click) sends it, so a stray click can be revised before it counts.
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const toggleMultiOption = (id: string) => {
     setCheckedIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   };
@@ -1839,6 +1878,8 @@ function ExtensionDialog({
   const submitValue = () => {
     if (request.method === "confirm") {
       onRespond(request, { confirmed: true });
+    } else if (request.method === "select") {
+      if (selectedOption !== null) onRespond(request, { value: selectedOption });
     } else if (multiSelect) {
       const value = checkedIds.length > 0
         ? checkedIds.slice().sort((a, b) => Number(a) - Number(b)).join(",")
@@ -1936,8 +1977,32 @@ function ExtensionDialog({
             <ExtensionDialogTitle title={multiSelect ? multiSelect.question || request.title : request.title} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
               <span>{t("chat.extensionRequest")}</span>
+              {queueTotal !== undefined && queueTotal > 1 && (
+                <span style={{ color: "var(--accent)" }}>
+                  {t("chat.question.pager", { index: queueIndex ?? 1, total: queueTotal })}
+                </span>
+              )}
               {countdown}
             </div>
+            {answered && answered.length > 0 && (
+              <div style={{ marginTop: 6, display: "grid", gap: 2 }}>
+                {answered.map((entry, answerIndex) => (
+                  <div
+                    key={entry.id}
+                    style={{
+                      fontSize: 11,
+                      color: entry.cancelled ? "var(--text-dim)" : "var(--text-muted)",
+                      opacity: entry.cancelled ? 0.6 : 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {`${answerIndex + 1}. ${entry.question} — ${entry.answer}`}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -1998,26 +2063,33 @@ function ExtensionDialog({
                   : tone === "negative"
                     ? { color: "#ef4444" }
                     : undefined;
+                const selected = selectedOption === option;
                 return (
                 <div
                   key={option}
                   role="button"
                   tabIndex={0}
                   data-extension-option
-                  className={`extension-option${tone === "neutral" ? "" : ` tone-${tone}`}`}
+                  className={`extension-option${tone === "neutral" ? "" : ` tone-${tone}`}${selected ? " selected" : ""}`}
                   aria-label={option}
+                  aria-pressed={selected}
                   ref={index === 0 ? focusFirstOption : undefined}
-                  onClick={() => onRespond(request, { value: option })}
+                  onClick={() => setSelectedOption((current) => current === option ? null : option)}
+                  onDoubleClick={() => {
+                    setSelectedOption(option);
+                    onRespond(request, { value: option });
+                  }}
                   onKeyDown={(event) => {
                     if (event.key !== "Enter" && event.key !== " ") return;
                     event.preventDefault();
-                    onRespond(request, { value: option });
+                    setSelectedOption((current) => current === option ? null : option);
                   }}
                   style={{
                     width: "100%",
                     padding: "7px 10px",
                     borderRadius: 8,
-                    border: "1px solid var(--border)",
+                    border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`,
+                    background: selected ? "var(--bg-selected)" : undefined,
                     color: "var(--text)",
                     cursor: "pointer",
                     textAlign: "left",
@@ -2197,7 +2269,24 @@ function ExtensionDialog({
             >
                {t("chat.confirm")}
             </button>
-          ) : request.method !== "select" ? (
+          ) : request.method === "select" ? (
+            <button
+              onClick={submitValue}
+              disabled={selectedOption === null}
+              autoFocus={request.options.length === 0}
+              style={{
+                padding: "8px 14px",
+                fontSize: 13,
+                borderRadius: 6,
+                border: "1px solid var(--accent)",
+                background: selectedOption === null ? "transparent" : "var(--accent)",
+                color: selectedOption === null ? "var(--text-dim)" : "var(--accent-contrast)",
+                cursor: selectedOption === null ? "default" : "pointer",
+              }}
+            >
+               {t("chat.confirm")}
+            </button>
+          ) : (
             <button
               onClick={submitValue}
               style={{
@@ -2212,7 +2301,7 @@ function ExtensionDialog({
             >
                {t("chat.submit")}
             </button>
-          ) : null}
+          )}
         </div>
       </div>
       )}
