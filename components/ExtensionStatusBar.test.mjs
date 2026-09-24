@@ -99,14 +99,15 @@ test("marks a permissive-mode status as a warning", () => {
   assert.doesNotMatch(html, /extension-status-warning"><span><span/);
 });
 
-test("keeps the horizontal scrollbar clear of the status glyphs", async () => {
+test("keeps the status glyphs clear of the scrollbar and the shelf corners", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const statusLineRule = css.match(/^\.extension-status-line\s*\{([^}]*)\}/m)?.[1] ?? "";
   const warningRule = css.match(/^\.extension-status-warning\s*\{([^}]*)\}/m)?.[1] ?? "";
 
   // An overlay scrollbar floats over the content box on macOS, so the line
-  // reserves room for it below the text.
-  assert.match(statusLineRule, /padding:\s*8px 12px 13px/);
+  // reserves room for it below the text, and the inline padding keeps a
+  // scrolled-to-the-end row off the shelf's rounded corner.
+  assert.match(statusLineRule, /padding:\s*8px 20px 13px/);
   assert.match(warningRule, /color:\s*#dc2626/);
 });
 

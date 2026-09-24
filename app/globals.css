@@ -718,8 +718,9 @@ button.extension-widget-trigger:focus-visible {
   min-height: 35px;
   max-height: min(144px, 18dvh);
   /* A long status row scrolls sideways, and macOS floats that scrollbar over
-     the content box: the wider bottom padding keeps it clear of the glyphs. */
-  padding: 8px 12px 13px;
+     the content box: the wider bottom padding keeps it clear of the glyphs, and
+     the wide inline padding keeps the text off the shelf's rounded corners. */
+  padding: 8px 20px 13px;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
