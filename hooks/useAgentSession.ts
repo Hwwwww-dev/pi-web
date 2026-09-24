@@ -24,7 +24,7 @@ import { clearDraft, rekeyDraft, restoreDraftSubmission, type ChatDraftImage } f
 import { getPreferredToolPreset, setPreferredToolPreset } from "@/lib/tool-preset-preference";
 import { CONFIGURED_TOOL_PRESET, getPresetFromToolNames, getToolNamesForPreset, type ToolEntry, type ToolPreset } from "@/lib/tool-presets";
 import type { SessionStatsInfo } from "@/lib/pi-types";
-import { mergeSessionStats, type SessionFileStats } from "@/lib/session-stats";
+import type { SessionFileStats } from "@/lib/session-stats";
 import { userMessageKey } from "@/lib/prompt-recovery";
 import {
   createQueuedSubmission,
@@ -552,25 +552,29 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, [sessionStatsOverride, contextUsage]);
 
   const sessionStats = useMemo(() => {
+    // One reading, one shape — the live SDK snapshot while a wrapper is alive,
+    // the session file's own stats (already counted server-side from the same
+    // entries) otherwise. Summing messages here as well is what let the top bar
+    // and the stats panel disagree.
     if (sessionStatsOverride) {
       return {
         ...sessionStatsOverride,
+        sessionName: sessionStatsOverride.sessionName ?? session?.name,
         totalActiveMs: data?.totalActiveMs,
         ...(displayContextUsage ? { contextUsage: displayContextUsage } : {}),
-      };
+      } satisfies SessionStatsInfo;
     }
     const fileStats = data?.stats;
-    const stats = mergeSessionStats(fileStats, data?.context.messages ?? [], messages);
-    if (stats.tokens.total === 0 && messages.length === 0 && !fileStats) return null;
+    if (!fileStats) return null;
     return {
       sessionFile: data?.filePath || undefined,
       sessionId: sessionIdRef.current ?? session?.id ?? "",
       sessionName: session?.name,
-      ...stats,
+      ...fileStats,
       totalActiveMs: data?.totalActiveMs,
       ...(displayContextUsage ? { contextUsage: displayContextUsage } : {}),
     } satisfies SessionStatsInfo;
-  }, [messages, sessionStatsOverride, displayContextUsage, data?.context.messages, data?.filePath, data?.totalActiveMs, data?.stats, session?.id, session?.name]);
+  }, [sessionStatsOverride, displayContextUsage, data?.filePath, data?.totalActiveMs, data?.stats, session?.id, session?.name]);
 
   useEffect(() => {
     entryIdsRef.current = entryIds;
@@ -2044,10 +2048,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
         case "session": {
           if (!sid) return complete({ handled: true, error: "No active session" });
-          const stats = await sendAgentCommand<SessionStatsInfo>(sid, { type: "get_session_stats" });
-          if (stats) {
-            setSessionStatsOverride(stats);
-          }
+          // The panel opens on the same reading the top bar renders.
+          refreshStatsRef.current?.();
           onSessionStatsPanelOpen?.();
           return complete({ handled: true, action: "openSessionStats" });
         }
@@ -2148,20 +2150,20 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, []);
 
-  // Fresh numbers for the top bar: same source as the /session command, minus
-  // the panel open. The override self-clears when messages or usage move, so a
-  // refresh never freezes later updates.
+  // Fresh numbers for the top bar and the stats panel: the agent-state route's
+  // snapshot, which carries the SDK's own stats for a live session. Reading it
+  // here means one source for both readers, no second command, and no session
+  // started just to look at counters.
   const refreshSessionStats = useCallback(async () => {
     const sid = sessionIdRef.current;
     if (!sid) return;
     try {
-      const stats = await sendAgentCommand<SessionStatsInfo>(sid, { type: "get_session_stats" });
-      if (stats && sessionIdRef.current === sid) {
-        setSessionStatsOverride(stats);
-        // One reading feeds the toolbar and the panel: the projection is the
-        // same value get_state reports, just read on a fresher schedule.
-        if (stats.contextUsage) setContextUsage(stats.contextUsage);
-      }
+      const res = await fetch(`/api/agent/${encodeURIComponent(sid)}`);
+      if (!res.ok) return;
+      const payload = await res.json() as { stats?: SessionStatsInfo | null };
+      if (sessionIdRef.current !== sid || !payload.stats) return;
+      setSessionStatsOverride(payload.stats);
+      if (payload.stats.contextUsage) setContextUsage(payload.stats.contextUsage);
     } catch (e) {
       console.error("Failed to refresh session stats:", e);
     }

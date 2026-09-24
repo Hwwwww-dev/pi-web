@@ -573,36 +573,16 @@ html.dark .web-login-error {
   display: none;
 }
 
-/* Widgets and the status line share one row while there is room for both. The
-  55%/240px split keeps the long-standing ≈2:1 ratio; a phone drops the basis and
-  lays them out in the same row instead (see below). */
-.extension-status-shelf.has-widgets.has-status .extension-widget-triggers {
-  flex: 1 1 55%;
-  border-right: 1px solid var(--border);
-}
-
-.extension-status-shelf.has-widgets.has-status .extension-status-line {
-  flex: 1 1 240px;
-}
-
-/* A phone keeps both in one row: the shelf never wraps, the chips keep their own
-  horizontal scroll and the status text takes the rest of the row. A widget panel
-  opens above the shelf instead of pushing the chat up, so an expanded TUI box
-  cannot eat the message list. */
+/* A widget panel opens above the shelf instead of pushing the chat up, so an
+  expanded TUI box cannot eat the message list. */
 @media (max-width: 640px) {
+  /* Touch targets get a little taller; every control grows together. */
+  .composer-chip {
+    height: 34px;
+  }
+
   .extension-status-shelf {
     position: relative;
-    flex-wrap: nowrap;
-  }
-
-  .extension-status-shelf.has-widgets.has-status .extension-widget-triggers {
-    flex: 0 1 auto;
-    max-width: 45%;
-  }
-
-  .extension-status-shelf.has-widgets.has-status .extension-status-line {
-    flex: 1 1 auto;
-    min-width: 0;
   }
 
   .extension-widget-panels {
@@ -747,38 +727,121 @@ button.extension-widget-trigger:focus-visible {
   scrollbar-width: thin;
 }
 
-.extension-status-line {
+/* One chip recipe for every control in the composer toolbar — thinking level,
+  model name, tool preset, YOLO marker, extension status, More, attach. Flat by
+  default: same height, padding, radius and type size, background only on hover,
+  so the row reads as one flat group instead of a row of boxes. */
+.composer-chip {
+  flex: 0 0 auto;
   display: flex;
-  flex: 1 1 0;
-  align-items: flex-start;
-  min-width: 0;
-  min-height: 35px;
-  max-height: min(144px, 18dvh);
-  /* A long status row scrolls sideways, and macOS floats that scrollbar over
-     the content box: the wider bottom padding keeps it clear of the glyphs. */
-  padding: 8px 12px 13px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
 }
 
-.extension-status-text {
-  flex: 1;
+.composer-chip:hover,
+.composer-chip[aria-expanded="true"] {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.composer-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Extension status texts (LSP state, goal mode, …) moved off the shelf behind
+  this chip, so the shelf only ever carries widget triggers. The popover opens
+  upward, right-aligned, and lists one line per reporting extension. */
+.extension-status-button-root {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+/* pi-lens reports green/red itself; the dot carries those two signals. */
+.extension-status-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.extension-status-dot[data-tone="ok"] {
+  background: #16a34a;
+}
+
+.extension-status-dot[data-tone="warning"] {
+  background: #d97706;
+}
+
+.extension-status-dot[data-tone="error"] {
+  background: #dc2626;
+}
+
+.extension-status-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 24px));
+  max-height: min(320px, 40dvh);
+  padding: 8px 10px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 10%);
+}
+
+.extension-status-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   min-width: 0;
+}
+
+/* Bullet for the first line of the entry, not its middle. */
+.extension-status-entry .extension-status-dot {
+  margin-top: 5px;
+}
+
+/* Status text is TUI output as well: it scrolls sideways instead of wrapping a
+  line into a broken row. */
+.extension-status-entry-text {
+  margin: 0;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.45;
+  overflow-wrap: normal;
   white-space: pre;
 }
 
-/* pi-permission-system announces a permissive run as the bare status "yolo"
-  (PERMISSION_SYSTEM_YOLO_STATUS_VALUE). It raises the risk of the turn, so it
-  reads as a warning rather than as another status word. */
-.extension-status-warning {
-  color: #dc2626;
-}
+/* pi-permission-system's permissive-mode pill (`yolo`) is styled inline in
+  components/ExtensionStatus.tsx: it is a marker with no responsive variants, and
+  inline keeps it from flickering when the stylesheet reloads behind the app. */
 
 :root {
   --font-mono: var(--font-noto-mono), 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, 'PingFang SC', 'Microsoft YaHei', monospace;

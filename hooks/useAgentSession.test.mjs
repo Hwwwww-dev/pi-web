@@ -703,8 +703,11 @@ test("top-bar session stats follow the run instead of the panel being open", () 
     source.indexOf("  const handleQueuedAction = useCallback"),
   );
 
-  assert.match(refreshSource, /type: "get_session_stats"/);
-  assert.match(refreshSource, /setSessionStatsOverride\(stats\)/);
+  // The numbers come from the agent-state snapshot, so reading them cannot
+  // start a session that was not already running.
+  assert.match(refreshSource, /const res = await fetch\(`\/api\/agent\/\$\{encodeURIComponent\(sid\)\}`\)/);
+  assert.match(refreshSource, /setSessionStatsOverride\(payload\.stats\)/);
+  assert.doesNotMatch(refreshSource, /sendAgentCommand/);
   // One snapshot feeds the top bar and the panel, and the running session is
   // what keeps it current — the panel opening no longer decides that.
   assert.match(refreshSource, /const timer = setInterval\(\(\) => refreshStatsRef\.current\?\.\(\), 3_000\);/);

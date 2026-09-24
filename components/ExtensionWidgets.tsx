@@ -114,7 +114,7 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
   };
 
   return (
-    <>
+    <div className="extension-status-shelf">
       {expandedWidget && (
         <div className="extension-widget-panels">
           {(() => {
@@ -203,6 +203,6 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
           );
         })}
       </div>
-    </>
+    </div>
   );
 }

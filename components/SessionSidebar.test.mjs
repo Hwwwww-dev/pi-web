@@ -125,27 +125,21 @@ test("offers the downstream context-menu hook only on a normal session row", () 
 });
 
 test("lifecycle refreshes bypass the cache while cross-window polling reuses it", () => {
-  assert.match(source, /function sessionListUrl\(summary: boolean, force: boolean\)/);
-  assert.match(source, /if \(summary\) return "\/api\/sessions\?summary=1"/);
-  assert.match(source, /if \(force\) return "\/api\/sessions\?force=1"/);
+  assert.match(source, /function sessionListUrl\(force: boolean\)/);
+  assert.match(source, /return force \? "\/api\/sessions\?force=1" : "\/api\/sessions"/);
   assert.match(source, /cache: "no-store"/);
-  // First paint uses the cheap summary listing, then hydrates after a delay.
-  assert.match(source, /loadSessions\(true, false, true\)/);
-  assert.match(source, /setTimeout\(\(\) => \{[\s\S]*?void loadSessions\(false, true\)/);
+  // Every listing carries full row details, so there is no second hydration pass.
+  assert.match(source, /if \(isFirst\) \{\s*void loadSessions\(true\);/);
   assert.match(source, /data\.sessionListVersion !== sessionListVersionRef\.current[\s\S]*?await loadSessions\(\)/);
   assert.doesNotMatch(source, /sessionRefreshDone|sessionRefreshTimerRef|title=\{t\("sidebar\.refresh"\)\}/);
   assert.match(source, /loadSessions\(false, true\);[\s\S]*?onBackgroundTaskDone/);
 });
 
-test("a polled summary row never blanks the details already on screen", () => {
-  assert.match(source, /import \{ mergePolledRow \} from "\.\/session-catalog-helpers"/);
-  assert.match(source, /polled\.map\(\(session\) => mergePolledRow\(previousById\.get\(session\.id\), session\)\)/);
-  // A row first seen in a poll has no details to keep: ask for a full listing
-  // instead of printing a placeholder count until the page is reloaded.
-  assert.match(
-    source,
-    /polled\.some\(\(session\) => session\.detailsPending[\s\S]{0,80}knownById\.get\(session\.id\)\?\.detailsPending !== false\)/,
-  );
+test("the running-state poll reloads the catalogue instead of patching rows", () => {
+  // The poll carries no catalogue, so every row keeps coming from one source
+  // and one shape: it only asks for a reload when the version moves.
+  assert.doesNotMatch(source, /mergePolledRow|detailsPending|summary=1/);
+  assert.match(source, /data\.sessionListVersion !== sessionListVersionRef\.current[\s\S]*?await loadSessions\(\)/);
 });
 
 test("does not expose disk-backed actions for transient sessions", () => {

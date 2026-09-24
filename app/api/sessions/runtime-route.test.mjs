@@ -152,14 +152,15 @@ test("deleting an unpersisted session shuts down its runtime and invalidates cac
   }
 });
 
-test("session listing supports cheap summaries and honors force refresh", () => {
-  assert.match(listRoute, /searchParams\.get\("summary"\) === "1"/);
-  assert.match(listRoute, /summary\s*\n?\s*\? listSessionSummaries\(\)/);
+test("session listing honors force refresh", () => {
   assert.match(listRoute, /searchParams\.get\("force"\) === "1"/);
   assert.match(listRoute, /listAllSessions\(\{ force \}\)/);
   assert.match(listRoute, /attachSessionProjectInfo\(getRpcSessionInfos\(\)\)/);
   assert.match(listRoute, /mergeSessionLists\(persistedSessions, runtimeSessions\)/);
   assert.match(listRoute, /"Cache-Control": "no-store"/);
+  // The catalogue is the single source for row details; a second, partial
+  // listing would print placeholder counts for just-changed files.
+  assert.doesNotMatch(listRoute, /listSessionSummaries|summary/);
 });
 
 test("session reads use the live SessionManager before requiring a JSONL path", () => {

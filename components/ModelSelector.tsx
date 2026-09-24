@@ -121,23 +121,12 @@ export function ModelSelector({
         textAlign: "left",
       }
     : {
-        display: "flex",
-        alignItems: "center",
         justifyContent: isMobile ? "flex-start" : undefined,
-        gap: 6,
-        width: isMobile ? "100%" : undefined,
-        maxWidth: isMobile ? "100%" : 220,
-        height: 32,
-        padding: isMobile ? "8px 10px" : "8px 12px",
+        width: isMobile ? "auto" : undefined,
+        maxWidth: isMobile ? "100%" : 168,
         overflow: "hidden",
-        border: "none",
-        borderRadius: 9,
-        background: open ? "var(--bg-hover)" : "none",
-        color: "var(--text-muted)",
         cursor: locked ? "not-allowed" : "pointer",
-        fontSize: 12,
         opacity: locked ? 0.5 : 1,
-        transition: "background 0.12s, color 0.12s",
       };
 
   const choose = (option: ModelSelectorOption) => {
@@ -151,7 +140,7 @@ export function ModelSelector({
     <div
       ref={rootRef}
       className={`model-selector is-${variant}${locked ? " is-disabled" : ""}`}
-      style={{ position: "relative", width: variant === "field" || isMobile ? "100%" : undefined, minWidth: 0, flex: variant === "toolbar" && isMobile ? "1 1 auto" : undefined }}
+      style={{ position: "relative", width: variant === "field" ? "100%" : undefined, minWidth: 0, flex: variant === "toolbar" && isMobile ? "0 1 auto" : undefined }}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || !open) return;
         event.preventDefault();
@@ -162,6 +151,7 @@ export function ModelSelector({
     >
       <button
         type="button"
+        className={variant === "toolbar" ? "composer-chip" : undefined}
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -177,20 +167,20 @@ export function ModelSelector({
             return !current;
           });
         }}
-        onMouseEnter={(event) => {
+        onMouseEnter={variant === "field" ? (event) => {
           if (locked) return;
           event.currentTarget.style.background = "var(--bg-hover)";
           event.currentTarget.style.color = "var(--text)";
-        }}
-        onMouseLeave={(event) => {
+        } : undefined}
+        onMouseLeave={variant === "field" ? (event) => {
           if (locked) {
-            event.currentTarget.style.background = variant === "field" ? "var(--bg-panel)" : "none";
-            event.currentTarget.style.color = variant === "field" ? "var(--text-dim)" : "var(--text-muted)";
+            event.currentTarget.style.background = "var(--bg-panel)";
+            event.currentTarget.style.color = "var(--text-dim)";
             return;
           }
-          event.currentTarget.style.background = open ? "var(--bg-hover)" : variant === "field" ? "var(--bg)" : "none";
-          event.currentTarget.style.color = variant === "field" ? "var(--text)" : "var(--text-muted)";
-        }}
+          event.currentTarget.style.background = open ? "var(--bg-hover)" : "var(--bg)";
+          event.currentTarget.style.color = "var(--text)";
+        } : undefined}
       >
         {busy ? (
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" style={{ animation: "spin 0.8s linear infinite", flexShrink: 0 }} aria-hidden="true">
@@ -206,7 +196,7 @@ export function ModelSelector({
             <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
           </svg>
         )}
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentName}</span>
+        <span style={{ flex: 1, minWidth: 0, maxWidth: variant === "toolbar" ? (isMobile ? 128 : 148) : undefined, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentName}</span>
         {variant === "field" && (
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, color: "var(--text-dim)" }}>
             <polyline points="6 9 12 15 18 9" />

@@ -83,7 +83,10 @@ export async function GET(
     }
 
     const state = await session.send({ type: "get_state" });
-    return NextResponse.json({ running: true, state });
+    // The authoritative counters ride along with the state snapshot: the toolbar
+    // and the stats panel read one reading, and no extra command is needed.
+    const stats = await session.send({ type: "get_session_stats" });
+    return NextResponse.json({ running: true, state, stats });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }

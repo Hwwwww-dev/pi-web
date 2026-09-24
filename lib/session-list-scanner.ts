@@ -1,10 +1,8 @@
 // Cache session-list metadata without building the SDK's unused allMessagesText.
-// Normal listings rescan only new/changed files; summary listings reuse whatever
-// the index already holds and fall back to header/stat metadata for the files
-// that changed, which a later normal listing hydrates.
+// Every listing rescans only the files whose fingerprint changed.
 // ponytail: size/mtime fingerprints miss same-size edits with restored mtime;
 // use content hashes if detecting those edits becomes necessary.
-import { closeSync, createReadStream, existsSync, openSync, readFileSync, readSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import { basename, join } from "node:path";
@@ -29,16 +27,12 @@ export interface ScannedSessionInfo {
 	messageCount: number;
 	firstMessage: string;
 	parentSessionPath?: string;
-	/** True when only header/stat metadata was available for this listing. */
-	detailsPending?: boolean;
 }
 
 interface Fingerprint {
 	size: number;
 	mtimeMs: number;
 }
-
-const SUMMARY_HEADER_MAX_BYTES = 64 * 1024;
 
 interface IndexEntry {
 	fp: Fingerprint;
@@ -71,27 +65,6 @@ function parseLine(line: string): RawEntry | null {
 	}
 }
 
-/** Read only the first physical line needed to identify a session file. */
-function readSessionHeaderSummary(filePath: string): RawEntry | null {
-	const fd = openSync(filePath, "r");
-	try {
-		const buffer = Buffer.allocUnsafe(SUMMARY_HEADER_MAX_BYTES);
-		const bytesRead = readSync(fd, buffer, 0, buffer.length, 0);
-		if (bytesRead <= 0) return null;
-		const source = buffer.subarray(0, bytesRead).toString("utf8");
-		for (const line of source.split("\n")) {
-			const entry = parseLine(line.replace(/\r$/, ""));
-			if (!entry) continue;
-			return entry.type === "session" ? entry : null;
-		}
-		return null;
-	} catch {
-		return null;
-	} finally {
-		closeSync(fd);
-	}
-}
-
 function hasMatchingFingerprint(
 	cached: IndexEntry | undefined,
 	fingerprint: Fingerprint,
@@ -101,35 +74,6 @@ function hasMatchingFingerprint(
 		&& cached.fp.size === fingerprint.size
 		&& cached.fp.mtimeMs === fingerprint.mtimeMs,
 	);
-}
-
-/** Build a session row from the header alone, without parsing the transcript. */
-function deferredSessionInfo(
-	filePath: string,
-	fingerprint: Fingerprint,
-): ScannedSessionInfo | null {
-	const header = readSessionHeaderSummary(filePath);
-	if (
-		!header
-		|| typeof header.id !== "string"
-		|| typeof header.cwd !== "string"
-		|| typeof header.timestamp !== "string"
-	) return null;
-
-	const created = new Date(header.timestamp);
-	if (!Number.isFinite(created.getTime())) return null;
-
-	return {
-		path: filePath,
-		id: header.id,
-		cwd: header.cwd,
-		created,
-		modified: new Date(fingerprint.mtimeMs),
-		messageCount: 0,
-		firstMessage: "",
-		...(typeof header.parentSession === "string" ? { parentSessionPath: header.parentSession } : {}),
-		detailsPending: true,
-	};
 }
 
 function extractTextContent(message: RawEntry): string {
@@ -375,11 +319,8 @@ function queueIndexPersist(): void {
  * (size, mtimeMs) changed since the last pass. Output ordering matches the SDK
  * catalogue (modified descending, ties by mtimeMs then basename descending).
  */
-export async function listSessionsIncremental(
-	options: { deferDetails?: boolean } = {},
-): Promise<ScannedSessionInfo[]> {
+export async function listSessionsIncremental(): Promise<ScannedSessionInfo[]> {
 	loadPersistedIndex();
-	const deferDetails = options.deferDetails ?? false;
 
 	const sessionsDir = join(getAgentDir(), "sessions");
 	const files = await enumerateSessionFiles(sessionsDir);
@@ -422,14 +363,6 @@ export async function listSessionsIncremental(
 			// can paint its real count and first message immediately. Blanking
 			// them would cost a request to get back what we are already holding.
 			results[resultIndex] = cached.info;
-			continue;
-		}
-		if (deferDetails) {
-			// Header and stat only: a later normal listing fills in the transcript
-			// details, so a first paint does not wait on parsing every file.
-			const summary = deferredSessionInfo(filePath, fp);
-			if (summary) results[resultIndex] = summary;
-			else index.delete(filePath);
 			continue;
 		}
 		changed.push({ filePath, fp, resultIndex });

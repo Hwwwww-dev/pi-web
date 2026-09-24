@@ -2409,8 +2409,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       quoteSelectionEnabled={quoteSelectionEnabled}
                       initialPrompt={isActive && pendingQuotePrompt?.sessionId === slot.session.id ? pendingQuotePrompt?.text : undefined}
                       onInitialPromptConsumed={() => setPendingQuotePrompt(null)}
-                      soundEnabled={soundEnabled}
-                      onSoundToggle={onSoundToggle}
                       playDoneSound={playDoneSound}
                       unlockAudio={unlockAudio}
                     />
@@ -2450,8 +2448,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     quoteSelectionEnabled={quoteSelectionEnabled}
                     initialPrompt={pendingQuotePrompt?.sessionId === activeChatSession?.id ? pendingQuotePrompt?.text : undefined}
                     onInitialPromptConsumed={() => setPendingQuotePrompt(null)}
-                    soundEnabled={soundEnabled}
-                    onSoundToggle={onSoundToggle}
                     playDoneSound={playDoneSound}
                     unlockAudio={unlockAudio}
                   />
@@ -2644,6 +2640,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         initialSection={settingsSection}
         quoteSelectionEnabled={quoteSelectionEnabled}
         onQuoteSelectionChange={handleQuoteSelectionChange}
+        soundEnabled={soundEnabled}
+        onSoundToggle={onSoundToggle}
         keepAliveConfig={keepAliveConfig}
         onKeepAliveConfigChange={handleKeepAliveConfigChange}
         onClose={() => {

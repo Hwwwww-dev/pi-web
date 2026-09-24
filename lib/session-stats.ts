@@ -1,4 +1,4 @@
-import type { AgentMessage, AgentUsage, SessionEntry, SessionMessage } from "./types";
+import type { AgentUsage, SessionEntry, SessionMessage } from "./types";
 
 export interface SessionFileStats {
   userMessages: number;
@@ -58,43 +58,6 @@ function addMessage(stats: SessionFileStats, message: SessionMessage): void {
 function finishStats(stats: SessionFileStats): SessionFileStats {
   stats.tokens.total = stats.tokens.input + stats.tokens.output + stats.tokens.cacheRead + stats.tokens.cacheWrite;
   return stats;
-}
-
-function computeMessageStats(messages: AgentMessage[]): SessionFileStats {
-  const stats = emptyStats();
-  for (const message of messages) {
-    if (message.role !== "custom") addMessage(stats, message);
-  }
-  return finishStats(stats);
-}
-
-export function mergeSessionStats(
-  fileStats: SessionFileStats | undefined,
-  loadedMessages: AgentMessage[],
-  currentMessages: AgentMessage[],
-): SessionFileStats {
-  const current = computeMessageStats(currentMessages);
-  if (!fileStats) return current;
-
-  const loaded = computeMessageStats(loadedMessages);
-  const delta = (now: number, before: number) => Math.max(0, now - before);
-  const tokens = {
-    input: fileStats.tokens.input + delta(current.tokens.input, loaded.tokens.input),
-    output: fileStats.tokens.output + delta(current.tokens.output, loaded.tokens.output),
-    cacheRead: fileStats.tokens.cacheRead + delta(current.tokens.cacheRead, loaded.tokens.cacheRead),
-    cacheWrite: fileStats.tokens.cacheWrite + delta(current.tokens.cacheWrite, loaded.tokens.cacheWrite),
-    total: 0,
-  };
-  tokens.total = tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite;
-  return {
-    userMessages: fileStats.userMessages + delta(current.userMessages, loaded.userMessages),
-    assistantMessages: fileStats.assistantMessages + delta(current.assistantMessages, loaded.assistantMessages),
-    toolCalls: fileStats.toolCalls + delta(current.toolCalls, loaded.toolCalls),
-    toolResults: fileStats.toolResults + delta(current.toolResults, loaded.toolResults),
-    totalMessages: fileStats.totalMessages + delta(current.totalMessages, loaded.totalMessages),
-    tokens,
-    cost: fileStats.cost + delta(current.cost, loaded.cost),
-  };
 }
 
 /**

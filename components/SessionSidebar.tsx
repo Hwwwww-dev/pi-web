@@ -15,7 +15,6 @@ import { useResizablePanel } from "@/hooks/useResizablePanel";
 import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import { DirectoryPicker } from "./DirectoryPicker";
 import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
-import { mergePolledRow } from "./session-catalog-helpers";
 import { PathLabel } from "./PathLabel";
 import { SessionSearch } from "./SessionSearch";
 
@@ -102,10 +101,8 @@ function ToolbarIconButton({
   );
 }
 
-function sessionListUrl(summary: boolean, force: boolean): string {
-  if (summary) return "/api/sessions?summary=1";
-  if (force) return "/api/sessions?force=1";
-  return "/api/sessions";
+function sessionListUrl(force: boolean): string {
+  return force ? "/api/sessions?force=1" : "/api/sessions";
 }
 
 interface Props {
@@ -176,7 +173,6 @@ interface ValidatedProject {
 const UNREAD_SESSIONS_STORAGE_KEY = "pi-web:unread-session-ids";
 const LAST_CUSTOM_CWD_STORAGE_KEY = "pi-web:last-custom-cwd";
 const RUNNING_SESSIONS_POLL_MS = 2500;
-const SESSION_DETAILS_HYDRATION_DELAY_MS = 750;
 const SESSION_PANE_DEFAULT_HEIGHT = 320;
 const SESSION_PANE_MIN_HEIGHT = 80;
 const EXPLORER_PANE_MIN_HEIGHT = 120;
@@ -370,7 +366,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // Tracked in a ref only: the version is compared against the polled value to
   // decide whether the list needs reloading, and no render reads it.
   const sessionListVersionRef = useRef<number | null>(null);
-  const allSessionsRef = useRef<SessionInfo[]>([]);
   const sessionLoadIdRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -415,7 +410,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // Once polling has delivered a snapshot it is the source of truth for
   // running state; late /api/sessions responses must not overwrite it.
   const runningPollAuthoritativeRef = useRef(false);
-  const detailsHydrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const explorerRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileExplorerRef = useRef<FileExplorerHandle>(null);
 
@@ -488,11 +482,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     return () => ro.disconnect();
   }, [sessionSearchActive]);
 
-  const loadSessions = useCallback(async (showLoading = false, force = false, summary = false) => {
+  const loadSessions = useCallback(async (showLoading = false, force = false) => {
     const loadId = ++sessionLoadIdRef.current;
     try {
       if (showLoading) setLoading(true);
-      const res = await fetch(sessionListUrl(summary, force), {
+      const res = await fetch(sessionListUrl(force), {
         cache: "no-store",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -537,30 +531,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   useEffect(() => {
     const isFirst = !initialLoadDone.current;
     initialLoadDone.current = true;
-    let active = true;
 
     if (isFirst) {
-      // Header/stat metadata is enough to select the URL session and paint the
-      // sidebar. Hydrate exact counts, names, and first messages once the
-      // selected chat has had a chance to start loading.
-      void loadSessions(true, false, true).then(() => {
-        if (!active) return;
-        detailsHydrationTimerRef.current = setTimeout(() => {
-          detailsHydrationTimerRef.current = null;
-          if (active) void loadSessions(false, true);
-        }, SESSION_DETAILS_HYDRATION_DELAY_MS);
-      });
+      void loadSessions(true);
     } else {
       void loadSessions(false, true);
     }
-
-    return () => {
-      active = false;
-      if (detailsHydrationTimerRef.current) {
-        clearTimeout(detailsHydrationTimerRef.current);
-        detailsHydrationTimerRef.current = null;
-      }
-    };
   }, [loadSessions, refreshKey]);
 
   // Browser storage is unavailable during server rendering. Restore the panel
@@ -607,7 +583,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           sessionListVersion: number;
           runningSessionIds?: string[];
           completionNotificationSuppressedSessionIds?: string[];
-          sessions?: SessionInfo[];
         };
         if (stopped || controller !== current) return;
         runningPollAuthoritativeRef.current = true;
@@ -615,24 +590,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           data.completionNotificationSuppressedSessionIds ?? [],
         );
         setRunningSessionIds(new Set(data.runningSessionIds ?? []));
-        if (data.sessions) {
-          // The poll carries a summary-grade catalogue, so rows (the keep-alive
-          // section included) refresh timing and names every tick. It must not
-          // blank what it omits: mergePolledRow keeps the details already on
-          // screen, and a row we have never listed in full asks for a listing
-          // instead of printing a placeholder count until the next page load.
+        if (data.sessionListVersion !== sessionListVersionRef.current) {
+          // A new session, rename, or title edit landed. Reload through the
+          // catalogue instead of patching rows from the poll, so every row keeps
+          // coming from one source and one shape.
           sessionListVersionRef.current = data.sessionListVersion;
-          const polled = data.sessions;
-          const knownById = new Map(allSessionsRef.current.map((session) => [session.id, session]));
-          setAllSessions((previous) => {
-            const previousById = new Map(previous.map((session) => [session.id, session]));
-            return polled.map((session) => mergePolledRow(previousById.get(session.id), session));
-          });
-          if (polled.some((session) => session.detailsPending && knownById.get(session.id)?.detailsPending !== false)) {
-            await loadSessions();
-          }
-        } else if (data.sessionListVersion !== sessionListVersionRef.current) {
-          // Reuse the invalidated cache; forcing a scan would change the version again.
           await loadSessions();
         }
       } catch {
@@ -670,12 +632,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   useEffect(() => {
     onSessionsChange?.(allSessions);
   }, [allSessions, onSessionsChange]);
-
-  // Mirror for the running-state poll, which inspects the rows already on screen
-  // on every tick and must not re-subscribe to the list to do it.
-  useEffect(() => {
-    allSessionsRef.current = allSessions;
-  }, [allSessions]);
 
   useEffect(() => {
     const previous = previousRunningSessionIdsRef.current;
@@ -1933,7 +1889,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                         <span className={`keepalive-sidebar-status${isRunning ? " is-running" : isUnread ? " is-done" : ""}`}>
                           {t(isRunning ? "keepalive.statusRunning" : isUnread ? "keepalive.statusDone" : "keepalive.statusIdle")}
                         </span>
-                        <span>{info.detailsPending ? "…" : t("sidebar.messagesCount", { count: info.messageCount })}</span>
+                        <span>{t("sidebar.messagesCount", { count: info.messageCount })}</span>
                         <span title={info.modified}>{formatRelativeTime(info.modified, locale)}</span>
                       </span>
                       {/* Same tail-first clipping as the project rows: when the path
@@ -2497,7 +2453,7 @@ function SessionItem({
                 <span title={session.modified}>{formatRelativeTime(session.modified, locale)}</span>
               )}
               <span>
-                {session.detailsPending ? "…" : t("sidebar.messagesCount", { count: session.messageCount })}
+                <span>{t("sidebar.messagesCount", { count: session.messageCount })}</span>
               </span>
               {actionError && (
                 <span style={{ color: "var(--error, #e5484d)" }} title={actionError}>{actionError}</span>

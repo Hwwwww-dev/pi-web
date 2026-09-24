@@ -155,9 +155,9 @@ function readSessionRelationEntries(filePath: string): SessionEntry[] {
 export async function attachSessionProjectInfo(sessions: SessionInfo[]): Promise<SessionInfo[]> {
   const uniqueCwds = [...new Set(sessions.map((s) => s.cwd).filter(Boolean))];
   const projectByCwd = new Map<string, ProjectInfo>();
-  await Promise.all(uniqueCwds.map(async (cwd) => {
-    projectByCwd.set(cwd, await resolveProject(cwd));
-  }));
+  await Promise.all(uniqueCwds.map((cwd) => resolveProject(cwd))).then((projects) => {
+    for (const [index, cwd] of uniqueCwds.entries()) projectByCwd.set(cwd, projects[index]);
+  });
 
   return sessions.map((session) => {
     const project = session.cwd ? projectByCwd.get(session.cwd) : undefined;
@@ -209,7 +209,6 @@ function mapScannedSession(
 ): SessionInfo {
   cacheSessionPath(scanned.id, scanned.path);
   const { originSessionId, subagent } = resolveScannedSessionRelation(scanned, pathToId);
-  const detailsPending = scanned.detailsPending === true;
   return {
     path: scanned.path,
     id: scanned.id,
@@ -218,11 +217,7 @@ function mapScannedSession(
     created: scanned.created.toISOString(),
     modified: scanned.modified.toISOString(),
     messageCount: scanned.messageCount,
-    // A pending row has no first message yet; the placeholder would read as a
-    // real "(no messages)" session until the details arrive.
-    firstMessage: detailsPending && !scanned.firstMessage
-      ? ""
-      : scanned.firstMessage || "(no messages)",
+    firstMessage: scanned.firstMessage || "(no messages)",
     parentSessionId: originSessionId,
     ...(subagent
       ? { relation: { kind: "subagent" as const, parentSessionId: subagent.parentSessionId, profile: subagent.profile, description: subagent.description, status: subagent.status } }
@@ -230,7 +225,6 @@ function mapScannedSession(
         ? { relation: { kind: "fork" as const, ...(originSessionId ? { originSessionId } : {}) } }
         : {}),
     transient: false,
-    ...(detailsPending ? { detailsPending: true } : {}),
   };
 }
 
@@ -242,15 +236,6 @@ async function buildSessionList(scanned: ScannedSessionInfo[]): Promise<SessionI
 
 async function loadAllSessions(): Promise<SessionInfo[]> {
   return buildSessionList(await listSessionsIncremental());
-}
-
-/**
- * Return a cheap catalogue for the first paint. Changed files contribute only
- * header/stat metadata; a normal listAllSessions() call hydrates the exact
- * counts, names, and first messages afterwards.
- */
-export async function listSessionSummaries(): Promise<SessionInfo[]> {
-  return buildSessionList(await listSessionsIncremental({ deferDetails: true }));
 }
 
 export async function listAllSessions(options: { force?: boolean; allowStale?: boolean } = {}): Promise<SessionInfo[]> {
@@ -618,6 +603,8 @@ export function readSessionHeader(filePath: string): SessionHeader | null {
 
 export function getSessionEntries(filePath: string): SessionEntry[] {
   const entries = openSessionManager(filePath).getEntries();
+  // SAFETY: openSessionManager() hands back the SDK's own entry objects; the
+  // cast only re-labels them with pi-web's structural SessionEntry type.
   return entries as unknown as SessionEntry[];
 }
 
