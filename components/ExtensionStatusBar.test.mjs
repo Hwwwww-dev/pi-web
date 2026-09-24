@@ -12,6 +12,7 @@ const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const {
   ExtensionStatusBar,
   formatExtensionStatusLine,
+  isWarningStatusText,
   sanitizeExtensionStatusText,
 } = await jiti.import("./ExtensionStatusBar.tsx");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
@@ -73,9 +74,40 @@ test("renders a single status line without identifier keys", () => {
   assert.match(html, /extension-status-shelf/);
   assert.match(html, /extension-status-line/);
   assert.match(html, /extension-status-text/);
-  assert.match(html, />ponytail <span style=/);
+  assert.match(html, /extension-status-text"><span>ponytail<\/span> <span><span style=/);
   assert.match(html, />memory</);
   assert.doesNotMatch(html, /05-ponytail|20-memory/);
+});
+
+test("marks a permissive-mode status as a warning", () => {
+  assert.equal(isWarningStatusText("yolo"), true);
+  assert.equal(isWarningStatusText("  YOLO\n"), true);
+  assert.equal(isWarningStatusText("yolomatic"), false);
+
+  const html = renderStatusBar({
+    statuses: [
+      { key: "pi-lens", text: "json, marksman, opengrep" },
+      { key: "pi-permission-system", text: "yolo" },
+    ],
+  });
+
+  // The joined line stays the accessible text, and only the warning word
+  // carries the red class — the statuses before it stay muted.
+  assert.match(html, /aria-label="json, marksman, opengrep yolo"/);
+  assert.match(html, /<span class="extension-status-warning"><span>yolo<\/span><\/span>/);
+  assert.match(html, /extension-status-text"><span>json, marksman, opengrep<\/span>/);
+  assert.doesNotMatch(html, /extension-status-warning"><span><span/);
+});
+
+test("keeps the horizontal scrollbar clear of the status glyphs", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const statusLineRule = css.match(/^\.extension-status-line\s*\{([^}]*)\}/m)?.[1] ?? "";
+  const warningRule = css.match(/^\.extension-status-warning\s*\{([^}]*)\}/m)?.[1] ?? "";
+
+  // An overlay scrollbar floats over the content box on macOS, so the line
+  // reserves room for it below the text.
+  assert.match(statusLineRule, /padding:\s*8px 12px 13px/);
+  assert.match(warningRule, /color:\s*#dc2626/);
 });
 
 test("renders widgets and status text in one footer", () => {

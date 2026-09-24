@@ -20,12 +20,20 @@ import {
   getSessionViewSnapshot,
   setSessionViewSnapshot,
 } from "@/lib/session-view-cache";
-import { clearDraft, rekeyDraft, restoreDraftSubmission } from "@/lib/draft-store";
+import { clearDraft, rekeyDraft, restoreDraftSubmission, type ChatDraftImage } from "@/lib/draft-store";
 import { getPreferredToolPreset, setPreferredToolPreset } from "@/lib/tool-preset-preference";
 import { CONFIGURED_TOOL_PRESET, getPresetFromToolNames, getToolNamesForPreset, type ToolEntry, type ToolPreset } from "@/lib/tool-presets";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import { mergeSessionStats, type SessionFileStats } from "@/lib/session-stats";
 import { userMessageKey } from "@/lib/prompt-recovery";
+import {
+  createQueuedSubmission,
+  emptyQueuedMessages,
+  reconcileQueuedSubmissions,
+  splitClearedQueue,
+  type QueuedMessages,
+  type QueuedSubmission,
+} from "@/lib/queued-submissions";
 import { AgentEventConnection } from "@/lib/agent-event-connection";
 import { isSystemMessageEvent } from "@/lib/agent-event-wire";
 import { getToolExecutionProgress } from "@/lib/tool-execution-progress";
@@ -96,10 +104,7 @@ type AgentStateResponse = {
   queuedMessages?: { steering?: string[]; followUp?: string[] } | null;
 };
 
-export interface QueuedMessages {
-  steering: string[];
-  followUp: string[];
-}
+export type { QueuedMessages, QueuedSubmission };
 
 function normalizeQueuedMessages(q?: { steering?: string[]; followUp?: string[] } | null): QueuedMessages {
   return { steering: q?.steering ?? [], followUp: q?.followUp ?? [] };
@@ -270,6 +275,7 @@ export interface ChatInputHandle {
   insertIfEmpty: (content: string) => void;
   replaceMessage: (message: UserMessage) => void;
   prependText: (text: string) => void;
+  prependQueuedMessage: (text: string, images: Array<{ data: string; mimeType: string }>) => void;
   addImages: (files: File[]) => void;
   rekeyDraft: (previousKey: string, nextKey: string) => void;
   restoreSubmission: (text: string, images?: Array<{ data: string; mimeType: string }>, targetDraftKey?: string) => void;
@@ -356,7 +362,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [extensionCustomUi, setExtensionCustomUi] = useState<ExtensionUiCustomRequest | null>(null);
   const [extensionStatuses, setExtensionStatuses] = useState<ExtensionStatusItem[]>([]);
   const [extensionWidgets, setExtensionWidgets] = useState<ExtensionWidgetItem[]>([]);
-  const [queuedMessages, setQueuedMessages] = useState<QueuedMessages>({ steering: [], followUp: [] });
+  const [queuedSubmissions, setQueuedSubmissions] = useState<QueuedSubmission[]>([]);
+  const queuedSubmissionsRef = useRef<QueuedSubmission[]>([]);
+  useEffect(() => {
+    queuedSubmissionsRef.current = queuedSubmissions;
+  }, [queuedSubmissions]);
+  // pi reports the queue as texts. Rows are folded from those snapshots so the
+  // local records keep their thumbnails while pi still lists their text.
+  const applyQueueSnapshot = useCallback((snapshot: QueuedMessages) => {
+    setQueuedSubmissions((records) => reconcileQueuedSubmissions(records, snapshot));
+  }, []);
 
   const eventConnectionRef = useRef<AgentEventConnection | null>(null);
   const eventStreamGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -494,10 +509,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   const restoreSubmission = useCallback((
     text: string,
-    images: AttachedImage[] | undefined,
+    images: ChatDraftImage[] | undefined,
     targetDraftKey: string | undefined,
   ) => {
-    const draftImages = images?.map(({ data, mimeType }) => ({ data, mimeType }));
     const destinationDraftKey = resolveComposerDraftKey(targetDraftKey);
     if (
       !sessionHookMountedRef.current
@@ -506,9 +520,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     ) return;
     const input = opts.chatInputRef?.current;
     if (input) {
-      input.restoreSubmission(text, draftImages, destinationDraftKey);
+      input.restoreSubmission(text, images, destinationDraftKey);
     } else if (destinationDraftKey) {
-      restoreDraftSubmission(destinationDraftKey, text, draftImages);
+      restoreDraftSubmission(destinationDraftKey, text, images);
     }
   }, [newSessionDraftKey, opts.chatInputRef, resolveComposerDraftKey]);
 
@@ -665,10 +679,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           if (liveState.systemPrompt !== undefined) setSystemPrompt(liveState.systemPrompt ?? null);
           if (liveState.extensionStatuses !== undefined) setExtensionStatuses(liveState.extensionStatuses ?? []);
           if (liveState.extensionWidgets !== undefined) setExtensionWidgets(liveState.extensionWidgets ?? []);
-          if (liveState.queuedMessages !== undefined) setQueuedMessages(normalizeQueuedMessages(liveState.queuedMessages));
+          if (liveState.queuedMessages !== undefined) applyQueueSnapshot(normalizeQueuedMessages(liveState.queuedMessages));
           if (liveState.autoCompactionEnabled !== undefined) setAutoCompactionEnabled(liveState.autoCompactionEnabled ?? true);
         } else if (!agentState.running) {
-          setQueuedMessages({ steering: [], followUp: [] });
+          applyQueueSnapshot(emptyQueuedMessages());
         }
         return agentState;
       } catch (e) {
@@ -687,7 +701,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (loadFlightsRef.current.get(flightKey) === flight) loadFlightsRef.current.delete(flightKey);
     });
     return await flight;
-  }, [setToolPresetState, syncLiveModel]);
+  }, [applyQueueSnapshot, setToolPresetState, syncLiveModel]);
 
   const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { tail?: number; signal?: AbortSignal }) => {
     try {
@@ -1229,7 +1243,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // (wrapper destroyed) means nothing is compacting.
       setIsCompacting(state?.isCompacting ?? false);
       setAutoCompactionEnabled(state?.autoCompactionEnabled ?? true);
-      setQueuedMessages(normalizeQueuedMessages(state?.queuedMessages));
+      applyQueueSnapshot(normalizeQueuedMessages(state?.queuedMessages));
       const busy = data.running && state
         && (state.isStreaming || state.isPromptRunning || state.isCompacting);
       if (busy) {
@@ -1248,7 +1262,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } catch {
       // Network still down — the next poll / visibility / online tick retries.
     }
-  }, [finishPromptWithoutStream, syncLiveModel]);
+  }, [applyQueueSnapshot, finishPromptWithoutStream, syncLiveModel]);
 
   // Recovery net for missed SSE events: while the agent is running, verify
   // against the server periodically and whenever the tab returns to the
@@ -1362,7 +1376,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
               if (d.state?.extensionWidgets !== undefined) setExtensionWidgets(d.state.extensionWidgets ?? []);
               // Aborted turns can leave messages queued in pi (delivered with the
               // next turn); dead wrapper (no state) means the queue is gone.
-              setQueuedMessages(normalizeQueuedMessages(d.state?.queuedMessages));
+              applyQueueSnapshot(normalizeQueuedMessages(d.state?.queuedMessages));
             })
             .catch(() => {});
         }
@@ -1544,7 +1558,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
       }
       case "queue_update":
-        setQueuedMessages({
+        applyQueueSnapshot({
           steering: [...((event.steering as string[] | undefined) ?? [])],
           followUp: [...((event.followUp as string[] | undefined) ?? [])],
         });
@@ -1579,7 +1593,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setExtensionDialog((current) => current?.id === event.id ? null : current);
         break;
     }
-  }, [addNotice, cancelEventStreamGrace, handleExtensionUiRequest, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, scrollToBottom, settleUiStage, syncLiveModel]);
+  }, [addNotice, applyQueueSnapshot, cancelEventStreamGrace, handleExtensionUiRequest, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, scrollToBottom, settleUiStage, syncLiveModel]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {
@@ -2051,7 +2065,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const sendStreamingPrompt = useCallback(async (
     message: string,
     behavior: "steer" | "followUp",
-    images?: AttachedImage[],
+    images?: ChatDraftImage[],
   ) => {
     const sid = sessionIdRef.current;
     const restore = () => restoreSubmission(message, images, composerDraftKey);
@@ -2081,19 +2095,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [addNotice, composerDraftKey, restoreSubmission]);
 
-  const handleSteer = useCallback(async (message: string, images?: AttachedImage[]) => {
-    await sendStreamingPrompt(message, "steer", images);
-  }, [sendStreamingPrompt]);
-
   const handlePromptWithStreamingBehavior = useCallback(async (
     message: string,
     behavior: "steer" | "followUp",
-    images?: AttachedImage[],
+    images?: ChatDraftImage[],
   ) => {
+    setQueuedSubmissions((records) => [...records, createQueuedSubmission(message, behavior, images)]);
     await sendStreamingPrompt(message, behavior, images);
   }, [sendStreamingPrompt]);
 
-  const handleFollowUp = useCallback(async (message: string, images?: AttachedImage[]) => {
+  const handleFollowUp = useCallback(async (message: string, images?: ChatDraftImage[]) => {
+    setQueuedSubmissions((records) => [...records, createQueuedSubmission(message, "followUp", images)]);
     await sendStreamingPrompt(message, "followUp", images);
   }, [sendStreamingPrompt]);
 
@@ -2107,23 +2119,39 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, []);
 
-  const handleRecallQueue = useCallback(async () => {
+  const handleQueuedAction = useCallback(async (id: string, action: "steer" | "edit") => {
     const sid = sessionIdRef.current;
     if (!sid) return;
+    const records = queuedSubmissionsRef.current;
+    const target = records.find((record) => record.id === id);
+    if (!target) return;
+    let cleared: QueuedMessages;
     try {
-      const result = await sendAgentCommand<{ steering?: string[]; followUp?: string[] }>(sid, { type: "clear_queue" });
-      // clearQueue also emits an empty queue_update, but that only reaches us
-      // while SSE is connected — clear locally so idle recalls update the UI.
-      setQueuedMessages({ steering: [], followUp: [] });
-      const texts = [...(result?.steering ?? []), ...(result?.followUp ?? [])];
-      if (texts.length > 0) {
-        opts.chatInputRef?.current?.prependText(texts.join("\n\n"));
-      }
+      cleared = normalizeQueuedMessages(
+        await sendAgentCommand<{ steering?: string[]; followUp?: string[] }>(sid, { type: "clear_queue" }),
+      );
     } catch (e) {
-      console.error("Failed to recall queued messages:", e);
-      addNotice({ type: "error", message: "Failed to recall queued messages" });
+      console.error("Failed to take a queued message:", e);
+      addNotice({ type: "error", message: "Failed to take the queued message" });
+      return;
     }
-  }, [opts.chatInputRef, addNotice]);
+    // clear_queue also emits an empty queue_update, but that only reaches us
+    // while SSE is connected — update the rows locally, and synchronously, so a
+    // second click cannot act on the queue this one just replaced.
+    const remaining = splitClearedQueue(cleared, records, id);
+    const nextRecords = remaining
+      .map((item) => createQueuedSubmission(item.text, item.behavior, item.images));
+    queuedSubmissionsRef.current = nextRecords;
+    setQueuedSubmissions(nextRecords);
+    if (action === "steer") {
+      await sendStreamingPrompt(target.text, "steer", target.images);
+    } else {
+      opts.chatInputRef?.current?.prependQueuedMessage(target.text, target.images);
+    }
+    for (const item of remaining) {
+      await sendStreamingPrompt(item.text, item.behavior, item.images);
+    }
+  }, [addNotice, opts.chatInputRef, sendStreamingPrompt]);
 
   const handleThinkingLevelChange = useCallback(async (level: ThinkingLevelOption) => {
     if (level === "auto") {
@@ -2323,7 +2351,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           if (agentState.state.systemPrompt !== undefined) setSystemPrompt(agentState.state.systemPrompt ?? null);
           if (agentState.state.extensionStatuses !== undefined) setExtensionStatuses(agentState.state.extensionStatuses ?? []);
           if (agentState.state.extensionWidgets !== undefined) setExtensionWidgets(agentState.state.extensionWidgets ?? []);
-          if (agentState.state.queuedMessages !== undefined) setQueuedMessages(normalizeQueuedMessages(agentState.state.queuedMessages));
+          if (agentState.state.queuedMessages !== undefined) applyQueueSnapshot(normalizeQueuedMessages(agentState.state.queuedMessages));
         }
       });
     }
@@ -2504,7 +2532,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunning, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats, autoCompactionEnabled,
-    slashCommands, slashCommandsLoading, queuedMessages,
+    slashCommands, slashCommandsLoading, queuedSubmissions,
     notices: noticeState.visible, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, dismissNotice,
     isAutoModelSelection: isNew && newSessionModel === null,
     isAutoThinkingSelection: isNew && newSessionThinkingLevel === null,
@@ -2517,8 +2545,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     lastUserMsgRef, pendingScrollToUserRef, initialScrollDoneRef,
     // Actions
     handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
-    handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
-    handleRecallQueue,
+    handleCompact, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
+    handleQueuedAction,
     handleBuiltinSlashCommand,
     setNoticePaused: setPausedNoticeId,
     handleToolPresetChange, handleThinkingLevelChange, loadTools, loadSlashCommands, setActiveLeafId, setData, setMessages, loadContext,

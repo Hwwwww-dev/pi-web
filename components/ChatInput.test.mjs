@@ -50,8 +50,8 @@ test("follow-up shortcuts preserve newline, IME, mobile and completion behavior"
     compilerOptions: { target: ts.ScriptTarget.ES2020 },
   }).outputText);
   const cases = [
-    ["Enter steers", {}, {}, "steer"],
-    ["Alt+Enter follows up", { altKey: true }, {}, "followup"],
+    ["Enter queues a follow-up", {}, {}, "followup"],
+    ["Alt+Enter queues a follow-up", { altKey: true }, {}, "followup"],
     ["idle Alt+Enter sends", { altKey: true }, { isStreaming: false }, "send"],
     ["Shift+Enter inserts a newline", { shiftKey: true }, {}, "native"],
     ["Alt+Shift+Enter keeps native behavior", { altKey: true, shiftKey: true }, {}, "native"],
@@ -64,8 +64,8 @@ test("follow-up shortcuts preserve newline, IME, mobile and completion behavior"
     ["mobile Ctrl+Alt+Enter follows up", { altKey: true, ctrlKey: true }, { isMobile: true }, "followup"],
     ["mobile Cmd+Alt+Enter follows up", { altKey: true, metaKey: true }, { isMobile: true }, "followup"],
     ["mobile modified Enter respects composition grace", { altKey: true, ctrlKey: true }, { isMobile: true, lastCompositionEndAtRef: { current: 950 } }, "prevented"],
-    ["Enter falls back to follow-up", {}, { onSteer: undefined }, "followup"],
-    ["Alt+Enter falls back to steer", { altKey: true }, { onFollowUp: undefined }, "steer"],
+    ["Enter still queues a follow-up without a steer handler", {}, { onSteer: undefined }, "followup"],
+    ["Alt+Enter sends when follow-up is unavailable", { altKey: true }, { onFollowUp: undefined }, "send"],
     ["slash completion takes priority", { altKey: true }, { slashMenuOpen: true, slashQuery: "help" }, "slash"],
     ["available built-in commands take priority", { altKey: true }, { slashMenuOpen: true, slashQuery: "copy", value: "/copy", displayedSlashCommands: [{ name: "copy", source: "builtin", availableWhileStreaming: true }] }, "send"],
     ["file completion takes priority", { altKey: true }, { atMenuOpen: true, atQuery: {} }, "file"],
@@ -82,7 +82,7 @@ test("follow-up shortcuts preserve newline, IME, mobile and completion behavior"
       slashMenuOpen: false, slashQuery: null, displayedSlashCommands: [{}], slashActiveIndex: 0,
       atMenuOpen: false, atQuery: null, atMatches: [{}], atActiveIndex: 0,
       onSteer() {}, onFollowUp() {},
-      sendQueued(mode) { action = mode; }, handleSend() { action = "send"; },
+      queueFollowUp() { action = "followup"; }, handleSend() { action = "send"; },
       applySlashCommand() { action = "slash"; },
       isExactSlashCommand, value: "", setSlashMenuOpen() {},
       applyAtCompletion() { action = "file"; },
@@ -290,7 +290,8 @@ test("renders the compact composer with the standard Send button and no session 
   );
 
   assert.match(html, /<textarea/);
-  assert.match(html, />Send<\/button>/);
+  assert.match(html, /aria-label="Send"/);
+  assert.match(html, /border-radius:50%/);
   assert.equal((html.match(/<button\b/g) ?? []).length, 1);
   assert.doesNotMatch(html, /type="file"|Attach image|Change tool preset/);
 });
