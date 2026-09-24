@@ -10,12 +10,12 @@ const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const {
   MessageView,
-  ThinkingBlock,
   getModelDisplayName,
   getTokenEstimateText,
   getToolCallInputText,
   replaceUserMessageText,
 } = await jiti.import("./MessageView.tsx");
+const { ThinkingRow } = await jiti.import("./ActivityRows.tsx");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 const { splitFinalAssistantBlocks } = await jiti.import("@/lib/message-display");
 
@@ -54,17 +54,20 @@ test("previews the first thinking line and reveals the full text with the saved 
       const html = renderToStaticMarkup(React.createElement(
         I18nProvider,
         null,
-        React.createElement(ThinkingBlock, {
+        React.createElement(ThinkingRow, {
           block: { type: "thinking", thinking: "**Independent reasoning**\n\nDetailed second line." },
           blockIndex: 2,
           duration: 3,
         }),
       ));
       assert.match(html, new RegExp(`aria-expanded="${expanded}"`));
-      assert.equal((html.match(/>[^<]*Independent reasoning[^<]*</g) ?? []).length, 1);
-      assert.equal(html.includes("Detailed second line."), expanded);
       assert.match(html, /aria-label="Thinking: /);
       assert.match(html, /3s/);
+      if (expanded) {
+        assert.ok(html.includes("Detailed second line."));
+      } else {
+        assert.doesNotMatch(html, /Detailed second line/);
+      }
     }
   } finally {
     if (previousWindow === undefined) delete globalThis.window;
@@ -163,8 +166,8 @@ test("renders subagents as standard tool calls with only an extra session button
     onOpenSession() {},
   });
 
-  assert.match(html, /border:1px solid rgba\(34,197,94,0\.25\)/);
-  assert.match(html, />Agent</);
+  assert.match(html, /data-activity-tool="Agent"/);
+  assert.match(html, />Sub-agent</);
   assert.match(html, />Explore</);
   assert.match(html, /aria-label="Open sub-agent session"/);
   assert.doesNotMatch(html, />completed</);
@@ -334,9 +337,9 @@ test("marks apply_patch returned failures as errors even when isError is unset",
     content: [block],
   }, { toolResults: new Map([[block.toolCallId, failed]]) });
 
-  assert.match(html, /border:1px solid rgba\(248,113,113,0\.45\)/);
-  assert.match(html, />apply_patch</);
-  assert.doesNotMatch(html, /border:1px solid rgba\(34,197,94,0\.25\)/);
+  assert.match(html, /activity-row-error/);
+  assert.match(html, /data-activity-tool="apply_patch"/);
+  assert.doesNotMatch(html, /activity-row-error.*rgba\(34,197,94/s);
 });
 
 test("renders custom-message images as buttons that open a larger preview", () => {

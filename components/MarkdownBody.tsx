@@ -2,9 +2,9 @@
 
 import { createContext, useContext, useMemo, type ComponentProps, type MouseEvent } from "react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
-import { parsePdfPageFragment, resolveLocalFileHref, shouldOpenLocalFileInApp } from "@/lib/file-links";
+import { parsePdfPageFragment, resolveLocalFileHref, resolveLocalFilePath, shouldOpenLocalFileInApp } from "@/lib/file-links";
 import { encodeFilePathForApi } from "@/lib/file-paths";
-import { markdownRehypePlugins, markdownRemarkPlugins, markdownUrlTransform, normalizeDisplayMath } from "@/lib/markdown";
+import { inlineCodeFilePath, markdownRehypePlugins, markdownRemarkPlugins, markdownUrlTransform, normalizeDisplayMath } from "@/lib/markdown";
 import { ImagePreview } from "./ImagePreview";
 import { MermaidBlock, CodeBlock } from "./MermaidBlock";
 
@@ -61,6 +61,34 @@ export function MarkdownBody({ children, className, isStreaming, cwd, onOpenFile
           );
         }
         return <CodeBlock code={raw.replace(/\n$/, "")} lang={lang} isStreaming={isStreaming} />;
+      }
+      // Inline code holding a filesystem path becomes a clickable file link.
+      if (onOpenFile) {
+        const candidate = inlineCodeFilePath(raw);
+        const filePath = candidate ? resolveLocalFilePath(candidate, cwd) : null;
+        if (filePath) {
+          const openFile = () => onOpenFile(filePath);
+          return (
+            <code
+              className="markdown-inline-code markdown-inline-file"
+              title={filePath}
+              role="button"
+              tabIndex={0}
+              onClick={(event) => {
+                if (!shouldOpenLocalFileInApp(event)) return;
+                event.preventDefault();
+                openFile();
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                openFile();
+              }}
+            >
+              {children}
+            </code>
+          );
+        }
       }
       return (
         <code

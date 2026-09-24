@@ -5,7 +5,7 @@ import test from "node:test";
 const component = await readFile(new URL("./TuiText.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const chatWindow = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
-const messageView = await readFile(new URL("./MessageView.tsx", import.meta.url), "utf8");
+const activityRows = await readFile(new URL("./ActivityRows.tsx", import.meta.url), "utf8");
 
 test("terminal text renders as an unwrapped, scrolled block", () => {
   assert.match(component, /"tui-text"/);
@@ -21,6 +21,6 @@ test("notifications, dialog titles and option previews fall back to terminal ren
 });
 
 test("tool results stop reflowing when they are terminal output", () => {
-  assert.match(messageView, /const tui = isTuiText\(text\);/);
-  assert.match(messageView, /whiteSpace: tui \? "pre" : "pre-wrap"/);
+  assert.match(activityRows, /const tui = isTuiText\(text\);/);
+  assert.match(activityRows, /whiteSpace: tui \? "pre" : "pre-wrap"/);
 });

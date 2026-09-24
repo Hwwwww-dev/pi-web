@@ -23,6 +23,61 @@ export function markdownUrlTransform(value: string): string {
   return /^file:/i.test(value) ? value : defaultUrlTransform(value);
 }
 
+interface ParsedInlineCodePath {
+  path: string;
+  line?: number;
+  column?: number;
+}
+
+/** Shared parser: splits a trailing `:line` / `:line:col` suffix off a path. */
+function parseInlineCodePath(code: string): ParsedInlineCodePath | null {
+  const raw = code.trim();
+  if (!raw || /\s/.test(raw)) return null;
+  if (raw.length > 512) return null;
+  // A scheme prefix (https:, mailto:, file:) is a URL, not a path. A single
+  // drive letter is allowed through: `C:\...` / `C:/...`.
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]{2,}:/.test(raw)) return null;
+
+  // Try the two-part suffix before the single-part one: a greedy `(.+)` would
+  // otherwise swallow the line number and leave the column unmatched.
+  const twoPart = /^(.+):(\d{1,7}):(\d{1,5})$/.exec(raw);
+  const onePart = twoPart ? null : /^(.+):(\d{1,7})$/.exec(raw);
+  const pathPart = (twoPart ? twoPart[1] : onePart ? onePart[1] : raw).trim();
+  if (!pathPart) return null;
+  if (!/\.[A-Za-z0-9]{1,12}$/.test(pathPart)) return null;
+
+  const isAbsolute = pathPart.startsWith("/") ||
+    pathPart.startsWith("~") ||
+    pathPart.startsWith("\\\\") ||
+    /^[a-zA-Z]:[\\/]/.test(pathPart);
+  const isRelativeWithSeparator = pathPart.startsWith("./") || pathPart.startsWith("../") ||
+    pathPart.includes("/") || pathPart.includes("\\");
+  if (!isAbsolute && !isRelativeWithSeparator) return null;
+
+  return {
+    path: pathPart,
+    line: twoPart ? Number.parseInt(twoPart[2], 10) : onePart ? Number.parseInt(onePart[2], 10) : undefined,
+    column: twoPart ? Number.parseInt(twoPart[3], 10) : undefined,
+  };
+}
+
+/**
+ * Recognizes a filesystem path written as plain inline code so the renderer can
+ * make it clickable. Deliberately conservative — a false positive only opens a
+ * not-found tab, but noisy linkification would make every code span look like
+ * a link.
+ */
+export function inlineCodeFilePath(code: string): string | null {
+  return parseInlineCodePath(code)?.path ?? null;
+}
+
+/** The `:line` / `:line:col` suffix parsed by inlineCodeFilePath, if any. */
+export function inlineCodeLineSuffix(code: string): { line?: number; column?: number } | null {
+  const parsed = parseInlineCodePath(code);
+  if (!parsed || parsed.line === undefined) return null;
+  return { line: parsed.line, column: parsed.column };
+}
+
 const escapedInlineCodePattern = /(?<![\\`])`((?:[^`\n]|\\`)+?)(?<![\\`])`(?!`)/g;
 
 function rewriteEscapedInlineCodeBackticks(line: string): string {
