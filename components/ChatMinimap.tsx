@@ -21,7 +21,9 @@ interface Props {
 }
 
 const MINIMAP_WIDTH = 36;
-const MAX_NODE_GAP = 50;
+// Turns sit in one tight rail: a wide cap left the dashes stranded at the top of
+// an otherwise empty column.
+const MAX_NODE_GAP = 12;
 const MINIMAP_PADDING = 12;
 const PREVIEW_SHOW_DELAY = 200;
 const PREVIEW_HIDE_DELAY = 250;
@@ -222,7 +224,7 @@ function layoutNodes(allNodes: NodeInfo[], minimapHeight: number): NodeLayout {
   const usableHeight = Math.max(0, height - MINIMAP_PADDING * 2);
   if (allNodes.length === 1) {
     return {
-      nodes: [{ ...allNodes[0], topRatio: MINIMAP_PADDING / height }],
+      nodes: [{ ...allNodes[0], topRatio: 0.5 }],
       gap: MAX_NODE_GAP,
       fillsHeight: false,
     };
@@ -230,10 +232,12 @@ function layoutNodes(allNodes: NodeInfo[], minimapHeight: number): NodeLayout {
 
   const naturalGap = usableHeight / (allNodes.length - 1);
   const gap = Math.min(MAX_NODE_GAP, naturalGap);
+  // A short session keeps one tight block instead of spreading across the rail.
+  const top = MINIMAP_PADDING + Math.max(0, (usableHeight - gap * (allNodes.length - 1)) / 2);
   return {
     nodes: allNodes.map((node, index) => ({
       ...node,
-      topRatio: (MINIMAP_PADDING + index * gap) / height,
+      topRatio: (top + index * gap) / height,
     })),
     gap,
     fillsHeight: naturalGap <= MAX_NODE_GAP,
@@ -645,10 +649,9 @@ export function ChatMinimap({
         position: "absolute",
         top: 0,
         bottom: 0,
-        // Anchored to the message column, not the window: 26px clears the
-        // scrollbar plus the list's horizontal padding, and the max() term
-        // pushes the zone into the empty gutter beside a centered column.
-        right: "calc(26px + max(0px, (100% - var(--chat-content-max-width, 820px) - 38px) / 2))",
+        // Inside the chat pane's right edge, clear of its scrollbar — flush
+        // right: 0 sat on top of the scrollbar and read as "outside" the pane.
+        right: 14,
         width: MINIMAP_WIDTH,
         zIndex: 25,
         cursor: "pointer",
