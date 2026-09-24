@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { registerHooks } from "node:module";
 import test from "node:test";
 import React from "react";
@@ -65,4 +66,10 @@ test("counts no tool calls for non-assistant or string-content messages", () => 
   assert.equal(countToolCalls({ role: "user", content: "run the tests" }), 0);
   assert.equal(countToolCalls({ role: "assistant", content: "plain string" }), 0);
   assert.equal(countToolCalls({ role: "assistant" }), 0);
+});
+
+test("dashes render without hover so the trigger zone is discoverable", async () => {
+  const source = await readFile(new URL("./ChatMinimap.tsx", import.meta.url), "utf8");
+  assert.match(source, /\{positionedNodes\.map\(\(node\) => \{/);
+  assert.doesNotMatch(source, /\{minimapHovered && positionedNodes\.map/);
 });

@@ -656,9 +656,19 @@ export function ChatMinimap({
         overflow: "visible",
       }}
     >
-      {minimapHovered && positionedNodes.map((node) => {
+      {positionedNodes.map((node) => {
         const isNearest = minimapHovered && nearestNode?.index === node.index;
         const isActive = activeIndex === node.index;
+        // The dashes are the minimap when nothing is hovered: without them the
+        // trigger zone is invisible, so there is nothing to aim for.
+        const width = isNearest ? 18 : minimapHovered || isActive ? 12 : 8;
+        const background = isActive
+          ? "var(--accent)"
+          : isNearest
+            ? "color-mix(in srgb, var(--accent) 55%, transparent)"
+            : minimapHovered
+              ? "color-mix(in srgb, var(--text-muted) 38%, transparent)"
+              : "color-mix(in srgb, var(--text-muted) 24%, transparent)";
 
         return (
           <div
@@ -682,10 +692,10 @@ export function ChatMinimap({
           >
             <div
               style={{
-                width: isActive || isNearest ? 18 : 12,
+                width,
                 height: 3,
                 borderRadius: 999,
-                background: isActive ? "var(--accent)" : isNearest ? "color-mix(in srgb, var(--accent) 55%, transparent)" : "color-mix(in srgb, var(--text-muted) 38%, transparent)",
+                background,
                 transition: "width 0.12s ease, background 0.12s ease",
               }}
             />
