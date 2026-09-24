@@ -608,6 +608,13 @@ export function ChatMinimap({
     window.addEventListener("mouseup", onUp);
   }, [findNearestNode, scrollToNode, showPreview, visible]);
 
+  // The overlay covers the chat's right edge, so wheel events over it would be
+  // swallowed; forward them so scrolling keeps working under the trigger zone.
+  const handleZoneWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    const container = scrollContainer.current;
+    if (container) container.scrollTop += event.deltaY;
+  }, [scrollContainer]);
+
   const nearestNode = mouseYRatio === null ? null : findNearestNode(mouseYRatio);
   const nearestNodeIndex = nearestNode?.index ?? null;
 
@@ -629,20 +636,27 @@ export function ChatMinimap({
       onMouseDown={handleMouseDown}
       onMouseEnter={showPreview}
       onMouseLeave={schedulePreviewHide}
+      onWheel={handleZoneWheel}
       onMouseMove={(event) => {
         const rect = event.currentTarget.getBoundingClientRect();
         setMouseYRatio((event.clientY - rect.top) / rect.height);
       }}
       style={{
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        // Anchored to the message column, not the window: 26px clears the
+        // scrollbar plus the list's horizontal padding, and the max() term
+        // pushes the zone into the empty gutter beside a centered column.
+        right: "calc(26px + max(0px, (100% - var(--chat-content-max-width, 820px) - 38px) / 2))",
         width: MINIMAP_WIDTH,
-        flexShrink: 0,
-        position: "relative",
+        zIndex: 25,
         cursor: "pointer",
         userSelect: "none",
         overflow: "visible",
       }}
     >
-      {positionedNodes.map((node) => {
+      {minimapHovered && positionedNodes.map((node) => {
         const isNearest = minimapHovered && nearestNode?.index === node.index;
         const isActive = activeIndex === node.index;
 

@@ -697,7 +697,7 @@ test("queued rows toggle behavior in place and edit through the authoritative cl
   assert.match(actionSource, /action: "toggle" \| "edit"[\s\S]*?type: "clear_queue"/);
 });
 
-test("top-bar session stats refresh on demand and while running", () => {
+test("top-bar session stats refresh on demand and while the panel is open", () => {
   const refreshSource = source.slice(
     source.indexOf("  const refreshSessionStats = useCallback"),
     source.indexOf("  const handleQueuedAction = useCallback"),
@@ -705,12 +705,15 @@ test("top-bar session stats refresh on demand and while running", () => {
 
   assert.match(refreshSource, /type: "get_session_stats"/);
   assert.match(refreshSource, /setSessionStatsOverride\(stats\)/);
-  assert.match(source, /handleQueuedAction, refreshSessionStats,/);
+  assert.match(refreshSource, /const clearSessionStats = useCallback\(\(\) => \{/);
+  assert.match(source, /handleQueuedAction, refreshSessionStats, clearSessionStats,/);
 
   assert.match(chatWindowSource, /statsPanelOpen\?: boolean/);
-  assert.match(chatWindowSource, /if \(background \|\| !statsPanelOpen\) return;/);
-  assert.match(chatWindowSource, /void refreshSessionStats\(\);/);
-  assert.match(chatWindowSource, /const timer = setInterval\(\(\) => \{ void refreshSessionStats\(\); \}, 15_000\);/);
+  // The snapshot is only authoritative while something keeps refreshing it, so
+  // the panel polls and closing it drops the snapshot.
+  assert.match(chatWindowSource, /if \(background \|\| !statsPanelOpen\) \{/);
+  assert.match(chatWindowSource, /clearSessionStats\(\);/);
+  assert.match(chatWindowSource, /const timer = setInterval\(\(\) => \{ void refreshSessionStats\(\); \}, 3_000\);/);
 
   // Slots report only when their own panel is open; the transient chat follows the active panel.
   assert.match(appShellSource, /statsPanelOpen=\{isActive && activeTopPanel === "session"\}/);

@@ -293,7 +293,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     lastUserMsgRef, promptAnchorActive,
     handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
     handleCompact, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
-    handleQueuedAction, refreshSessionStats,
+    handleQueuedAction, refreshSessionStats, clearSessionStats,
     handleBuiltinSlashCommand,
     handleToolPresetChange, handleThinkingLevelChange, loadSlashCommands, scrollUserMsgToTop,
     loadContext, activeLeafId, scrollToBottom, scrollToMessage,
@@ -712,18 +712,19 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   }, [background, statsKey, onSessionStatsChange]);
   useEffect(() => () => { onSessionStatsChange?.(null); }, [onSessionStatsChange]);
 
-  // The top bar renders outside this window, so it cannot see stream-driven
-  // stat changes for a background slot. Refresh on demand: when the stats
-  // panel opens, and on a slow ticker while this session is running.
+  // The panel renders the SDK's authoritative numbers, so keep them current
+  // while it is open: one in-process `get_session_stats` every 3s, instead of
+  // waiting for the next turn or a reopen. Closing the panel drops the snapshot
+  // so the top bar returns to the live per-message merge.
   useEffect(() => {
-    if (background || !statsPanelOpen) return;
+    if (background || !statsPanelOpen) {
+      clearSessionStats();
+      return;
+    }
     void refreshSessionStats();
-  }, [background, statsPanelOpen, refreshSessionStats]);
-  useEffect(() => {
-    if (background || !sessionRunning) return;
-    const timer = setInterval(() => { void refreshSessionStats(); }, 15_000);
+    const timer = setInterval(() => { void refreshSessionStats(); }, 3_000);
     return () => clearInterval(timer);
-  }, [background, sessionRunning, refreshSessionStats]);
+  }, [background, statsPanelOpen, refreshSessionStats, clearSessionStats]);
 
   // Push context usage up to AppShell as well.
   const ctxKey = contextUsage
@@ -1364,7 +1365,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           </div>
         )}
         {isEmptyNew && (
-          <div className="mb-3 w-full" style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
+          <div className="mb-3 w-full" style={{ paddingLeft: 16, paddingRight: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto", fontFamily: "var(--font-mono)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 7 : 10, minWidth: 0, flex: 1, lineHeight: 1.4, overflow: "hidden" }}>
                 <Image src="/icons/apple-touch-icon.png" width={32} height={32} alt="" priority style={{ flexShrink: 0 }} />

@@ -2134,6 +2134,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, []);
 
+  // Drop the authoritative snapshot once nothing keeps it current: it is a
+  // point-in-time reading, so any later turn would otherwise sit behind stale
+  // numbers until the panel is reopened.
+  const clearSessionStats = useCallback(() => {
+    setSessionStatsOverride(null);
+  }, []);
+
   const handleQueuedAction = useCallback(async (id: string, action: "toggle" | "edit") => {
     const sid = sessionIdRef.current;
     if (!sid) return;
@@ -2567,7 +2574,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // Actions
     handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
     handleCompact, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
-    handleQueuedAction, refreshSessionStats,
+    handleQueuedAction, refreshSessionStats, clearSessionStats,
     handleBuiltinSlashCommand,
     setNoticePaused: setPausedNoticeId,
     handleToolPresetChange, handleThinkingLevelChange, loadTools, loadSlashCommands, setActiveLeafId, setData, setMessages, loadContext,
