@@ -62,10 +62,15 @@ test("commit rows and controls keep 36px touch targets", () => {
   assert.match(source, /minHeight: CONTROL_MIN_HEIGHT/);
 });
 
-test("diff layer reuses the shared DiffView renderer", () => {
+test("commit file view reuses the shared DiffView and source renderers", () => {
   assert.match(source, /import \{ DiffView \} from "\.\/DiffView";/);
-  assert.match(source, /patch !== null && <DiffView patch=\{patch\} \/>/);
-  assert.match(source, /data-gitpanel-diff-path\b[\s\S]*?wordBreak: "break-all"/);
+  assert.match(source, /import \{ FileMentionButton, FileToolbar, FILE_MODE_LABELS \} from "\.\/FileToolbar";/);
+  assert.match(source, /import \{ SourceCodeView \} from "\.\/SourceCodeView";/);
+  assert.match(source, /patch !== null && <DiffView patch=\{patch\} wrapLines=\{wrapLines\} \/>/);
+  assert.match(source, /<SourceCodeView content=\{sourceFile\.content\} language=\{sourceFile\.language\} wrapLines=\{wrapLines\} \/>/);
+  // The source tab reads the blob at that revision, and only when it is opened.
+  assert.match(source, /commitFileUrl\(selectedRepo, commit\.hash, file\.path, false\)/);
+  assert.match(source, /diffMode !== "source"/);
 });
 
 test("narrow mobile stretches the toolbar pickers to full row width", () => {
@@ -144,14 +149,24 @@ test("detail layer shows full commit info, totals and per-file line counts", () 
 test("manual rescan bypasses the discovery cache with refresh=1", () => {
   assert.match(source, /async \(refresh = false\) => \{/);
   assert.match(source, /refresh \? "&refresh=1" : ""/);
-  // Only the mount-time load uses the TTL cache; the rescan button and error retry force a fresh scan.
-  assert.match(source, /onClick=\{\(\) => \{ void loadRepositories\(true\); \}\}/);
-  assert.match(source, /renderError\(reposError, \(\) => \{ void loadRepositories\(true\); \}\)\}/);
+  // Only the mount-time load uses the TTL cache; the refresh button and error retry force a fresh scan.
+  assert.match(source, /const refresh = useCallback\(\(\) => \{[\s\S]*?void loadRepositories\(true\);[\s\S]*?\}, \[loadRepositories\]\);/);
+  assert.match(source, /onClick=\{refresh\}/);
+  assert.match(source, /renderError\(reposError, refresh\)/);
+});
+
+test("refresh reloads the open layers, not just the repository list", () => {
+  // The log, file list and patch effects are keyed on the selected ref, so a
+  // rescan that finds commits made since the panel opened needs its own token.
+  assert.match(source, /filesLoadedForRef\.current = null;\s*\n\s*setRefreshToken\(\(token\) => token \+ 1\);/);
+  assert.match(source, /\[selectedRepo, selectedBranch, branchesLoading, view\.type, loadCommits, refreshToken\]/);
+  assert.match(source, /\[view, selectedRepo, refreshToken\]/);
+  assert.match(source, /\[view, selectedRepo, diffMode, refreshToken\]/);
 });
 
 test("desktop full-width splits the diff view into list above patch", () => {
   assert.match(source, /fullWidth\?: boolean;/);
-  assert.match(source, /export function GitPanel\(\{ cwd, fullWidth = false \}: Props\)/);
+  assert.match(source, /export function GitPanel\(\{ cwd, fullWidth = false, onAtMention \}: Props\)/);
   assert.match(source, /data-gitpanel-split/);
   assert.match(source, /view\.type === "diff" && fullWidth && \(/);
   assert.match(source, /view\.type === "diff" && !fullWidth && renderDiffLayer\(view\.commit, view\.file\)/);
@@ -164,10 +179,10 @@ test("commit rows show author and locale-aware relative time (story 6)", () => {
 });
 
 test("diff layer header keeps the commit hash (story 10)", () => {
-  const diffLayer = source.match(/const renderDiffLayer = \(commit: CommitSummary, file: CommitDetailFile\) => \([\s\S]*?\n  \);/)?.[0];
+  const diffLayer = source.match(/const renderDiffLayer = \(commit: CommitSummary, file: CommitDetailFile\) => \{[\s\S]*?\n  \};/)?.[0];
   assert.ok(diffLayer);
-  assert.match(diffLayer, /\{commit\.shortHash\}/);
-  assert.match(diffLayer, /data-gitpanel-diff-path/);
+  assert.match(diffLayer, /\{commit\.shortHash\}\$\{lineCounts\}/);
+  assert.match(diffLayer, /pathLabel=\{relativePath\}/);
   assert.match(diffLayer, /onClick=\{\(\) => setView\(\{ type: "detail", commit \}\)\}/);
 });
 

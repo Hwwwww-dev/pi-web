@@ -19,6 +19,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { useAgentSession, type AgentPhase, type NoticeItem } from "@/hooks/useAgentSession";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useDialogMaxHeight } from "@/hooks/useDialogMaxHeight";
 import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import type { AppUpdateResponse } from "@/lib/api-types";
@@ -1645,6 +1646,10 @@ function ExtensionDialog({
     setCheckedIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   };
   const [collapsed, setCollapsed] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  // The panel this dialog is anchored in, not the visual viewport, is what
+  // bounds it: on mobile the chat panel is far shorter than the viewport.
+  const dialogMaxHeight = useDialogMaxHeight(wrapperRef);
   const [now, setNow] = useState(() => Date.now());
   const focusFirstOption = useCallback((element: HTMLDivElement | null) => element?.focus(), []);
   const summary = getExtensionDialogSummary(request);
@@ -1680,6 +1685,7 @@ function ExtensionDialog({
 
   return (
     <div
+      ref={wrapperRef}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
         event.preventDefault();
@@ -1744,11 +1750,9 @@ function ExtensionDialog({
           pointerEvents: "auto",
           position: "relative",
           width: "min(680px, 100%)",
-          // dvh instead of a parent percentage: the absolute-positioned wrapper's
-          // height chain makes min(760px, 100%) unreliable, and an unresolvable
-          // percentage invalidates the whole declaration, letting huge option
-          // previews stretch the drawer far past the viewport.
-          maxHeight: "min(760px, calc(var(--app-viewport-height, 100dvh) - 40px))",
+          // Bounded by the panel that holds it, so a tall option preview cannot
+          // push the drawer past the chat area and clip its header.
+          maxHeight: dialogMaxHeight,
           margin: "0 auto",
           display: "flex",
           flexDirection: "column",
@@ -2063,6 +2067,8 @@ function ExtensionCustomPanel({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composingRef = useRef(false);
   const [collapsed, setCollapsed] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const dialogMaxHeight = useDialogMaxHeight(wrapperRef);
   const displayLines = normalizeCustomPanelLines(request.lines);
   const summary = displayLines.find((line) => line.trim())?.trim();
 
@@ -2072,6 +2078,7 @@ function ExtensionCustomPanel({
 
   return (
     <div
+      ref={wrapperRef}
       style={{
         position: "absolute",
         inset: 0,
@@ -2130,7 +2137,7 @@ function ExtensionCustomPanel({
           pointerEvents: "auto",
           position: "relative",
           width: "min(920px, 100%)",
-          maxHeight: "min(760px, calc(var(--app-viewport-height, 100dvh) - 40px))",
+          maxHeight: dialogMaxHeight,
           display: "flex",
           flexDirection: "column",
           border: "1px solid var(--border)",

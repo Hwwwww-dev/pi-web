@@ -71,7 +71,7 @@ function diffLines(patch: string): DiffLine[] {
   }));
 }
 
-export function DiffView({ patch }: { patch: string }) {
+export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLines?: boolean }) {
   const { t } = useI18n();
   const diff = diffLines(patch);
 
@@ -118,7 +118,7 @@ export function DiffView({ patch }: { patch: string }) {
     <div
       className="file-diff-view"
       style={{
-        width: "max-content",
+        width: wrapLines ? "100%" : "max-content",
         minWidth: "100%",
         ...FILE_CODE_STYLE,
       }}
@@ -189,10 +189,11 @@ export function DiffView({ patch }: { patch: string }) {
               <span
                 className="file-diff-line-content"
                 style={{
-                  flexShrink: 0,
                   padding: "0 8px 0 0",
-                  whiteSpace: "pre",
                   color: "var(--text)",
+                  ...(wrapLines
+                    ? { flex: "1 1 auto", minWidth: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }
+                    : { flexShrink: 0, whiteSpace: "pre" }),
                 }}
               >
                 {line.text || "\u00a0"}

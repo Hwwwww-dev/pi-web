@@ -26,7 +26,7 @@ test("restoreTerminalTabs returns the persisted activeId verbatim for the caller
 });
 
 test("the Git tab renders GitPanel and file tabs keep rendering FileViewer", () => {
-  assert.match(appShellSource, /\{activeFileTabId === GIT_TAB_ID \? \(\s*<GitPanel cwd=\{selectedSession\?\.cwd \?\? newSessionCwd \?\? null\} fullWidth=\{rightPanelFullWidth\} \/>/);
+  assert.match(appShellSource, /\{activeFileTabId === GIT_TAB_ID \? \(\s*<GitPanel\s*cwd=\{selectedSession\?\.cwd \?\? newSessionCwd \?\? null\}\s*fullWidth=\{rightPanelFullWidth\}\s*onAtMention=\{handleAtMention\}/);
   assert.match(appShellSource, /\) : activeFileTab\?\.filePath \? \(\s*<FileViewer/);
 });
 

@@ -573,10 +573,17 @@ html.dark .web-login-error {
   display: none;
 }
 
+/* Widgets and the status line share one row while there is room for both. The
+  55%/240px split keeps the long-standing ≈2:1 ratio, and the 240px basis is
+  what makes the status line wrap to its own full-width row on a phone instead
+  of squeezing the text into the 30% the fixed 70% cap used to leave behind. */
 .extension-status-shelf.has-widgets.has-status .extension-widget-triggers {
-  flex: 0 0 auto;
-  max-width: 70%;
+  flex: 1 1 55%;
   border-right: 1px solid var(--border);
+}
+
+.extension-status-shelf.has-widgets.has-status .extension-status-line {
+  flex: 1 1 240px;
 }
 
 .extension-widget-trigger {
@@ -686,15 +693,21 @@ button.extension-widget-trigger:focus-visible {
   }
 }
 
+/* Extension widgets render TUI output: tables, progress bars and box drawing
+  only line up while the monospace grid survives, so the panel scrolls
+  sideways rather than wrapping a line into a broken row. */
 .extension-widget-content {
   margin: 0;
   padding: 3px 12px 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: calc(14px + var(--chat-font-size-offset, 0px));
   line-height: 1.45;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
+  overflow-wrap: normal;
+  white-space: pre;
+  scrollbar-width: thin;
 }
 
 .extension-status-line {

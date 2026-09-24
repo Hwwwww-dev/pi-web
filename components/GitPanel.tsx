@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsNarrowMobile } from "@/hooks/useIsMobile";
+import { formatFileSize } from "@/lib/file-types";
 import { formatRelativeTime } from "@/lib/i18n/format";
+import { getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
 import { DiffView } from "./DiffView";
+import { FileMentionButton, FileToolbar, FILE_MODE_LABELS } from "./FileToolbar";
+import { SourceCodeView } from "./SourceCodeView";
 
 /** One row of `GET /api/git/repos`. */
 interface GitRepository {
@@ -42,6 +46,19 @@ interface CommitDetailFile {
   /** Deleted lines; null for binary files. */
   deletions: number | null;
 }
+
+/** `GET /api/git/file` — one file as it exists at one commit. */
+interface CommitFileContent {
+  content: string;
+  language: string;
+  size: number;
+  truncated: boolean;
+}
+
+type SourceFileState = CommitFileContent & { lines: number };
+
+/** The diff layer shows the commit's patch or the file's content at that commit. */
+type DiffLayerMode = "source" | "diff";
 
 type GitView =
   | { type: "log" }
@@ -202,6 +219,14 @@ interface Props {
   cwd: string | null;
   /** Desktop expanded panel: the diff view renders the file list above the patch. */
   fullWidth?: boolean;
+  /** Insert a path into the composer's @ mention list. */
+  onAtMention?: (relativePath: string, isDir: boolean) => void;
+}
+
+/** `/api/git/file` URL for one blob at one revision. */
+function commitFileUrl(repo: string, hash: string, filePath: string, download: boolean): string {
+  const query = `repo=${encodeURIComponent(repo)}&hash=${encodeURIComponent(hash)}&path=${encodeURIComponent(filePath)}`;
+  return `/api/git/file?${query}${download ? "&download=1" : ""}`;
 }
 
 /**
@@ -209,7 +234,7 @@ interface Props {
  * Push navigation: repository select → commit log → commit files → file diff.
  * Only the desktop full-width panel splits the diff view into list-above-diff.
  */
-export function GitPanel({ cwd, fullWidth = false }: Props) {
+export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
   const { t, locale } = useI18n();
   const narrowMobile = useIsNarrowMobile();
 
@@ -240,6 +265,15 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
   const [patchLoading, setPatchLoading] = useState(false);
   const [patchError, setPatchError] = useState<string | null>(null);
 
+  const [diffMode, setDiffMode] = useState<DiffLayerMode>("diff");
+  const [wrapLines, setWrapLines] = useState(false);
+  const [sourceFile, setSourceFile] = useState<SourceFileState | null>(null);
+  const [sourceLoading, setSourceLoading] = useState(false);
+  const [sourceError, setSourceError] = useState<string | null>(null);
+
+  // Bumped by the refresh button so every layer refetches even when its key did not change.
+  const [refreshToken, setRefreshToken] = useState(0);
+
   // Monotonic ids: a slow response from a superseded request must never land.
   const reposRequestRef = useRef(0);
   const logRequestRef = useRef(0);
@@ -269,6 +303,14 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
       if (requestId === reposRequestRef.current) setReposLoading(false);
     }
   }, [cwd]);
+
+  const refresh = useCallback(() => {
+    // A rescan can see commits made since the panel opened, so every layer
+    // reloads: the repository list, the log, and the open commit's file list.
+    filesLoadedForRef.current = null;
+    setRefreshToken((token) => token + 1);
+    void loadRepositories(true);
+  }, [loadRepositories]);
 
   useEffect(() => {
     setRepositories([]);
@@ -334,7 +376,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
     setCommits([]);
     setHasMore(false);
     void loadCommits(selectedRepo, selectedBranch ?? "", 0);
-  }, [selectedRepo, selectedBranch, branchesLoading, view.type, loadCommits]);
+  }, [selectedRepo, selectedBranch, branchesLoading, view.type, loadCommits, refreshToken]);
 
   useEffect(() => {
     if ((view.type !== "detail" && view.type !== "diff") || !selectedRepo) return;
@@ -362,7 +404,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
         setFilesError(error instanceof Error ? error.message : String(error));
       })
       .finally(() => { if (filesLoadedForRef.current === commit.hash || filesLoadedForRef.current === null) setFilesLoading(false); });
-  }, [view, selectedRepo]);
+  }, [view, selectedRepo, refreshToken]);
 
   useEffect(() => {
     if (view.type !== "diff" || !selectedRepo) return;
@@ -378,7 +420,33 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
       .catch((error: unknown) => { if (!cancelled) setPatchError(error instanceof Error ? error.message : String(error)); })
       .finally(() => { if (!cancelled) setPatchLoading(false); });
     return () => { cancelled = true; };
-  }, [view, selectedRepo]);
+  }, [view, selectedRepo, refreshToken]);
+
+  // The source tab loads on demand: the diff is what a commit file opens on.
+  useEffect(() => {
+    if (view.type !== "diff" || !selectedRepo || diffMode !== "source") return;
+    const { commit, file } = view;
+    setSourceFile(null);
+    setSourceLoading(true);
+    setSourceError(null);
+    let cancelled = false;
+    fetchJson<CommitFileContent>(
+      commitFileUrl(selectedRepo, commit.hash, file.path, false),
+    )
+      .then((data) => {
+        if (!cancelled) setSourceFile({ ...data, lines: data.content.split("\n").length });
+      })
+      .catch((error: unknown) => { if (!cancelled) setSourceError(error instanceof Error ? error.message : String(error)); })
+      .finally(() => { if (!cancelled) setSourceLoading(false); });
+    return () => { cancelled = true; };
+  }, [view, selectedRepo, diffMode, refreshToken]);
+
+  const openCommitFile = (commit: CommitSummary, file: CommitDetailFile) => {
+    // Every file opens on its diff; the source tab is a per-file choice.
+    setDiffMode("diff");
+    setSourceFile(null);
+    setView({ type: "diff", commit, file });
+  };
 
   const selectRepository = (repositoryRoot: string) => {
     if (repositoryRoot === selectedRepo) return;
@@ -473,7 +541,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
           <button
             key={`${file.status}:${file.path}`}
             type="button"
-            onClick={() => setView({ type: "diff", commit, file })}
+            onClick={() => openCommitFile(commit, file)}
             style={{
               display: "flex", width: "100%", alignItems: "center", gap: 8, textAlign: "left",
               minHeight: LIST_ROW_MIN_HEIGHT,
@@ -506,26 +574,77 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
     </div>
   );
 
-  const renderDiffLayer = (commit: CommitSummary, file: CommitDetailFile) => (
-    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-        <button type="button" onClick={() => setView({ type: "detail", commit })} style={{ ...buttonStyle, flexShrink: 0 }}>
-          ‹ {t("gitPanel.back")}
-        </button>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", flexShrink: 0 }}>
-          {commit.shortHash}
-        </span>
-        <span data-gitpanel-diff-path style={{ fontSize: 12, fontFamily: "var(--font-mono)", wordBreak: "break-all", minWidth: 0 }}>
-          {file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}
-        </span>
+  const renderDiffLayer = (commit: CommitSummary, file: CommitDetailFile) => {
+    // A file that does not exist at this revision has no source to show.
+    const deleted = file.status === "D";
+    const showSource = diffMode === "source" && !deleted;
+    const relativePath = file.previousPath ? `${file.previousPath} → ${file.path}` : file.path;
+    const lineCounts = file.additions !== null && file.deletions !== null
+      ? ` · +${file.additions} −${file.deletions}`
+      : "";
+    const meta = showSource && sourceFile
+      ? `${sourceFile.language} · ${sourceFile.lines} lines · ${formatFileSize(sourceFile.size)}${sourceFile.truncated ? ` · ${t("gitPanel.truncated")}` : ""}`
+      : `${commit.shortHash}${lineCounts}`;
+    const mentionPath = getRelativeFilePath(
+      selectedRepo ? joinFilePath(selectedRepo, file.path) : file.path,
+      cwd ?? undefined,
+    );
+
+    return (
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <FileToolbar
+          leading={(
+            <button type="button" onClick={() => setView({ type: "detail", commit })} style={buttonStyle}>
+              ‹ {t("gitPanel.back")}
+            </button>
+          )}
+          pathLabel={relativePath}
+          meta={meta}
+          modes={(deleted ? ["diff"] : ["source", "diff"]).map((mode) => ({
+            mode: mode as DiffLayerMode,
+            label: FILE_MODE_LABELS[mode],
+            title: mode === "diff" ? t("gitPanel.compareCommit") : undefined,
+          }))}
+          activeMode={showSource ? "source" : "diff"}
+          onSelectMode={setDiffMode}
+          actions={onAtMention && !deleted
+            ? <FileMentionButton onClick={() => onAtMention(mentionPath, false)} title={t("files.insertPath")} />
+            : undefined}
+          wrapLines={wrapLines}
+          onToggleWrapLines={() => setWrapLines((current) => !current)}
+          download={deleted || !selectedRepo ? undefined : (
+            <a
+              href={commitFileUrl(selectedRepo, commit.hash, file.path, true)}
+              title={t("i18n.downloadFile")}
+              aria-label={t("i18n.downloadFile")}
+              className="file-viewer-icon-button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" />
+              </svg>
+            </a>
+          )}
+        />
+        <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: "var(--bg)" }}>
+          {showSource ? (
+            <>
+              {sourceLoading && <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>}
+              {sourceError && renderError(sourceError, () => setView({ type: "diff", commit, file }))}
+              {!sourceError && !sourceLoading && sourceFile && (
+                <SourceCodeView content={sourceFile.content} language={sourceFile.language} wrapLines={wrapLines} />
+              )}
+            </>
+          ) : (
+            <>
+              {patchLoading && <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>}
+              {patchError && renderError(patchError, () => setView({ type: "diff", commit, file }))}
+              {!patchError && !patchLoading && patch !== null && <DiffView patch={patch} wrapLines={wrapLines} />}
+            </>
+          )}
+        </div>
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-        {patchLoading && <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>}
-        {patchError && renderError(patchError, () => setView({ type: "diff", commit, file }))}
-        {!patchError && !patchLoading && patch !== null && <DiffView patch={patch} />}
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div
@@ -578,7 +697,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
         />
         <button
           type="button"
-          onClick={() => { void loadRepositories(true); }}
+          onClick={refresh}
           disabled={reposLoading}
           title={t("gitPanel.refresh")}
           aria-label={t("gitPanel.refresh")}
@@ -590,7 +709,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
         </button>
       </div>
 
-      {reposError && renderError(reposError, () => { void loadRepositories(true); })}
+      {reposError && renderError(reposError, refresh)}
 
       {/* Log layer */}
       {view.type === "log" && selectedRepo && (

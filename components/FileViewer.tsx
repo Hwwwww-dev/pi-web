@@ -1,17 +1,10 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo, type MouseEvent } from "react";
-import {
-  Prism as SyntaxHighlighter,
-  createElement as renderSyntaxNode,
-  type SyntaxHighlighterProps,
-} from "react-syntax-highlighter";
-import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import ReactMarkdown from "react-markdown";
-import { useTheme } from "@/hooks/useTheme";
 import {
   DOCX_PREVIEW_MAX_BYTES,
+  formatFileSize,
   getFileExt,
   isAudioPath,
   isDocumentPreviewPath,
@@ -24,7 +17,10 @@ import { parseFrontmatter } from "@/lib/frontmatter";
 import { markdownPreviewRehypePlugins, markdownPreviewRemarkPlugins, markdownUrlTransform, normalizeDisplayMath } from "@/lib/markdown";
 import { CodeBlock, MermaidBlock } from "./MermaidBlock";
 import { FrontmatterCard } from "./FrontmatterCard";
-import { DiffView, FILE_CODE_STYLE, FILE_LINE_NUMBER_STYLE } from "./DiffView";import type { GitFileDiffResponse } from "@/lib/git-types";
+import { DiffView } from "./DiffView";
+import { FileMentionButton, FileToolbar, FILE_MODE_LABELS } from "./FileToolbar";
+import { SourceCodeView } from "./SourceCodeView";
+import type { GitFileDiffResponse } from "@/lib/git-types";
 import { useI18n } from "@/hooks/useI18n";
 import {
   resolveInitialFileDisplayMode,
@@ -59,29 +55,9 @@ interface FileData {
   truncated: boolean;
 }
 
-const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;
-const DISPLAY_MODE_LABELS: Record<DisplayMode, string> = {
-  source: "Source",
-  preview: "Preview",
-  diff: "Diff",
-};
-
-type SourceCodeRendererProps = Parameters<NonNullable<SyntaxHighlighterProps["renderer"]>>[0] & {
-  wrapLines: boolean;
-};
-
 interface SelectedLineRange {
   startLine: number;
   endLine: number;
-}
-
-function MentionIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
-    </svg>
-  );
 }
 
 function closestSourceLine(node: Node): HTMLElement | null {
@@ -142,49 +118,6 @@ function getSelectedSourceLineRange(root: HTMLElement, selection: Selection | nu
   return { startLine, endLine };
 }
 
-function SourceCodeRenderer({ rows, stylesheet, useInlineStyles, wrapLines }: SourceCodeRendererProps) {
-  return rows.map((row, lineIndex) => {
-    const children = row.children ?? [];
-    const firstChildClasses = children[0]?.properties?.className;
-    const hasLineNumber = Array.isArray(firstChildClasses)
-      && firstChildClasses.includes("react-syntax-highlighter-line-number");
-    const lineNumberNode = hasLineNumber ? children[0] : null;
-    const contentNodes = hasLineNumber ? children.slice(1) : children;
-
-    return (
-      <span
-        className="file-source-line"
-        data-line-number={lineIndex + 1}
-        key={`source-line-${lineIndex}`}
-        style={{ display: "flex", minWidth: "100%" }}
-      >
-        {lineNumberNode && renderSyntaxNode({
-          node: lineNumberNode,
-          stylesheet,
-          useInlineStyles,
-          key: `source-line-number-${lineIndex}`,
-        })}
-        <span
-          className="file-source-line-content"
-          style={{
-            flex: "1 1 auto",
-            minWidth: 0,
-            overflowWrap: wrapLines ? "anywhere" : "normal",
-            whiteSpace: wrapLines ? "pre-wrap" : "pre",
-          }}
-        >
-          {contentNodes.map((node, tokenIndex) => renderSyntaxNode({
-            node,
-            stylesheet,
-            useInlineStyles,
-            key: `source-token-${lineIndex}-${tokenIndex}`,
-          }))}
-        </span>
-      </span>
-    );
-  });
-}
-
 function getFileApiUrl(
   filePath: string,
   type: "read" | "download" | "meta" | "preview" | "watch",
@@ -217,12 +150,6 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
       </svg>
     </a>
   );
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Props) {
@@ -308,7 +235,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
 
   const src = getFileApiUrl(filePath, "read", sourceSessionId, bust ? { v: bust } : undefined);
 
-  const formatSizeStr = size != null ? formatSize(size) : null;
+  const formatSizeStr = size != null ? formatFileSize(size) : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
@@ -500,7 +427,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
         </span>
         <span style={{ marginLeft: "auto" }}>{ext || "audio"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
-        {size != null && <span>{formatSize(size)}</span>}
+        {size != null && <span>{formatFileSize(size)}</span>}
         <span
           title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
           style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
@@ -653,7 +580,7 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
         </span>
         <span style={{ marginLeft: "auto" }}>{ext || "video"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
-        {size != null && <span>{formatSize(size)}</span>}
+        {size != null && <span>{formatFileSize(size)}</span>}
         <span
           title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
           style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
@@ -840,7 +767,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
           {getRelativeFilePath(filePath, cwd)}
         </span>
         <span style={{ marginLeft: "auto" }}>{ext === "docx" ? "docx preview" : "pdf"}</span>
-        {size != null && <span>{formatSize(size)}</span>}
+        {size != null && <span>{formatFileSize(size)}</span>}
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
         <span
           title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
@@ -934,7 +861,6 @@ function TextFileViewer({
   onStateChange,
   watchEnabled = true,
 }: Props) {
-  const { isDark } = useTheme();
   const { t } = useI18n();
   const [data, setData] = useState<FileData | null>(null);
   const [gitDiff, setGitDiff] = useState<GitFileDiffResponse | null>(null);
@@ -1169,75 +1095,6 @@ function TextFileViewer({
   const isMarkdown = language === "markdown";
   const hasPreview = !data?.truncated && (isHtml || isMarkdown);
   const effectiveDisplayMode = isDeletedDiff ? "diff" : displayMode;
-  const useLightweightSource = sourceLines.length > SOURCE_HIGHLIGHT_MAX_LINES
-    && !(effectiveDisplayMode === "diff" && hasGitDiff)
-    && !(effectiveDisplayMode === "preview" && hasPreview);
-  // react-syntax-highlighter rebuilds every token element on each render, which
-  // costs hundreds of milliseconds on large files. Cache the rendered trees so
-  // unrelated re-renders (panel open/close, selection changes) reuse them as-is.
-  const highlightedSource = useMemo(
-    () => (
-      <SyntaxHighlighter
-        className={wrapLines ? "file-source-view is-wrapped" : "file-source-view"}
-        language={language === "text" ? "plaintext" : language}
-        style={isDark ? vscDarkPlus : vs}
-        showLineNumbers
-        lineNumberStyle={{
-          ...FILE_LINE_NUMBER_STYLE,
-        }}
-        customStyle={{
-          margin: 0,
-          padding: 0,
-          border: 0,
-          background: "var(--bg)",
-          ...FILE_CODE_STYLE,
-          width: wrapLines ? "100%" : "max-content",
-          minWidth: "100%",
-          minHeight: "100%",
-          overflow: "visible",
-        }}
-        codeTagProps={{
-          style: {
-            fontFamily: "var(--font-mono)",
-            overflowWrap: wrapLines ? "anywhere" : "normal",
-          },
-        }}
-        renderer={(rendererProps) => (
-          <SourceCodeRenderer {...rendererProps} wrapLines={wrapLines} />
-        )}
-        wrapLongLines={wrapLines}
-      >
-        {viewerContent}
-      </SyntaxHighlighter>
-    ),
-    [isDark, language, viewerContent, wrapLines],
-  );
-  const lightweightSourceLines = useMemo(
-    () => useLightweightSource ? sourceLines.map((line, lineIndex) => (
-      <span
-        className="file-source-line"
-        data-line-number={lineIndex + 1}
-        key={`source-line-${lineIndex}`}
-        style={{ display: "flex", minWidth: "100%" }}
-      >
-        <span aria-hidden="true" style={FILE_LINE_NUMBER_STYLE}>
-          {lineIndex + 1}
-        </span>
-        <span
-          className="file-source-line-content"
-          style={{
-            flex: "1 1 auto",
-            minWidth: 0,
-            overflowWrap: wrapLines ? "anywhere" : "normal",
-            whiteSpace: wrapLines ? "pre-wrap" : "pre",
-          }}
-        >
-          {line}
-        </span>
-      </span>
-    )) : null,
-    [sourceLines, useLightweightSource, wrapLines],
-  );
 
   useEffect(() => {
     const updateSelectedLineRange = () => {
@@ -1344,71 +1201,27 @@ function TextFileViewer({
       ];
   const metadata = isDeletedDiff
     ? t("files.deleted")
-    : `${language} · ${lines.length} lines · ${formatSize(data!.size)}`;
+    : `${language} · ${lines.length} lines · ${formatFileSize(data!.size)}`;
 
   return (
     <div className="file-viewer-shell" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", position: "relative" }}>
-      <div
-        className="file-viewer-toolbar"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "5px 12px",
-          borderBottom: "1px solid var(--border)",
-          fontSize: 11,
-          color: "var(--text-dim)",
-          background: "var(--bg)",
-          flexShrink: 0,
-        }}
-      >
-        <span className="file-viewer-path" style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
-          {getRelativeFilePath(filePath, cwd)}
-        </span>
-
-        <span className="file-viewer-meta" title={metadata}>{metadata}</span>
-        {!isDeletedDiff && (
-          <span
-            title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-            aria-label={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-            className="file-viewer-live-indicator"
-            style={{
-              background: watching ? "#4ade80" : "var(--border)",
-              boxShadow: watching ? "0 0 4px #4ade80" : "none",
-            }}
-          />
-        )}
-
-        <div className="file-viewer-controls">
-          {displayModes.length > 1 && (
-            <div className="file-viewer-mode-switch" aria-label={t("i18n.fileViewMode")}>
-              {displayModes.map((mode) => {
-                const active = effectiveDisplayMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => updateDisplayMode(mode)}
-                    title={mode === "diff" ? t("i18n.compareHead") : undefined}
-                    aria-pressed={active}
-                    className="file-viewer-mode-button"
-                    style={{
-                      background: active ? "var(--bg-selected)" : "transparent",
-                      color: active ? "var(--text)" : "var(--text-muted)",
-                    }}
-                  >
-                    {DISPLAY_MODE_LABELS[mode]}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="file-viewer-actions">
+      <FileToolbar
+        pathLabel={getRelativeFilePath(filePath, cwd)}
+        pathTitle={filePath}
+        meta={metadata}
+        live={isDeletedDiff ? undefined : watching}
+        modes={displayModes.map((mode) => ({
+          mode,
+          label: FILE_MODE_LABELS[mode],
+          title: mode === "diff" ? t("i18n.compareHead") : undefined,
+        }))}
+        activeMode={effectiveDisplayMode}
+        onSelectMode={updateDisplayMode}
+        actions={(
+          <>
             {(onAtMention || onMentionLines) && (
-              <button
-                type="button"
-                onPointerDown={(event) => event.preventDefault()}
+              <FileMentionButton
+                disabled={!onAtMention && !onMentionLines}
                 onClick={() => {
                   // Mention selected lines when a range is active (and line
                   // mention is wired up); otherwise fall back to a whole-file
@@ -1424,41 +1237,16 @@ function TextFileViewer({
                     ? `${t("i18n.mentionSelectedLines")} (L${selectedLineRange.startLine}${selectedLineRange.startLine !== selectedLineRange.endLine ? `-L${selectedLineRange.endLine}` : ""})`
                     : t("files.insertPath")
                 }
-                aria-label={t("files.mention")}
-                disabled={!onAtMention && !onMentionLines}
-                className="file-viewer-icon-button"
-              >
-                <MentionIcon />
-              </button>
+              />
             )}
-            {effectiveDisplayMode === "source" && (
-              <>
-                <button
-                  type="button"
-                  onClick={toggleWrapLines}
-                  title={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
-                  aria-label={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
-                  aria-pressed={wrapLines}
-                  className="file-viewer-icon-button"
-                  style={{
-                    background: wrapLines ? "var(--bg-selected)" : "transparent",
-                    color: wrapLines ? "var(--text)" : "var(--text-muted)",
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M3 6h18" />
-                    <path d="M3 12h15a3 3 0 1 1 0 6h-4" />
-                    <path d="m16 16-2 2 2 2" />
-                    <path d="M3 18h7" />
-                  </svg>
-                </button>
-              </>
-            )}
-          </div>
-
-          {!isDeletedDiff && <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />}
-        </div>
-      </div>
+          </>
+        )}
+        wrapLines={wrapLines}
+        onToggleWrapLines={
+          effectiveDisplayMode === "source" || effectiveDisplayMode === "diff" ? toggleWrapLines : undefined
+        }
+        download={!isDeletedDiff ? <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} /> : undefined}
+      />
 
       {data?.truncated && (
         <div
@@ -1475,7 +1263,7 @@ function TextFileViewer({
             fontSize: 11,
           }}
         >
-          <span>{formatSize(data.nextOffset)} / {formatSize(data.size)}</span>
+          <span>{formatFileSize(data.nextOffset)} / {formatFileSize(data.size)}</span>
           <button
             type="button"
             className="file-viewer-mode-button"
@@ -1501,7 +1289,7 @@ function TextFileViewer({
         style={{ flex: 1, overflow: "auto", background: "var(--bg)", paddingBottom: data?.truncated ? 48 : undefined }}
       >
         {effectiveDisplayMode === "diff" && hasGitDiff ? (
-          <DiffView patch={gitDiff.patch!} />
+          <DiffView patch={gitDiff.patch!} wrapLines={wrapLines} />
         ) : isHtml && effectiveDisplayMode === "preview" ? (
           <iframe
             srcDoc={content}
@@ -1575,21 +1363,8 @@ function TextFileViewer({
               {markdownPreview}
             </ReactMarkdown>
           </div>
-        ) : useLightweightSource ? (
-          <div
-            className="file-source-view is-lightweight"
-            style={{
-              width: wrapLines ? "100%" : "max-content",
-              minWidth: "100%",
-              minHeight: "100%",
-              background: "var(--bg)",
-              ...FILE_CODE_STYLE,
-            }}
-          >
-            {lightweightSourceLines}
-          </div>
         ) : (
-          highlightedSource
+          <SourceCodeView content={viewerContent} language={language} wrapLines={wrapLines} />
         )}
       </div>
     </div>

@@ -42,7 +42,11 @@ test("contains chat content and inputs within the mobile viewport", () => {
   assert.match(cssSource, /\.markdown-body \{[\s\S]*?min-width: 0;[\s\S]*?max-width: 100%;[\s\S]*?overflow-x: hidden;/);
   assert.match(cssSource, /\.markdown-code-block \{[\s\S]*?min-width: 0;[\s\S]*?max-width: 100%;/);
   assert.match(chatWindowSource, /overflow-x-hidden overflow-y-auto/);
-  assert.match(chatWindowSource, /maxHeight: "min\(760px, calc\(var\(--app-viewport-height, 100dvh\) - 40px\)\)"/);
+  // The extension overlays are bounded by the panel that anchors them, not the
+  // visual viewport, which is far taller than the chat panel on mobile.
+  assert.match(chatWindowSource, /import \{ useDialogMaxHeight \} from "@\/hooks\/useDialogMaxHeight";/);
+  assert.match(chatWindowSource, /const dialogMaxHeight = useDialogMaxHeight\(wrapperRef\);/);
+  assert.match(chatWindowSource, /maxHeight: dialogMaxHeight/);
   assert.match(chatInputSource, /flex: compact \? "none" : 1,\s*minWidth: 0,\s*width: "100%",/);
 });
 

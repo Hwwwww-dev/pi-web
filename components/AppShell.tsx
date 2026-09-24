@@ -2664,7 +2664,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         {/* Only the active viewer is mounted. Lightweight per-tab state is restored on activation. */}
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", paddingBottom: "env(safe-area-inset-bottom)" }}>
           {activeFileTabId === GIT_TAB_ID ? (
-            <GitPanel cwd={selectedSession?.cwd ?? newSessionCwd ?? null} fullWidth={rightPanelFullWidth} />
+            <GitPanel
+              cwd={selectedSession?.cwd ?? newSessionCwd ?? null}
+              fullWidth={rightPanelFullWidth}
+              onAtMention={handleAtMention}
+            />
           ) : activeFileTab?.filePath ? (
             <FileViewer
               key={`${activeFileTab.id}:${activeFileTab.viewerRevision ?? 0}`}

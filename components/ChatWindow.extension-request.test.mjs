@@ -18,7 +18,9 @@ test("confines extension overlays to the content region above the composer", () 
   assert.match(customSource, /position: "absolute"[\s\S]*?inset: 0/);
   assert.match(customSource, /pointerEvents: "none"/);
   assert.doesNotMatch(source, /z-\[100\]|zIndex: 100/);
-  assert.match(customSource, /maxHeight: "min\(760px, calc\(var\(--app-viewport-height, 100dvh\) - 40px\)\)"/);
+  assert.match(customSource, /ref=\{wrapperRef\}/);
+  assert.match(customSource, /const dialogMaxHeight = useDialogMaxHeight\(wrapperRef\);/);
+  assert.match(customSource, /maxHeight: dialogMaxHeight/);
 });
 
 test("adds collapse without replacing cancel", () => {

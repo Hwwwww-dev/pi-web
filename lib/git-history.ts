@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
+import { TEXT_PREVIEW_MAX_BYTES } from "@/lib/file-types";
 
 const execFileAsync = promisify(execFile);
 
@@ -234,4 +235,58 @@ export async function readCommitFilePatch(repoRoot: string, hash: string, filePa
     filePath,
   ]);
   return stdout.trim() === "" ? null : stdout;
+}
+
+function gitBytes(cwd: string, args: string[]): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    execFile("git", ["-C", cwd, ...args], {
+      timeout: GIT_TIMEOUT_MS,
+      maxBuffer: GIT_MAX_BUFFER,
+      encoding: "buffer",
+      env: { ...process.env, LC_ALL: "C" },
+    }, (error, stdout) => {
+      if (error) reject(error);
+      else resolve(stdout);
+    });
+  });
+}
+
+/** The revision has no such path (as opposed to git itself failing). */
+export class CommitFileMissingError extends Error {}
+
+/**
+ * The body of one file at one revision, as raw bytes. The caller decodes text
+ * itself so the same blob can also be downloaded verbatim; keeping bytes here
+ * is what makes binary files work at all.
+ */
+export async function readCommitFileBytes(repoRoot: string, hash: string, filePath: string): Promise<Buffer> {
+  try {
+    return await gitBytes(repoRoot, ["show", `${hash}:${filePath}`]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // git prints `fatal: path 'x' does not exist in 'abc'` for a blob that is
+    // absent at that revision, and `exists on disk, but not in 'abc'` when the
+    // path is in the worktree but not in that tree. Any other failure (timeout,
+    // maxBuffer) is real.
+    if (/does not exist in|exists on disk, but not in|invalid object name|unknown revision|bad revision|bad object/i.test(message)) {
+      throw new CommitFileMissingError(message);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Decode a blob for the source viewer the same way the file API chunks text:
+ * bounded to the first text-preview bytes and cut back to a line boundary.
+ * Returns null for binary blobs, which have no meaningful source view.
+ */
+export function decodeCommitFileText(bytes: Buffer): { content: string; truncated: boolean } | null {
+  if (bytes.includes(0)) return null;
+  if (bytes.length <= TEXT_PREVIEW_MAX_BYTES) return { content: bytes.toString("utf8"), truncated: false };
+
+  const head = bytes.subarray(0, TEXT_PREVIEW_MAX_BYTES).toString("utf8");
+  // Dropping the partial trailing line also drops any half-decoded code point
+  // the byte boundary left behind.
+  const lastNewline = head.lastIndexOf("\n");
+  return { content: lastNewline >= 0 ? head.slice(0, lastNewline + 1) : head, truncated: true };
 }
