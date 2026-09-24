@@ -486,7 +486,10 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
         <RowChevron expanded={expanded} />
       </button>
       {expanded && (
-        <div className="activity-row-body" style={error ? { color: "#f87171" } : undefined}>
+        <div
+          className="activity-row-body"
+          style={{ maxHeight: 380, overflowY: "auto", overscrollBehavior: "contain", ...(error ? { color: "#f87171" } : undefined) }}
+        >
           {loading ? t("i18n.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
         </div>
       )}
