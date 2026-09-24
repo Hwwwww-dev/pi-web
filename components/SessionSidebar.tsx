@@ -389,7 +389,7 @@ function PiWebTitle() {
 }
 
 export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange, onOpenGitPanel, keepAliveSlots, onKeepAliveSelect, onKeepAliveDismiss }: Props) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   // Tracked in a ref only: the version is compared against the polled value to
   // decide whether the list needs reloading, and no render reads it.
@@ -1910,26 +1910,45 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           {keepAliveOpen && (
             <div className="keepalive-sidebar-list">
               {keepAliveSlots.map((slot) => {
-                const isSelected = slot.session.id === selectedSessionId;
+                // Counts and timing come from the live catalogue so this list and
+                // the session tree never disagree; the slot snapshot is only the
+                // fallback while the list is being refreshed.
+                const info = allSessions.find((session) => session.id === slot.session.id) ?? slot.session;
+                const isSelected = info.id === selectedSessionId;
+                const isRunning = runningSessionIds.has(info.id);
+                const isUnread = !isRunning && unreadSessionIds.has(info.id);
                 return (
-                  <div key={slot.session.id} className={`keepalive-sidebar-row${isSelected ? " is-active" : ""}`}>
+                  <div key={info.id} className={`keepalive-sidebar-row${isSelected ? " is-active" : ""}`}>
                     <button
                       type="button"
                       className="keepalive-sidebar-open"
                       onClick={() => {
-                        if (!isSelected) onKeepAliveSelect?.(slot.session);
+                        if (!isSelected) onKeepAliveSelect?.(info);
                       }}
                     >
-                      <span className="keepalive-sidebar-name">{slot.session.name || slot.session.firstMessage || slot.session.id}</span>
-                      <span className="keepalive-sidebar-cwd">{slot.session.cwd}</span>
+                      <span className="keepalive-sidebar-name">{info.name || info.firstMessage || info.id}</span>
+                      <span className="keepalive-sidebar-meta">
+                        {isRunning && <RunningSessionIndicator />}
+                        {isUnread && <UnreadSessionIndicator />}
+                        <span className={`keepalive-sidebar-status${isRunning ? " is-running" : isUnread ? " is-done" : ""}`}>
+                          {t(isRunning ? "keepalive.statusRunning" : isUnread ? "keepalive.statusDone" : "keepalive.statusIdle")}
+                        </span>
+                        <span>{info.detailsPending ? "…" : t("sidebar.messagesCount", { count: info.messageCount })}</span>
+                        <span title={info.modified}>{formatRelativeTime(info.modified, locale)}</span>
+                      </span>
+                      {/* The path is clipped, not truncated: hovering slides the
+                          track so the whole path can be read without a tooltip. */}
+                      <span className="keepalive-sidebar-cwd" title={info.cwd}>
+                        <span className="keepalive-sidebar-cwd-track">{info.cwd}</span>
+                      </span>
                     </button>
                     {!isSelected && (
                       <button
                         type="button"
                         className="keepalive-sidebar-close"
                         title={t("keepalive.close")}
-                        aria-label={`${t("keepalive.close")}: ${slot.session.name || slot.session.id}`}
-                        onClick={() => onKeepAliveDismiss?.(slot.session.id)}
+                        aria-label={`${t("keepalive.close")}: ${info.name || info.id}`}
+                        onClick={() => onKeepAliveDismiss?.(info.id)}
                       >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M18 6 6 18M6 6l12 12" />

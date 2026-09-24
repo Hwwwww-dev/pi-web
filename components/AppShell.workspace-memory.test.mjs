@@ -17,26 +17,19 @@ function callbackBody(name, nextName) {
   return source.slice(start, end);
 }
 
-test("explicit context changes invalidate a pending workspace restore", () => {
-  const callbacks = [
-    ["handleCwdChange", "handleSelectSession"],
-    ["handleSelectSession", "handleNewSession"],
-    ["handleNewSession", "hydrateSelectedSession"],
-    ["handleSessionCreated", "handleAgentEnd"],
-    ["handleSessionForked", "handleInitialRestoreDone"],
-    ["handleSessionDeleted", "handleOpenFile"],
-  ];
-
-  for (const [name, nextName] of callbacks) {
-    assert.match(callbackBody(name, nextName), /invalidateWorkspaceRestore\(\);/);
-  }
-});
-
 test("all active-session transitions share one persistence effect", () => {
   assert.match(
     source,
-    /useEffect\(\(\) => \{\s+if \(selectedSession\) \{[\s\S]*?setLastOpenSession\(projectKey, selectedSession\.id\);\s+setTabOpenSession\(selectedSession\.id\);\s+return;\s+\}\s+if \(newSessionCwd\) setTabOpenNewSession\(newSessionCwd\);\s+\}, \[newSessionCwd, selectedSession\]\);/,
+    /useEffect\(\(\) => \{\s+if \(selectedSession\) \{\s+setTabOpenSession\(selectedSession\.id\);\s+return;\s+\}\s+if \(newSessionCwd\) setTabOpenNewSession\(newSessionCwd\);\s+\}, \[newSessionCwd, selectedSession\]\);/,
   );
+});
+
+test("a project switch lands on a new conversation", () => {
+  // Switching projects clears the open session and never consults a remembered
+  // session for the target project.
+  const body = callbackBody("handleCwdChange", "handleSelectSession");
+  assert.match(body, /setSelectedSession\(null\)/);
+  assert.doesNotMatch(body, /restoreWorkspaceContext|setLastOpenSession|getLastOpenSession|clearLastOpen/);
 });
 
 test("keeps chat scroll positions in page memory by session id", () => {
@@ -47,16 +40,8 @@ test("keeps chat scroll positions in page memory by session id", () => {
   assert.doesNotMatch(source, /localStorage[^\n]*sessionScroll/i);
 });
 
-test("workspace restoration remains inside the cross-project branch", () => {
-  assert.match(
-    callbackBody("handleCwdChange", "handleSelectSession"),
-    /if \(currentProject !== newProject\) \{[\s\S]*?restoreWorkspaceContext\(newProject, cwd\);[\s\S]*?\}/,
-  );
-});
-
-test("New restores the draft after session navigation and workspace auto-restore", async (t) => {
+test("New restores the draft after session navigation and a project switch", async (t) => {
   const callbacks = [
-    callbackBody("restoreWorkspaceContext", "handleCwdChange"),
     callbackBody("handleCwdChange", "handleSelectSession"),
     callbackBody("handleSelectSession", "handleNewSession"),
     callbackBody("handleNewSession", "hydrateSelectedSession"),
@@ -70,7 +55,6 @@ test("New restores the draft after session navigation and workspace auto-restore
     await t.test(`remembered session cwd: ${rememberedCwd}`, async () => {
       const cwd = "/draft-project";
       const session = { id: "remembered", cwd: rememberedCwd, projectKey: cwd };
-      const response = Promise.withResolvers();
       const context = vm.createContext({
         ...draftStore,
         crypto: globalThis.crypto,
@@ -78,15 +62,11 @@ test("New restores the draft after session navigation and workspace auto-restore
         URLSearchParams,
         window: { location: { pathname: "/", search: "" } },
         router: { replace() {} },
-        fetch: () => response.promise,
-        getLastOpenSession: (key) => key === cwd ? session.id : null,
-        clearLastOpen() {},
         workspaceKeyOf: (value) => value.projectKey ?? value.cwd,
         useCallback: (callback) => callback,
         useGlobalKeyboardShortcuts() {},
         activeNewSessionDraftKeyRef: { current: `new:initial:${cwd}` },
         activeProjectKeyRef: { current: cwd },
-        workspaceRestoreTokenRef: { current: 0 },
         suppressCwdBumpRef: { current: false },
         branchLeafChangeFnRef: { current: null },
         liveFollowFrameRef: { current: null },
@@ -105,7 +85,6 @@ test("New restores the draft after session navigation and workspace auto-restore
         keepAliveSlots: [],
         upsertKeepAliveSlot: (slots, session, now) => [...slots, { session, lastActiveAt: now, epoch: 0 }],
       });
-      context.invalidateWorkspaceRestore = () => context.workspaceRestoreTokenRef.current++;
       for (const [setter] of callbacks.matchAll(/\bset[A-Z]\w*(?=\()/g)) {
         const state = setter[3].toLowerCase() + setter.slice(4);
         context[setter] = (value) => {
@@ -156,14 +135,10 @@ test("New restores the draft after session navigation and workspace auto-restore
       await commit();
       context.navigate.handleCwdChange("/other-project", "/other-project", "/other-project");
       await commit();
-      context.navigate.handleCwdChange(cwd, cwd, cwd);
-      await commit();
-      assert.deepEqual(draftStore.getDraft(context.activeNewSessionDraftKeyRef.current), draft);
-      response.resolve({ ok: true, json: async () => ({ sessions: [session] }) });
-      await new Promise((resolve) => setImmediate(resolve));
-      await commit();
-      assert.equal(context.selectedSession.id, session.id);
-      context.navigate.handleNewSession("after-auto-restore", cwd);
+      // The switch clears the session instead of restoring one, and the parked
+      // draft still belongs to its own cwd.
+      assert.equal(context.selectedSession, null);
+      context.navigate.handleNewSession("after-project-switch", cwd);
       await commit();
       assert.deepEqual(draftStore.getDraft(context.activeNewSessionDraftKeyRef.current), draft);
       draftStore.clearDraft(context.activeNewSessionDraftKeyRef.current);

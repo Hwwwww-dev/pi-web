@@ -148,3 +148,18 @@ test("hides subagent rows and aggregates their state into the main session row",
   assert.match(source, /familySessions\.some\(\(session\) => runningSessionIds\.has\(session\.id\)\)/);
   assert.doesNotMatch(source, /function SessionTreeItem/);
 });
+
+test("active-session rows show live status, message count and time", () => {
+  // Counts and timing come from the live catalogue, so an active row and its
+  // tree row never disagree; the slot snapshot is only the fallback.
+  assert.match(source, /const info = allSessions\.find\(\(session\) => session\.id === slot\.session\.id\) \?\? slot\.session;/);
+  assert.match(source, /keepalive\.statusRunning/);
+  assert.match(source, /keepalive\.statusDone/);
+  assert.match(source, /t\("sidebar\.messagesCount", \{ count: info\.messageCount \}\)/);
+  assert.match(source, /formatRelativeTime\(info\.modified, locale\)/);
+  // The clipped path slides on hover instead of being truncated.
+  assert.match(source, /<span className="keepalive-sidebar-cwd-track">\{info\.cwd\}<\/span>/);
+  assert.match(globalStyles, /\.keepalive-sidebar-cwd \{[\s\S]*?container-type: inline-size;/);
+  assert.match(globalStyles, /\.keepalive-sidebar-row:hover \.keepalive-sidebar-cwd-track \{[\s\S]*?animation: keepalive-cwd-scroll/);
+  assert.match(globalStyles, /@keyframes keepalive-cwd-scroll \{[\s\S]*?translateX\(min\(0px, calc\(100cqw - 100%\)\)\)/);
+});
