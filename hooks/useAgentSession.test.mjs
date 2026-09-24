@@ -697,7 +697,7 @@ test("queued rows toggle behavior in place and edit through the authoritative cl
   assert.match(actionSource, /action: "toggle" \| "edit"[\s\S]*?type: "clear_queue"/);
 });
 
-test("top-bar session stats refresh on demand and while the panel is open", () => {
+test("top-bar session stats follow the run instead of the panel being open", () => {
   const refreshSource = source.slice(
     source.indexOf("  const refreshSessionStats = useCallback"),
     source.indexOf("  const handleQueuedAction = useCallback"),
@@ -705,17 +705,21 @@ test("top-bar session stats refresh on demand and while the panel is open", () =
 
   assert.match(refreshSource, /type: "get_session_stats"/);
   assert.match(refreshSource, /setSessionStatsOverride\(stats\)/);
-  assert.match(refreshSource, /const clearSessionStats = useCallback\(\(\) => \{/);
-  assert.match(source, /handleQueuedAction, refreshSessionStats, clearSessionStats,/);
+  // One snapshot feeds the top bar and the panel, and the running session is
+  // what keeps it current — the panel opening no longer decides that.
+  assert.match(refreshSource, /const timer = setInterval\(\(\) => refreshStatsRef\.current\?\.\(\), 3_000\);/);
+  assert.match(refreshSource, /const timers = \[1_500, 5_000, 12_000\]\.map\(/);
+  assert.match(refreshSource, /\}, \[agentRunning, session\?\.id\]\);/);
+  assert.match(source, /handleQueuedAction, refreshSessionStats,/);
+  assert.doesNotMatch(source, /clearSessionStats/);
 
-  assert.match(chatWindowSource, /statsPanelOpen\?: boolean/);
-  // The snapshot is only authoritative while something keeps refreshing it, so
-  // the panel polls and closing it drops the snapshot.
-  assert.match(chatWindowSource, /if \(background \|\| !statsPanelOpen\) \{/);
-  assert.match(chatWindowSource, /clearSessionStats\(\);/);
-  assert.match(chatWindowSource, /const timer = setInterval\(\(\) => \{ void refreshSessionStats\(\); \}, 3_000\);/);
+  // Neither the panel nor its close decides whether the numbers stay current.
+  assert.doesNotMatch(chatWindowSource, /statsPanelOpen/);
+  assert.doesNotMatch(chatWindowSource, /clearSessionStats/);
+  assert.doesNotMatch(appShellSource, /statsPanelOpen=/);
 
-  // Slots report only when their own panel is open; the transient chat follows the active panel.
-  assert.match(appShellSource, /statsPanelOpen=\{isActive && activeTopPanel === "session"\}/);
-  assert.match(appShellSource, /statsPanelOpen=\{activeTopPanel === "session"\}/);
+  // get_state fills the gap before the first reading, and the projection is
+  // capped because the top bar prints a portion of the window.
+  assert.match(source, /const usage = sessionStatsOverride\?\.contextUsage \?\? contextUsage;/);
+  assert.match(source, /Math\.max\(0, Math\.min\(100, usage\.percent\)\)/);
 });

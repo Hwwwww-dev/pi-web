@@ -574,9 +574,8 @@ html.dark .web-login-error {
 }
 
 /* Widgets and the status line share one row while there is room for both. The
-  55%/240px split keeps the long-standing ≈2:1 ratio, and the 240px basis is
-  what makes the status line wrap to its own full-width row on a phone instead
-  of squeezing the text into the 30% the fixed 70% cap used to leave behind. */
+  55%/240px split keeps the long-standing ≈2:1 ratio; a phone drops the basis and
+  lays them out in the same row instead (see below). */
 .extension-status-shelf.has-widgets.has-status .extension-widget-triggers {
   flex: 1 1 55%;
   border-right: 1px solid var(--border);
@@ -586,17 +585,36 @@ html.dark .web-login-error {
   flex: 1 1 240px;
 }
 
-/* Narrow shelves wrap the status line onto its own row, so the divider that
-  separates the two columns on a wide shelf would hang in empty space, and the
-  row that holds it keeps its box instead of sizing to its last chip. */
+/* A phone keeps both in one row: the shelf never wraps, the chips keep their own
+  horizontal scroll and the status text takes the rest of the row. A widget panel
+  opens above the shelf instead of pushing the chat up, so an expanded TUI box
+  cannot eat the message list. */
 @media (max-width: 640px) {
-  .extension-status-shelf.has-widgets.has-status .extension-widget-triggers,
-  .extension-status-shelf.has-widgets.has-status .extension-status-line {
-    flex: 1 1 100%;
+  .extension-status-shelf {
+    position: relative;
+    flex-wrap: nowrap;
   }
 
   .extension-status-shelf.has-widgets.has-status .extension-widget-triggers {
-    border-right: 0;
+    flex: 0 1 auto;
+    max-width: 45%;
+  }
+
+  .extension-status-shelf.has-widgets.has-status .extension-status-line {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .extension-widget-panels {
+    position: absolute;
+    inset: auto 0 100% 0;
+    z-index: 5;
+    max-height: min(144px, 26dvh);
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    background: var(--bg-panel);
+    box-shadow: 0 -6px 18px rgb(0 0 0 / 14%);
   }
 }
 
@@ -737,9 +755,8 @@ button.extension-widget-trigger:focus-visible {
   min-height: 35px;
   max-height: min(144px, 18dvh);
   /* A long status row scrolls sideways, and macOS floats that scrollbar over
-     the content box: the wider bottom padding keeps it clear of the glyphs, and
-     the wide inline padding keeps the text off the shelf's rounded corners. */
-  padding: 8px 20px 13px;
+     the content box: the wider bottom padding keeps it clear of the glyphs. */
+  padding: 8px 12px 13px;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -1338,6 +1355,21 @@ pre, code {
 .file-viewer-toolbar {
   min-width: 0;
   min-height: 35px;
+}
+
+/* Long paths ellipsize on the left so the trailing segments — the part that
+  identifies the file — stay visible. `direction: rtl` moves the ellipsis to the
+  left edge while the plaintext bidi isolation inside PathLabel keeps the path
+  itself rendered left-to-right. */
+.path-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  direction: rtl;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.35;
 }
 
 .file-viewer-path {

@@ -57,7 +57,6 @@ interface Props {
   background?: boolean;
   onSessionStatsChange?: (stats: SessionStatsInfo | null) => void;
   onSessionStatsPanelOpen?: () => void;
-  statsPanelOpen?: boolean;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   onOpenFile?: (filePath: string, page?: number) => void;
   onOpenSession?: (sessionId: string) => void;
@@ -244,7 +243,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, defaultExpanded = fa
   );
 }
 
-export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, statsPanelOpen, onContextUsageChange, onOpenFile, onOpenSession, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, onSoundToggle, playDoneSound = () => {}, unlockAudio }: Props) {
+export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile, onOpenSession, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, onSoundToggle, playDoneSound = () => {}, unlockAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const completionNotificationsEnabled = session?.relation?.kind !== "subagent";
@@ -293,7 +292,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     lastUserMsgRef, promptAnchorActive,
     handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
     handleCompact, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
-    handleQueuedAction, refreshSessionStats, clearSessionStats,
+    handleQueuedAction,
     handleBuiltinSlashCommand,
     handleToolPresetChange, handleThinkingLevelChange, loadSlashCommands, scrollUserMsgToTop,
     loadContext, activeLeafId, scrollToBottom, scrollToMessage,
@@ -711,20 +710,6 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     onSessionStatsChange?.(sessionStatsRef.current);
   }, [background, statsKey, onSessionStatsChange]);
   useEffect(() => () => { onSessionStatsChange?.(null); }, [onSessionStatsChange]);
-
-  // The panel renders the SDK's authoritative numbers, so keep them current
-  // while it is open: one in-process `get_session_stats` every 3s, instead of
-  // waiting for the next turn or a reopen. Closing the panel drops the snapshot
-  // so the top bar returns to the live per-message merge.
-  useEffect(() => {
-    if (background || !statsPanelOpen) {
-      clearSessionStats();
-      return;
-    }
-    void refreshSessionStats();
-    const timer = setInterval(() => { void refreshSessionStats(); }, 3_000);
-    return () => clearInterval(timer);
-  }, [background, statsPanelOpen, refreshSessionStats, clearSessionStats]);
 
   // Push context usage up to AppShell as well.
   const ctxKey = contextUsage

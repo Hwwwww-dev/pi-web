@@ -545,12 +545,18 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [newSessionDraftKey, opts.chatInputRef, resolveComposerDraftKey]);
 
+  const displayContextUsage = useMemo(() => {
+    const usage = sessionStatsOverride?.contextUsage ?? contextUsage;
+    if (!usage || usage.percent === null) return usage;
+    return { ...usage, percent: Math.max(0, Math.min(100, usage.percent)) };
+  }, [sessionStatsOverride, contextUsage]);
+
   const sessionStats = useMemo(() => {
     if (sessionStatsOverride) {
       return {
         ...sessionStatsOverride,
         totalActiveMs: data?.totalActiveMs,
-        ...(contextUsage ? { contextUsage } : {}),
+        ...(displayContextUsage ? { contextUsage: displayContextUsage } : {}),
       };
     }
     const fileStats = data?.stats;
@@ -562,9 +568,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       sessionName: session?.name,
       ...stats,
       totalActiveMs: data?.totalActiveMs,
-      ...(contextUsage ? { contextUsage } : {}),
+      ...(displayContextUsage ? { contextUsage: displayContextUsage } : {}),
     } satisfies SessionStatsInfo;
-  }, [messages, sessionStatsOverride, contextUsage, data?.context.messages, data?.filePath, data?.totalActiveMs, data?.stats, session?.id, session?.name]);
+  }, [messages, sessionStatsOverride, displayContextUsage, data?.context.messages, data?.filePath, data?.totalActiveMs, data?.stats, session?.id, session?.name]);
 
   useEffect(() => {
     entryIdsRef.current = entryIds;
@@ -2162,12 +2168,24 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, []);
   refreshStatsRef.current = refreshSessionStats;
 
-  // Drop the authoritative snapshot once nothing keeps it current: it is a
-  // point-in-time reading, so any later turn would otherwise sit behind stale
-  // numbers until the panel is reopened.
-  const clearSessionStats = useCallback(() => {
-    setSessionStatsOverride(null);
-  }, []);
+  // Both readers — the top bar and the stats panel — render this snapshot, so
+  // the numbers move while the run does instead of waiting for the next turn or
+  // for the panel to be opened. Turns that settle between polls are covered by
+  // the prompt events, plus this tail, because the wrapper writes its last
+  // usage entry just after the run ends.
+  const statsWasRunningRef = useRef(false);
+  useEffect(() => {
+    refreshStatsRef.current?.();
+    const wasRunning = statsWasRunningRef.current;
+    statsWasRunningRef.current = agentRunning;
+    if (agentRunning) {
+      const timer = setInterval(() => refreshStatsRef.current?.(), 3_000);
+      return () => clearInterval(timer);
+    }
+    if (!wasRunning) return;
+    const timers = [1_500, 5_000, 12_000].map((delay) => setTimeout(() => refreshStatsRef.current?.(), delay));
+    return () => timers.forEach(clearTimeout);
+  }, [agentRunning, session?.id]);
 
   const handleQueuedAction = useCallback(async (id: string, action: "toggle" | "edit") => {
     const sid = sessionIdRef.current;
@@ -2585,7 +2603,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   useEffect(() => {
     setSessionStatsOverride(null);
-  }, [messages.length, contextUsage?.tokens, contextUsage?.percent, contextUsage?.contextWindow]);
+  }, [session?.id]);
 
   const thinkingLevel: ThinkingLevelOption = displayThinkingLevel ?? "auto";
 
@@ -2593,7 +2611,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // State
     data, loading, error, activeLeafId, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, streamState,
     agentRunning, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
-    retryInfo, contextUsage, systemPrompt, forkingEntryId,
+    retryInfo, contextUsage: displayContextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats, autoCompactionEnabled,
     slashCommands, slashCommandsLoading, queuedSubmissions,
     notices: noticeState.visible, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, dismissNotice,
@@ -2609,7 +2627,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // Actions
     handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
     handleCompact, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
-    handleQueuedAction, refreshSessionStats, clearSessionStats,
+    handleQueuedAction, refreshSessionStats,
     handleBuiltinSlashCommand,
     setNoticePaused: setPausedNoticeId,
     handleToolPresetChange, handleThinkingLevelChange, loadTools, loadSlashCommands, setActiveLeafId, setData, setMessages, loadContext,

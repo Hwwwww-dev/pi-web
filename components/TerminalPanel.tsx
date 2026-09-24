@@ -5,6 +5,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { useI18n } from "@/hooks/useI18n";
 import { createTerminalWriter, terminalRequest } from "@/lib/terminal-client";
+import { PathLabel } from "./PathLabel";
 import type { TerminalEvent } from "@/lib/terminal-manager";
 import type { TerminalTab } from "./terminal-tab-state";
 
@@ -99,7 +100,13 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
       events?.close();
       events = new EventSource(`/api/terminal/${encodeURIComponent(id)}/events${offset === undefined ? "" : `?after=${offset}`}`);
       events.onmessage = (message) => {
-        const event = JSON.parse(message.data) as TerminalEvent;
+        let event: TerminalEvent;
+        try {
+          event = JSON.parse(message.data) as TerminalEvent;
+        } catch (e) {
+          console.error("Failed to parse terminal event:", e);
+          return;
+        }
         if (event.type === "output") {
           if (event.reset) terminal.reset();
           else if (offset !== undefined && event.offset <= offset) return;
@@ -204,7 +211,7 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
       <header className="terminal-panel-header">
         <div className="terminal-panel-path">
           <span className={`terminal-status-dot is-${status}`} title={t(`terminal.${status}`)} />
-          <span title={cwd}>{cwd}</span>
+          <PathLabel text={cwd} />
         </div>
         {status === "error" && (
           <button type="button" onClick={() => setReconnectKey((key) => key + 1)} disabled={Boolean(tab.closing)} title={t("terminal.reconnect")} aria-label={t("terminal.reconnect")}>

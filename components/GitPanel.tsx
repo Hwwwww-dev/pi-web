@@ -7,6 +7,7 @@ import { formatFileSize } from "@/lib/file-types";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import { getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
 import { DiffView } from "./DiffView";
+import { PathLabel } from "./PathLabel";
 import { FileMentionButton, FileToolbar, FILE_MODE_LABELS } from "./FileToolbar";
 import { SourceCodeView } from "./SourceCodeView";
 
@@ -562,9 +563,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
             }}>
               {file.status}
             </span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}
-            </span>
+            <PathLabel text={file.previousPath ? `${file.previousPath} → ${file.path}` : file.path} style={{ flex: 1, minWidth: 0, fontSize: 12, fontFamily: "var(--font-mono)" }} />
             {file.additions !== null && file.deletions !== null && (
               <span style={{ flexShrink: 0, fontSize: 10, fontFamily: "var(--font-mono)" }}>
                 <span style={{ color: "var(--diff-add)" }}>+{file.additions}</span>{" "}

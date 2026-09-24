@@ -20,6 +20,7 @@ import { FrontmatterCard } from "./FrontmatterCard";
 import { DiffView } from "./DiffView";
 import { FileMentionButton, FileToolbar, FILE_MODE_LABELS } from "./FileToolbar";
 import { SourceCodeView } from "./SourceCodeView";
+import { PathLabel } from "./PathLabel";
 import type { GitFileDiffResponse } from "@/lib/git-types";
 import { useI18n } from "@/hooks/useI18n";
 import {
@@ -252,9 +253,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
           flexShrink: 0,
         }}
       >
-        <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
-          {getRelativeFilePath(filePath, cwd)}
-        </span>
+        <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} style={{ fontFamily: "var(--font-mono)" }} />
         <span style={{ marginLeft: "auto" }}>{ext || "image"}</span>
         {naturalSize && <span>{naturalSize.w} × {naturalSize.h}</span>}
         {formatSizeStr && <span>{formatSizeStr}</span>}
@@ -422,9 +421,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
           flexShrink: 0,
         }}
       >
-        <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
-          {getRelativeFilePath(filePath, cwd)}
-        </span>
+        <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} style={{ fontFamily: "var(--font-mono)" }} />
         <span style={{ marginLeft: "auto" }}>{ext || "audio"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatFileSize(size)}</span>}
@@ -575,9 +572,7 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
           flexShrink: 0,
         }}
       >
-        <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
-          {getRelativeFilePath(filePath, cwd)}
-        </span>
+        <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} style={{ fontFamily: "var(--font-mono)" }} />
         <span style={{ marginLeft: "auto" }}>{ext || "video"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatFileSize(size)}</span>}
@@ -763,9 +758,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
           flexShrink: 0,
         }}
       >
-        <span style={{ fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={filePath}>
-          {getRelativeFilePath(filePath, cwd)}
-        </span>
+        <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} style={{ fontFamily: "var(--font-mono)" }} />
         <span style={{ marginLeft: "auto" }}>{ext === "docx" ? "docx preview" : "pdf"}</span>
         {size != null && <span>{formatFileSize(size)}</span>}
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />

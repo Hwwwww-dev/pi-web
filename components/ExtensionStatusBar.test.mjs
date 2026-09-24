@@ -99,15 +99,15 @@ test("marks a permissive-mode status as a warning", () => {
   assert.doesNotMatch(html, /extension-status-warning"><span><span/);
 });
 
-test("keeps the status glyphs clear of the scrollbar and the shelf corners", async () => {
+test("keeps the status glyphs clear of the scrollbar", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const statusLineRule = css.match(/^\.extension-status-line\s*\{([^}]*)\}/m)?.[1] ?? "";
   const warningRule = css.match(/^\.extension-status-warning\s*\{([^}]*)\}/m)?.[1] ?? "";
 
   // An overlay scrollbar floats over the content box on macOS, so the line
-  // reserves room for it below the text, and the inline padding keeps a
-  // scrolled-to-the-end row off the shelf's rounded corner.
-  assert.match(statusLineRule, /padding:\s*8px 20px 13px/);
+  // reserves room for it below the text; a phone has to fit both the chips and
+  // the text, so the inline padding stays tight.
+  assert.match(statusLineRule, /padding:\s*8px 12px 13px/);
   assert.match(warningRule, /color:\s*#dc2626/);
 });
 
@@ -140,15 +140,18 @@ test("status text keeps its share of the shelf beside widget triggers", async ()
   assert.match(statusRule, /flex:\s*1 1 240px/);
 });
 
-test("a narrow shelf gives both rows the full width and drops the trailing divider", async () => {
+test("a phone keeps the shelf to one row and floats the panel above it", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  // Stacked on a phone, the divider between the two columns would hang in empty
-  // space beside a single chip, and that chip's own divider would sit at the end
-  // of its row with nothing after it.
-  assert.match(
-    css,
-    /@media \(max-width: 640px\) \{\n  \.extension-status-shelf\.has-widgets\.has-status \.extension-widget-triggers,\n  \.extension-status-shelf\.has-widgets\.has-status \.extension-status-line \{\n    flex: 1 1 100%;\n  \}/,
-  );
+  const narrow = css.match(/@media \(max-width: 640px\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+  // One row on a phone: the shelf never wraps and the status text takes what is
+  // left of the row beside the chips.
+  assert.match(narrow, /\.extension-status-shelf \{\n    position: relative;\n    flex-wrap: nowrap;/);
+  assert.match(narrow, /has-status \.extension-widget-triggers \{\n    flex: 0 1 auto;\n    max-width: 45%;/);
+  assert.match(narrow, /has-status \.extension-status-line \{\n    flex: 1 1 auto;\n    min-width: 0;/);
+  // The panel covers the chat instead of pushing it up.
+  assert.match(narrow, /\.extension-widget-panels \{\n    position: absolute;\n    inset: auto 0 100% 0;/);
+  assert.match(narrow, /border-radius: 8px 8px 0 0;/);
   assert.match(css, /\.extension-widget-trigger:last-child \{[\s\S]{0,120}border-right: 0;/);
 });
 

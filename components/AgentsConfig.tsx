@@ -7,6 +7,7 @@ import type { SubagentProfilesResponse, SubagentSettingsResponse } from "@/lib/a
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ModelsData } from "@/lib/models-cache";
 import { isSubagentProfileOverridden } from "@/lib/subagent-profile-precedence";
+import { PathLabel } from "./PathLabel";
 import type { SubagentProfile, SubagentScope, SubagentWritableScope } from "@/lib/subagents";
 import {
   getLastSettingsSelection,
@@ -549,9 +550,7 @@ export function AgentsConfig({
                           {t(`agents.scope.${displayedScope}`)}
                         </span>
                       )}
-                      <span title={fullPath} className="config-detail-path">
-                        {displayedPath}
-                      </span>
+                      <PathLabel className="config-detail-path" text={displayedPath} title={fullPath} />
                     </ConfigDetailHeaderInfo>
                     <ConfigDetailActions>
                       {selected && (mode === "view" || mode === "edit") && <ConfigButton size="small" onClick={beginDuplicate} disabled={saving || toggling}>{t("agents.duplicate")}</ConfigButton>}

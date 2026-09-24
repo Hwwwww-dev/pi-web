@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
+import { PathLabel } from "./PathLabel";
 
 export interface FileToolbarMode<Mode extends string = string> {
   mode: Mode;
@@ -82,9 +83,7 @@ export function FileToolbar<Mode extends string = string>({
         flexShrink: 0,
       }}
     >
-      <span className="file-viewer-path" style={{ fontFamily: "var(--font-mono)" }} title={pathTitle ?? pathLabel}>
-        {pathLabel}
-      </span>
+      <PathLabel className="file-viewer-path" text={pathLabel} title={pathTitle ?? pathLabel} style={{ fontFamily: "var(--font-mono)" }} />
 
       <span className="file-viewer-meta" title={metaTitle ?? meta}>{meta}</span>
       {live !== undefined && (

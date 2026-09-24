@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useI18n } from "@/hooks/useI18n";
+import { PathLabel } from "./PathLabel";
 import type {
   SkillInfo as Skill,
   SkillInstallScope,
@@ -114,9 +115,7 @@ function SkillDetail({
             <span className={`config-scope-tag${label === "project" ? " is-project" : ""}`}>
               {label}
             </span>
-            <span className="config-detail-path">
-              {displayPath(skill.filePath)}
-            </span>
+            <PathLabel className="config-detail-path" text={displayPath(skill.filePath)} />
           </ConfigDetailHeaderInfo>
           <ConfigDetailActions>
             <ConfigSwitch
