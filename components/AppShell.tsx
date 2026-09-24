@@ -1670,9 +1670,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       if (percent !== null && percent > 90) contextColor = "#ef4444";
       else if (percent !== null && percent > 70) contextColor = "rgba(234,179,8,0.95)";
       desktopContextText = percent !== null
-        ? `${formatContextPercent(percent, 0)} / ${formatCompact(contextUsage.contextWindow)}`
+        ? `${formatContextPercent(percent, 1)} / ${formatCompact(contextUsage.contextWindow)}`
         : `? / ${formatCompact(contextUsage.contextWindow)}`;
-      mobileContextText = percent !== null ? formatContextPercent(percent, 0) : null;
+      mobileContextText = percent !== null ? formatContextPercent(percent, 1) : null;
     }
 
     const tooltipParts: string[] = [];
