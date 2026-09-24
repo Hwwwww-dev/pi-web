@@ -27,13 +27,17 @@ import type { SessionStatsInfo } from "@/lib/pi-types";
 import type { SessionFileStats } from "@/lib/session-stats";
 import { userMessageKey } from "@/lib/prompt-recovery";
 import {
+  createQueuedImageMemory,
+  createQueueSnapshotGate,
   createQueuedSubmission,
   emptyQueuedMessages,
   queuedGraceDeadline,
+  queuedImageRecallFromEntries,
   reconcileQueuedSubmissions,
   splitClearedQueue,
   type QueuedBehavior,
   type QueuedMessages,
+  type QueuedSnapshotEntry,
   type QueuedSubmission,
 } from "@/lib/queued-submissions";
 import { AgentEventConnection } from "@/lib/agent-event-connection";
@@ -104,6 +108,7 @@ type AgentStateResponse = {
   extensionStatuses?: ExtensionStatusItem[];
   extensionWidgets?: ExtensionWidgetItem[];
   queuedMessages?: { steering?: string[]; followUp?: string[] } | null;
+  queuedEntries?: QueuedSnapshotEntry[];
 };
 
 export type { QueuedMessages, QueuedSubmission };
@@ -375,10 +380,40 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // pi reports the queue as texts. Rows are folded from those snapshots so the
   // local records keep their thumbnails while pi still lists their text.
   const lastQueueSnapshotRef = useRef<QueuedMessages>(emptyQueuedMessages());
-  const applyQueueSnapshot = useCallback((snapshot: QueuedMessages) => {
+  // HTTP queue reads travel a different channel than SSE, so this gate decides
+  // whether a point-in-time reading may still apply (see createQueueSnapshotGate).
+  const queueSnapshotGateRef = useRef(createQueueSnapshotGate());
+  // Attachments of records that left the queue, offered back when a row has to
+  // be rebuilt from a text-only snapshot.
+  const queuedImageMemoryRef = useRef(createQueuedImageMemory());
+  const applyQueuedRecords = useCallback((snapshot: QueuedMessages, entries?: readonly QueuedSnapshotEntry[]) => {
     lastQueueSnapshotRef.current = snapshot;
-    setQueuedSubmissions((records) => reconcileQueuedSubmissions(records, snapshot));
+    const fromEntries = queuedImageRecallFromEntries(entries);
+    setQueuedSubmissions((records) => reconcileQueuedSubmissions(
+      records,
+      snapshot,
+      Date.now(),
+      fromEntries
+        ? (text, behavior) => fromEntries(text, behavior) ?? queuedImageMemoryRef.current.recall(text, behavior)
+        : undefined,
+      (record) => queuedImageMemoryRef.current.remember(record),
+    ));
   }, []);
+  // SSE queue snapshots are the authoritative feed: they observe a queue
+  // change and always apply.
+  const applyQueueSnapshot = useCallback((snapshot: QueuedMessages, entries?: readonly QueuedSnapshotEntry[]) => {
+    queueSnapshotGateRef.current.observe();
+    applyQueuedRecords(snapshot, entries);
+  }, [applyQueuedRecords]);
+  // get_state responses are point-in-time reads; they apply only while no
+  // queue change has been observed since the read was issued — an older
+  // reading can neither resurrect a delivered entry nor erase a queued one.
+  const applyRecordedQueueSnapshot = useCallback((snapshot: QueuedMessages, token: number, entries?: readonly QueuedSnapshotEntry[]) => {
+    const gate = queueSnapshotGateRef.current;
+    if (!gate.isFresh(token)) return;
+    gate.observe();
+    applyQueuedRecords(snapshot, entries);
+  }, [applyQueuedRecords]);
 
   // Reconciliation also runs on the clock: pi's snapshots stop arriving once the
   // queue is empty, so a row whose message was already delivered would keep
@@ -387,7 +422,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const deadline = queuedGraceDeadline(queuedSubmissions, lastQueueSnapshotRef.current);
     if (deadline === null) return;
     const timer = setTimeout(() => {
-      setQueuedSubmissions((records) => reconcileQueuedSubmissions(records, lastQueueSnapshotRef.current));
+      setQueuedSubmissions((records) => reconcileQueuedSubmissions(
+        records,
+        lastQueueSnapshotRef.current,
+        Date.now(),
+        undefined,
+        (record) => queuedImageMemoryRef.current.remember(record),
+      ));
     }, Math.max(0, deadline - Date.now()));
     return () => clearTimeout(timer);
   }, [queuedSubmissions]);
@@ -696,6 +737,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (!includeState) return null;
 
       try {
+        const queueToken = queueSnapshotGateRef.current.capture();
         const stateRes = await fetch(`/api/sessions/${encodeURIComponent(sid)}/state`);
         if (!stateRes.ok) throw new Error(`HTTP ${stateRes.status}`);
         const agentState = await stateRes.json() as { running: boolean; state?: AgentStateResponse };
@@ -708,10 +750,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           if (liveState.systemPrompt !== undefined) setSystemPrompt(liveState.systemPrompt ?? null);
           if (liveState.extensionStatuses !== undefined) setExtensionStatuses(liveState.extensionStatuses ?? []);
           if (liveState.extensionWidgets !== undefined) setExtensionWidgets(liveState.extensionWidgets ?? []);
-          if (liveState.queuedMessages !== undefined) applyQueueSnapshot(normalizeQueuedMessages(liveState.queuedMessages));
+          if (liveState.queuedMessages !== undefined) {
+            applyRecordedQueueSnapshot(normalizeQueuedMessages(liveState.queuedMessages), queueToken, liveState.queuedEntries);
+          }
           if (liveState.autoCompactionEnabled !== undefined) setAutoCompactionEnabled(liveState.autoCompactionEnabled ?? true);
         } else if (!agentState.running) {
-          applyQueueSnapshot(emptyQueuedMessages());
+          applyRecordedQueueSnapshot(emptyQueuedMessages(), queueToken);
         }
         return agentState;
       } catch (e) {
@@ -730,7 +774,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (loadFlightsRef.current.get(flightKey) === flight) loadFlightsRef.current.delete(flightKey);
     });
     return await flight;
-  }, [applyQueueSnapshot, setToolPresetState, syncLiveModel]);
+  }, [applyRecordedQueueSnapshot, setToolPresetState, syncLiveModel]);
 
   const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { tail?: number; signal?: AbortSignal }) => {
     try {
@@ -1257,6 +1301,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const reconcileAgentState = useCallback(async (sid: string) => {
     if (!agentRunningRef.current || sessionIdRef.current !== sid) return;
     const runId = promptRunIdRef.current;
+    const queueToken = queueSnapshotGateRef.current.capture();
     try {
       const res = await fetch(`/api/agent/${encodeURIComponent(sid)}`);
       if (!res.ok) return;
@@ -1272,7 +1317,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // (wrapper destroyed) means nothing is compacting.
       setIsCompacting(state?.isCompacting ?? false);
       setAutoCompactionEnabled(state?.autoCompactionEnabled ?? true);
-      applyQueueSnapshot(normalizeQueuedMessages(state?.queuedMessages));
+      applyRecordedQueueSnapshot(normalizeQueuedMessages(state?.queuedMessages), queueToken, state?.queuedEntries);
       const busy = data.running && state
         && (state.isStreaming || state.isPromptRunning || state.isCompacting);
       if (busy) {
@@ -1291,7 +1336,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } catch {
       // Network still down — the next poll / visibility / online tick retries.
     }
-  }, [applyQueueSnapshot, finishPromptWithoutStream, syncLiveModel]);
+  }, [applyRecordedQueueSnapshot, finishPromptWithoutStream, syncLiveModel]);
 
   // Recovery net for missed SSE events: while the agent is running, verify
   // against the server periodically and whenever the tab returns to the
@@ -1395,6 +1440,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         dispatch({ type: "end" });
         if (sessionIdRef.current) {
           loadSession(sessionIdRef.current);
+          const queueToken = queueSnapshotGateRef.current.capture();
           fetch(`/api/agent/${encodeURIComponent(sessionIdRef.current)}`)
             .then((r) => r.json())
             .then((d: { state?: AgentStateResponse }) => {
@@ -1405,7 +1451,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
               if (d.state?.extensionWidgets !== undefined) setExtensionWidgets(d.state.extensionWidgets ?? []);
               // Aborted turns can leave messages queued in pi (delivered with the
               // next turn); dead wrapper (no state) means the queue is gone.
-              applyQueueSnapshot(normalizeQueuedMessages(d.state?.queuedMessages));
+              applyRecordedQueueSnapshot(normalizeQueuedMessages(d.state?.queuedMessages), queueToken, d.state?.queuedEntries);
             })
             .catch(() => {});
         }
@@ -1626,7 +1672,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setExtensionDialog((current) => current?.id === event.id ? null : current);
         break;
     }
-  }, [addNotice, applyQueueSnapshot, cancelEventStreamGrace, handleExtensionUiRequest, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, scrollToBottom, settleUiStage, syncLiveModel]);
+  }, [addNotice, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, handleExtensionUiRequest, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, scrollToBottom, settleUiStage, syncLiveModel]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {
@@ -2131,12 +2177,19 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     behavior: "steer" | "followUp",
     images?: ChatDraftImage[],
   ) => {
-    setQueuedSubmissions((records) => [...records, createQueuedSubmission(message, behavior, images)]);
+    // pi clears queued texts by matching the delivered message's text and
+    // skips empty strings — an images-only queued text ("") could never leave
+    // its row (or pi's own queue list). Record rows only for non-empty texts.
+    setQueuedSubmissions((records) => message.trim()
+      ? [...records, createQueuedSubmission(message, behavior, images)]
+      : records);
     await sendStreamingPrompt(message, behavior, images);
   }, [sendStreamingPrompt]);
 
   const handleFollowUp = useCallback(async (message: string, images?: ChatDraftImage[]) => {
-    setQueuedSubmissions((records) => [...records, createQueuedSubmission(message, "followUp", images)]);
+    setQueuedSubmissions((records) => message.trim()
+      ? [...records, createQueuedSubmission(message, "followUp", images)]
+      : records);
     await sendStreamingPrompt(message, "followUp", images);
   }, [sendStreamingPrompt]);
 
@@ -2223,6 +2276,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     setQueuedSubmissions(nextRecords);
     // The rows just replaced the queue pi had, and no snapshot confirms that
     // until the re-sends land: a stale one must not resurrect the taken entry.
+    // The gate bump marks this rebuild as a queue change, cutting every
+    // state read issued before the clear.
+    queueSnapshotGateRef.current.observe();
     const snapshot: QueuedMessages = { steering: [], followUp: [] };
     for (const record of nextRecords) {
       (record.behavior === "steer" ? snapshot.steering : snapshot.followUp).push(record.text);
@@ -2434,7 +2490,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           if (agentState.state.systemPrompt !== undefined) setSystemPrompt(agentState.state.systemPrompt ?? null);
           if (agentState.state.extensionStatuses !== undefined) setExtensionStatuses(agentState.state.extensionStatuses ?? []);
           if (agentState.state.extensionWidgets !== undefined) setExtensionWidgets(agentState.state.extensionWidgets ?? []);
-          if (agentState.state.queuedMessages !== undefined) applyQueueSnapshot(normalizeQueuedMessages(agentState.state.queuedMessages));
+          // The queue snapshot is applied inside loadSession's state read,
+          // guarded by the snapshot gate; re-applying the same response here
+          // without a token could overwrite a fresher SSE event.
         }
       });
     }

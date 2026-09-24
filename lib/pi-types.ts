@@ -146,6 +146,8 @@ export interface AgentSessionLike {
       thinkingLevel?: string;
       streamingMessage?: PiAgentMessage;
     };
+    /** Content of whichever queue the next turn would drain (steering first). */
+    peekQueuedMessages?(): PiAgentMessage[];
   };
   readonly extensionRunner: ExtensionRunnerLike;
   readonly promptTemplates: readonly PromptTemplateLike[];

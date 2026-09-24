@@ -726,3 +726,61 @@ test("top-bar session stats follow the run instead of the panel being open", () 
   assert.match(source, /const usage = sessionStatsOverride\?\.contextUsage \?\? contextUsage;/);
   assert.match(source, /Math\.max\(0, Math\.min\(100, usage\.percent\)\)/);
 });
+
+test("stale queue reads cannot overwrite fresher SSE snapshots", () => {
+  // SSE queue_updates observe a queue change and always apply. get_state
+  // responses are point-in-time reads on a separate channel: each capture a
+  // gate token before the fetch and apply only while the token is still
+  // fresh, so an older reading can neither resurrect a delivered entry nor
+  // erase a freshly queued one.
+  const applySource = source.slice(
+    source.indexOf("  // SSE queue snapshots are the authoritative feed"),
+    source.indexOf("  // Reconciliation also runs on the clock"),
+  );
+  const reconcileSource = source.slice(
+    source.indexOf("  const reconcileAgentState = useCallback"),
+    source.indexOf("  // Recovery net for missed SSE events"),
+  );
+  const loadStateSource = source.slice(
+    source.indexOf("      try {\n        const queueToken = queueSnapshotGateRef.current.capture();"),
+    source.indexOf('      } catch (e) {\n        console.error("Failed to load agent state:", e);'),
+  );
+  const agentEndSource = source.slice(
+    source.indexOf('case "agent_end"'),
+    source.indexOf('case "agent_settled"'),
+  );
+
+  assert.match(applySource, /queueSnapshotGateRef\.current\.observe\(\);\s*\n\s*applyQueuedRecords\(snapshot, entries\);/);
+  assert.match(applySource, /if \(!gate\.isFresh\(token\)\) return;\s*\n\s*gate\.observe\(\);\s*\n\s*applyQueuedRecords\(snapshot, entries\);/);
+  assert.match(reconcileSource, /const queueToken = queueSnapshotGateRef\.current\.capture\(\);/);
+  assert.match(reconcileSource, /applyRecordedQueueSnapshot\(normalizeQueuedMessages\(state\?\.queuedMessages\), queueToken, state\?\.queuedEntries\)/);
+  assert.match(loadStateSource, /applyRecordedQueueSnapshot\(normalizeQueuedMessages\(liveState\.queuedMessages\), queueToken, liveState\.queuedEntries\)/);
+  assert.match(loadStateSource, /applyRecordedQueueSnapshot\(emptyQueuedMessages\(\), queueToken\)/);
+  assert.match(agentEndSource, /applyRecordedQueueSnapshot\(normalizeQueuedMessages\(d\.state\?\.queuedMessages\), queueToken, d\.state\?\.queuedEntries\)/);
+  // The mount effect no longer re-applies the loadSession response without a
+  // token — that unguarded apply was the resurrection path.
+  assert.doesNotMatch(source, /queuedMessages !== undefined\) applyQueueSnapshot\(normalizeQueuedMessages\(agentState\.state\.queuedMessages\)\)/);
+  // Taking a row out of the queue rebuilds it locally; the rebuild observes a
+  // change so pre-clear state reads are cut too.
+  const actionSource = source.slice(
+    source.indexOf("  const handleQueuedAction = useCallback"),
+    source.indexOf("  const handleThinkingLevelChange = useCallback"),
+  );
+  assert.match(actionSource, /queueSnapshotGateRef\.current\.observe\(\);\s*\n\s*const snapshot: QueuedMessages/);
+});
+
+test("empty queued texts never render, and expired records feed the image memory", () => {
+  // pi clears queued texts by matching the delivered message's text, which
+  // skips empty strings — an images-only queued message would otherwise keep
+  // its row (and pi's list entry) forever.
+  const submitSource = source.slice(
+    source.indexOf("  const handlePromptWithStreamingBehavior = useCallback"),
+    source.indexOf("  const handleAbortCompaction = useCallback"),
+  );
+  assert.match(submitSource, /message\.trim\(\)\s*\n\s*\? \[\.\.\.records, createQueuedSubmission\(message, behavior, images\)\]\s*\n\s*: records\)/);
+  assert.match(source, /const queuedImageMemoryRef = useRef\(createQueuedImageMemory\(\)\);/);
+  // Expired records hand their thumbnails to the memory; rebuilt rows recall
+  // the wrapper's entries first, then the memory.
+  assert.match(source, /\(record\) => queuedImageMemoryRef\.current\.remember\(record\)/);
+  assert.match(source, /fromEntries\(text, behavior\) \?\? queuedImageMemoryRef\.current\.recall\(text, behavior\)/);
+});

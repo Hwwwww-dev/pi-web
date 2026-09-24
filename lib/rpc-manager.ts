@@ -1,4 +1,5 @@
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+import { contentText } from "@earendil-works/pi-ai";
 import { createAgentSessionFromServices, createAgentSessionServices, getAgentDir, initTheme, SessionManager, SettingsManager, Theme } from "@earendil-works/pi-coding-agent";
 import { KeybindingsManager as TuiKeybindingsManager, TUI_KEYBINDINGS } from "@earendil-works/pi-tui";
 import { randomUUID } from "crypto";
@@ -7,6 +8,7 @@ import { resolve } from "path";
 import { validateAgentImages } from "./image-attachments";
 import { invalidateModelsCache } from "./models-cache";
 import { resolveVisibleModels, selectInitialModelScope } from "./model-scope";
+import type { QueuedSnapshotEntry } from "./queued-submissions";
 import {
   createProjectCommandBashExtension,
   createProjectCommandBashOperations,
@@ -707,6 +709,7 @@ export class AgentSessionWrapper {
             steering: [...this.inner.getSteeringMessages()],
             followUp: [...this.inner.getFollowUpMessages()],
           },
+          queuedEntries: this.buildQueuedEntries(),
           contextUsage: contextUsage
             ? { percent: contextUsage.percent, contextWindow: contextUsage.contextWindow, tokens: contextUsage.tokens }
             : null,
@@ -1114,6 +1117,58 @@ export class AgentSessionWrapper {
 
   private getExtensionStatuses(): Array<{ key: string; text: string }> {
     return Array.from(this.extensionStatuses, ([key, text]) => ({ key, text }));
+  }
+
+  /**
+   * The queue lists pi reports are texts only. The agent's peek exposes the
+   * full content of whichever queue the next turn would drain (steering
+   * first), so queued attachments are matched back to their entries by text,
+   * each peeked message consumed once — the same value-matching pi itself
+   * uses to clear the lists. An entry whose attachments cannot be matched (a
+   * mixed queue hides follow-up content while steering entries exist) reports
+   * no images: rows rebuilt from this lose thumbnails, not the message.
+   */
+  private buildQueuedEntries(): QueuedSnapshotEntry[] {
+    const steering = this.inner.getSteeringMessages();
+    const followUp = this.inner.getFollowUpMessages();
+    if (steering.length === 0 && followUp.length === 0) return [];
+    const peeked = this.inner.agent.peekQueuedMessages?.().slice() ?? [];
+    const totalBytesCap = 32 * 1024 * 1024;
+    let totalBytes = 0;
+    const takeImages = (text: string): Array<{ data: string; mimeType: string }> => {
+      const index = peeked.findIndex((message) => {
+        if (message.role !== "user") return false;
+        // pi-ai's user content is `string | Content[]`; the union is not a
+        // discriminated one here, so read content defensively.
+        const content = (message as { content?: string | unknown[] }).content;
+        return contentText(content as string | never[], "") === text;
+      });
+      if (index < 0) return [];
+      const [match] = peeked.splice(index, 1);
+      const images: Array<{ data: string; mimeType: string }> = [];
+      const matchContent = (match as { content?: unknown }).content;
+      if (!Array.isArray(matchContent)) return images;
+      for (const block of matchContent) {
+        if (!block || typeof block !== "object" || (block as { type?: unknown }).type !== "image") continue;
+        // Queued messages carry pi-ai's flat image shape; read the nested
+        // session format defensively the same way the message renderer does.
+        const flat = block as { data?: unknown; mimeType?: unknown; source?: { type?: unknown; data?: unknown; media_type?: unknown } };
+        const data = flat.source?.type === "base64" ? flat.source.data : flat.data;
+        const mimeType = flat.source?.type === "base64" ? flat.source.media_type : flat.mimeType;
+        if (typeof data !== "string" || typeof mimeType !== "string") continue;
+        if (totalBytes + data.length > totalBytesCap) continue;
+        totalBytes += data.length;
+        images.push({ data, mimeType });
+      }
+      return images;
+    };
+    const entries: QueuedSnapshotEntry[] = [];
+    for (const behavior of ["steer", "followUp"] as const) {
+      for (const text of behavior === "steer" ? steering : followUp) {
+        entries.push({ text, behavior, images: takeImages(text) });
+      }
+    }
+    return entries;
   }
 
   private getExtensionWidgets(): ExtensionWidgetItem[] {
