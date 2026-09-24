@@ -273,12 +273,20 @@ function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, toolResu
     const assistantMessage = message as AssistantMessage;
     const content = assistantMessage.content ?? [];
     const limit = processBlockLimitByIdx?.get(idx) ?? content.length;
+    // Same file-timestamp estimate AssistantMessageView used: time from the
+    // previous message to this one approximates the thinking block's duration.
+    const prevMessage = messages[idx - 1] as (AgentMessage & { timestamp?: number }) | undefined;
+    let thinkingDuration: number | undefined;
+    if (assistantMessage.timestamp && prevMessage?.timestamp) {
+      const secs = Math.round((assistantMessage.timestamp - prevMessage.timestamp) / 1000);
+      if (secs > 0) thinkingDuration = secs;
+    }
     for (let blockIdx = 0; blockIdx < content.length && blockIdx < limit; blockIdx++) {
       const block = content[blockIdx];
       if (block.type === "thinking" && !block.deferred && block.thinking.trim() === "") continue;
       const searchTarget = hitsEntry && block === searchBlock;
       if (block.type === "thinking") {
-        items.push({ kind: "thinking", key: `thinking-${entryId ?? idx}-${blockIdx}`, block: block as ThinkingContent, entryId, blockIndex: blockIdx, searchTarget });
+        items.push({ kind: "thinking", key: `thinking-${entryId ?? idx}-${blockIdx}`, block: block as ThinkingContent, duration: thinkingDuration, entryId, blockIndex: blockIdx, searchTarget });
         continue;
       }
       if (block.type === "toolCall") {

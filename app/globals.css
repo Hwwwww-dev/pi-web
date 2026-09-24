@@ -1037,6 +1037,9 @@ pre, code {
   display: flex;
   align-items: center;
   gap: 7px;
+  /* Block-context parents (thinking rows) render the button shrink-to-fit;
+    width: 100% keeps the preview span shrinking and the chevron on screen. */
+  width: 100%;
   flex: 1;
   min-width: 0;
   min-height: 24px;
