@@ -2090,23 +2090,23 @@ span.token.table {
   color: var(--text-dim);
   /* A real ellipsis would freeze the text; fading the edge shows there is more
      while the track stays free to slide on hover. */
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 12px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 12px), transparent);
 }
 .keepalive-sidebar-cwd-track {
   display: inline-block;
   white-space: nowrap;
+  /* The slide travel is measured on the border box, so this trailing gap parks
+     the last glyph clear of the mask's fade instead of under it. */
+  padding-right: 18px;
+  transition: transform 1.2s ease-out;
 }
 .keepalive-sidebar-row:hover .keepalive-sidebar-cwd-track {
-  animation: keepalive-cwd-scroll 4s ease-in-out infinite alternate;
-}
-@keyframes keepalive-cwd-scroll {
-  from { transform: translateX(0); }
   /* min() pins paths that already fit: only clipped text slides. */
-  to { transform: translateX(min(0px, calc(100cqw - 100%))); }
+  transform: translateX(min(0px, calc(100cqw - 100%)));
 }
 @media (prefers-reduced-motion: reduce) {
-  .keepalive-sidebar-row:hover .keepalive-sidebar-cwd-track { animation: none; }
+  .keepalive-sidebar-cwd-track { transition: none; }
 }
 .keepalive-sidebar-close {
   display: flex;

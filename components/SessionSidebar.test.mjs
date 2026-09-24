@@ -160,6 +160,6 @@ test("active-session rows show live status, message count and time", () => {
   // The clipped path slides on hover instead of being truncated.
   assert.match(source, /<span className="keepalive-sidebar-cwd-track">\{info\.cwd\}<\/span>/);
   assert.match(globalStyles, /\.keepalive-sidebar-cwd \{[\s\S]*?container-type: inline-size;/);
-  assert.match(globalStyles, /\.keepalive-sidebar-row:hover \.keepalive-sidebar-cwd-track \{[\s\S]*?animation: keepalive-cwd-scroll/);
-  assert.match(globalStyles, /@keyframes keepalive-cwd-scroll \{[\s\S]*?translateX\(min\(0px, calc\(100cqw - 100%\)\)\)/);
+  assert.match(globalStyles, /\.keepalive-sidebar-cwd-track \{[\s\S]*?padding-right: 18px;[\s\S]*?transition: transform 1\.2s ease-out;/);
+  assert.match(globalStyles, /\.keepalive-sidebar-row:hover \.keepalive-sidebar-cwd-track \{[\s\S]*?translateX\(min\(0px, calc\(100cqw - 100%\)\)\)/);
 });
