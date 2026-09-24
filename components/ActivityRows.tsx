@@ -11,7 +11,7 @@ import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { isTuiText } from "@/lib/ansi";
 import { getFileName, getRelativeFilePath } from "@/lib/file-paths";
 import { resolveLocalFilePath } from "@/lib/file-links";
-import { parseUnifiedPatch, type SplitDiffCell, type SplitDiffFile } from "@/lib/patch";
+import type { SplitDiffCell, SplitDiffFile } from "@/lib/patch";
 import { applyPatchPreviewToFiles, applyPatchResultHasFailures, extractApplyPatchPaths, getApplyPatchInputText, parseApplyPatchInput } from "@/lib/apply-patch";
 import { isApplyPatchToolName, isEditToolName } from "@/lib/tool-names";
 import { isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansion";
@@ -221,6 +221,7 @@ export function ToolRow({ block, result, duration, cwd, onOpenFile, onOpenSessio
   const inputStr = getToolCallInputText(block);
   const isStreamingInput = block.rawInput !== undefined;
   const resultDiff = result && !result.isError ? getResultDiff(result) : null;
+  const diffStat = resultDiff ? countDiffStat(resultDiff.text) : null;
   const patchFiles = getApplyPatchFiles(block, result);
   const resultText = result
     ? result.content.filter((b): b is { type: "text"; text: string } => b.type === "text").map((b) => b.text).join("\n")
@@ -231,6 +232,14 @@ export function ToolRow({ block, result, duration, cwd, onOpenFile, onOpenSessio
     || (isApplyPatchToolName(block.toolName) && applyPatchResultHasFailures(result?.details));
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
   const active = Boolean(isStreaming) && !result;
+  // Terminal rows render command + output as one ZCode-style block ($ cmd, then
+  // the output) instead of the raw JSON args.
+  const commandText = category === "terminal" && !isStreamingInput && typeof block.input?.command === "string"
+    ? block.input.command
+    : null;
+  const combinedTerminalText = commandText !== null
+    ? `$ ${commandText}${resultText && !resultIsEmpty ? `\n\n${resultText}` : ""}`
+    : null;
 
   const label = category === "other" ? block.toolName : t(TOOL_CATEGORY_LABEL_KEYS[category]);
 
@@ -250,7 +259,16 @@ export function ToolRow({ block, result, duration, cwd, onOpenFile, onOpenSessio
               ? t("chat.generatingToolInput")
               : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
           </span>
+          {diffStat && (
+            <span className="diff-stat" aria-hidden="true">
+              <span className="diff-stat-added">+{diffStat.added}</span>
+              <span className="diff-stat-removed">−{diffStat.removed}</span>
+            </span>
+          )}
           {active ? <RowSpinner /> : duration !== undefined && <span className="activity-row-meta">{duration}s</span>}
+          {!active && isError && result && (
+            <span className="activity-row-meta activity-row-failed">{t("chat.activity.failed")}</span>
+          )}
           <RowChevron expanded={expanded} />
         </button>
         {subagent && onOpenSession && (
@@ -270,17 +288,27 @@ export function ToolRow({ block, result, duration, cwd, onOpenFile, onOpenSessio
 
       {expanded && (
         <div className="activity-row-detail">
-          {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
-            <pre className="activity-detail-pre">{inputStr}</pre>
-          )}
-          {patchFiles && <SplitFilesView files={patchFiles} />}
-          {result && patchFiles && isError && (
-            <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
-          )}
-          {result && !patchFiles && (
-            resultDiff ? <PairedDiffResult diff={resultDiff} /> : (!resultIsEmpty || resultImages.length === 0) && (
-              <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
-            )
+          {combinedTerminalText !== null ? (
+            <PairedResult
+              text={combinedTerminalText}
+              isEmpty={false}
+              isError={isError}
+            />
+          ) : (
+            <>
+              {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
+                <pre className="activity-detail-pre">{inputStr}</pre>
+              )}
+              {patchFiles && <SplitFilesView files={patchFiles} />}
+              {result && patchFiles && isError && (
+                <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+              )}
+              {result && !patchFiles && combinedTerminalText === null && (
+                resultDiff ? <PairedDiffResult diff={resultDiff} /> : (!resultIsEmpty || resultImages.length === 0) && (
+                  <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                )
+              )}
+            </>
           )}
         </div>
       )}
@@ -918,6 +946,9 @@ interface ResultDiff {
 function PairedDiffResult({ diff }: {
   diff: ResultDiff;
 }) {
+  // Unified diff with line numbers — the split side-by-side view does not
+  // survive narrow (mobile) chat columns and edit rows should read as a diff,
+  // not as the source file.
   return (
     <div
       style={{
@@ -925,15 +956,20 @@ function PairedDiffResult({ diff }: {
         background: "var(--bg)",
       }}
     >
-      <SplitPatchView text={diff.text} />
+      <PatchTextView text={diff.text} />
     </div>
   );
 }
 
-function SplitPatchView({ text }: { text: string }) {
-  const files = useMemo(() => parseUnifiedPatch(text), [text]);
-  if (!files) return <PatchTextView text={text} />;
-  return <SplitFilesView files={files} />;
+/** +N / −M line counts for a unified diff, for the collapsed row badge. */
+function countDiffStat(text: string): { added: number; removed: number } {
+  let added = 0;
+  let removed = 0;
+  for (const line of text.split(/\r?\n/)) {
+    if (line.startsWith("+") && !line.startsWith("+++")) added += 1;
+    else if (line.startsWith("-") && !line.startsWith("---")) removed += 1;
+  }
+  return { added, removed };
 }
 
 function SplitFilesView({ files }: { files: SplitDiffFile[] }) {

@@ -1042,8 +1042,10 @@ pre, code {
   width: 100%;
   flex: 1;
   min-width: 0;
-  min-height: 24px;
-  padding: 2px 4px;
+  /* Fixed height so every row sits on the same grid: icons, labels, durations
+    and chevrons align across consecutive rows. */
+  height: 26px;
+  padding: 0 4px;
   background: none;
   border: none;
   border-radius: 5px;
@@ -1093,6 +1095,24 @@ pre, code {
   color: var(--text-dim);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
+}
+.activity-row-failed {
+  color: #ef4444;
+}
+.diff-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.diff-stat-added {
+  color: #22c55e;
+}
+.diff-stat-removed {
+  color: #f87171;
 }
 .activity-row-action {
   display: grid;

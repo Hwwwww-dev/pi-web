@@ -345,6 +345,7 @@ export const zhTWLocale: LocalePlugin = {
     "chat.activity.call": "{count} 次",
     "chat.activity.calls": "{count} 次",
     "chat.activity.subagentNotification": "子代理彙報",
+    "chat.activity.failed": "執行失敗",
     "chat.question.pager": "問題 {index}/{total}",
     "chat.question.answered": "已回答",
     "chat.filesWritten": "已變更的檔案",

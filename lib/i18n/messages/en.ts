@@ -345,6 +345,7 @@ export const enLocale: LocalePlugin = {
     "chat.activity.call": "{count} call",
     "chat.activity.calls": "{count} calls",
     "chat.activity.subagentNotification": "Sub-agent update",
+    "chat.activity.failed": "failed",
     "chat.question.pager": "Question {index} of {total}",
     "chat.question.answered": "Answered",
     "chat.filesWritten": "Files changed",
