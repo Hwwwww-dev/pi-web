@@ -41,8 +41,6 @@ export function FileMentionButton({ onClick, title, disabled }: { onClick: () =>
 }
 
 interface Props<Mode extends string> {
-  /** Navigation or status chips rendered before the path (git diff: back button, status badge). */
-  leading?: ReactNode;
   pathLabel: string;
   pathTitle?: string;
   meta: string;
@@ -65,7 +63,7 @@ interface Props<Mode extends string> {
  * both carry the same path/meta header, mode switch and action buttons.
  */
 export function FileToolbar<Mode extends string = string>({
-  leading, pathLabel, pathTitle, meta, metaTitle, live, modes = [], activeMode, onSelectMode, actions, wrapLines, onToggleWrapLines, download,
+  pathLabel, pathTitle, meta, metaTitle, live, modes = [], activeMode, onSelectMode, actions, wrapLines, onToggleWrapLines, download,
 }: Props<Mode>) {
   const { t } = useI18n();
 
@@ -84,7 +82,6 @@ export function FileToolbar<Mode extends string = string>({
         flexShrink: 0,
       }}
     >
-      {leading}
       <span className="file-viewer-path" style={{ fontFamily: "var(--font-mono)" }} title={pathTitle ?? pathLabel}>
         {pathLabel}
       </span>

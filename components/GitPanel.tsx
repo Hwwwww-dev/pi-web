@@ -448,6 +448,12 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
     setView({ type: "diff", commit, file });
   };
 
+  // One step back through the push stack: file view → commit files → log.
+  const goBack = () => {
+    if (view.type === "diff") setView({ type: "detail", commit: view.commit });
+    else if (view.type === "detail") setView({ type: "log" });
+  };
+
   const selectRepository = (repositoryRoot: string) => {
     if (repositoryRoot === selectedRepo) return;
     setSelectedRepo(repositoryRoot);
@@ -488,9 +494,6 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
   const renderDetailLayer = (commit: CommitSummary) => (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-        <button type="button" onClick={() => setView({ type: "log" })} style={buttonStyle}>
-          ‹ {t("gitPanel.back")}
-        </button>
         <span style={{ fontSize: 12, fontWeight: 600, minWidth: 0, wordBreak: "break-word" }}>
           {commit.subject}
         </span>
@@ -593,11 +596,6 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
     return (
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <FileToolbar
-          leading={(
-            <button type="button" onClick={() => setView({ type: "detail", commit })} style={buttonStyle}>
-              ‹ {t("gitPanel.back")}
-            </button>
-          )}
           pathLabel={relativePath}
           meta={meta}
           modes={(deleted ? ["diff"] : ["source", "diff"]).map((mode) => ({
@@ -652,7 +650,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
       data-gitpanel-narrow={narrowMobile ? "true" : "false"}
       style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", color: "var(--text)" }}
     >
-      {/* Toolbar: repository picker + branch picker + rescan */}
+      {/* The row that never scrolls away owns the one back affordance. */}
       <div
         data-gitpanel-toolbar
         style={{
@@ -660,6 +658,19 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
           flexShrink: 0, padding: 8, borderBottom: "1px solid var(--border)",
         }}
       >
+        {view.type !== "log" && (
+          <button
+            type="button"
+            onClick={goBack}
+            title={t("gitPanel.back")}
+            aria-label={t("gitPanel.back")}
+            style={{ ...buttonStyle, width: CONTROL_MIN_HEIGHT, padding: 0 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+        )}
         <GitDropdown
           stretch={narrowMobile}
           value={selectedRepo}

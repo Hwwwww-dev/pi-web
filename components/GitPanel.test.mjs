@@ -19,13 +19,19 @@ test("renders the three push-navigation layers behind data-gitpanel-view", () =>
   for (const layer of ["log", "detail", "diff"]) {
     assert.match(source, new RegExp(`view\\.type === "${layer}"`));
   }
-  assert.match(source, /setView\(\{ type: "detail", commit \}\)/);
+  assert.match(source, /const openCommitFile = \(commit: CommitSummary, file: CommitDetailFile\) => \{/);
   assert.match(source, /setView\(\{ type: "diff", commit, file \}\)/);
 });
 
 test("back navigation pops one layer and repository switch resets to the log layer", () => {
-  assert.match(source, /onClick=\{\(\) => setView\(\{ type: "log" \}\)\}/);
-  assert.match(source, /onClick=\{\(\) => setView\(\{ type: "detail", commit \}\)\}/);
+  // The toolbar owns the only back affordance, so it stays put while the
+  // layers below scroll: file view → commit files → log.
+  const goBack = source.match(/const goBack = \(\) => \{[\s\S]*?\n  \};/)?.[0];
+  assert.ok(goBack);
+  assert.match(goBack, /if \(view\.type === "diff"\) setView\(\{ type: "detail", commit: view\.commit \}\)/);
+  assert.match(goBack, /else if \(view\.type === "detail"\) setView\(\{ type: "log" \}\)/);
+  assert.match(source, /\{view\.type !== "log" && \(\s*<button[\s\S]{0,80}?onClick=\{goBack\}/);
+  assert.doesNotMatch(source, /‹ \{t\("gitPanel\.back"\)\}/);
   const selectHandler = source.match(/const selectRepository = \(repositoryRoot: string\) => \{[\s\S]*?\n  \};/)?.[0];
   assert.ok(selectHandler);
   assert.match(selectHandler, /setView\(\{ type: "log" \}\)/);
@@ -183,7 +189,7 @@ test("diff layer header keeps the commit hash (story 10)", () => {
   assert.ok(diffLayer);
   assert.match(diffLayer, /\{commit\.shortHash\}\$\{lineCounts\}/);
   assert.match(diffLayer, /pathLabel=\{relativePath\}/);
-  assert.match(diffLayer, /onClick=\{\(\) => setView\(\{ type: "detail", commit \}\)\}/);
+  assert.doesNotMatch(diffLayer, /gitPanel\.back/);
 });
 
 test("superseded responses are dropped by monotonic request guards", () => {
