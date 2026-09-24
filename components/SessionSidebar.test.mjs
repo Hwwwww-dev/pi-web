@@ -7,6 +7,7 @@ const jiti = createJiti(import.meta.url, { jsx: { runtime: "automatic" }, tsconf
 const { getSessionListIndices } = await jiti.import("./SessionSidebar.tsx");
 
 const source = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
+const dockSource = await readFile(new URL("./KeepAliveDock.tsx", import.meta.url), "utf8");
 const globalStyles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const sessionItemSource = source.slice(source.indexOf("function SessionItem("));
 
@@ -155,14 +156,14 @@ test("hides subagent rows and aggregates their state into the main session row",
 });
 
 test("active-session rows show live status, message count and time", () => {
-  // Counts and timing come from the live catalogue, so an active row and its
-  // tree row never disagree; the slot snapshot is only the fallback.
-  assert.match(source, /const info = allSessions\.find\(\(session\) => session\.id === slot\.session\.id\) \?\? slot\.session;/);
-  assert.match(source, /keepalive\.statusRunning/);
-  assert.match(source, /keepalive\.statusDone/);
-  assert.match(source, /t\("sidebar\.messagesCount", \{ count: info\.messageCount \}\)/);
-  assert.match(source, /formatRelativeTime\(info\.modified, locale\)/);
+  // The active-session list moved out of the sidebar into the keep-alive dock;
+  // the assertions follow the code there.
+  assert.match(dockSource, /const info = sessions\.find\(\(session\) => session\.id === slot\.session\.id\) \?\? slot\.session;/);
+  assert.match(dockSource, /keepalive\.statusRunning/);
+  assert.match(dockSource, /keepalive\.statusDone/);
+  assert.match(dockSource, /t\("sidebar\.messagesCount", \{ count: info\.messageCount \}\)/);
+  assert.match(dockSource, /formatRelativeTime\(info\.modified, locale\)/);
   // Tail-first clipping, same as the project rows: the head gets the ellipsis,
   // the specific tail stays readable.
-  assert.match(source, /<PathLabel\n?\s*text=\{info\.cwd\}/s);
+  assert.match(dockSource, /<PathLabel\n?\s*text=\{info\.cwd\}/s);
 });

@@ -39,6 +39,7 @@ export const zhTWLocale: LocalePlugin = {
     "keepalive.title": "活躍會話",
     "keepalive.label": "活躍會話",
     "keepalive.close": "移出活躍會話",
+    "keepalive.dismissAll": "全部移出活躍會話",
     "keepalive.statusIdle": "空閒",
     "keepalive.statusRunning": "執行中",
     "keepalive.statusDone": "已完成",

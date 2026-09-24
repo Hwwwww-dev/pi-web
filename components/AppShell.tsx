@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } fr
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar } from "./SessionSidebar";
+import { KeepAliveDock } from "./KeepAliveDock";
 import { ChatWindow } from "./ChatWindow";
 import type { ChatScrollPosition } from "@/lib/chat-scroll-position";
 import { FileViewer } from "./FileViewer";
@@ -160,6 +161,15 @@ export function AppShell() {
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   const handleRunningSessionIdsChange = useCallback((ids: Set<string>) => {
     setRunningSessionIds((previous) => {
+      if (previous.size === ids.size && [...ids].every((id) => previous.has(id))) return previous;
+      return ids;
+    });
+  }, []);
+  // Source of truth stays in the sidebar's poll; the keep-alive dock reads the
+  // reported set for its unread dots.
+  const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(() => new Set());
+  const handleUnreadSessionIdsChange = useCallback((ids: Set<string>) => {
+    setUnreadSessionIds((previous) => {
       if (previous.size === ids.size && [...ids].every((id) => previous.has(id))) return previous;
       return ids;
     });
@@ -1002,6 +1012,17 @@ export function AppShell() {
     setKeepAliveSlots((slots) => slots.filter((slot) => slot.session.id !== sessionId));
   }, []);
 
+  // Remove every keep-alive slot except the session currently on screen.
+  const handleKeepAliveDismissAll = useCallback(() => {
+    setKeepAliveSlots((slots) => {
+      const selectedId = selectedSession?.id;
+      for (const slot of slots) {
+        if (slot.session.id !== selectedId) sessionScrollPositionsRef.current.delete(slot.session.id);
+      }
+      return slots.filter((slot) => slot.session.id === selectedId);
+    });
+  }, [selectedSession?.id]);
+
   const handleInitialRestoreDone = useCallback(() => {
     setInitialSessionRestored(true);
   }, []);
@@ -1246,9 +1267,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         onBackgroundTaskDone={handleBackgroundTaskDone}
         onRunningSessionIdsChange={handleRunningSessionIdsChange}
         onSessionsChange={handleSessionsChange}
-        keepAliveSlots={keepAliveSlots}
-        onKeepAliveSelect={handleSelectSession}
-        onKeepAliveDismiss={handleKeepAliveDismiss}
+        onUnreadSessionIdsChange={handleUnreadSessionIdsChange}
       />
       <div style={{ padding: "8px", flexShrink: 0, display: "flex", justifyContent: "space-between", gap: 4 }}>
         {([
@@ -2453,6 +2472,16 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   />
                 </div>
               )}
+              <KeepAliveDock
+                slots={keepAliveSlots}
+                sessions={sessionCatalog}
+                selectedSessionId={selectedSession?.id ?? null}
+                runningSessionIds={runningSessionIds}
+                unreadSessionIds={unreadSessionIds}
+                onSelect={handleSelectSession}
+                onDismiss={handleKeepAliveDismiss}
+                onDismissAll={handleKeepAliveDismissAll}
+              />
             </>
           ) : initialCwdStatus === "validating" ? (
             <div

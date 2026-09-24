@@ -86,22 +86,26 @@ export function upsertKeepAliveSlot(slots: KeepAliveSlot[], session: SessionInfo
   return next;
 }
 
-const SIDEBAR_OPEN_STORAGE_KEY = "pi-web:keepalive-sidebar:open";
+const DOCK_TOP_STORAGE_KEY = "pi-web:keepalive-dock:top-pct";
 
-export function loadKeepAliveSidebarOpen(): boolean {
-  if (typeof window === "undefined") return true;
+/** Vertical dock position as a percentage of the chat area height. */
+export function loadKeepAliveDockTopPct(): number {
+  if (typeof window === "undefined") return 28;
   try {
-    return window.localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY) !== "false";
+    const raw = window.localStorage.getItem(DOCK_TOP_STORAGE_KEY);
+    const parsed = raw === null ? Number.NaN : Number.parseFloat(raw);
+    if (!Number.isFinite(parsed)) return 28;
+    return Math.min(95, Math.max(5, parsed));
   } catch {
-    return true;
+    return 28;
   }
 }
 
-export function saveKeepAliveSidebarOpen(open: boolean): void {
+export function saveKeepAliveDockTopPct(pct: number): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, String(open));
+    window.localStorage.setItem(DOCK_TOP_STORAGE_KEY, String(Math.min(95, Math.max(5, pct))));
   } catch {
-    // Persistence is best-effort; privacy mode and storage quotas must not break the sidebar.
+    // Persistence is best-effort; privacy mode and storage quotas must not break the dock.
   }
 }

@@ -39,6 +39,7 @@ export const zhCNLocale: LocalePlugin = {
     "keepalive.title": "活跃会话",
     "keepalive.label": "活跃会话",
     "keepalive.close": "移出活跃会话",
+    "keepalive.dismissAll": "全部移出活跃会话",
     "keepalive.statusIdle": "空闲",
     "keepalive.statusRunning": "运行中",
     "keepalive.statusDone": "已完成",

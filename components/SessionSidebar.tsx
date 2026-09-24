@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, typ
 import type { SessionInfo } from "@/lib/types";
 import { listSessionFamilies } from "@/lib/session-family";
 import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
-import { loadKeepAliveSidebarOpen, saveKeepAliveSidebarOpen, type KeepAliveSlot } from "@/lib/chat-keepalive";
+import { RunningSessionIndicator, UnreadSessionIndicator } from "./SessionIndicators";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
 import { skillExpansionToCommand } from "@/lib/slash-display";
 import { getProjectActivity, getRecentProjects, sessionsForProject } from "@/lib/project-groups";
@@ -132,10 +132,8 @@ interface Props {
   onBackgroundTaskDone?: () => void;
   onRunningSessionIdsChange?: (ids: Set<string>) => void;
   onSessionsChange?: (sessions: SessionInfo[]) => void;
-  /** Live keep-alive slots; rendered as a collapsible sidebar section when non-empty. */
-  keepAliveSlots?: KeepAliveSlot[];
-  onKeepAliveSelect?: (session: SessionInfo) => void;
-  onKeepAliveDismiss?: (sessionId: string) => void;
+  /** Reported upward so the keep-alive dock can show unread dots too. */
+  onUnreadSessionIdsChange?: (ids: Set<string>) => void;
 }
 
 interface WorktreeEntry {
@@ -360,8 +358,8 @@ function PiWebTitle() {
   );
 }
 
-export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange, onOpenGitPanel, keepAliveSlots, onKeepAliveSelect, onKeepAliveDismiss }: Props) {
-  const { locale, t } = useI18n();
+export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange, onUnreadSessionIdsChange, onOpenGitPanel }: Props) {
+  const { t } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   // Tracked in a ref only: the version is compared against the polled value to
   // decide whether the list needs reloading, and no render reads it.
@@ -392,7 +390,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const wtDropdownRef = useRef<HTMLDivElement>(null);
   const wtNewInputRef = useRef<HTMLInputElement>(null);
   const [explorerOpen, setExplorerOpen] = useState(true);
-  const [keepAliveOpen, setKeepAliveOpen] = useState(true);
   const [explorerKey, setExplorerKey] = useState(0);
   const [explorerUploadBusy, setExplorerUploadBusy] = useState(false);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
@@ -543,7 +540,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // preference after hydration so a collapsed explorer stays collapsed on reload.
   useEffect(() => {
     setExplorerOpen(loadExplorerOpen());
-    setKeepAliveOpen(loadKeepAliveSidebarOpen());
   }, []);
 
   // Persist unread markers so they survive a browser refresh before the user
@@ -628,6 +624,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   useEffect(() => {
     onRunningSessionIdsChange?.(runningSessionIds);
   }, [onRunningSessionIdsChange, runningSessionIds]);
+
+  useEffect(() => {
+    onUnreadSessionIdsChange?.(unreadSessionIds);
+  }, [onUnreadSessionIdsChange, unreadSessionIds]);
 
   useEffect(() => {
     onSessionsChange?.(allSessions);
@@ -1830,96 +1830,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         />
       )}
 
-      {/* Active keep-alive chats */}
-      {keepAliveSlots && keepAliveSlots.length > 0 && (
-        <div style={{ flex: "0 0 auto", borderTop: "1px solid var(--border)", overflow: "hidden" }}>
-          <button
-            type="button"
-            onClick={() => setKeepAliveOpen((open) => {
-              const next = !open;
-              saveKeepAliveSidebarOpen(next);
-              return next;
-            })}
-            style={{
-              display: "flex", alignItems: "center", gap: 6, width: "100%",
-              padding: "6px 10px", background: "none", border: "none",
-              color: "var(--text-muted)", cursor: "pointer",
-              fontSize: 11, fontWeight: 600, letterSpacing: "0.05em",
-              textTransform: "uppercase", textAlign: "left",
-            }}
-          >
-            <svg
-              width="9" height="9" viewBox="0 0 10 10" fill="none"
-              stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-              style={{ transform: keepAliveOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}
-            >
-              <polyline points="3 2 7 5 3 8" />
-            </svg>
-            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("keepalive.title")}</span>
-            <span style={{
-              minWidth: 14, height: 14, padding: "0 3px",
-              display: "inline-flex", alignItems: "center", justifyContent: "center",
-              borderRadius: 7, background: "var(--accent)", color: "#fff",
-              fontSize: 9, fontWeight: 700, lineHeight: 1, flexShrink: 0,
-            }}>{keepAliveSlots.length}</span>
-          </button>
-          {keepAliveOpen && (
-            <div className="keepalive-sidebar-list">
-              {keepAliveSlots.map((slot) => {
-                // Counts and timing come from the live catalogue so this list and
-                // the session tree never disagree; the slot snapshot is only the
-                // fallback while the list is being refreshed.
-                const info = allSessions.find((session) => session.id === slot.session.id) ?? slot.session;
-                const isSelected = info.id === selectedSessionId;
-                const isRunning = runningSessionIds.has(info.id);
-                const isUnread = !isRunning && unreadSessionIds.has(info.id);
-                return (
-                  <div key={info.id} className={`keepalive-sidebar-row${isSelected ? " is-active" : ""}`}>
-                    <button
-                      type="button"
-                      className="keepalive-sidebar-open"
-                      onClick={() => {
-                        if (!isSelected) onKeepAliveSelect?.(info);
-                      }}
-                    >
-                      <span className="keepalive-sidebar-name">{info.name || info.firstMessage || info.id}</span>
-                      <span className="keepalive-sidebar-meta">
-                        {isRunning && <RunningSessionIndicator />}
-                        {isUnread && <UnreadSessionIndicator />}
-                        <span className={`keepalive-sidebar-status${isRunning ? " is-running" : isUnread ? " is-done" : ""}`}>
-                          {t(isRunning ? "keepalive.statusRunning" : isUnread ? "keepalive.statusDone" : "keepalive.statusIdle")}
-                        </span>
-                        <span>{t("sidebar.messagesCount", { count: info.messageCount })}</span>
-                        <span title={info.modified}>{formatRelativeTime(info.modified, locale)}</span>
-                      </span>
-                      {/* Same tail-first clipping as the project rows: when the path
-                          is too long, the head gets the ellipsis and the specific
-                          tail stays readable. */}
-                      <PathLabel
-                        text={info.cwd}
-                        style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}
-                      />
-                    </button>
-                    {!isSelected && (
-                      <button
-                        type="button"
-                        className="keepalive-sidebar-close"
-                        title={t("keepalive.close")}
-                        aria-label={`${t("keepalive.close")}: ${info.name || info.id}`}
-                        onClick={() => onKeepAliveDismiss?.(info.id)}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M18 6 6 18M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* File Explorer section */}
       {(selectedCwdProp || selectedCwd) && (
@@ -2085,70 +1995,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   );
 }
 
-function RunningSessionIndicator() {
-  const { t } = useI18n();
-  return (
-    <span
-      title={t("sidebar.agentRunning")}
-      aria-label={t("sidebar.agentRunning")}
-      style={{
-        width: 14,
-        height: 14,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        color: "var(--accent)",
-      }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ display: "block" }}>
-        <g>
-          <path
-            d="M21 12a9 9 0 1 1-3.8-7.4"
-            stroke="currentColor"
-            strokeWidth="2.8"
-            strokeLinecap="round"
-          />
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            from="0 12 12"
-            to="360 12 12"
-            dur="0.9s"
-            repeatCount="indefinite"
-          />
-        </g>
-      </svg>
-    </span>
-  );
-}
-
-function UnreadSessionIndicator() {
-  const { t } = useI18n();
-  return (
-    <span
-      title={t("sidebar.newActivity")}
-      aria-label={t("sidebar.newSessionActivity")}
-      style={{
-        width: 14,
-        height: 14,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        color: "#0891b2",
-      }}
-    >
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{ display: "block" }}>
-        <circle cx="7" cy="7" r="2.5" fill="currentColor" />
-        <circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.4" opacity="0.32">
-          <animate attributeName="r" values="3;6;3" dur="1.6s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.32;0;0.32" dur="1.6s" repeatCount="indefinite" />
-        </circle>
-      </svg>
-    </span>
-  );
-}
 
 /**
  * Compact per-project activity badges for the workspace selector dropdown items:
