@@ -474,6 +474,7 @@ function QueuedMessageRow({
 }) {
   const { t } = useI18n();
   const isSteer = item.behavior === "steer";
+  const behaviorLabel = isSteer ? t("chat.queueBehaviorSteer") : t("chat.queueBehaviorFollowUp");
   const behaviorChipStyle = {
     flexShrink: 0,
     fontSize: 10,
@@ -496,18 +497,6 @@ function QueuedMessageRow({
         minWidth: 0,
       }}
     >
-      {onAction ? (
-        <button
-          type="button"
-          title={t("chat.queueBehaviorHint")}
-          onClick={() => onAction(item.id, "toggle")}
-          style={{ ...behaviorChipStyle, background: "transparent", cursor: "pointer" }}
-        >
-          {isSteer ? "steer" : "follow-up"}
-        </button>
-      ) : (
-        <span style={behaviorChipStyle}>{isSteer ? "steer" : "follow-up"}</span>
-      )}
       {item.images.length > 0 && (
         <span style={{ display: "flex", gap: 3, flexShrink: 0 }}>
           {item.images.map((image, index) => {
@@ -526,16 +515,28 @@ function QueuedMessageRow({
         </span>
       )}
       <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.text}</span>
-      {onAction && (
-        <span style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: "auto" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: "auto" }}>
+        {onAction ? (
+          <button
+            type="button"
+            title={t("chat.queueBehaviorHint")}
+            onClick={() => onAction(item.id, "toggle")}
+            style={{ ...behaviorChipStyle, background: "transparent", cursor: "pointer" }}
+          >
+            {behaviorLabel}
+          </button>
+        ) : (
+          <span style={behaviorChipStyle}>{behaviorLabel}</span>
+        )}
+        {onAction && (
           <QueueActionButton label={t("chat.editQueued")} title={t("chat.editQueuedTitle")} onClick={() => onAction(item.id, "edit")}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 20h9" />
               <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
             </svg>
           </QueueActionButton>
-        </span>
-      )}
+        )}
+      </span>
     </div>
   );
 }

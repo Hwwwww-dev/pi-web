@@ -372,7 +372,9 @@ export const zhTWLocale: LocalePlugin = {
     "chat.steerPlaceholder": "立即引導 / 將後續訊息排入佇列...",
     "chat.agentPlaceholder": "Agent 執行中…",
     "chat.messagePlaceholder": "訊息…輸入 / 使用命令，輸入 @ 搜尋檔案",
-    "chat.queueBehaviorHint": "點擊切換：引導在下一請求前注入，follow-up 等執行結束",
+    "chat.queueBehaviorHint": "點擊切換：引導在下一請求前注入，排隊等執行結束",
+    "chat.queueBehaviorSteer": "引導",
+    "chat.queueBehaviorFollowUp": "排隊",
 
     "chat.inputHistory": "輸入紀錄",
     "chat.modelError": "模型錯誤",

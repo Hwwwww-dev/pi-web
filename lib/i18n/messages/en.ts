@@ -372,7 +372,9 @@ export const enLocale: LocalePlugin = {
     "chat.steerPlaceholder": "Steer now / queue follow-up...",
     "chat.agentPlaceholder": "Agent is running…",
     "chat.messagePlaceholder": "Message… Type / for commands, @ for files",
-    "chat.queueBehaviorHint": "Click to switch: steer injects before the next request, follow-up waits for the run to end",
+    "chat.queueBehaviorHint": "Click to switch: steer injects before the next request, queue waits for the run to end",
+    "chat.queueBehaviorSteer": "Steer",
+    "chat.queueBehaviorFollowUp": "Queue",
 
     "chat.inputHistory": "Input history",
     "chat.modelError": "Model error",

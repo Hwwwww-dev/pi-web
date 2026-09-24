@@ -372,7 +372,9 @@ export const zhCNLocale: LocalePlugin = {
     "chat.steerPlaceholder": "立即引导 / 排队后续消息...",
     "chat.agentPlaceholder": "Agent 运行中…",
     "chat.messagePlaceholder": "消息…输入 / 使用命令，输入 @ 查找文件",
-    "chat.queueBehaviorHint": "点击切换：引导在下一请求前注入，follow-up 等运行结束",
+    "chat.queueBehaviorHint": "点击切换：引导在下一请求前注入，排队等运行结束",
+    "chat.queueBehaviorSteer": "引导",
+    "chat.queueBehaviorFollowUp": "排队",
 
     "chat.inputHistory": "输入历史",
     "chat.modelError": "模型错误",
