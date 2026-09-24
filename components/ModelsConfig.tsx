@@ -303,13 +303,29 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // ── Provider detail ───────────────────────────────────────────────────────────
 
-function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddModels, enabledModels }: {
+function openExternalUrl(rawUrl: string | undefined): void {
+  if (!rawUrl) return;
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return;
+  }
+  // OAuth endpoints are always https; refuse anything else (javascript:, data:, …).
+  if (parsed.protocol !== "https:") return;
+  window.open(parsed.toString(), "_blank", "noopener,noreferrer");
+}
+
+function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddModels, enabledModels, nameTaken }: {
   name: string; provider: ProviderEntry;
   onChange: (p: ProviderEntry) => void; onRename: (n: string) => void; onDelete: () => void;
   onAddModels: (models: DiscoveredModel[]) => void; enabledModels: EnabledModelsController;
+  nameTaken?: (name: string) => boolean;
 }) {
   const { t } = useI18n();
   const [editingName, setEditingName] = useState(name);
+  const trimmedName = editingName.trim();
+  const renameConflict = trimmedName !== "" && trimmedName !== name && Boolean(nameTaken?.(trimmedName));
   const [discoveryState, setDiscoveryState] = useState<ModelDiscoveryState>({ phase: "idle" });
   const [discoveryQuery, setDiscoveryQuery] = useState("");
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
@@ -410,8 +426,13 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddMod
 
        <Field label={t("i18n.providerName")}>
         <TextInput value={editingName} onChange={setEditingName} placeholder="provider-name" mono />
-        {editingName !== name && editingName.trim() && (
-          <button onClick={() => onRename(editingName.trim())}
+        {renameConflict && (
+          <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "var(--error, #e5484d)" }}>
+            {t("modelsConfig.providerNameTaken")}
+          </span>
+        )}
+        {editingName !== name && trimmedName && !renameConflict && (
+          <button onClick={() => onRename(trimmedName)}
             style={{ marginTop: 4, padding: "3px 10px", background: "var(--accent)", border: "none", borderRadius: 4, color: "var(--accent-contrast)", cursor: "pointer", fontSize: 11, alignSelf: "flex-start" }}>
              {t("i18n.rename")}
           </button>
@@ -1341,7 +1362,7 @@ function OAuthDetail({ provider, onRefresh, enabledModels }: {
       };
       if (data.type === "auth") {
         setLoginState({ phase: "auth", url: data.url!, instructions: data.instructions ?? null, token: data.token! });
-        window.open(data.url!, "_blank", "noopener,noreferrer");
+        openExternalUrl(data.url);
       } else if (data.type === "device_code") {
         setLoginState({
           phase: "device_code",
@@ -1350,7 +1371,7 @@ function OAuthDetail({ provider, onRefresh, enabledModels }: {
           intervalSeconds: data.intervalSeconds ?? null,
           expiresInSeconds: data.expiresInSeconds ?? null,
         });
-        window.open(data.verificationUri!, "_blank", "noopener,noreferrer");
+        openExternalUrl(data.verificationUri);
       } else if (data.type === "prompt_request") {
         setLoginState({ phase: "prompt", message: data.message!, placeholder: data.placeholder ?? null, token: data.token! });
       } else if (data.type === "select_request") {
@@ -1923,6 +1944,9 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
   }, []);
 
   const renameProvider = useCallback((oldName: string, newName: string) => {
+    // Same guard as addCustomProvider: a collision would silently overwrite the
+    // target provider's draft and its savedModelIds slots on save.
+    if (oldName === newName || config.providers?.[newName]) return;
     // Remember where each saved provider ended up, so the enabledModels entries
     // can follow it on save instead of pointing at an id that no longer exists.
     const renames = renamesRef.current;
@@ -1952,7 +1976,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
       if (prev.type === "model" && prev.providerName === oldName) return { ...prev, providerName: newName };
       return prev;
     });
-  }, []);
+  }, [config.providers]);
 
   const deleteProvider = useCallback((name: string) => {
     savedModelIdsRef.current.delete(name);
@@ -2090,6 +2114,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
           onDelete={() => deleteProvider(selection.name)}
           onAddModels={(models) => addDiscoveredModels(selection.name, models)}
           enabledModels={enabledModels}
+          nameTaken={(n) => Boolean(config.providers?.[n])}
         />
       );
     }

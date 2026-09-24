@@ -81,6 +81,7 @@ function editableProfile(profile: SubagentProfile): EditableProfile {
     description: profile.description,
     systemPrompt: profile.systemPrompt,
     tools: [...profile.tools],
+    ...(profile.extensionTools ? { extensionTools: [...profile.extensionTools] } : {}),
     loadSkills: profile.loadSkills,
     loadExtensions: profile.loadExtensions,
     promptMode: profile.promptMode,
@@ -89,6 +90,10 @@ function editableProfile(profile: SubagentProfile): EditableProfile {
     ...(profile.maxTurns ? { maxTurns: profile.maxTurns } : {}),
     inheritContext: profile.inheritContext,
     runInBackground: profile.runInBackground,
+    // Managed keys the form does not edit must survive the PUT round-trip.
+    ...(profile.color ? { color: profile.color } : {}),
+    ...(profile.isolation ? { isolation: profile.isolation } : {}),
+    ...(profile.persistSession !== undefined ? { persistSession: profile.persistSession } : {}),
     enabled: profile.enabled,
   };
 }

@@ -102,7 +102,9 @@ test("session listing returns a gzip-compressed response when the client accepts
   assert.equal(response.headers.get("Content-Encoding"), "gzip");
   assert.match(response.headers.get("Vary") ?? "", /(?:^|,\s*)Accept-Encoding(?:\s*,|$)/i);
   const payload = JSON.parse(gunzipSync(Buffer.from(await response.arrayBuffer())).toString("utf8"));
-  assert.equal(payload.sessions[0].firstMessage, firstMessage);
+  // The scanner caps stored firstMessage lengths (the giant transcript text is
+  // only the bulk vehicle that pushes the body past the gzip threshold).
+  assert.equal(payload.sessions[0].firstMessage, firstMessage.slice(0, 2048));
 });
 
 test("deleting an unpersisted session shuts down its runtime and invalidates caches", async (t) => {

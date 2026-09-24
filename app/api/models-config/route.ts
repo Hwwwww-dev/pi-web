@@ -16,8 +16,13 @@ export async function GET() {
 
 export async function PUT(req: Request) {
   try {
-    const body = await req.json() as Record<string, unknown>;
-    writeModelsConfig(body);
+    const body = await req.json() as unknown;
+    // Non-object bodies would atomically replace models.json wholesale and leave
+    // both this panel and the pi CLI with an unreadable config — refuse them.
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return NextResponse.json({ error: "models config must be a JSON object" }, { status: 400 });
+    }
+    writeModelsConfig(body as Record<string, unknown>);
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof ModelsConfigReadError) {

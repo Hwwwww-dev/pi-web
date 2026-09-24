@@ -22,5 +22,7 @@ test("storage corruption cannot create invalid or duplicate terminal tabs", () =
     tabs: [null, {}, tab, tab, { ...tab, id: "../../bad" }, { ...tab, cwd: null }],
     activeId: "missing",
   }));
-  assert.deepEqual(saved, { tabs: [{ ...tab, restored: true }], activeId: null, open: false });
+  // activeId is returned verbatim (it also names non-terminal tabs like the
+  // git tab); the AppShell restore effect owns dropping ids that match no tab.
+  assert.deepEqual(saved, { tabs: [{ ...tab, restored: true }], activeId: "missing", open: false });
 });

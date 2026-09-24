@@ -82,6 +82,9 @@ test("back navigation stays in-panel: no gesture routing, no new breakpoints", a
   for (const line of appShell.split("\n").filter((line) => line.includes("GIT_"))) {
     assert.doesNotMatch(line, /max-width: \d+/, line.trim());
   }
+  // Scrollable layers (log, detail files, dropdown list) keep vertical panning
+  // usable inside iOS standalone swipe-back (OPT-git-6).
+  assert.equal((source.match(/touchAction: "pan-y"/g) ?? []).length, 3);
 });
 
 test("repository and branch pickers are custom dropdowns, not native selects", () => {
@@ -166,4 +169,17 @@ test("diff layer header keeps the commit hash (story 10)", () => {
   assert.match(diffLayer, /\{commit\.shortHash\}/);
   assert.match(diffLayer, /data-gitpanel-diff-path/);
   assert.match(diffLayer, /onClick=\{\(\) => setView\(\{ type: "detail", commit \}\)\}/);
+});
+
+test("superseded responses are dropped by monotonic request guards", () => {
+  // Log pagination race: two in-flight log requests must land in request order.
+  assert.match(source, /const requestId = \+\+logRequestRef\.current/);
+  assert.match(source, /if \(requestId !== logRequestRef\.current\) return;/);
+  // Repository discovery refresh shares the same guard family.
+  assert.match(source, /const requestId = \+\+reposRequestRef\.current/);
+  assert.match(source, /if \(requestId !== reposRequestRef\.current\) return;/);
+  // Detail→diff unmounts the files effect; landing is keyed on the ref, not a cleanup flag,
+  // so a real commit switch discards the stale response while the split view keeps its data.
+  assert.match(source, /if \(filesLoadedForRef\.current !== commit\.hash\) return;/);
+  assert.doesNotMatch(source, /let cancelled = false;\s*\n\s*fetchJson<\{ files: CommitDetailFile\[\]/);
 });

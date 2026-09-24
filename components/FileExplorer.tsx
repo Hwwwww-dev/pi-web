@@ -250,17 +250,20 @@ function TreeNode({
   const [children, setChildren] = useState<FileNode[]>(node.children ?? []);
   const [loaded, setLoaded] = useState(node.loaded ?? false);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [hovered, setHovered] = useState(false);
 
   const loadChildren = useCallback(async (force = false) => {
     if (loaded && !force) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const entries = await fetchEntries(node.fullPath);
       setChildren(entries);
       setLoaded(true);
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      // Surface the failure inline; loaded stays false so the next click retries.
+      setLoadError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
@@ -453,6 +456,26 @@ function TreeNode({
           {children.length === 0 && loaded && (
             <div style={{ paddingLeft: 8 + (depth + 1) * 14, fontSize: 11, color: "var(--text-dim)", height: 22, display: "flex", alignItems: "center" }}>
               empty
+            </div>
+          )}
+          {!loading && loadError !== null && (
+            <div
+              onClick={(e) => { e.stopPropagation(); void loadChildren(true); }}
+              title={`${loadError} — click to retry`}
+              style={{
+                paddingLeft: 8 + (depth + 1) * 14,
+                fontSize: 11,
+                color: "#f87171",
+                height: 22,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                cursor: "pointer",
+                minWidth: 0,
+              }}
+            >
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loadError}</span>
+              <span style={{ flexShrink: 0 }}>↻</span>
             </div>
           )}
         </div>

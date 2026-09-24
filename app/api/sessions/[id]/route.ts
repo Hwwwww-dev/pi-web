@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync, unlinkSync } from "fs";
 import { dirname, join } from "path";
 import {
   attachSessionProjectInfo,
@@ -25,6 +25,7 @@ import type { SessionEntry } from "@/lib/types";
 import { readSubagentRun, readSubagentSessionResources, SUBAGENT_META_TYPE } from "@/lib/subagents";
 import { readSessionToolSelection } from "@/lib/session-tool-selection";
 import { jsonResponse } from "@/lib/json-response";
+import { writePrivateFileAtomicSync } from "@/lib/atomic-file";
 
 export async function GET(
   req: Request,
@@ -80,6 +81,9 @@ export async function GET(
     // Cumulative usage over ALL entries, including history compacted away —
     // the same aggregation the SDK's getSessionStats() uses. Lets the client
     // keep monotonic token/cost counters across compaction and page reloads.
+    // SAFETY: entries come from the SDK session manager whose wire shape is the
+    // structural mirror of our local SessionEntry union (same fields, declared
+    // independently); computeSessionStats only reads those shared fields.
     const stats = computeSessionStats(entries as unknown as SessionEntry[]);
     perf?.span("stats");
     // Opaque freshness token for the session view cache. Derived from the
@@ -300,12 +304,16 @@ export async function DELETE(
         try {
           const content = readFileSync(childPath, "utf8");
           const lines = content.split("\n");
-          const header = JSON.parse(lines[0]) as { type?: string; parentSession?: string };
+          const header = JSON.parse(lines[0]) as { type?: string; id?: string; parentSession?: string };
           if (
             header.type === "session" &&
             header.parentSession &&
             sessionPathKey(header.parentSession) === targetPathKey
           ) {
+            // A live wrapper on the child appends to this file while we rewrite
+            // it — the interleaved write would tear entries. Skip; the header is
+            // repaired on a later pass once the session is idle.
+            if (header.id && getRpcSession(header.id)?.isAlive()) continue;
             // Rewrite header with new parentSession
             header.parentSession = parentSessionPath;
             lines[0] = JSON.stringify(header);
@@ -333,7 +341,7 @@ export async function DELETE(
                 break;
               }
             }
-            writeFileSync(childPath, lines.join("\n"));
+            writePrivateFileAtomicSync(childPath, lines.join("\n"));
           }
         } catch { /* skip malformed */ }
       }

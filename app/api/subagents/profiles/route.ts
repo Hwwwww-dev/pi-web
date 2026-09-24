@@ -81,6 +81,7 @@ export async function PATCH(req: Request) {
       description: source.description,
       systemPrompt: source.systemPrompt,
       tools: source.tools,
+      ...(source.extensionTools ? { extensionTools: source.extensionTools } : {}),
       loadSkills: source.loadSkills,
       loadExtensions: source.loadExtensions,
       promptMode: source.promptMode,
@@ -89,6 +90,10 @@ export async function PATCH(req: Request) {
       maxTurns: source.maxTurns,
       inheritContext: source.inheritContext,
       runInBackground: source.runInBackground,
+      // Managed keys the toggle does not touch must survive the rewrite.
+      ...(source.color ? { color: source.color } : {}),
+      ...(source.isolation ? { isolation: source.isolation } : {}),
+      ...(source.persistSession !== undefined ? { persistSession: source.persistSession } : {}),
       enabled: source.enabled,
     };
     return NextResponse.json({ profile: saveSubagentProfile(cwd, scope, { ...profile, enabled: body.enabled }) });

@@ -42,7 +42,7 @@ interface Props {
   sessionRunning?: boolean;
   newSessionCwd: string | null;
   newSessionDraftKey: string | null;
-  onAgentEnd?: () => void;
+  onAgentEnd?: (sessionId: string | null) => void;
   onAttentionNeeded?: (request: BlockingExtensionUiRequest) => void;
   onSessionCreated?: (session: SessionInfo, sourceDraftKey: string) => void;
   onSessionForked?: (newSessionId: string) => void;
@@ -257,11 +257,11 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
   const soundedExtensionDialogIdRef = useRef<string | null>(null);
-  const wrappedOnAgentEnd = useCallback(() => {
+  const wrappedOnAgentEnd = useCallback((sessionId: string | null) => {
     if (completionNotificationsEnabled && soundEnabledRef.current) {
       playDoneSoundRef.current();
     }
-    onAgentEnd?.();
+    onAgentEnd?.(sessionId);
   }, [completionNotificationsEnabled, onAgentEnd]);
 
   // 稳定化 onEditContent 引用，配合 React.memo 防止历史消息重渲染

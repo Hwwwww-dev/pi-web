@@ -142,7 +142,7 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, s
             boxShadow: "0 6px 20px rgba(0,0,0,0.10)", overflow: "hidden",
           }}
         >
-          <div style={{ maxHeight: "min(40vh, 300px)", overflowY: "auto" }}>
+          <div style={{ maxHeight: "min(40vh, 300px)", overflowY: "auto", touchAction: "pan-y" }}>
             {options.map((option) => {
               const isSelected = option.value === value;
               return (
@@ -240,14 +240,20 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
   const [patchLoading, setPatchLoading] = useState(false);
   const [patchError, setPatchError] = useState<string | null>(null);
 
+  // Monotonic ids: a slow response from a superseded request must never land.
+  const reposRequestRef = useRef(0);
+  const logRequestRef = useRef(0);
+
   const loadRepositories = useCallback(async (refresh = false) => {
     if (!cwd) return;
+    const requestId = ++reposRequestRef.current;
     setReposLoading(true);
     setReposError(null);
     try {
       const data = await fetchJson<{ repositories: GitRepository[] }>(
         `/api/git/repos?cwd=${encodeURIComponent(cwd)}${refresh ? "&refresh=1" : ""}`,
       );
+      if (requestId !== reposRequestRef.current) return;
       setRepositories(data.repositories);
       setSelectedRepo((current) => {
         if (current && data.repositories.some((repo) => trimTrailingSlash(repo.repositoryRoot) === trimTrailingSlash(current))) {
@@ -257,9 +263,10 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
         return cwdRepo?.repositoryRoot ?? data.repositories[0]?.repositoryRoot ?? null;
       });
     } catch (error) {
+      if (requestId !== reposRequestRef.current) return;
       setReposError(error instanceof Error ? error.message : String(error));
     } finally {
-      setReposLoading(false);
+      if (requestId === reposRequestRef.current) setReposLoading(false);
     }
   }, [cwd]);
 
@@ -304,18 +311,21 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
   }, [selectedRepo]);
 
   const loadCommits = useCallback(async (repo: string, ref: string, offset: number) => {
+    const requestId = ++logRequestRef.current;
     setCommitsLoading(true);
     setCommitsError(null);
     try {
       const data = await fetchJson<{ commits: CommitSummary[]; hasMore: boolean }>(
         `/api/git/log?repo=${encodeURIComponent(repo)}&ref=${encodeURIComponent(ref)}&limit=${LOG_PAGE_SIZE}&offset=${offset}`,
       );
+      if (requestId !== logRequestRef.current) return;
       setCommits((current) => offset === 0 ? data.commits : [...current, ...data.commits]);
       setHasMore(data.hasMore);
     } catch (error) {
+      if (requestId !== logRequestRef.current) return;
       setCommitsError(error instanceof Error ? error.message : String(error));
     } finally {
-      setCommitsLoading(false);
+      if (requestId === logRequestRef.current) setCommitsLoading(false);
     }
   }, []);
 
@@ -335,23 +345,23 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
     setTotals({ additions: 0, deletions: 0 });
     setFilesLoading(true);
     setFilesError(null);
-    let cancelled = false;
+    // Landing is keyed on filesLoadedForRef, not a cleanup flag: detail→diff unmounts this
+    // effect but the same request still belongs to the visible layer, while a newer commit
+    // (ref moved on) discards the stale response.
     fetchJson<{ files: CommitDetailFile[]; totalAdditions: number; totalDeletions: number }>(
       `/api/git/commit?repo=${encodeURIComponent(selectedRepo)}&hash=${encodeURIComponent(commit.hash)}`,
     )
       .then((data) => {
-        if (cancelled) return;
+        if (filesLoadedForRef.current !== commit.hash) return;
         setFiles(data.files);
         setTotals({ additions: data.totalAdditions, deletions: data.totalDeletions });
       })
       .catch((error: unknown) => {
-        if (!cancelled) {
-          filesLoadedForRef.current = null;
-          setFilesError(error instanceof Error ? error.message : String(error));
-        }
+        if (filesLoadedForRef.current !== commit.hash) return;
+        filesLoadedForRef.current = null;
+        setFilesError(error instanceof Error ? error.message : String(error));
       })
-      .finally(() => { if (!cancelled) setFilesLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => { if (filesLoadedForRef.current === commit.hash || filesLoadedForRef.current === null) setFilesLoading(false); });
   }, [view, selectedRepo]);
 
   useEffect(() => {
@@ -417,7 +427,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
           {commit.subject}
         </span>
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", touchAction: "pan-y" }}>
         <div style={{
           padding: "8px 12px", borderBottom: "1px solid var(--border)",
           display: "flex", flexDirection: "column", gap: 5,
@@ -584,7 +594,7 @@ export function GitPanel({ cwd, fullWidth = false }: Props) {
 
       {/* Log layer */}
       {view.type === "log" && selectedRepo && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", touchAction: "pan-y" }}>
           {reposLoading && repositories.length === 0 && (
             <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>
           )}

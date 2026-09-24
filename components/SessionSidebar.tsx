@@ -2246,6 +2246,7 @@ function SessionItem({
   const [renameValue, setRenameValue] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Select the whole name once the rename input is mounted (startRename's
@@ -2279,28 +2280,39 @@ function SessionItem({
     // a skill-invoked session stays a no-op instead of persisting raw XML.)
     if (renameValue === title || name === (session.name ?? "")) return;
     try {
-      await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
+      if (!res.ok) {
+        setActionError(t("sidebar.sessionActionFailed"));
+        return;
+      }
+      setActionError(null);
       onRenamed?.();
     } catch {
-      // ignore
+      setActionError(t("sidebar.sessionActionFailed"));
     }
-  }, [renameValue, session.id, session.name, onRenamed, title]);
+  }, [renameValue, session.id, session.name, onRenamed, title, t]);
 
   const performDelete = useCallback(async () => {
     if (session.transient) return;
     setConfirmDelete(false);
     setDeleting(true);
     try {
-      await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" });
+      const res = await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" });
+      if (!res.ok) {
+        setActionError(t("sidebar.sessionActionFailed"));
+        setDeleting(false);
+        return;
+      }
       onDeleted?.(session.id);
     } catch {
+      setActionError(t("sidebar.sessionActionFailed"));
       setDeleting(false);
     }
-  }, [session.id, session.transient, onDeleted]);
+  }, [session.id, session.transient, onDeleted, t]);
 
   const handleDeleteClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -2466,6 +2478,9 @@ function SessionItem({
               <span>
                 {session.detailsPending ? "…" : t("sidebar.messagesCount", { count: session.messageCount })}
               </span>
+              {actionError && (
+                <span style={{ color: "var(--error, #e5484d)" }} title={actionError}>{actionError}</span>
+              )}
               {session.isWorktree && session.branch && (
                 <span
                   title={`Worktree: ${session.cwd}`}

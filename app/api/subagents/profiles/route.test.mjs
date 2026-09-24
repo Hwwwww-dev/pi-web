@@ -90,7 +90,7 @@ test("profiles route keeps same-name global and project profiles independently e
   let response = await PUT(jsonRequest("PUT", {
     cwd,
     scope: "global",
-    profile: profile({ description: "Global profile" }),
+    profile: profile({ description: "Global profile", color: "#ff8800", isolation: "worktree", persistSession: true }),
   }));
   assert.equal(response.status, 200);
   assert.equal((await response.json()).profile.scope, "global");
@@ -124,6 +124,14 @@ test("profiles route keeps same-name global and project profiles independently e
   assert.equal(toggledSources.find((item) => item.scope === "global").description, "Global profile");
   assert.equal(toggledSources.find((item) => item.scope === "global").loadSkills, true);
   assert.equal(toggledSources.find((item) => item.scope === "global").loadExtensions, true);
+  // Managed keys the toggle does not touch must survive the PATCH rewrite.
+  assert.equal(toggledSources.find((item) => item.scope === "global").color, "#ff8800");
+  assert.equal(toggledSources.find((item) => item.scope === "global").isolation, "worktree");
+  assert.equal(toggledSources.find((item) => item.scope === "global").persistSession, true);
+  const toggledFile = await readFile(join(testAgentDir, "agents", "api-test-agent.md"), "utf8");
+  assert.match(toggledFile, /color: ["']?#ff8800/);
+  assert.match(toggledFile, /isolation: worktree/);
+  assert.match(toggledFile, /persist_session: true/);
   assert.equal(toggledSources.find((item) => item.scope === "project").enabled, true);
 
   response = await DELETE(jsonRequest("DELETE", { cwd, scope: "project", name: "api-test-agent" }));

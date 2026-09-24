@@ -160,7 +160,7 @@ export interface UseAgentSessionOptions {
   sessionRunning?: boolean;
   newSessionCwd: string | null;
   newSessionDraftKey: string | null;
-  onAgentEnd?: () => void;
+  onAgentEnd?: (sessionId: string | null) => void;
   onAttentionNeeded?: (request: BlockingExtensionUiRequest) => void;
   onSessionCreated?: (session: SessionInfo, sourceDraftKey: string) => void;
   onSessionForked?: (newSessionId: string) => void;
@@ -701,7 +701,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       const res = await fetch(url, { signal: options?.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = await res.json() as { context: SessionData["context"] };
+      // A leaf-scoped load must still target the selected leaf: rapid A→B
+      // switches would otherwise let A's late response overwrite B's tree.
       if (sessionIdRef.current !== sid || options?.signal?.aborted || !sessionHookMountedRef.current) return;
+      if (leafId && activeLeafIdRef.current !== leafId) return;
       setHistoryCursor(d.context.oldestEntryId);
       setHasEarlierMessages(d.context.hasMore);
       setData((prev) => {
@@ -1060,7 +1063,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const notifyPromptStage = useCallback((runId: number) => {
     if (notifiedPromptRunIdRef.current === runId) return false;
     notifiedPromptRunIdRef.current = runId;
-    onAgentEnd?.();
+    onAgentEnd?.(sessionIdRef.current);
     return true;
   }, [onAgentEnd]);
 
@@ -1144,7 +1147,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (promptWasPending) {
         notifyPromptStage(runId);
       } else if (agentWasActive && wasRunning) {
-        onAgentEnd?.();
+        onAgentEnd?.(sessionIdRef.current);
       }
       if (sid) scheduleEventStreamClose(sid);
     }
@@ -1273,6 +1276,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   // Idle follow: a read-only open session must track appends made by another
   // pi process (the TUI) writing the same file. Probe cheaply with tail=1 and
+  // tree=summary (entryIds live in context; the summary tree drops bodies) and
   // only reload on a changed latest entry id; ?force=1 reuses the server's
   // evictIfDiskAhead() so a live wrapper lagging behind disk is rebuilt.
   // Runs only while the tab is visible and no web-side run owns the session
@@ -1287,7 +1291,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (sessionIdRef.current !== sid) return;
       followProbeInFlightRef.current = true;
       try {
-        const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?tail=1&deferThinking=1&deferMedia=1&force=1`);
+        const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?tail=1&deferThinking=1&deferMedia=1&force=1&tree=summary`);
         if (!res.ok) return;
         const d = await res.json() as SessionData;
         if (sessionIdRef.current !== sid) return;
@@ -1375,7 +1379,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           void loadSession(sid);
           scheduleEventStreamClose(sid);
         }
-        if (wasRunning) onAgentEnd?.();
+        if (wasRunning) onAgentEnd?.(sessionIdRef.current);
         break;
       }
       case "prompt_done":
@@ -1789,9 +1793,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!sid) return;
     await loadContext(sid, leafId);
     if (leafId) {
-      sendAgentCommand(sid, { type: "navigate_tree", targetId: leafId }).catch(() => {});
+      sendAgentCommand(sid, { type: "navigate_tree", targetId: leafId }).catch(() => {
+        // The server leaf and the UI leaf have drifted; surface it instead of
+        // silently continuing (the next prompt would append to a stale branch).
+        addNotice?.({ type: "error", message: "Branch switch failed on the server; the view may be out of date." });
+      });
     }
-  }, [loadContext]);
+  }, [loadContext, addNotice]);
 
   const handleModelChange = useCallback(async (provider: string, modelId: string) => {
     if (isNew) {

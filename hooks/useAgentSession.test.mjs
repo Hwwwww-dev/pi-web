@@ -47,7 +47,7 @@ test("keeps the session event stream open through the idle grace window", () => 
   assert.doesNotMatch(agentEndSource, /closeEvents\(\)/);
   assert.match(agentStartSource, /cancelEventStreamGrace\(\)/);
   assert.match(agentSettledSource, /scheduleEventStreamClose\(sid\)/);
-  assert.match(agentSettledSource, /onAgentEnd\?\.\(\)/);
+  assert.match(agentSettledSource, /onAgentEnd\?\.\(sessionIdRef\.current\)/);
   assert.match(promptDoneSource, /notifyPromptStage\(runId\)/);
   assert.match(promptDoneSource, /scheduleEventStreamClose\(sid\)/);
   assert.match(sendSource, /const definitivelyRejected = !promptRequestStarted/);
@@ -502,7 +502,7 @@ test("suppresses sounds and browser attention for the active subagent session", 
   assert.match(chatWindowSource, /completionNotificationsEnabled = session\?\.relation\?\.kind !== "subagent"/);
   assert.match(chatWindowSource, /completionNotificationsEnabled && soundEnabledRef\.current/);
   assert.match(chatWindowSource, /!completionNotificationsEnabled[\s\S]*?!extensionDialog/);
-  assert.match(completionSource, /selectedSession\?\.relation\?\.kind === "subagent"\) return/);
+  assert.match(completionSource, /targetSession\?\.relation\?\.kind === "subagent"\) return/);
   assert.match(attentionSource, /selectedSession\?\.relation\?\.kind === "subagent"\) return/);
 });
 

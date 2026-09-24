@@ -115,16 +115,29 @@ export async function readCommitLog(repoRoot: string, limit: number, offset: num
   return { commits: page.map((commit, index) => ({ ...commit, pushed: pushed[index] })), hasMore };
 }
 
-/** Whether each commit is reachable from any remote branch (`git branch -r --contains`). */
+/** Whether each commit is reachable from any remote branch. */
 async function computeRemoteStatus(repoRoot: string, hashes: string[]): Promise<boolean[]> {
-  return Promise.all(hashes.map(async (hash) => {
-    try {
-      const out = await git(repoRoot, ["branch", "-r", "--contains", hash]);
-      return out.trim() !== "";
-    } catch {
-      return false;
-    }
-  }));
+  if (hashes.length === 0) return [];
+  try {
+    // Fast path: one rev-list over all remote tips yields the exact pushed set
+    // (a page of commits would otherwise cost one `branch -r --contains` per hash).
+    const tipsOut = await git(repoRoot, ["for-each-ref", "refs/remotes", "--format=%(objectname)"]);
+    const tips = [...new Set(tipsOut.split("\n").map((line) => line.trim()).filter((line) => /^[0-9a-f]{40}$/.test(line)))];
+    if (tips.length === 0) return hashes.map(() => false);
+    const walk = await git(repoRoot, ["rev-list", ...tips]);
+    const reachable = new Set(walk.split("\n").map((line) => line.trim()));
+    return hashes.map((hash) => reachable.has(hash));
+  } catch {
+    // Fallback (e.g. rev-list output beyond maxBuffer on huge repos): exact per-commit check.
+    return Promise.all(hashes.map(async (hash) => {
+      try {
+        const out = await git(repoRoot, ["branch", "-r", "--contains", hash]);
+        return out.trim() !== "";
+      } catch {
+        return false;
+      }
+    }));
+  }
 }
 
 /** Local branches of the repository plus the currently checked-out one. */

@@ -47,14 +47,18 @@ export async function POST(req: Request) {
     });
 
     const output = (stdout + stderr).replace(ANSI_RE, "");
-    const success = /Installation complete|Installed \d+ skill/.test(output);
-    if (!success) {
-      return NextResponse.json({ error: output.slice(-300) || "Install failed" }, { status: 500 });
-    }
+    // runNpx resolves only on exit 0 — the exit code is the success criterion.
+    // Grep-shaped output checks misreport "already installed" or any upstream
+    // wording change as a failure after the skill was actually written (#audit BUG-plug-3).
     return NextResponse.json({ success: true, output });
   } catch (e: unknown) {
     const err = e as { stdout?: string; stderr?: string; message?: string };
     const output = ((err.stdout ?? "") + (err.stderr ?? "")).replace(ANSI_RE, "");
-    return NextResponse.json({ error: output || (err.message ?? String(e)) }, { status: 500 });
+    // Keep parity with the success path: tail only, so a cold npx cache or a
+    // timeout cannot flood the panel with tens of KB of output.
+    return NextResponse.json(
+      { error: `Command failed: npx skills add\n${output.slice(-300)}`.trim() || (err.message ?? String(e)) },
+      { status: 500 },
+    );
   }
 }

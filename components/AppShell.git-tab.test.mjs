@@ -13,8 +13,16 @@ test("the Git tab is opened from the sidebar and removed by its close button", (
   assert.match(appShellSource, /const \[gitPanelOpen, setGitPanelOpen\] = useState\(false\);/);
   assert.match(appShellSource, /const panelTabs: Tab\[\] = \[\.\.\.\(gitPanelOpen \? \[GIT_PANEL_TAB\] : \[\]\), \.\.\.fileTabs/);
   assert.match(appShellSource, /if \(tabId === GIT_TAB_ID\) \{\s*setGitPanelOpen\(false\);\s*setActiveFileTabId\(\(current\) => current === GIT_TAB_ID \? null : current\);\s*if \(!fileTabs\.length && !terminalTabs\.length\) setRightPanelOpen\(false\);\s*return;\s*\}/);
-  // A page refresh with the Git tab active restores it (sessionStorage activeId).
-  assert.match(appShellSource, /if \(saved\.activeId === GIT_TAB_ID\) setGitPanelOpen\(true\);/);
+  // A page refresh with the Git tab active restores it: the git branch wins
+  // before the terminal-id whitelist branch in the same restore effect.
+  assert.match(appShellSource, /if \(saved\.activeId === GIT_TAB_ID\) \{\s*setActiveFileTabId\(saved\.activeId\);\s*setRightPanelOpen\(saved\.open\);\s*setGitPanelOpen\(true\);\s*\} else if \(saved\.activeId && saved\.tabs\.some/);
+});
+
+test("restoreTerminalTabs returns the persisted activeId verbatim for the caller to namespace", async () => {
+  const stateSource = await readFile(new URL("./terminal-tab-state.ts", import.meta.url), "utf8");
+  // The old whitelist (tabs.some(...) ? activeId : null) made the git branch dead code.
+  assert.match(stateSource, /activeId: typeof saved\?\.activeId === "string" \? saved\.activeId : null/);
+  assert.doesNotMatch(stateSource, /tabs\.some\(\(tab\) => tab\.id === saved\.activeId\)/);
 });
 
 test("the Git tab renders GitPanel and file tabs keep rendering FileViewer", () => {

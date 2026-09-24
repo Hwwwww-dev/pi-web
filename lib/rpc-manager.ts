@@ -59,6 +59,14 @@ export interface AgentEvent {
   [key: string]: unknown;
 }
 
+/** SDK session-manager entries share the wire shape of our local SessionEntry mirror. */
+function toSessionEntries(entries: readonly { type?: unknown }[]): SessionEntry[] {
+  for (const entry of entries) {
+    if (typeof entry.type !== "string") throw new Error("Unexpected entry shape from SDK SessionManager");
+  }
+  return entries as SessionEntry[];
+}
+
 type EventListener = (event: AgentEvent) => void;
 type AgentRunCompleteListener = (sessionId: string) => void;
 
@@ -385,7 +393,7 @@ export class AgentSessionWrapper {
             method: "notify",
             notifyType: "warning",
             message: "Extension requested shutdown, but shutdown is not supported in Pi Web.",
-          } as ExtensionUiRequest as AgentEvent),
+          } satisfies ExtensionUiRequest as AgentEvent),
           onError: (error) => this.emit({
             type: "extension_error",
             extensionPath: error.extensionPath,
@@ -498,7 +506,8 @@ export class AgentSessionWrapper {
     // Pi normally delays the first flush until an assistant message exists.
     // A leading shell command has no assistant message, so mark this SDK
     // manager as flushed after writing its own generated entries.
-    (manager as unknown as { flushed: boolean }).flushed = true;
+    // `flushed` is a private SDK field, so go through Reflect instead of a cast.
+    Reflect.set(manager, "flushed", true);
     cacheSessionPath(this.inner.sessionId, sessionFile);
   }
 
@@ -548,6 +557,7 @@ export class AgentSessionWrapper {
 
   async send(command: Record<string, unknown>): Promise<unknown> {
     const type = command.type as string;
+    if (!this._alive) throw new Error("Session has been shut down");
     const allowedDuringReplacement = COMMANDS_ALLOWED_DURING_SESSION_REPLACEMENT.has(type);
     if (this.sessionReplacement && !allowedDuringReplacement) {
       throw new Error("Session is being copied to a new session");
@@ -563,6 +573,8 @@ export class AgentSessionWrapper {
       // Status reconciliation must not postpone forced cleanup after Stop.
       if (type !== "get_state") this.resetIdleTimer();
       if (this.shouldWaitForExtensions(type)) await this.waitForExtensionsBound();
+      // Shutdown can land during any await above; re-check before touching inner.
+      if (!this._alive) throw new Error("Session has been shut down");
       if (this.sessionReplacement && !allowedDuringReplacement) {
         throw new Error("Session is being copied to a new session");
       }
@@ -1143,7 +1155,7 @@ export class AgentSessionWrapper {
       widgetKey: key,
       widgetLines: undefined,
       widgetPlacement: undefined,
-    } as ExtensionUiRequest as AgentEvent);
+    } satisfies ExtensionUiRequest as AgentEvent);
   }
 
   private clearExtensionWidget(key: string, emitClear = true): number {
@@ -1259,7 +1271,7 @@ export class AgentSessionWrapper {
       widgetKey: active.key,
       widgetLines,
       widgetPlacement: active.placement,
-    } as ExtensionUiRequest as AgentEvent);
+    } satisfies ExtensionUiRequest as AgentEvent);
   }
 
   private setExtensionWidgetFactory(
@@ -1336,7 +1348,7 @@ export class AgentSessionWrapper {
       id,
       method: "custom",
       lines,
-    } as ExtensionUiRequest as AgentEvent;
+    } satisfies ExtensionUiRequest as AgentEvent;
     this.pendingUiRequests.set(id, event);
     this.emit(event);
   }
@@ -1358,7 +1370,7 @@ export class AgentSessionWrapper {
       method: "custom",
       lines: [],
       closed: true,
-    } as ExtensionUiRequest as AgentEvent);
+    } satisfies ExtensionUiRequest as AgentEvent);
     custom.resolve(value);
   }
 
@@ -1542,7 +1554,7 @@ export class AgentSessionWrapper {
           method: "notify",
           message,
           notifyType: type,
-        } as ExtensionUiRequest as AgentEvent);
+        } satisfies ExtensionUiRequest as AgentEvent);
       },
       onTerminalInput: () => () => {},
       setStatus: (key, text) => {
@@ -1554,7 +1566,7 @@ export class AgentSessionWrapper {
           method: "setStatus",
           statusKey: key,
           statusText: text,
-        } as ExtensionUiRequest as AgentEvent);
+        } satisfies ExtensionUiRequest as AgentEvent);
       },
       setWorkingMessage: () => {},
       setWorkingVisible: () => {},
@@ -1565,7 +1577,7 @@ export class AgentSessionWrapper {
         if (typeof content === "function") {
           this.setExtensionWidgetFactory(
             key,
-            content as unknown as ExtensionWidgetFactory,
+            content as ExtensionWidgetFactory,
             options,
           );
           return;
@@ -1591,7 +1603,7 @@ export class AgentSessionWrapper {
           widgetKey: key,
           widgetLines: content,
           widgetPlacement: options?.placement,
-        } as ExtensionUiRequest as AgentEvent);
+        } satisfies ExtensionUiRequest as AgentEvent);
       },
       setFooter: () => {},
       setHeader: () => {},
@@ -1601,7 +1613,7 @@ export class AgentSessionWrapper {
           id: randomUUID(),
           method: "setTitle",
           title,
-        } as ExtensionUiRequest as AgentEvent);
+        } satisfies ExtensionUiRequest as AgentEvent);
       },
       custom: <T = unknown>(factory: unknown, options?: unknown) => this.requestExtensionCustomUi<T>(factory, options),
       pasteToEditor: (text) => {
@@ -1610,7 +1622,7 @@ export class AgentSessionWrapper {
           id: randomUUID(),
           method: "set_editor_text",
           text,
-        } as ExtensionUiRequest as AgentEvent);
+        } satisfies ExtensionUiRequest as AgentEvent);
       },
       setEditorText: (text) => {
         this.emit({
@@ -1618,7 +1630,7 @@ export class AgentSessionWrapper {
           id: randomUUID(),
           method: "set_editor_text",
           text,
-        } as ExtensionUiRequest as AgentEvent);
+        } satisfies ExtensionUiRequest as AgentEvent);
       },
       getEditorText: () => "",
       addAutocompleteProvider: () => {},
@@ -1696,7 +1708,11 @@ function registerRpcWrapper(wrapper: AgentSessionWrapper): void {
   const registry = getRegistry();
   const sessionId = wrapper.sessionId;
   if (wrapper.sessionFile) cacheSessionPath(sessionId, wrapper.sessionFile);
-  wrapper.onDestroy(() => registry.delete(sessionId));
+  wrapper.onDestroy(() => {
+    // Identity guard: while a slow shutdown emit is still in flight a new wrapper
+    // for the same id may already be registered — never evict the replacement.
+    if (registry.get(sessionId) === wrapper) registry.delete(sessionId);
+  });
   registry.set(sessionId, wrapper);
   wrapper.start();
   if (!wrapper.isChatOnly()) wrapper.beginExtensionBinding();
@@ -1789,7 +1805,7 @@ export async function setRpcSessionTools(
   if (!existing?.isAlive()) {
     if (!sessionFile) throw new Error("Session not found");
     const manager = SessionManager.open(sessionFile, undefined);
-    if (readSubagentSessionResources(manager.getEntries() as unknown as SessionEntry[])) {
+    if (readSubagentSessionResources(toSessionEntries(manager.getEntries()))) {
       throw new Error("Subagent tool selection is fixed by its profile");
     }
     if (toolNames === undefined) appendClearedSessionToolSelection(manager);
@@ -1800,7 +1816,7 @@ export async function setRpcSessionTools(
   }
 
   if (existing.isRunning()) throw new Error("Cannot change tools while the session is running");
-  if (readSubagentSessionResources(existing.inner.sessionManager.getEntries() as unknown as SessionEntry[])) {
+  if (readSubagentSessionResources(toSessionEntries(existing.inner.sessionManager.getEntries()))) {
     throw new Error("Subagent tool selection is fixed by its profile");
   }
 
@@ -1872,14 +1888,12 @@ export function getRpcSessionInfos(options: { includeTransient?: boolean } = {})
     const manager = session.inner?.sessionManager;
     if (!manager) continue;
     const header = manager.getHeader();
-    const entries = manager.getEntries() as unknown as Array<
-      { type: string; timestamp: string } | SessionMessageEntry
-    >;
+    const entries = toSessionEntries(manager.getEntries());
     const messages = entries.filter((entry): entry is SessionMessageEntry => entry.type === "message");
     const firstUserMessage = messages.find((entry) => entry.message.role === "user");
     const sessionFile = manager.getSessionFile() ?? session.sessionFile;
     const persisted = Boolean(sessionFile && existsSync(sessionFile));
-    const subagent = readSubagentRun(entries as unknown as SessionEntry[], header?.id ?? session.sessionId, sessionFile ?? "");
+    const subagent = readSubagentRun(entries, header?.id ?? session.sessionId, sessionFile ?? "");
 
     // An ensure_session call creates an idle, empty runtime while the composer
     // loads commands. Do not leak it into history before a prompt is accepted.
@@ -1991,12 +2005,12 @@ export async function startRpcSession(
   const sessionCwd = sessionManager.getCwd();
   const subagentResources = sessionFile
     ? readSubagentSessionResources(
-        sessionManager.getEntries() as unknown as SessionEntry[],
+        toSessionEntries(sessionManager.getEntries()),
       )
     : null;
   const persistedToolNames = subagentResources
     ? undefined
-    : readSessionToolSelection(sessionManager.getEntries() as unknown as SessionEntry[]);
+    : readSessionToolSelection(toSessionEntries(sessionManager.getEntries()));
   const selectedToolNames = subagentResources?.tools ?? persistedToolNames ?? requestedToolNames;
   if (!subagentResources && persistedToolNames === undefined && requestedToolNames !== undefined) {
     appendSessionToolSelection(sessionManager, requestedToolNames);
@@ -2105,7 +2119,7 @@ export async function startRpcSession(
     // System messages carry the prompt and tool loadout, not a conversation.
     const hasExistingMessages = branch.some((entry) => entry.type === "message" && entry.message.role !== "system");
     const savedModel = hasExistingMessages
-      ? getLatestModelChange(branch as unknown as SessionEntry[])
+      ? getLatestModelChange(toSessionEntries(branch))
       : null;
     const restoredModel = savedModel
       ? services.modelRuntime.getModel(savedModel.provider, savedModel.modelId)

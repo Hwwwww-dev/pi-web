@@ -4,10 +4,19 @@ import type { SkillInstallScope } from "@/lib/api-types";
 import { buildSkillUpdateArgs } from "@/lib/skill-updates";
 import { loadSkillsWithInstallInfo } from "@/lib/skills-service";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
+import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getProjectTrustStatus } from "@/lib/project-trust";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  if (!isApiRequestAllowed(req)) {
+    return NextResponse.json({ error: "Untrusted API request" }, { status: 403 });
+  }
+  if (!hasJsonContentType(req)) {
+    return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 });
+  }
   try {
     const body = await req.json() as {
       cwd?: unknown;
@@ -25,6 +34,14 @@ export async function POST(req: Request) {
     const allowedRoots = await getAllowedFileRoots();
     if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+    // Update is the same write path as install (npx into the project + lock
+    // file), so it needs the same project-trust gate (#audit BUG-plug-2).
+    if (scope === "project" && !getProjectTrustStatus(cwd, getAgentDir()).trusted) {
+      return NextResponse.json(
+        { error: "Project resources must be trusted before installing project skills" },
+        { status: 403 },
+      );
     }
 
     const { skills } = await loadSkillsWithInstallInfo(cwd);
@@ -57,7 +74,7 @@ export async function POST(req: Request) {
     const detail = error as { stdout?: string; stderr?: string; message?: string };
     const output = `${detail.stdout ?? ""}${detail.stderr ?? ""}`;
     return NextResponse.json(
-      { error: output || detail.message || String(error) },
+      { error: `Command failed: npx skills update\n${output.slice(-300)}`.trim() || detail.message || String(error) },
       { status: 500 },
     );
   }

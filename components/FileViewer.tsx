@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, useMemo, type CSSProperties, type MouseEvent } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, type MouseEvent } from "react";
 import {
   Prism as SyntaxHighlighter,
   createElement as renderSyntaxNode,

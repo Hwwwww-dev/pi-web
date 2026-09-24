@@ -12,6 +12,13 @@ import { createInterface } from "node:readline";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { writePrivateFileAtomicSync } from "./atomic-file";
 
+// Sidebar previews use the first ~50 characters; the cap only stops a giant
+// pasted first message from inflating every index entry and each persist.
+const FIRST_MESSAGE_MAX_LENGTH = 2048;
+// Debounce window that coalesces a scan burst (agent activity, bulk refresh)
+// into a single index write, off the request path.
+const INDEX_PERSIST_DELAY_MS = 2_000;
+
 export interface ScannedSessionInfo {
 	path: string;
 	id: string;
@@ -50,6 +57,8 @@ declare global {
 	var __piWebScanIndex: Map<string, IndexEntry> | undefined;
 	var __piWebScanIndexLoaded: boolean | undefined;
 	var __piWebScanIndexSaveQueued: boolean | undefined;
+	/** Test hook: override the persist debounce (ms). */
+	var __piWebScanIndexPersistDelayMs: number | undefined;
 }
 
 function parseLine(line: string): RawEntry | null {
@@ -206,7 +215,7 @@ export async function scanSessionFileInfo(
 
 			const textContent = extractTextContent(message);
 			if (!textContent) continue;
-			if (!firstMessage && message.role === "user") firstMessage = textContent;
+			if (!firstMessage && message.role === "user") firstMessage = textContent.slice(0, FIRST_MESSAGE_MAX_LENGTH);
 		}
 
 		if (!header) return null;
@@ -310,7 +319,7 @@ function loadPersistedIndex(): void {
 				info.path !== pathKey ||
 				typeof info.id !== "string" ||
 				typeof info.cwd !== "string" ||
-				typeof info.firstMessage !== "string" ||
+				typeof info.firstMessage !== "string" || info.firstMessage.length > FIRST_MESSAGE_MAX_LENGTH ||
 				(info.name !== undefined && typeof info.name !== "string") ||
 				(info.parentSessionPath !== undefined && typeof info.parentSessionPath !== "string") ||
 				typeof info.messageCount !== "number" || !Number.isSafeInteger(info.messageCount) || info.messageCount < 0 ||
@@ -342,7 +351,11 @@ function loadPersistedIndex(): void {
 function queueIndexPersist(): void {
 	if (globalThis.__piWebScanIndexSaveQueued) return;
 	globalThis.__piWebScanIndexSaveQueued = true;
-	queueMicrotask(() => {
+	// Debounced timer instead of queueMicrotask: the old microtask still ran on
+	// the request's tick and serialized + wrote the full index synchronously,
+	// stalling every concurrent request during a scan burst. unref'd so a
+	// pending write never holds the server open at shutdown.
+	setTimeout(() => {
 		globalThis.__piWebScanIndexSaveQueued = undefined;
 		try {
 			const entries: Record<string, IndexEntry> = {};
@@ -354,7 +367,7 @@ function queueIndexPersist(): void {
 		} catch {
 			// persistence is best-effort; the in-memory index remains authoritative
 		}
-	});
+	}, globalThis.__piWebScanIndexPersistDelayMs ?? INDEX_PERSIST_DELAY_MS).unref?.();
 }
 
 /**

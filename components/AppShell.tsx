@@ -523,10 +523,15 @@ export function AppShell() {
     try {
       const saved = restoreTerminalTabs(window.sessionStorage.getItem(TERMINAL_TABS_KEY));
       setTerminalTabs(saved.tabs);
-      if (saved.activeId) {
+      // activeId namespaces: "git" → git tab; 32-hex → a restored terminal tab.
+      // Anything else (e.g. "file:" ids — file tabs are not persisted) is dropped.
+      if (saved.activeId === GIT_TAB_ID) {
         setActiveFileTabId(saved.activeId);
         setRightPanelOpen(saved.open);
-        if (saved.activeId === GIT_TAB_ID) setGitPanelOpen(true);
+        setGitPanelOpen(true);
+      } else if (saved.activeId && saved.tabs.some((tab) => tab.id === saved.activeId)) {
+        setActiveFileTabId(saved.activeId);
+        setRightPanelOpen(saved.open);
       }
     } catch { /* storage is optional */ }
     setTerminalsRestored(true);
@@ -963,14 +968,22 @@ export function AppShell() {
     }
   }, [handleSelectSession, locale]);
 
-  const handleAgentEnd = useCallback(() => {
+  // Completion notifications must name the session that finished, which can be
+  // a keep-alive background window while another session is selected. The list
+  // is read through a latest-ref so handleAgentEnd stays referentially stable.
+  const latestSessionsRef = useRef(sessionsWithSelection);
+  latestSessionsRef.current = sessionsWithSelection;
+
+  const handleAgentEnd = useCallback((sessionId: string | null) => {
     setRefreshKey((k) => k + 1);
     setExplorerRefreshKey((k) => k + 1);
     if (selectedSession) hydrateSelectedSession(selectedSession.id);
 
-    if (selectedSession?.relation?.kind === "subagent") return;
     if (!shouldShowBrowserNotification()) return;
-    const targetSession = selectedSession;
+    const targetSession = sessionId
+      ? latestSessionsRef.current.find((session) => session.id === sessionId) ?? null
+      : selectedSession;
+    if (targetSession?.relation?.kind === "subagent") return;
     deliverSessionNotification({
       targetSession,
       title: targetSession?.name ?? translate("i18n.sessionComplete"),

@@ -107,7 +107,14 @@ const EMPTY_MODELS: ModelsData = {
 };
 
 export async function GET(req: Request) {
-  const requestedCwd = new URL(req.url).searchParams.get("cwd") || process.cwd();
+  // req.url is synthesized by Next.js and is normally well-formed; fall back to
+  // the process cwd rather than letting a malformed URL 500 the whole route.
+  let requestedCwd: string;
+  try {
+    requestedCwd = new URL(req.url).searchParams.get("cwd") || process.cwd();
+  } catch {
+    requestedCwd = process.cwd();
+  }
   const cwd = resolve(requestedCwd);
 
   let cwdStat;
@@ -126,7 +133,14 @@ export async function GET(req: Request) {
 
   try {
     return Response.json(await loadModelsWithCache(cwd, () => loadModels(cwd)));
-  } catch {
+  } catch (error) {
+    // The ambiguity message is constructed in this repo (lib/model-scope.ts)
+    // and already names every matching provider/modelId plus the fix — it is
+    // a permanent configuration mistake, not a transient outage, so surface
+    // it verbatim instead of the generic safe text.
+    if (error instanceof Error && error.message.startsWith("Ambiguous enabledModels entry")) {
+      return Response.json({ ...EMPTY_MODELS, modelError: error.message });
+    }
     return Response.json(withSafeModelLoadFailure(EMPTY_MODELS));
   }
 }
