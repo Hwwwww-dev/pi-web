@@ -206,7 +206,7 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
   }, [reveal]);
 
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div style={{ marginBottom: 12 }}>
       <button
         type="button"
         aria-expanded={expanded || reveal}
@@ -1196,7 +1196,43 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
               };
 
               const rendered: ReactNode[] = [];
-              for (let idx = 0; idx < messages.length;) {
+              let idx = 0;
+              // Lazy pagination: the loaded window may begin mid-turn, before
+              // this turn's user message, so the anchor scan cannot group it.
+              // Render that partial head as flat activity rows (like the live
+              // tail) instead of standalone messages; once earlier messages
+              // finish loading the turn regroups normally.
+              if (hasEarlierMessages && messages.length > 0 && !isMessageGroupAnchor(messages[0])) {
+                let headEnd = 0;
+                while (headEnd < messages.length && !isMessageGroupAnchor(messages[headEnd])) headEnd += 1;
+                const headItems = buildTurnActivityItems({
+                  messages,
+                  startIdx: 0,
+                  endIdx: headEnd,
+                  entryIds,
+                  toolResults: toolResultsMap,
+                  searchEntryId: pendingSearchScroll?.entryId,
+                  searchBlock,
+                });
+                if (headItems.length > 0) {
+                  rendered.push(
+                    <TurnActivityBody
+                      key="head-activity"
+                      items={headItems}
+                      cwd={messageCwd}
+                      onOpenFile={onOpenFile}
+                      onOpenSession={onOpenSession}
+                      sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+                    />,
+                  );
+                } else {
+                  for (let headIdx = 0; headIdx < headEnd; headIdx++) {
+                    rendered.push(renderMessage(headIdx, { showModelLabel: true }));
+                  }
+                }
+                idx = headEnd;
+              }
+              for (; idx < messages.length;) {
                 const msg = messages[idx];
                 if (!isMessageGroupAnchor(msg)) {
                   rendered.push(renderMessage(idx, { showModelLabel: true }));

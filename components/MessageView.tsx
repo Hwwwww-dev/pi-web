@@ -197,10 +197,16 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
     return null;
   }
   if (message.role === "custom") {
-    if ((message as CustomMessage).customType === "compaction") {
-      return <CompactionRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} />;
-    }
-    return <CustomRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} onOpenSession={onOpenSession} />;
+    // Standalone custom anchors (compaction, subagent notifications) need turn
+    // spacing of their own; inside grouped activity bodies the rows are spaced
+    // by the activity container.
+    return (
+      <div style={{ marginBottom: 12 }}>
+        {(message as CustomMessage).customType === "compaction"
+          ? <CompactionRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} />
+          : <CustomRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} onOpenSession={onOpenSession} />}
+      </div>
+    );
   }
   if (message.role === "bashExecution") {
     return <BashExecutionView message={message as BashExecutionMessage} sessionId={sessionId} />;
@@ -307,7 +313,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
   return (
     <div
-      style={{ marginBottom: 16, display: "flex", flexDirection: "column", alignItems: "flex-end" }}
+      style={{ marginBottom: 12, display: "flex", flexDirection: "column", alignItems: "flex-end" }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -676,7 +682,7 @@ function AssistantMessageView({
     <div
       data-message-role="assistant"
       data-entry-id={entryId}
-      style={{ marginBottom: 16 }}
+      style={{ marginBottom: 12 }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >

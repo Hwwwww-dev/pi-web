@@ -1218,7 +1218,8 @@ pre, code {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 6px;
+  margin-top: 4px;
+  margin-bottom: 2px;
   font-size: 11px;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
