@@ -12,7 +12,10 @@ const PRECACHE_URLS = [
 // A reachable port backed by a dead upstream accepts the connection and then
 // never answers: fetch() neither resolves nor rejects, so the navigation hangs
 // forever instead of falling back to offline.html. Bound every network wait.
-const NAVIGATION_TIMEOUT_MS = 8000;
+// Through a tunnel the time-to-first-byte of a navigation easily exceeds a
+// tight ceiling while the server is healthy, so navigations get a generous
+// limit plus one retry before the offline fallback.
+const NAVIGATION_TIMEOUT_MS = 15000;
 const ASSET_TIMEOUT_MS = 8000;
 
 self.addEventListener("install", (event) => {
@@ -51,7 +54,7 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetchWithTimeout(request, NAVIGATION_TIMEOUT_MS).catch(async () => {
+      fetchWithRetry(request, NAVIGATION_TIMEOUT_MS).catch(async () => {
         const fallback = await caches.match(OFFLINE_URL);
         return fallback ?? Response.error();
       }),
@@ -148,6 +151,16 @@ async function fetchWithTimeout(request, timeoutMs) {
     return await fetch(request, { signal: controller.signal });
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** One retry for navigations: the abort was ours, and a tunneled hiccup is
+ * usually gone by the next attempt. Only a second failure means offline. */
+async function fetchWithRetry(request, timeoutMs) {
+  try {
+    return await fetchWithTimeout(request, timeoutMs);
+  } catch {
+    return fetchWithTimeout(request, timeoutMs);
   }
 }
 

@@ -76,8 +76,29 @@
     <main>
       <img src="/icons/icon-192.png" alt="" />
       <h1>Pi Web is offline</h1>
-      <p>Reconnect to the local Pi Web server, then try again.</p>
+      <p id="status">Reconnect to the local Pi Web server, then try again.</p>
       <button type="button" onclick="location.reload()">Try again</button>
     </main>
+    <script>
+      // The tunnel may simply be slow or mid-hiccup: probe until the server
+      // answers, then reload instead of leaving a dead end on screen.
+      const statusEl = document.getElementById("status");
+      let probing = false;
+      function probe() {
+        if (probing) return;
+        probing = true;
+        fetch(location.href, { cache: "no-store" })
+          .then((response) => {
+            if (response.ok) {
+              statusEl.textContent = "Server is back — reloading…";
+              location.reload();
+            }
+          })
+          .catch(() => {})
+          .finally(() => { probing = false; });
+      }
+      setTimeout(probe, 3000);
+      setInterval(probe, 5000);
+    </script>
   </body>
 </html>

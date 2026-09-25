@@ -185,19 +185,57 @@ function installHungNetwork() {
  */
 const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
 
-test("a stalled navigation falls back to offline.html", async () => {
+test("a stalled navigation retries once before falling back to offline.html", async () => {
   installOfflineStub();
-  const wasAborted = installHungNetwork();
+  let fetchCalls = 0;
+  globalThis.fetch = (_request, init) => {
+    fetchCalls += 1;
+    return new Promise((_resolve, reject) => {
+      init.signal.addEventListener("abort", () =>
+        reject(new DOMException("The operation was aborted.", "AbortError")));
+    });
+  };
 
   mock.timers.enable({ apis: ["setTimeout"] });
   try {
     const pending = dispatchFetch("https://pi.test/", { mode: "navigate" });
     await flushMicrotasks();
-    mock.timers.tick(8000);
+    mock.timers.tick(15000);
+    await flushMicrotasks();
+    assert.equal(fetchCalls, 2, "the first timeout must be retried, not served offline");
+
+    mock.timers.tick(15000);
     const response = await pending;
 
-    assert.equal(wasAborted(), true, "a hung upstream must be aborted, not awaited forever");
     assert.match(await response.text(), /Pi Web is offline/);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test("a successful second navigation attempt still reaches the server", async () => {
+  installOfflineStub();
+  let fetchCalls = 0;
+  globalThis.fetch = (_request, init) => {
+    fetchCalls += 1;
+    if (fetchCalls === 1) {
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener("abort", () =>
+          reject(new DOMException("The operation was aborted.", "AbortError")));
+      });
+    }
+    return Promise.resolve(new Response("<!doctype html><title>Pi Web</title>"));
+  };
+
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const pending = dispatchFetch("https://pi.test/", { mode: "navigate" });
+    await flushMicrotasks();
+    mock.timers.tick(15000);
+    const response = await pending;
+
+    assert.equal(fetchCalls, 2);
+    assert.match(await response.text(), /Pi Web/);
   } finally {
     mock.timers.reset();
   }
