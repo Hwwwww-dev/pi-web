@@ -604,6 +604,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (sessionStatsOverride) {
       return {
         ...sessionStatsOverride,
+        // The SDK snapshot carries no per-request reading; the file's own stats
+        // track the most recent request's usage for the live cache segment.
+        lastUsage: sessionStatsOverride.lastUsage ?? data?.stats?.lastUsage ?? null,
         sessionName: sessionStatsOverride.sessionName ?? session?.name,
         totalActiveMs: data?.totalActiveMs,
         ...(displayContextUsage ? { contextUsage: displayContextUsage } : {}),

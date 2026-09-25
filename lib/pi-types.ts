@@ -8,6 +8,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { AgentMessage as PiAgentMessage } from "@earendil-works/pi-agent-core";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
+import type { AgentUsage } from "./types";
 
 export interface ContextUsage {
   percent: number | null;
@@ -52,6 +53,8 @@ export interface SessionStatsInfo {
   };
   cost: number;
   contextUsage?: ContextUsage;
+  /** Usage of the most recent model request in file order — the live cache reading. */
+  lastUsage?: AgentUsage | null;
   /** Estimated active time across all entries in the session file. */
   totalActiveMs?: number;
 }

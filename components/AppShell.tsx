@@ -43,7 +43,9 @@ import { rekeyDraft } from "@/lib/draft-store";
 import {
   DEFAULT_KEEP_ALIVE_CONFIG,
   loadKeepAliveConfig,
+  loadKeepAliveSlotRecords,
   saveKeepAliveConfig,
+  saveKeepAliveSlots,
   upsertKeepAliveSlot,
   type ChatKeepAliveConfig,
   type KeepAliveSlot,
@@ -192,6 +194,31 @@ export function AppShell() {
   useEffect(() => {
     setKeepAliveConfig(loadKeepAliveConfig());
   }, []);
+  // Slots are browser-tab memory otherwise; persist the identities so a page
+  // refresh (or PWA relaunch) restores the dock instead of dropping it.
+  const keepAliveSlotsRestoredRef = useRef(false);
+  useEffect(() => {
+    if (keepAliveSlotsRestoredRef.current || sessionCatalog.length === 0) return;
+    keepAliveSlotsRestoredRef.current = true;
+    const records = loadKeepAliveSlotRecords();
+    if (records.length === 0) return;
+    const cutoff = Date.now() - keepAliveConfig.idleTimeoutMinutes * 60_000;
+    setKeepAliveSlots((slots) => {
+      const known = new Set(slots.map((slot) => slot.session.id));
+      const additions = records
+        .filter((record) => !known.has(record.id) && record.lastActiveAt >= cutoff)
+        .map((record) => {
+          const session = sessionCatalog.find((candidate) => candidate.id === record.id);
+          return session ? { session, lastActiveAt: record.lastActiveAt, epoch: record.epoch } : null;
+        })
+        .filter((slot): slot is KeepAliveSlot => slot !== null);
+      return additions.length === 0 ? slots : [...slots, ...additions];
+    });
+  }, [sessionCatalog, keepAliveConfig.idleTimeoutMinutes]);
+  useEffect(() => {
+    if (!keepAliveSlotsRestoredRef.current) return;
+    saveKeepAliveSlots(keepAliveSlots);
+  }, [keepAliveSlots]);
   /** Forces a keep-alive slot's ChatWindow to remount (trust change, session reload). */
   const bumpKeepAliveSlot = useCallback((sessionId: string | null | undefined) => {
     if (!sessionId) return;
@@ -1696,6 +1723,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
 
     const tokens = sessionStats?.tokens;
     const cost = sessionStats?.cost ?? 0;
+    // The cache segment shows the most recent request's cache read (the live
+    // cache hit), not the session cumulative — the cumulative always dwarfs
+    // the current context after a few dozen requests.
+    const cacheRead = sessionStats?.lastUsage?.cacheRead ?? tokens?.cacheRead ?? 0;
 
     let contextColor: string | undefined;
     if (contextUsage?.contextWindow) {
@@ -1708,8 +1739,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     if (tokens) {
       tooltipParts.push(`in: ${tokens.input.toLocaleString(locale)}`);
       tooltipParts.push(`out: ${tokens.output.toLocaleString(locale)}`);
-      tooltipParts.push(`cache read: ${tokens.cacheRead.toLocaleString(locale)}`);
-      tooltipParts.push(`cache write: ${tokens.cacheWrite.toLocaleString(locale)}`);
+      tooltipParts.push(`cache read: ${cacheRead.toLocaleString(locale)}`);
       if (cost > 0) tooltipParts.push(`cost: $${cost.toFixed(4)}`);
     }
     if (contextUsage?.contextWindow) {
@@ -1757,7 +1787,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         }}
       >
         <UsageBar
-          usage={tokens ? { input: tokens.input, output: tokens.output, cacheRead: tokens.cacheRead, cost } : null}
+          usage={tokens ? { input: tokens.input, output: tokens.output, cacheRead, cost } : null}
           ctx={contextUsage?.contextWindow ? { percent: contextUsage.percent, contextWindow: contextUsage.contextWindow } : undefined}
           emphasizeCost
           ctxColor={contextColor}

@@ -14,6 +14,8 @@ export interface SessionFileStats {
     total: number;
   };
   cost: number;
+  /** Usage of the most recent model request in file order — the live cache/context reading. */
+  lastUsage: AgentUsage | null;
 }
 
 function emptyStats(): SessionFileStats {
@@ -25,6 +27,7 @@ function emptyStats(): SessionFileStats {
     totalMessages: 0,
     tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     cost: 0,
+    lastUsage: null,
   };
 }
 
@@ -35,6 +38,9 @@ function addUsage(stats: SessionFileStats, usage?: AgentUsage): void {
   stats.tokens.cacheRead += usage.cacheRead ?? 0;
   stats.tokens.cacheWrite += usage.cacheWrite ?? 0;
   stats.cost += usage.cost?.total ?? 0;
+  // Entries arrive in file order, so the last one carrying usage is the most
+  // recent model request.
+  stats.lastUsage = usage;
 }
 
 function addMessage(stats: SessionFileStats, message: SessionMessage): void {

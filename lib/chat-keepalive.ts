@@ -88,6 +88,43 @@ export function upsertKeepAliveSlot(slots: KeepAliveSlot[], session: SessionInfo
 
 const DOCK_TOP_STORAGE_KEY = "pi-web:keepalive-dock:top-pct";
 
+export interface PersistedKeepAliveSlot {
+  id: string;
+  lastActiveAt: number;
+  epoch: number;
+}
+
+const SLOTS_STORAGE_KEY = "pi-web:keepalive-slots";
+
+/** Slot identities only — the session snapshot is rebuilt from the catalogue. */
+export function loadKeepAliveSlotRecords(): PersistedKeepAliveSlot[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(SLOTS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is PersistedKeepAliveSlot => {
+      const record = item as PersistedKeepAliveSlot;
+      return typeof record?.id === "string"
+        && typeof record?.lastActiveAt === "number"
+        && typeof record?.epoch === "number";
+    });
+  } catch {
+    return [];
+  }
+}
+
+export function saveKeepAliveSlots(slots: KeepAliveSlot[]): void {
+  try {
+    window.localStorage.setItem(SLOTS_STORAGE_KEY, JSON.stringify(
+      slots.map((slot) => ({ id: slot.session.id, lastActiveAt: slot.lastActiveAt, epoch: slot.epoch })),
+    ));
+  } catch {
+    // Persistence is best-effort; privacy mode and storage quotas must not break the dock.
+  }
+}
+
 /** Vertical dock position as a percentage of the chat area height. */
 export function loadKeepAliveDockTopPct(): number {
   if (typeof window === "undefined") return 28;
