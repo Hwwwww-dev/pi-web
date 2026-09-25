@@ -18,7 +18,7 @@ import { isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansi
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
-import { formatUsage, formatUsageCompact, type ActivityItem, type TurnUsage } from "@/lib/turn-view";
+import { formatUsage, usageCompactSegments, type ActivityItem, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
 import type { CustomMessage, ImageContent, TextContent, ThinkingContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -307,7 +307,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
         <div className="activity-row-detail">
           {usage && (
             <div className="activity-usage-line">
-              {formatUsageCompact(usage, ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined)}
+              <UsageBar usage={usage} ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined} />
             </div>
           )}
           {combinedTerminalText !== null ? (
@@ -764,7 +764,37 @@ function CompactionFileList({ title, files }: { title: string; files: string[] }
 // Per-turn meta line (aggregated usage / model / time)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** One quiet line per turn: model · usage (former top-bar format) · time · copy.
+/** Stacked-database icon standing in for the "cache" label. */
+const CACHE_ICON = (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <ellipse cx="12" cy="5" rx="9" ry="3" />
+    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+  </svg>
+);
+
+/** Top-bar-style usage segments with breathing room; cache shows as an icon. */
+export function UsageBar({ usage, ctx, gap = 10 }: {
+  usage?: TurnUsage | null;
+  ctx?: UsageContextPart;
+  gap?: number;
+}) {
+  const segments = usageCompactSegments(usage, ctx);
+  if (segments.length === 0) return null;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "baseline", flexWrap: "wrap", columnGap: gap, rowGap: 2, fontVariantNumeric: "tabular-nums" }}>
+      {segments.map((segment) => (
+        <span key={segment.id} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+          {segment.label === "cache" && CACHE_ICON}
+          {segment.label === "ctx" && <span style={{ opacity: 0.75 }}>ctx</span>}
+          {segment.text}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** One quiet line per turn: model · usage (top-bar format) · time · copy.
  *  ctx = context occupancy after this turn: the next request's prompt size, or
  *  the live reading while this is still the conversation tail. */
 export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCtx, ctxWindow }: {
@@ -779,19 +809,17 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
 }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
-  const ctx = ctxTokens !== undefined
+  const ctx: UsageContextPart | undefined = ctxTokens !== undefined
     ? { tokens: ctxTokens, contextWindow: ctxWindow }
     : liveCtx
       ? { percent: liveCtx.percent, contextWindow: liveCtx.contextWindow }
       : undefined;
-  const usageText = usage || ctx
-    ? formatUsageCompact(usage ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } }, ctx)
-    : null;
-  if (!usageText && !model && !time && !copySource) return null;
+  const hasUsage = usageCompactSegments(usage, ctx).length > 0;
+  if (!hasUsage && !model && !time && !copySource) return null;
   return (
     <div className="turn-meta-line" title={usage ? formatUsage(usage) : undefined}>
       {model && <span>{model}</span>}
-      {usageText && <span>{usageText}</span>}
+      {hasUsage && <UsageBar usage={usage} ctx={ctx} />}
       {time && <span>{time}</span>}
       {copySource && (
         <button

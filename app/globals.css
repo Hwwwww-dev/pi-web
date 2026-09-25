@@ -1221,15 +1221,11 @@ pre, code {
   margin: 2px 0 4px 24px;
   min-width: 0;
 }
-/* Per-call usage line at the top of an expanded tool row (former top-bar format). */
+/* Per-call usage line at the top of an expanded tool row (top-bar format). */
 .activity-usage-line {
   margin: 2px 0 4px;
-  font-size: 11px;
   color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
 }
 .activity-detail-pre {
   margin: 4px 0;
