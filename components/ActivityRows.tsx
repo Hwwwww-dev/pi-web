@@ -18,7 +18,8 @@ import { isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansi
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
-import { formatUsage, usageCompactSegments, type ActivityItem, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
+import { formatUsage, type ActivityItem, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
+import { UsageBar } from "./UsageBar";
 import type { CustomMessage, ImageContent, TextContent, ThinkingContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -307,31 +308,36 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
         <div className="activity-row-detail">
           {usage && (
             <div className="activity-usage-line">
-              <UsageBar usage={usage} ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined} />
+              <UsageBar
+                usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
+                ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
+              />
             </div>
           )}
-          {combinedTerminalText !== null ? (
-            <PairedResult
-              text={combinedTerminalText}
-              isEmpty={false}
-              isError={isError}
-            />
-          ) : (
-            <>
-              {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
-                <pre className="activity-detail-pre">{inputStr}</pre>
-              )}
-              {patchFiles && <SplitFilesView files={patchFiles} />}
-              {result && patchFiles && isError && (
-                <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
-              )}
-              {result && !patchFiles && combinedTerminalText === null && (
-                resultDiff ? <PairedDiffResult diff={resultDiff} /> : (!resultIsEmpty || resultImages.length === 0) && (
+          <div className="activity-detail-card">
+            {combinedTerminalText !== null ? (
+              <PairedResult
+                text={combinedTerminalText}
+                isEmpty={false}
+                isError={isError}
+              />
+            ) : (
+              <>
+                {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
+                  <pre className="activity-detail-pre">{inputStr}</pre>
+                )}
+                {patchFiles && <SplitFilesView files={patchFiles} />}
+                {result && patchFiles && isError && (
                   <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
-                )
-              )}
-            </>
-          )}
+                )}
+                {result && !patchFiles && combinedTerminalText === null && (
+                  resultDiff ? <PatchTextView text={resultDiff.text} /> : (!resultIsEmpty || resultImages.length === 0) && (
+                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                  )
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -513,8 +519,8 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
       </button>
       {expanded && (
         <div
-          className="activity-row-body"
-          style={{ maxHeight: 380, overflowY: "auto", overscrollBehavior: "contain", ...(error ? { color: "var(--danger)" } : undefined) }}
+          className="activity-detail-card"
+          style={{ maxHeight: 380, overflowY: "auto", overscrollBehavior: "contain", whiteSpace: "pre-wrap", overflowWrap: "anywhere", ...(error ? { color: "var(--danger)" } : undefined) }}
         >
           {loading ? t("i18n.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
         </div>
@@ -631,7 +637,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSession }: {
         )}
       </div>
       {expanded && (
-        <div className="activity-row-body">
+        <div className="activity-detail-card">
           {images.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: text ? 8 : 0 }}>
               {images.map((img, i) => {
@@ -713,7 +719,7 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
         <RowChevron expanded={expanded} />
       </button>
       {expanded && (
-        <div className="activity-row-body">
+        <div className="activity-detail-card">
           <div style={{ color: "var(--text)", fontSize: "calc(14px + var(--chat-font-size-offset, 0px))", lineHeight: 1.5 }}>
             {t("i18n.compactionDescription")}
           </div>
@@ -764,36 +770,6 @@ function CompactionFileList({ title, files }: { title: string; files: string[] }
 // Per-turn meta line (aggregated usage / model / time)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Stacked-database icon standing in for the "cache" label. */
-const CACHE_ICON = (
-  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <ellipse cx="12" cy="5" rx="9" ry="3" />
-    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-  </svg>
-);
-
-/** Top-bar-style usage segments with breathing room; cache shows as an icon. */
-export function UsageBar({ usage, ctx, gap = 10 }: {
-  usage?: TurnUsage | null;
-  ctx?: UsageContextPart;
-  gap?: number;
-}) {
-  const segments = usageCompactSegments(usage, ctx);
-  if (segments.length === 0) return null;
-  return (
-    <span style={{ display: "inline-flex", alignItems: "baseline", flexWrap: "wrap", columnGap: gap, rowGap: 2, fontVariantNumeric: "tabular-nums" }}>
-      {segments.map((segment) => (
-        <span key={segment.id} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-          {segment.label === "cache" && CACHE_ICON}
-          {segment.label === "ctx" && <span style={{ opacity: 0.75 }}>ctx</span>}
-          {segment.text}
-        </span>
-      ))}
-    </span>
-  );
-}
-
 /** One quiet line per turn: model · usage (top-bar format) · time · copy.
  *  ctx = context occupancy after this turn: the next request's prompt size, or
  *  the live reading while this is still the conversation tail. */
@@ -814,12 +790,18 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
     : liveCtx
       ? { percent: liveCtx.percent, contextWindow: liveCtx.contextWindow }
       : undefined;
-  const hasUsage = usageCompactSegments(usage, ctx).length > 0;
-  if (!hasUsage && !model && !time && !copySource) return null;
+  const hasUsage = Boolean(usage && (usage.input > 0 || usage.output > 0 || usage.cacheRead > 0 || usage.cost.total > 0));
+  const hasCtx = Boolean(ctx && (ctx.tokens !== undefined || ctx.percent !== undefined || ctx.contextWindow));
+  if (!hasUsage && !hasCtx && !model && !time && !copySource) return null;
   return (
     <div className="turn-meta-line" title={usage ? formatUsage(usage) : undefined}>
       {model && <span>{model}</span>}
-      {hasUsage && <UsageBar usage={usage} ctx={ctx} />}
+      {(hasUsage || hasCtx) && (
+        <UsageBar
+          usage={usage ? { input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total } : null}
+          ctx={ctx}
+        />
+      )}
       {time && <span>{time}</span>}
       {copySource && (
         <button
@@ -1039,24 +1021,6 @@ interface ResultDiff {
   text: string;
 }
 
-function PairedDiffResult({ diff }: {
-  diff: ResultDiff;
-}) {
-  // Unified diff with line numbers — the split side-by-side view does not
-  // survive narrow (mobile) chat columns and edit rows should read as a diff,
-  // not as the source file.
-  return (
-    <div
-      style={{
-        borderTop: "1px solid var(--border)",
-        background: "var(--bg)",
-      }}
-    >
-      <PatchTextView text={diff.text} />
-    </div>
-  );
-}
-
 /** +N / −M line counts for a unified diff, for the collapsed row badge. */
 function countDiffStat(text: string): { added: number; removed: number } {
   let added = 0;
@@ -1073,7 +1037,7 @@ function SplitFilesView({ files }: { files: SplitDiffFile[] }) {
   const showFileHeaders = files.length > 1;
 
   return (
-    <div style={{ maxHeight: 560, overflowY: "auto", overflowX: "hidden", background: "var(--bg)" }}>
+    <div style={{ maxHeight: 560, overflowY: "auto", overflowX: "hidden" }}>
       {files.map((file, fileIndex) => (
         <div
           key={fileIndex}
@@ -1093,7 +1057,7 @@ function SplitFilesView({ files }: { files: SplitDiffFile[] }) {
                 position: "sticky",
                 top: 0,
                 zIndex: 1,
-                background: "var(--bg-panel)",
+                background: "var(--bg-subtle)",
                 borderBottom: "1px solid var(--border)",
               }}
             >
@@ -1360,7 +1324,6 @@ function PairedResult({ text, isEmpty, isError }: {
         wordBreak: tui ? "normal" : "break-all",
         fontStyle: isEmpty ? "italic" : "normal",
         opacity: isEmpty ? 0.6 : 1,
-        background: "var(--bg)",
       }}
     >
       {isEmpty ? t("i18n.noOutput") : text}

@@ -1208,18 +1208,40 @@ pre, code {
   gap: 1px;
   min-width: 0;
 }
-.activity-row-body {
-  margin: 2px 0 6px 24px;
-  color: var(--text-muted);
-  font-size: calc(12px + var(--chat-font-size-offset, 0px));
-  line-height: 1.55;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
 .activity-row-detail {
   margin: 2px 0 4px 24px;
   min-width: 0;
+}
+/* The one expanded-detail card: a single thin border wrapping terminal output,
+   diffs, raw inputs, thinking text and compaction summaries alike. Content
+   inside stays flat — no nested borders or boxes. */
+.activity-detail-card {
+  margin: 2px 0 4px 24px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: calc(12px + var(--chat-font-size-offset, 0px));
+  line-height: 1.55;
+  min-width: 0;
+}
+.activity-row-detail .activity-detail-card {
+  margin: 0;
+}
+.activity-detail-card > * + * {
+  margin-top: 8px;
+}
+/* Markdown code blocks inside a detail card are content, not a second card. */
+.activity-detail-card .markdown-code-block {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+.activity-detail-card .markdown-code-header {
+  padding: 0 0 4px;
+  background: transparent;
+  border-bottom: none;
 }
 /* Per-call usage line at the top of an expanded tool row (top-bar format). */
 .activity-usage-line {
@@ -1228,14 +1250,13 @@ pre, code {
   min-width: 0;
 }
 .activity-detail-pre {
-  margin: 4px 0;
-  padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-subtle);
-  color: var(--text-muted);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
   font-family: var(--font-mono);
-  font-size: calc(12px + var(--chat-font-size-offset, 0px));
+  font-size: inherit;
   line-height: 1.5;
   overflow: auto;
   max-height: 400px;
@@ -1422,11 +1443,9 @@ pre, code {
 .compaction-file-list {
   max-height: 180px;
   margin: 0;
-  padding: 7px 8px;
+  padding: 0;
   overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-panel);
+  color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.45;
@@ -1434,9 +1453,10 @@ pre, code {
 }
 .compaction-file-list li {
   overflow-wrap: anywhere;
+  padding: 3px 0;
 }
 .compaction-file-list li + li {
-  margin-top: 3px;
+  border-top: 1px solid var(--border);
 }
 
 .markdown-code-block {

@@ -65,32 +65,6 @@ export interface UsageContextPart {
   contextWindow?: number;
 }
 
-export interface UsageSegment {
-  id: string;
-  /** cache renders as an icon, ctx keeps its text label; others are bare values. */
-  label?: "cache" | "ctx";
-  text: string;
-}
-
-/** The top-bar usage format, as renderable segments: ↑in ↓out cache N $cost ctx x% / window. */
-export function usageCompactSegments(usage: TurnUsage | null | undefined, ctx?: UsageContextPart): UsageSegment[] {
-  const segments: UsageSegment[] = [];
-  if (usage && usage.input > 0) segments.push({ id: "in", text: `↑${formatCompactTokens(usage.input)}` });
-  if (usage && usage.output > 0) segments.push({ id: "out", text: `↓${formatCompactTokens(usage.output)}` });
-  if (usage && usage.cacheRead > 0) segments.push({ id: "cache", label: "cache", text: formatCompactTokens(usage.cacheRead) });
-  if (usage && usage.cost.total > 0) segments.push({ id: "cost", text: `$${usage.cost.total.toFixed(4)}` });
-  if (ctx && (ctx.tokens !== undefined || ctx.percent !== undefined)) {
-    const percent = ctx.tokens !== undefined && ctx.contextWindow
-      ? (ctx.tokens / ctx.contextWindow) * 100
-      : ctx.percent ?? null;
-    if (percent !== null || ctx.contextWindow) {
-      const percentText = percent !== null ? `${percent.toFixed(1)}%` : "?";
-      segments.push({ id: "ctx", label: "ctx", text: percentText + (ctx.contextWindow ? ` / ${formatCompactTokens(ctx.contextWindow)}` : "") });
-    }
-  }
-  return segments;
-}
-
 export function withAssistantBlocks(
   message: AssistantMessage,
   content: AssistantContentBlock[],
