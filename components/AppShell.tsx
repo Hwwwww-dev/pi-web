@@ -1027,6 +1027,11 @@ export function AppShell() {
     setInitialSessionRestored(true);
   }, []);
 
+  // Stable for the memoized ChatWindow: only clears the one-shot quote prompt.
+  const handleInitialPromptConsumed = useCallback(() => {
+    setPendingQuotePrompt(null);
+  }, []);
+
   const handleSessionDeleted = useCallback((sessionId: string) => {
     setRefreshKey((k) => k + 1);
     sessionScrollPositionsRef.current.delete(sessionId);
@@ -1807,9 +1812,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             )}
             {tokens && tokens.cacheRead > 0 && (
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M8.5 5a3.5 3.5 0 1 1-1-2.45" /><polyline points="6.5 1.5 8.5 2.5 7.5 4.5" />
-                </svg>
+                <span style={{ color: "var(--text-dim)" }}>cache</span>
                 {formatCompact(tokens.cacheRead)}
               </span>
             )}
@@ -1820,9 +1823,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             )}
             {desktopContextText && (
               <span style={{ display: "flex", alignItems: "center", gap: 4, color: contextColor }}>
-                <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M1 9 L1 5 Q1 1 5 1 Q9 1 9 5 L9 9" /><line x1="1" y1="9" x2="9" y2="9" />
-                </svg>
+                <span style={{ color: "var(--text-dim)" }}>ctx</span>
                 {desktopContextText}
               </span>
             )}
@@ -2466,7 +2467,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     onAskInNewChat={handleAskInNewChat}
                     quoteSelectionEnabled={quoteSelectionEnabled}
                     initialPrompt={pendingQuotePrompt?.sessionId === activeChatSession?.id ? pendingQuotePrompt?.text : undefined}
-                    onInitialPromptConsumed={() => setPendingQuotePrompt(null)}
+                    onInitialPromptConsumed={handleInitialPromptConsumed}
                     playDoneSound={playDoneSound}
                     unlockAudio={unlockAudio}
                   />

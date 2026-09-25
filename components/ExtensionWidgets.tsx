@@ -5,7 +5,6 @@ import { useI18n } from "@/hooks/useI18n";
 import { AnsiText } from "@/components/AnsiText";
 import type { ExtensionWidgetItem } from "@/lib/types";
 
-export const DEFAULT_EXPANDED_WIDGET_LINES = 3;
 export const WIDGET_UPDATE_IDLE_MS = 1100;
 
 export function formatExtensionWidgetContent(lines: string[]): string {
@@ -32,13 +31,6 @@ export function getUpdatedExtensionWidgetKeys(
   }).filter((key): key is string => key !== null);
 }
 
-function getDefaultExpandedWidgetKey(widgets: ExtensionWidgetItem[]): string | null {
-  return widgets.find((widget) => {
-    const lineCount = widget.lines.length;
-    return lineCount > 1 && lineCount <= DEFAULT_EXPANDED_WIDGET_LINES;
-  })?.key ?? null;
-}
-
 export function getNextExpandedWidgetKey(
   currentKey: string | null,
   requestedKey: string,
@@ -51,9 +43,9 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
   const idPrefix = useId();
   const previousContentsRef = useRef<Map<string, string[]> | null>(null);
   const updateClearTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  const [expandedWidgetKey, setExpandedWidgetKey] = useState<string | null>(
-    () => getDefaultExpandedWidgetKey(widgets),
-  );
+  // Widgets start collapsed: auto-expanding raw TUI output above the composer
+  // read like broken message content. The trigger chips expand on demand.
+  const [expandedWidgetKey, setExpandedWidgetKey] = useState<string | null>(null);
   const [updatingWidgetKeys, setUpdatingWidgetKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
   );

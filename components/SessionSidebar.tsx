@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
+import { memo, useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import type { SessionInfo } from "@/lib/types";
 import { listSessionFamilies } from "@/lib/session-family";
 import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
@@ -11,6 +11,7 @@ import { getProjectActivity, getRecentProjects, sessionsForProject } from "@/lib
 import { workspaceKeyOf } from "@/lib/workspace-memory";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import { useI18n } from "@/hooks/useI18n";
+import { useCoarsePointer } from "@/hooks/useIsMobile";
 import { useResizablePanel } from "@/hooks/useResizablePanel";
 import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import { DirectoryPicker } from "./DirectoryPicker";
@@ -358,7 +359,10 @@ function PiWebTitle() {
   );
 }
 
-export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange, onUnreadSessionIdsChange, onOpenGitPanel }: Props) {
+// Memoized: AppShell re-renders on every streamed stats/context poll, and the
+// sidebar's own state (tree, explorer) must not be re-rendered along with it.
+// All handler props are useCallback-stable in AppShell.
+export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange, onUnreadSessionIdsChange, onOpenGitPanel }: Props) {
   const { t } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   // Tracked in a ref only: the version is compared against the polled value to
@@ -1993,7 +1997,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       )}
     </div>
   );
-}
+});
 
 
 /**
@@ -2064,6 +2068,7 @@ function SessionItem({
   onToggleCollapse?: () => void;
 }) {
   const { locale, t } = useI18n();
+  const coarsePointer = useCoarsePointer();
   const [hovered, setHovered] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -2341,8 +2346,8 @@ function SessionItem({
             </button>
           )}
 
-          {/* Action buttons — shown on hover */}
-          {hovered && !session.transient && (
+          {/* Action buttons — shown on hover, always on touch (no hover there) */}
+          {(hovered || coarsePointer) && !session.transient && (
             <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
               <button
                 onClick={startRename}

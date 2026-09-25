@@ -644,7 +644,7 @@ export function ModelScopeWarningBanner({ warnings }: { warnings?: string[] }) {
 // per chunk while streaming.
 export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatInput({
   onSend, onAbort, onFollowUp, isStreaming, model, isAutoModelSelection, modelNames, modelList, modelError, modelScopeWarnings, onModelChange, modelSwitching,
-  // onCompact, onAbortCompaction, isCompacting,
+  onCompact, onAbortCompaction, isCompacting,
   compactError, compactResult, toolPreset, onToolPresetChange,
   thinkingLevel, isAutoThinkingSelection = false, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   retryInfo, queuedSubmissions, inputHistory = [], onQueuedAction,
@@ -2550,47 +2550,25 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </div>
             )}
 
-            {/* {!isStreaming && onCompact && (
-              <div>
-                <button
-                  onClick={isCompacting ? onAbortCompaction : onCompact}
-                  disabled={isStreaming && !isCompacting}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    padding: isMobile ? "0 6px" : "8px 12px",
-                    width: isMobile ? "auto" : undefined,
-                    height: 32,
-                    background: isCompacting ? "rgba(239,68,68,0.08)" : "none",
-                    border: "none",
-                    borderRadius: 9,
-                    color: isCompacting ? "#ef4444" : "var(--text-muted)",
-                    cursor: (isStreaming && !isCompacting) ? "not-allowed" : "pointer",
-                    fontSize: 12, opacity: (isStreaming && !isCompacting) ? 0.5 : 1,
-                    transition: "background 0.12s, color 0.12s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (isStreaming && !isCompacting) return;
-                    e.currentTarget.style.background = isCompacting ? "rgba(239,68,68,0.16)" : "var(--bg-hover)";
-                    e.currentTarget.style.color = isCompacting ? "#ef4444" : "var(--text)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = isCompacting ? "rgba(239,68,68,0.08)" : "none";
-                    e.currentTarget.style.color = isCompacting ? "#ef4444" : "var(--text-muted)";
-                  }}
-                   title={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
-                   aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
-                >
-                  {isCompacting ? (
-                    <><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" fill="currentColor" /></svg>{(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{t("chat.compacting")}</span>}</>
-                  ) : (
-                    <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
-                      <line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" />
-                    </svg>{(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{t("chat.compact")}</span>}</>
-                  )}
-                </button>
-              </div>
-            )} */}
+            {!isStreaming && onCompact && (
+              <button
+                onClick={isCompacting ? onAbortCompaction : onCompact}
+                disabled={isCompacting && !onAbortCompaction}
+                className="composer-chip"
+                style={isCompacting ? { color: "var(--danger)" } : undefined}
+                 title={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
+                 aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
+              >
+                {isCompacting ? (
+                  <><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" fill="currentColor" /></svg>{(!isMobile || controlsMenuOpen) && <span>{t("chat.compacting")}</span>}</>
+                ) : (
+                  <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
+                    <line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" />
+                  </svg>{(!isMobile || controlsMenuOpen) && <span>{t("chat.compact")}</span>}</>
+                )}
+              </button>
+            )}
 
             {isMobile && controlsMenuOpen && (
               <button

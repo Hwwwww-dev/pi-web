@@ -1,17 +1,18 @@
 "use client";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import Image from "next/image";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantContentBlock, AssistantMessage, CustomMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, TextContent, ThinkingContent, ToolCallContent, ToolResultMessage, UserMessage } from "@/lib/types";
+import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, UserMessage } from "@/lib/types";
 import { isTuiText, normalizeCustomPanelLines } from "@/lib/ansi";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
-import { getAssistantErrorMessage, isAssistantTruncated, isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
+import { isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
 import { getToolCategory, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
-import { extractTurnWrittenFiles, type WrittenFile } from "@/lib/turn-written-files";
+import { buildTurnActivityItems, getFinishedTurnView } from "@/lib/turn-view";
+import type { WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
 import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
-import { TurnActivityBody, TurnMetaLine, type ActivityItem, type TurnUsage } from "./ActivityRows";
+import { TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ExtensionWidgets } from "./ExtensionWidgets";
@@ -61,7 +62,7 @@ interface Props {
   onSessionStatsChange?: (stats: SessionStatsInfo | null) => void;
   onSessionStatsPanelOpen?: () => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
   onAskInNewChat?: (prompt: string, sourceSessionId: string, sourceEntryId: string) => Promise<void>;
   quoteSelectionEnabled?: boolean;
@@ -189,16 +190,6 @@ function getUserInputText(message: AgentMessage): string | null {
   return text.length > 0 ? text : null;
 }
 
-function withAssistantBlocks(
-  message: AssistantMessage,
-  content: AssistantContentBlock[],
-  options: { omitUsage?: boolean } = {},
-): AssistantMessage {
-  const next = { ...message, content };
-  if (options.omitUsage) next.usage = undefined;
-  return next;
-}
-
 function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false, children, t }: { summary: string; defaultExpanded?: boolean; reveal?: boolean; children: ReactNode; t: (key: string, params?: Record<string, string | number>) => string }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   useLayoutEffect(() => {
@@ -243,98 +234,11 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
   );
 }
 
-/**
- * Flattens a turn's process messages (assistant blocks + custom messages) into
- * ordered activity items for TurnActivityBody. Block indices are the original
- * `message.content` positions so deferred thinking can be re-fetched by index.
- */
-function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, toolResults, searchEntryId, searchBlock, processBlockLimitByIdx }: {
-  messages: AgentMessage[];
-  startIdx: number;
-  endIdx: number;
-  entryIds: (string | undefined)[];
-  toolResults: Map<string, ToolResultMessage>;
-  searchEntryId?: string;
-  searchBlock?: AssistantContentBlock;
-  /** Message idx → exclusive block count (drops the final answer's own blocks). */
-  processBlockLimitByIdx?: Map<number, number>;
-}): ActivityItem[] {
-  const items: ActivityItem[] = [];
-  for (let idx = startIdx; idx < endIdx; idx++) {
-    const message = messages[idx];
-    if (!message) continue;
-    const entryId = entryIds[idx];
-    const hitsEntry = searchEntryId !== undefined && entryId === searchEntryId;
-    if (message.role === "custom") {
-      items.push({ kind: "custom", key: `custom-${entryId ?? idx}`, message: message as CustomMessage, searchTarget: hitsEntry });
-      continue;
-    }
-    if (message.role !== "assistant") continue;
-    const assistantMessage = message as AssistantMessage;
-    const content = assistantMessage.content ?? [];
-    const limit = processBlockLimitByIdx?.get(idx) ?? content.length;
-    // Same file-timestamp estimate AssistantMessageView used: time from the
-    // previous message to this one approximates the thinking block's duration.
-    const prevMessage = messages[idx - 1] as (AgentMessage & { timestamp?: number }) | undefined;
-    let thinkingDuration: number | undefined;
-    if (assistantMessage.timestamp && prevMessage?.timestamp) {
-      const secs = Math.round((assistantMessage.timestamp - prevMessage.timestamp) / 1000);
-      if (secs > 0) thinkingDuration = secs;
-    }
-    for (let blockIdx = 0; blockIdx < content.length && blockIdx < limit; blockIdx++) {
-      const block = content[blockIdx];
-      if (block.type === "thinking" && !block.deferred && block.thinking.trim() === "") continue;
-      const searchTarget = hitsEntry && block === searchBlock;
-      if (block.type === "thinking") {
-        items.push({ kind: "thinking", key: `thinking-${entryId ?? idx}-${blockIdx}`, block: block as ThinkingContent, duration: thinkingDuration, entryId, blockIndex: blockIdx, searchTarget });
-        continue;
-      }
-      if (block.type === "toolCall") {
-        const toolCall = block as ToolCallContent;
-        const result = toolResults.get(toolCall.toolCallId);
-        let duration: number | undefined;
-        if (result?.timestamp && assistantMessage.timestamp) {
-          const secs = Math.round((result.timestamp - assistantMessage.timestamp) / 1000);
-          if (secs > 0) duration = secs;
-        }
-        items.push({ kind: "tool", key: `tool-${toolCall.toolCallId ?? `${entryId ?? idx}-${blockIdx}`}`, block: toolCall, result, duration, searchTarget });
-        continue;
-      }
-      if (block.type === "text") {
-        items.push({ kind: "text", key: `text-${entryId ?? idx}-${blockIdx}`, block: block as TextContent, searchTarget });
-      }
-    }
-  }
-  return items;
-}
-
-/** Sums the usage of every assistant message in a turn for the meta line. */
-function summarizeTurnUsage({ messages, startIdx, endIdx }: {
-  messages: AgentMessage[];
-  startIdx: number;
-  endIdx: number;
-}): { usage: TurnUsage | null; lastAssistant: AssistantMessage | null } {
-  let usage: TurnUsage | null = null;
-  let lastAssistant: AssistantMessage | null = null;
-  for (let idx = startIdx; idx < endIdx; idx++) {
-    const message = messages[idx];
-    if (message?.role !== "assistant") continue;
-    const assistantMessage = message as AssistantMessage;
-    lastAssistant = assistantMessage;
-    const messageUsage = assistantMessage.usage;
-    if (messageUsage) {
-      usage ??= { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } };
-      usage.input += messageUsage.input ?? 0;
-      usage.output += messageUsage.output ?? 0;
-      usage.cacheRead += messageUsage.cacheRead ?? 0;
-      usage.cacheWrite += messageUsage.cacheWrite ?? 0;
-      usage.cost.total += messageUsage.cost?.total ?? 0;
-    }
-  }
-  return { usage, lastAssistant };
-}
-
-export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile, onOpenSession, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio }: Props) {
+// Memoized so AppShell-level state churn (session stats / context-usage
+// polling, panel toggles) does not re-render every chat instance, including
+// the keep-alive background slots. Props are hook state and stable
+// useCallback handlers in AppShell.
+export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile, onOpenSession, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const completionNotificationsEnabled = session?.relation?.kind !== "subagent";
@@ -1015,6 +919,289 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     />
   );
 
+  // The message list is built in one memoized pass. Streaming chunks only change
+  // `streamState`, so the memo holds across them: per-chunk renders reuse the
+  // previous element identities and the memoized message/activity views skip
+  // re-rendering. Recomputes happen on message appends (a few times per turn),
+  // search reveals, and run boundaries.
+  const messageListView = useMemo(() => {
+    let liveActivityRendered = false;
+      let lastUserIdx = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "user") { lastUserIdx = i; break; }
+      }
+      // Anchor for live-tail detection. A compaction summary or subagent
+      // completion can sit after the last user message and own the
+      // still-streaming segment. lastUserIdx stays the scroll target.
+      let lastAnchorIdx = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (isMessageGroupAnchor(messages[i])) { lastAnchorIdx = i; break; }
+      }
+
+      const visibleRefIndexByMessage = new Map<number, number>();
+      let refIdx = 0;
+      messages.forEach((msg, idx) => {
+        if (isMessageGroupAnchor(msg) || msg.role === "assistant") {
+          visibleRefIndexByMessage.set(idx, refIdx++);
+        }
+      });
+
+      const attachVisibleRef = (idx: number, refIndex: number) => (el: HTMLDivElement | null) => {
+        messageRefs.current[refIndex] = el;
+        if (idx === lastUserIdx) { (lastUserMsgRef as { current: HTMLDivElement | null }).current = el; }
+      };
+
+      const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; showModelLabel?: boolean } = {}): ReactNode => {
+        const msg = options.messageOverride ?? messages[idx];
+        const isVisible = isMessageGroupAnchor(msg) || msg.role === "assistant";
+        const currentRefIdx = visibleRefIndexByMessage.get(idx);
+        const keyPrefix = options.keyPrefix ?? "message";
+        const messageKey = entryIds[idx] ?? idx;
+        let showTimestamp = false;
+        if (msg.role === "assistant") {
+          showTimestamp = true;
+          for (let j = idx + 1; j < messages.length; j++) {
+            const r = messages[j].role;
+            if (r === "user") break;
+            if (r === "assistant") { showTimestamp = false; break; }
+          }
+          // Hide on the currently-streaming tail (the streaming bubble owns the live timestamp)
+          if (showTimestamp && streamState.isStreaming && idx === messages.length - 1) {
+            showTimestamp = false;
+          }
+        }
+        if (options.showTimestamp !== undefined) showTimestamp = options.showTimestamp;
+        const view = (
+          <MessageView
+            key={`${keyPrefix}-view-${messageKey}`}
+            message={msg}
+            toolResults={toolResultsMap}
+            modelNames={modelNames}
+            cwd={messageCwd}
+            onOpenFile={onOpenFile}
+            onOpenSession={onOpenSession}
+            entryId={entryIds[idx]}
+            searchBlock={entryIds[idx] === pendingSearchScroll?.entryId ? searchBlock : undefined}
+            onFork={sessionBusy || isNew ? undefined : handleFork}
+            forking={forkingEntryId === entryIds[idx]}
+            onNavigate={sessionBusy ? undefined : handleNavigate}
+            onEditContent={handleEditContent}
+            showTimestamp={showTimestamp}
+            prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
+            sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+            writtenFiles={options.writtenFiles}
+            showModelLabel={options.showModelLabel}
+          />
+        );
+        if (!isVisible || currentRefIdx === undefined) return view;
+        return (
+          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
+            {view}
+          </div>
+        );
+      };
+
+      const rendered: ReactNode[] = [];
+      let idx = 0;
+      // Lazy pagination: the loaded window may begin mid-turn, before
+      // this turn's user message, so the anchor scan cannot group it.
+      // Render that partial head as flat activity rows (like the live
+      // tail) instead of standalone messages; once earlier messages
+      // finish loading the turn regroups normally.
+      if (hasEarlierMessages && messages.length > 0 && !isMessageGroupAnchor(messages[0])) {
+        let headEnd = 0;
+        while (headEnd < messages.length && !isMessageGroupAnchor(messages[headEnd])) headEnd += 1;
+        const headItems = buildTurnActivityItems({
+          messages,
+          startIdx: 0,
+          endIdx: headEnd,
+          entryIds,
+          toolResults: toolResultsMap,
+          searchEntryId: pendingSearchScroll?.entryId,
+          searchBlock,
+        });
+        if (headItems.length > 0) {
+          rendered.push(
+            <TurnActivityBody
+              key="head-activity"
+              items={headItems}
+              cwd={messageCwd}
+              onOpenFile={onOpenFile}
+              onOpenSession={onOpenSession}
+              sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+            />,
+          );
+        } else {
+          for (let headIdx = 0; headIdx < headEnd; headIdx++) {
+            rendered.push(renderMessage(headIdx, { showModelLabel: true }));
+          }
+        }
+        idx = headEnd;
+      }
+      for (; idx < messages.length;) {
+        const msg = messages[idx];
+        if (!isMessageGroupAnchor(msg)) {
+          rendered.push(renderMessage(idx, { showModelLabel: true }));
+          idx += 1;
+          continue;
+        }
+
+        const userIdx = idx;
+        let endIdx = userIdx + 1;
+        while (endIdx < messages.length && !isMessageGroupAnchor(messages[endIdx])) endIdx += 1;
+
+        const finalAssistantIdx = findFinalAssistantIndex(messages, userIdx, endIdx);
+
+        if (finalAssistantIdx === -1) {
+          for (let renderIdx = userIdx; renderIdx < endIdx; renderIdx++) {
+            rendered.push(renderMessage(renderIdx, { showModelLabel: true }));
+          }
+          idx = endIdx;
+          continue;
+        }
+
+        const isLiveTail = (sessionBusy || streamState.isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
+        if (isLiveTail) {
+          // A running turn streams as flat activity rows (no wrapper, no
+          // final-answer split); once settled the turn regroups below.
+          rendered.push(renderMessage(userIdx));
+          const liveItems = buildTurnActivityItems({
+            messages,
+            startIdx: userIdx + 1,
+            endIdx,
+            entryIds,
+            toolResults: toolResultsMap,
+            searchEntryId: pendingSearchScroll?.entryId,
+            searchBlock,
+          });
+          if (liveItems.length > 0) {
+            liveActivityRendered = true;
+            rendered.push(
+              <TurnActivityBody
+                key={`live-activity-${entryIds[userIdx] ?? userIdx}`}
+                items={liveItems}
+                cwd={messageCwd}
+                onOpenFile={onOpenFile}
+                onOpenSession={onOpenSession}
+                sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+                live
+              />,
+            );
+          }
+          idx = endIdx;
+          continue;
+        }
+
+        rendered.push(renderMessage(userIdx));
+
+        // Per-turn view model, cached by the turn's entry fingerprint so its
+        // object identities survive list recomputes (memoized MessageView /
+        // TurnActivityBody then skip finished turns entirely).
+        const turnView = getFinishedTurnView({
+          messages,
+          userIdx,
+          endIdx,
+          finalAssistantIdx,
+          entryIds,
+          cwd: messageCwd,
+          searchEntryId: pendingSearchScroll?.entryId,
+          searchBlockKey: pendingSearchScroll?.blockIndex,
+          searchBlock,
+        });
+        const { finalAnswerMessage, writtenFiles, activityItems, processBlockLimitByIdx } = turnView;
+
+        // Search reveal: the outer group opens when the hit sits inside it.
+        let revealProcess = false;
+        let processRefIdx: number | undefined;
+        for (let processIdx = userIdx + 1; processIdx <= finalAssistantIdx; processIdx++) {
+          const processMessage = messages[processIdx];
+          const hitsEntry = Boolean(pendingSearchScroll && pendingSearchScroll.entryId === entryIds[processIdx]);
+          if (processMessage.role === "custom") {
+            revealProcess ||= hitsEntry;
+            processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
+            continue;
+          }
+          if (processMessage.role !== "assistant") continue;
+          const processContent = (processMessage as AssistantMessage).content ?? [];
+          const processLimit = processBlockLimitByIdx?.get(processIdx) ?? processContent.length;
+          if (processLimit === 0) continue;
+          processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
+          revealProcess ||= hitsEntry && (!searchBlock || processContent.slice(0, processLimit).includes(searchBlock));
+        }
+
+        const categoryCounts = new Map<ToolCategory, number>();
+        for (const item of activityItems) {
+          if (item.kind === "tool") {
+            const category = getToolCategory(item.block.toolName);
+            categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
+          }
+        }
+        let processMessageCount = 0;
+        for (let processIdx = userIdx + 1; processIdx <= finalAssistantIdx; processIdx++) {
+          const role = messages[processIdx]?.role;
+          if (role === "assistant" || role === "custom") processMessageCount += 1;
+        }
+        const categorySummary = [...categoryCounts.entries()]
+          .map(([category, count]) => `${count} ${t(TOOL_CATEGORY_LABEL_KEYS[category])}`)
+          .join(" · ");
+        const processSummary = categorySummary
+          ? `${t("chat.processDetails")} · ${categorySummary}`
+          : `${t("chat.processDetails")} · ${processMessageCount} ${t(processMessageCount === 1 ? "chat.message" : "chat.messages")}`;
+
+        if (activityItems.length > 0) {
+          rendered.push(
+            <div
+              key={`process-group-${entryIds[userIdx] ?? userIdx}`}
+              ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
+            >
+              <ProcessDetailsGroup summary={processSummary} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
+                <TurnActivityBody
+                  items={activityItems}
+                  cwd={messageCwd}
+                  onOpenFile={onOpenFile}
+                  onOpenSession={onOpenSession}
+                  sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+                />
+              </ProcessDetailsGroup>
+            </div>,
+          );
+        }
+
+        if (finalAnswerMessage) {
+          rendered.push(renderMessage(finalAssistantIdx, {
+            messageOverride: finalAnswerMessage,
+            writtenFiles,
+            // The turn's timestamp lives on the TurnMetaLine right below; a
+            // second copy in the message footer read like a rendering glitch.
+            showTimestamp: false,
+          }));
+        }
+
+        // One aggregated usage/model/time line per turn replaces the
+        // per-message usage rows and model labels.
+        const { usage: turnUsage, lastAssistant: turnLastAssistant } = turnView;
+        rendered.push(
+          <TurnMetaLine
+            key={`turn-meta-${entryIds[userIdx] ?? userIdx}`}
+            usage={turnUsage}
+            model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
+            time={formatTime(turnLastAssistant?.timestamp)}
+          />,
+        );
+
+        for (let renderIdx = finalAssistantIdx + 1; renderIdx < endIdx; renderIdx++) {
+          rendered.push(renderMessage(renderIdx, { showModelLabel: true }));
+        }
+        idx = endIdx;
+      }
+    return { rendered, liveActivityRendered };
+  }, [messages, entryIds, toolResultsMap, hasEarlierMessages, streamState.isStreaming, sessionBusy,
+     forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
+     sessionIdRef, handleFork, handleNavigate, handleEditContent, onOpenFile, onOpenSession,
+     isNew, messageRefs, lastUserMsgRef]);
+  const { rendered: turnRendered, liveActivityRendered } = messageListView;
+  const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
+  const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center text-text-muted">
@@ -1031,9 +1218,6 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     );
   }
 
-  // Set by the message-list IIFE when the running turn already renders its own
-  // activity rows with spinners; the phase text line then stays out of the way.
-  let liveActivityRendered = false;
 
   return (
     <div
@@ -1119,303 +1303,12 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
         >
           <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
             <div ref={messageContentRef} onPointerUp={captureQuotedSelection} style={{ width: "100%", minWidth: 0, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
-            {(() => {
-              let lastUserIdx = -1;
-              for (let i = messages.length - 1; i >= 0; i--) {
-                if (messages[i].role === "user") { lastUserIdx = i; break; }
-              }
-              // Anchor for live-tail detection. A compaction summary or subagent
-              // completion can sit after the last user message and own the
-              // still-streaming segment. lastUserIdx stays the scroll target.
-              let lastAnchorIdx = -1;
-              for (let i = messages.length - 1; i >= 0; i--) {
-                if (isMessageGroupAnchor(messages[i])) { lastAnchorIdx = i; break; }
-              }
-
-              const visibleRefIndexByMessage = new Map<number, number>();
-              let refIdx = 0;
-              messages.forEach((msg, idx) => {
-                if (isMessageGroupAnchor(msg) || msg.role === "assistant") {
-                  visibleRefIndexByMessage.set(idx, refIdx++);
-                }
-              });
-
-              const attachVisibleRef = (idx: number, refIndex: number) => (el: HTMLDivElement | null) => {
-                messageRefs.current[refIndex] = el;
-                if (idx === lastUserIdx) { (lastUserMsgRef as { current: HTMLDivElement | null }).current = el; }
-              };
-
-              const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; showModelLabel?: boolean } = {}): ReactNode => {
-                const msg = options.messageOverride ?? messages[idx];
-                const isVisible = isMessageGroupAnchor(msg) || msg.role === "assistant";
-                const currentRefIdx = visibleRefIndexByMessage.get(idx);
-                const keyPrefix = options.keyPrefix ?? "message";
-                const messageKey = entryIds[idx] ?? idx;
-                let showTimestamp = false;
-                if (msg.role === "assistant") {
-                  showTimestamp = true;
-                  for (let j = idx + 1; j < messages.length; j++) {
-                    const r = messages[j].role;
-                    if (r === "user") break;
-                    if (r === "assistant") { showTimestamp = false; break; }
-                  }
-                  // Hide on the currently-streaming tail (the streaming bubble owns the live timestamp)
-                  if (showTimestamp && streamState.isStreaming && idx === messages.length - 1) {
-                    showTimestamp = false;
-                  }
-                }
-                if (options.showTimestamp !== undefined) showTimestamp = options.showTimestamp;
-                const view = (
-                  <MessageView
-                    key={`${keyPrefix}-view-${messageKey}`}
-                    message={msg}
-                    toolResults={toolResultsMap}
-                    modelNames={modelNames}
-                    cwd={messageCwd}
-                    onOpenFile={onOpenFile}
-                    onOpenSession={onOpenSession}
-                    entryId={entryIds[idx]}
-                    searchBlock={entryIds[idx] === pendingSearchScroll?.entryId ? searchBlock : undefined}
-                    onFork={sessionBusy || isNew ? undefined : handleFork}
-                    forking={forkingEntryId === entryIds[idx]}
-                    onNavigate={sessionBusy ? undefined : handleNavigate}
-                    onEditContent={handleEditContent}
-                    showTimestamp={showTimestamp}
-                    prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
-                    sessionId={session?.id ?? sessionIdRef.current ?? undefined}
-                    writtenFiles={options.writtenFiles}
-                    showModelLabel={options.showModelLabel}
-                  />
-                );
-                if (!isVisible || currentRefIdx === undefined) return view;
-                return (
-                  <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
-                    {view}
-                  </div>
-                );
-              };
-
-              const rendered: ReactNode[] = [];
-              let idx = 0;
-              // Lazy pagination: the loaded window may begin mid-turn, before
-              // this turn's user message, so the anchor scan cannot group it.
-              // Render that partial head as flat activity rows (like the live
-              // tail) instead of standalone messages; once earlier messages
-              // finish loading the turn regroups normally.
-              if (hasEarlierMessages && messages.length > 0 && !isMessageGroupAnchor(messages[0])) {
-                let headEnd = 0;
-                while (headEnd < messages.length && !isMessageGroupAnchor(messages[headEnd])) headEnd += 1;
-                const headItems = buildTurnActivityItems({
-                  messages,
-                  startIdx: 0,
-                  endIdx: headEnd,
-                  entryIds,
-                  toolResults: toolResultsMap,
-                  searchEntryId: pendingSearchScroll?.entryId,
-                  searchBlock,
-                });
-                if (headItems.length > 0) {
-                  rendered.push(
-                    <TurnActivityBody
-                      key="head-activity"
-                      items={headItems}
-                      cwd={messageCwd}
-                      onOpenFile={onOpenFile}
-                      onOpenSession={onOpenSession}
-                      sessionId={session?.id ?? sessionIdRef.current ?? undefined}
-                    />,
-                  );
-                } else {
-                  for (let headIdx = 0; headIdx < headEnd; headIdx++) {
-                    rendered.push(renderMessage(headIdx, { showModelLabel: true }));
-                  }
-                }
-                idx = headEnd;
-              }
-              for (; idx < messages.length;) {
-                const msg = messages[idx];
-                if (!isMessageGroupAnchor(msg)) {
-                  rendered.push(renderMessage(idx, { showModelLabel: true }));
-                  idx += 1;
-                  continue;
-                }
-
-                const userIdx = idx;
-                let endIdx = userIdx + 1;
-                while (endIdx < messages.length && !isMessageGroupAnchor(messages[endIdx])) endIdx += 1;
-
-                const finalAssistantIdx = findFinalAssistantIndex(messages, userIdx, endIdx);
-
-                if (finalAssistantIdx === -1) {
-                  for (let renderIdx = userIdx; renderIdx < endIdx; renderIdx++) {
-                    rendered.push(renderMessage(renderIdx, { showModelLabel: true }));
-                  }
-                  idx = endIdx;
-                  continue;
-                }
-
-                const isLiveTail = (sessionBusy || streamState.isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
-                if (isLiveTail) {
-                  // A running turn streams as flat activity rows (no wrapper, no
-                  // final-answer split); once settled the turn regroups below.
-                  rendered.push(renderMessage(userIdx));
-                  const liveItems = buildTurnActivityItems({
-                    messages,
-                    startIdx: userIdx + 1,
-                    endIdx,
-                    entryIds,
-                    toolResults: toolResultsMap,
-                    searchEntryId: pendingSearchScroll?.entryId,
-                    searchBlock,
-                  });
-                  if (liveItems.length > 0) {
-                    liveActivityRendered = true;
-                    rendered.push(
-                      <TurnActivityBody
-                        key={`live-activity-${entryIds[userIdx] ?? userIdx}`}
-                        items={liveItems}
-                        cwd={messageCwd}
-                        onOpenFile={onOpenFile}
-                        onOpenSession={onOpenSession}
-                        sessionId={session?.id ?? sessionIdRef.current ?? undefined}
-                        live
-                      />,
-                    );
-                  }
-                  idx = endIdx;
-                  continue;
-                }
-
-                rendered.push(renderMessage(userIdx));
-
-                const finalAssistant = messages[finalAssistantIdx] as AssistantMessage;
-                const finalSplit = splitFinalAssistantBlocks(finalAssistant);
-                const finalAnswerMessage = finalSplit.answerBlocks.length > 0 || getAssistantErrorMessage(finalAssistant) || isAssistantTruncated(finalAssistant)
-                  ? withAssistantBlocks(finalAssistant, finalSplit.answerBlocks, { omitUsage: true })
-                  : null;
-
-                // The final assistant's answer blocks render as the reply; only its
-                // process prefix feeds the activity rows.
-                const finalProcessEnd = finalAssistant.content.indexOf(finalSplit.answerBlocks[0]);
-                const processBlockLimitByIdx = finalProcessEnd < 0 ? undefined : new Map([[finalAssistantIdx, finalProcessEnd]]);
-
-                const activityItems = buildTurnActivityItems({
-                  messages,
-                  startIdx: userIdx + 1,
-                  endIdx: finalAssistantIdx + 1,
-                  entryIds,
-                  toolResults: toolResultsMap,
-                  searchEntryId: pendingSearchScroll?.entryId,
-                  searchBlock,
-                  processBlockLimitByIdx,
-                });
-
-                // Search reveal: the outer group opens when the hit sits inside it.
-                let revealProcess = false;
-                let processRefIdx: number | undefined;
-                for (let processIdx = userIdx + 1; processIdx <= finalAssistantIdx; processIdx++) {
-                  const processMessage = messages[processIdx];
-                  const hitsEntry = Boolean(pendingSearchScroll && pendingSearchScroll.entryId === entryIds[processIdx]);
-                  if (processMessage.role === "custom") {
-                    revealProcess ||= hitsEntry;
-                    processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
-                    continue;
-                  }
-                  if (processMessage.role !== "assistant") continue;
-                  const processContent = (processMessage as AssistantMessage).content ?? [];
-                  const processLimit = processBlockLimitByIdx?.get(processIdx) ?? processContent.length;
-                  if (processLimit === 0) continue;
-                  processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
-                  revealProcess ||= hitsEntry && (!searchBlock || processContent.slice(0, processLimit).includes(searchBlock));
-                }
-
-                const categoryCounts = new Map<ToolCategory, number>();
-                for (const item of activityItems) {
-                  if (item.kind === "tool") {
-                    const category = getToolCategory(item.block.toolName);
-                    categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
-                  }
-                }
-                let processMessageCount = 0;
-                for (let processIdx = userIdx + 1; processIdx <= finalAssistantIdx; processIdx++) {
-                  const role = messages[processIdx]?.role;
-                  if (role === "assistant" || role === "custom") processMessageCount += 1;
-                }
-                const categorySummary = [...categoryCounts.entries()]
-                  .map(([category, count]) => `${count} ${t(TOOL_CATEGORY_LABEL_KEYS[category])}`)
-                  .join(" · ");
-                const processSummary = categorySummary
-                  ? `${t("chat.processDetails")} · ${categorySummary}`
-                  : `${t("chat.processDetails")} · ${processMessageCount} ${t(processMessageCount === 1 ? "chat.message" : "chat.messages")}`;
-
-                if (activityItems.length > 0) {
-                  rendered.push(
-                    <div
-                      key={`process-group-${entryIds[userIdx] ?? userIdx}`}
-                      ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
-                    >
-                      <ProcessDetailsGroup summary={processSummary} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
-                        <TurnActivityBody
-                          items={activityItems}
-                          cwd={messageCwd}
-                          onOpenFile={onOpenFile}
-                          onOpenSession={onOpenSession}
-                          sessionId={session?.id ?? sessionIdRef.current ?? undefined}
-                        />
-                      </ProcessDetailsGroup>
-                    </div>,
-                  );
-                }
-
-                if (finalAnswerMessage) {
-                  // Each tool call is stored as its own assistant entry, so the
-                  // final answer alone carries no record of what the turn wrote.
-                  // Gather the turn's assistant blocks and derive the file list
-                  // from the write/edit calls among them.
-                  const turnContent: AssistantContentBlock[] = [];
-                  for (let i = userIdx + 1; i <= finalAssistantIdx; i++) {
-                    const m = messages[i];
-                    if (m?.role === "assistant") {
-                      for (const b of (m as AssistantMessage).content ?? []) turnContent.push(b);
-                    }
-                  }
-                  const writtenFiles = extractTurnWrittenFiles(turnContent, toolResultsMap, messageCwd);
-                  rendered.push(renderMessage(finalAssistantIdx, {
-                    messageOverride: finalAnswerMessage,
-                    writtenFiles,
-                  }));
-                }
-
-                // One aggregated usage/model/time line per turn replaces the
-                // per-message usage rows and model labels.
-                const { usage: turnUsage, lastAssistant: turnLastAssistant } = summarizeTurnUsage({ messages, startIdx: userIdx + 1, endIdx: finalAssistantIdx + 1 });
-                rendered.push(
-                  <TurnMetaLine
-                    key={`turn-meta-${entryIds[userIdx] ?? userIdx}`}
-                    usage={turnUsage}
-                    model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
-                    time={formatTime(turnLastAssistant?.timestamp)}
-                  />,
-                );
-
-                for (let renderIdx = finalAssistantIdx + 1; renderIdx < endIdx; renderIdx++) {
-                  rendered.push(renderMessage(renderIdx, { showModelLabel: true }));
-                }
-                idx = endIdx;
-              }
-              const { startIndex } = getVisibleRenderWindow(rendered.length, visibleCount);
-              const hasMore = startIndex > 0 || hasEarlierMessages;
-              return (
-                <>
-                  {hasMore && (
-                     <div ref={sentinelRef} className="py-3 text-center text-xs text-text-muted">
-                       {t("chat.loadEarlier")}
-                    </div>
-                  )}
-                  {rendered.slice(startIndex)}
-                </>
-              );
-            })()}
+            {hasMoreRendered && (
+              <div ref={sentinelRef} className="py-3 text-center text-xs text-text-muted">
+                {t("chat.loadEarlier")}
+              </div>
+            )}
+            {turnRendered.slice(startIndex)}
             {streamState.isStreaming && hasStreamingContent && streamState.streamingMessage && (
               <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSession={onOpenSession} />
             )}
@@ -1593,7 +1486,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       {isEmptyNew && <div className="min-h-0 flex-1" />}
     </div>
   );
-}
+});
 
 // Toast 整体高度上限；文本区高度上限 = 整体上限 - 上下 padding(14*2) - 上下边框(1*2)
 const NOTICE_MAX_HEIGHT_PX = 500;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
@@ -18,6 +18,7 @@ import { isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansi
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
+import { formatUsage, type ActivityItem, type TurnUsage } from "@/lib/turn-view";
 import type { CustomMessage, ImageContent, TextContent, ThinkingContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,7 +43,7 @@ function ToolCategoryIcon({ category, isError }: { category: ToolCategory; isErr
     height: 13,
     viewBox: "0 0 24 24",
     fill: "none",
-    stroke: isError ? "#ef4444" : "currentColor",
+    stroke: isError ? "var(--danger)" : "currentColor",
     strokeWidth: 1.8,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
@@ -126,8 +127,10 @@ function ToolCategoryIcon({ category, isError }: { category: ToolCategory; isErr
   }
 }
 
-/** A clickable file reference inside a tool row, opening the file viewer. */
-function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; onOpenFile?: (filePath: string, page?: number) => void }) {
+/** A clickable file reference inside a tool row, opening the file viewer.
+ *  A span rather than a button: it sits inside the row-header button, and
+ *  nested buttons double-trigger the row toggle and trip validateDOMNesting. */
+function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void }) {
   const resolved = resolveLocalFilePath(path, cwd) ?? path;
   const name = getFileName(resolved);
   const relative = cwd ? getRelativeFilePath(resolved, cwd) : resolved;
@@ -137,20 +140,27 @@ function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; o
       ? relative.slice(0, relative.lastIndexOf("\\"))
       : null;
   const clickable = Boolean(onOpenFile);
+  const activate = () => onOpenFile!(resolved);
   return (
-    <button
-      type="button"
+    <span
       className="tool-file-chip"
       title={resolved}
       aria-label={name}
-      disabled={!clickable}
-      onClick={clickable ? () => onOpenFile!(resolved) : undefined}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? (event) => { event.stopPropagation(); activate(); } : undefined}
+      onKeyDown={clickable ? (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.stopPropagation();
+        event.preventDefault();
+        activate();
+      } : undefined}
       style={clickable ? undefined : { cursor: "default" }}
     >
       {getFileIcon(name, 12)}
       <span className="tool-file-chip-name">{name}</span>
       {dir && <span className="tool-file-chip-dir">{dir}/</span>}
-    </button>
+    </span>
   );
 }
 
@@ -180,7 +190,7 @@ function ToolRowPreview({ block, result, cwd, onOpenFile }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
   cwd?: string;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
 }) {
   const paths = useMemo(() => {
     if (isApplyPatchToolName(block.toolName)) return applyPatchPaths(block, result);
@@ -205,7 +215,7 @@ export function ToolRow({ block, result, duration, cwd, onOpenFile, onOpenSessio
   result?: ToolResultMessage;
   duration?: number;
   cwd?: string;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
   isStreaming?: boolean;
 }) {
@@ -320,7 +330,7 @@ export function ToolRow({ block, result, duration, cwd, onOpenFile, onOpenSessio
 export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSession, defaultExpanded = false }: {
   calls: ToolCallEntry[];
   cwd?: string;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
   defaultExpanded?: boolean;
 }) {
@@ -479,7 +489,7 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
         title={t("i18n.thinking")}
         onClick={() => setExpanded((v) => !v)}
       >
-        <span className="activity-row-icon" style={{ color: active ? "#d4a017" : undefined }}><ThinkingIcon active={expanded || Boolean(active)} /></span>
+        <span className="activity-row-icon" style={{ color: active ? "var(--warning)" : undefined }}><ThinkingIcon active={expanded || Boolean(active)} /></span>
         <span className="activity-row-label">{t("i18n.thinking")}</span>
         <span className="activity-row-preview">{preview}</span>
         {active ? <RowSpinner /> : duration !== undefined && <span className="activity-row-meta">{duration}s</span>}
@@ -488,7 +498,7 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
       {expanded && (
         <div
           className="activity-row-body"
-          style={{ maxHeight: 380, overflowY: "auto", overscrollBehavior: "contain", ...(error ? { color: "#f87171" } : undefined) }}
+          style={{ maxHeight: 380, overflowY: "auto", overscrollBehavior: "contain", ...(error ? { color: "var(--danger)" } : undefined) }}
         >
           {loading ? t("i18n.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
         </div>
@@ -555,7 +565,7 @@ function customRowLabel(message: CustomMessage, t: (key: string, params?: Record
 export function CustomRow({ message, cwd, onOpenFile, onOpenSession }: {
   message: CustomMessage;
   cwd?: string;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
 }) {
   const { t } = useI18n();
@@ -659,7 +669,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSession }: {
 export function CompactionRow({ message, cwd, onOpenFile }: {
   message: CustomMessage;
   cwd?: string;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
@@ -738,49 +748,29 @@ function CompactionFileList({ title, files }: { title: string; files: string[] }
 // Per-turn meta line (aggregated usage / model / time)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface TurnUsage {
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-  cost: { total: number };
-}
-
-export function formatUsage(usage: TurnUsage): string {
-  const parts = [];
-  if (usage.input) parts.push(`${usage.input.toLocaleString()} in`);
-  if (usage.output) parts.push(`${usage.output.toLocaleString()} out`);
-  if (usage.cacheRead) parts.push(`${usage.cacheRead.toLocaleString()} cache R`);
-  if (usage.cacheWrite) parts.push(`${usage.cacheWrite.toLocaleString()} cache W`);
-  if (usage.cost?.total) parts.push(`$${usage.cost.total.toFixed(4)}`);
-  return parts.join(" · ");
-}
-
+/** One quiet line per turn: model · cost · time. The full in/out/cache breakdown
+ *  stays available as the hover tooltip instead of a second always-on row. */
 export function TurnMetaLine({ usage, model, time }: {
   usage?: TurnUsage | null;
   model?: string;
   time?: string | null;
 }) {
   const usageText = usage ? formatUsage(usage) : null;
+  const costText = usage?.cost?.total ? `$${usage.cost.total.toFixed(4)}` : null;
   if (!usageText && !model && !time) return null;
   return (
-    <div className="turn-meta-line">
-      {usageText && <span>{usageText}</span>}
+    <div className="turn-meta-line" title={usageText ?? undefined}>
       {model && <span>{model}</span>}
+      {costText && <span>{costText}</span>}
       {time && <span>{time}</span>}
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Activity item assembly — shared by finished turns and the live tail
+// Activity item assembly — shared by finished turns and the live tail.
+// The ActivityItem / TurnUsage types and formatUsage live in lib/turn-view.
 // ─────────────────────────────────────────────────────────────────────────────
-
-export type ActivityItem =
-  | { kind: "thinking"; key: string; block: ThinkingContent; duration?: number; entryId?: string; blockIndex: number; searchTarget?: boolean }
-  | { kind: "text"; key: string; block: TextContent; searchTarget?: boolean }
-  | { kind: "tool"; key: string; block: ToolCallContent; result?: ToolResultMessage; duration?: number; searchTarget?: boolean }
-  | { kind: "custom"; key: string; message: CustomMessage; searchTarget?: boolean };
 
 /** MarkdownBody with an oversized-content guard: huge messages render as a
  *  click-to-reveal plain-text <pre> instead of running the markdown pipeline. */
@@ -837,11 +827,15 @@ export function SafeMarkdownBody({ children, className, ...props }: React.Compon
  * Renders a turn's process as compact activity rows. Consecutive tool calls of
  * the same category merge into one group row; thinking and custom messages get
  * their own row; interstitial prose flows as plain text.
+ *
+ * Memoized on prop identity: `items` comes from the cached turn view, so list
+ * recomputes during streaming reuse the previous identity and finished turns
+ * skip re-rendering their rows entirely.
  */
-export function TurnActivityBody({ items, cwd, onOpenFile, onOpenSession, sessionId, live = false }: {
+export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onOpenFile, onOpenSession, sessionId, live = false }: {
   items: ActivityItem[];
   cwd?: string;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
   /** Needed to load deferred thinking content from history on expand. */
   sessionId?: string;
@@ -936,7 +930,7 @@ export function TurnActivityBody({ items, cwd, onOpenFile, onOpenSession, sessio
     index += 1;
   }
   return <div className="activity-body">{nodes}</div>;
-}
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool call detail views (moved from MessageView; shared with bash executions)
@@ -1050,16 +1044,16 @@ function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right
 function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" | "right" }) {
   const bg =
     cell.type === "added"
-      ? "rgba(34,197,94,0.12)"
+      ? "var(--diff-add-bg)"
       : cell.type === "removed"
-      ? "rgba(248,113,113,0.13)"
+      ? "var(--diff-del-bg)"
       : cell.type === "empty"
       ? "var(--bg-subtle)"
       : "transparent";
   const marker =
     cell.type === "added" ? "+" : cell.type === "removed" ? "-" : " ";
   const markerColor =
-    cell.type === "added" ? "#22c55e" : cell.type === "removed" ? "#f87171" : "var(--text-dim)";
+    cell.type === "added" ? "var(--diff-add)" : cell.type === "removed" ? "var(--diff-del)" : "var(--text-dim)";
 
   return (
     <div
@@ -1124,13 +1118,13 @@ function PatchTextView({ text }: { text: string }) {
           line.startsWith("-") && !line.startsWith("---") ? "removed" :
           "context";
         const bg =
-          kind === "added" ? "rgba(34,197,94,0.12)" :
-          kind === "removed" ? "rgba(248,113,113,0.13)" :
-          kind === "hunk" ? "rgba(96,165,250,0.12)" :
+          kind === "added" ? "var(--diff-add-bg)" :
+          kind === "removed" ? "var(--diff-del-bg)" :
+          kind === "hunk" ? "var(--diff-hunk-bg)" :
           "transparent";
         const color =
-          kind === "added" ? "#22c55e" :
-          kind === "removed" ? "#f87171" :
+          kind === "added" ? "var(--diff-add)" :
+          kind === "removed" ? "var(--diff-del)" :
           kind === "hunk" ? "var(--accent)" :
           "var(--text)";
 
@@ -1141,9 +1135,9 @@ function PatchTextView({ text }: { text: string }) {
               display: "flex",
               background: bg,
               borderLeft: kind === "added"
-                ? "3px solid #22c55e"
+                ? "3px solid var(--diff-add)"
                 : kind === "removed"
-                ? "3px solid #f87171"
+                ? "3px solid var(--diff-del)"
                 : kind === "hunk"
                 ? "3px solid var(--accent)"
                 : "3px solid transparent",

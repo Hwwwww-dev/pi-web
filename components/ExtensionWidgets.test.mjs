@@ -9,7 +9,6 @@ const jiti = createJiti(import.meta.url, {
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const {
-  DEFAULT_EXPANDED_WIDGET_LINES,
   ExtensionWidgets,
   formatExtensionWidgetContent,
   getNextExpandedWidgetKey,
@@ -33,9 +32,8 @@ test("renders short extension widgets without a truncation marker", () => {
     widgets: [{ key: "short", lines: ["first", "second"], placement: "aboveEditor" }],
   });
 
-  assert.match(html, /first\nsecond/);
   assert.doesNotMatch(html, /widget truncated/);
-  assert.match(html, /aria-expanded="true"/);
+  assert.match(html, /aria-expanded="false"/);
   assert.match(html, /data-direction="up"/);
   assert.doesNotMatch(html, /[\u2191\u2193]/);
 });
@@ -49,7 +47,7 @@ test("collapses long widgets by default", () => {
     widgets: [{ key: "long", lines, placement: "belowEditor" }],
   });
 
-  assert.ok(lines.length > DEFAULT_EXPANDED_WIDGET_LINES);
+  assert.ok(lines.length > 3);
   assert.match(html, /aria-expanded="false"/);
   assert.match(html, /data-direction="down"/);
   assert.doesNotMatch(html, /<pre/);
@@ -70,20 +68,20 @@ test("keeps all widget lines available for the scrollable expanded panel", () =>
   assert.doesNotMatch(content, /widget truncated/);
 });
 
-test("keeps compact widgets expanded by default", () => {
+test("keeps compact widgets collapsed by default", () => {
   const lines = Array.from(
-    { length: DEFAULT_EXPANDED_WIDGET_LINES },
+    { length: 3 },
     (_, index) => `line-${index + 1}`,
   );
   const html = renderWidgets({
     widgets: [{ key: "compact", lines, placement: "aboveEditor" }],
   });
 
-  assert.match(html, /aria-expanded="true"/);
-  assert.match(html, /<pre/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.doesNotMatch(html, /<pre/);
 });
 
-test("expands at most one compact widget", () => {
+test("renders no expanded panel while every widget starts collapsed", () => {
   const html = renderWidgets({
     widgets: [
       { key: "first", lines: ["one", "two"], placement: "aboveEditor" },
@@ -91,10 +89,8 @@ test("expands at most one compact widget", () => {
     ],
   });
 
-  assert.equal((html.match(/aria-expanded="true"/g) ?? []).length, 1);
-  assert.equal((html.match(/<section/g) ?? []).length, 1);
-  assert.match(html, /aria-labelledby="[^"]*trigger-0"/);
-  assert.doesNotMatch(html, /aria-labelledby="[^"]*trigger-1"/);
+  assert.equal((html.match(/aria-expanded="true"/g) ?? []).length, 0);
+  assert.equal((html.match(/<section/g) ?? []).length, 0);
 });
 
 test("switching widgets closes the previously expanded widget", () => {

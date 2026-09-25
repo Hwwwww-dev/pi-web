@@ -145,7 +145,8 @@ test("the running-state poll reloads the catalogue instead of patching rows", ()
 
 test("does not expose disk-backed actions for transient sessions", () => {
   assert.match(sessionItemSource, /if \(session\.transient\) return;/);
-  assert.match(sessionItemSource, /\{hovered && !session\.transient && \(/);
+  // Touch devices have no hover: the row actions must stay reachable there.
+  assert.match(sessionItemSource, /\{\(hovered \|\| coarsePointer\) && !session\.transient && \(/);
 });
 
 test("hides subagent rows and aggregates their state into the main session row", () => {

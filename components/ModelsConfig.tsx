@@ -38,6 +38,7 @@ import {
   ConfigSidebar,
   ConfigSidebarItem,
   ConfigSidebarList,
+  ConfigSidebarGroupLabel,
   ConfigSidebarText,
   ConfigSplitView,
 } from "./SettingsUi";
@@ -2145,6 +2146,9 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
           {/* Left: tree */}
           <ConfigSidebar>
             <ConfigSidebarList>
+              {(activeOAuth.length > 0 || activeApiKey.length > 0) && (
+                <ConfigSidebarGroupLabel>{t("modelsConfig.groupSignedIn")}</ConfigSidebarGroupLabel>
+              )}
               {/* Active OAuth subscriptions */}
               {activeOAuth.map((p) => {
                 const isSelected = selection?.type === "oauth" && selection.providerId === p.id;
@@ -2183,6 +2187,9 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
               )}
 
               {/* Custom providers */}
+              {providers.length > 0 && (
+                <ConfigSidebarGroupLabel>{t("modelsConfig.groupCustom")}</ConfigSidebarGroupLabel>
+              )}
               {loading ? (
                  <div style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>{t("i18n.loading")}</div>
               ) : providers.map(([pName, pData]) => {

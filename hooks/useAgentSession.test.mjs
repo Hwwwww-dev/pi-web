@@ -358,7 +358,7 @@ test("uses server pagination state instead of guessing from rendered rows", () =
   assert.match(chatWindowSource, /const oldestId = historyCursor/);
   assert.doesNotMatch(chatWindowSource, /const oldestId = entryIds\[0\]/);
   assert.match(chatWindowSource, /if \(!hasEarlierMessages\) return/);
-  assert.match(chatWindowSource, /const hasMore = startIndex > 0 \|\| hasEarlierMessages/);
+  assert.match(chatWindowSource, /const hasMoreRendered = startIndex > 0 \|\| hasEarlierMessages/);
   assert.doesNotMatch(chatWindowSource, /rendered\.length >= visibleCount/);
 });
 

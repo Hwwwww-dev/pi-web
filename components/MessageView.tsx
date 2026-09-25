@@ -9,8 +9,8 @@ import {
   SafeMarkdownBody,
   ThinkingRow,
   ToolRow,
-  formatUsage,
 } from "./ActivityRows";
+import { formatUsage } from "@/lib/turn-view";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
 import { getAssistantErrorMessage, isAssistantTruncated, isEmptyThinkingBlock } from "@/lib/message-display";
@@ -95,7 +95,7 @@ interface Props {
   toolResults?: Map<string, ToolResultMessage>;
   modelNames?: Record<string, string>;
   cwd?: string;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
   entryId?: string;
   searchBlock?: AssistantContentBlock;
@@ -236,7 +236,7 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
 function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, onNavigate, onEditContent }: {
   message: UserMessage;
   cwd?: string;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   entryId?: string;
   onFork?: (entryId: string) => void;
   forking?: boolean;
@@ -295,7 +295,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             <img
               src={src}
               alt=""
-              style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid rgba(59,130,246,0.15)" }}
+              style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid var(--user-border)" }}
             />
           </ImagePreview>
         );
@@ -323,7 +323,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             flex: 1,
             minWidth: 0,
             background: "var(--user-bg)",
-            border: "1px solid rgba(59,130,246,0.2)",
+            border: "1px solid var(--user-border)",
             borderRadius: 12,
             padding: "8px 12px",
             fontSize: "calc(14px + var(--chat-font-size-offset, 0px))",
@@ -409,7 +409,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
           display: "flex", alignItems: "center", justifyContent: "flex-end",
           gap: 6, marginTop: 3,
         }}>
-          <div style={{
+          <div className="touch-hover-actions" style={{
             display: "flex", gap: 3,
             opacity: hovered ? 1 : 0,
             pointerEvents: hovered ? "auto" : "none",
@@ -446,7 +446,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             </button>
           </div>
           {(canFork || canNavigate) && (
-            <div style={{
+            <div className="touch-hover-actions" style={{
               display: "flex", gap: 3,
               opacity: (hovered || forking) ? 1 : 0,
               pointerEvents: (hovered || forking) ? "auto" : "none",
@@ -537,7 +537,7 @@ function AssistantMessageView({
   toolResults?: Map<string, ToolResultMessage>;
   modelNames?: Record<string, string>;
   cwd?: string;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
   showTimestamp?: boolean;
   prevTimestamp?: number;
@@ -743,10 +743,10 @@ function AssistantMessageView({
           style={{
             marginTop: blocks.length > 0 ? 8 : 0,
             padding: "7px 10px",
-            border: "1px solid rgba(239,68,68,0.3)",
+            border: "1px solid var(--danger-border)",
             borderRadius: 6,
-            background: "rgba(239,68,68,0.07)",
-            color: "#ef4444",
+            background: "var(--danger-bg)",
+            color: "var(--danger)",
             fontFamily: "var(--font-mono)",
             fontSize: 12,
             lineHeight: 1.5,
@@ -764,10 +764,10 @@ function AssistantMessageView({
           style={{
             marginTop: blocks.length > 0 || providerError ? 8 : 0,
             padding: "7px 10px",
-            border: "1px solid rgba(234,179,8,0.3)",
+            border: "1px solid var(--warning-border)",
             borderRadius: 6,
-            background: "rgba(234,179,8,0.07)",
-            color: "#ca8a04",
+            background: "var(--warning-bg)",
+            color: "var(--warning)",
             fontFamily: "var(--font-mono)",
             fontSize: 12,
             lineHeight: 1.5,
@@ -795,6 +795,7 @@ function AssistantMessageView({
           <button
             onClick={copyContent}
              title={t("i18n.copyMessage")}
+            className="touch-hover-actions"
             style={{
               display: "flex", alignItems: "center", gap: 4,
               padding: "3px 8px", height: 22,
@@ -832,7 +833,7 @@ function AssistantMessageView({
   );
 }
 
-function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDuration, toolCallDurations, cwd, onOpenFile, onOpenSession, sessionId, entryId, blockIndex }: { block: AssistantContentBlock; searchTarget?: boolean; toolResults?: Map<string, ToolResultMessage>; isStreaming?: boolean; streamingDuration?: number; toolCallDurations?: Map<string, number>; cwd?: string; onOpenFile?: (filePath: string, page?: number) => void; onOpenSession?: (sessionId: string) => void; sessionId?: string; entryId?: string; blockIndex: number }) {
+function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDuration, toolCallDurations, cwd, onOpenFile, onOpenSession, sessionId, entryId, blockIndex }: { block: AssistantContentBlock; searchTarget?: boolean; toolResults?: Map<string, ToolResultMessage>; isStreaming?: boolean; streamingDuration?: number; toolCallDurations?: Map<string, number>; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void; onOpenSession?: (sessionId: string) => void; sessionId?: string; entryId?: string; blockIndex: number }) {
   if (block.type === "text") {
     return <div data-message-text data-search-target={searchTarget || undefined}><TextBlock block={block as TextContent} isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile} /></div>;
   }
@@ -848,7 +849,7 @@ function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDur
   return null;
 }
 
-function TextBlock({ block, isStreaming, cwd, onOpenFile }: { block: TextContent; isStreaming?: boolean; cwd?: string; onOpenFile?: (filePath: string, page?: number) => void }) {
+function TextBlock({ block, isStreaming, cwd, onOpenFile }: { block: TextContent; isStreaming?: boolean; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void }) {
   return <SafeMarkdownBody isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile}>{block.text}</SafeMarkdownBody>;
 }
 

@@ -6,6 +6,8 @@ import { useSyncExternalStore } from "react";
 const MOBILE_QUERY = "(max-width: 640px)";
 // Narrow phones keep secondary toolbar actions behind the More button.
 const NARROW_MOBILE_QUERY = "(max-width: 480px)";
+// Touch screens have no hover: hover-gated actions need a persistent fallback.
+const COARSE_POINTER_QUERY = "(pointer: coarse)";
 
 function subscribeToQuery(query: string, cb: () => void): () => void {
   if (typeof window === "undefined" || !window.matchMedia) return () => {};
@@ -23,6 +25,8 @@ const subscribeMobile = (cb: () => void) => subscribeToQuery(MOBILE_QUERY, cb);
 const getMobileSnapshot = () => queryMatches(MOBILE_QUERY);
 const subscribeNarrowMobile = (cb: () => void) => subscribeToQuery(NARROW_MOBILE_QUERY, cb);
 const getNarrowMobileSnapshot = () => queryMatches(NARROW_MOBILE_QUERY);
+const subscribeCoarsePointer = (cb: () => void) => subscribeToQuery(COARSE_POINTER_QUERY, cb);
+const getCoarsePointerSnapshot = () => queryMatches(COARSE_POINTER_QUERY);
 
 function getServerSnapshot(): boolean {
   return false;
@@ -40,4 +44,9 @@ export function useIsMobile(): boolean {
 /** Returns true when the compact mobile toolbar should collapse extra actions. */
 export function useIsNarrowMobile(): boolean {
   return useSyncExternalStore(subscribeNarrowMobile, getNarrowMobileSnapshot, getServerSnapshot);
+}
+
+/** Returns true on touch-primary devices (no reliable hover). */
+export function useCoarsePointer(): boolean {
+  return useSyncExternalStore(subscribeCoarsePointer, getCoarsePointerSnapshot, getServerSnapshot);
 }
