@@ -55,20 +55,25 @@ export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8,
       ),
     });
   }
-  if (ctx && (ctx.tokens !== undefined || ctx.percent !== undefined || ctx.contextWindow)) {
+  if (ctx) {
     const percent = ctx.tokens !== undefined && ctx.contextWindow
       ? (ctx.tokens / ctx.contextWindow) * 100
       : ctx.percent ?? null;
-    const text = `${percent !== null ? `${percent.toFixed(1)}%` : "?"}${ctx.contextWindow ? ` / ${formatCompactTokens(ctx.contextWindow)}` : ""}`;
-    segments.push({
-      id: "ctx",
-      node: (
-        <>
-          <span style={{ opacity: 0.75 }}>ctx</span>
-          <span style={ctxColor ? { color: ctxColor } : undefined}>{text}</span>
-        </>
-      ),
-    });
+    // No computable reading (provider without a declared context window) —
+    // omit the segment instead of rendering a meaningless "?".
+    if (percent !== null) {
+      segments.push({
+        id: "ctx",
+        node: (
+          <>
+            <span style={{ opacity: 0.75 }}>ctx</span>
+            <span style={ctxColor ? { color: ctxColor } : undefined}>
+              {`${percent.toFixed(1)}%${ctx.contextWindow ? ` / ${formatCompactTokens(ctx.contextWindow)}` : ""}`}
+            </span>
+          </>
+        ),
+      });
+    }
   }
   if (segments.length === 0) return null;
 
