@@ -212,7 +212,10 @@ export function AppShell() {
           return session ? { session, lastActiveAt: record.lastActiveAt, epoch: record.epoch } : null;
         })
         .filter((slot): slot is KeepAliveSlot => slot !== null);
-      return additions.length === 0 ? slots : [...slots, ...additions];
+      if (additions.length === 0) return slots;
+      const merged = [...slots, ...additions];
+      if (merged.length <= keepAliveConfig.maxSessions) return merged;
+      return [...merged].sort((a, b) => b.lastActiveAt - a.lastActiveAt).slice(0, keepAliveConfig.maxSessions);
     });
   }, [sessionCatalog, keepAliveConfig.idleTimeoutMinutes]);
   useEffect(() => {

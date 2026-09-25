@@ -306,6 +306,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // Read-only record of this run's answered dialogs, shown in the dialog header
   // so sequential questions ("问题 1/2") keep their earlier answers visible.
   const [answeredDialogs, setAnsweredDialogs] = useState<Array<{ id: string; question: string; answer: string; cancelled?: boolean }>>([]);
+  // Answers belong to one ask sequence; a new run starts a clean page so the
+  // previous run's answers cannot inflate the next dialog's "N/M" pager.
+  const sessionBusyPrevRef = useRef(sessionBusy);
+  useEffect(() => {
+    if (sessionBusy && !sessionBusyPrevRef.current) setAnsweredDialogs([]);
+    sessionBusyPrevRef.current = sessionBusy;
+  }, [sessionBusy]);
   const handleDialogRespond = useCallback((request: ExtensionDialogRequest, response: { value: string } | { confirmed: boolean } | { cancelled: true }) => {
     const question = (request.title.split("\n").find((line: string) => line.trim()) ?? request.title).trim().slice(0, 80);
     let answer: string;
