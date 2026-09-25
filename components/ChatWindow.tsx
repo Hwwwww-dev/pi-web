@@ -3,7 +3,7 @@ import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import Image from "next/image";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, UserMessage } from "@/lib/types";
+import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";
 import { isTuiText, normalizeCustomPanelLines } from "@/lib/ansi";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
@@ -298,6 +298,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     deferInitialScroll: Boolean(pendingScrollRestore),
   });
   const sessionBusy = agentRunning || bashRunning;
+  // Context window + live reading for usage lines: the polled reading when a
+  // run is active, the session-stats fallback while just browsing. Held in a
+  // ref so an update does not recompute the whole memoized message list.
+  const ctxInfoRef = useRef(contextUsage ?? sessionStats?.contextUsage ?? null);
+  ctxInfoRef.current = contextUsage ?? sessionStats?.contextUsage ?? null;
   // Read-only record of this run's answered dialogs, shown in the dialog header
   // so sequential questions ("问题 1/2") keep their earlier answers visible.
   const [answeredDialogs, setAnsweredDialogs] = useState<Array<{ id: string; question: string; answer: string; cancelled?: boolean }>>([]);
@@ -951,7 +956,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         if (idx === lastUserIdx) { (lastUserMsgRef as { current: HTMLDivElement | null }).current = el; }
       };
 
-      const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; showModelLabel?: boolean } = {}): ReactNode => {
+      const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; showModelLabel?: boolean; hideCopy?: boolean } = {}): ReactNode => {
         const msg = options.messageOverride ?? messages[idx];
         const isVisible = isMessageGroupAnchor(msg) || msg.role === "assistant";
         const currentRefIdx = visibleRefIndexByMessage.get(idx);
@@ -991,6 +996,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             sessionId={session?.id ?? sessionIdRef.current ?? undefined}
             writtenFiles={options.writtenFiles}
             showModelLabel={options.showModelLabel}
+            hideCopy={options.hideCopy}
           />
         );
         if (!isVisible || currentRefIdx === undefined) return view;
@@ -1025,6 +1031,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             <TurnActivityBody
               key="head-activity"
               items={headItems}
+              ctxWindow={ctxInfoRef.current?.contextWindow}
               cwd={messageCwd}
               onOpenFile={onOpenFile}
               onOpenSession={onOpenSession}
@@ -1080,6 +1087,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               <TurnActivityBody
                 key={`live-activity-${entryIds[userIdx] ?? userIdx}`}
                 items={liveItems}
+                ctxWindow={ctxInfoRef.current?.contextWindow}
                 cwd={messageCwd}
                 onOpenFile={onOpenFile}
                 onOpenSession={onOpenSession}
@@ -1157,6 +1165,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               <ProcessDetailsGroup summary={processSummary} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
                 <TurnActivityBody
                   items={activityItems}
+                  ctxWindow={ctxInfoRef.current?.contextWindow}
                   cwd={messageCwd}
                   onOpenFile={onOpenFile}
                   onOpenSession={onOpenSession}
@@ -1174,18 +1183,37 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             // The turn's timestamp lives on the TurnMetaLine right below; a
             // second copy in the message footer read like a rendering glitch.
             showTimestamp: false,
+            // The copy affordance joins the TurnMetaLine instead of hanging
+            // alone under the reply.
+            hideCopy: true,
           }));
         }
 
         // One aggregated usage/model/time line per turn replaces the
-        // per-message usage rows and model labels.
+        // per-message usage rows and model labels. ctx = context occupancy
+        // after this turn: the next request's prompt, or the live reading
+        // while this is still the conversation tail.
         const { usage: turnUsage, lastAssistant: turnLastAssistant } = turnView;
+        const finalAnswerCopyText = finalAnswerMessage
+          ? (finalAnswerMessage.content ?? [])
+              .filter((b): b is TextContent => b.type === "text")
+              .map((b) => b.text)
+              .join("\n")
+          : "";
+        const isConversationTail = endIdx >= messages.length;
+        const liveCtx = turnView.nextPromptTokens === undefined && isConversationTail
+          ? ctxInfoRef.current ?? null
+          : null;
         rendered.push(
           <TurnMetaLine
             key={`turn-meta-${entryIds[userIdx] ?? userIdx}`}
             usage={turnUsage}
             model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
             time={formatTime(turnLastAssistant?.timestamp)}
+            copySource={finalAnswerCopyText || undefined}
+            ctxTokens={turnView.nextPromptTokens}
+            liveCtx={liveCtx}
+            ctxWindow={ctxInfoRef.current?.contextWindow}
           />,
         );
 

@@ -87,11 +87,12 @@ test("keeps theme and language in settings instead of the chat toolbar", () => {
   assert.match(source, /useTheme\(\);/);
 });
 
-test("prioritizes context and cost when the mobile statistics area narrows", () => {
-  assert.match(source, /\.mobile-session-stats \{[\s\S]*?container-type: inline-size/);
-  assert.match(source, /@container \(max-width: 158px\)[\s\S]*?\.mobile-session-stat-io/);
-  assert.match(source, /@container \(max-width: 88px\)[\s\S]*?\.mobile-session-stat-cost/);
-  assert.match(source, /mobileContextText = percent !== null \? formatContextPercent\(percent, 1\) : null/);
+test("renders the session stats control as an icon-only panel toggle", () => {
+  // Usage numbers moved into the per-turn meta lines and expanded tool rows;
+  // the top bar keeps only the entry to the detailed session panel.
+  assert.match(source, /Usage numbers moved into the per-turn meta lines/);
+  assert.doesNotMatch(source, /mobileContextText/);
+  assert.doesNotMatch(source, /mobile-session-stat-io|mobile-session-stat-cost/);
 });
 
 test("places trust warnings below the mobile toolbar and the file toggle in toolbar flow", () => {

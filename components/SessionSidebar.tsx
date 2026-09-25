@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { SessionInfo } from "@/lib/types";
 import { listSessionFamilies } from "@/lib/session-family";
 import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
@@ -22,6 +23,16 @@ import { SessionSearch } from "./SessionSearch";
 // Fixed row height for the session list. SessionItem renders at exactly this
 // height, so the list can be windowed (only the visible slice is mounted).
 const SESSION_LIST_ITEM_HEIGHT = 54;
+
+// Session row actions menu — portal-rendered so the row's overflow:hidden and
+// any transformed sidebar drawer cannot clip or displace it.
+const SESSION_MENU_ITEM_BASE: CSSProperties = {
+  display: "flex", alignItems: "center", gap: 8, width: "100%",
+  padding: "7px 10px",
+  background: "none", border: "none", borderRadius: 6,
+  color: "var(--text)", cursor: "pointer",
+  fontSize: 12, textAlign: "left", whiteSpace: "nowrap",
+};
 
 export function getSessionListIndices(count: number, scrollTop: number, viewportHeight: number, focusedIndex = -1): number[] {
   const overscan = 8;
@@ -2161,6 +2172,44 @@ function SessionItem({
     setConfirmDelete(false);
   }, []);
 
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const [actionsMenuPos, setActionsMenuPos] = useState({ top: 0, right: 0 });
+  const menuAnchorRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const openActionsMenu = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Roughly two menu items; flip above when the list bottom is too close.
+    const menuHeight = 84;
+    setActionsMenuPos({
+      top: rect.bottom + 4 + menuHeight > window.innerHeight ? rect.top - menuHeight - 4 : rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    });
+    setActionsMenuOpen(true);
+  }, []);
+
+  // Close on outside press, Escape, or any scroll (the menu is viewport-fixed,
+  // so it must not outlive the row position it was anchored to).
+  useEffect(() => {
+    if (!actionsMenuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (menuAnchorRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setActionsMenuOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setActionsMenuOpen(false); };
+    const onScroll = () => setActionsMenuOpen(false);
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [actionsMenuOpen]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const handled = dispatchSessionRowContextMenu({
       id: session.id,
@@ -2346,15 +2395,18 @@ function SessionItem({
             </button>
           )}
 
-          {/* Action buttons — shown on hover, always on touch (no hover there) */}
+          {/* Row actions — kebab shown on hover, always on touch (no hover there) */}
           {(hovered || coarsePointer) && !session.transient && (
-            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            <div ref={menuAnchorRef} style={{ flexShrink: 0 }}>
               <button
-                onClick={startRename}
-                title={t("sidebar.rename")}
+                onClick={openActionsMenu}
+                title={t("sidebar.moreActions")}
+                aria-label={t("sidebar.moreActions")}
+                aria-haspopup="menu"
+                aria-expanded={actionsMenuOpen || undefined}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 32, height: 32, padding: 0,
+                  width: 28, height: 28, padding: 0,
                   background: "var(--bg-hover)", border: "1px solid var(--border)",
                   borderRadius: 7, color: "var(--text-muted)",
                   cursor: "pointer", flexShrink: 0,
@@ -2363,48 +2415,60 @@ function SessionItem({
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "var(--bg-selected)";
                   e.currentTarget.style.color = "var(--accent)";
-                  e.currentTarget.style.borderColor = "rgba(37,99,235,0.35)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "var(--bg-hover)";
                   e.currentTarget.style.color = "var(--text-muted)";
-                  e.currentTarget.style.borderColor = "var(--border)";
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="1.9" />
+                  <circle cx="12" cy="12" r="1.9" />
+                  <circle cx="12" cy="19" r="1.9" />
                 </svg>
               </button>
+            </div>
+          )}
+          {actionsMenuOpen && !session.transient && createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              style={{
+                position: "fixed", top: actionsMenuPos.top, right: actionsMenuPos.right, zIndex: 1000,
+                minWidth: 132, padding: 4,
+                background: "var(--bg-panel)", border: "1px solid var(--border)",
+                borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+              }}
+            >
               <button
-                onClick={handleDeleteClick}
-                title={t("sidebar.deleteWithShiftClick")}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 32, height: 32, padding: 0,
-                  background: "var(--bg-hover)", border: "1px solid var(--border)",
-                  borderRadius: 7, color: "var(--text-muted)",
-                  cursor: "pointer", flexShrink: 0,
-                  transition: "background 0.12s, color 0.12s, border-color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(239,68,68,0.08)";
-                  e.currentTarget.style.color = "#ef4444";
-                  e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text-muted)";
-                  e.currentTarget.style.borderColor = "var(--border)";
-                }}
+                role="menuitem"
+                onClick={(e) => { e.stopPropagation(); setActionsMenuOpen(false); startRename(e); }}
+                style={SESSION_MENU_ITEM_BASE}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                </svg>
+                {t("sidebar.rename")}
+              </button>
+              <button
+                role="menuitem"
+                onClick={(e) => { e.stopPropagation(); setActionsMenuOpen(false); handleDeleteClick(e); }}
+                style={{ ...SESSION_MENU_ITEM_BASE, color: "var(--danger)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--danger-bg)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                   <polyline points="3 6 5 6 21 6" />
                   <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
                   <path d="M10 11v6M14 11v6" />
                   <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                 </svg>
+                {t("sidebar.delete")}
               </button>
-            </div>
+            </div>,
+            document.body,
           )}
         </>
       )}

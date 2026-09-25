@@ -107,6 +107,8 @@ interface Props {
   prevTimestamp?: number;
   sessionId?: string;
   showModelLabel?: boolean;
+  /** Turn-grouped final answers: the copy affordance lives on the turn meta line. */
+  hideCopy?: boolean;
   /**
    * Files this turn wrote, derived by the caller from the whole turn's
    * successful write/edit tool calls. ChatWindow computes this because the
@@ -185,12 +187,12 @@ function haveSameRelevantToolResults(
   return true;
 }
 
-export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, modelNames, cwd, onOpenFile, onOpenSession, entryId, searchBlock, onFork, forking, onNavigate, onEditContent, showTimestamp, prevTimestamp, sessionId, writtenFiles, showModelLabel }: Props) {
+export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, modelNames, cwd, onOpenFile, onOpenSession, entryId, searchBlock, onFork, forking, onNavigate, onEditContent, showTimestamp, prevTimestamp, sessionId, writtenFiles, showModelLabel, hideCopy }: Props) {
   if (message.role === "user") {
     return <UserMessageView message={message as UserMessage} cwd={cwd} onOpenFile={onOpenFile} entryId={entryId} onFork={onFork} forking={forking} onNavigate={onNavigate} onEditContent={onEditContent} />;
   }
   if (message.role === "assistant") {
-    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} onOpenSession={onOpenSession} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} showModelLabel={showModelLabel} />;
+    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} onOpenSession={onOpenSession} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} showModelLabel={showModelLabel} hideCopy={hideCopy} />;
   }
   if (message.role === "toolResult") {
     // Rendered inline under its toolCall — skip standalone rendering if paired
@@ -230,7 +232,8 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
     && prev.prevTimestamp === next.prevTimestamp
     && prev.writtenFiles === next.writtenFiles
     && prev.sessionId === next.sessionId
-    && prev.showModelLabel === next.showModelLabel;
+    && prev.showModelLabel === next.showModelLabel
+    && prev.hideCopy === next.hideCopy;
 });
 
 function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, onNavigate, onEditContent }: {
@@ -404,7 +407,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
       </div>
 
       {/* Bottom row: action buttons + timestamp */}
-      {(time || canFork || canNavigate || true) && (
+      {(
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "flex-end",
           gap: 6, marginTop: 3,
@@ -417,16 +420,15 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
           }}>
             <button
               onClick={copyContent}
-               title={t("i18n.copyMessage")}
+              title={t("i18n.copyMessage")}
+              aria-label={t("i18n.copyMessage")}
               style={{
-                display: "flex", alignItems: "center", gap: 4,
-                padding: "3px 8px", height: 22,
+                display: "flex", alignItems: "center",
+                padding: "3px 6px", height: 22,
                 background: "none", border: "none",
                 borderRadius: 5,
                 color: copied ? "var(--accent)" : "var(--text-dim)",
                 cursor: "pointer",
-                fontSize: 11, fontWeight: 400,
-                whiteSpace: "nowrap",
                 transition: "color 0.12s",
               }}
               onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
@@ -442,7 +444,6 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                 </svg>
               )}
-               {copied ? t("i18n.copied") : t("i18n.copy")}
             </button>
           </div>
           {(canFork || canNavigate) && (
@@ -458,15 +459,14 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                     if (navigated) onEditContent?.(editTarget);
                   })}
                    title={t("i18n.editFromHereTitle")}
+                  aria-label={t("i18n.editFromHere")}
                   style={{
-                    display: "flex", alignItems: "center", gap: 4,
-                    padding: "3px 8px", height: 22,
+                    display: "flex", alignItems: "center",
+                    padding: "3px 6px", height: 22,
                     background: "none", border: "none",
                     borderRadius: 5,
                     color: "var(--text-dim)",
                     cursor: "pointer",
-                    fontSize: 11, fontWeight: 400,
-                    whiteSpace: "nowrap",
                     transition: "color 0.12s",
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
@@ -476,7 +476,6 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                     <polyline points="15 10 20 15 15 20" />
                     <path d="M4 4v7a4 4 0 0 0 4 4h12" />
                   </svg>
-                   {t("i18n.editFromHere")}
                 </button>
               )}
               {canFork && (
@@ -484,15 +483,14 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   onClick={() => { onFork!(entryId!); }}
                   disabled={forking}
                    title={forking ? t("i18n.creatingSession") : t("i18n.newSessionTitle")}
+                  aria-label={t("i18n.newSession")}
                   style={{
-                    display: "flex", alignItems: "center", gap: 4,
-                    padding: "3px 8px", height: 22,
+                    display: "flex", alignItems: "center",
+                    padding: "3px 6px", height: 22,
                     background: "none", border: "none",
                     borderRadius: 5,
                     color: forking ? "var(--accent)" : "var(--text-dim)",
                     cursor: forking ? "not-allowed" : "pointer",
-                    fontSize: 11, fontWeight: 400,
-                    whiteSpace: "nowrap",
                     transition: "color 0.12s",
                   }}
                   onMouseEnter={(e) => { if (!forking) e.currentTarget.style.color = "var(--accent)"; }}
@@ -504,7 +502,6 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                     <circle cx="6" cy="18" r="3" />
                     <path d="M18 9a9 9 0 0 1-9 9" />
                   </svg>
-                   {forking ? t("i18n.creating") : t("i18n.newSession")}
                 </button>
               )}
             </div>
@@ -531,6 +528,7 @@ function AssistantMessageView({
   searchBlock,
   writtenFiles,
   showModelLabel,
+  hideCopy,
 }: {
   message: AssistantMessage;
   isStreaming?: boolean;
@@ -550,6 +548,7 @@ function AssistantMessageView({
    * messages (interrupted turns, orphans) keep the per-message label.
    */
   showModelLabel?: boolean;
+  hideCopy?: boolean;
 }) {
   const { t } = useI18n();
   const time = showTimestamp ? formatTime(message.timestamp) : null;
@@ -783,28 +782,28 @@ function AssistantMessageView({
         <TurnWrittenFiles files={writtenFiles} onOpenFile={onOpenFile} />
       )}
 
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8, marginTop: 4,
-      }}>
-        {message.usage && !isStreaming && (
-          <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-            {formatUsage(message.usage)}
-          </div>
-        )}
-        {textContent && !isStreaming && (
+      {((message.usage && !isStreaming) || (textContent && !isStreaming && !hideCopy) || (time && !isStreaming)) && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, marginTop: 4,
+        }}>
+          {message.usage && !isStreaming && (
+            <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+              {formatUsage(message.usage)}
+            </div>
+          )}
+          {textContent && !isStreaming && !hideCopy && (
           <button
             onClick={copyContent}
-             title={t("i18n.copyMessage")}
+            title={t("i18n.copyMessage")}
+            aria-label={t("i18n.copyMessage")}
             className="touch-hover-actions"
             style={{
-              display: "flex", alignItems: "center", gap: 4,
-              padding: "3px 8px", height: 22,
+              display: "flex", alignItems: "center",
+              padding: "3px 6px", height: 22,
               background: "none", border: "none",
               borderRadius: 5,
               color: copied ? "var(--accent)" : "var(--text-dim)",
               cursor: "pointer",
-              fontSize: 11, fontWeight: 400,
-              whiteSpace: "nowrap",
               opacity: hovered ? 1 : 0,
               pointerEvents: hovered ? "auto" : "none",
               transition: "opacity 0.12s, color 0.12s",
@@ -822,13 +821,13 @@ function AssistantMessageView({
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
             )}
-             {copied ? t("i18n.copied") : t("i18n.copy")}
           </button>
-        )}
-        {time && !isStreaming && (
-          <span style={{ fontSize: 10, color: "var(--text-dim)", marginLeft: "auto" }}>{time}</span>
-        )}
-      </div>
+          )}
+          {time && !isStreaming && (
+            <span style={{ fontSize: 10, color: "var(--text-dim)", marginLeft: "auto" }}>{time}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

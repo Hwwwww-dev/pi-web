@@ -18,7 +18,7 @@ import { isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansi
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
-import { formatUsage, type ActivityItem, type TurnUsage } from "@/lib/turn-view";
+import { formatUsage, formatUsageCompact, type ActivityItem, type TurnUsage } from "@/lib/turn-view";
 import type { CustomMessage, ImageContent, TextContent, ThinkingContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,6 +176,8 @@ export interface ToolCallEntry {
   block: ToolCallContent;
   result?: ToolResultMessage;
   duration?: number;
+  usage?: TurnUsage;
+  ctxTokens?: number;
 }
 
 function applyPatchPaths(block: ToolCallContent, result?: ToolResultMessage): string[] {
@@ -210,10 +212,15 @@ function ToolRowPreview({ block, result, cwd, onOpenFile }: {
   return <>{preview}</>;
 }
 
-export function ToolRow({ block, result, duration, cwd, onOpenFile, onOpenSession, isStreaming }: {
+export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, cwd, onOpenFile, onOpenSession, isStreaming }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
   duration?: number;
+  /** The request that issued this tool call (its own assistant message's usage). */
+  usage?: TurnUsage;
+  /** Prompt tokens of the next request — context occupancy after this call. */
+  ctxTokens?: number;
+  ctxWindow?: number;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
@@ -298,6 +305,11 @@ export function ToolRow({ block, result, duration, cwd, onOpenFile, onOpenSessio
 
       {expanded && (
         <div className="activity-row-detail">
+          {usage && (
+            <div className="activity-usage-line">
+              {formatUsageCompact(usage, ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined)}
+            </div>
+          )}
           {combinedTerminalText !== null ? (
             <PairedResult
               text={combinedTerminalText}
@@ -327,8 +339,9 @@ export function ToolRow({ block, result, duration, cwd, onOpenFile, onOpenSessio
 }
 
 /** Merges consecutive same-category tool calls into one collapsed summary row. */
-export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSession, defaultExpanded = false }: {
+export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSession, defaultExpanded = false }: {
   calls: ToolCallEntry[];
+  ctxWindow?: number;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
@@ -379,6 +392,9 @@ export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSession, defaultExp
               block={call.block}
               result={call.result}
               duration={call.duration}
+              usage={call.usage}
+              ctxTokens={call.ctxTokens}
+              ctxWindow={ctxWindow}
               cwd={cwd}
               onOpenFile={onOpenFile}
               onOpenSession={onOpenSession}
@@ -748,21 +764,68 @@ function CompactionFileList({ title, files }: { title: string; files: string[] }
 // Per-turn meta line (aggregated usage / model / time)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** One quiet line per turn: model · cost · time. The full in/out/cache breakdown
- *  stays available as the hover tooltip instead of a second always-on row. */
-export function TurnMetaLine({ usage, model, time }: {
+/** One quiet line per turn: model · usage (former top-bar format) · time · copy.
+ *  ctx = context occupancy after this turn: the next request's prompt size, or
+ *  the live reading while this is still the conversation tail. */
+export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCtx, ctxWindow }: {
   usage?: TurnUsage | null;
   model?: string;
   time?: string | null;
+  /** Final answer text — renders an icon-only copy button at the line end. */
+  copySource?: string;
+  ctxTokens?: number;
+  liveCtx?: { percent: number | null; contextWindow: number } | null;
+  ctxWindow?: number;
 }) {
-  const usageText = usage ? formatUsage(usage) : null;
-  const costText = usage?.cost?.total ? `$${usage.cost.total.toFixed(4)}` : null;
-  if (!usageText && !model && !time) return null;
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  const ctx = ctxTokens !== undefined
+    ? { tokens: ctxTokens, contextWindow: ctxWindow }
+    : liveCtx
+      ? { percent: liveCtx.percent, contextWindow: liveCtx.contextWindow }
+      : undefined;
+  const usageText = usage || ctx
+    ? formatUsageCompact(usage ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } }, ctx)
+    : null;
+  if (!usageText && !model && !time && !copySource) return null;
   return (
-    <div className="turn-meta-line" title={usageText ?? undefined}>
+    <div className="turn-meta-line" title={usage ? formatUsage(usage) : undefined}>
       {model && <span>{model}</span>}
-      {costText && <span>{costText}</span>}
+      {usageText && <span>{usageText}</span>}
       {time && <span>{time}</span>}
+      {copySource && (
+        <button
+          onClick={() => {
+            copyText(copySource).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            });
+          }}
+          title={t("i18n.copyMessage")}
+          aria-label={t("i18n.copyMessage")}
+          style={{
+            marginLeft: "auto",
+            display: "flex", alignItems: "center",
+            padding: 2,
+            background: "none", border: "none",
+            borderRadius: 4,
+            color: copied ? "var(--accent)" : "var(--text-dim)",
+            cursor: "pointer",
+            transition: "color 0.12s",
+          }}
+        >
+          {copied ? (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -832,8 +895,10 @@ export function SafeMarkdownBody({ children, className, ...props }: React.Compon
  * recomputes during streaming reuse the previous identity and finished turns
  * skip re-rendering their rows entirely.
  */
-export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onOpenFile, onOpenSession, sessionId, live = false }: {
+export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindow, cwd, onOpenFile, onOpenSession, sessionId, live = false }: {
   items: ActivityItem[];
+  /** Current model's context window, for the ctx % in per-call usage lines. */
+  ctxWindow?: number;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
@@ -867,6 +932,9 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
             block={only.block}
             result={only.result}
             duration={only.duration}
+            usage={only.usage}
+            ctxTokens={only.ctxTokens}
+            ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSession={onOpenSession}
@@ -881,7 +949,10 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
               block: entry.block,
               result: entry.result,
               duration: entry.duration,
+              usage: entry.usage,
+              ctxTokens: entry.ctxTokens,
             }))}
+            ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSession={onOpenSession}

@@ -19,7 +19,7 @@ export interface TurnUsage {
 export type ActivityItem =
   | { kind: "thinking"; key: string; block: ThinkingContent; duration?: number; entryId?: string; blockIndex: number; searchTarget?: boolean }
   | { kind: "text"; key: string; block: TextContent; searchTarget?: boolean }
-  | { kind: "tool"; key: string; block: ToolCallContent; result?: ToolResultMessage; duration?: number; searchTarget?: boolean }
+  | { kind: "tool"; key: string; block: ToolCallContent; result?: ToolResultMessage; duration?: number; usage?: TurnUsage; ctxTokens?: number; searchTarget?: boolean }
   | { kind: "custom"; key: string; message: CustomMessage; searchTarget?: boolean };
 
 export function formatUsage(usage: TurnUsage): string {
@@ -30,6 +30,58 @@ export function formatUsage(usage: TurnUsage): string {
   if (usage.cacheWrite) parts.push(`${usage.cacheWrite.toLocaleString()} cache W`);
   if (usage.cost?.total) parts.push(`$${usage.cost.total.toFixed(4)}`);
   return parts.join(" · ");
+}
+
+export function usageOf(messageUsage: {
+  input?: number; output?: number; cacheRead?: number; cacheWrite?: number; cost?: { total?: number };
+} | null | undefined): TurnUsage | null {
+  if (!messageUsage) return null;
+  return {
+    input: messageUsage.input ?? 0,
+    output: messageUsage.output ?? 0,
+    cacheRead: messageUsage.cacheRead ?? 0,
+    cacheWrite: messageUsage.cacheWrite ?? 0,
+    cost: { total: messageUsage.cost?.total ?? 0 },
+  };
+}
+
+/** Prompt tokens a provider charged for one request: non-cached input plus cache reads/writes. */
+export function promptTokensOf(usage: { input?: number; cacheRead?: number; cacheWrite?: number }): number {
+  return (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);
+}
+
+/** Compact token counts, matching the former top-bar stats format. */
+export function formatCompactTokens(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+  return String(value);
+}
+
+export interface UsageContextPart {
+  /** Prompt tokens of the next model request — the context occupancy after this point. */
+  tokens?: number;
+  /** Live reading (current conversation tail); used when no next request exists yet. */
+  percent?: number | null;
+  contextWindow?: number;
+}
+
+/** The former top-bar usage format: ↑in ↓out cache N $cost ctx x% / window. */
+export function formatUsageCompact(usage: TurnUsage, ctx?: UsageContextPart): string {
+  const parts: string[] = [];
+  if (usage.input > 0) parts.push(`↑${formatCompactTokens(usage.input)}`);
+  if (usage.output > 0) parts.push(`↓${formatCompactTokens(usage.output)}`);
+  if (usage.cacheRead > 0) parts.push(`cache ${formatCompactTokens(usage.cacheRead)}`);
+  if (usage.cost?.total > 0) parts.push(`$${usage.cost.total.toFixed(4)}`);
+  if (ctx && (ctx.tokens !== undefined || ctx.percent !== undefined)) {
+    const percent = ctx.tokens !== undefined && ctx.contextWindow
+      ? (ctx.tokens / ctx.contextWindow) * 100
+      : ctx.percent ?? null;
+    if (percent !== null || ctx.contextWindow) {
+      const percentText = percent !== null ? `${percent.toFixed(1)}%` : "?";
+      parts.push(`ctx ${percentText}${ctx.contextWindow ? ` / ${formatCompactTokens(ctx.contextWindow)}` : ""}`);
+    }
+  }
+  return parts.join("  ");
 }
 
 export function withAssistantBlocks(
@@ -59,6 +111,15 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
   processBlockLimitByIdx?: Map<number, number>;
 }): ActivityItem[] {
   const items: ActivityItem[] = [];
+  // nextPromptTokens[i] = prompt tokens of the nearest assistant request after
+  // index i — the context occupancy at that point of the conversation.
+  const nextPromptTokens: (number | undefined)[] = new Array(messages.length);
+  let accPromptTokens: number | undefined;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    nextPromptTokens[i] = accPromptTokens;
+    const messageUsage = (messages[i] as AssistantMessage | undefined)?.usage;
+    if (messages[i]?.role === "assistant" && messageUsage) accPromptTokens = promptTokensOf(messageUsage);
+  }
   for (let idx = startIdx; idx < endIdx; idx++) {
     const message = messages[idx];
     if (!message) continue;
@@ -96,7 +157,16 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
           const secs = Math.round((result.timestamp - assistantMessage.timestamp) / 1000);
           if (secs > 0) duration = secs;
         }
-        items.push({ kind: "tool", key: `tool-${toolCall.toolCallId ?? `${entryId ?? idx}-${blockIdx}`}`, block: toolCall, result, duration, searchTarget });
+        items.push({
+          kind: "tool",
+          key: `tool-${toolCall.toolCallId ?? `${entryId ?? idx}-${blockIdx}`}`,
+          block: toolCall,
+          result,
+          duration,
+          usage: usageOf(assistantMessage.usage) ?? undefined,
+          ctxTokens: nextPromptTokens[idx],
+          searchTarget,
+        });
         continue;
       }
       if (block.type === "text") {
@@ -141,6 +211,8 @@ export interface FinishedTurnView {
   processBlockLimitByIdx: Map<number, number> | undefined;
   usage: TurnUsage | null;
   lastAssistant: AssistantMessage | null;
+  /** Prompt tokens of the next model request — context occupancy after this turn. */
+  nextPromptTokens?: number;
 }
 
 // A finished turn's messages are append-only, so the view only changes when the
@@ -150,6 +222,17 @@ export interface FinishedTurnView {
 // skip re-rendering while a session streams or older pages load.
 const finishedTurnViewCache = new Map<string, FinishedTurnView>();
 const FINISHED_TURN_VIEW_CACHE_MAX = 1024;
+
+/** First assistant request after `fromIdx`: its prompt size and entry id. */
+function scanNextPrompt(messages: AgentMessage[], entryIds: (string | undefined)[], fromIdx: number): { tokens?: number; entryId?: string } {
+  for (let idx = fromIdx; idx < messages.length; idx++) {
+    const message = messages[idx];
+    if (message?.role !== "assistant") continue;
+    const usage = (message as AssistantMessage).usage;
+    if (usage) return { tokens: promptTokensOf(usage), entryId: entryIds[idx] };
+  }
+  return {};
+}
 
 export function getFinishedTurnView({ messages, userIdx, endIdx, finalAssistantIdx, entryIds, cwd, searchEntryId, searchBlockKey, searchBlock }: {
   messages: AgentMessage[];
@@ -162,7 +245,11 @@ export function getFinishedTurnView({ messages, userIdx, endIdx, finalAssistantI
   searchBlockKey?: number | string;
   searchBlock?: AssistantContentBlock;
 }): FinishedTurnView {
-  const fingerprint = `${entryIds[userIdx] ?? `#${userIdx}`}|${endIdx - userIdx}|${entryIds[endIdx - 1] ?? `#${endIdx - 1}`}|${searchEntryId ?? ""}|${searchBlockKey ?? ""}|${cwd ?? ""}`;
+  const fingerprintBase = `${entryIds[userIdx] ?? `#${userIdx}`}|${endIdx - userIdx}|${entryIds[endIdx - 1] ?? `#${endIdx - 1}`}|${searchEntryId ?? ""}|${searchBlockKey ?? ""}|${cwd ?? ""}`;
+  // The turn's context occupancy depends on the next request, which only exists
+  // once a later turn has been added — recompute when that message appears.
+  const nextPromptProbe = scanNextPrompt(messages, entryIds, endIdx);
+  const fingerprint = `${fingerprintBase}|${nextPromptProbe.entryId ?? ""}`;
   const cached = finishedTurnViewCache.get(fingerprint);
   if (cached) return cached;
 
@@ -214,7 +301,16 @@ export function getFinishedTurnView({ messages, userIdx, endIdx, finalAssistantI
 
   const { usage, lastAssistant } = summarizeTurnUsage({ messages, startIdx: userIdx + 1, endIdx: finalAssistantIdx + 1 });
 
-  const view: FinishedTurnView = { finalAssistantIdx, finalAnswerMessage, writtenFiles, activityItems, processBlockLimitByIdx, usage, lastAssistant };
+  const view: FinishedTurnView = {
+    finalAssistantIdx,
+    finalAnswerMessage,
+    writtenFiles,
+    activityItems,
+    processBlockLimitByIdx,
+    usage,
+    lastAssistant,
+    nextPromptTokens: nextPromptProbe.tokens,
+  };
   if (finishedTurnViewCache.size >= FINISHED_TURN_VIEW_CACHE_MAX) finishedTurnViewCache.clear();
   finishedTurnViewCache.set(fingerprint, view);
   return view;
