@@ -401,7 +401,6 @@ export const enLocale: LocalePlugin = {
     "chat.queueBehaviorSteer": "Steer",
     "chat.queueBehaviorFollowUp": "Queue",
 
-    "chatMinimap.locateAssistant": "Jump to this answer",
     "chatMinimap.toolCalls": "{count} tools",
     "chatMinimap.turnTokens": "{tokens} tokens",
 

@@ -1,13 +1,7 @@
 "use client";
 
-import { memo, useEffect, useRef, useState, useCallback, useMemo, type RefObject } from "react";
-import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
-import rehypeKatex from "rehype-katex";
-import {
-  markdownPreviewRemarkPlugins,
-  normalizeDisplayMath,
-} from "@/lib/markdown";
-import { isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
+import { useEffect, useRef, useState, useCallback, useMemo, type RefObject } from "react";
+import { isMessageGroupAnchor } from "@/lib/message-display";
 import type { AgentMessage, AssistantMessage, CustomMessage, TextContent, UserMessage } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
 import styles from "./ChatMinimap.module.css";
@@ -31,14 +25,8 @@ const PREVIEW_SHOW_DELAY = 200;
 const PREVIEW_HIDE_DELAY = 250;
 const NAVIGATION_ACTIVE_LOCK_MS = 1600;
 
-interface AssistantPreview {
-  markdown: string;
-  element: HTMLDivElement | null;
-}
-
 interface TurnInfo {
   userMessage: UserMessage | CustomMessage;
-  assistantPreviews: AssistantPreview[];
   scrollTop: number | null;
   /** Tool calls issued anywhere in this turn's assistant replies. */
   toolCount: number;
@@ -78,140 +66,6 @@ function formatTurnTokens(value: number): string {
   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return String(value);
 }
-
-function getAssistantAnswerMarkdown(message: AgentMessage | Partial<AgentMessage>): string {
-  if (message.role !== "assistant") return "";
-  const { answerBlocks } = splitFinalAssistantBlocks(message as AssistantMessage);
-  return answerBlocks
-    .filter((block): block is TextContent => block.type === "text")
-    .map((block) => block.text)
-    .join("\n\n")
-    .trim();
-}
-
-function PreviewHeading({
-  level,
-  children,
-  headingIndex,
-  onClick,
-}: {
-  level: 1 | 2 | 3;
-  children: React.ReactNode;
-  headingIndex: number | null;
-  onClick?: (headingIndex: number) => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={styles.heading}
-      data-level={level}
-      data-preview-heading-index={headingIndex ?? undefined}
-      disabled={headingIndex === null || !onClick}
-      onClick={(event) => {
-        event.stopPropagation();
-        if (headingIndex !== null) onClick?.(headingIndex);
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-interface PreviewAstNode {
-  type?: string;
-  depth?: number;
-  data?: {
-    hProperties?: Record<string, unknown>;
-  };
-}
-
-function remarkPreviewOutline() {
-  return (tree: { children?: PreviewAstNode[] }) => {
-    if (!Array.isArray(tree.children)) return;
-    const headings = tree.children.filter((node) => (
-      node.type === "heading" && typeof node.depth === "number" && node.depth <= 3
-    ));
-    if (headings.length > 0) {
-      headings.forEach((node, headingIndex) => {
-        node.data = {
-          ...node.data,
-          hProperties: {
-            ...node.data?.hProperties,
-            "data-preview-heading-index": headingIndex,
-          },
-        };
-      });
-      tree.children = headings;
-      return;
-    }
-    const firstParagraph = tree.children.find((node) => node.type === "paragraph");
-    tree.children = firstParagraph ? [firstParagraph] : [];
-  };
-}
-
-const previewRemarkPlugins = [
-  ...(markdownPreviewRemarkPlugins ?? []),
-  remarkPreviewOutline,
-];
-const previewRehypePlugins: ReactMarkdownOptions["rehypePlugins"] = [
-  [rehypeKatex, { throwOnError: false, strict: false }],
-];
-
-function getPreviewHeadingIndex(node: unknown): number | null {
-  const properties = (node as { properties?: Record<string, unknown> } | undefined)?.properties;
-  const value = properties?.dataPreviewHeadingIndex ?? properties?.["data-preview-heading-index"];
-  if (typeof value === "number") return value;
-  if (typeof value === "string" && /^\d+$/.test(value)) return Number(value);
-  return null;
-}
-
-export const AssistantOutline = memo(function AssistantOutline({
-  markdown,
-  onHeadingClick,
-  onAnswerClick,
-}: {
-  markdown: string;
-  onHeadingClick?: (headingIndex: number) => void;
-  onAnswerClick?: () => void;
-}) {
-  const normalizedMarkdown = useMemo(() => normalizeDisplayMath(markdown), [markdown]);
-  if (!markdown) return null;
-  return (
-    <div className={styles.outline}>
-      <ReactMarkdown
-        remarkPlugins={previewRemarkPlugins}
-        rehypePlugins={previewRehypePlugins}
-        components={{
-          h1: ({ children, node }) => <PreviewHeading level={1} headingIndex={getPreviewHeadingIndex(node)} onClick={onHeadingClick}>{children}</PreviewHeading>,
-          h2: ({ children, node }) => <PreviewHeading level={2} headingIndex={getPreviewHeadingIndex(node)} onClick={onHeadingClick}>{children}</PreviewHeading>,
-          h3: ({ children, node }) => <PreviewHeading level={3} headingIndex={getPreviewHeadingIndex(node)} onClick={onHeadingClick}>{children}</PreviewHeading>,
-          h4: () => null,
-          h5: () => null,
-          h6: () => null,
-          p: ({ children }) => (
-            <button
-              type="button"
-              className={styles.paragraph}
-              onClick={onAnswerClick}
-            >
-              {children}
-            </button>
-          ),
-          blockquote: () => null,
-          ul: () => null,
-          ol: () => null,
-          pre: () => null,
-          table: () => null,
-          hr: () => null,
-          a: ({ children }) => <>{children}</>,
-          code: ({ children }) => <>{children}</>,
-        }}
-      >
-        {normalizedMarkdown}
-      </ReactMarkdown>
-    </div>
-  );
-});
 
 function createTurnNodes(turns: TurnInfo[]): NodeInfo[] {
   return turns.map((turn, index) => ({
@@ -312,9 +166,6 @@ export function ChatMinimap({
   const activeNodeLockRef = useRef<{ index: number; until: number } | null>(null);
   const pendingNavigationRef = useRef<{
     nodeIndex: number;
-    target: "user" | "assistant" | "heading";
-    assistantIndex?: number;
-    headingIndex?: number;
   } | null>(null);
 
   const allMessages = useMemo(
@@ -392,15 +243,13 @@ export function ChatMinimap({
       for (const message of allMessagesRef.current) {
         const isAnchor = isMessageGroupAnchor(message);
         if (!isAnchor && message.role !== "assistant") continue;
-        const element = refs?.[refIndex];
-        refIndex++;
-
         if (isAnchor) {
+          const element = refs?.[refIndex];
+          refIndex++;
           currentTurn = null;
           const elementRect = element?.getBoundingClientRect();
           currentTurn = {
             userMessage: message as UserMessage | CustomMessage,
-            assistantPreviews: [],
             scrollTop: elementRect
               ? elementRect.top - containerRect.top + scrollEl.scrollTop
               : null,
@@ -411,6 +260,9 @@ export function ChatMinimap({
           turns.push(currentTurn);
           continue;
         }
+        // Assistant messages consume a ref slot even though only the anchor
+        // element is read — refIndex must stay aligned with attachVisibleRef.
+        refIndex++;
 
         if (!currentTurn) continue;
         currentTurn.toolCount += countToolCalls(message);
@@ -421,13 +273,6 @@ export function ChatMinimap({
           if (tokens > 0) currentTurn.usageTokens = (currentTurn.usageTokens ?? 0) + tokens;
           const cost = usage.cost?.total;
           if (typeof cost === "number") currentTurn.usageCost = (currentTurn.usageCost ?? 0) + cost;
-        }
-        const answerMarkdown = getAssistantAnswerMarkdown(message);
-        if (answerMarkdown) {
-          currentTurn.assistantPreviews.push({
-            markdown: answerMarkdown,
-            element,
-          });
         }
       }
 
@@ -443,28 +288,7 @@ export function ChatMinimap({
         ? nextNodes[pendingNavigation.nodeIndex]
         : null;
       if (pendingNavigation && pendingNode) {
-        const assistant = pendingNavigation.assistantIndex === undefined
-          ? null
-          : pendingNode.targetTurn.assistantPreviews[pendingNavigation.assistantIndex];
-        let targetTop: number | null = pendingNode.targetTurn.scrollTop;
-        if (pendingNavigation.target === "assistant") {
-          const assistantRect = assistant?.element?.getBoundingClientRect();
-          targetTop = assistantRect
-            ? assistantRect.top - containerRect.top + scrollEl.scrollTop
-            : null;
-        } else if (pendingNavigation.target === "heading") {
-          const heading = (
-            pendingNavigation.headingIndex === undefined
-              ? null
-              : assistant?.element
-                ?.querySelectorAll<HTMLElement>("h1, h2, h3")
-                .item(pendingNavigation.headingIndex)
-          );
-          const headingRect = heading?.getBoundingClientRect();
-          targetTop = headingRect
-            ? headingRect.top - containerRect.top + scrollEl.scrollTop
-            : null;
-        }
+        const targetTop = pendingNode.targetTurn.scrollTop;
         if (targetTop === null) return;
         pendingNavigationRef.current = null;
         lockActiveNode(pendingNode.index);
@@ -514,7 +338,7 @@ export function ChatMinimap({
     if (!scrollEl) return;
     lockActiveNode(node.index);
     if (node.targetTurn.scrollTop === null) {
-      pendingNavigationRef.current = { nodeIndex: node.index, target: "user" };
+      pendingNavigationRef.current = { nodeIndex: node.index };
       onRevealHistory();
       return;
     }
@@ -523,31 +347,6 @@ export function ChatMinimap({
       node.targetTurn.scrollTop - scrollEl.clientHeight * 0.3,
     );
     scrollEl.scrollTo({ top: targetTop, behavior });
-  }, [lockActiveNode, onRevealHistory, scrollContainer]);
-
-  const scrollToAssistant = useCallback((node: NodeInfo, assistantIndex: number) => {
-    const scrollEl = scrollContainer.current;
-    if (!scrollEl) return;
-    const assistantElement = node.targetTurn.assistantPreviews[assistantIndex]?.element;
-    if (!assistantElement) {
-      pendingNavigationRef.current = {
-        nodeIndex: node.index,
-        target: "assistant",
-        assistantIndex,
-      };
-      onRevealHistory();
-      return;
-    }
-    const containerRect = scrollEl.getBoundingClientRect();
-    const assistantRect = assistantElement.getBoundingClientRect();
-    const targetTop = (
-      assistantRect.top
-      - containerRect.top
-      + scrollEl.scrollTop
-      - scrollEl.clientHeight * 0.3
-    );
-    lockActiveNode(node.index);
-    scrollEl.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
   }, [lockActiveNode, onRevealHistory, scrollContainer]);
 
   const findNearestSlot = useCallback((ratio: number): MinimapSlot | null => {
@@ -568,38 +367,6 @@ export function ChatMinimap({
     }
     return slot;
   }, []);
-
-  const scrollToHeading = useCallback((
-    node: NodeInfo,
-    assistantIndex: number,
-    headingIndex: number,
-  ) => {
-    const scrollEl = scrollContainer.current;
-    if (!scrollEl) return;
-    const answerElement = node.targetTurn.assistantPreviews[assistantIndex]?.element;
-    if (!answerElement) {
-      pendingNavigationRef.current = {
-        nodeIndex: node.index,
-        target: "heading",
-        assistantIndex,
-        headingIndex,
-      };
-      onRevealHistory();
-      return;
-    }
-    const heading = answerElement.querySelectorAll<HTMLElement>("h1, h2, h3").item(headingIndex);
-    if (!heading) return;
-    const containerRect = scrollEl.getBoundingClientRect();
-    const headingRect = heading.getBoundingClientRect();
-    const targetTop = (
-      headingRect.top
-      - containerRect.top
-      + scrollEl.scrollTop
-      - scrollEl.clientHeight * 0.3
-    );
-    lockActiveNode(node.index);
-    scrollEl.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
-  }, [lockActiveNode, onRevealHistory, scrollContainer]);
 
   const cancelPreviewHide = useCallback(() => {
     if (!previewHideTimerRef.current) return;
@@ -813,35 +580,11 @@ export function ChatMinimap({
                       scrollToNode(node, "smooth");
                     }}
                   >
-                    <span className={styles.userText}>
+                      <span className={styles.userText}>
                       {getUserPreview(node.targetTurn.userMessage)}
                     </span>
                   </button>
 
-                  {node.targetTurn.assistantPreviews.map((assistant, assistantIndex) => (
-                    <div
-                      key={assistantIndex}
-                      className={styles.assistant}
-                    >
-                      <button
-                        type="button"
-                        className={styles.assistantJump}
-                        data-minimap-preview-assistant={`${node.index}-${assistantIndex}`}
-                        onClick={() => scrollToAssistant(node, assistantIndex)}
-                        aria-label={t("chatMinimap.locateAssistant")}
-                        title={t("chatMinimap.locateAssistant")}
-                      >
-                        A
-                      </button>
-                      <AssistantOutline
-                        markdown={assistant.markdown}
-                        onAnswerClick={() => scrollToAssistant(node, assistantIndex)}
-                        onHeadingClick={(headingIndex) => (
-                          scrollToHeading(node, assistantIndex, headingIndex)
-                        )}
-                      />
-                    </div>
-                  ))}
                   {metaParts.length > 0 && (
                     <div className={styles.meta}>{metaParts.join(" · ")}</div>
                   )}

@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { registerHooks } from "node:module";
 import test from "node:test";
-import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { createJiti } from "jiti";
 
 registerHooks({
@@ -21,23 +19,7 @@ const jiti = createJiti(import.meta.url, {
   jsx: { runtime: "automatic" },
   tsconfigPaths: true,
 });
-const { AssistantOutline, countToolCalls } = await jiti.import("./ChatMinimap.tsx");
-
-test("renders math in headings without disabling heading navigation", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(AssistantOutline, {
-      markdown: String.raw`# Inline $f_{k,t+1}$
-
-## Parentheses \(x^2 + y^2\)`,
-      onHeadingClick() {},
-    }),
-  );
-
-  assert.match(html, /class="katex"/);
-  assert.match(html, /data-preview-heading-index="0"/);
-  assert.match(html, /data-preview-heading-index="1"/);
-  assert.doesNotMatch(html, /disabled=""/);
-});
+const { countToolCalls } = await jiti.import("./ChatMinimap.tsx");
 
 test("counts tool calls per assistant reply, including replies that also answer", () => {
   // A reply can both answer and call tools, so counting text-less messages

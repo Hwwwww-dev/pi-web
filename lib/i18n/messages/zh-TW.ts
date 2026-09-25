@@ -401,7 +401,6 @@ export const zhTWLocale: LocalePlugin = {
     "chat.queueBehaviorSteer": "引導",
     "chat.queueBehaviorFollowUp": "排隊",
 
-    "chatMinimap.locateAssistant": "跳轉到這則回覆",
     "chatMinimap.toolCalls": "{count} 工具",
     "chatMinimap.turnTokens": "{tokens} Token",
 
