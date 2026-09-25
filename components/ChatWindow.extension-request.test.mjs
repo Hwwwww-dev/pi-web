@@ -61,9 +61,13 @@ test("queues concurrent requests and pages over pending ones", () => {
   assert.match(hookSource, /current\.some\(\(item\) => item\.id === request\.id\) \? current : \[\.\.\.current, request\]/);
   assert.match(hookSource, /current\.filter\(\(item\) => item\.id !== request\.id\)/);
   assert.match(hookSource, /current\.filter\(\(item\) => item\.id !== event\.id\)/);
-  // Pager + answered review in the dialog header.
+  // ‹ › pager steps through answered questions (read-only) and back to the
+  // live one; Escape in review mode returns instead of cancelling.
   assert.match(dialogSource, /chat\.question\.pager/);
-  assert.match(dialogSource, /answered\.map\(\(entry, answerIndex\)/);
+  assert.match(dialogSource, /const totalQuestions = \(answered\?\.length \?\? 0\) \+ \(queueTotal \?\? 1\)/);
+  assert.match(dialogSource, /const stepToPrevious = /);
+  assert.match(dialogSource, /chat\.question\.backToCurrent/);
+  assert.match(dialogSource, /if \(reviewIndex !== null\) \{\s*\n\s*setReviewIndex\(null\);/);
 });
 
 test("select answers are two-step: click selects, confirm sends", () => {

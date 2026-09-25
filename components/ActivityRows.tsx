@@ -986,7 +986,9 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
           sessionId={sessionId}
           entryId={item.entryId}
           blockIndex={item.blockIndex}
-          active={live && item.duration === undefined}
+          // Only the block currently being written spins; finished thinking
+          // without an estimated duration must not look stuck.
+          active={live && item.duration === undefined && index === items.length - 1}
         />,
       );
       index += 1;

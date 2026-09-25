@@ -1310,7 +1310,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <ExtensionDialog
             key={extensionDialog.id}
             request={extensionDialog}
-            queueIndex={1}
             queueTotal={extensionDialogQueue.length}
             answered={answeredDialogs}
             onRespond={handleDialogRespond}
@@ -1794,13 +1793,12 @@ function parseMultiSelectPrompt(title: string): { question: string; options: Arr
 function ExtensionDialog({
   request,
   onRespond,
-  queueIndex,
   queueTotal,
   answered,
 }: {
   request: ExtensionDialogRequest;
   onRespond: (request: ExtensionDialogRequest, response: { value: string } | { confirmed: boolean } | { cancelled: true }) => void;
-  queueIndex?: number;
+  /** Requests still queued including this one — the ask tool sends several. */
   queueTotal?: number;
   answered?: Array<{ id: string; question: string; answer: string; cancelled?: boolean }>;
 }) {
@@ -1816,6 +1814,22 @@ function ExtensionDialog({
     setCheckedIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   };
   const [collapsed, setCollapsed] = useState(false);
+  // Multi-question asks page: ‹ › steps back through the answers already sent
+  // (read-only review — those responses are with the agent) and forward to the
+  // question awaiting a response.
+  const totalQuestions = (answered?.length ?? 0) + (queueTotal ?? 1);
+  const currentQuestionIndex = (answered?.length ?? 0) + 1;
+  const [reviewIndex, setReviewIndex] = useState<number | null>(null);
+  const reviewed = reviewIndex !== null ? answered?.[reviewIndex] : undefined;
+  const stepToPrevious = () => {
+    const count = answered?.length ?? 0;
+    if (!count) return;
+    setReviewIndex((current) => current === null ? count - 1 : Math.max(0, current - 1));
+  };
+  const stepToNext = () => {
+    const count = answered?.length ?? 0;
+    setReviewIndex((current) => current === null || current + 1 >= count ? null : current + 1);
+  };
   const wrapperRef = useRef<HTMLDivElement>(null);
   // The panel this dialog is anchored in, not the visual viewport, is what
   // bounds it: on mobile the chat panel is far shorter than the viewport.
@@ -1862,6 +1876,12 @@ function ExtensionDialog({
         if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
         event.preventDefault();
         event.stopPropagation();
+        // Reviewing a previous question: Escape returns to the live one
+        // instead of cancelling a response the user did not intend.
+        if (reviewIndex !== null) {
+          setReviewIndex(null);
+          return;
+        }
         onRespond(request, { cancelled: true });
       }}
       style={{
@@ -1940,34 +1960,41 @@ function ExtensionDialog({
             {/* Pi's TUI shows the title verbatim, newlines included; select/input have no
                 separate message field, so extensions put multi-line text here. */}
             <ExtensionDialogTitle title={multiSelect ? multiSelect.question || request.title : request.title} />
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", alignItems: "center" }}>
               <span>{t("chat.extensionRequest")}</span>
-              {queueTotal !== undefined && queueTotal > 1 && (
-                <span style={{ color: "var(--accent)" }}>
-                  {t("chat.question.pager", { index: queueIndex ?? 1, total: queueTotal })}
+              {totalQuestions > 1 && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <button
+                    type="button"
+                    onClick={stepToPrevious}
+                    disabled={!answered?.length || reviewIndex === 0}
+                    aria-label={t("chat.question.previous")}
+                    title={t("chat.question.previous")}
+                    style={{ display: "grid", placeItems: "center", width: 18, height: 18, padding: 0, border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-panel)", color: "var(--text-muted)", cursor: "pointer" }}
+                  >
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="6.5 2 3 5 6.5 8" />
+                    </svg>
+                  </button>
+                  <span style={{ color: reviewIndex !== null ? "var(--text)" : "var(--accent)", fontVariantNumeric: "tabular-nums" }}>
+                    {t("chat.question.pager", { index: reviewIndex !== null ? reviewIndex + 1 : currentQuestionIndex, total: totalQuestions })}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={stepToNext}
+                    disabled={reviewIndex === null}
+                    aria-label={t("chat.question.next")}
+                    title={t("chat.question.next")}
+                    style={{ display: "grid", placeItems: "center", width: 18, height: 18, padding: 0, border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-panel)", color: "var(--text-muted)", cursor: "pointer" }}
+                  >
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="3.5 2 7 5 3.5 8" />
+                    </svg>
+                  </button>
                 </span>
               )}
               {countdown}
             </div>
-            {answered && answered.length > 0 && (
-              <div style={{ marginTop: 6, display: "grid", gap: 2 }}>
-                {answered.map((entry, answerIndex) => (
-                  <div
-                    key={entry.id}
-                    style={{
-                      fontSize: 11,
-                      color: entry.cancelled ? "var(--text-dim)" : "var(--text-muted)",
-                      opacity: entry.cancelled ? 0.6 : 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {`${answerIndex + 1}. ${entry.question} — ${entry.answer}`}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
           <button
             type="button"
@@ -2000,6 +2027,21 @@ function ExtensionDialog({
             flex: "1 1 auto", minHeight: 0, overflowY: "auto",
           }}
         >
+          {reviewed ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", lineHeight: 1.55, overflowWrap: "anywhere" }}>
+                {`${(reviewIndex ?? 0) + 1}. ${reviewed.question}`}
+              </div>
+              <div style={{ padding: "9px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg-panel)", color: "var(--text)", fontSize: 13, lineHeight: 1.6, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
+                <span style={{ display: "block", marginBottom: 4, color: "var(--text-dim)", fontSize: 11 }}>
+                  {reviewed.cancelled ? t("chat.question.answeredCancelled") : t("chat.question.answerLabel")}
+                </span>
+                {reviewed.answer}
+              </div>
+              <div style={{ color: "var(--text-dim)", fontSize: 11 }}>{t("chat.question.reviewHint")}</div>
+            </div>
+          ) : (
+          <>
           {request.method === "confirm" && (
             <div style={{ fontSize: 13, lineHeight: 1.6 }}>
               <MarkdownBody>{request.message}</MarkdownBody>
@@ -2201,8 +2243,28 @@ function ExtensionDialog({
               }}
             />
           )}
+          </>
+          )}
         </div>
 
+        {reviewed ? (
+          <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--bg-panel)" }}>
+            <button
+              onClick={() => setReviewIndex(null)}
+              style={{
+                padding: "8px 14px",
+                fontSize: 13,
+                borderRadius: 6,
+                border: "1px solid var(--accent)",
+                background: "var(--accent)",
+                color: "var(--accent-contrast)",
+                cursor: "pointer",
+              }}
+            >
+              {t("chat.question.backToCurrent")}
+            </button>
+          </div>
+        ) : (
         <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--bg-panel)" }}>
           <button
             autoFocus={request.method === "confirm" || (request.method === "select" && request.options.length === 0)}
@@ -2268,6 +2330,7 @@ function ExtensionDialog({
             </button>
           )}
         </div>
+        )}
       </div>
       )}
     </div>
