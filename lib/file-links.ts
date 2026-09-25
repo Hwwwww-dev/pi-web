@@ -31,8 +31,28 @@ function normalizeFilePathSlashes(filePath: string): string {
   return filePath;
 }
 
+const LINE_SUFFIX_PATTERN = /:(\d+)(?::\d+)?$/;
+
 function stripLineSuffix(filePath: string): string {
-  return filePath.replace(/:\d+(?::\d+)?$/, "");
+  return filePath.replace(LINE_SUFFIX_PATTERN, "");
+}
+
+/** The `:line` / `:line:col` suffix of a filesystem path, if present. */
+export function parseLineSuffix(value: string): number | null {
+  const match = LINE_SUFFIX_PATTERN.exec(value);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+/**
+ * File-open options carried by a local-file href: the PDF `#page=N` fragment
+ * and/or the `:line` suffix of the path portion. Undefined when neither exists.
+ */
+export function parseFileOpenOptions(href: string | undefined): { page?: number; line?: number } | undefined {
+  const page = parsePdfPageFragment(href) ?? undefined;
+  const cleanPath = href?.split("#", 1)[0].split("?", 1)[0] ?? "";
+  const line = parseLineSuffix(cleanPath) ?? undefined;
+  if (page === undefined && line === undefined) return undefined;
+  return { page, line };
 }
 
 function normalizeLocalPath(filePath: string): string {

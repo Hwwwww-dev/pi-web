@@ -2,9 +2,9 @@
 
 import { createContext, useContext, useMemo, type ComponentProps, type MouseEvent } from "react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
-import { parsePdfPageFragment, resolveLocalFileHref, resolveLocalFilePath, shouldOpenLocalFileInApp } from "@/lib/file-links";
+import { parseFileOpenOptions, resolveLocalFileHref, resolveLocalFilePath, shouldOpenLocalFileInApp } from "@/lib/file-links";
 import { encodeFilePathForApi } from "@/lib/file-paths";
-import { inlineCodeFilePath, markdownRehypePlugins, markdownRemarkPlugins, markdownUrlTransform, normalizeDisplayMath } from "@/lib/markdown";
+import { inlineCodeFilePath, inlineCodeLineSuffix, markdownRehypePlugins, markdownRemarkPlugins, markdownUrlTransform, normalizeDisplayMath } from "@/lib/markdown";
 import { ImagePreview } from "./ImagePreview";
 import { MermaidBlock, CodeBlock } from "./MermaidBlock";
 
@@ -15,7 +15,7 @@ interface MarkdownBodyProps {
   className?: string;
   isStreaming?: boolean;
   cwd?: string;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
 }
 
 function MarkdownImage({
@@ -67,7 +67,8 @@ export function MarkdownBody({ children, className, isStreaming, cwd, onOpenFile
         const candidate = inlineCodeFilePath(raw);
         const filePath = candidate ? resolveLocalFilePath(candidate, cwd) : null;
         if (filePath) {
-          const openFile = () => onOpenFile(filePath);
+          const lineSuffix = inlineCodeLineSuffix(raw);
+          const openFile = () => onOpenFile(filePath, lineSuffix ? { line: lineSuffix.line } : undefined);
           return (
             <code
               className="markdown-inline-code markdown-inline-file"
@@ -122,7 +123,7 @@ export function MarkdownBody({ children, className, isStreaming, cwd, onOpenFile
         const target = event.currentTarget.getAttribute("target");
         if (target && target !== "_self") return;
         event.preventDefault();
-        openFile(filePath, parsePdfPageFragment(href) ?? undefined);
+        openFile(filePath, parseFileOpenOptions(href));
       };
 
       return (

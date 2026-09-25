@@ -12,7 +12,7 @@ import {
   isVideoPath,
 } from "@/lib/file-types";
 import { encodeFilePathForApi, getFileDirectory, getFileName, getRelativeFilePath } from "@/lib/file-paths";
-import { parsePdfPageFragment, resolveLocalFileHref, shouldOpenLocalFileInApp } from "@/lib/file-links";
+import { parseFileOpenOptions, resolveLocalFileHref, shouldOpenLocalFileInApp } from "@/lib/file-links";
 import { parseFrontmatter } from "@/lib/frontmatter";
 import { markdownPreviewRehypePlugins, markdownPreviewRemarkPlugins, markdownUrlTransform, normalizeDisplayMath } from "@/lib/markdown";
 import { CodeBlock, MermaidBlock } from "./MermaidBlock";
@@ -35,7 +35,7 @@ interface Props {
   filePath: string;
   cwd?: string;
   sourceSessionId?: string | null;
-  onOpenFile?: (filePath: string, page?: number) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onMentionLines?: (relativePath: string, startLine: number, endLine: number) => void;
   /** Insert this file's relative path into the chat input (@ mention). */
   onAtMention?: (relativePath: string, isDir: boolean) => void;
@@ -43,6 +43,8 @@ interface Props {
   initialDisplayMode?: DisplayMode;
   /** PDF page to open on first render (`#page=N` from a markdown link). */
   initialPage?: number;
+  /** Source line to scroll to on first load (`:line` suffix from a file link). */
+  initialLine?: number;
   initialState?: FileViewerState;
   onStateChange?: (state: FileViewerState) => void;
   watchEnabled?: boolean;
@@ -809,6 +811,7 @@ export function FileViewer({
   initialDisplayMode,
   initialState,
   initialPage,
+  initialLine,
   onStateChange,
   watchEnabled = true,
 }: Props) {
@@ -835,6 +838,7 @@ export function FileViewer({
       gitRefreshKey={gitRefreshKey}
       initialDisplayMode={initialDisplayMode}
       initialState={initialState}
+      initialLine={initialLine}
       onStateChange={onStateChange}
       watchEnabled={watchEnabled}
     />
@@ -851,6 +855,7 @@ function TextFileViewer({
   gitRefreshKey,
   initialDisplayMode,
   initialState,
+  initialLine,
   onStateChange,
   watchEnabled = true,
 }: Props) {
@@ -862,7 +867,12 @@ function TextFileViewer({
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const requestedInitialDisplayMode = resolveInitialFileDisplayMode(initialState, initialDisplayMode);
+  // A line target is an explicit "show me this source line" intent: it only
+  // makes sense in source mode, so it overrides a restored preview mode.
+  const lineTargetRef = useRef<number | null>(initialLine ?? null);
+  const requestedInitialDisplayMode = lineTargetRef.current !== null
+    ? "source" as DisplayMode
+    : resolveInitialFileDisplayMode(initialState, initialDisplayMode);
   const initialWrapLines = initialState?.wrapLines ?? false;
   const initialScrollTop = initialState?.scrollTop ?? 0;
   const initialScrollLeft = initialState?.scrollLeft ?? 0;
@@ -875,7 +885,7 @@ function TextFileViewer({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const autoDiffAppliedRef = useRef(false);
   const defaultPreviewEligibleRef = useRef(
-    initialState === undefined && initialDisplayMode === undefined,
+    initialState === undefined && initialDisplayMode === undefined && initialLine === undefined,
   );
   const scrollRestorePendingRef = useRef(true);
   const viewerStateRef = useRef<FileViewerState>({
@@ -1150,6 +1160,23 @@ function TextFileViewer({
     const content = contentRef.current;
     if (!content) return;
 
+    const lineTarget = lineTargetRef.current;
+    if (lineTarget !== null) {
+      lineTargetRef.current = null;
+      const target = content.querySelector<HTMLElement>(
+        `.file-source-line[data-line-number="${lineTarget}"]`,
+      );
+      if (target) {
+        const targetTop = target.getBoundingClientRect().top - content.getBoundingClientRect().top;
+        content.scrollTop = Math.max(0, content.scrollTop + targetTop - content.clientHeight / 3);
+        // The animation ends transparent on its own; the element is discarded
+        // on the next content reload, so no cleanup timer is needed.
+        target.classList.add("file-viewer-line-flash");
+      }
+      scrollRestorePendingRef.current = false;
+      return;
+    }
+
     content.scrollTop = viewerStateRef.current.scrollTop;
     content.scrollLeft = viewerStateRef.current.scrollLeft;
     scrollRestorePendingRef.current = false;
@@ -1334,7 +1361,7 @@ function TextFileViewer({
                   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
                     if (!shouldOpenLocalFileInApp(event)) return;
                     event.preventDefault();
-                    onOpenFile(linkedFile, parsePdfPageFragment(href) ?? undefined);
+                    onOpenFile(linkedFile, parseFileOpenOptions(href));
                   };
 
                   return <a href={href} {...props} onClick={handleClick}>{children}</a>;

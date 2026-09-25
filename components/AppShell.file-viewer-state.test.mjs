@@ -30,8 +30,9 @@ test("closing the file panel pauses the active viewer watcher", () => {
   assert.match(fileContentBlock(), /watchEnabled=\{rightPanelOpen\}/);
 });
 
-test("markdown preview links forward a PDF page fragment to the viewer", () => {
+test("markdown preview links forward page/line fragments to the viewer", () => {
   const block = fileContentBlock();
-  assert.match(block, /onOpenFile=\{\(filePath, page\) => handleOpenFile\(/);
-  assert.match(block, /\{ sourceSessionId: activeFileTab\.sourceSessionId, page \}/);
+  assert.match(block, /onOpenFile=\{\(filePath, options\) => handleOpenFile\(/);
+  assert.match(block, /page: options\?\.page,/);
+  assert.match(block, /line: options\?\.line,/);
 });

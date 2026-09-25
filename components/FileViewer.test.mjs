@@ -66,7 +66,7 @@ test("lightweight source rows are skipped for highlighted, diff, and preview vie
   assert.match(source, /<SourceCodeView content=\{viewerContent\} language=\{language\} wrapLines=\{wrapLines\} \/>/);
 });
 
-test("markdown preview links carry PDF page fragments", () => {
-  assert.match(source, /parsePdfPageFragment/);
-  assert.match(source, /onOpenFile\(linkedFile, parsePdfPageFragment\(href\) \?\? undefined\)/);
+test("markdown preview links carry page/line fragments", () => {
+  assert.match(source, /parseFileOpenOptions/);
+  assert.match(source, /onOpenFile\(linkedFile, parseFileOpenOptions\(href\)\)/);
 });

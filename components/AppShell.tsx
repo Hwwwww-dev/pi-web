@@ -512,6 +512,9 @@ export function AppShell() {
   // Files unmount when inactive; workspace terminals stay mounted until closed.
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
+  // One-shot line target for the next mount of a file tab's viewer; cleared as
+  // soon as it has been rendered so switching tabs away and back does not replay it.
+  const fileLineTargetRef = useRef<{ tabId: string; line: number } | null>(null);
   const [terminalTabs, setTerminalTabs] = useState<TerminalTab[]>([]);
   const [terminalsRestored, setTerminalsRestored] = useState(false);
   // The Git tab is opened from the sidebar entry and removed by its × like any other tab.
@@ -1060,28 +1063,35 @@ export function AppShell() {
   const handleOpenFile = useCallback((
     filePath: string,
     fileName: string,
-    options?: { sourceSessionId?: string | null; modeHint?: "diff"; page?: number },
+    options?: { sourceSessionId?: string | null; modeHint?: "diff"; page?: number; line?: number },
   ) => {
     const sourceSessionId = options?.sourceSessionId;
     const modeHint = options?.modeHint;
     const page = options?.page;
+    const line = options?.line;
     const tabId = `file:${filePath}`;
     setFileTabs((prev) => openFileTab(prev, {
       fileName,
       filePath,
       modeHint,
       page,
+      line,
       sourceSessionId,
       tabId,
     }));
+    if (line !== undefined) fileLineTargetRef.current = { tabId, line };
     setActiveFileTabId(tabId);
     setRightPanelOpen(true);
     // On mobile the file panel is full-screen; close the drawer so it shows.
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
 
-  const handleOpenLinkedFile = useCallback((filePath: string, page?: number) => {
-    handleOpenFile(filePath, getFileName(filePath), { sourceSessionId: selectedSession?.id ?? null, page });
+  const handleOpenLinkedFile = useCallback((filePath: string, options?: { page?: number; line?: number }) => {
+    handleOpenFile(filePath, getFileName(filePath), {
+      sourceSessionId: selectedSession?.id ?? null,
+      page: options?.page,
+      line: options?.line,
+    });
   }, [handleOpenFile, selectedSession?.id]);
 
   const handleOpenTerminal = useCallback((cwd: string) => {
@@ -1209,6 +1219,12 @@ export function AppShell() {
   }, [projectTrustBusy, projectTrustCwd, bumpKeepAliveSlot, selectedSession?.id]);
 
   const activeFileTab = fileTabs.find((tab) => tab.id === activeFileTabId) ?? null;
+
+  // The viewer consumed the line target as a prop during this render; drop it so
+  // later remounts (tab switches) restore the saved scroll position instead.
+  useEffect(() => {
+    fileLineTargetRef.current = null;
+  }, [activeFileTabId, activeFileTab?.viewerRevision]);
 // Tab title truncation: budget measured in CJK character widths (1 per full-width
 // char, 0.5 per half-width char like letters and digits).
 /** pi estimates the projected context by character count whenever a compaction
@@ -2630,6 +2646,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               initialDisplayMode={activeFileTab.initialDisplayMode}
               initialPage={activeFileTab.page}
               initialState={activeFileTab.viewerState}
+              initialLine={fileLineTargetRef.current?.tabId === activeFileTab.id
+                ? fileLineTargetRef.current.line
+                : undefined}
               watchEnabled={rightPanelOpen}
               onStateChange={(viewerState) => handleFileViewerStateChange(
                 activeFileTab.id,
@@ -2638,10 +2657,14 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               )}
               onMentionLines={rightPanelOpen ? handleFileLineMention : undefined}
               onAtMention={handleAtMention}
-              onOpenFile={(filePath, page) => handleOpenFile(
+              onOpenFile={(filePath, options) => handleOpenFile(
                 filePath,
                 getFileName(filePath),
-                { sourceSessionId: activeFileTab.sourceSessionId, page },
+                {
+                  sourceSessionId: activeFileTab.sourceSessionId,
+                  page: options?.page,
+                  line: options?.line,
+                },
               )}
             />
           ) : !terminalTabs.some((tab) => tab.id === activeFileTabId) ? (

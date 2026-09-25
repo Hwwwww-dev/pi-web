@@ -6,6 +6,8 @@ interface OpenFileTabInput {
   filePath: string;
   modeHint?: "diff";
   page?: number;
+  /** Source line target; when present the viewer remounts and scrolls to it. */
+  line?: number;
   sourceSessionId?: string | null;
   tabId: string;
 }
@@ -35,7 +37,8 @@ export function openFileTab(tabs: Tab[], input: OpenFileTabInput): Tab[] {
   );
   const sourceUnchanged = !sourceChanged;
   const pageChanged = existing.page !== input.page;
-  if (sourceUnchanged && !input.modeHint && !pageChanged) return tabs;
+  const lineRequested = input.line !== undefined;
+  if (sourceUnchanged && !input.modeHint && !pageChanged && !lineRequested) return tabs;
 
   return tabs.map((tab) => {
     if (tab.id !== input.tabId) return tab;
@@ -49,6 +52,7 @@ export function openFileTab(tabs: Tab[], input: OpenFileTabInput): Tab[] {
       next.page = input.page;
       bumpRevision = true;
     }
+    if (lineRequested) bumpRevision = true;
     if (input.modeHint) {
       next.initialDisplayMode = input.modeHint;
       next.viewerState = {
