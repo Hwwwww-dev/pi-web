@@ -697,8 +697,10 @@ function AssistantMessageView({
             alignItems: "center",
             gap: 6,
             // The live-tail streaming message renders next to the activity
-            // rows: line its tokens/rate up with the rows' label column.
-            paddingLeft: isStreaming && !showModelLabel ? 27 : undefined,
+            // rows: line its tokens/rate up with the rows' icon column, and
+            // keep it clear of the tool row above.
+            paddingLeft: isStreaming && !showModelLabel ? 4 : undefined,
+            marginTop: isStreaming && !showModelLabel ? 6 : undefined,
           }}
         >
           {showModelLabel && message.provider && (

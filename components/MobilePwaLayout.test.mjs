@@ -35,7 +35,7 @@ test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(viewportHookSource, /window\.scrollTo\(0, 0\)/);
   assert.match(cssSource, /height: var\(--app-viewport-height, 100dvh\)/);
   assert.match(cssSource, /left: env\(safe-area-inset-left\)/);
-  assert.match(chatWindowSource, /paddingBottom: "env\(safe-area-inset-bottom\)"/);
+  assert.match(chatWindowSource, /paddingBottom: "calc\(env\(safe-area-inset-bottom, 0px\) \/ 2\)"/);
 });
 
 test("contains chat content and inputs within the mobile viewport", () => {

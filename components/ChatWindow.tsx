@@ -1250,7 +1250,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   return (
     <div
       className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      // Half the home-indicator inset: the full 34pt left a dead white strip
+      // under the widget shelf on the iOS PWA, while the 35px trigger row
+      // still keeps its tap target clear of the indicator.
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) / 2)" }}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
