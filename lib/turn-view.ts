@@ -158,7 +158,12 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
   return items;
 }
 
-/** Sums the usage of every assistant message in a turn for the meta line. */
+/**
+ * Sums the usage of every assistant message in a turn for the meta line.
+ * Cache read/write are not summable — each request re-reads the whole cached
+ * prompt — so they report the turn's last request (the live cache hit), like
+ * the top bar's cache segment.
+ */
 export function summarizeTurnUsage({ messages, startIdx, endIdx }: {
   messages: AgentMessage[];
   startIdx: number;
@@ -176,8 +181,8 @@ export function summarizeTurnUsage({ messages, startIdx, endIdx }: {
       usage ??= { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } };
       usage.input += messageUsage.input ?? 0;
       usage.output += messageUsage.output ?? 0;
-      usage.cacheRead += messageUsage.cacheRead ?? 0;
-      usage.cacheWrite += messageUsage.cacheWrite ?? 0;
+      usage.cacheRead = messageUsage.cacheRead ?? 0;
+      usage.cacheWrite = messageUsage.cacheWrite ?? 0;
       usage.cost.total += messageUsage.cost?.total ?? 0;
     }
   }
