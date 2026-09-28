@@ -2364,8 +2364,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 return (
                   <div
                     key={slot.session.id}
-                    aria-hidden={!isActive}
-                    style={{ width: "100%", height: "100%", display: isActive ? "block" : "none" }}
+                    className="chat-slot"
+                    data-slot-state={isActive ? "active" : "hidden"}
+                    inert={!isActive}
                   >
                     <ChatWindow
                       key={`${slot.session.id}:${slot.epoch}`}

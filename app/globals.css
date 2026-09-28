@@ -1065,6 +1065,19 @@ pre, code {
   white-space: pre-wrap;
 }
 
+/* ── Keep-alive chat slots ──
+   Visibility is driven by a data attribute rather than inline styles, class
+   toggles or aria-hidden: those four attributes are what translation
+   extensions observe, and a slot switch writing them makes the extension
+   re-walk every mounted transcript. */
+.chat-slot {
+  height: 100%;
+  width: 100%;
+}
+.chat-slot[data-slot-state="hidden"] {
+  display: none;
+}
+
 /* ── Activity rows: compact one-line rendering of a turn's process ── */
 .activity-body {
   display: flex;
