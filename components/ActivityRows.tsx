@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
@@ -345,17 +345,19 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
 }
 
 /** Merges consecutive same-category tool calls into one collapsed summary row. */
-export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSession, defaultExpanded = false }: {
+export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSession }: {
   calls: ToolCallEntry[];
   ctxWindow?: number;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
-  defaultExpanded?: boolean;
 }) {
   const { t } = useI18n();
   const groupKey = `group:${calls[0]?.block.toolCallId ?? ""}`;
-  const [expanded, setExpanded] = useState(() => defaultExpanded || isToolCallExpanded(groupKey));
+  // Always start collapsed — live tail, reopened conversations, and finished
+  // turns look the same; only a user click expands (remembered across the
+  // streaming remounts by toolCallId).
+  const [expanded, setExpanded] = useState(() => isToolCallExpanded(groupKey));
   const toggleExpanded = () => {
     const next = !expanded;
     setToolCallExpanded(groupKey, next);
@@ -448,6 +450,9 @@ function loadThinkingContent(sessionId: string, entryId: string, blockIndex: num
   return request;
 }
 
+/** Distance from the card's bottom within which a manual scroll re-attaches live follow. */
+const THINKING_STREAM_TAIL_TOLERANCE = 24;
+
 export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, active }: {
   block: ThinkingContent;
   duration?: number;
@@ -464,6 +469,9 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
   const [error, setError] = useState<string | null>(null);
   const tRef = useRef(t);
   tRef.current = t;
+  const detailRef = useRef<HTMLDivElement | null>(null);
+  const stickRef = useRef(true);
+  const prevScrollTopRef = useRef(0);
   const preview = block.thinking.trimStart().match(/^[^\r\n]{0,240}/u)?.[0].trimEnd() ?? "";
 
   // Keep already-mounted blocks in sync when the preference changes.
@@ -501,6 +509,27 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
     };
   }, [expanded, block.deferred, content, sessionId, entryId, blockIndex]);
 
+  // Stick the inner scroller to the streaming tail. Detaches when the user
+  // scrolls up inside the card and re-attaches once they return near the
+  // bottom, mirroring the outer message list's live-follow behavior.
+  useEffect(() => {
+    const el = detailRef.current;
+    if (!el || !expanded || !active || !stickRef.current) return;
+    el.scrollTop = el.scrollHeight;
+    prevScrollTopRef.current = el.scrollTop;
+  }, [expanded, active, block.thinking, content]);
+
+  const handleDetailScroll = useCallback(() => {
+    const el = detailRef.current;
+    if (!el) return;
+    const delta = el.scrollTop - prevScrollTopRef.current;
+    prevScrollTopRef.current = el.scrollTop;
+    // |delta| <= 1 is our own content-growth clamping, not a user scroll.
+    if (Math.abs(delta) <= 1) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickRef.current = distanceFromBottom <= THINKING_STREAM_TAIL_TOLERANCE;
+  }, []);
+
   return (
     <div className="activity-row" data-activity="thinking">
       <button
@@ -509,7 +538,14 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
         aria-expanded={expanded}
         aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
         title={t("i18n.thinking")}
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setExpanded((v) => {
+          const next = !v;
+          // Expanding mid-stream means "show me the live tail"; expanding a
+          // finished block opens from the top for reading.
+          stickRef.current = next && Boolean(active);
+          prevScrollTopRef.current = 0;
+          return next;
+        })}
       >
         <span className="activity-row-icon" style={{ color: active ? "var(--warning)" : undefined }}><ThinkingIcon active={expanded || Boolean(active)} /></span>
         <span className="activity-row-label">{t("i18n.thinking")}</span>
@@ -519,8 +555,10 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
       </button>
       {expanded && (
         <div
+          ref={detailRef}
           className="activity-detail-card"
           style={{ maxHeight: 380, overflowY: "auto", overscrollBehavior: "contain", whiteSpace: "pre-wrap", overflowWrap: "anywhere", ...(error ? { color: "var(--danger)" } : undefined) }}
+          onScroll={handleDetailScroll}
         >
           {loading ? t("i18n.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
         </div>
@@ -966,7 +1004,6 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSession={onOpenSession}
-            defaultExpanded={live}
           />,
         );
       }
