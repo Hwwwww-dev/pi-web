@@ -42,5 +42,16 @@ test("deleting the current session forgets its tab memory", () => {
   const end = source.indexOf("  const handleOpenFile = useCallback", start);
   const body = source.slice(start, end);
   assert.match(body, /clearTabOpenSession\(sessionId\);/);
-  assert.ok(body.indexOf("clearTabOpenSession(sessionId)") < body.indexOf("setSelectedSession(null)"));
+  // Tab memory is cleared before the draft switch deselects the session.
+  assert.ok(body.indexOf("clearTabOpenSession(sessionId)") < body.indexOf("openNewSessionDraftForCwd("));
+  const draftStart = source.indexOf("  const openNewSessionDraftForCwd = useCallback");
+  const draftEnd = source.indexOf("  // Dismissing a keep-alive slot", draftStart);
+  assert.match(source.slice(draftStart, draftEnd), /setSelectedSession\(null\)/);
+
+  // The dock-dismiss fallback shares the same ordering guarantee.
+  const dismissStart = source.indexOf("  const handleKeepAliveDismiss = useCallback");
+  const dismissEnd = source.indexOf("  const handleKeepAliveDismissAll = useCallback", dismissStart);
+  const dismissBody = source.slice(dismissStart, dismissEnd);
+  assert.match(dismissBody, /clearTabOpenSession\(sessionId\);/);
+  assert.ok(dismissBody.indexOf("clearTabOpenSession(sessionId)") < dismissBody.indexOf("openNewSessionDraftForCwd("));
 });

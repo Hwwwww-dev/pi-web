@@ -1038,13 +1038,46 @@ export function AppShell() {
     handleSessionForked(result.newSessionId);
   }, [handleSessionForked, translate]);
 
+  // Shared fallback: replace the on-screen session with a fresh new-chat draft
+  // for the same cwd.
+  const openNewSessionDraftForCwd = useCallback((cwd: string | null) => {
+    const draftId = typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    setNewSessionDraftId(draftId);
+    activeNewSessionDraftKeyRef.current = cwd ? `new:${draftId}:${cwd}` : null;
+    setSelectedSession(null);
+    setNewSessionCwd(cwd);
+    setSessionKey((k) => k + 1);
+    setBranchTree([]);
+    setBranchActiveLeafId(null);
+    setSystemPrompt(null);
+    setSystemTools(null);
+    setSystemInfoLoading(false);
+    setActiveTopPanel(null);
+    router.replace(cwd ? `?cwd=${encodeURIComponent(cwd)}` : (typeof window !== "undefined" ? window.location.pathname : "/"), { scroll: false });
+  }, [router]);
+
   // Dismissing a keep-alive slot must leave nothing behind: the ChatWindow
   // unmounts with the slot, and its parked scroll position goes too, so the
-  // next open is a full reload instead of a half-restored session.
+  // next open is a full reload instead of a half-restored session. Closing
+  // the on-screen slot advances to its dock neighbor, or falls back to a
+  // fresh new-chat draft when no slot remains.
   const handleKeepAliveDismiss = useCallback((sessionId: string) => {
     sessionScrollPositionsRef.current.delete(sessionId);
-    setKeepAliveSlots((slots) => slots.filter((slot) => slot.session.id !== sessionId));
-  }, []);
+    const closedIndex = keepAliveSlots.findIndex((slot) => slot.session.id === sessionId);
+    const remaining = keepAliveSlots.filter((slot) => slot.session.id !== sessionId);
+    setKeepAliveSlots(remaining);
+    if (selectedSession?.id !== sessionId) return;
+    if (remaining.length > 0) {
+      // Advance like a browser tab: the next slot in dock order, wrapping to
+      // the last one when the closed slot was at the end.
+      handleSelectSession(remaining[Math.min(closedIndex, remaining.length - 1)].session);
+      return;
+    }
+    clearTabOpenSession(sessionId);
+    openNewSessionDraftForCwd(selectedSession.cwd ?? null);
+  }, [keepAliveSlots, selectedSession, handleSelectSession, openNewSessionDraftForCwd]);
 
   // Remove every keep-alive slot except the session currently on screen.
   const handleKeepAliveDismissAll = useCallback(() => {
@@ -1072,24 +1105,9 @@ export function AppShell() {
     setKeepAliveSlots((slots) => slots.filter((slot) => slot.session.id !== sessionId));
     if (selectedSession?.id === sessionId) {
       clearTabOpenSession(sessionId);
-      const cwd = selectedSession.cwd;
-      const draftId = typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-      setNewSessionDraftId(draftId);
-      activeNewSessionDraftKeyRef.current = cwd ? `new:${draftId}:${cwd}` : null;
-      setSelectedSession(null);
-      setNewSessionCwd(cwd ?? null);
-      setSessionKey((k) => k + 1);
-      setBranchTree([]);
-      setBranchActiveLeafId(null);
-      setSystemPrompt(null);
-      setSystemTools(null);
-      setSystemInfoLoading(false);
-      setActiveTopPanel(null);
-      router.replace(cwd ? `?cwd=${encodeURIComponent(cwd)}` : (typeof window !== "undefined" ? window.location.pathname : "/"), { scroll: false });
+      openNewSessionDraftForCwd(selectedSession.cwd ?? null);
     }
-  }, [selectedSession, router]);
+  }, [selectedSession, openNewSessionDraftForCwd]);
 
   const handleOpenFile = useCallback((
     filePath: string,

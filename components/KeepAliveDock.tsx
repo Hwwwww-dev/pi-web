@@ -168,19 +168,17 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                       style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}
                     />
                   </button>
-                  {!isSelected && (
-                    <button
-                      type="button"
-                      className="keepalive-dock-close"
-                      title={t("keepalive.close")}
-                      aria-label={`${t("keepalive.close")}: ${info.name || info.id}`}
-                      onClick={() => onDismiss(info.id)}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M18 6 6 18M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="keepalive-dock-close"
+                    title={t("keepalive.close")}
+                    aria-label={`${t("keepalive.close")}: ${info.name || info.id}`}
+                    onClick={() => onDismiss(info.id)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               );
             })}
