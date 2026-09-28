@@ -6,11 +6,16 @@ import ts from "typescript";
 
 const source = await readFile(new URL("./FileViewer.tsx", import.meta.url), "utf8");
 
-test("large source previews bypass the per-line syntax highlighter", async () => {
+test("large source previews defer the syntax highlighter by one tick", async () => {
   // The source renderer is shared with the git commit diff view.
   const sourceCodeViewSource = await readFile(new URL("./SourceCodeView.tsx", import.meta.url), "utf8");
-  assert.match(sourceCodeViewSource, /export const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;/);
+  assert.match(sourceCodeViewSource, /export const SOURCE_HIGHLIGHT_MAX_LINES = 3_000;/);
   assert.match(sourceCodeViewSource, /const useLightweightSource = sourceLines\.length > SOURCE_HIGHLIGHT_MAX_LINES/);
+
+  // Above the cap the plain grid paints first; the colored tree replaces it on
+  // the next tick so the heavy render never blocks the first paint.
+  assert.match(sourceCodeViewSource, /const \[deferredHighlightReady, setDeferredHighlightReady\] = useState\(false\);/);
+  assert.match(sourceCodeViewSource, /const timer = setTimeout\(\(\) => setDeferredHighlightReady\(true\), 0\);/);
 
   // Both source trees are memoized so unrelated re-renders (panel open/close,
   // selection changes) reuse them instead of rebuilding every line element.
@@ -44,18 +49,18 @@ test("lightweight source rows are skipped for highlighted, diff, and preview vie
   ).map((node) => node.getText(file)).join("\n");
   const { outputText } = ts.transpileModule(`
     return (content, wrapLines = false) => {
-      const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;
+      const SOURCE_HIGHLIGHT_MAX_LINES = 3_000;
       const FILE_LINE_NUMBER_STYLE = {};
       ${calculations}
       return lightweightSourceLines;
     };
   `, { compilerOptions: { jsx: ts.JsxEmit.React } });
   const render = new Function("React", "useMemo", outputText)(React, (calculate) => calculate());
-  const large = "line\n".repeat(1_000);
+  const large = "line\n".repeat(3_000);
 
-  assert.equal(render("line\n".repeat(999)), null);
+  assert.equal(render("line\n".repeat(2_999)), null);
   const rows = render(large);
-  assert.equal(rows.length, 1_001);
+  assert.equal(rows.length, 3_001);
   assert.equal(rows[0].props["data-line-number"], 1);
   assert.equal(rows[0].props.children[1].props.children, "line");
   assert.equal(render(large, true)[0].props.children[1].props.style.whiteSpace, "pre-wrap");

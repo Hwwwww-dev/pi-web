@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Prism as SyntaxHighlighter,
   createElement as renderSyntaxNode,
@@ -11,8 +11,9 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
 import { FILE_CODE_STYLE, FILE_LINE_NUMBER_STYLE } from "./DiffView";
 
-/** Above this line count the plain line grid replaces the syntax highlighter. */
-export const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;
+/** Above this line count the highlighter render is deferred one tick: the plain
+ * line grid paints first, then the colored tree replaces it off the first paint. */
+export const SOURCE_HIGHLIGHT_MAX_LINES = 3_000;
 
 type SourceCodeRendererProps = Parameters<NonNullable<SyntaxHighlighterProps["renderer"]>>[0] & {
   wrapLines: boolean;
@@ -73,6 +74,13 @@ export function SourceCodeView({ content, language, wrapLines }: {
   const { isDark } = useTheme();
   const sourceLines = useMemo(() => content.split("\n"), [content]);
   const useLightweightSource = sourceLines.length > SOURCE_HIGHLIGHT_MAX_LINES;
+  const [deferredHighlightReady, setDeferredHighlightReady] = useState(false);
+  useEffect(() => {
+    setDeferredHighlightReady(false);
+    if (!useLightweightSource) return;
+    const timer = setTimeout(() => setDeferredHighlightReady(true), 0);
+    return () => clearTimeout(timer);
+  }, [useLightweightSource, content, language]);
   // react-syntax-highlighter rebuilds every token element on each render, which
   // costs hundreds of milliseconds on large files. Cache the rendered trees so
   // unrelated re-renders (panel open/close, selection changes) reuse them as-is.
@@ -141,19 +149,21 @@ export function SourceCodeView({ content, language, wrapLines }: {
   );
 
   if (!useLightweightSource) return highlightedSource;
-
-  return (
-    <div
-      className="file-source-view is-lightweight"
-      style={{
-        width: wrapLines ? "100%" : "max-content",
-        minWidth: "100%",
-        minHeight: "100%",
-        background: "var(--bg)",
-        ...FILE_CODE_STYLE,
-      }}
-    >
-      {lightweightSourceLines}
-    </div>
-  );
+  if (!deferredHighlightReady) {
+    return (
+      <div
+        className="file-source-view is-lightweight"
+        style={{
+          width: wrapLines ? "100%" : "max-content",
+          minWidth: "100%",
+          minHeight: "100%",
+          background: "var(--bg)",
+          ...FILE_CODE_STYLE,
+        }}
+      >
+        {lightweightSourceLines}
+      </div>
+    );
+  }
+  return highlightedSource;
 }
