@@ -1286,14 +1286,38 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
   const windowTitle = activeSessionTitle ? truncateSessionTitle(activeSessionTitle) : "Pi Web";
 
   useEffect(() => {
+    // A head-wide observer writing document.title synchronously in its
+    // callback self-fed on foreign head churn (extension content scripts)
+    // into an endless microtask loop that froze the tab. Keep the write in a
+    // macrotask and only watch the <title> element itself; direct head
+    // children are watched solely to re-attach when that element is replaced.
+    let titleEl = document.head?.querySelector("title") ?? null;
+    let resyncTimer: ReturnType<typeof setTimeout> | null = null;
+
     const syncWindowTitle = () => {
-      if (document.title !== windowTitle) document.title = windowTitle;
+      if (resyncTimer === null && document.title !== windowTitle) {
+        resyncTimer = setTimeout(() => {
+          resyncTimer = null;
+          if (document.title !== windowTitle) document.title = windowTitle;
+        }, 0);
+      }
     };
 
+    const observer = new MutationObserver(() => {
+      if (!titleEl?.isConnected) {
+        titleEl = document.head?.querySelector("title") ?? null;
+        if (titleEl) observer.observe(titleEl, { childList: true, subtree: true, characterData: true });
+      }
+      syncWindowTitle();
+    });
+    if (titleEl) observer.observe(titleEl, { childList: true, subtree: true, characterData: true });
+    if (document.head) observer.observe(document.head, { childList: true });
+
     syncWindowTitle();
-    const observer = new MutationObserver(syncWindowTitle);
-    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
-    return () => observer.disconnect();
+    return () => {
+      if (resyncTimer !== null) clearTimeout(resyncTimer);
+      observer.disconnect();
+    };
   }, [windowTitle]);
 
   const sidebarContent = (
