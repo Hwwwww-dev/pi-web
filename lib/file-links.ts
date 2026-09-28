@@ -142,6 +142,11 @@ export function resolveLocalFileHref(
   } else if (/^[a-zA-Z]:\//.test(normalizedHref)) {
     candidate = normalizedHref;
     candidateKind = "absolute";
+  } else if (normalizedHref === "~" || normalizedHref.startsWith("~/")) {
+    // Home-relative by intent; the browser cannot expand it, so pass it
+    // verbatim and let the file API expand it server-side.
+    candidate = normalizedHref;
+    candidateKind = "absolute";
   } else if (normalizedHref.startsWith("/")) {
     candidate = normalizedHref;
     candidateKind = "absolute";
@@ -192,6 +197,10 @@ export function resolveLocalFilePath(filePath: string | undefined, baseDir?: str
   let candidate: string;
 
   if (isDriveAbsolute || isUncAbsolute) {
+    candidate = normalizedPath;
+  } else if (normalizedPath === "~" || normalizedPath.startsWith("~/")) {
+    // Home-relative by intent; the browser cannot expand it, so pass it
+    // verbatim and let the file API expand it server-side.
     candidate = normalizedPath;
   } else if (normalizedPath.startsWith("/")) {
     const windowsRoot = normalizedBase?.match(/^([a-zA-Z]:)(?:\/|$)/)?.[1]

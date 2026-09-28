@@ -1,4 +1,5 @@
-import { normalize, parse, sep } from "path";
+import { homedir } from "os";
+import { join, normalize, parse, sep } from "path";
 
 // ============================================================================
 // Path primitives.
@@ -30,10 +31,26 @@ export function isWindowsAbsolutePath(filePath: string): boolean {
 /** Rebuild an absolute filesystem path from Next.js catch-all route segments. */
 export function filePathFromApiSegments(segments: string[]): string {
   const joined = segments.join("/");
+  // A verbatim `~` home-relative path round-trips through the segments
+  // untouched; the file API expands it right after decoding.
+  if (joined === "~" || joined.startsWith("~/")) return joined;
   const slashJoined = toSlashPath(joined);
   if (/^[a-zA-Z]:$/.test(slashJoined)) return `${slashJoined}/`;
   if (isWindowsAbsolutePath(slashJoined)) return slashJoined;
   return "/" + joined.replace(/^\/+/, "");
+}
+
+/**
+ * Expand a leading `~` to the server user's home directory. Paths written in
+ * transcripts (`~/.pi/...`) are home-relative by intent, but the browser
+ * cannot know the home path, so the client sends them verbatim and the file
+ * API expands them before the allow-list check. Only a bare `~` prefix is
+ * expanded; `~user/...` stays literal.
+ */
+export function expandHomePath(p: string): string {
+  if (p === "~") return homedir();
+  if (p.startsWith("~/")) return join(homedir(), p.slice(2));
+  return p;
 }
 
 /**
