@@ -73,8 +73,10 @@ export function useViewportHeight(): void {
       });
       if (keyboardOpen) {
         root.style.setProperty("--app-viewport-height", `${visibleHeight}px`);
+        root.dataset.keyboardOpen = "true";
       } else {
         root.style.removeProperty("--app-viewport-height");
+        delete root.dataset.keyboardOpen;
       }
 
       const pageWasShifted = window.scrollX !== 0 || window.scrollY !== 0;
@@ -113,6 +115,12 @@ export function useViewportHeight(): void {
       }, 50);
     };
 
+    // IME candidate bars can resize the keyboard without any visualViewport
+    // event; restarting the focus poll from input activity covers those.
+    const onEditableActivity = () => {
+      if (!hasFocusedEditableElement()) return;
+      startKeyboardPoll();
+    };
     const handleFocusIn = (event: FocusEvent) => {
       if (isEditableTarget(event.target)) startKeyboardPoll();
       scheduleUpdate();
@@ -129,6 +137,11 @@ export function useViewportHeight(): void {
     window.addEventListener("focusin", handleFocusIn);
     window.addEventListener("focusout", handleFocusOut);
     window.addEventListener("pageshow", scheduleUpdate);
+    document.addEventListener("compositionstart", onEditableActivity);
+    document.addEventListener("compositionupdate", onEditableActivity);
+    document.addEventListener("compositionend", onEditableActivity);
+    document.addEventListener("input", onEditableActivity);
+    document.addEventListener("keyup", onEditableActivity);
 
     return () => {
       viewport.removeEventListener("resize", scheduleUpdate);
@@ -137,6 +150,11 @@ export function useViewportHeight(): void {
       window.removeEventListener("focusin", handleFocusIn);
       window.removeEventListener("focusout", handleFocusOut);
       window.removeEventListener("pageshow", scheduleUpdate);
+      document.removeEventListener("compositionstart", onEditableActivity);
+      document.removeEventListener("compositionupdate", onEditableActivity);
+      document.removeEventListener("compositionend", onEditableActivity);
+      document.removeEventListener("input", onEditableActivity);
+      document.removeEventListener("keyup", onEditableActivity);
       stopKeyboardPoll();
       if (frameId !== null) window.cancelAnimationFrame(frameId);
       root.style.removeProperty("--app-viewport-height");

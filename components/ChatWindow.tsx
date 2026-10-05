@@ -3,13 +3,13 @@ import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import Image from "next/image";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";
+import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage } from "@/lib/types";
 import { isTuiText, normalizeCustomPanelLines } from "@/lib/ansi";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
 import { getToolCategory, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
 import { buildTurnActivityItems, getFinishedTurnView } from "@/lib/turn-view";
-import type { WrittenFile } from "@/lib/turn-written-files";
+import { type WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
 import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
 import { TurnActivityBody, TurnMetaLine } from "./ActivityRows";
@@ -20,7 +20,8 @@ import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
 import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
-import { useAgentSession, type AgentPhase, type NoticeItem } from "@/hooks/useAgentSession";
+import { phaseLabel } from "@/lib/chat-phase-label";
+import { useAgentSession, type NoticeItem } from "@/hooks/useAgentSession";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useDialogMaxHeight } from "@/hooks/useDialogMaxHeight";
@@ -28,6 +29,7 @@ import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import type { AppUpdateResponse } from "@/lib/api-types";
 import type { ToolEntry } from "@/lib/tool-presets";
+import type { SettingsSection } from "@/lib/settings-navigation";
 import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll-position";
 import {
   captureScrollDistance,
@@ -53,7 +55,7 @@ interface Props {
   onSessionForked?: (newSessionId: string) => void;
   modelsRefreshKey?: number;
   chatInputRef?: React.RefObject<ChatInputHandle | null>;
-  onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;
+  onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void, locked: boolean) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
   onSystemToolsChange?: (tools: ToolEntry[] | null) => void;
   onSystemInfoLoaderChange?: (loader: (() => Promise<void>) | null) => void;
@@ -61,6 +63,8 @@ interface Props {
   background?: boolean;
   onSessionStatsChange?: (stats: SessionStatsInfo | null) => void;
   onSessionStatsPanelOpen?: () => void;
+  /** Opens Settings on a section: a bare `/mcp` that pi's built-in MCP extension owns opens Settings › MCP. */
+  onOpenSettings?: (section: SettingsSection) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSession?: (sessionId: string) => void;
@@ -71,25 +75,9 @@ interface Props {
   /** Completion sound state + controls, owned by AppShell so tasks finishing in
    *  a non-active workspace can still ring. */
   soundEnabled?: boolean;
+  onSoundToggle?: () => void;
   playDoneSound?: () => void;
   unlockAudio?: () => void;
-}
-
-function phaseLabel(phase: AgentPhase, t: (key: string, params?: Record<string, string | number>) => string): string | null {
-  if (phase?.kind === "running_tools") {
-    const latest = phase.tools[phase.tools.length - 1];
-    if (latest?.progress) {
-      return `${t("chat.runningNamedTool", { name: latest.name })} ${latest.progress}`;
-    }
-    const names = phase.tools.map((t) => t.name);
-    if (names.length === 0) return t("chat.runningTool");
-    if (names.length === 1) return t("chat.runningNamedTool", { name: names[0] });
-    if (names.length <= 3) return t("chat.runningTools", { names: names.join(", ") });
-    return t("chat.runningToolsMore", { names: names.slice(0, 2).join(", "), count: names.length - 2 });
-  }
-  if (phase?.kind === "waiting_model") return t("chat.waitingModel");
-  if (phase?.kind === "running_command") return t("chat.runningCommand");
-  return null;
 }
 
 const CHAT_COLUMN_PADDING = 16;
@@ -238,7 +226,7 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
 // polling, panel toggles) does not re-render every chat instance, including
 // the keep-alive background slots. Props are hook state and stable
 // useCallback handlers in AppShell.
-export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile, onOpenSession, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio }: Props) {
+export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onOpenSession, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const completionNotificationsEnabled = session?.relation?.kind !== "subagent";
@@ -259,11 +247,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     onAgentEnd?.(sessionId);
   }, [completionNotificationsEnabled, onAgentEnd]);
 
-  // 稳定化 onEditContent 引用，配合 React.memo 防止历史消息重渲染
-  const handleEditContent = useCallback((message: UserMessage) => {
-    chatInputRef?.current?.replaceMessage(message);
-  }, [chatInputRef]);
-
   const initialScrollPositionRef = useRef(searchTarget ? null : initialScrollPosition ?? null);
   const [pendingScrollRestore, setPendingScrollRestore] = useState<Extract<ChatScrollPosition, { atBottom: false }> | null>(() => {
     const position = initialScrollPositionRef.current;
@@ -277,24 +260,27 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
     slashCommands, slashCommandsLoading, queuedSubmissions,
-    notices, extensionDialog, extensionDialogQueue, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused, dismissNotice,
+    notices, extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused, dismissNotice,
     isAutoModelSelection,
     isAutoThinkingSelection,
+    defaultModel,
+    savedDefaultThinkingLevel,
     agentPhase,
     isNew,
     showScrollToBottom,
     sessionIdRef, scrollContainerRef,
     lastUserMsgRef, promptAnchorActive,
-    handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
-    handleCompact, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
-    handleQueuedAction,
+    handleSend, handleAbort, handleFork, handleModelChange,
+    handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
+    handleQueuedAction, handleEditContent,
     handleBuiltinSlashCommand,
-    handleToolPresetChange, handleThinkingLevelChange, loadSlashCommands, scrollUserMsgToTop,
+    handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadSlashCommands, scrollUserMsgToTop,
     loadContext, activeLeafId, scrollToBottom, scrollToMessage,
   } = useAgentSession({
     session, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd: wrappedOnAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked,
     modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen,
     background,
+    onOpenSettings,
     deferInitialScroll: Boolean(pendingScrollRestore),
   });
   const sessionBusy = agentRunning || bashRunning;
@@ -477,10 +463,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     void handleSend(initialPrompt);
   }, [initialPrompt, loading, error, handleSend, onInitialPromptConsumed]);
 
+  // Play the completion sound the first time a given extension dialog
+  // surfaces; queued dialogs behind it only ring when they reach the front.
   useEffect(() => {
-    if (
-      !completionNotificationsEnabled
-      || !extensionDialog
+    if (!extensionDialog || completionNotificationsEnabled === false
       || soundedExtensionDialogIdRef.current === extensionDialog.id
     ) return;
     soundedExtensionDialogIdRef.current = extensionDialog.id;
@@ -894,6 +880,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       onSend={handleSend}
       onAbort={handleAbort}
       onFollowUp={agentRunning ? handleFollowUp : undefined}
+      onSteer={agentRunning ? handleSteer : undefined}
       onPromptWithStreamingBehavior={agentRunning ? handlePromptWithStreamingBehavior : undefined}
       isStreaming={sessionBusy}
       model={displayModelValue}
@@ -904,6 +891,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       modelScopeWarnings={modelScopeWarnings}
       onModelChange={handleModelChange}
       modelSwitching={modelSwitching}
+      defaultModel={defaultModel}
+      onSetDefaultModel={handleSetDefaultModel}
       onCompact={session || isNew ? handleCompact : undefined}
       onAbortCompaction={handleAbortCompaction}
       isCompacting={isCompacting}
@@ -917,6 +906,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
       availableThinkingLevels={availableThinkingLevels}
       thinkingLevelMap={currentThinkingLevelMap}
+      savedDefaultThinkingLevel={savedDefaultThinkingLevel}
+      onSetDefaultThinkingLevel={session || isNew ? handleSetDefaultThinkingLevel : undefined}
       retryInfo={retryInfo}
       queuedSubmissions={queuedSubmissions}
       inputHistory={inputHistory}
@@ -994,10 +985,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             onOpenSession={onOpenSession}
             entryId={entryIds[idx]}
             searchBlock={entryIds[idx] === pendingSearchScroll?.entryId ? searchBlock : undefined}
-            onFork={sessionBusy || isNew ? undefined : handleFork}
+            onFork={bashRunning || isNew ? undefined : handleFork}
             forking={forkingEntryId === entryIds[idx]}
-            onNavigate={sessionBusy ? undefined : handleNavigate}
-            onEditContent={handleEditContent}
+            onEditContent={sessionBusy ? undefined : handleEditContent}
             showTimestamp={showTimestamp}
             prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
             sessionId={session?.id ?? sessionIdRef.current ?? undefined}
@@ -1169,7 +1159,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               key={`process-group-${entryIds[userIdx] ?? userIdx}`}
               ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
             >
-              <ProcessDetailsGroup summary={processSummary} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
+              <ProcessDetailsGroup key={finalAnswerMessage ? "answered" : "unanswered"} summary={processSummary} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
                 <TurnActivityBody
                   items={activityItems}
                   ctxWindow={ctxInfoRef.current?.contextWindow}
@@ -1232,8 +1222,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return { rendered, liveActivityRendered };
   }, [messages, entryIds, toolResultsMap, hasEarlierMessages, streamState.isStreaming, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
-     sessionIdRef, handleFork, handleNavigate, handleEditContent, onOpenFile, onOpenSession,
-     isNew, messageRefs, lastUserMsgRef]);
+     sessionIdRef, handleFork, handleEditContent, onOpenFile, onOpenSession,
+     isNew, messageRefs, lastUserMsgRef, bashRunning]);
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
   const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
   const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
@@ -1320,13 +1310,14 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <ExtensionDialog
             key={extensionDialog.id}
             request={extensionDialog}
+            waitingCount={waitingExtensionDialogCount}
             queueTotal={extensionDialogQueue.length}
             answered={answeredDialogs}
             onRespond={handleDialogRespond}
           />
         )}
         {extensionCustomUi && (
-          <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} onInput={sendExtensionCustomInput} />
+          <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} waitingCount={waitingExtensionCustomUiCount} onInput={sendExtensionCustomInput} />
         )}
         {!isEmptyNew && <>
         <div
@@ -1345,14 +1336,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 {t("chat.loadEarlier")}
               </div>
             )}
-            {turnRendered.slice(startIndex)}
-            {streamState.isStreaming && hasStreamingContent && streamState.streamingMessage && (
+            {turnRendered.slice(startIndex)}            {streamState.isStreaming && hasStreamingContent && streamState.streamingMessage && (
               <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSession={onOpenSession} />
             )}
 
-            {agentRunning && !hasStreamingContent && agentPhase && !liveActivityRendered && (
+            {agentRunning && !hasStreamingContent && (agentPhase || isCompacting) && !liveActivityRendered && (
               <div className="break-words py-2 text-[13px] text-text-muted">
-                <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t)}</span>
+                <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t, isCompacting)}</span>
               </div>
             )}
 
@@ -1449,7 +1439,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             <span aria-hidden="true" style={{ fontSize: 15 }}>@</span>
             <span>{t("chat.askInCurrent")}</span>
           </button>
-          {onAskInNewChat && quotedSelection.sourceEntryId && !sessionBusy && (
+          {onAskInNewChat && quotedSelection.sourceEntryId && !bashRunning && (
             <button
               type="button"
               className="file-viewer-icon-button"
@@ -1800,13 +1790,26 @@ function parseMultiSelectPrompt(title: string): { question: string; options: Arr
   return { question: question.join("\n"), options };
 }
 
+function ExtensionWaitingCount({ count }: { count: number }) {
+  const { t } = useI18n();
+  if (count <= 0) return null;
+  return (
+    <span style={{ fontSize: 11, fontWeight: 650, color: "var(--accent)", whiteSpace: "nowrap", flexShrink: 0 }}>
+      {t("chat.extensionMoreWaiting", { count })}
+    </span>
+  );
+}
+
 function ExtensionDialog({
   request,
+  waitingCount,
   onRespond,
   queueTotal,
   answered,
 }: {
   request: ExtensionDialogRequest;
+  /** Further dialogs queued behind this one; each opens after this one is answered. */
+  waitingCount: number;
   onRespond: (request: ExtensionDialogRequest, response: { value: string } | { confirmed: boolean } | { cancelled: true }) => void;
   /** Requests still queued including this one — the ask tool sends several. */
   queueTotal?: number;
@@ -1938,6 +1941,7 @@ function ExtensionDialog({
               {summary}
             </span>
           )}
+          <ExtensionWaitingCount count={waitingCount} />
           {countdown}
           <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
             {t("chat.extensionExpand")}
@@ -1965,7 +1969,7 @@ function ExtensionDialog({
           overflow: "hidden",
         }}
       >
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border)", maxHeight: 180, overflowY: "auto" }}>
+        <div style={{ flexShrink: 1, minHeight: 0, display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border)", maxHeight: 180, overflowY: "auto" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {/* Pi's TUI shows the title verbatim, newlines included; select/input have no
                 separate message field, so extensions put multi-line text here. */}
@@ -2003,6 +2007,7 @@ function ExtensionDialog({
                   </button>
                 </span>
               )}
+              <ExtensionWaitingCount count={waitingCount} />
               {countdown}
             </div>
           </div>
@@ -2351,9 +2356,12 @@ type ExtensionCustomRequest = Extract<ExtensionUiRequest, { method: "custom" }>;
 
 function ExtensionCustomPanel({
   request,
+  waitingCount,
   onInput,
 }: {
   request: ExtensionCustomRequest;
+  /** Further custom panels queued behind this one; each opens after this one closes. */
+  waitingCount: number;
   onInput: (request: ExtensionCustomRequest, data: string) => void;
 }) {
   const { t } = useI18n();
@@ -2416,6 +2424,7 @@ function ExtensionCustomPanel({
               {summary}
             </span>
           )}
+          <ExtensionWaitingCount count={waitingCount} />
           <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
             {t("chat.extensionExpand")}
           </span>
@@ -2492,6 +2501,7 @@ function ExtensionCustomPanel({
         <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
            <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 650 }}>{t("chat.extensionPanel")}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ExtensionWaitingCount count={waitingCount} />
             <button
               type="button"
               onClick={() => setCollapsed(true)}

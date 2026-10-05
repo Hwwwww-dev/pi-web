@@ -17,6 +17,9 @@ import { isApplyPatchToolName, isEditToolName } from "@/lib/tool-names";
 import { isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansion";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
+import { CODEMODE_TOOL_NAME, codemodeCalls, codemodeScript, codemodeScriptPreview, stripCodemodeHeader } from "@/lib/codemode-view";
+import { mcpToolLabel, prettyMcpResultText } from "@/lib/mcp-tool-display";
+import { CodemodeCallList } from "./CodemodeToolView";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
 import { formatUsage, type ActivityItem, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
 import { UsageBar } from "./UsageBar";
@@ -241,14 +244,23 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   const resultDiff = result && !result.isError ? getResultDiff(result) : null;
   const diffStat = resultDiff ? countDiffStat(resultDiff.text) : null;
   const patchFiles = getApplyPatchFiles(block, result);
-  const resultText = result
-    ? result.content.filter((b): b is { type: "text"; text: string } => b.type === "text").map((b) => b.text).join("\n")
+  // A script and the calls it made, instead of the input JSON. Streamed input is
+  // still incomplete JSON and keeps the generic view.
+  const codemodeCode = block.toolName === CODEMODE_TOOL_NAME && !isStreamingInput ? codemodeScript(block.input) : null;
+  const codemode = codemodeCode === null ? null : { code: codemodeCode, ...codemodeCalls(result?.details) };
+  // `server/tool` instead of the registered `mcp__server__tool`, as pi's TUI shows it.
+  const mcpLabel = mcpToolLabel(block.toolName, result?.details);
+  const resultContent = result ? (codemode ? stripCodemodeHeader(result.content) : result.content) : [];
+  const joinedResultText = result
+    ? resultContent.filter((b): b is { type: "text"; text: string } => b.type === "text").map((b) => b.text).join("\n")
     : null;
-  const resultImages = getMessageImages(result?.content ?? []);
+  const resultText = mcpLabel && joinedResultText !== null ? prettyMcpResultText(joinedResultText) : joinedResultText;
+  const resultImages = getMessageImages(resultContent);
   const resultIsEmpty = resultText === null ? false : (resultText.trim() === "(no output)" || resultText.trim() === "");
   const isError = (result?.isError ?? false)
     || (isApplyPatchToolName(block.toolName) && applyPatchResultHasFailures(result?.details));
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
+  const codemodeCallCount = codemode ? codemode.calls.length + codemode.omitted : 0;
   const active = Boolean(isStreaming) && !result;
   // Terminal rows render command + output as one ZCode-style block ($ cmd, then
   // the output) instead of the raw JSON args.
@@ -271,12 +283,21 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
           onClick={toggleExpanded}
         >
           <span className="activity-row-icon"><ToolCategoryIcon category={category} isError={isError} /></span>
-          <span className="activity-row-label">{label}</span>
+          <span className="activity-row-label" title={mcpLabel ? block.toolName : undefined}>
+            {mcpLabel ? `${mcpLabel.server}/${mcpLabel.tool}` : label}
+          </span>
           <span className="activity-row-preview">
             {isStreamingInput
               ? t("chat.generatingToolInput")
-              : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
+              : codemode
+                ? codemodeScriptPreview(codemode.code)
+                : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
           </span>
+          {codemodeCallCount > 0 && (
+            <span className="activity-row-meta">
+              {codemodeCallCount === 1 ? t("codemode.callCountOne") : t("codemode.callCount", { count: codemodeCallCount })}
+            </span>
+          )}
           {diffStat && (
             <span className="diff-stat" aria-hidden="true">
               <span className="diff-stat-added">+{diffStat.added}</span>
@@ -315,7 +336,15 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
             </div>
           )}
           <div className="activity-detail-card">
-            {combinedTerminalText !== null ? (
+            {codemode ? (
+              <>
+                <pre className="activity-detail-pre">{codemode.code.replace(/\r/g, "").trimEnd()}</pre>
+                <CodemodeCallList calls={codemode.calls} omitted={codemode.omitted} isError={isError} />
+                {result && (resultText !== null && !resultIsEmpty || resultImages.length > 0) && (
+                  <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                )}
+              </>
+            ) : combinedTerminalText !== null ? (
               <PairedResult
                 text={combinedTerminalText}
                 isEmpty={false}

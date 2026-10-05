@@ -41,7 +41,10 @@ test("renders extension confirmation and options as markdown", () => {
 test("preserves title newlines like pi's TUI and keeps long titles from hiding the body", () => {
   const header = dialogSource.slice(dialogSource.indexOf('role="dialog"'), dialogSource.indexOf("{request.method === \"confirm\""));
   assert.match(header, /<ExtensionDialogTitle title=\{multiSelect \? multiSelect\.question \|\| request\.title : request\.title\} \/>/);
-  assert.match(header, /maxHeight: 180, overflowY: "auto" \}\}>/);
+  // #890: a non-shrinkable header grows to its full text height, pushing the
+  // option list and the footer past the dialog's overflow edge. The header has
+  // to be allowed to shrink and scroll instead.
+  assert.match(header, /flexShrink: 1, minHeight: 0,[\s\S]*?maxHeight: 180, overflowY: "auto" \}\}>/);
 });
 
 test("renders option preview blocks in the dialog title as markdown", () => {
@@ -57,10 +60,10 @@ test("resets collapse state when a new extension request arrives", () => {
 
 test("queues concurrent requests and pages over pending ones", () => {
   // Requests append to a queue; responses and ui_closed remove by id.
-  assert.match(hookSource, /extensionDialogQueue, setExtensionDialogQueue\] = useState<ExtensionUiDialogRequest\[\]>\(\[\]\)/);
-  assert.match(hookSource, /current\.some\(\(item\) => item\.id === request\.id\) \? current : \[\.\.\.current, request\]/);
-  assert.match(hookSource, /current\.filter\(\(item\) => item\.id !== request\.id\)/);
-  assert.match(hookSource, /current\.filter\(\(item\) => item\.id !== event\.id\)/);
+  assert.match(hookSource, /extensionDialogs, setExtensionDialogs\] = useState<ExtensionUiDialogRequest\[\]>\(\[\]\)/);
+  assert.match(hookSource, /enqueueExtensionUiRequest\(queue, request\)/);
+  assert.match(hookSource, /removeExtensionUiRequest\(queue, request\.id\)/);
+  assert.match(hookSource, /removeExtensionUiRequest\(queue, event\.id as string\)/);
   // ‹ › pager steps through answered questions (read-only) and back to the
   // live one; Escape in review mode returns instead of cancelling.
   assert.match(dialogSource, /chat\.question\.pager/);
@@ -75,4 +78,21 @@ test("select answers are two-step: click selects, confirm sends", () => {
   assert.match(dialogSource, /onClick=\{\(\) => setSelectedOption\(\(current\) => current === option \? null : option\)\}/);
   assert.match(dialogSource, /onDoubleClick=\{\(\) => \{\s*\n\s*setSelectedOption\(option\);\s*\n\s*onRespond\(request, \{ value: option \}\);\s*\n\s*\}\}/);
   assert.match(dialogSource, /request\.method === "select" \? \([\s\S]{0,400}disabled=\{selectedOption === null\}/);
+});
+
+test("shows how many extension requests wait behind the one on screen", () => {
+  const expandedHeader = dialogSource.slice(dialogSource.indexOf('role="dialog"'), dialogSource.indexOf("{request.method === \"confirm\""));
+  const collapsedButton = dialogSource.slice(dialogSource.indexOf("{collapsed ? ("), dialogSource.indexOf('role="dialog"'));
+  const customCollapsed = customSource.slice(customSource.indexOf("{collapsed ? ("), customSource.indexOf('role="dialog"'));
+  const customExpanded = customSource.slice(customSource.indexOf('role="dialog"'));
+  const waitingSource = source.slice(source.indexOf("function ExtensionWaitingCount"), source.indexOf("function ExtensionDialog("));
+
+  assert.match(source, /<ExtensionDialog\s+key=\{extensionDialog\.id\}\s+request=\{extensionDialog\}\s+waitingCount=\{waitingExtensionDialogCount\}/);
+  assert.match(source, /<ExtensionCustomPanel key=\{extensionCustomUi.id\} request=\{extensionCustomUi\} waitingCount=\{waitingExtensionCustomUiCount\}/);
+  assert.match(waitingSource, /if \(count <= 0\) return null;[\s\S]*?t\("chat\.extensionMoreWaiting", \{ count \}\)/);
+  assert.match(expandedHeader, /chat\.extensionRequest"\)\}<\/span>[\s\S]*?\{countdown\}/);
+  assert.match(expandedHeader, /<ExtensionWaitingCount count=\{waitingCount\} \/>\s+\{countdown\}/);
+  assert.match(collapsedButton, /<ExtensionWaitingCount count=\{waitingCount\} \/>\s+\{countdown\}/);
+  assert.match(customCollapsed, /<ExtensionWaitingCount count=\{waitingCount\} \/>\s+<span[^>]*>\s+\{t\("chat\.extensionExpand"\)\}/);
+  assert.match(customExpanded, /chat\.extensionPanel"\)\}<\/div>\s+<div[^>]*>\s+<ExtensionWaitingCount count=\{waitingCount\} \/>/);
 });
