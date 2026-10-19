@@ -4,7 +4,6 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { useI18n } from "@/hooks/useI18n";
 import { useTheme } from "@/hooks/useTheme";
 import { THEME_OPTIONS } from "@/lib/theme";
-import { ThemeIcon } from "./ThemeIcon";
 import {
   CHAT_CONTENT_WIDTH_DEFAULT,
   CHAT_CONTENT_WIDTH_MAX,
@@ -15,6 +14,7 @@ import {
   useChatAppearance,
 } from "@/hooks/useChatAppearance";
 import { useEnterSendMode, setEnterSendMode } from "@/hooks/useEnterSendMode";
+import { useFilesPlacement, setFilesPlacement } from "@/hooks/useFilesPlacement";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ProjectTrustStatus, ToolSettingsResponse } from "@/lib/api-types";
 import { KEEP_ALIVE_CONFIG_LIMITS, type ChatKeepAliveConfig } from "@/lib/chat-keepalive";
@@ -29,6 +29,7 @@ import {
   setThinkingExpandedByDefault,
 } from "@/lib/thinking-expansion-preference";
 import { ModelsConfig } from "./ModelsConfig";
+import { ThemeIcon } from "./ThemeIcon";
 import { setupPushSubscription } from "@/lib/push-client";
 import { SkillsConfig } from "./SkillsConfig";
 import { AgentsConfig } from "./AgentsConfig";
@@ -93,13 +94,14 @@ export function SettingsSectionIcon({ section, size = 16, strokeWidth = 1.8 }: {
   return <svg {...common}><path d="M9 7V2M15 7V2M6 13V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5a6 6 0 0 1-12 0ZM12 19v3" /></svg>;
 }
 
-type GeneralDetail = "appearance" | "chat" | "shell" | "push" | "language";
+type GeneralDetail = "appearance" | "chat" | "sidebar" | "shell" | "push" | "language";
 
 function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange, soundEnabled, onSoundToggle, keepAliveConfig, onKeepAliveConfigChange }: Pick<Props, "sessionId" | "onClose" | "onSessionReloaded" | "quoteSelectionEnabled" | "onQuoteSelectionChange" | "soundEnabled" | "onSoundToggle" | "keepAliveConfig" | "onKeepAliveConfigChange">) {
   const { locale, setLocale, supportedLocales, t } = useI18n();
   const { preference, setThemePreference } = useTheme();
   const { width: chatContentWidth, setWidth: setChatContentWidth, fontSize, setFontSize } = useChatAppearance();
   const enterSendMode = useEnterSendMode();
+  const filesPlacement = useFilesPlacement();
   const [shellSettings, setShellSettings] = useState<ToolSettingsResponse | null>(null);
   const [shellSaving, setShellSaving] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
@@ -155,6 +157,20 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/cache-miss-notices")
+      .then(async (response) => {
+        const data = await response.json() as { enabled?: boolean; error?: string };
+        if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+        if (!cancelled) setCacheMissNotices(data.enabled === true);
+      })
+      .catch((cause) => {
+        if (!cancelled) setCacheMissNoticesError(cause instanceof Error ? cause.message : String(cause));
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   // pi's showCacheMissNotices (#1265); the open chat is read again to show or drop them.
   const toggleCacheMissNotices = async (enabled: boolean) => {
     setCacheMissNoticesSaving(true);
@@ -175,20 +191,6 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       setCacheMissNoticesSaving(false);
     }
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/cache-miss-notices")
-      .then(async (response) => {
-        const data = await response.json() as { enabled?: boolean; error?: string };
-        if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
-        if (!cancelled) setCacheMissNotices(data.enabled === true);
-      })
-      .catch((cause) => {
-        if (!cancelled) setCacheMissNoticesError(cause instanceof Error ? cause.message : String(cause));
-      });
-    return () => { cancelled = true; };
-  }, []);
 
   const togglePowerShell = async (enabled: boolean) => {
     setShellSaving(true);
@@ -238,6 +240,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   const generalDetails: { id: GeneralDetail; label: string }[] = [
     { id: "appearance", label: t("settings.appearance") },
     { id: "chat", label: t("settings.chat") },
+    { id: "sidebar", label: t("settings.sidebar") },
     ...(shellSettings?.isWindows ? [{ id: "shell" as const, label: t("settings.shellTool") }] : []),
     { id: "push", label: t("settings.pushPermission") },
     { id: "language", label: t("common.language") },
@@ -276,7 +279,6 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             <ConfigDetailHeader>
               <ConfigDetailTitle>{activeDetailLabel}</ConfigDetailTitle>
             </ConfigDetailHeader>
-
             {detail === "appearance" && (
               <div role="radiogroup" aria-label={t("settings.appearance")} className="settings-theme-options">
                 {THEME_OPTIONS.map((option) => {
@@ -454,6 +456,41 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                       }}
                     />
                   </div>
+                </div>
+              </div>
+            )}
+
+            {detail === "sidebar" && (
+              <div
+                className="settings-chat-option settings-chat-switch-option"
+                role="radiogroup"
+                aria-label={t("settings.filesPlacement")}
+                aria-describedby="settings-files-placement-description"
+              >
+                <span>{t("settings.filesPlacement")}</span>
+                <div className="settings-send-mode-options">
+                  <label className="settings-send-mode-option">
+                    <input
+                      type="radio"
+                      name="files-placement"
+                      value="below"
+                      checked={filesPlacement === "below"}
+                      onChange={() => setFilesPlacement("below")}
+                      className="sr-only"
+                    />
+                    <span className="settings-send-mode-label">{t("settings.filesPlacementBelow")}</span>
+                  </label>
+                  <label className="settings-send-mode-option">
+                    <input
+                      type="radio"
+                      name="files-placement"
+                      value="tab"
+                      checked={filesPlacement === "tab"}
+                      onChange={() => setFilesPlacement("tab")}
+                      className="sr-only"
+                    />
+                    <span className="settings-send-mode-label">{t("settings.filesPlacementTab")}</span>
+                  </label>
                 </div>
               </div>
             )}

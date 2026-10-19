@@ -25,6 +25,7 @@ import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
 import { phaseLabel } from "@/lib/chat-phase-label";
 import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
+import { selectHasStreamingContent, selectIsStreaming, selectStreamingMessage, useStreamingSelector } from "@/hooks/useStreamingSelector";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useDialogMaxHeight } from "@/hooks/useDialogMaxHeight";
@@ -90,14 +91,16 @@ interface Props {
   onSoundToggle?: () => void;
   playDoneSound?: () => void;
   unlockAudio?: () => void;
+  /** Keeps the completion sound's audio running until the returned release is called. */
+  holdAudio?: () => () => void;
 }
 
 const CHAT_COLUMN_PADDING = 16;
 
 // One update check per page. Every fresh composer mounts the header again
 // (each move of the new-session bar does), and a link that turned up late
-// each time could push the bar onto a line of its own under the composer's
-// eyes; from the second header on it is there in the first paint.
+// each time would lengthen the versions line under the reader's eyes; from
+// the second header on it is there in the first paint.
 let appUpdateCheck: Promise<AppUpdateResponse | null> | null = null;
 let appUpdateFound: AppUpdateResponse | null = null;
 
@@ -140,40 +143,25 @@ function NewSessionUpdateLink({
   if (!update) return null;
   const accessibleLabel = label(update.latestVersion);
 
+  // In the versions line, after the version in use: "→ v<latest> ↗".
   return (
-    <a
-      href={update.releaseUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={accessibleLabel}
-      aria-label={accessibleLabel}
-      onMouseEnter={(event) => { event.currentTarget.style.background = "var(--bg-hover)"; }}
-      onMouseLeave={(event) => { event.currentTarget.style.background = "transparent"; }}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        alignSelf: "center",
-        gap: 3,
-        minHeight: 32,
-        minWidth: 0,
-        padding: "0 4px",
-        background: "transparent",
-        borderRadius: 5,
-        color: "var(--accent)",
-        fontSize: 12,
-        fontWeight: 600,
-        lineHeight: 1.2,
-        textDecoration: "none",
-        transition: "background 0.12s",
-        whiteSpace: "nowrap",
-      }}
-    >
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>v{update.latestVersion}</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-        <path d="M7 17 17 7" />
-        <path d="M7 7h10v10" />
-      </svg>
-    </a>
+    <>
+      <span className="new-session-meta-arrow" aria-hidden="true">→</span>
+      <a
+        className="new-session-update"
+        href={update.releaseUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={accessibleLabel}
+        aria-label={accessibleLabel}
+      >
+        v{update.latestVersion}
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M7 17 17 7" />
+          <path d="M7 7h10v10" />
+        </svg>
+      </a>
+    </>
   );
 }
 
@@ -219,12 +207,14 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
       <button
         type="button"
         aria-expanded={expanded || reveal}
+        aria-label={summary}
         onClick={() => setExpanded((v) => !v)}
         style={{
           display: "flex",
           alignItems: "center",
           gap: 8,
           width: "auto",
+          maxWidth: "100%",
           minHeight: 24,
           padding: "2px 0",
           border: "none",
@@ -256,7 +246,7 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
 // polling, panel toggles) does not re-render every chat instance, including
 // the keep-alive background slots. Props are hook state and stable
 // useCallback handlers in AppShell.
-export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio }: Props) {
+export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const completionNotificationsEnabled = session?.relation?.kind !== "subagent";
@@ -286,7 +276,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const [restoreAnchorReady, setRestoreAnchorReady] = useState(false);
 
   const {
-    loading, error, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, earlierTurnCount, streamState,
+    loading, error, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, earlierTurnCount, streamingStore,
     agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
@@ -314,6 +304,14 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     onOpenSettings,
     deferInitialScroll: Boolean(pendingScrollRestore),
   });
+  // Only whether a reply is streaming and has content yet: the chunks themselves
+  // re-render StreamingReply alone.
+  const isStreaming = useStreamingSelector(streamingStore, selectIsStreaming);
+  const hasStreamingContent = useStreamingSelector(streamingStore, selectHasStreamingContent);
+  const streamingMessage = useStreamingSelector(streamingStore, selectStreamingMessage);
+  // streamState shape kept from the dev hook contract; derived from the store selectors.
+  const streamState = useMemo(() => ({ isStreaming, streamingMessage }), [isStreaming, streamingMessage]);
+  const getStreamingMessage = useCallback(() => streamingStore.getState().streamingMessage, [streamingStore]);
   const sessionBusy = agentRunning || bashRunning;
   // Context window + live reading for usage lines: the polled reading when a
   // run is active, the session-stats fallback while just browsing. Held in a
@@ -345,6 +343,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     setAnsweredDialogs((prev) => [...prev.slice(-9), { id: request.id, question, answer, cancelled }]);
     respondToExtensionUi(request, response);
   }, [respondToExtensionUi, t]);
+  // While this session's run is under way its chime may come with the phone
+  // locked, where a suspended context cannot start again (#1157).
+  useEffect(() => {
+    if (!agentRunning || !holdAudio) return;
+    return holdAudio();
+  }, [agentRunning, holdAudio]);
   const [quotedSelection, setQuotedSelection] = useState<{
     text: string;
     top: number;
@@ -837,7 +841,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
   const { isDragOver, handleDragEnter, handleDragOver, handleDragLeave, handleDrop } = useDragDrop(onDrop);
   // Stable Map identity: `messages` doesn't change during streaming updates
-  // (the streaming message lives in streamState), so memoized MessageViews
+  // (the streaming message lives in streamingStore), so memoized MessageViews
   // skip re-rendering on every message_update event. An inline `new Map()`
   // here used to defeat MessageView's memo() on each streamed chunk.
   const toolResultsMap = useMemo(() => {
@@ -863,7 +867,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [messages]);
   const isEmptyNew = isNew && messages.length === 0 && !streamState.isStreaming && !sessionBusy;
   useScrollbarVisibility(scrollContainerRef, Boolean(session?.id) || !isEmptyNew);
-  const hasStreamingContent = Boolean(streamState.streamingMessage?.content.length);
   const messageCwd = session?.cwd ?? newSessionCwd ?? undefined;
   const promptAnchorSpacerRef = useRef<HTMLDivElement | null>(null);
   const promptAnchorSpacerHeightRef = useRef(0);
@@ -959,9 +962,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     scrollUserMsgToTop,
   ]);
 
-  useLayoutEffect(() => {
+  // Each streamed chunk StreamingReply commits, and the bubble coming and going.
+  const updatePromptAnchor = useCallback(() => {
     promptAnchorUpdateRef.current?.();
-  }, [streamState.streamingMessage]);
+  }, []);
+  useLayoutEffect(updatePromptAnchor, [isStreaming, hasStreamingContent, updatePromptAnchor]);
 
   const availableThinkingLevels = displayModelValue
     ? (modelThinkingLevels[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
@@ -1476,7 +1481,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         {isMobile || pendingScrollRestore ? null : (
           <ChatMinimap
             messages={messages}
-            streamingMessage={streamState.streamingMessage}
+            getStreamingMessage={getStreamingMessage}
             scrollContainer={scrollContainerRef}
             messageRefs={messageRefs}
             onRevealHistory={revealHistoryForMinimap}
@@ -1593,21 +1598,25 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </button>
           </div>
         )}
-        {/* The brand, the project/worktree bar and the versions: one row, or
-            the bar on a line of its own under the brand where it does not
-            fit beside it (.new-session-hero in app/globals.css). The
-            versions come first: floated right of the first line. */}
+        {/* The brand (the logo, "Pi Web" and its versions line), then the
+            project/worktree row right above the composer, all on the
+            composer's left edge (.new-session-brand, .new-session-meta and
+            .new-session-context in app/globals.css; the side padding and
+            width are inline here). */}
         {isEmptyNew && (
           <div className="new-session-hero" style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
-            <div className="new-session-hero-row" style={{ maxWidth: "var(--chat-content-max-width, 820px)" }}>
-              <div className="new-session-versions">
-                <span>web <span className="new-session-version">v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span></span>
-                <span>pi <span className="new-session-version">v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span></span>
-              </div>
-              <div className="new-session-brand" style={{ gap: isMobile ? 7 : 10 }}>
-                <Image src="/icons/apple-touch-icon.png" width={32} height={32} alt="" priority style={{ flexShrink: 0 }} />
-                <span className="new-session-brand-name">Pi Web</span>
-                <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
+            <div className="new-session-hero-inner" style={{ maxWidth: "var(--chat-content-max-width, 820px)" }}>
+              <div className="new-session-brand">
+                <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo" />
+                <div className="new-session-brand-text">
+                  <span className="new-session-brand-name">Pi Web</span>
+                  <span className="new-session-meta">
+                    <span>web v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
+                    <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
+                    <span aria-hidden="true">·</span>
+                    <span className="new-session-meta-pi">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
+                  </span>
+                </div>
               </div>
               {newSessionContextBar}
             </div>

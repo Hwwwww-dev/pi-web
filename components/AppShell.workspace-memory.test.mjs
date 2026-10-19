@@ -6,8 +6,8 @@ import vm from "node:vm";
 import { createJiti } from "jiti";
 
 const source = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
-const jiti = createJiti(import.meta.url);
-const draftStore = await jiti.import("../lib/draft-store.ts");
+const jiti = createJiti(import.meta.url, { tsconfigPaths: true });
+const draftStore = await jiti.import("@/lib/draft-store");
 
 // The merged AppShell's session callbacks also touch the keep-alive dock's
 // state; the sandbox only needs the shapes the callbacks read.
@@ -25,7 +25,7 @@ function callbackBody(name, nextName) {
   return source.slice(start, end);
 }
 
-test("explicit context changes invalidate a pending workspace restore", () => {
+test("a linked session that is gone gets no other session in its place (#1168)", () => {
   const callbacks = [
     ["handleCwdChange", "handleSelectSession"],
     ["handleSelectSession", "handleNewSession"],
@@ -101,6 +101,7 @@ test("New restores the draft after session navigation and workspace auto-restore
         activeProjectKeyRef: { current: cwd },
         workspaceRestoreTokenRef: { current: 0 },
         suppressCwdBumpRef: { current: false },
+        skipWorkspaceRestoreRef: { current: false },
         branchLeafChangeFnRef: { current: null },
         liveFollowFrameRef: { current: null },
         bashRecoveryIdRef: { current: 0 },
@@ -208,6 +209,7 @@ test("New in another project adopts it up front and parks the composer's draft",
     activeProjectKeyRef: { current: "/p1" },
     workspaceRestoreTokenRef: { current: 0 },
     suppressCwdBumpRef: { current: false },
+    skipWorkspaceRestoreRef: { current: false },
     branchLeafChangeFnRef: { current: null },
     isMobile: false,
     activeCwd: "/p1",
@@ -292,6 +294,7 @@ test("the composer's bar moves the fresh composer's draft and model picks instea
     activeProjectKeyRef: { current: "/p1" },
     workspaceRestoreTokenRef: { current: 0 },
     suppressCwdBumpRef: { current: false },
+    skipWorkspaceRestoreRef: { current: false },
     branchLeafChangeFnRef: { current: null },
     chatInputRef: { current: null },
     newSessionChoicesRef: { current: choices },

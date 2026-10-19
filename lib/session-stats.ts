@@ -18,6 +18,15 @@ export interface SessionFileStats {
   lastUsage: AgentUsage | null;
 }
 
+/** One session's totals for the agent switcher (POST /api/sessions/stats). */
+export interface SessionUsageSummary {
+  tokens: SessionFileStats["tokens"];
+  cost: number;
+  toolCalls: number;
+  /** Estimated active time across all entries, as the stats popover shows it. */
+  totalActiveMs: number;
+}
+
 function emptyStats(): SessionFileStats {
   return {
     userMessages: 0,

@@ -9,7 +9,7 @@ import {
 import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
-import { FILE_CODE_STYLE, FILE_LINE_NUMBER_STYLE } from "./DiffView";
+import { FILE_CODE_STYLE, FILE_LINE_NUMBER_STYLE, FILE_PINNED_LINE_NUMBER_STYLE } from "./DiffView";
 
 /** Above this line count the highlighter render is deferred one tick: the plain
  * line grid paints first, then the colored tree replaces it off the first paint. */
@@ -92,7 +92,7 @@ export function SourceCodeView({ content, language, wrapLines }: {
         style={isDark ? vscDarkPlus : vs}
         showLineNumbers
         lineNumberStyle={{
-          ...FILE_LINE_NUMBER_STYLE,
+          ...FILE_PINNED_LINE_NUMBER_STYLE,
         }}
         customStyle={{
           margin: 0,

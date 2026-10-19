@@ -478,7 +478,7 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
 const MAX_THINKING_CACHE_ENTRIES = 100;
 const thinkingContentCache = new Map<string, Promise<string>>();
 
-function loadThinkingContent(sessionId: string, entryId: string, blockIndex: number): Promise<string> {
+export function loadThinkingContent(sessionId: string, entryId: string, blockIndex: number): Promise<string> {
   const key = `${sessionId}:${entryId}:${blockIndex}`;
   const cached = thinkingContentCache.get(key);
   if (cached) {
@@ -1188,7 +1188,7 @@ function SplitFilesView({ files }: { files: SplitDiffFile[] }) {
 
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
             {file.rows.map((row, rowIndex) => {
-              if (row.type === "hunk") {
+              if (row.type !== "line") {
                 return null;
               }
 

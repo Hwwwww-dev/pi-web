@@ -6,15 +6,15 @@ import { gunzipSync } from "node:zlib";
 import test from "node:test";
 import { createJiti } from "jiti";
 
-const listRoute = await readFile(new URL("./route.ts", import.meta.url), "utf8");
-const detailRoute = await readFile(new URL("./[id]/route.ts", import.meta.url), "utf8");
-const contextRoute = await readFile(new URL("./[id]/context/route.ts", import.meta.url), "utf8");
-const stateRoute = await readFile(new URL("./[id]/state/route.ts", import.meta.url), "utf8");
 const jiti = createJiti(import.meta.url, {
   alias: { "@": process.cwd() },
   interopDefault: true,
   moduleCache: false,
 });
+const listRoute = await readFile(new URL("./route.ts", import.meta.url), "utf8");
+const detailRoute = await readFile(new URL("./[id]/route.ts", import.meta.url), "utf8");
+const contextRoute = await readFile(new URL("./[id]/context/route.ts", import.meta.url), "utf8");
+const stateRoute = await readFile(new URL("./[id]/state/route.ts", import.meta.url), "utf8");
 const { DELETE: deleteSession, GET: getSessionDetail, PATCH: renameSession } = await jiti.import("./[id]/route.ts");
 const { GET: getSessionList } = await jiti.import("./route.ts");
 const { GET: getRunningSessions } = await jiti.import("../agent/running/route.ts");
@@ -130,10 +130,14 @@ test("session listing returns a gzip-compressed response when the client accepts
     await rm(dir, { recursive: true, force: true });
   });
 
+  // The list carries at most 500 characters of each first message, so a few
+  // sessions make the body large enough to compress.
   const firstMessage = "compressible session content ".repeat(500);
-  const manager = SessionManager.create(dir);
-  manager.appendMessage({ role: "user", content: firstMessage, timestamp: Date.now() });
-  manager.appendMessage({ role: "assistant", content: [{ type: "text", text: "done" }], timestamp: Date.now() });
+  for (let index = 0; index < 4; index++) {
+    const manager = SessionManager.create(dir);
+    manager.appendMessage({ role: "user", content: firstMessage, timestamp: Date.now() });
+    manager.appendMessage({ role: "assistant", content: [{ type: "text", text: "done" }], timestamp: Date.now() });
+  }
   invalidateSessionListCache();
 
   const response = await getSessionList(new Request("http://localhost/api/sessions", {
@@ -144,9 +148,8 @@ test("session listing returns a gzip-compressed response when the client accepts
   assert.equal(response.headers.get("Content-Encoding"), "gzip");
   assert.match(response.headers.get("Vary") ?? "", /(?:^|,\s*)Accept-Encoding(?:\s*,|$)/i);
   const payload = JSON.parse(gunzipSync(Buffer.from(await response.arrayBuffer())).toString("utf8"));
-  // The scanner caps stored firstMessage lengths (the giant transcript text is
-  // only the bulk vehicle that pushes the body past the gzip threshold).
-  assert.equal(payload.sessions[0].firstMessage, firstMessage.slice(0, 2048));
+  assert.equal(payload.sessions.length, 4);
+  assert.equal(payload.sessions[0].firstMessage, firstMessage.slice(0, 500));
 });
 
 test("deleting an unpersisted session shuts down its runtime and invalidates caches", async (t) => {

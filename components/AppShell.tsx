@@ -39,7 +39,7 @@ import {
   showBrowserNotification,
 } from "@/lib/browser-notifications";
 import { setupPushSubscription } from "@/lib/push-client";
-import { getInitialNavigation, withTabOpen } from "@/lib/initial-navigation";
+import { getInitialNavigation, linkedSessionId, withTabOpen } from "@/lib/initial-navigation";
 import { clearTabOpenSession, getTabOpen, setTabOpenNewSession, setTabOpenSession } from "@/lib/tab-session";
 import { mergeCatalogRow } from "./session-catalog-helpers";
 import { getDraft, rekeyDraft } from "@/lib/draft-store";
@@ -79,9 +79,10 @@ import type { McpErrorResponse, ProjectTrustStatus } from "@/lib/api-types";
 import type { ChatInputHandle } from "./ChatInput";
 import type { AgentEndInfo, NewSessionChoices } from "@/hooks/useAgentSession";
 import type { SessionStatsInfo } from "@/lib/pi-types";
+import { formatActiveDuration, formatCompactCount, formatCostShort } from "@/lib/session-stats-format";
 import type { FileViewerState } from "@/lib/file-viewer-state";
 import { PRESET_READ_ONLY, type ToolEntry } from "@/lib/tool-presets";
-import { getSessionFamily } from "@/lib/session-family";
+import { getAgentsBadge, getSessionFamily } from "@/lib/session-family";
 import { getLastSettingsSection, settingsSectionRequiresProject, type SettingsSection } from "@/lib/settings-navigation";
 
 type SessionCopyField = "file" | "id" | "projectDir" | "gitBranch" | "gitWorktree";
@@ -135,7 +136,7 @@ export function AppShell() {
   // Audio ownership lives here (not in ChatWindow) so the completion tone can
   // also fire for tasks finishing in a non-active workspace whose ChatWindow
   // is not mounted. ChatWindow receives the audio callbacks as props.
-  const { soundEnabled, onSoundToggle, playDoneSound, unlockAudio, soundEnabledRef } = useAudio();
+  const { soundEnabled, onSoundToggle, playDoneSound, unlockAudio, holdAudio, soundEnabledRef } = useAudio();
   const [quoteSelectionEnabled, setQuoteSelectionEnabled] = useState(false);
   useEffect(() => {
     try {
@@ -210,6 +211,10 @@ export function AppShell() {
       return ids;
     });
   }, []);
+  const agentsBadge = activeSessionFamily ? getAgentsBadge(activeSessionFamily.subagents, runningSessionIds) : null;
+  const agentsButtonLabel = agentsBadge?.running
+    ? translate("agentSwitcher.titleRunning", { count: agentsBadge.count })
+    : translate("agentSwitcher.title");
   // The temporary id distinguishes consecutive fresh composers in one cwd.
   const [newSessionCwd, setNewSessionCwd] = useState<string | null>(null);
   const [newSessionDraftId, setNewSessionDraftId] = useState("initial");
@@ -718,6 +723,7 @@ export function AppShell() {
   }, [isMobile]);
 
   const initialSessionId = initialNavigation.sessionId;
+  const initialLinkedSessionId = linkedSessionId(initialNavigation);
   const [activeCwd, setActiveCwd] = useState<string | null>(null);
   const activeProjectKeyRef = useRef<string | null>(null);
   // True once the initial ?session= URL param has been resolved (or confirmed absent)
@@ -733,6 +739,9 @@ export function AppShell() {
   }, [initialNavigation]);
   // Suppresses sessionKey bump in handleCwdChange during the initial URL restore
   const suppressCwdBumpRef = useRef(false);
+  // Set when the session the URL linked to is gone: the project the sidebar
+  // adopts next keeps a fresh composer instead of restoring its last session.
+  const skipWorkspaceRestoreRef = useRef(false);
   // Guards the async workspace restore so a slow response from an earlier
   // switch cannot resurrect a session into a project the user already left.
   const workspaceRestoreTokenRef = useRef(0);
@@ -864,6 +873,8 @@ export function AppShell() {
     setActiveCwd(cwd);
     // Skip if cwd is null (initial mount).
     if (!cwd) return;
+    const skipWorkspaceRestore = skipWorkspaceRestoreRef.current;
+    skipWorkspaceRestoreRef.current = false;
     const newProject = projectKey ?? projectRoot ?? cwd;
     const currentProject = activeProjectKeyRef.current
       ?? (selectedSession ? workspaceKeyOf(selectedSession) : null);
@@ -919,7 +930,7 @@ export function AppShell() {
       changeFileWorkspace(currentProject, newProject);
       // Restore the workspace we switched to: its last open session, or keep
       // the default welcome page when none is remembered.
-      restoreWorkspaceContext(newProject, cwd);
+      if (!skipWorkspaceRestore) restoreWorkspaceContext(newProject, cwd);
     }
     router.replace(typeof window !== "undefined" ? window.location.pathname : "/", { scroll: false });
   }, [activeCwd, changeFileWorkspace, invalidateWorkspaceRestore, newSessionCwd, router, selectedSession, restoreWorkspaceContext]);
@@ -1117,9 +1128,10 @@ export function AppShell() {
   }, [handleSelectSession, locale]);
 
   const handleAgentEnd = useCallback((end: AgentEndInfo) => {
+    // The sidebar's reload merges the selected session's new row into it
+    // (handleSessionsChange), so no list fetch of its own here.
     setRefreshKey((k) => k + 1);
     setExplorerRefreshKey((k) => k + 1);
-    if (selectedSession) hydrateSelectedSession(selectedSession.id);
 
     setRefreshKey((k) => k + 1);
     setExplorerRefreshKey((k) => k + 1);
@@ -1137,7 +1149,7 @@ export function AppShell() {
       body: translate("i18n.taskFinished"),
       tag: targetSession ? `pi-session-complete:${targetSession.id}` : "pi-session-complete",
     });
-  }, [deliverSessionNotification, hydrateSelectedSession, selectedSession, translate]);
+  }, [deliverSessionNotification, selectedSession, translate]);
 
   const handleAttentionNeeded = useCallback((request: BlockingExtensionUiRequest) => {
     if (selectedSession?.relation?.kind === "subagent") return;
@@ -1291,7 +1303,8 @@ export function AppShell() {
 
   const handleInitialRestoreDone = useCallback(() => {
     setInitialSessionRestored(true);
-  }, []);
+    if (initialLinkedSessionId) skipWorkspaceRestoreRef.current = true;
+  }, [initialLinkedSessionId]);
 
   // Stable for the memoized ChatWindow: only clears the one-shot quote prompt.
   const handleInitialPromptConsumed = useCallback(() => {
@@ -1379,6 +1392,23 @@ export function AppShell() {
     setRightPanelOpen(true);
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
+
+  // The agent switcher's side-panel button: opens a subagent's tab, or closes
+  // it when the open panel already has it (the panel closes with its last tab).
+  // The switcher stays open beside the panel, except on phones, where the
+  // panel covers the chat.
+  const openSubagentTabIds = useMemo(
+    () => new Set(rightPanelOpen ? agentTabs.map((tab) => tab.sessionId) : []),
+    [agentTabs, rightPanelOpen],
+  );
+  const handleToggleSubagentTab = (sessionId: string, label: string) => {
+    if (openSubagentTabIds.has(sessionId)) {
+      handleCloseFileTab(`agent:${sessionId}`);
+      return;
+    }
+    if (isMobile) setActiveTopPanel(null);
+    handleOpenSubagentTab(sessionId, label);
+  };
 
   const handleTerminalClosed = (tab: TerminalTab) => {
     const replacement = tab.closing === "restart" ? newTerminalTab(tab.cwd) : null;
@@ -1650,6 +1680,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         controlRef={sidebarControlRef}
         onNewSessionContextChange={handleSidebarNewSessionContext}
         initialSessionId={initialSessionId}
+        initialSessionLinked={initialLinkedSessionId !== null}
         skipInitialProjectSelection={initialNavigation.requestedCwd !== null}
         onInitialRestoreDone={handleInitialRestoreDone}
         refreshKey={refreshKey}
@@ -1912,12 +1943,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </button>
           );
         })()}
-        {hasSubagentSessions && (
+        {hasSubagentSessions && agentsBadge && (
           <button
             type="button"
             onClick={() => toggleTopPanel("agents", mobile)}
-            title={translate("agentSwitcher.title")}
-            aria-label={translate("agentSwitcher.title")}
+            title={agentsButtonLabel}
+            aria-label={agentsButtonLabel}
             aria-pressed={activeTopPanel === "agents"}
             style={{
               position: "relative",
@@ -1938,16 +1969,31 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               <rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" />
             </svg>
             {!mobile && <span>{translate("agentSwitcher.title")}</span>}
+            {/* While subagents run: their count, ringed by a spinner; otherwise all of them. */}
             <span
               aria-hidden="true"
               style={{
+                position: "relative",
                 minWidth: 15, height: 15, padding: "0 4px", display: "grid", placeItems: "center",
-                borderRadius: 7, background: "var(--bg-selected)", color: "var(--accent)",
+                borderRadius: 7,
+                background: agentsBadge.running ? "color-mix(in srgb, var(--accent) 22%, var(--bg-panel))" : "var(--bg-selected)",
+                color: "var(--accent)",
                 fontSize: 10, lineHeight: 1, fontVariantNumeric: "tabular-nums",
-                ...(mobile ? { position: "absolute", top: 2, right: 2, minWidth: 13, height: 13, padding: "0 3px", fontSize: 9 } : {}),
+                fontWeight: agentsBadge.running ? 600 : undefined,
+                ...(mobile ? { position: "absolute", top: 3, right: 3, minWidth: 13, height: 13, padding: "0 3px", fontSize: 9 } : {}),
               }}
             >
-              {activeSessionFamily!.subagents.length}
+              {agentsBadge.running && (
+                <svg
+                  className="animate-spin motion-reduce:animate-none"
+                  viewBox="0 0 24 24" fill="none" aria-hidden="true"
+                  style={{ position: "absolute", top: -3, left: -3, width: "calc(100% + 6px)", height: "calc(100% + 6px)", pointerEvents: "none" }}
+                >
+                  <circle cx="12" cy="12" r="11" stroke="currentColor" strokeWidth="2" opacity="0.2" />
+                  <path d="M23 12a11 11 0 0 0-11-11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              )}
+              {agentsBadge.count}
             </span>
           </button>
         )}
@@ -2071,10 +2117,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
 
     const tokens = sessionStats?.tokens;
     const cost = sessionStats?.cost ?? 0;
-    // The cache segment shows the most recent request's cache read (the live
-    // cache hit), not the session cumulative — the cumulative always dwarfs
-    // the current context after a few dozen requests.
-    const cacheRead = sessionStats?.lastUsage?.cacheRead ?? tokens?.cacheRead ?? 0;
+    const formatCompact = formatCompactCount;
+    const costText = formatCostShort(cost);
 
     let contextColor: string | undefined;
     if (contextUsage?.contextWindow) {
@@ -2087,7 +2131,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     if (tokens) {
       tooltipParts.push(`in: ${tokens.input.toLocaleString(locale)}`);
       tooltipParts.push(`out: ${tokens.output.toLocaleString(locale)}`);
-      tooltipParts.push(`cache read: ${cacheRead.toLocaleString(locale)}`);
+      tooltipParts.push(`cache read: ${tokens.cacheRead.toLocaleString(locale)}`);
       if (cost > 0) tooltipParts.push(`cost: $${cost.toFixed(4)}`);
     }
     if (contextUsage?.contextWindow) {
@@ -2135,7 +2179,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         }}
       >
         <UsageBar
-          usage={tokens ? { input: tokens.input, output: tokens.output, cacheRead, cost } : null}
+          usage={tokens ? { input: tokens.input, output: tokens.output, cacheRead: tokens.cacheRead, cost } : null}
           ctx={contextUsage?.contextWindow ? { percent: contextUsage.percent, contextWindow: contextUsage.contextWindow } : undefined}
           emphasizeCost
           ctxColor={contextColor}
@@ -2469,6 +2513,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   selectedSessionId={selectedSession.id}
                   runningSessionIds={runningSessionIds}
                   onSelectSession={handleSelectSession}
+                  openSubagentTabIds={openSubagentTabIds}
+                  onToggleSubagentTab={handleToggleSubagentTab}
                 />
               )}
               {activeTopPanel === "system" && (
@@ -2493,23 +2539,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   padding: "12px 16px",
                 }}>
                   {sessionStats ? (() => {
-                    const formatDuration = (ms: number) => {
-                      if (ms <= 0) return "0s";
-                      const totalSec = Math.floor(ms / 1000);
-                      const h = Math.floor(totalSec / 3600);
-                      const m = Math.floor((totalSec % 3600) / 60);
-                      const s = totalSec % 60;
-                      if (h > 0) return `${h}h ${m}m`;
-                      if (m > 0) return `${m}m ${s}s`;
-                      return `${s}s`;
-                    };
                     const totalActiveMs = sessionStats.totalActiveMs ?? 0;
                     const ws = selectedSession;
                     const sessionRows = [
                        ...(sessionStats.sessionName ? [{ label: translate("session.name"), value: sessionStats.sessionName, copyField: null }] : []),
                        { label: translate("session.file"), value: sessionStats.sessionFile ?? translate("session.inMemory"), copyField: "file" as const },
                        { label: translate("session.id"), value: sessionStats.sessionId, copyField: "id" as const },
-                       ...(totalActiveMs > 0 ? [{ label: translate("session.totalActive"), value: formatDuration(totalActiveMs), copyField: null }] : []),
+                       ...(totalActiveMs > 0 ? [{ label: translate("session.totalActive"), value: formatActiveDuration(totalActiveMs), copyField: null }] : []),
                     ];
                     const projectRows = [
                       ...(ws ? [{ label: translate("session.projectDir"), value: ws.projectRoot ?? ws.cwd, copyField: "projectDir" as const }] : []),
@@ -2531,10 +2567,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                        [translate("session.total"), sessionStats.tokens.total.toLocaleString(locale)],
                     ];
                     const ctx = contextUsage ?? sessionStats.contextUsage;
-                    const formatCompact = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
                     const extraTokenRows = [
                        ...(sessionStats.cost > 0 ? [[translate("session.cost"), `$${sessionStats.cost.toFixed(4)}`]] : []),
-                       ...(ctx?.contextWindow ? [[translate("session.context"), `${ctx.percent !== null ? formatContextPercent(ctx.percent, 1) : "?"} / ${formatCompact(ctx.contextWindow)}`]] : []),
+                       ...(ctx?.contextWindow ? [[translate("session.context"), `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} / ${formatCompactCount(ctx.contextWindow)}`]] : []),
                        // Cache hit rate = cache reads / (input + cache writes + cache reads) — the denominator covers all input-class tokens.
                        ...(sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite > 0 && sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input > 0
                          ? [[translate("session.cacheHitRate"), `${(sessionStats.tokens.cacheRead / (sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input) * 100).toFixed(1)}%`]]

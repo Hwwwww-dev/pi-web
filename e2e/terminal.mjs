@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { showSidebarFiles, showSidebarSessions } from "./sidebar.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 assert.ok(!existsSync(join(root, ".next/dev/lock")), "Run in a checkout without an active dev server");
@@ -88,12 +89,10 @@ try {
       const button = page.getByRole("button", { name: "Show sidebar", exact: true });
       if (await button.count()) await button.click();
     };
-    // The explorer and its terminal button are in the Files tab, the session rows in the Sessions tab.
-    const showTab = async (name) => {
-      const tab = page.getByRole("tab", { name, exact: true });
-      if (await tab.getAttribute("aria-selected") !== "true") await tab.click();
-    };
-    const filesPanel = page.getByRole("tabpanel", { name: "Files", exact: true });
+    // The explorer and its terminal button are in the sidebar's files, the
+    // session rows in its sessions: one above the other on a desktop, tabs on a phone.
+    const showTab = (name) => (name === "Files" ? showSidebarFiles(page) : showSidebarSessions(page));
+    const filesPanel = page.locator("#session-sidebar-panel-files");
     const showPanel = () => page.getByRole("button", { name: "Show file panel", exact: true }).click();
     const hidePanel = async () => {
       const button = page.locator("#file-panel").getByRole("button", { name: "Hide file panel", exact: true, includeHidden: true });
@@ -155,9 +154,24 @@ try {
       await run("printf '\\nSESSION:%s:%s\\n' \"$PR695_TOKEN\" \"$$\"");
       await waitOutput(`SESSION:alive:${pid}`);
 
+      // The terminal's own theme swaps xterm's palette in place and survives a reload.
+      const terminalBackground = () => page.locator(".terminal-panel:visible .xterm-viewport").evaluate((el) => getComputedStyle(el).backgroundColor);
+      const appTheme = await page.evaluate(() => document.documentElement.dataset.theme);
+      await page.getByRole("button", { name: "Switch terminal to light theme", exact: true }).click();
+      await page.locator('.terminal-panel:visible[data-terminal-theme="light"]').waitFor();
+      assert.equal(await terminalBackground(), "rgb(251, 251, 252)");
+      assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), appTheme);
+      await run("printf '\\nTHEME:%s:%s\\n' \"$PR695_TOKEN\" \"$$\"");
+      await waitOutput(`THEME:alive:${pid}`);
+
       await page.reload();
       await ready();
       await expectFontWeight(600);
+      await page.locator('.terminal-panel:visible[data-terminal-theme="light"]').waitFor();
+      assert.equal(await terminalBackground(), "rgb(251, 251, 252)");
+      await page.getByRole("button", { name: "Switch terminal to dark theme", exact: true }).click();
+      assert.equal(await terminalBackground(), "rgb(17, 19, 24)");
+      assert.equal(await page.evaluate(() => localStorage.getItem("pi-web:terminal-theme")), "dark");
       await run("printf '\\nREFRESH:%s:%s\\n' \"$PR695_TOKEN\" \"$$\"");
       await waitOutput(`REFRESH:alive:${pid}`);
       assert.equal(created.size, 1, "refresh must reconnect, not create");
@@ -169,6 +183,32 @@ try {
       await run("printf '\\nRECONNECT:%s:%s\\n' \"$PR695_TOKEN\" \"$$\"");
       await waitOutput(`RECONNECT:alive:${pid}`);
       assert.equal(((await text()).match(new RegExp(`REFRESH:alive:${pid}`, "g")) ?? []).length, 1, "reconnect must not replay delivered output");
+
+      // The chat font size also sets the live terminal's (13px at its default) and refits the PTY.
+      const xtermFontSize = () => page.locator(".terminal-panel:visible .xterm-rows").evaluate((el) => getComputedStyle(el).fontSize);
+      const ptyColumns = async (label) => {
+        await run(`printf '\\n${label}:%s\\n' "$(stty size)"`);
+        await waitOutput(`${label}:[0-9]+ [0-9]+`);
+        return Number((await text()).match(new RegExp(`${label}:\\d+ (\\d+)`))[1]);
+      };
+      assert.equal(await xtermFontSize(), "13px");
+      const columnsBefore = await ptyColumns("COLS_BEFORE");
+      fontConnections.length = 0;
+      page.on("request", trackFontConnections);
+      await hidePanel();
+      await showSidebar();
+      await page.getByRole("button", { name: "Settings", exact: true }).click();
+      await page.getByRole("slider", { name: "Chat & terminal font size", exact: true }).fill("18");
+      await page.keyboard.press("Escape");
+      if (viewport.width <= 640) {
+        await page.locator(".sidebar-overlay-backdrop").click({ position: { x: viewport.width - 5, y: 100 } });
+      }
+      await showPanel();
+      await ready();
+      assert.equal(await xtermFontSize(), "17px");
+      assert.ok(await ptyColumns("COLS_AFTER") < columnsBefore, "A larger font must refit the PTY to fewer columns");
+      page.off("request", trackFontConnections);
+      assert.deepEqual(fontConnections, [], "A font size change must not recreate the terminal or reconnect its stream");
 
       await page.screenshot({ path: join(artifacts, `${viewport.width}.png`), fullPage: true });
       const dimensions = await page.locator(".terminal-panel:visible").evaluate((element) => {
@@ -217,7 +257,7 @@ try {
       await run("export PR695_WORKSPACE=retained");
       await hidePanel();
       await showSidebar();
-      // Switch projects with the Files tab's project menu (its button and items carry the root as title;
+      // Switch projects with the files' project menu (its button and items carry the root as title;
       // the menu is portaled to the body, outside the panel).
       await showTab("Files");
       await filesPanel.getByRole("button").and(page.getByTitle(workspace, { exact: true })).first().click();

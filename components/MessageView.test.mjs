@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createJiti } from "jiti";
+import ts from "typescript";
 
 const jiti = createJiti(import.meta.url, {
   jsx: { runtime: "automatic" },
@@ -78,6 +80,26 @@ test("previews the first thinking line and reveals the full text with the saved 
   }
 });
 
+test("long thinking renders in pages instead of one DOM blob (#1196)", () => {
+  // dev renders thinking through ThinkingRow's deferred pagination
+  // (loadThinkingContent): a historical block's body loads page by page,
+  // so an expanded 2_000-line block never lands in the DOM at once.
+  const source = ts.createSourceFile("ActivityRows.tsx", readFileSync(new URL("./ActivityRows.tsx", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const calls = [];
+  (function visit(node) {
+    if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && node.tagName.getText(source) === "ThinkingRow") {
+      const props = node.attributes.properties.map((attribute) => (ts.isJsxAttribute(attribute) ? attribute.name.getText(source) : null));
+      calls.push(props);
+    }
+    ts.forEachChild(node, visit);
+  })(source);
+  assert.ok(calls.length >= 1, "ThinkingRow renders the thinking blocks");
+  for (const props of calls) {
+    assert.ok(props.includes("sessionId") && props.includes("entryId"), "each row loads its body through the deferred pages");
+  }
+  assert.match(readFileSync(new URL("./ActivityRows.tsx", import.meta.url), "utf8"), /loadThinkingContent/);
+});
+
 test("shows deferred thinking previews without loading the full content", () => {
   const html = renderMessage({
     role: "assistant",
@@ -85,6 +107,22 @@ test("shows deferred thinking previews without loading the full content", () => 
   });
   assert.match(html, />Historical first line<\/span>/);
   assert.match(html, /aria-expanded="false"/);
+});
+
+test("keys an assistant message's blocks by their place, not the entry id (#1184)", () => {
+  // A message of the running turn gets its entry id when the file is read again.
+  // A block keyed by it remounted then: open thinking closed, a tool output's
+  // scroll went back to the top. ThinkingBlock drops what it loaded for another id.
+  const source = ts.createSourceFile("MessageView.tsx", readFileSync(new URL("./MessageView.tsx", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const keys = [];
+  (function visit(node) {
+    if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && node.tagName.getText(source) === "BlockView") {
+      const key = node.attributes.properties.find((attribute) => ts.isJsxAttribute(attribute) && attribute.name.getText(source) === "key");
+      keys.push(key?.initializer?.expression?.getText(source));
+    }
+    ts.forEachChild(node, visit);
+  })(source);
+  assert.deepEqual(keys, ["originalIndex"]);
 });
 
 test("marks only the matched text block after splitting thinking and the final answer", () => {

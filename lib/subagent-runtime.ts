@@ -34,14 +34,17 @@ import {
 import type { SessionEntry } from "./types";
 import { buildSubagentPromptPlan } from "./subagent-prompt";
 import { createSubagentSkillsBinding } from "./subagent-skills";
-import { appendSubagentInputFiles, loadSubagentInputFiles } from "./subagent-input";
+import { appendSubagentInputFiles, loadSubagentInputFiles, subagentInputLimits } from "./subagent-input";
 import { projectTrustReloadOptions } from "./project-trust";
-import { createSubagentCodemodeExtension } from "./builtin-extensions";
+import { createSubagentCodemodeExtension, createSubagentMcpExtensions } from "./builtin-extensions";
+import type { McpHost } from "./mcp-host";
+import { createSubagentMcpPolicyExtension } from "./mcp-read-only-policy";
 import { resolveShellTools } from "./powershell-settings";
 import { isBuiltInSubagentsEnabled, readSubagentSettings } from "./subagent-settings";
 import { SubagentQueue } from "./subagent-queue";
 import { addWorktree, removeWorktree } from "./worktree";
 import { randomUUID } from "node:crypto";
+import { existsSync, writeFileSync } from "node:fs";
 
 interface HostSession {
   readonly inner: AgentSessionLike;
@@ -50,14 +53,19 @@ interface HostSession {
   isAlive(): boolean;
   isRunning(): boolean;
   waitUntilReady(): Promise<void>;
+  /**
+   * Connect the session's MCP servers before a run prompts the SDK session directly, past the
+   * wrapper's `send()`; false when Stop or `signal` ended the wait and the run must not start.
+   */
+  prepareMcpForRun?(signal: AbortSignal): Promise<boolean>;
 }
 
 export interface SubagentRuntimeDependencies {
   getSession(sessionId: string): HostSession | undefined;
   registerSession(
     inner: AgentSessionLike,
-    options?: { exactSystemPrompt?: () => string; chatOnly?: boolean },
-  ): void;
+    options?: { exactSystemPrompt?: () => string; chatOnly?: boolean; mcpHost?: McpHost },
+  ): HostSession | void;
   reopenSession(sessionId: string, sessionFile: string): Promise<HostSession>;
   resolveSessionPath(sessionId: string): Promise<string | null>;
   invalidateSessionList(): void;
@@ -78,6 +86,8 @@ type StoredSubagentExecution = {
   /** Set once the turn limit ends the run; later steering is refused instead of starting another turn. */
   turnLimitReached?: boolean;
   cancelQueued?: () => boolean;
+  /** Ends the wait for the child's MCP servers before its prompt (`prepareChildMcp()`). */
+  mcpWait?: AbortController;
 };
 
 declare global {
@@ -112,6 +122,25 @@ function turnLimitError(turnLimit: number, undelivered: readonly string[]): stri
   const error = `Subagent reached its turn limit (${turnLimit}) without completing the task.`;
   if (undelivered.length === 0) return error;
   return `${error} These queued messages were not delivered:\n${undelivered.map((text) => `- ${text}`).join("\n")}`;
+}
+
+/**
+ * A child with `mcp: on` connects its servers before its prompt, as a prompt sent to the wrapper
+ * does. The parent's Stop and `abort()` end the wait through `stored.mcpWait`, the child's own
+ * Stop through the wrapper; either way the run is aborted before it starts.
+ */
+async function prepareChildMcp(session: HostSession | void, stored: StoredSubagentExecution): Promise<void> {
+  if (!session?.prepareMcpForRun) return;
+  const controller = new AbortController();
+  stored.mcpWait = controller;
+  try {
+    if (stored.abortRequested) controller.abort();
+    if (await session.prepareMcpForRun(controller.signal)) return;
+  } finally {
+    stored.mcpWait = undefined;
+  }
+  stored.abortRequested = true;
+  throw new Error("Stopped while connecting MCP servers");
 }
 
 function getSubagentRuns(): Map<string, StoredSubagentExecution> {
@@ -167,21 +196,52 @@ function settleOrphanedRun(run: SubagentRunInfo): SubagentRunInfo {
   return run.status === "running" || run.status === "queued" ? { ...run, status: "interrupted" } : run;
 }
 
+function findSubagentModel(runtime: ModelRuntime, reference: string) {
+  const slash = reference.indexOf("/");
+  if (slash > 0) return runtime.getModel(reference.slice(0, slash), reference.slice(slash + 1));
+  const matches = runtime.getModels().filter((model) => model.id === reference);
+  if (matches.length > 1) throw new Error(`Subagent model is ambiguous; use provider/modelId: ${reference}`);
+  return matches[0];
+}
+
+/**
+ * Reads a model reference as pi's `--model` does: `provider/modelId` or a bare id, optionally
+ * followed by `:<thinking level>`. The whole reference is tried first, so an id that itself
+ * contains a colon (`qwen3:8b`) still matches; a suffix that is no thinking level never matches.
+ */
 function parseSubagentModel(runtime: ModelRuntime, value: string | undefined) {
   if (!value?.trim()) return undefined;
   const requested = value.trim();
-  const slash = requested.indexOf("/");
-  if (slash > 0) {
-    const provider = requested.slice(0, slash);
-    const modelId = requested.slice(slash + 1);
-    const model = runtime.getModel(provider, modelId);
-    if (!model) throw new Error(`Subagent model not found: ${requested}`);
-    return model;
+  const exact = findSubagentModel(runtime, requested);
+  if (exact) return { model: exact };
+  const colon = requested.lastIndexOf(":");
+  const level = requested.slice(colon + 1) as ThinkingLevel;
+  if (colon > 0 && THINKING_LEVELS.has(level)) {
+    const model = findSubagentModel(runtime, requested.slice(0, colon));
+    if (model) return { model, thinkingLevel: level };
   }
-  const matches = runtime.getModels().filter((model) => model.id === requested);
-  if (matches.length === 1) return matches[0];
-  if (matches.length === 0) throw new Error(`Subagent model not found: ${requested}`);
-  throw new Error(`Subagent model is ambiguous; use provider/modelId: ${requested}`);
+  throw new Error(`Subagent model not found: ${requested}`);
+}
+
+/**
+ * The model the child is expected to run (the call's, else the profile's, else the parent's),
+ * looked up early to size `input_files` before a worktree or child session exists (#1199). It
+ * never throws: the child's model is resolved for real, and a bad reference refused, only after
+ * the child's services have refreshed the shared runtime from models.json and registered its
+ * extensions' providers. A reference this lookup misses leaves the files the flat limit.
+ */
+function expectedSubagentModel(
+  runtime: ModelRuntime,
+  callModel: string | undefined,
+  profileModel: string | undefined,
+  parentModel: AgentSessionLike["model"],
+) {
+  try {
+    const reference = callModel?.trim() || profileModel?.trim();
+    return reference ? parseSubagentModel(runtime, reference)?.model : parentModel;
+  } catch {
+    return undefined;
+  }
 }
 
 function parentContextText(parent: HostSession): string {
@@ -189,6 +249,23 @@ function parentContextText(parent: HostSession): string {
   const serialized = JSON.stringify(messages);
   if (serialized.length <= SUBAGENT_CONTEXT_LIMIT) return serialized;
   return `${serialized.slice(0, SUBAGENT_CONTEXT_LIMIT)}\n[Parent context truncated]`;
+}
+
+/**
+ * pi creates a session file only once the session holds a user or assistant message, so a run
+ * that ended before its prompt reached the model (stopped while queued or connecting MCP servers,
+ * a provider without credentials) kept its metadata and result in memory only. Once the idle
+ * child's wrapper was released, `get_subagent_result` and `resume` answered `Subagent not found`
+ * for an id the parent had been given, and the session left the sidebar. Write the file when the
+ * child is dispatched; `setSessionFile()` reloads it, so pi appends every later entry to it.
+ */
+function persistChildSession(sessionManager: SessionManager): void {
+  const sessionFile = sessionManager.getSessionFile();
+  const header = sessionManager.getHeader();
+  if (!sessionFile || !header || existsSync(sessionFile)) return;
+  const lines = [header, ...sessionManager.getEntries()].map((entry) => JSON.stringify(entry));
+  writeFileSync(sessionFile, `${lines.join("\n")}\n`, { flag: "wx" });
+  sessionManager.setSessionFile(sessionFile);
 }
 
 async function cleanupWorktree(
@@ -202,6 +279,27 @@ async function cleanupWorktree(
   } catch (error) {
     return `Worktree retained at ${worktree.path}: ${error instanceof Error ? error.message : String(error)}`;
   }
+}
+
+/**
+ * Writes a settled run's result entry, which `readSubagentRun()` reads back, and returns the run as
+ * recorded. An isolated run's entry keeps whether its worktree path still exists now, which decides
+ * what the parent is told about it, live and read back alike (#1202): a checkout removed during
+ * the run is gone though git's removal then failed, and a resumed run removes nothing.
+ */
+function recordResult(sessionManager: SessionManager, run: SubagentRunInfo): SubagentRunInfo {
+  const recorded = run.worktreePath ? { ...run, worktreeExists: existsSync(run.worktreePath) } : run;
+  const entry: SubagentResultMetadata = {
+    version: 1,
+    status: recorded.status as SubagentResultMetadata["status"],
+    completedAt: recorded.completedAt!,
+    ...(recorded.result ? { result: recorded.result } : {}),
+    ...(recorded.error ? { error: recorded.error } : {}),
+    ...(recorded.worktreeCleanupError ? { worktreeCleanupError: recorded.worktreeCleanupError } : {}),
+    ...(recorded.worktreeExists !== undefined ? { worktreeExists: recorded.worktreeExists } : {}),
+  };
+  sessionManager.appendCustomEntry(SUBAGENT_RESULT_TYPE, entry);
+  return recorded;
 }
 
 export function createSubagentController(
@@ -222,6 +320,14 @@ export function createSubagentController(
 
       const runInBackground = request.runInBackground ?? profile.runInBackground;
       const isolation = profile.isolation === "off" ? undefined : request.isolation ?? profile.isolation;
+      // SAFETY: the SDK AgentSession exposes modelRuntime at runtime (d.ts getter),
+      // but the type carried on wrapper.inner here omits it.
+      const parentModelRuntime = (parent.inner as unknown as { modelRuntime: ModelRuntime }).modelRuntime;
+      // Sized by the window of the model expected to read the copy, and refused before a worktree
+      // or child session exists.
+      const inputFiles = loadSubagentInputFiles(parent.cwd, request.inputFiles ?? [], subagentInputLimits(
+        expectedSubagentModel(parentModelRuntime, request.model, profile.model, parent.inner.model),
+      ));
       if (isolation === "worktree") {
         isolatedWorktree = await addWorktree(parent.cwd, `pi-web-agent-${randomUUID()}`);
       }
@@ -229,20 +335,12 @@ export function createSubagentController(
       const inheritContext = profile.inheritContext;
       // `parseProfileFile` already floors a positive profile `max_turns`, so it is an integer or absent.
       const turnLimit = profile.maxTurns;
-      const thinking = profile.thinking ?? parent.inner.agent.state?.thinkingLevel;
-      if (thinking && !THINKING_LEVELS.has(thinking as ThinkingLevel)) {
-        throw new Error(`Invalid subagent thinking level: ${thinking}`);
-      }
 
       const agentDir = getAgentDir();
-      // SAFETY: the SDK AgentSession exposes modelRuntime at runtime (d.ts getter),
-      // but the type carried on wrapper.inner here omits it.
-      const parentModelRuntime = (parent.inner as unknown as { modelRuntime: ModelRuntime }).modelRuntime;
       const settingsManager = SettingsManager.create(childCwd, agentDir);
       const inheritedParentContext = inheritContext
         ? `The following is the active conversation context from the parent session. Use it only as background for the delegated task:\n${parentContextText(parent)}`
         : undefined;
-      const inputFiles = loadSubagentInputFiles(parent.cwd, request.inputFiles ?? []);
       const promptPlan = buildSubagentPromptPlan({
         profileSystemPrompt: profile.systemPrompt,
         tools: profile.tools,
@@ -261,6 +359,10 @@ export function createSubagentController(
       // A chat-only profile remains chat-only when inheritance is selected. An explicit `on`
       // is rejected above so it cannot silently grant a script capability to tools:none.
       const codemodeEnabled = !promptPlan.chatOnly && wantsCodemode;
+      if (promptPlan.chatOnly && profile.mcp === "on") {
+        throw new Error("MCP cannot be enabled for a chat-only subagent profile");
+      }
+      const mcpEnabled = profile.mcp === "on";
       const chatOnly = promptPlan.chatOnly;
       const { appendSystemPrompt, delegatedTask } = promptPlan;
       const skillsBinding = createSubagentSkillsBinding({
@@ -275,8 +377,19 @@ export function createSubagentController(
             projectTrusted: () => settingsManager.isProjectTrusted(),
           })
         : undefined;
+      // The policy reads the child's tools once they are resolved below.
+      const mcpScope: { tools: readonly string[]; allExtensionTools?: boolean } = { tools: [] };
+      const mcp = mcpEnabled
+        ? await createSubagentMcpExtensions({
+            agentDir,
+            cwd: childCwd,
+            projectTrusted: () => settingsManager.isProjectTrusted(),
+            codemode: codemodeEnabled,
+          })
+        : undefined;
       const extensionFactories = [
         ...(codemodeExtension ? [codemodeExtension] : []),
+        ...(mcp ? [...mcp.extensions, createSubagentMcpPolicyExtension(() => mcpScope)] : []),
         ...(skillsBinding.loaderOptions.extensionFactories ?? []),
       ];
       if (!chatOnly) initTheme();
@@ -286,7 +399,7 @@ export function createSubagentController(
         modelRuntime: parentModelRuntime,
         settingsManager,
         resourceLoaderOptions: {
-          ...subagentExtensionLoaderOptions(profile),
+          ...subagentExtensionLoaderOptions({ ...profile, mcp: mcpEnabled }),
           ...skillsBinding.loaderOptions,
           ...(extensionFactories.length > 0 ? { extensionFactories } : {}),
           noPromptTemplates: true,
@@ -300,7 +413,7 @@ export function createSubagentController(
             : {}),
           appendSystemPrompt,
         },
-        ...((profile.loadExtensions || profile.loadSkills || codemodeEnabled)
+        ...((profile.loadExtensions || profile.loadSkills || codemodeEnabled || mcpEnabled)
           ? { resourceLoaderReloadOptions: projectTrustReloadOptions(childCwd, agentDir) }
           : {}),
       });
@@ -325,6 +438,8 @@ export function createSubagentController(
         settingsManager.getDefaultTools(),
       );
       if (codemodeEnabled && !activeTools.includes("codemode")) activeTools.push("codemode");
+      mcpScope.tools = activeTools;
+      mcpScope.allExtensionTools = allExtensionTools;
 
       const sessionManager = isolatedWorktree
         ? SessionManager.create(childCwd, undefined, { parentSession: parent.sessionFile })
@@ -345,6 +460,7 @@ export function createSubagentController(
           appendSystemPrompt: [...appendSystemPrompt],
           tools: [...activeTools],
           ...(codemodeEnabled ? { codemode: true as const } : {}),
+          ...(mcpEnabled ? { mcp: true as const } : {}),
           loadSkills: profile.loadSkills,
           ...(profile.skills !== undefined ? { skills: [...profile.skills] } : {}),
           loadExtensions: profile.loadExtensions,
@@ -357,21 +473,34 @@ export function createSubagentController(
       sessionManager.appendCustomEntry(SUBAGENT_META_TYPE, metadata);
       sessionManager.appendSessionInfo(metadata.description);
 
-      const requestedModel = parseSubagentModel(parentModelRuntime, request.model ?? profile.model);
+      // A `:level` suffix travels with its model. As with pi's `--thinking` over `--model x:level`,
+      // the profile's own `thinking` beats a suffix on the profile's model, while a call naming
+      // a model with a suffix chose both for this run.
+      const callModel = parseSubagentModel(parentModelRuntime, request.model);
+      const profileModel = callModel ? undefined : parseSubagentModel(parentModelRuntime, profile.model);
+      const thinking = callModel?.thinkingLevel
+        ?? profile.thinking
+        ?? profileModel?.thinkingLevel
+        ?? parent.inner.agent.state?.thinkingLevel;
+      if (thinking && !THINKING_LEVELS.has(thinking as ThinkingLevel)) {
+        throw new Error(`Invalid subagent thinking level: ${thinking}`);
+      }
       const parentModel = parent.inner.model as ReturnType<ModelRuntime["getModel"]>;
       const { session: inner } = await createAgentSessionFromServices({
         services,
         sessionManager,
-        model: requestedModel ?? parentModel,
+        model: (callModel ?? profileModel)?.model ?? parentModel,
         ...(thinking ? { thinkingLevel: thinking as ThinkingLevel } : {}),
-        ...subagentToolOptions({ tools: activeTools, allExtensionTools }),
+        ...subagentToolOptions({ tools: activeTools, allExtensionTools, mcp: mcpEnabled }),
       });
+      persistChildSession(sessionManager);
       skillsBinding.setActiveToolsGetter(() => inner.getActiveToolNames());
-      dependencies.registerSession(inner, {
+      const childSession = dependencies.registerSession(inner, {
         ...(skillsBinding.getExactSystemPrompt !== undefined
           ? { exactSystemPrompt: skillsBinding.getExactSystemPrompt }
           : {}),
         chatOnly,
+        ...(mcp?.mcpHost ? { mcpHost: mcp.mcpHost } : {}),
       });
 
       const initialRun: SubagentRunInfo = {
@@ -402,15 +531,22 @@ export function createSubagentController(
       const handleParentAbort = () => {
         stored.abortRequested = true;
         if (stored.run.status === "queued") stored.cancelQueued?.();
+        else if (stored.mcpWait) stored.mcpWait.abort();
         else void inner.abort();
       };
       if (!runInBackground) request.signal?.addEventListener("abort", handleParentAbort, { once: true });
 
       const execute = async (): Promise<SubagentRunInfo> => {
+        // Reached only when the abort fires while the run is being queued, before `cancelQueued`
+        // is set; a run aborted later in the queue ends in `finishQueuedAbort`.
         if (stored.abortRequested) {
-          const result: SubagentRunInfo = { ...initialRun, status: "aborted", completedAt: new Date().toISOString() };
-          sessionManager.appendCustomEntry(SUBAGENT_RESULT_TYPE, { version: 1, status: "aborted", completedAt: result.completedAt });
-          await cleanupWorktree(parent.cwd, isolatedWorktree);
+          const cleanupError = await cleanupWorktree(parent.cwd, isolatedWorktree);
+          const result = recordResult(sessionManager, {
+            ...initialRun,
+            status: "aborted",
+            completedAt: new Date().toISOString(),
+            ...(cleanupError ? { worktreeCleanupError: cleanupError } : {}),
+          });
           stored.run = result;
           request.onUpdate?.(result);
           getSubagentRuns().delete(initialRun.sessionId);
@@ -463,6 +599,7 @@ export function createSubagentController(
         }
         let result: SubagentRunInfo;
         try {
+          await prepareChildMcp(childSession, stored);
           await inner.prompt(delegatedTask, { source: "rpc" });
           const text = inner.getLastAssistantText()?.trim();
           const stop = stored.abortRequested ? undefined : lastAssistantStop(sessionManager);
@@ -499,15 +636,7 @@ export function createSubagentController(
 
         const cleanupError = await cleanupWorktree(parent.cwd, isolatedWorktree);
         if (cleanupError) result = { ...result, worktreeCleanupError: cleanupError };
-        const persisted: SubagentResultMetadata = {
-          version: 1,
-          status: result.status as SubagentResultMetadata["status"],
-          completedAt: result.completedAt!,
-          ...(result.result ? { result: result.result } : {}),
-          ...(result.error ? { error: result.error } : {}),
-          ...(result.worktreeCleanupError ? { worktreeCleanupError: result.worktreeCleanupError } : {}),
-        };
-        sessionManager.appendCustomEntry(SUBAGENT_RESULT_TYPE, persisted);
+        result = recordResult(sessionManager, result);
         stored.run = result;
         request.onUpdate?.(result);
         getSubagentRuns().delete(initialRun.sessionId);
@@ -519,8 +648,7 @@ export function createSubagentController(
         if (stored.run.status !== "queued") return;
         const result: SubagentRunInfo = { ...initialRun, status: "aborted", completedAt: new Date().toISOString() };
         const cleanupError = await cleanupWorktree(parent.cwd, isolatedWorktree);
-        const finalResult = cleanupError ? { ...result, worktreeCleanupError: cleanupError } : result;
-        sessionManager.appendCustomEntry(SUBAGENT_RESULT_TYPE, { version: 1, status: "aborted", completedAt: finalResult.completedAt, ...(cleanupError ? { worktreeCleanupError: cleanupError } : {}) });
+        const finalResult = recordResult(sessionManager, cleanupError ? { ...result, worktreeCleanupError: cleanupError } : result);
         stored.run = finalResult;
         request.onUpdate?.(finalResult);
         getSubagentRuns().delete(initialRun.sessionId);
@@ -571,6 +699,11 @@ export function createSubagentController(
     if (!wrapper?.isAlive()) wrapper = await dependencies.reopenSession(request.sessionId, sessionPath);
     if (!wrapper.isAlive()) throw new Error("Subagent session is no longer available");
     if (wrapper.isRunning()) throw new Error("Subagent is already running");
+    // The run prompts the SDK session directly, past the wrapper's `send()`, so refuse here as
+    // `send()` does: an isolated child's worktree is removed when its run ends, and a run in the
+    // missing folder would only let the model's tools fail (and `write` recreate it outside git).
+    // The error reaches the model, so it also says what to do instead.
+    if (!existsSync(wrapper.cwd)) throw new Error(`Directory does not exist: ${wrapper.cwd}. Start a new subagent instead.`);
 
     const runInBackground = request.runInBackground ?? existing.runInBackground;
     const initialRun: SubagentRunInfo = {
@@ -583,6 +716,9 @@ export function createSubagentController(
       completedAt: undefined,
       result: undefined,
       error: undefined,
+      // Resume removes no worktree: this run's result says only whether it is still there.
+      worktreeCleanupError: undefined,
+      worktreeExists: undefined,
       resumed: true,
     };
     const manager = wrapper.inner.sessionManager;
@@ -595,14 +731,14 @@ export function createSubagentController(
     const handleParentAbort = () => {
       stored.abortRequested = true;
       if (stored.run.status === "queued") stored.cancelQueued?.();
+      else if (stored.mcpWait) stored.mcpWait.abort();
       else void wrapper!.inner.abort();
     };
     if (!runInBackground) request.signal?.addEventListener("abort", handleParentAbort, { once: true });
 
     const execute = async (): Promise<SubagentRunInfo> => {
       if (stored.abortRequested) {
-        const result: SubagentRunInfo = { ...initialRun, status: "aborted", completedAt: new Date().toISOString() };
-        manager.appendCustomEntry(SUBAGENT_RESULT_TYPE, { version: 1, status: "aborted", completedAt: result.completedAt });
+        const result = recordResult(manager, { ...initialRun, status: "aborted", completedAt: new Date().toISOString() });
         stored.run = result;
         getSubagentRuns().delete(request.sessionId);
         resolveCompletion(result);
@@ -613,6 +749,7 @@ export function createSubagentController(
       request.onUpdate?.(stored.run);
       let result: SubagentRunInfo;
       try {
+        await prepareChildMcp(wrapper, stored);
         await wrapper!.inner.prompt(request.task, { source: "rpc" });
         const text = wrapper!.inner.getLastAssistantText()?.trim();
         const stop = stored.abortRequested ? undefined : lastAssistantStop(manager);
@@ -635,13 +772,7 @@ export function createSubagentController(
       } finally {
         request.signal?.removeEventListener("abort", handleParentAbort);
       }
-      manager.appendCustomEntry(SUBAGENT_RESULT_TYPE, {
-        version: 1,
-        status: result.status as "completed" | "failed" | "aborted",
-        completedAt: result.completedAt!,
-        ...(result.result ? { result: result.result } : {}),
-        ...(result.error ? { error: result.error } : {}),
-      });
+      result = recordResult(manager, result);
       stored.run = result;
       request.onUpdate?.(result);
       getSubagentRuns().delete(request.sessionId);
@@ -650,8 +781,7 @@ export function createSubagentController(
     };
     const finishQueuedAbort = () => {
       if (stored.run.status !== "queued") return;
-      const result: SubagentRunInfo = { ...initialRun, status: "aborted", completedAt: new Date().toISOString() };
-      manager.appendCustomEntry(SUBAGENT_RESULT_TYPE, { version: 1, status: "aborted", completedAt: result.completedAt });
+      const result = recordResult(manager, { ...initialRun, status: "aborted", completedAt: new Date().toISOString() });
       stored.run = result;
       request.onUpdate?.(result);
       getSubagentRuns().delete(request.sessionId);
@@ -733,6 +863,12 @@ export function createSubagentController(
     if (stored?.run.status === "queued") {
       stored.abortRequested = true;
       if (!stored.cancelQueued?.()) throw new Error("Subagent is no longer queued");
+      return;
+    }
+    // Still connecting its MCP servers: no run to stop yet, so the wait ends instead.
+    if (stored?.mcpWait) {
+      stored.abortRequested = true;
+      stored.mcpWait.abort();
       return;
     }
     if (!wrapper?.isAlive() || !wrapper.isRunning()) throw new Error("Subagent is not running");

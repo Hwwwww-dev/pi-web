@@ -3,9 +3,11 @@
 import type { CSSProperties } from "react";
 import { parseUnifiedPatch } from "@/lib/patch";
 import { useI18n } from "@/hooks/useI18n";
+import { SOURCE_HIGHLIGHT_MAX_LINES } from "./SourceCodeView";
 
 export const FILE_CODE_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
+  fontWeight: "var(--font-mono-weight)",
   fontSize: 13,
   lineHeight: 1.6,
 };
@@ -19,6 +21,7 @@ export const FILE_LINE_NUMBER_STYLE: CSSProperties = {
   background: "var(--bg-panel)",
   borderRight: "1px solid var(--border)",
   fontFamily: "var(--font-mono)",
+  fontWeight: "var(--font-mono-weight)",
   fontSize: 11,
   fontStyle: "normal",
   fontVariantNumeric: "tabular-nums",
@@ -26,6 +29,16 @@ export const FILE_LINE_NUMBER_STYLE: CSSProperties = {
   userSelect: "none",
   flexShrink: 0,
   verticalAlign: "top",
+};
+
+// Only views of at most SOURCE_HIGHLIGHT_MAX_LINES rows pin it: a long plain
+// fallback or huge diff scrolled with 50-67 ms frames while pinned, so those
+// keep the plain gutter.
+export const FILE_PINNED_LINE_NUMBER_STYLE: CSSProperties = {
+  ...FILE_LINE_NUMBER_STYLE,
+  position: "sticky",
+  left: 0,
+  zIndex: 1,
 };
 
 type DiffLine = {
@@ -41,6 +54,7 @@ function diffLines(patch: string): DiffLine[] {
 
   return files.flatMap((file) => file.rows.flatMap((row): DiffLine[] => {
     if (row.type === "hunk") return [];
+    if (row.type === "gap") return [];
     if (row.left.type === "context" && row.right.type === "context") {
       return [{
         type: "unchanged",
@@ -114,6 +128,9 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
     }
   }
 
+  const lineNumberStyle = diff.length <= SOURCE_HIGHLIGHT_MAX_LINES
+    ? FILE_PINNED_LINE_NUMBER_STYLE
+    : FILE_LINE_NUMBER_STYLE;
   return (
     <div
       className="file-diff-view"
@@ -170,7 +187,7 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
               }}
             >
               <span
-                style={FILE_LINE_NUMBER_STYLE}
+                style={lineNumberStyle}
               >
                 {line.type === "removed" ? line.oldLineNo : line.newLineNo}
               </span>

@@ -6,80 +6,144 @@ import ts from "typescript";
 
 const source = await readFile(new URL("./FileViewer.tsx", import.meta.url), "utf8");
 
-test("large source previews defer the syntax highlighter by one tick", async () => {
-  // The source renderer is shared with the git commit diff view.
-  const sourceCodeViewSource = await readFile(new URL("./SourceCodeView.tsx", import.meta.url), "utf8");
-  assert.match(sourceCodeViewSource, /export const SOURCE_HIGHLIGHT_MAX_LINES = 3_000;/);
-  assert.match(sourceCodeViewSource, /const useLightweightSource = sourceLines\.length > SOURCE_HIGHLIGHT_MAX_LINES/);
-
-  // Above the cap the plain grid paints first; the colored tree replaces it on
-  // the next tick so the heavy render never blocks the first paint.
-  assert.match(sourceCodeViewSource, /const \[deferredHighlightReady, setDeferredHighlightReady\] = useState\(false\);/);
-  assert.match(sourceCodeViewSource, /const timer = setTimeout\(\(\) => setDeferredHighlightReady\(true\), 0\);/);
-
-  // Both source trees are memoized so unrelated re-renders (panel open/close,
-  // selection changes) reuse them instead of rebuilding every line element.
-  assert.match(sourceCodeViewSource, /const highlightedSource = useMemo\(/);
-
-  const lightweightStart = sourceCodeViewSource.indexOf("const lightweightSourceLines = useMemo(");
-  const lightweightEnd = sourceCodeViewSource.indexOf("[sourceLines, useLightweightSource, wrapLines]", lightweightStart);
-  assert.notEqual(lightweightStart, -1);
-  assert.notEqual(lightweightEnd, -1);
-
-  const lightweightSource = sourceCodeViewSource.slice(lightweightStart, lightweightEnd);
-  assert.match(lightweightSource, /useLightweightSource \? sourceLines\.map\(\(line, lineIndex\) =>/);
-  assert.match(lightweightSource, /className="file-source-line"/);
-  assert.match(lightweightSource, /className="file-source-line-content"/);
-  assert.match(lightweightSource, /style=\{FILE_LINE_NUMBER_STYLE\}/);
-
-  // The lightweight tree still wins over the syntax highlighter.
-  assert.match(sourceCodeViewSource, /if \(!useLightweightSource\) return highlightedSource;/);
-  assert.match(sourceCodeViewSource, /className="file-source-view is-lightweight"/);
-});
-
-test("lightweight source rows are skipped for highlighted, diff, and preview views", async () => {
+test("lightweight source rows are skipped for highlighted, diff, and preview views", () => {
   // Execute the source-view calculations without mounting the file-fetching component.
-  const sourceCodeViewSource = await readFile(new URL("./SourceCodeView.tsx", import.meta.url), "utf8");
-  const file = ts.createSourceFile("SourceCodeView.tsx", sourceCodeViewSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const view = file.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "SourceCodeView");
-  const calculations = view.body.statements.filter((node) =>
+  const file = ts.createSourceFile("FileViewer.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const viewer = file.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "TextFileViewer");
+  const calculations = viewer.body.statements.filter((node) =>
     ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) =>
-      ["sourceLines", "useLightweightSource", "lightweightSourceLines"].includes(declaration.name.getText(file)),
+      ["isDelimitedTable", "viewerContent", "sourceLines", "language", "isHtml", "isMarkdown", "hasPreview", "effectiveDisplayMode", "useLightweightSource", "lightweightSourceLines"].includes(declaration.name.getText(file)),
     ),
   ).map((node) => node.getText(file)).join("\n");
   const { outputText } = ts.transpileModule(`
-    return (content, wrapLines = false) => {
-      const SOURCE_HIGHLIGHT_MAX_LINES = 3_000;
+    return (data, displayMode, hasGitDiff = false, isDeletedDiff = false, wrapLines = false, filePath = "/tmp/file.txt") => {
+      const isDelimitedTablePath = (path) => /\\.(csv|tsv)$/i.test(path);
+      const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;
+      const HTML_PREVIEW_MAX_BYTES = 10 * 1024 * 1024;
       const FILE_LINE_NUMBER_STYLE = {};
       ${calculations}
       return lightweightSourceLines;
     };
   `, { compilerOptions: { jsx: ts.JsxEmit.React } });
   const render = new Function("React", "useMemo", outputText)(React, (calculate) => calculate());
-  const large = "line\n".repeat(3_000);
+  const large = { content: "line\n".repeat(1_000), language: "text" };
 
-  assert.equal(render("line\n".repeat(2_999)), null);
-  const rows = render(large);
-  assert.equal(rows.length, 3_001);
-  assert.equal(rows[0].props["data-line-number"], 1);
-  assert.equal(rows[0].props.children[1].props.children, "line");
-  assert.equal(render(large, true)[0].props.children[1].props.style.whiteSpace, "pre-wrap");
+  assert.equal(render({ ...large, content: "line\n".repeat(999) }, "source"), null);
+  assert.equal(render(large, "diff", true), null);
+  assert.equal(render(large, "source", true, true), null);
+  for (const language of ["html", "markdown"]) {
+    assert.equal(render({ ...large, language }, "preview"), null);
+  }
+  // A CSV/TSV table previews a loaded prefix too; markdown waits for the whole file.
+  assert.equal(render({ ...large, truncated: true }, "preview", false, false, false, "/tmp/data.csv"), null);
+  assert.equal(render({ ...large, language: "markdown", truncated: true }, "preview").length, 1_001);
+  // A partly loaded HTML file previews too: the preview fetches it whole.
+  assert.equal(render({ ...large, language: "html", truncated: true, size: 900 * 1024 }, "preview"), null);
+  for (const mode of ["source", "diff", "preview"]) {
+    const rows = render(large, mode);
+    assert.equal(rows.length, 1_001, `${mode} must retain its source fallback`);
+    assert.equal(rows[0].props["data-line-number"], 1);
+    assert.equal(rows[0].props.children[1].props.children, "line");
+  }
+  assert.equal(render(large, "source", false, false, true)[0].props.children[1].props.style.whiteSpace, "pre-wrap");
+});
 
-  // Diff and preview modes render their own viewers, so the source rows are
-  // only ever reached by the source mode.
-  assert.match(source, /effectiveDisplayMode === "diff" && hasGitDiff \? \(\s*<DiffView patch=\{gitDiff\.patch!\} wrapLines=\{wrapLines\} \/>/);
-  assert.match(source, /<SourceCodeView content=\{viewerContent\} language=\{language\} wrapLines=\{wrapLines\} \/>/);
+test("partly loaded HTML previews up to the HTML cap; partly loaded markdown does not", () => {
+  const start = source.indexOf("  const hasPreview = ");
+  const statement = source.slice(start, source.indexOf(";\n", start) + 1);
+  const hasPreview = new Function("data", "isHtml", "isMarkdown", "isDelimitedTable", "HTML_PREVIEW_MAX_BYTES", `${statement}\nreturn hasPreview;`);
+  const cap = 10 * 1024 * 1024;
+  const partial = { truncated: true, size: 900 * 1024 };
+
+  assert.equal(hasPreview(partial, true, false, false, cap), true);
+  assert.equal(hasPreview({ ...partial, size: cap + 1 }, true, false, false, cap), false);
+  assert.equal(hasPreview({ truncated: false, size: cap + 1 }, true, false, false, cap), true);
+  assert.equal(hasPreview(partial, false, true, false, cap), false);
+  assert.equal(hasPreview({ ...partial, size: cap + 1 }, false, false, true, cap), true);
+});
+
+test("the line-number gutter is pinned only in views of at most SOURCE_HIGHLIGHT_MAX_LINES rows", async () => {
+  // Evaluate the module's own style constants (the numbers in the highlighted,
+  // plain and diff views all come from these), the highlighted and lightweight
+  // source elements and the Diff view's rows, instead of matching the
+  // component's text. The source views live in SourceCodeView.tsx (dev keeps
+  // the syntax-highlighted tree in its own module; FileViewer renders it).
+  const sourceCodeViewSource = await readFile(new URL("./SourceCodeView.tsx", import.meta.url), "utf8");
+  const file = ts.createSourceFile("SourceCodeView.tsx", sourceCodeViewSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  // The style constants live in DiffView.tsx (dev shares them across the file
+  // views); the row cap is declared beside the lightweight threshold.
+  const diffViewSource = await readFile(new URL("./DiffView.tsx", import.meta.url), "utf8");
+  const diffViewFile = ts.createSourceFile("DiffView.tsx", diffViewSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const constants = (moduleFile, ...names) => {
+    const statements = names.map((name) => {
+      const statement = moduleFile.statements.find((node) =>
+        ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) =>
+          ts.isIdentifier(declaration.name) && declaration.name.text === name,
+        ),
+      );
+      assert.ok(statement, `${name} is declared in the module`);
+      return statement.getText(moduleFile).replace(/^export /, "");
+    });
+    const { outputText } = ts.transpileModule(`${statements.join("\n")}\nreturn [${names.join(", ")}];`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } });
+    return new Function(outputText)();
+  };
+  const [codeStyle, gutterStyle, pinnedStyle] = constants(diffViewFile, "FILE_CODE_STYLE", "FILE_LINE_NUMBER_STYLE", "FILE_PINNED_LINE_NUMBER_STYLE");
+  const [maxRows] = constants(file, "SOURCE_HIGHLIGHT_MAX_LINES");
+
+  // Build the source views without mounting the file-fetching component, with
+  // the real gutter styles in place.
+  const calculations = file.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "SourceCodeView").body.statements.filter((node) =>
+    ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) =>
+      ["sourceLines", "useLightweightSource", "deferredHighlightReady", "highlightedSource", "lightweightSourceLines"].includes(declaration.name.getText(file)),
+    ),
+  ).map((node) => node.getText(file)).join("\n");
+  const { outputText } = ts.transpileModule(`
+    return (content, wrapLines = false, language = "text") => {
+      const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;
+      const FILE_LINE_NUMBER_STYLE = gutterStyle;
+      const FILE_PINNED_LINE_NUMBER_STYLE = pinnedStyle;
+      // Stand-ins for what the highlighted element only passes on.
+      const [useTheme, SyntaxHighlighter, SourceCodeRenderer, vs, vscDarkPlus, FILE_CODE_STYLE, useState, useEffect, isDark] = [() => ({ isDark: false }), "pre", "span", {}, {}, {}, () => [false, () => {}], () => {}, false];
+      ${calculations}
+      return { lightweightSourceLines, highlightedSource };
+    };
+  `, { compilerOptions: { jsx: ts.JsxEmit.React } });
+  const render = new Function("React", "useMemo", "gutterStyle", "pinnedStyle", outputText)(React, (calculate) => calculate(), gutterStyle, pinnedStyle);
+  const { lightweightSourceLines: rows, highlightedSource } = render("line\n".repeat(1_000));
+  const numberStyle = rows[0].props.children[0].props.style;
+  // The Diff view's first row number, with every row an added line.
+  const diffView = diffViewFile.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "DiffView");
+  const { outputText: diffOutput } = ts.transpileModule(`return ${diffView.getText(diffViewFile).replace(/^export /, "")}`, { compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022 } });
+  const diffNumberStyle = (rowCount) => {
+    const added = Array.from({ length: rowCount }, (_, index) => ({ type: "added", text: "line", oldLineNo: null, newLineNo: index + 1 }));
+    const DiffView = new Function("React", "useI18n", "diffLines", "SOURCE_HIGHLIGHT_MAX_LINES", "FILE_CODE_STYLE", "FILE_LINE_NUMBER_STYLE", "FILE_PINNED_LINE_NUMBER_STYLE", diffOutput)(
+      React, () => ({ t: (key) => key }), () => added, maxRows, codeStyle, gutterStyle, pinnedStyle,
+    );
+    return DiffView({ patch: "" }).props.children[0].props.children[0].props.children[0].props.style;
+  };
+
+  // The pinned gutter is the same column, pinned to the left edge of the
+  // viewer's `overflow: auto` content box above the tokens that slide behind it.
+  for (const [key, value] of Object.entries(gutterStyle)) assert.equal(pinnedStyle[key], value, key);
+  assert.equal(pinnedStyle.position, "sticky");
+  assert.equal(pinnedStyle.left, 0);
+  assert.ok(pinnedStyle.zIndex >= 1, "the pinned gutter must stack above the scrolling text");
+  // Views of at most SOURCE_HIGHLIGHT_MAX_LINES rows pin it: the highlighted
+  // Source view (never longer) and a diff up to that many rows.
+  assert.deepEqual(highlightedSource.props.lineNumberStyle, pinnedStyle);
+  assert.equal(diffNumberStyle(maxRows), pinnedStyle);
+  assert.equal(diffNumberStyle(maxRows + 1), gutterStyle);
+  // The plain fallback has more rows than that by definition, and the browser
+  // repositions every sticky cell on each scroll: its numbers stay unpinned.
+  assert.equal(numberStyle, gutterStyle);
+  assert.equal(numberStyle.position, undefined);
+
+  // The gutter repeats the code line's height in px, so a code-font change
+  // without it puts the numbers off the line boxes they belong to.
+  assert.equal(parseFloat(numberStyle.lineHeight), Number((codeStyle.fontSize * codeStyle.lineHeight).toFixed(1)));
 });
 
 test("markdown preview links carry page/line fragments", () => {
   assert.match(source, /parseFileOpenOptions/);
   assert.match(source, /onOpenFile\(linkedFile, parseFileOpenOptions\(href\)\)/);
-});
-
-test("markdown preview keeps app links and opens web and app links in a new tab (#1108)", () => {
-  assert.match(source, /urlTransform=\{onOpenFile \? markdownUrlTransform : markdownAppUrlTransform\}/);
-  assert.match(
-    source,
-    /return isExternalMarkdownHref\(href\)\s*\? <a href=\{href\} \{\.\.\.props\} target="_blank" rel="noopener noreferrer">\{children\}<\/a>\s*: <a href=\{href\} \{\.\.\.props\}>\{children\}<\/a>;/,
-  );
 });

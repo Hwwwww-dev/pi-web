@@ -1,28 +1,38 @@
+
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo, type CSSProperties, type MouseEvent } from "react";
+import type { SyntaxHighlighterProps } from "react-syntax-highlighter";
+import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
+import renderSyntaxNode from "react-syntax-highlighter/dist/esm/create-element";
+import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import ReactMarkdown from "react-markdown";
+import { useTheme } from "@/hooks/useTheme";
+import { usePrismLanguages } from "@/hooks/usePrismLanguages";
 import {
   DOCX_PREVIEW_MAX_BYTES,
-  formatFileSize,
+  HTML_PREVIEW_MAX_BYTES,
   getFileExt,
   isAudioPath,
   isDocumentPreviewPath,
   isImagePath,
   isVideoPath,
+  formatFileSize,
 } from "@/lib/file-types";
 import { encodeFilePathForApi, getFileDirectory, getFileName, getRelativeFilePath } from "@/lib/file-paths";
 import { parseFileOpenOptions, resolveLocalFileHref, shouldOpenLocalFileInApp } from "@/lib/file-links";
 import { parseFrontmatter } from "@/lib/frontmatter";
 import { isExternalMarkdownHref, markdownAppUrlTransform, markdownPreviewRehypePlugins, markdownPreviewRemarkPlugins, markdownUrlTransform, normalizeDisplayMath } from "@/lib/markdown";
 import { CodeBlock, MermaidBlock } from "./MermaidBlock";
+import { FILE_CODE_STYLE, FILE_LINE_NUMBER_STYLE, FILE_PINNED_LINE_NUMBER_STYLE } from "./DiffView";
 import { DelimitedTable } from "./DelimitedTable";
-import { isDelimitedTablePath } from "@/lib/delimited-table";
-import { FrontmatterCard } from "./FrontmatterCard";
-import { DiffView } from "./DiffView";
+import { PathLabel } from "./PathLabel";
 import { FileMentionButton, FileToolbar, FILE_MODE_LABELS } from "./FileToolbar";
 import { SourceCodeView } from "./SourceCodeView";
-import { PathLabel } from "./PathLabel";
+import { isDelimitedTablePath } from "@/lib/delimited-table";
+import { FrontmatterCard } from "./FrontmatterCard";
+import { diffGapLabel, parseUnifiedPatch } from "@/lib/patch";
 import type { GitFileDiffResponse } from "@/lib/git-types";
 import { useI18n } from "@/hooks/useI18n";
 import {
@@ -62,36 +72,8 @@ interface FileData {
 
 const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;
 
-const FILE_CODE_STYLE: CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  fontWeight: "var(--font-mono-weight)",
-  fontSize: 13,
-  lineHeight: 1.6,
-};
-
-// Prism's light theme colors <pre> with backgroundColor, its dark theme with
-// the background shorthand. The source view sets backgroundColor itself and the
-// dark theme's shorthand is dropped, as CodeBlock does: a theme switch then never
-// makes React remove one beside the other (it warned, and the view lost its
-// background).
-
-const FILE_LINE_NUMBER_STYLE: CSSProperties = {
-  width: 48,
-  minWidth: 48,
-  padding: "0 10px",
-  textAlign: "right",
-  color: "var(--text-dim)",
-  background: "var(--bg-panel)",
-  borderRight: "1px solid var(--border)",
-  fontFamily: "var(--font-mono)",
-  fontWeight: "var(--font-mono-weight)",
-  fontSize: 11,
-  fontStyle: "normal",
-  fontVariantNumeric: "tabular-nums",
-  lineHeight: "20.8px",
-  userSelect: "none",
-  flexShrink: 0,
-  verticalAlign: "top",
+type SourceCodeRendererProps = Parameters<NonNullable<SyntaxHighlighterProps["renderer"]>>[0] & {
+  wrapLines: boolean;
 };
 
 interface SelectedLineRange {
@@ -157,6 +139,7 @@ function getSelectedSourceLineRange(root: HTMLElement, selection: Selection | nu
   return { startLine, endLine };
 }
 
+
 function getFileApiUrl(
   filePath: string,
   type: "read" | "download" | "meta" | "preview" | "watch",
@@ -188,6 +171,199 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
         <line x1="12" y1="15" x2="12" y2="3" />
       </svg>
     </a>
+  );
+}
+
+type DiffLine = {
+  type: "unchanged" | "removed" | "added";
+  text: string;
+  oldLineNo: number | null;
+  newLineNo: number | null;
+};
+
+// Unchanged lines the patch leaves out between two hunks.
+type DiffGap = { type: "gap"; count: number | null };
+
+
+function diffLines(patch: string): Array<DiffLine | DiffGap> {
+  const files = parseUnifiedPatch(patch);
+  if (!files) return [];
+
+  return files.flatMap((file) => file.rows.flatMap((row): Array<DiffLine | DiffGap> => {
+    if (row.type === "hunk") return [];
+    if (row.type === "gap") return [row];
+    if (row.left.type === "context" && row.right.type === "context") {
+      return [{
+        type: "unchanged",
+        text: row.right.text,
+        oldLineNo: row.left.lineNo,
+        newLineNo: row.right.lineNo,
+      }];
+    }
+
+    const lines: DiffLine[] = [];
+    if (row.left.type === "removed") {
+      lines.push({
+        type: "removed",
+        text: row.left.text,
+        oldLineNo: row.left.lineNo,
+        newLineNo: null,
+      });
+    }
+    if (row.right.type === "added") {
+      lines.push({
+        type: "added",
+        text: row.right.text,
+        oldLineNo: null,
+        newLineNo: row.right.lineNo,
+      });
+    }
+    return lines;
+  }));
+}
+
+function DiffView({ patch }: { patch: string }) {
+  const { t } = useI18n();
+  const diff = diffLines(patch);
+
+  const isChange = (l: DiffLine | DiffGap) => l.type === "added" || l.type === "removed";
+  const hasChanges = diff.some(isChange);
+  if (!hasChanges) {
+    return (
+      <div style={{ padding: "12px 16px", fontSize: 12, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
+        {t("i18n.noChanges")}
+      </div>
+    );
+  }
+
+  // Render with context: show 3 lines around each change, collapse the rest
+  const CONTEXT = 3;
+  const changed = new Set(diff.flatMap((l, i) => (isChange(l) ? [i] : [])));
+  const visible = new Set<number>();
+  for (const ci of changed) {
+    for (let j = Math.max(0, ci - CONTEXT); j <= Math.min(diff.length - 1, ci + CONTEXT); j++) {
+      visible.add(j);
+    }
+  }
+  const lineNumberStyle = visible.size <= SOURCE_HIGHLIGHT_MAX_LINES
+    ? FILE_PINNED_LINE_NUMBER_STYLE
+    : FILE_LINE_NUMBER_STYLE;
+
+  // Collapsed lines and the lines the patch leaves out between hunks share one
+  // marker; its count is unknown when a gap's is.
+  const isShown = (j: number) => diff[j].type !== "gap" && visible.has(j);
+  const segments: Array<{ hidden: true; count: number | null } | { hidden: false; lines: DiffLine[] }> = [];
+  let i = 0;
+  while (i < diff.length) {
+    if (isShown(i)) {
+      const block: DiffLine[] = [];
+      while (i < diff.length && isShown(i)) {
+        const line = diff[i];
+        if (line.type !== "gap") block.push(line);
+        i++;
+      }
+      segments.push({ hidden: false, lines: block });
+    } else {
+      let count: number | null = 0;
+      while (i < diff.length && !isShown(i)) {
+        const item = diff[i];
+        const skipped = item.type === "gap" ? item.count : 1;
+        count = count === null || skipped === null ? null : count + skipped;
+        i++;
+      }
+      segments.push({ hidden: true, count });
+    }
+  }
+
+  return (
+    <div
+      className="file-diff-view"
+      style={{
+        width: "max-content",
+        minWidth: "100%",
+        ...FILE_CODE_STYLE,
+      }}
+    >
+      {segments.map((seg, si) => {
+        if (seg.hidden) {
+          const result = (
+            <div
+              key={si}
+              style={{
+                padding: "2px 16px",
+                color: "var(--text-dim)",
+                background: "var(--bg-panel)",
+                fontSize: 11,
+                borderTop: "1px solid var(--border)",
+                borderBottom: "1px solid var(--border)",
+              }}
+            >
+              {seg.count === null ? "⋯" : `⋯ ${diffGapLabel(seg.count, t)}`}
+            </div>
+          );
+          return result;
+        }
+        const lines = seg.lines.map((line, li) => {
+          const bg =
+            line.type === "added"
+              ? "rgba(0,200,80,0.12)"
+              : line.type === "removed"
+              ? "rgba(240,60,60,0.14)"
+              : "transparent";
+          const prefix =
+            line.type === "added" ? "+" : line.type === "removed" ? "-" : " ";
+          const prefixColor =
+            line.type === "added" ? "#4ade80" : line.type === "removed" ? "#f87171" : "var(--text-dim)";
+
+          return (
+            <div
+              key={li}
+              className="file-diff-line"
+              style={{
+                display: "flex",
+                minWidth: "100%",
+                background: bg,
+                borderLeft: line.type === "added"
+                  ? "3px solid #4ade80"
+                  : line.type === "removed"
+                  ? "3px solid #f87171"
+                  : "3px solid transparent",
+              }}
+            >
+              <span
+                style={lineNumberStyle}
+              >
+                {line.type === "removed" ? line.oldLineNo : line.newLineNo}
+              </span>
+              <span
+                style={{
+                  minWidth: 16,
+                  padding: "0 6px",
+                  color: prefixColor,
+                  userSelect: "none",
+                  flexShrink: 0,
+                  fontWeight: 600,
+                }}
+              >
+                {prefix}
+              </span>
+              <span
+                className="file-diff-line-content"
+                style={{
+                  flexShrink: 0,
+                  padding: "0 8px 0 0",
+                  whiteSpace: "pre",
+                  color: "var(--text)",
+                }}
+              >
+                {line.text || "\u00a0"}
+              </span>
+            </div>
+          );
+        });
+        return <div key={si}>{lines}</div>;
+      })}
+    </div>
   );
 }
 
@@ -896,6 +1072,7 @@ function TextFileViewer({
   watchEnabled = true,
 }: Props) {
   const { t } = useI18n();
+  const { isDark } = useTheme();
   const [data, setData] = useState<FileData | null>(null);
   const [gitDiff, setGitDiff] = useState<GitFileDiffResponse | null>(null);
   const [gitDiffLoading, setGitDiffLoading] = useState(false);
@@ -932,6 +1109,8 @@ function TextFileViewer({
   });
   const onStateChangeRef = useRef(onStateChange);
   const [selectedLineRange, setSelectedLineRange] = useState<SelectedLineRange | null>(null);
+  // Whole file for an HTML preview whose source view is still chunked.
+  const [htmlFull, setHtmlFull] = useState<{ text?: string; error?: string } | null>(null);
 
   onStateChangeRef.current = onStateChange;
 
@@ -1097,12 +1276,41 @@ function TextFileViewer({
     if (
       defaultPreviewEligibleRef.current
       && data
-      && (isDelimitedTable || (!data.truncated && (data.language === "markdown" || data.language === "html")))
+      && (
+        isDelimitedTable
+        || (data.language === "markdown" && !data.truncated)
+        || (data.language === "html" && (!data.truncated || data.size <= HTML_PREVIEW_MAX_BYTES))
+      )
     ) {
       defaultPreviewEligibleRef.current = false;
       updateDisplayMode("preview");
     }
   }, [data, isDelimitedTable, updateDisplayMode]);
+
+  // Large HTML: the source view loads 256 KB chunks, but a half document cannot
+  // render, so the preview fetches the whole file once. A new `data` (watch
+  // change, reload) refetches it; the previous page stays up meanwhile, so a
+  // live change does not flash "Loading".
+  const needsHtmlFull = displayMode === "preview"
+    && data?.language === "html"
+    && data.truncated
+    && data.size <= HTML_PREVIEW_MAX_BYTES;
+  useEffect(() => {
+    if (!needsHtmlFull) {
+      setHtmlFull(null);
+      return;
+    }
+    const controller = new AbortController();
+    fetch(getFileApiUrl(filePath, "download", sourceSessionId), { signal: controller.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        setHtmlFull({ text: await r.text() });
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setHtmlFull({ error: String(e) });
+      });
+    return () => controller.abort();
+  }, [needsHtmlFull, data, filePath, sourceSessionId]);
 
   const hasGitDiff = gitDiff?.supported === true && typeof gitDiff.patch === "string";
   const isDeletedDiff = hasGitDiff && gitDiff.status === "deleted";
@@ -1133,11 +1341,18 @@ function TextFileViewer({
   const viewerContent = data?.content ?? "";
   const sourceLines = useMemo(() => viewerContent.split("\n"), [viewerContent]);
   const language = data?.language ?? "text";
+  // Plain text needs no Prism languages; any other file loads them once.
+  const prismReady = usePrismLanguages(Boolean(data) && language !== "text");
   const isHtml = language === "html";
   const isMarkdown = language === "markdown";
-  // A table shows a loaded prefix too, without its cut last record.
-  const hasPreview = isDelimitedTable || (!data?.truncated && (isHtml || isMarkdown));
+  // A table shows a loaded prefix too, without its cut last record; an HTML
+  // preview fetches the whole file up to HTML_PREVIEW_MAX_BYTES.
+  const hasPreview = isDelimitedTable || (isHtml
+    ? !!data && (!data.truncated || data.size <= HTML_PREVIEW_MAX_BYTES)
+    : isMarkdown && !data?.truncated);
   const effectiveDisplayMode = isDeletedDiff ? "diff" : displayMode;
+  // A partly loaded HTML file previews whole, so Load more belongs to its source view.
+  const showLoadMore = !!data?.truncated && !(isHtml && effectiveDisplayMode === "preview");
   const useLightweightSource = sourceLines.length > SOURCE_HIGHLIGHT_MAX_LINES
     && !(effectiveDisplayMode === "diff" && hasGitDiff)
     && !(effectiveDisplayMode === "preview" && hasPreview);
@@ -1337,7 +1552,7 @@ function TextFileViewer({
         download={!isDeletedDiff ? <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} /> : undefined}
       />
 
-      {data?.truncated && (
+      {showLoadMore && data?.truncated && (
         <div
           className="file-viewer-load-more"
           style={{
@@ -1375,13 +1590,17 @@ function TextFileViewer({
           viewerStateRef.current.scrollTop = event.currentTarget.scrollTop;
           viewerStateRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
-        style={{ flex: 1, overflow: "auto", background: "var(--bg)", paddingBottom: data?.truncated ? 48 : undefined }}
+        style={{ flex: 1, overflow: "auto", background: "var(--bg)", paddingBottom: showLoadMore ? 48 : undefined }}
       >
         {effectiveDisplayMode === "diff" && hasGitDiff ? (
-          <DiffView patch={gitDiff.patch!} wrapLines={wrapLines} />
+          <DiffView patch={gitDiff.patch!} />
+        ) : isHtml && effectiveDisplayMode === "preview" && data?.truncated && !htmlFull?.text ? (
+          <div style={{ padding: 24, color: "var(--text-dim)", fontSize: 12 }}>
+            {htmlFull?.error ?? t("i18n.loading")}
+          </div>
         ) : isHtml && effectiveDisplayMode === "preview" ? (
           <iframe
-            srcDoc={content}
+            srcDoc={data?.truncated ? htmlFull?.text : content}
             sandbox="allow-scripts"
             style={{ width: "100%", height: "100%", border: "none", background: "var(--bg)" }}
              title={t("i18n.htmlPreview")}

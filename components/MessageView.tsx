@@ -9,11 +9,16 @@ import {
   SafeMarkdownBody,
   ThinkingRow,
   ToolRow,
+  loadThinkingContent,
 } from "./ActivityRows";
 import { formatUsage } from "@/lib/turn-view";
+import { ThinkingIcon } from "./ThinkingIcon";
+import ReactMarkdown from "react-markdown";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
-import { getAssistantErrorMessage, hasAssistantAnswer, isAssistantTruncated, isEmptyThinkingBlock } from "@/lib/message-display";
+import { getAssistantErrorMessage, getThinkingPreview, hasAssistantAnswer, isAssistantTruncated, isEmptyThinkingBlock, splitThinkingPieces } from "@/lib/message-display";
+import { formatTurnDuration } from "@/lib/turn-duration";
+import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
 import { skillExpansionToCommand } from "@/lib/slash-display";
@@ -118,6 +123,8 @@ interface Props {
    * final answer text-only.
    */
   writtenFiles?: WrittenFile[];
+  /** The whole turn's time, for a final answer with no process details to show it. */
+  turnDurationMs?: number;
   onCompact?: () => void;
   isCompacting?: boolean;
   compactError?: string | null;
@@ -192,12 +199,12 @@ function haveSameRelevantToolResults(
   return true;
 }
 
-export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, modelNames, cwd, onOpenFile, onOpenSubagent, entryId, searchBlock, onFork, forking, onEditContent, onCancelEdit, isEditing, showTimestamp, prevTimestamp, sessionId, writtenFiles, showModelLabel, hideCopy, onCompact, isCompacting, compactError }: Props) {
+export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, modelNames, cwd, onOpenFile, onOpenSubagent, entryId, searchBlock, onFork, forking, onEditContent, onCancelEdit, isEditing, showTimestamp, prevTimestamp, sessionId, writtenFiles, turnDurationMs, showModelLabel, hideCopy, onCompact, isCompacting, compactError }: Props) {
   if (message.role === "user") {
     return <UserMessageView message={message as UserMessage} cwd={cwd} onOpenFile={onOpenFile} entryId={entryId} onFork={onFork} forking={forking} onEditContent={onEditContent} onCancelEdit={onCancelEdit} isEditing={isEditing} />;
   }
   if (message.role === "assistant") {
-    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} showModelLabel={showModelLabel} hideCopy={hideCopy} onCompact={onCompact} isCompacting={isCompacting} compactError={compactError} />;
+    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} turnDurationMs={turnDurationMs} showModelLabel={showModelLabel} hideCopy={hideCopy} onCompact={onCompact} isCompacting={isCompacting} compactError={compactError} />;
   }
   if (message.role === "toolResult") {
     // Rendered inline under its toolCall — skip standalone rendering if paired
@@ -236,6 +243,7 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
     && prev.showTimestamp === next.showTimestamp
     && prev.prevTimestamp === next.prevTimestamp
     && prev.writtenFiles === next.writtenFiles
+    && prev.turnDurationMs === next.turnDurationMs
     && prev.sessionId === next.sessionId
     && prev.showModelLabel === next.showModelLabel
     && prev.hideCopy === next.hideCopy
@@ -563,6 +571,7 @@ function AssistantMessageView({
   entryId,
   searchBlock,
   writtenFiles,
+  turnDurationMs,
   showModelLabel,
   hideCopy,
   onCompact,
@@ -582,10 +591,7 @@ function AssistantMessageView({
   entryId?: string;
   searchBlock?: AssistantContentBlock;
   writtenFiles?: WrittenFile[];
-  /**
-   * Grouped turns show the model once in the turn meta line; standalone
-   * messages (interrupted turns, orphans) keep the per-message label.
-   */
+  turnDurationMs?: number;
   showModelLabel?: boolean;
   hideCopy?: boolean;
   onCompact?: () => void;
@@ -784,8 +790,10 @@ function AssistantMessageView({
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* Not keyed by the entry id: a message of this run gets one when the file is
+            read again, and its blocks keep their state across that read (#1184). */}
         {blockItems.map(({ block, originalIndex }) => (
-          <BlockView key={`${entryId ?? "stream"}-${originalIndex}`} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
+          <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
         ))}
       </div>
 
@@ -858,13 +866,16 @@ function AssistantMessageView({
         <TurnWrittenFiles files={writtenFiles} onOpenFile={onOpenFile} />
       )}
 
-      {((message.usage && !isStreaming) || (textContent && !isStreaming && !hideCopy) || (time && !isStreaming)) && (
+      {((message.usage && !isStreaming) || (turnDurationMs !== undefined && !isStreaming) || (textContent && !isStreaming && !hideCopy) || (time && !isStreaming)) && (
         <div style={{
           display: "flex", alignItems: "center", gap: 8, marginTop: 4,
         }}>
-          {message.usage && !isStreaming && (
+          {(message.usage || turnDurationMs !== undefined) && !isStreaming && (
             <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-              {formatUsage(message.usage)}
+              {[
+                message.usage ? formatUsage(message.usage) : null,
+                turnDurationMs !== undefined ? t("chat.turnDuration", { time: formatTurnDuration(turnDurationMs) }) : null,
+              ].filter(Boolean).join("\u00b7 ")}
             </div>
           )}
           {textContent && !isStreaming && !hideCopy && (
@@ -927,6 +938,145 @@ function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDur
 function TextBlock({ block, isStreaming, cwd, onOpenFile }: { block: TextContent; isStreaming?: boolean; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void }) {
   return <SafeMarkdownBody isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile}>{block.text}</SafeMarkdownBody>;
 }
+
+// A model looping in its thinking can write megabytes. As one text node, every
+// streamed chunk laid all of it out again (the prompt anchor reads layout after
+// each commit). As pieces, only the last one changes. Thinking that fits one
+// piece stays one text node.
+function ThinkingText({ text }: { text: string }) {
+  const pieces = useMemo(() => splitThinkingPieces(text), [text]);
+  if (pieces.length === 1) return text;
+  // No memo: React already skips a div whose text is unchanged, and a memo
+  // bailout keeps the old props, each a slice pinning the whole thinking of
+  // its chunk (995 MB retained streaming 2M Chinese characters).
+  return pieces.map((piece, index) => <div key={index}>{piece.text}</div>);
+}
+
+export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
+  block: ThinkingContent;
+  duration?: number;
+  sessionId?: string;
+  entryId?: string;
+  blockIndex: number;
+}) {
+  const { t } = useI18n();
+  const [expanded, setExpanded] = useState(isThinkingExpandedByDefault);
+  const [content, setContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // The block outlives a change of entry id (a message of this run gets its id
+  // when the file is read again, #1184): what was loaded for another entry goes.
+  const loadKey = `${sessionId}:${entryId}:${blockIndex}`;
+  const [loadedKey, setLoadedKey] = useState(loadKey);
+  if (loadedKey !== loadKey) {
+    setLoadedKey(loadKey);
+    setContent(null);
+    setLoading(false);
+    setError(null);
+  }
+  const tRef = useRef(t);
+  tRef.current = t;
+  const preview = getThinkingPreview(block.thinking);
+
+  // Keep already-mounted blocks in sync when the preference changes.
+  useEffect(() => {
+    const onChange = () => setExpanded(isThinkingExpandedByDefault());
+    window.addEventListener(THINKING_EXPANDED_EVENT, onChange);
+    return () => window.removeEventListener(THINKING_EXPANDED_EVENT, onChange);
+  }, []);
+
+  // Load deferred history content whenever the block is expanded.
+  // loadThinkingContent() memoizes in-flight promises and drops failed ones
+  // from its cache, so re-running this effect is cheap and a failed load can
+  // be retried by collapsing and expanding the block again.
+  useEffect(() => {
+    if (!expanded || !block.deferred || content !== null) return;
+    if (!sessionId || !entryId) {
+      setError(tRef.current("i18n.thinkingUnavailable"));
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    loadThinkingContent(sessionId, entryId, blockIndex)
+      .then((value) => {
+        if (!cancelled) {
+          setContent(value);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, block.deferred, content, sessionId, entryId, blockIndex]);
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0,
+      border: "1px solid var(--border)",
+      borderRadius: 7,
+      padding: "6px 10px",
+      background: "var(--bg)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "calc(11px + var(--chat-font-size-offset, 0px))",
+      lineHeight: 1.5,
+    }}>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
+        title={t("i18n.thinking")}
+        onClick={() => setExpanded((v) => !v)}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          width: expanded ? 14 : "100%",
+          flexShrink: expanded ? 0 : 1,
+          minWidth: 0,
+          minHeight: "1.5em",
+          padding: 0,
+          background: "transparent",
+          border: "none",
+          color: "var(--text-muted)",
+          cursor: "pointer",
+          font: "inherit",
+          textAlign: "left",
+        }}
+      >
+        <ThinkingIcon active={expanded} />
+        {!expanded && (
+          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {preview ? <ReactMarkdown allowedElements={[]} unwrapDisallowed skipHtml>{preview}</ReactMarkdown> : "..."}
+          </span>
+        )}
+      </button>
+      {expanded && (
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            color: error ? "#f87171" : "var(--text-muted)",
+            whiteSpace: "pre-wrap",
+            overflowWrap: "anywhere",
+          }}
+        >
+           {loading ? t("i18n.loadingThinking") : error ?? <ThinkingText text={(block.deferred ? content : block.thinking) ?? ""} />}
+        </div>
+      )}
+      {duration !== undefined && (
+        <span style={{ flexShrink: 0, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>{duration}s</span>
+      )}
+    </div>
+  );
+}
+
 
 /** A duration pi recorded on a message, or undefined when there is none to trust. */
 function recordedDurationMs(value: unknown): number | undefined {

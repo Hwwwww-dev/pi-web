@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -42,7 +43,7 @@ test("keeps the session event stream open through the idle grace window", () => 
 
   assert.match(source, /const EVENT_STREAM_IDLE_GRACE_MS = 30_000/);
   assert.match(graceSource, /setTimeout\(\(\) => void checkServerIdle\(\), EVENT_STREAM_IDLE_GRACE_MS\)/);
-  assert.match(graceSource, /fetch\(`\/api\/agent\/\$\{encodeURIComponent\(sid\)\}`\)/);
+  assert.match(graceSource, /fetch\(agentStatusUrl\(sid\)\)/);
   assert.match(graceSource, /closeEvents\(\)/);
   assert.match(finishSource, /scheduleEventStreamClose\(sid\)/);
   assert.doesNotMatch(finishSource, /closeEvents\(\)/);
@@ -401,7 +402,7 @@ test("delegates event stream readiness and hides an empty agent phase", () => {
   assert.match(source, /shouldMaintain: \(sid\)[\s\S]*?sessionIdRef\.current === sid/);
   assert.match(ensureSource, /eventConnectionRef\.current!\.ensureConnected\(sid\)/);
   assert.match(ensureSource, /eventConnectionRef\.current!\.maintain\(sid\)/);
-  assert.match(chatWindowSource, /const hasStreamingContent = Boolean\(streamState\.streamingMessage\?\.content\.length\)/);
+  assert.match(chatWindowSource, /const hasStreamingContent = useStreamingSelector\(streamingStore, selectHasStreamingContent\)/);
   assert.match(chatWindowSource, /streamState\.isStreaming && hasStreamingContent && streamState\.streamingMessage/);
   assert.match(chatWindowSource, /agentRunning && !hasStreamingContent && \(agentPhase \|\| isCompacting\)/);
   // Compaction is what the user needs to know while a turn is being compacted, so it is
@@ -490,7 +491,9 @@ test("keeps one reducer-owned assistant partial and consumes Pi JSON deltas", ()
     source.indexOf('case "tool_execution_start"'),
   );
 
-  assert.match(source, /streamReducer,[\s\S]*type ClientAssistantMessageEvent/);
+  assert.match(source, /createStreamingStore/);
+  assert.match(readFileSync(new URL("../lib/streaming-message.ts", import.meta.url), "utf8"), /streamReducer/);
+  assert.match(source, /type ClientAssistantMessageEvent/);
   assert.doesNotMatch(source, /streamingMessageRef/);
   assert.match(connectedSource, /dispatch\(\{ type: "end" \}\)/);
   assert.match(connectedSource, /event\.isStreaming === true/);
@@ -776,7 +779,7 @@ test("keeps prompt anchor measurement outside the React update cycle", () => {
   );
   assert.notEqual(anchorEffectStart, -1);
   const syncEffectStart = chatWindowSource.indexOf(
-    "useLayoutEffect(() => {\n    promptAnchorUpdateRef.current?.();",
+    "const updatePromptAnchor = useCallback(() => {",
     anchorEffectStart,
   );
   assert.notEqual(syncEffectStart, -1);
@@ -800,7 +803,7 @@ test("keeps prompt anchor measurement outside the React update cycle", () => {
   assert.match(anchorLifecycleEffectSource, /if \(disposed \|\| promptAnchorMeasureFrameRef\.current !== null\) return/);
   assert.match(anchorLifecycleEffectSource, /promptAnchorMeasureFrameRef\.current = requestAnimationFrame\(\(\) => \{\s*promptAnchorMeasureFrameRef\.current = null;\s*updatePromptAnchorSpacer\(\)/);
   assert.match(anchorLifecycleEffectSource, /disposed = true;[\s\S]*?promptAnchorUpdateRef\.current === updatePromptAnchorSpacer[\s\S]*?cancelAnimationFrame\(promptAnchorMeasureFrameRef\.current\)/);
-  assert.match(anchorSyncEffectSource, /promptAnchorUpdateRef\.current\?\.\(\);\s*\}, \[streamState\.streamingMessage\]\)/);
+  assert.match(anchorSyncEffectSource, /const updatePromptAnchor = useCallback\(\(\) => \{\s*promptAnchorUpdateRef\.current\?\.\(\);\s*\}, \[\]\);\s*useLayoutEffect\(updatePromptAnchor, \[isStreaming, hasStreamingContent, updatePromptAnchor\]\)/);
   assert.match(chatWindowSource, /<div ref=\{messageContentRef\}[^>]*style=\{\{/);
 });
 
