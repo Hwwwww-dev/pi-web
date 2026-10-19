@@ -134,9 +134,16 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
         const toolCall = block as ToolCallContent;
         const result = toolResults.get(toolCall.toolCallId);
         let duration: number | undefined;
-        if (result?.timestamp && assistantMessage.timestamp) {
-          const secs = Math.round((result.timestamp - assistantMessage.timestamp) / 1000);
-          if (secs > 0) duration = secs;
+        if (result) {
+          // pi 1.1 records the execution itself (durationMs); older results fall
+          // back to the timestamps' difference.
+          const recorded = (result as ToolResultMessage & { durationMs?: number }).durationMs;
+          if (recorded !== undefined) {
+            duration = recorded;
+          } else if (result.timestamp && assistantMessage.timestamp) {
+            const secs = Math.round((result.timestamp - assistantMessage.timestamp) / 1000);
+            if (secs > 0) duration = secs * 1000;
+          }
         }
         items.push({
           kind: "tool",

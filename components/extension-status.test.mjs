@@ -168,17 +168,17 @@ test("keeps the status label and the permissive chip in the composer's controls 
   assert.match(chatWindow, /extensionStatuses=\{extensionStatuses\}/);
 });
 
-test("leaves no status line behind in the shelf", async () => {
+test("shelf carries widget triggers and the status line side by side", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const shelfRule = css.match(/^\.extension-status-shelf\s*\{([^}]*)\}/m)?.[1] ?? "";
   const triggersRule = css.match(/^\.extension-widget-triggers\s*\{([^}]*)\}/m)?.[1] ?? "";
 
-  // The shelf only ever carries widget triggers now, so nothing shares the row
-  // with them and the fixed 55%/240px split is gone.
+  // The shelf carries both halves now: widget triggers keep their own compact
+  // row and the status cells sit beside them, split by a hairline border.
   assert.match(shelfRule, /flex-wrap:\s*wrap/);
-  assert.match(triggersRule, /flex:\s*1 1 100%/);
-  assert.doesNotMatch(css, /^\.extension-status-line|^\.extension-status-text|^\.extension-status-warning/m);
-  assert.doesNotMatch(css, /has-widgets\.has-status/);
+  assert.match(triggersRule, /flex:\s*0 0 auto/);
+  assert.match(css, /\.extension-status-shelf\.has-widgets\.has-status \.extension-widget-triggers/);
+  assert.match(css, /^\.extension-status-line\s*\{/m);
 });
 
 test("scrolls status text sideways instead of wrapping it", async () => {
@@ -190,7 +190,8 @@ test("scrolls status text sideways instead of wrapping it", async () => {
   assert.match(popoverRule, /max-height:/);
   assert.match(popoverRule, /overflow:\s*auto/);
   assert.match(popoverRule, /bottom:\s*calc\(100% \+ 6px\)/);
-  assert.match(textRule, /white-space:\s*pre\s*;/);
+  // The shelf's status text wraps (pre-wrap); only a popover entry scrolls sideways.
+  assert.match(textRule, /white-space:\s*pre-wrap/);
   assert.match(textRule, /overflow-x:\s*auto/);
   assert.doesNotMatch(textRule, /overflow-wrap:\s*anywhere/);
   // YOLO is a marker, not a control: its own red pill, styled inline so a stale

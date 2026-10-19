@@ -13,7 +13,19 @@ import { getFileName, getRelativeFilePath } from "@/lib/file-paths";
 import { resolveLocalFilePath } from "@/lib/file-links";
 import type { SplitDiffCell, SplitDiffFile } from "@/lib/patch";
 import { applyPatchPreviewToFiles, applyPatchResultHasFailures, extractApplyPatchPaths, getApplyPatchInputText, parseApplyPatchInput } from "@/lib/apply-patch";
-import { isApplyPatchToolName, isEditToolName } from "@/lib/tool-names";
+import { isApplyPatchToolName, isEditToolName, isWriteToolName } from "@/lib/tool-names";
+
+// A write's file text in place of its JSON (from main's MessageView). Streamed
+// input is still incomplete JSON, and any other argument (a mode, a title)
+// would vanish from this view, so those calls keep the generic view.
+const WRITE_VIEW_KEYS = new Set(["path", "file_path", "content"]);
+
+export function getWrittenFileText(block: ToolCallContent): string | null {
+  if (block.rawInput !== undefined || !isWriteToolName(block.toolName)) return null;
+  const { content } = block.input;
+  if (typeof content !== "string" || content === "") return null;
+  return Object.keys(block.input).every((key) => WRITE_VIEW_KEYS.has(key)) ? content : null;
+}
 import { isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansion";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
@@ -172,6 +184,20 @@ function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; o
 // Tool call rows
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Below this a tool card shows no time: it would read 0.0s on every quick read or search. */
+export const TOOL_DURATION_MIN_MS = 100;
+
+/** A tool's run time as the pi CLI's "Took" writes it: 2.4s, then 3m 5s, then 1h 2m 5s. */
+export function formatToolDuration(ms: number): string {
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const totalSeconds = Math.floor(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainder = totalSeconds % 60;
+  if (minutes < 60) return `${minutes}m ${remainder}s`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m ${remainder}s`;
+}
+
 export function getToolCallInputText(block: ToolCallContent): string {
   return block.rawInput ?? JSON.stringify(block.input, null, 2);
 }
@@ -216,9 +242,10 @@ function ToolRowPreview({ block, result, cwd, onOpenFile }: {
   return <>{preview}</>;
 }
 
-export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, cwd, onOpenFile, onOpenSession, isStreaming }: {
+export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, cwd, onOpenFile, onOpenSubagent, isStreaming }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
+  /** Tool run time in milliseconds (pi 1.1's durationMs, else the timestamps' difference). */
   duration?: number;
   /** The request that issued this tool call (its own assistant message's usage). */
   usage?: TurnUsage;
@@ -227,7 +254,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   ctxWindow?: number;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
-  onOpenSession?: (sessionId: string) => void;
+  onOpenSubagent?: (sessionId: string, label: string) => void;
   isStreaming?: boolean;
 }) {
   const { t } = useI18n();
@@ -240,6 +267,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
 
   const category = getToolCategory(block.toolName);
   const inputStr = getToolCallInputText(block);
+  const writtenFileText = getWrittenFileText(block);
   const isStreamingInput = block.rawInput !== undefined;
   const resultDiff = result && !result.isError ? getResultDiff(result) : null;
   const diffStat = resultDiff ? countDiffStat(resultDiff.text) : null;
@@ -304,19 +332,19 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
               <span className="diff-stat-removed">−{diffStat.removed}</span>
             </span>
           )}
-          {active ? <RowSpinner /> : duration !== undefined && <span className="activity-row-meta">{duration}s</span>}
+          {active ? <RowSpinner /> : duration !== undefined && <span className="activity-row-meta">{formatToolDuration(duration)}</span>}
           {!active && isError && result && (
             <span className="activity-row-meta activity-row-failed">{t("chat.activity.failed")}</span>
           )}
           <RowChevron expanded={expanded} />
         </button>
-        {subagent && onOpenSession && (
+        {subagent && onOpenSubagent && (
           <button
             type="button"
             className="activity-row-action"
-            onClick={() => onOpenSession(subagent.sessionId)}
-            title={t("subagent.open")}
-            aria-label={t("subagent.open")}
+            onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
+            title={t("subagent.openTab")}
+            aria-label={t("subagent.openTab")}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
           </button>
@@ -353,7 +381,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
             ) : (
               <>
                 {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
-                  <pre className="activity-detail-pre">{inputStr}</pre>
+                  <pre className="activity-detail-pre">{writtenFileText ?? inputStr}</pre>
                 )}
                 {patchFiles && <SplitFilesView files={patchFiles} />}
                 {result && patchFiles && isError && (
@@ -374,12 +402,12 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
 }
 
 /** Merges consecutive same-category tool calls into one collapsed summary row. */
-export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSession }: {
+export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent }: {
   calls: ToolCallEntry[];
   ctxWindow?: number;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
-  onOpenSession?: (sessionId: string) => void;
+  onOpenSubagent?: (sessionId: string, label: string) => void;
 }) {
   const { t } = useI18n();
   const groupKey = `group:${calls[0]?.block.toolCallId ?? ""}`;
@@ -418,7 +446,7 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSession 
         <span className="activity-row-icon"><ToolCategoryIcon category={category} isError={isError} /></span>
         <span className="activity-row-label">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</span>
         <span className="activity-row-preview">{summaryCount}</span>
-        {hasPending ? <RowSpinner /> : totalDuration > 0 && <span className="activity-row-meta">{totalDuration}s</span>}
+        {hasPending ? <RowSpinner /> : totalDuration > 0 && <span className="activity-row-meta">{formatToolDuration(totalDuration)}</span>}
         <RowChevron expanded={expanded} />
       </button>
       {expanded && (
@@ -434,7 +462,7 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSession 
               ctxWindow={ctxWindow}
               cwd={cwd}
               onOpenFile={onOpenFile}
-              onOpenSession={onOpenSession}
+              onOpenSubagent={onOpenSubagent}
             />
           ))}
         </div>
@@ -651,11 +679,11 @@ function customRowLabel(message: CustomMessage, t: (key: string, params?: Record
 }
 
 /** Generic custom-message row: extension output, hook messages, subagent notifications. */
-export function CustomRow({ message, cwd, onOpenFile, onOpenSession }: {
+export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
   message: CustomMessage;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
-  onOpenSession?: (sessionId: string) => void;
+  onOpenSubagent?: (sessionId: string, label: string) => void;
 }) {
   const { t } = useI18n();
   const isHiddenDisplay = message.display === false;
@@ -691,13 +719,13 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSession }: {
           <span className="activity-row-preview">{preview || (isHiddenDisplay ? t("i18n.showExtensionMessage") : null)}</span>
           <RowChevron expanded={expanded} />
         </button>
-        {subagent && onOpenSession && (
+        {subagent && onOpenSubagent && (
           <button
             type="button"
             className="activity-row-action"
-            onClick={() => onOpenSession(subagent.sessionId)}
-            title={t("subagent.open")}
-            aria-label={t("subagent.open")}
+            onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
+            title={t("subagent.openTab")}
+            aria-label={t("subagent.openTab")}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
           </button>
@@ -764,6 +792,7 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
   const [expanded, setExpanded] = useState(false);
   const summary = getMessageText(message.content);
   const parsedSummary = useMemo(() => parseCompactionSummary(summary), [summary]);
+  const tokensBefore = (message.details as { tokensBefore?: unknown } | undefined)?.tokensBefore;
   const total = parsedSummary.readFiles.length + parsedSummary.modifiedFiles.length;
   const preview = total > 0
     ? t("i18n.fileContext", { details: [
@@ -778,27 +807,50 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
         type="button"
         className="activity-row-header"
         aria-expanded={expanded}
+        title={expanded ? t("i18n.collapse") : t("i18n.expand")}
         onClick={() => setExpanded((v) => !v)}
       >
         <span className="activity-row-icon"><ToolCategoryIcon category="compact" /></span>
         <span className="activity-row-label">{t("i18n.conversationCompacted")}</span>
-        <span className="activity-row-preview">{preview}</span>
+        <span className="activity-row-preview">
+          {preview}
+          {typeof tokensBefore === "number" && Number.isFinite(tokensBefore) && (
+            <>
+              {" · "}{t("i18n.compactedFromTokens", { tokens: tokensBefore.toLocaleString() })}
+            </>
+          )}
+        </span>
         <RowChevron expanded={expanded} />
       </button>
       {expanded && (
         <div className="activity-detail-card">
-          <div style={{ color: "var(--text)", fontSize: "calc(14px + var(--chat-font-size-offset, 0px))", lineHeight: 1.5 }}>
-            {t("i18n.compactionDescription")}
-          </div>
-          {parsedSummary.body ? (
-            <MarkdownBody className="markdown-compaction-message" cwd={cwd} onOpenFile={onOpenFile}>{parsedSummary.body}</MarkdownBody>
-          ) : (
-            <span style={{ color: "var(--text-dim)", fontSize: 12 }}>{t("i18n.noSummary")}</span>
-          )}
-          <CompactionFileMetadata readFiles={parsedSummary.readFiles} modifiedFiles={parsedSummary.modifiedFiles} />
+          <CompactionSummaryDetails summary={summary} cwd={cwd} onOpenFile={onOpenFile} />
         </div>
       )}
     </div>
+  );
+}
+
+export function CompactionSummaryDetails({ summary, cwd, onOpenFile }: {
+  summary: string;
+  cwd?: string;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
+}) {
+  const { t } = useI18n();
+  const parsedSummary = useMemo(() => parseCompactionSummary(summary), [summary]);
+
+  return (
+    <>
+      <div style={{ color: "var(--text)", fontSize: "calc(14px + var(--chat-font-size-offset, 0px))", lineHeight: 1.5 }}>
+        {t("i18n.compactionDescription")}
+      </div>
+      {parsedSummary.body ? (
+        <MarkdownBody className="markdown-compaction-message" cwd={cwd} onOpenFile={onOpenFile}>{parsedSummary.body}</MarkdownBody>
+      ) : (
+        <span style={{ color: "var(--text-dim)", fontSize: 12 }}>{t("i18n.noSummary")}</span>
+      )}
+      <CompactionFileMetadata readFiles={parsedSummary.readFiles} modifiedFiles={parsedSummary.modifiedFiles} />
+    </>
   );
 }
 
@@ -972,13 +1024,13 @@ export function SafeMarkdownBody({ children, className, ...props }: React.Compon
  * recomputes during streaming reuse the previous identity and finished turns
  * skip re-rendering their rows entirely.
  */
-export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindow, cwd, onOpenFile, onOpenSession, sessionId, live = false }: {
+export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindow, cwd, onOpenFile, onOpenSubagent, sessionId, live = false }: {
   items: ActivityItem[];
   /** Current model's context window, for the ctx % in per-call usage lines. */
   ctxWindow?: number;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
-  onOpenSession?: (sessionId: string) => void;
+  onOpenSubagent?: (sessionId: string, label: string) => void;
   /** Needed to load deferred thinking content from history on expand. */
   sessionId?: string;
   /** The turn is currently running: groups start expanded and pending rows spin. */
@@ -1014,7 +1066,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
             ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
-            onOpenSession={onOpenSession}
+            onOpenSubagent={onOpenSubagent}
             isStreaming={live && !only.result}
           />,
         );
@@ -1032,7 +1084,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
             ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
-            onOpenSession={onOpenSession}
+            onOpenSubagent={onOpenSubagent}
           />,
         );
       }
@@ -1074,7 +1126,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
     nodes.push(
       message.customType === "compaction"
         ? <CompactionRow key={item.key} message={message} cwd={cwd} onOpenFile={onOpenFile} />
-        : <CustomRow key={item.key} message={message} cwd={cwd} onOpenFile={onOpenFile} onOpenSession={onOpenSession} />,
+        : <CustomRow key={item.key} message={message} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />,
     );
     index += 1;
   }

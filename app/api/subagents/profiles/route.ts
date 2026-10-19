@@ -81,9 +81,13 @@ export async function PATCH(req: Request) {
       description: source.description,
       systemPrompt: source.systemPrompt,
       tools: source.tools,
-      ...(source.extensionTools ? { extensionTools: source.extensionTools } : {}),
+      ...(source.extensionTools !== undefined ? { extensionTools: [...source.extensionTools] } : {}),
+      ...(source.disallowedExtensionTools !== undefined ? { disallowedExtensionTools: [...source.disallowedExtensionTools] } : {}),
       loadSkills: source.loadSkills,
+      ...(source.skills !== undefined ? { skills: [...source.skills] } : {}),
       loadExtensions: source.loadExtensions,
+      ...(source.extensions !== undefined ? { extensions: [...source.extensions] } : {}),
+      codemode: source.codemode,
       promptMode: source.promptMode,
       model: source.model,
       thinking: source.thinking,
@@ -91,9 +95,9 @@ export async function PATCH(req: Request) {
       inheritContext: source.inheritContext,
       runInBackground: source.runInBackground,
       // Managed keys the toggle does not touch must survive the rewrite.
-      ...(source.color ? { color: source.color } : {}),
-      ...(source.isolation ? { isolation: source.isolation } : {}),
-      ...(source.persistSession !== undefined ? { persistSession: source.persistSession } : {}),
+      color: source.color,
+      isolation: source.isolation,
+      persistSession: source.persistSession,
       enabled: source.enabled,
     };
     return NextResponse.json({ profile: saveSubagentProfile(cwd, scope, { ...profile, enabled: body.enabled }) });

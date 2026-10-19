@@ -75,3 +75,11 @@ test("markdown preview links carry page/line fragments", () => {
   assert.match(source, /parseFileOpenOptions/);
   assert.match(source, /onOpenFile\(linkedFile, parseFileOpenOptions\(href\)\)/);
 });
+
+test("markdown preview keeps app links and opens web and app links in a new tab (#1108)", () => {
+  assert.match(source, /urlTransform=\{onOpenFile \? markdownUrlTransform : markdownAppUrlTransform\}/);
+  assert.match(
+    source,
+    /return isExternalMarkdownHref\(href\)\s*\? <a href=\{href\} \{\.\.\.props\} target="_blank" rel="noopener noreferrer">\{children\}<\/a>\s*: <a href=\{href\} \{\.\.\.props\}>\{children\}<\/a>;/,
+  );
+});

@@ -20,7 +20,6 @@ test("every path display that can truncate renders the shared label", async () =
     "FileToolbar.tsx",
     "GitPanel.tsx",
     "TerminalPanel.tsx",
-    "SessionSidebar.tsx",
     "SkillsConfig.tsx",
     "AgentsConfig.tsx",
   ];
@@ -29,6 +28,10 @@ test("every path display that can truncate renders the shared label", async () =
     assert.match(text, /from "\.\/PathLabel"/, `${file} imports PathLabel`);
     assert.match(text, /<PathLabel/, `${file} renders PathLabel`);
   }
+  // The project/worktree picker is main's component: it keeps its own ~
+  // shortening (displayPath) instead of the shared label.
+  const picker = await readFile(new URL("./ProjectWorktreePicker.tsx", import.meta.url), "utf8");
+  assert.match(picker, /function displayPath\(/);
   // The sidebar no longer keeps its own copy of the trick.
   const sidebar = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(sidebar, /function PathLabel\(/);

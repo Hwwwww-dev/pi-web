@@ -7,6 +7,7 @@ import {
   mergeSessionLists,
 } from "@/lib/session-reader";
 import {
+  getAwaitingInputRpcSessionIds,
   getCompletionNotificationSuppressedRpcSessionIds,
   getRpcSessionInfos,
   getRunningRpcSessionIds,
@@ -31,6 +32,7 @@ export async function GET(req: Request) {
       sessions: mergeSessionLists(persistedSessions, runtimeSessions),
       sessionListVersion,
       runningSessionIds: getRunningRpcSessionIds(),
+      awaitingInputSessionIds: getAwaitingInputRpcSessionIds(),
       completionNotificationSuppressedSessionIds: getCompletionNotificationSuppressedRpcSessionIds(),
     };
     const headers = { "Cache-Control": "no-store" };

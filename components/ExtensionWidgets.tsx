@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { AnsiText } from "@/components/AnsiText";
 import type { ExtensionWidgetItem } from "@/lib/types";
 
+export const DEFAULT_EXPANDED_WIDGET_LINES = 3;
 export const WIDGET_UPDATE_IDLE_MS = 1100;
 
 export function formatExtensionWidgetContent(lines: string[]): string {
@@ -31,6 +32,13 @@ export function getUpdatedExtensionWidgetKeys(
   }).filter((key): key is string => key !== null);
 }
 
+function getDefaultExpandedWidgetKey(widgets: ExtensionWidgetItem[]): string | null {
+  return widgets.find((widget) => {
+    const lineCount = widget.lines.length;
+    return lineCount > 1 && lineCount <= DEFAULT_EXPANDED_WIDGET_LINES;
+  })?.key ?? null;
+}
+
 export function getNextExpandedWidgetKey(
   currentKey: string | null,
   requestedKey: string,
@@ -38,14 +46,18 @@ export function getNextExpandedWidgetKey(
   return currentKey === requestedKey ? null : requestedKey;
 }
 
-export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }) {
+/**
+ * `children` (the status line) joins the triggers in one row, so the whole row
+ * scrolls sideways together; the expanded panel stays above it, out of the scroll.
+ */
+export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidgetItem[]; children?: ReactNode }) {
   const { t } = useI18n();
   const idPrefix = useId();
   const previousContentsRef = useRef<Map<string, string[]> | null>(null);
   const updateClearTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  // Widgets start collapsed: auto-expanding raw TUI output above the composer
-  // read like broken message content. The trigger chips expand on demand.
-  const [expandedWidgetKey, setExpandedWidgetKey] = useState<string | null>(null);
+  const [expandedWidgetKey, setExpandedWidgetKey] = useState<string | null>(
+    () => getDefaultExpandedWidgetKey(widgets),
+  );
   const [updatingWidgetKeys, setUpdatingWidgetKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -106,7 +118,7 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
   };
 
   return (
-    <div className="extension-status-shelf">
+    <>
       {expandedWidget && (
         <div className="extension-widget-panels">
           {(() => {
@@ -130,71 +142,74 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
           })()}
         </div>
       )}
-      <div className="extension-widget-triggers" aria-label={t("chat.extensionWidgets")}>
-        {widgets.map((widget, index) => {
-          const expandable = widget.lines.length > 0;
-          const expanded = expandable && widget.key === expandedWidget?.key;
-          const updating = updatingWidgetKeys.has(widget.key);
-          const lineCountLabel = t(
-            widget.lines.length === 1 ? "chat.extensionWidgetLine" : "chat.extensionWidgetLines",
-            { count: widget.lines.length },
-          );
-          const placementLabel = t(
-            widget.placement === "belowEditor"
-              ? "chat.extensionWidgetBelow"
-              : "chat.extensionWidgetAbove",
-          );
-          const triggerId = `${idPrefix}-trigger-${index}`;
-          const panelId = `${idPrefix}-panel-${index}`;
-          const content = (
-            <>
-              <span className="extension-widget-update-pulse" aria-hidden="true" />
-              <span className="extension-widget-placement" aria-hidden="true">
-                <svg
-                  className="extension-widget-placement-icon"
-                  viewBox="0 0 8 6"
-                  width="8"
-                  height="6"
-                  data-direction={widget.placement === "belowEditor" ? "down" : "up"}
-                  focusable="false"
-                >
-                  <path
-                    d={widget.placement === "belowEditor"
-                      ? "M0 0h8L4 6z"
-                      : "M4 0l4 6H0z"}
-                  />
-                </svg>
-              </span>
-              <span className="extension-widget-key">{widget.key}</span>
-            </>
-          );
+      <div className="extension-status-row">
+        <div className="extension-widget-triggers" aria-label={t("chat.extensionWidgets")}>
+          {widgets.map((widget, index) => {
+            const expandable = widget.lines.length > 0;
+            const expanded = expandable && widget.key === expandedWidget?.key;
+            const updating = updatingWidgetKeys.has(widget.key);
+            const lineCountLabel = t(
+              widget.lines.length === 1 ? "chat.extensionWidgetLine" : "chat.extensionWidgetLines",
+              { count: widget.lines.length },
+            );
+            const placementLabel = t(
+              widget.placement === "belowEditor"
+                ? "chat.extensionWidgetBelow"
+                : "chat.extensionWidgetAbove",
+            );
+            const triggerId = `${idPrefix}-trigger-${index}`;
+            const panelId = `${idPrefix}-panel-${index}`;
+            const content = (
+              <>
+                <span className="extension-widget-update-pulse" aria-hidden="true" />
+                <span className="extension-widget-placement" aria-hidden="true">
+                  <svg
+                    className="extension-widget-placement-icon"
+                    viewBox="0 0 8 6"
+                    width="8"
+                    height="6"
+                    data-direction={widget.placement === "belowEditor" ? "down" : "up"}
+                    focusable="false"
+                  >
+                    <path
+                      d={widget.placement === "belowEditor"
+                        ? "M0 0h8L4 6z"
+                        : "M4 0l4 6H0z"}
+                    />
+                  </svg>
+                </span>
+                <span className="extension-widget-key">{widget.key}</span>
+              </>
+            );
 
-          return expandable ? (
-            <button
-              key={widget.key}
-              id={triggerId}
-              type="button"
-              className={`extension-widget-trigger${expanded ? " is-expanded" : ""}${updating ? " is-updating" : ""}`}
-              aria-controls={panelId}
-              aria-expanded={expanded}
-              aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-              title={`${widget.key} - ${placementLabel} - ${expanded ? t("i18n.collapse") : t("i18n.expand")}`}
-              onClick={() => toggleWidget(widget)}
-            >
-              {content}
-            </button>
-          ) : (
-            <div
-              key={widget.key}
-              className={`extension-widget-trigger${updating ? " is-updating" : ""}`}
-              aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-              title={`${widget.key} - ${placementLabel}`}
-            >
-              {content}
-            </div>
-          );
-        })}
+            return expandable ? (
+              <button
+                key={widget.key}
+                id={triggerId}
+                type="button"
+                className={`extension-widget-trigger${expanded ? " is-expanded" : ""}${updating ? " is-updating" : ""}`}
+                aria-controls={panelId}
+                aria-expanded={expanded}
+                aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
+                title={`${widget.key} - ${placementLabel} - ${expanded ? t("i18n.collapse") : t("i18n.expand")}`}
+                onClick={() => toggleWidget(widget)}
+              >
+                {content}
+              </button>
+            ) : (
+              <div
+                key={widget.key}
+                className={`extension-widget-trigger${updating ? " is-updating" : ""}`}
+                aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
+                title={`${widget.key} - ${placementLabel}`}
+              >
+                {content}
+              </div>
+            );
+          })}
+        </div>
+        {children}
       </div>
-    </div>
+    </>
   );
 }

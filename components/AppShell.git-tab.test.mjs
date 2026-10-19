@@ -38,7 +38,7 @@ test("the explorer header button opens the right panel on the Git tab", () => {
 });
 
 test("the tab bar renders the Git tab with a localized title and a close button", () => {
-  assert.match(tabBarSource, /kind\?: "terminal" \| "git";/);
+  assert.match(tabBarSource, /kind\?: "terminal" \| "git" \| "agent";/);
   assert.match(tabBarSource, /tab\.kind === "git" \? \(\s*<svg[\s\S]*?<circle cx="18" cy="6" r="3" \/>/);
   assert.match(tabBarSource, /\{tab\.kind === "git" \? t\("gitPanel\.title"\) : tab\.label\}/);
   // No git close-button guard: every tab (including Git) shows the close button.

@@ -54,6 +54,6 @@ test("dashes render without hover so the trigger zone is discoverable", async ()
   const source = await readFile(new URL("./ChatMinimap.tsx", import.meta.url), "utf8");
   // Every slot is drawn unconditionally — hover only feeds its size and colour —
   // so the trigger zone stays discoverable with nothing hovered.
-  assert.match(source, /\{positionedSlots\.map\(\(slot\) => \{/);
-  assert.doesNotMatch(source, /\{minimapHovered && positionedSlots\.map/);
+  assert.match(source, /\{positionedNodes\.map\(\(node\) => \{/);
+  assert.doesNotMatch(source, /\{minimapHovered && positionedNodes\.map/);
 });

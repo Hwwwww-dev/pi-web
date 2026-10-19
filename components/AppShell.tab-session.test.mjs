@@ -42,8 +42,9 @@ test("deleting the current session forgets its tab memory", () => {
   const end = source.indexOf("  const handleOpenFile = useCallback", start);
   const body = source.slice(start, end);
   assert.match(body, /clearTabOpenSession\(sessionId\);/);
-  // Tab memory is cleared before the draft switch deselects the session.
-  assert.ok(body.indexOf("clearTabOpenSession(sessionId)") < body.indexOf("openNewSessionDraftForCwd("));
+  // Tab memory is cleared before the delete deselects the session (the delete
+  // falls back to the empty composer; the dock-dismiss path opens a draft).
+  assert.ok(body.indexOf("clearTabOpenSession(sessionId)") < body.indexOf("setSelectedSession(null)"));
   const draftStart = source.indexOf("  const openNewSessionDraftForCwd = useCallback");
   const draftEnd = source.indexOf("  // Dismissing a keep-alive slot", draftStart);
   assert.match(source.slice(draftStart, draftEnd), /setSelectedSession\(null\)/);
