@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
@@ -11,7 +11,9 @@ import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { isTuiText } from "@/lib/ansi";
 import { getFileName, getRelativeFilePath } from "@/lib/file-paths";
 import { resolveLocalFilePath } from "@/lib/file-links";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { SplitDiffCell, SplitDiffFile } from "@/lib/patch";
+import { diffGapLabel, parseUnifiedPatch, unifiedDiffLines, type SplitDiffGap, type UnifiedDiffLine } from "@/lib/patch";
 import { applyPatchPreviewToFiles, applyPatchResultHasFailures, extractApplyPatchPaths, getApplyPatchInputText, parseApplyPatchInput } from "@/lib/apply-patch";
 import { isApplyPatchToolName, isEditToolName, isWriteToolName } from "@/lib/tool-names";
 
@@ -30,6 +32,7 @@ import { isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansi
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
 import { CODEMODE_TOOL_NAME, codemodeCalls, codemodeScript, codemodeScriptPreview, stripCodemodeHeader } from "@/lib/codemode-view";
+import { toolFieldsOfInput, type ToolField } from "@/lib/tool-fields";
 import { mcpToolLabel, prettyMcpResultText } from "@/lib/mcp-tool-display";
 import { CodemodeCallList } from "./CodemodeToolView";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
@@ -298,6 +301,12 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   const combinedTerminalText = commandText !== null
     ? `$ ${commandText}${resultText && !resultIsEmpty ? `\n\n${resultText}` : ""}`
     : null;
+  // Flat arguments as rows instead of a JSON blob, unless the card has a view of
+  // its own (a write's file text, codemode, an applied patch, a terminal pair).
+  const toolFields =
+    !isStreamingInput && writtenFileText === null && codemode === null && patchFiles === null && combinedTerminalText === null
+      ? toolFieldsOfInput(block.input)
+      : null;
 
   const label = category === "other" ? block.toolName : t(TOOL_CATEGORY_LABEL_KEYS[category]);
 
@@ -381,14 +390,18 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
             ) : (
               <>
                 {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
-                  <pre className="activity-detail-pre">{writtenFileText ?? inputStr}</pre>
+                  toolFields ? (
+                    <ToolFieldRows fields={toolFields} />
+                  ) : (
+                    <pre className="activity-detail-pre">{writtenFileText ?? inputStr}</pre>
+                  )
                 )}
                 {patchFiles && <SplitFilesView files={patchFiles} />}
                 {result && patchFiles && isError && (
                   <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
                 )}
                 {result && !patchFiles && combinedTerminalText === null && (
-                  resultDiff ? <PatchTextView text={resultDiff.text} /> : (!resultIsEmpty || resultImages.length === 0) && (
+                  resultDiff ? <SplitPatchView text={resultDiff.text} /> : (!resultIsEmpty || resultImages.length === 0) && (
                     <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
                   )
                 )}
@@ -1153,11 +1166,23 @@ function countDiffStat(text: string): { added: number; removed: number } {
 }
 
 function SplitFilesView({ files }: { files: SplitDiffFile[] }) {
+  const layout: PatchDiffLayout = useIsMobile() ? "stacked" : "split";
+  return <PatchDiffFiles files={files} layout={layout} />;
+}
+
+export type PatchDiffLayout = "split" | "stacked";
+
+/**
+ * The patch as the viewport can show it. Two columns need two code columns side
+ * by side, which a phone does not have: there the same rows read as one column
+ * — a removed line above the line that replaces it, each with its own number.
+ */
+export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layout: PatchDiffLayout }) {
   const { t } = useI18n();
   const showFileHeaders = files.length > 1;
 
   return (
-    <div style={{ maxHeight: 560, overflowY: "auto", overflowX: "hidden" }}>
+    <div style={{ maxHeight: 560, overflowY: "auto", overflowX: "hidden", background: "var(--bg)" }}>
       {files.map((file, fileIndex) => (
         <div
           key={fileIndex}
@@ -1169,7 +1194,7 @@ function SplitFilesView({ files }: { files: SplitDiffFile[] }) {
             lineHeight: 1.55,
           }}
         >
-          {showFileHeaders && (
+          {showFileHeaders && layout === "split" && (
             <div
               style={{
                 display: "grid",
@@ -1186,23 +1211,94 @@ function SplitFilesView({ files }: { files: SplitDiffFile[] }) {
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
-            {file.rows.map((row, rowIndex) => {
-              if (row.type !== "line") {
-                return null;
-              }
+          {showFileHeaders && layout === "stacked" && stackedFilePath(file) && (
+            <div
+              title={stackedFilePath(file)}
+              style={{
+                position: "sticky",
+                top: 0,
+                zIndex: 1,
+                padding: "5px 10px",
+                color: "var(--text-dim)",
+                background: "var(--bg-subtle)",
+                borderBottom: "1px solid var(--border)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {stackedFilePath(file)}
+            </div>
+          )}
 
-              return (
-                <div key={rowIndex} style={{ display: "contents" }}>
-                  <SplitDiffCellView cell={row.left} side="left" />
-                  <SplitDiffCellView cell={row.right} side="right" />
-                </div>
-              );
-            })}
-          </div>
+          {layout === "split" && (
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
+              {file.rows.map((row, rowIndex) => {
+                if (row.type === "hunk") {
+                  return null;
+                }
+                if (row.type === "gap") {
+                  return <DiffGapRow key={rowIndex} gap={row} />;
+                }
+
+                return (
+                  <div key={rowIndex} style={{ display: "contents" }}>
+                    <SplitDiffCellView cell={row.left} side="left" />
+                    <SplitDiffCellView cell={row.right} side="right" />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {layout === "stacked" && unifiedDiffLines(file).map((line, lineIndex) => (
+            line.type === "gap"
+              ? <DiffGapRow key={lineIndex} gap={line} />
+              : <StackedDiffLineView key={lineIndex} line={line} />
+          ))}
         </div>
       ))}
     </div>
+  );
+}
+
+/** Unchanged lines the patch leaves out between two hunks, across the whole width. */
+function DiffGapRow({ gap }: { gap: SplitDiffGap }) {
+  const { t } = useI18n();
+  return (
+    <div
+      style={{
+        gridColumn: "1 / -1",
+        padding: "0 10px",
+        color: "var(--text-dim)",
+        background: "var(--bg-subtle)",
+        borderTop: "1px solid var(--border)",
+        borderBottom: "1px solid var(--border)",
+        userSelect: "none",
+      }}
+    >
+      {gap.count === null ? "⋯" : `⋯ ${diffGapLabel(gap.count, t)}`}
+    </div>
+  );
+}
+
+/** The file a stacked section is named for: the new path, the one that survives, unless the file was deleted. */
+function stackedFilePath(file: SplitDiffFile): string {
+  if (file.newPath && file.newPath !== "/dev/null") return file.newPath;
+  return file.oldPath || file.newPath || "";
+}
+
+function StackedDiffLineView({ line }: { line: UnifiedDiffLine }) {
+  return (
+    <SplitDiffCellView
+      side="right"
+      cell={{
+        // One gutter, so a removed line keeps the old number and everything else the new one.
+        lineNo: line.type === "removed" ? line.oldLineNo : line.newLineNo,
+        text: line.text,
+        type: line.type,
+      }}
+    />
   );
 }
 
@@ -1287,6 +1383,12 @@ function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" |
       </span>
     </div>
   );
+}
+
+function SplitPatchView({ text }: { text: string }) {
+  const files = useMemo(() => parseUnifiedPatch(text), [text]);
+  if (!files) return <PatchTextView text={text} />;
+  return <SplitFilesView files={files} />;
 }
 
 function PatchTextView({ text }: { text: string }) {
@@ -1448,5 +1550,52 @@ function PairedResult({ text, isEmpty, isError }: {
     >
       {isEmpty ? t("i18n.noOutput") : text}
     </pre>
+  );
+}
+
+const TOOL_FIELD_LABEL: CSSProperties = {
+  padding: "4px 12px 4px 0",
+  color: "var(--text-dim)",
+  fontSize: "calc(11px + var(--chat-font-size-offset, 0px))",
+  whiteSpace: "nowrap",
+  verticalAlign: "top",
+};
+
+const TOOL_FIELD_VALUE: CSSProperties = {
+  padding: "4px 0",
+  color: "var(--text-muted)",
+  fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
+  fontFamily: "var(--font-mono)",
+  overflowWrap: "anywhere",
+};
+
+// A value with newlines of its own keeps them, scrolled in place.
+const TOOL_FIELD_BLOCK: CSSProperties = {
+  margin: 0,
+  padding: "8px 10px",
+  maxHeight: 260,
+  overflow: "auto",
+  border: "1px solid var(--border)",
+  borderRadius: 6,
+  background: "var(--bg)",
+  font: "inherit",
+  lineHeight: 1.5,
+  whiteSpace: "pre-wrap",
+};
+
+function ToolFieldRows({ fields }: { fields: ToolField[] }) {
+  return (
+    <table style={{ borderCollapse: "collapse" }}>
+      <tbody>
+        {fields.map((field) => (
+          <tr key={field.key}>
+            <td style={TOOL_FIELD_LABEL}>{field.key}</td>
+            <td style={TOOL_FIELD_VALUE}>
+              {field.multiline ? <pre style={TOOL_FIELD_BLOCK}>{field.value}</pre> : field.value}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

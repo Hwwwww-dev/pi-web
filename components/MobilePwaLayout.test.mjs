@@ -54,7 +54,7 @@ test("contains chat content and inputs within the mobile viewport", () => {
   assert.match(chatWindowSource, /import \{ useDialogMaxHeight \} from "@\/hooks\/useDialogMaxHeight";/);
   assert.match(chatWindowSource, /const dialogMaxHeight = useDialogMaxHeight\(wrapperRef\);/);
   assert.match(chatWindowSource, /maxHeight: dialogMaxHeight/);
-  assert.match(chatInputSource, /flex: compact \? "none" : 1,\s*minWidth: 0,\s*width: "100%",/);
+  assert.match(chatInputSource, /flex: stackedComposer \? "none" : 1,\s*minWidth: 0,\s*width: "100%",/);
 });
 
 test("prevents iOS focus zoom from widening the layout", () => {
