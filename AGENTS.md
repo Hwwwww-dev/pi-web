@@ -59,6 +59,7 @@ app/api/
   sessions/route.ts                GET list all sessions
   sessions/[id]/route.ts           GET/PATCH/DELETE a session
   sessions/[id]/context/route.ts   GET ?leafId=&tail=&before= a page of a leaf's context (tail defaults to 50; before pages upward)
+  sessions/[id]/turns/route.ts     GET ?leafId= the whole-branch turn index for the minimap (entry id, timestamp, preview per turn)
   sessions/[id]/export/route.ts    GET exported HTML
   sessions/[id]/fork/route.ts      POST copy the session's current branch into a new session (never starts an AgentSession)
   sessions/delete/route.ts         POST { ids } delete sessions and their subagents (a project's Delete all sessions); running ones kept

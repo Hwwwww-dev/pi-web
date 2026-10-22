@@ -111,6 +111,15 @@
   color: var(--accent);
 }
 
+/* Turns listed from the index whose messages are not loaded (or rendered) yet. */
+.turn[data-unloaded] .userText {
+  opacity: 0.6;
+}
+
+.turn[data-unloaded] .meta {
+  font-style: italic;
+}
+
 /* Tool count, tokens and cost of the turn, in one monospaced line. */
 .meta {
   margin: 1px 0 3px 8px;

@@ -5,7 +5,7 @@ import {
 import { closeSync, type Dirent, fstatSync, openSync, readSync, statSync } from "fs";
 import { readdir } from "fs/promises";
 import { isAbsolute, join, normalize as normalizePath, relative, resolve as resolvePath, sep } from "path";
-import type { AgentMessage, ImageContent, SessionEntry, SessionHeader, SessionInfo, SessionContext } from "./types";
+import type { AgentMessage, ImageContent, MinimapTurnDescriptor, SessionEntry, SessionHeader, SessionInfo, SessionContext } from "./types";
 import { normalizeToolCalls } from "./normalize";
 import { withoutMessageSignatures } from "./message-signatures";
 import { getThinkingPreview, isMessageGroupAnchor } from "./message-display";
@@ -769,6 +769,43 @@ function countTurnsBefore(entries: SessionEntry[], oldest: SessionEntry): number
     const shape = turnAnchorShape(current);
     if (shape && isMessageGroupAnchor(shape)) turns++;
     current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+  return turns;
+}
+
+/** The user-visible text of a turn anchor, as the minimap's preview shows it.
+ *  Anchors are partial shapes (branch summaries carry no body), so the content
+ *  is read defensively. */
+function turnPreviewText(message: Parameters<typeof isMessageGroupAnchor>[0]): string {
+  if (message.role !== "user") return "";
+  const content: unknown = (message as { content?: unknown }).content;
+  const text = typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content
+        .filter((block): block is { type: "text"; text: string } => (block as { type?: string }).type === "text")
+        .map((block) => block.text)
+        .join("\n")
+      : "";
+  const trimmed = text.trim();
+  return trimmed.length > 200 ? trimmed.slice(0, 200) : trimmed;
+}
+
+/**
+ * The chat's turns as a whole-branch index, oldest first: one descriptor per
+ * turn anchor of the active branch. The minimap lists every turn from it and
+ * pages history in when an unloaded one is clicked, so all turns stay
+ * identifiable without loading their messages.
+ */
+export function buildTurnIndex(entries: SessionEntry[], leafId?: string | null): MinimapTurnDescriptor[] {
+  if (leafId === null) return [];
+  const branch = sliceActiveBranch(entries, leafId ?? null, entries.length);
+  const turns: MinimapTurnDescriptor[] = [];
+  for (const entry of branch) {
+    const shape = turnAnchorShape(entry);
+    if (!shape || !isMessageGroupAnchor(shape)) continue;
+    const timestamp = typeof entry.timestamp === "string" ? parseEntryTimestamp(entry.timestamp) : undefined;
+    turns.push({ entryId: entry.id, preview: turnPreviewText(shape), timestamp });
   }
   return turns;
 }

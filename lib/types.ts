@@ -55,6 +55,15 @@ export interface UserMessage {
   timestamp?: number;
 }
 
+/** One chat turn of the whole-branch turn index (the minimap's listing):
+ *  identity and preview only — loaded turns' scroll positions and usage are
+ *  measured live from the rendered messages. */
+export interface MinimapTurnDescriptor {
+  entryId: string;
+  preview: string;
+  timestamp?: number;
+}
+
 export interface AgentUsage {
   input: number;
   output: number;

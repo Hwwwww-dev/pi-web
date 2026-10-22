@@ -21,6 +21,7 @@ import {
 import { cacheSessionPath, catalogFirstMessage, getLatestModelChange, invalidateSessionListCache, readLatestSessionEntryId, resolveSessionPath } from "./session-reader";
 import { computeLiveSessionTotalActiveMs } from "./session-timing";
 import { getProjectTrustStatus, projectTrustReloadOptions } from "./project-trust";
+import { loadPiSdkInternals } from "./pi-sdk-internals";
 import { notifySessionComplete } from "./web-push";
 import { hasActiveSessionLivenessProvider } from "./session-liveness";
 import type { SlashCommandInfo } from "@earendil-works/pi-coding-agent";
@@ -2189,6 +2190,15 @@ declare global {
   var __piStartingSessionCwds: Map<string, number> | undefined;
 }
 
+/** Another live session means this one cannot reuse the shared extension module
+ *  world: extensions bound to the earlier session would keep owning it. */
+function hasOtherAliveWrapper(registry: Map<string, AgentSessionWrapper>, sessionId: string): boolean {
+  for (const [id, wrapper] of registry) {
+    if (id !== sessionId && wrapper.isAlive()) return true;
+  }
+  return false;
+}
+
 function getRegistry(): Map<string, AgentSessionWrapper> {
   if (!globalThis.__piSessions) {
     globalThis.__piSessions = new Map();
@@ -2672,7 +2682,20 @@ export async function startRpcSession(
         : []),
       ...(skillsBinding?.loaderOptions.extensionFactories ?? []),
     ];
-    const services = await createAgentSessionServices({
+    // Extensions assume one live session per process (the TUI model): rpiv-todo
+  // claims a process-global foreground and pi-lens rebinds its runtime on
+  // session_start, so a second session sharing their module state never binds
+  // its own UI — its todo widget never registers and its LSP status goes stale.
+  // The SDK caches extension factories per path across sessions
+  // (loadExtensionsCached); dropping the cache makes this session's loader
+  // re-evaluate every extension module into its own world. Alive wrappers keep
+  // their already-bound instances, and a lone session keeps the fast path.
+  if (hasOtherAliveWrapper(registry, sessionId)) {
+    const internals = await loadPiSdkInternals();
+    if (internals.ok) internals.clearExtensionCache();
+    else console.warn(`[pi-web] extension module isolation unavailable: ${internals.reason}`);
+  }
+  const services = await createAgentSessionServices({
       cwd: sessionCwd,
       agentDir,
       settingsManager,

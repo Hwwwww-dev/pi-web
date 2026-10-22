@@ -30,6 +30,7 @@ const SDK_MODULES = {
   mcpOAuth: "dist/extensions/mcp/oauth.js",
   mcpServers: "dist/core/mcp-servers.js",
   configValues: "dist/core/resolve-config-value.js",
+  extensionLoader: "dist/core/extensions/loader.js",
 } as const;
 
 type SdkModuleName = keyof typeof SDK_MODULES | "mcpClient";
@@ -52,6 +53,7 @@ const MEMBERS = {
   resolveHeadersOrThrow: { module: "configValues", kind: "function" },
   getConfigValueEnvVarNames: { module: "configValues", kind: "function" },
   isCommandConfigValue: { module: "configValues", kind: "function" },
+  clearExtensionCache: { module: "extensionLoader", kind: "function" },
 } as const satisfies Record<string, { module: SdkModuleName; kind: MemberKind }>;
 
 /** What a transport factory returns: pi-mcp's `McpTransport`, which the SDK root does not export. */
@@ -230,6 +232,9 @@ export interface PiSdkInternals {
   /** Variables a `${NAME}` / `$NAME` value references; none for a `!command` value. */
   getConfigValueEnvVarNames: (config: string) => string[];
   isCommandConfigValue: (config: string) => boolean;
+  /** Drops the SDK's process-wide extension factory cache (loader.js:92), so the
+   *  next extension load re-evaluates every module. See startRpcSession. */
+  clearExtensionCache: () => void;
 }
 
 export type PiSdkInternalsResult = ({ ok: true } & PiSdkInternals) | { ok: false; reason: string };

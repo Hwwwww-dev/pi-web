@@ -28,7 +28,7 @@ export function getWrittenFileText(block: ToolCallContent): string | null {
   if (typeof content !== "string" || content === "") return null;
   return Object.keys(block.input).every((key) => WRITE_VIEW_KEYS.has(key)) ? content : null;
 }
-import { isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansion";
+import { COLLAPSIBLE_EXPANDED_EVENT, isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansion";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
 import { CODEMODE_TOOL_NAME, codemodeCalls, codemodeScript, codemodeScriptPreview, stripCodemodeHeader } from "@/lib/codemode-view";
@@ -608,14 +608,15 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
         aria-expanded={expanded}
         aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
         title={t("i18n.thinking")}
-        onClick={() => setExpanded((v) => {
-          const next = !v;
+        onClick={() => {
+          const next = !expanded;
           // Expanding mid-stream means "show me the live tail"; expanding a
           // finished block opens from the top for reading.
           stickRef.current = next && Boolean(active);
           prevScrollTopRef.current = 0;
-          return next;
-        })}
+          setExpanded(next);
+          if (next) window.dispatchEvent(new Event(COLLAPSIBLE_EXPANDED_EVENT));
+        }}
       >
         <span className="activity-row-icon" style={{ color: active ? "var(--warning)" : undefined }}><ThinkingIcon active={expanded || Boolean(active)} /></span>
         <span className="activity-row-label">{t("i18n.thinking")}</span>

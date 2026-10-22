@@ -3,7 +3,7 @@ import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import Image from "next/image";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage } from "@/lib/types";
+import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage } from "@/lib/types";
 import { isTuiText, normalizeCustomPanelLines } from "@/lib/ansi";
 import { splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
@@ -30,6 +30,7 @@ import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useDialogMaxHeight } from "@/hooks/useDialogMaxHeight";
 import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
+import { COLLAPSIBLE_EXPANDED_EVENT } from "@/lib/tool-call-expansion";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import type { AppUpdateResponse } from "@/lib/api-types";
 import type { ToolEntry } from "@/lib/tool-presets";
@@ -521,9 +522,30 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // top, load another page while keeping the scroll position stable.
   const [visibleCount, setVisibleCount] = useState(VISIBLE_PAGE_SIZE);
   const messageRefs = useMessageRefs(messages.length);
-  const revealHistoryForMinimap = useCallback(() => {
-    setVisibleCount((current) => Math.max(current, messages.length * 2));
-  }, [messages.length]);
+  const messagesLenRef = useRef(0);
+  messagesLenRef.current = messages.length;
+  // Whole-branch turn index for the minimap's listing: turns the chat has not
+  // loaded still show their preview there and page in when clicked. Absent
+  // (fetch failed or still loading), the minimap falls back to loaded turns.
+  const [minimapTurnIndex, setMinimapTurnIndex] = useState<MinimapTurnDescriptor[]>([]);
+  useEffect(() => {
+    const sid = session?.id;
+    if (!sid) {
+      setMinimapTurnIndex([]);
+      return;
+    }
+    const controller = new AbortController();
+    const params = activeLeafId ? `?leafId=${encodeURIComponent(activeLeafId)}` : "";
+    fetch(`/api/sessions/${encodeURIComponent(sid)}/turns${params}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { turns?: MinimapTurnDescriptor[] } | null) => {
+        if (data && Array.isArray(data.turns)) setMinimapTurnIndex(data.turns);
+      })
+      .catch(() => {
+        // Aborted or transient; the minimap lists loaded turns only.
+      });
+    return () => controller.abort();
+  }, [session?.id, activeLeafId]);
   // State, not a ref: the sentinel can appear with nothing else changing (a
   // finished turn regrouped into more rows), and must get an observer then.
   const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
@@ -553,6 +575,24 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (!context && requestedCursorRef.current === before) requestedCursorRef.current = null;
     return context;
   }, [activeLeafId, loadContext]);
+  // Jump to a minimap turn: reveal everything already in memory, then page
+  // ancestors in until the turn's anchor entry is loaded. One page asks for
+  // the largest tail the context route serves, so distant turns land in a
+  // request or two; the minimap scrolls once the anchor renders.
+  const revealTurnForMinimap = useCallback(async (turnNumber: number) => {
+    setVisibleCount((current) => Math.max(current, messagesLenRef.current * 2));
+    const sid = session?.id;
+    const target = minimapTurnIndex[turnNumber];
+    if (!sid || !target) return;
+    for (let guard = 0; guard < 20; guard++) {
+      const snapshot = searchHistoryRef.current;
+      if (snapshot.entryIds.includes(target.entryId)) break;
+      if (!snapshot.historyCursor || !snapshot.hasEarlierMessages) break;
+      const page = await loadOlderPage(sid, snapshot.historyCursor, { tail: 1000 });
+      if (!page) break;
+    }
+    setVisibleCount((current) => Math.max(current, messagesLenRef.current));
+  }, [session?.id, minimapTurnIndex, loadOlderPage]);
   useEffect(() => {
     // A reloaded history can come back to a cursor asked for before.
     if (historyCursor !== requestedCursorRef.current) requestedCursorRef.current = null;
@@ -588,6 +628,22 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   useEffect(() => {
     if (searchTarget) setPendingScrollRestore(null);
   }, [searchTarget]);
+
+  // Expanding a collapsed thinking row or tool card grows the content. While
+  // the user reads at the tail, keep the tail in view instead of letting the
+  // opened body fall below the fold.
+  useEffect(() => {
+    const onExpanded = () => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      // Measured synchronously: the expansion has not painted yet, so this is
+      // the pre-expand distance from the tail.
+      if (!isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)) return;
+      requestAnimationFrame(() => scrollToBottom("smooth"));
+    };
+    window.addEventListener(COLLAPSIBLE_EXPANDED_EVENT, onExpanded);
+    return () => window.removeEventListener(COLLAPSIBLE_EXPANDED_EVENT, onExpanded);
+  }, [scrollContainerRef, scrollToBottom]);
 
   useEffect(() => {
     const position = pendingScrollRestore;
@@ -1487,8 +1543,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             getStreamingMessage={getStreamingMessage}
             scrollContainer={scrollContainerRef}
             messageRefs={messageRefs}
-            onRevealHistory={revealHistoryForMinimap}
+            onRevealTurn={revealTurnForMinimap}
             turnsBefore={earlierTurnCount}
+            turnIndex={minimapTurnIndex}
           />
         )}
         </>}

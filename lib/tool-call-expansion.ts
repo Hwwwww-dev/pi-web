@@ -12,14 +12,19 @@
  */
 const expandedToolCalls = new Set<string>();
 
+/** Fired whenever a collapsed body (tool card, group, thinking row) opens or closes, so the scroll container can keep the tail in view. */
+export const COLLAPSIBLE_EXPANDED_EVENT = "pi-collapsible-expanded";
+
 export function isToolCallExpanded(toolCallId: string | undefined): boolean {
   return toolCallId !== undefined && expandedToolCalls.has(toolCallId);
 }
 
 export function setToolCallExpanded(toolCallId: string | undefined, expanded: boolean): void {
   if (!toolCallId) return;
+  if (expanded === expandedToolCalls.has(toolCallId)) return;
   if (expanded) expandedToolCalls.add(toolCallId);
   else expandedToolCalls.delete(toolCallId);
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(COLLAPSIBLE_EXPANDED_EVENT));
 }
 
 export function clearExpandedToolCalls(): void {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo, memo, type RefObject } from "react";
 import { isMessageGroupAnchor } from "@/lib/message-display";
-import type { AgentMessage, AssistantMessage, CustomMessage, TextContent, UserMessage } from "@/lib/types";
+import type { AgentMessage, AssistantMessage, CustomMessage, MinimapTurnDescriptor, TextContent, UserMessage } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
 import styles from "./ChatMinimap.module.css";
 
@@ -12,9 +12,14 @@ interface Props {
   getStreamingMessage: () => Partial<AgentMessage> | null;
   scrollContainer: RefObject<HTMLDivElement | null>;
   messageRefs: RefObject<(HTMLDivElement | null)[]>;
-  onRevealHistory: () => void;
+  /** Pages the clicked turn in (or reveals it when loaded but hidden), then
+   *  the next measurement scrolls to it. */
+  onRevealTurn: (turnNumber: number) => void;
   /** Turns shown on earlier pages, so numbering stays continuous across loaded history. */
   turnsBefore?: number;
+  /** Whole-branch turn index, oldest first: turns before the loaded window
+   *  list from it and page their messages in on click. */
+  turnIndex?: MinimapTurnDescriptor[];
 }
 
 const MINIMAP_WIDTH = 36;
@@ -36,6 +41,8 @@ interface TurnInfo {
   /** Tokens and cost the whole turn's assistant replies reported, when the model sent usage. */
   usageTokens: number | null;
   usageCost: number | null;
+ /** Set on index-listed turns whose messages are not loaded (or rendered) yet. */
+  timestamp?: number;
 }
 
 interface NodeInfo {
@@ -70,12 +77,24 @@ function formatTurnTokens(value: number): string {
   return String(value);
 }
 
-function createTurnNodes(turns: TurnInfo[]): NodeInfo[] {
+function createTurnNodes(turns: TurnInfo[], firstIndex = 0): NodeInfo[] {
   return turns.map((turn, index) => ({
     topRatio: 0,
     targetTurn: turn,
-    index,
+    index: firstIndex + index,
   }));
+}
+
+const EMPTY_TURN_INDEX: MinimapTurnDescriptor[] = [];
+
+/** A short absolute time for an unloaded turn's preview card. */
+function formatTurnTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleString(undefined, {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 interface MinimapSlot {
@@ -145,8 +164,9 @@ export const ChatMinimap = memo(function ChatMinimap({
   getStreamingMessage,
   scrollContainer,
   messageRefs,
-  onRevealHistory,
+  onRevealTurn,
   turnsBefore = 0,
+  turnIndex = EMPTY_TURN_INDEX,
 }: Props) {
   const { t } = useI18n();
   const [visible, setVisible] = useState(false);
@@ -236,7 +256,21 @@ export const ChatMinimap = memo(function ChatMinimap({
 
       const refs = messageRefs.current;
       const containerRect = scrollEl.getBoundingClientRect();
-      const turns: TurnInfo[] = [];
+      // Turns listed from the whole-branch index sit ahead of the loaded
+      // window; their messages are not rendered, so they have no scroll
+      // position until their page is fetched and their anchor measures.
+      const headCount = Math.min(turnIndex.length, Math.max(0, turnsBefore));
+      const headNodes = createTurnNodes(
+        turnIndex.slice(0, headCount).map((descriptor) => ({
+          userMessage: { role: "user", content: descriptor.preview } as UserMessage,
+          scrollTop: null,
+          toolCount: 0,
+          usageTokens: null,
+          usageCost: null,
+          timestamp: descriptor.timestamp,
+        })),
+      );
+      const measuredTurns: TurnInfo[] = [];
       let refIndex = 0;
       let currentTurn: TurnInfo | null = null;
 
@@ -261,7 +295,7 @@ export const ChatMinimap = memo(function ChatMinimap({
             usageTokens: null,
             usageCost: null,
           };
-          turns.push(currentTurn);
+          measuredTurns.push(currentTurn);
           continue;
         }
         // Assistant messages consume a ref slot even though only the anchor
@@ -280,7 +314,13 @@ export const ChatMinimap = memo(function ChatMinimap({
         }
       }
 
-      const nextNodes = createTurnNodes(turns);
+      // Numbering comes from the whole-branch index once it is known (the JSX
+      // renders node.index + 1 directly); without it (not fetched yet), the
+      // earlier-page count keeps numbers continuous.
+      const nextNodes = [
+        ...headNodes,
+        ...createTurnNodes(measuredTurns, headCount),
+      ];
       setMinimapHeight(minimapEl.clientHeight);
       allNodesRef.current = nextNodes;
       setAllNodes(nextNodes);
@@ -289,7 +329,7 @@ export const ChatMinimap = memo(function ChatMinimap({
 
       const pendingNavigation = pendingNavigationRef.current;
       const pendingNode = pendingNavigation
-        ? nextNodes[pendingNavigation.nodeIndex]
+        ? nextNodes.find((node) => node.index === pendingNavigation.nodeIndex)
         : null;
       if (pendingNavigation && pendingNode) {
         const targetTop = pendingNode.targetTurn.scrollTop;
@@ -300,7 +340,7 @@ export const ChatMinimap = memo(function ChatMinimap({
         scrollEl.scrollTo({ top: Math.max(0, targetTop - targetOffset), behavior: "smooth" });
       }
     }, 150);
-  }, [getStreamingMessage, lockActiveNode, messageRefs, scrollContainer, syncActiveNode]);
+  }, [getStreamingMessage, lockActiveNode, messageRefs, scrollContainer, syncActiveNode, turnIndex, turnsBefore]);
 
   useEffect(() => {
     const el = scrollContainer.current;
@@ -342,8 +382,10 @@ export const ChatMinimap = memo(function ChatMinimap({
     if (!scrollEl) return;
     lockActiveNode(node.index);
     if (node.targetTurn.scrollTop === null) {
+      // The next measurement completes the navigation once the turn's anchor
+      // has rendered (revealTurn pages hidden or unloaded history in).
       pendingNavigationRef.current = { nodeIndex: node.index };
-      onRevealHistory();
+      onRevealTurn(node.index);
       return;
     }
     const targetTop = Math.max(
@@ -351,7 +393,7 @@ export const ChatMinimap = memo(function ChatMinimap({
       node.targetTurn.scrollTop - scrollEl.clientHeight * 0.3,
     );
     scrollEl.scrollTo({ top: targetTop, behavior });
-  }, [lockActiveNode, onRevealHistory, scrollContainer]);
+  }, [lockActiveNode, onRevealTurn, scrollContainer]);
 
   const findNearestSlot = useCallback((ratio: number): MinimapSlot | null => {
     const { slots, gap, fillsHeight } = slotLayoutRef.current;
@@ -552,14 +594,20 @@ export const ChatMinimap = memo(function ChatMinimap({
             const isLocated = nearestNodeIndex === node.index;
             const turn = node.targetTurn;
             const metaParts: string[] = [];
-            if (turn.toolCount > 0) {
-              metaParts.push(t("chatMinimap.toolCalls", { count: turn.toolCount }));
-            }
-            if (turn.usageTokens !== null) {
-              metaParts.push(t("chatMinimap.turnTokens", { tokens: formatTurnTokens(turn.usageTokens) }));
-            }
-            if (turn.usageCost !== null && turn.usageCost > 0) {
-              metaParts.push(`$${turn.usageCost.toFixed(4)}`);
+            if (turn.scrollTop === null) {
+              // Unloaded turn: identify it by time and offer the jump.
+              if (turn.timestamp) metaParts.push(formatTurnTime(turn.timestamp));
+              metaParts.push(t("chatMinimap.notLoaded"));
+            } else {
+              if (turn.toolCount > 0) {
+                metaParts.push(t("chatMinimap.toolCalls", { count: turn.toolCount }));
+              }
+              if (turn.usageTokens !== null) {
+                metaParts.push(t("chatMinimap.turnTokens", { tokens: formatTurnTokens(turn.usageTokens) }));
+              }
+              if (turn.usageCost !== null && turn.usageCost > 0) {
+                metaParts.push(`$${turn.usageCost.toFixed(4)}`);
+              }
             }
             return (
               <div
@@ -571,9 +619,10 @@ export const ChatMinimap = memo(function ChatMinimap({
                 className={styles.turn}
                 data-minimap-preview-index={node.index}
                 data-located={isLocated ? "true" : undefined}
+                data-unloaded={turn.scrollTop === null ? "" : undefined}
               >
                 <span className={styles.number} aria-hidden="true">
-                  {String(node.index + 1 + turnsBefore).padStart(2, "0")}
+                  {String(node.index + 1 + (turnIndex.length > 0 ? 0 : turnsBefore)).padStart(2, "0")}
                 </span>
                 <div className={styles.content}>
                   <button
