@@ -6,6 +6,7 @@ import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
 import { KeepAliveDock } from "./KeepAliveDock";
 import { ChatWindow } from "./ChatWindow";
+import { MINIMAP_RAIL_STRIP } from "./ChatMinimap";
 import { NewSessionContextBar, type NewSessionContextControl } from "./NewSessionContextBar";
 import { UsageBar } from "./UsageBar";
 import type { ChatScrollPosition } from "@/lib/chat-scroll-position";
@@ -472,6 +473,12 @@ export function AppShell() {
     setContextUsage(usage);
   }, []);
 
+  // Whether the active chat shows the minimap rail; the top panels keep clear of it.
+  const [minimapPaneWide, setMinimapPaneWide] = useState(false);
+  const handleMinimapPaneChange = useCallback((wide: boolean) => {
+    setMinimapPaneWide(wide);
+  }, []);
+
   // Single active panel — only one dropdown open at a time
   const [activeTopPanel, setActiveTopPanel] = useState<"agents" | "branches" | "system" | "tools" | "session" | null>(null);
   const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -596,21 +603,24 @@ export function AppShell() {
     if (!activeTopPanel || !topBarRef.current) return;
     const update = () => {
       const topBarRect = topBarRef.current!.getBoundingClientRect();
+      // Panels drop from the chat toolbar, so they must not run underneath
+      // the minimap rail that floats at the chat pane's right edge.
+      const railReserve = minimapPaneWide ? MINIMAP_RAIL_STRIP + 8 : 0;
       if (activeTopPanel === "agents") {
         setTopPanelPos({
           top: topBarRect.bottom,
           left: topBarRect.left,
-          width: Math.min(AGENT_PANEL_WIDTH, topBarRect.width),
+          width: Math.min(AGENT_PANEL_WIDTH, topBarRect.width - railReserve),
         });
         return;
       }
-      setTopPanelPos({ top: topBarRect.bottom, left: topBarRect.left, width: topBarRect.width });
+      setTopPanelPos({ top: topBarRect.bottom, left: topBarRect.left, width: topBarRect.width - railReserve });
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(topBarRef.current);
     return () => ro.disconnect();
-  }, [activeTopPanel, isMobile]);
+  }, [activeTopPanel, isMobile, minimapPaneWide]);
 
   // Files unmount when inactive; workspace terminals stay mounted until closed.
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
@@ -2542,6 +2552,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   borderBottom: "1px solid var(--border)",
                   boxShadow: "0 10px 28px rgba(0,0,0,0.10)",
                   padding: "12px 16px",
+                  overflowX: "auto",
                 }}>
                   {sessionStats ? (() => {
                     const totalActiveMs = sessionStats.totalActiveMs ?? 0;
@@ -2776,6 +2787,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       onSystemToolsChange={isActive ? handleSystemToolsChange : undefined}
                       onSystemInfoLoaderChange={isActive ? handleSystemInfoLoaderChange : undefined}
                       onSessionStatsChange={isActive ? handleSessionStatsChange : undefined}
+                      onMinimapPaneChange={isActive ? handleMinimapPaneChange : undefined}
                       onSessionStatsPanelOpen={isActive ? openSessionStatsPanel : undefined}
                       onContextUsageChange={isActive ? handleContextUsageChange : undefined}
                       onOpenFile={handleOpenLinkedFile}
@@ -2821,6 +2833,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     onSystemToolsChange={handleSystemToolsChange}
                     onSystemInfoLoaderChange={handleSystemInfoLoaderChange}
                     onSessionStatsChange={handleSessionStatsChange}
+                    onMinimapPaneChange={handleMinimapPaneChange}
                     onSessionStatsPanelOpen={openSessionStatsPanel}
                     onOpenSettings={openSettingsSection}
                     onContextUsageChange={handleContextUsageChange}

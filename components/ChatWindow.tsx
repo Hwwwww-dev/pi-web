@@ -74,6 +74,8 @@ interface Props {
   /** Keep-alive background slot: skip AppShell-wide state reporting so background instances cannot overwrite the visible session's state. */
   background?: boolean;
   onSessionStatsChange?: (stats: SessionStatsInfo | null) => void;
+  /** Whether this chat's pane is wide enough to show the minimap rail; the top panels keep clear of it. */
+  onMinimapPaneChange?: (wide: boolean) => void;
   onSessionStatsPanelOpen?: () => void;
   /** Opens Settings on a section: a bare `/mcp` that pi's built-in MCP extension owns opens Settings › MCP. */
   onOpenSettings?: (section: SettingsSection) => void;
@@ -247,7 +249,7 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
 // polling, panel toggles) does not re-render every chat instance, including
 // the keep-alive background slots. Props are hook state and stable
 // useCallback handlers in AppShell.
-export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
+export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onMinimapPaneChange, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const completionNotificationsEnabled = session?.relation?.kind !== "subagent";
@@ -594,19 +596,20 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return context;
   }, [activeLeafId, loadContext]);
   // Jump to a minimap turn: reveal everything already in memory, then page
-  // ancestors in until the turn's anchor entry is loaded. One page asks for
-  // the largest tail the context route serves, so distant turns land in a
-  // request or two; the minimap scrolls once the anchor renders.
+  // ancestors in until the turn's anchor entry is loaded. Pages are small
+  // (≈10–15 turns each) and the loop stops the moment the anchor lands, so
+  // clicking a nearby turn never drags in thirty; the minimap scrolls once
+  // the anchor renders.
   const revealTurnForMinimap = useCallback(async (turnNumber: number) => {
     setVisibleCount((current) => Math.max(current, messagesLenRef.current * 2));
     const sid = session?.id;
     const target = minimapTurnIndex[turnNumber];
     if (!sid || !target) return;
-    for (let guard = 0; guard < 20; guard++) {
+    for (let guard = 0; guard < 100; guard++) {
       const snapshot = searchHistoryRef.current;
       if (snapshot.entryIds.includes(target.entryId)) break;
       if (!snapshot.historyCursor || !snapshot.hasEarlierMessages) break;
-      const page = await loadOlderPage(sid, snapshot.historyCursor, { tail: 1000 });
+      const page = await loadOlderPage(sid, snapshot.historyCursor, { tail: 100 });
       if (!page) break;
     }
     setVisibleCount((current) => Math.max(current, messagesLenRef.current));
@@ -858,6 +861,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     onSessionStatsChange?.(sessionStatsRef.current);
   }, [background, statsKey, onSessionStatsChange]);
   useEffect(() => () => { onSessionStatsChange?.(null); }, [onSessionStatsChange]);
+
+  // Let the shell's top panels keep clear of the minimap rail.
+  useEffect(() => {
+    if (background) return;
+    onMinimapPaneChange?.(minimapPaneWide);
+  }, [background, minimapPaneWide, onMinimapPaneChange]);
+  useEffect(() => () => { onMinimapPaneChange?.(false); }, [onMinimapPaneChange]);
 
   // Push context usage up to AppShell as well.
   const ctxKey = contextUsage
