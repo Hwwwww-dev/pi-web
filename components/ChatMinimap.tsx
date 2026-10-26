@@ -29,6 +29,17 @@ const MAX_NODE_GAP = 12;
 // Below this pitch the 3px dashes would touch, so turns fold into buckets first.
 const MIN_SLOT_PITCH = 7;
 const MINIMAP_PADDING = 12;
+// A tall viewport must not multiply the dashes: past this many slots the rail
+// folds turns into buckets regardless of height, so a long session stays at a
+// readable handful of nodes instead of one dash per turn.
+export const MAX_VISIBLE_SLOTS = 18;
+// The chat pane hides the rail below this width — with the file panel open the
+// centered message column would otherwise run underneath it (mobile hides the
+// rail unconditionally already).
+export const MINIMAP_MIN_PANE_WIDTH = 680;
+// The message column reserves this right strip while the rail shows:
+// rail width + its right offset + breathing gap.
+export const MINIMAP_RAIL_STRIP = MINIMAP_WIDTH + 14 + 8;
 const PREVIEW_SHOW_DELAY = 200;
 const PREVIEW_HIDE_DELAY = 250;
 const NAVIGATION_ACTIVE_LOCK_MS = 1600;
@@ -111,14 +122,14 @@ interface SlotLayout {
   fillsHeight: boolean;
 }
 
-function layoutSlots(allNodes: NodeInfo[], minimapHeight: number): SlotLayout {
+export function layoutSlots(allNodes: NodeInfo[], minimapHeight: number): SlotLayout {
   if (allNodes.length === 0) {
     return { slots: [], gap: MAX_NODE_GAP, fillsHeight: false };
   }
 
   const height = Math.max(1, minimapHeight);
   const usableHeight = Math.max(0, height - MINIMAP_PADDING * 2);
-  const maxSlots = Math.max(1, Math.floor(usableHeight / MIN_SLOT_PITCH));
+  const maxSlots = Math.min(MAX_VISIBLE_SLOTS, Math.max(1, Math.floor(usableHeight / MIN_SLOT_PITCH)));
 
   // Long sessions fold turns into buckets: one dash per bucket keeps the rail
   // readable instead of collapsing into a solid line once the 3px dashes meet.

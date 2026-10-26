@@ -19,7 +19,7 @@ const jiti = createJiti(import.meta.url, {
   jsx: { runtime: "automatic" },
   tsconfigPaths: true,
 });
-const { countToolCalls } = await jiti.import("./ChatMinimap.tsx");
+const { countToolCalls, layoutSlots, MAX_VISIBLE_SLOTS } = await jiti.import("./ChatMinimap.tsx");
 
 test("counts tool calls per assistant reply, including replies that also answer", () => {
   // A reply can both answer and call tools, so counting text-less messages
@@ -56,4 +56,36 @@ test("dashes render without hover so the trigger zone is discoverable", async ()
   // so the trigger zone stays discoverable with nothing hovered.
   assert.match(source, /\{positionedSlots\.map\(\(slot\) => \{/);
   assert.doesNotMatch(source, /\{minimapHovered && positionedSlots\.map/);
+});
+
+const fakeNode = (index) => ({ topRatio: 0, targetTurn: { scrollTop: index * 100 }, index });
+
+function fakeNodes(count) {
+  return Array.from({ length: count }, (_, index) => fakeNode(index));
+}
+
+test("a tall rail folds long sessions into at most MAX_VISIBLE_SLOTS dashes", () => {
+  // 2000px of rail height would fit ~280 slots at the 7px pitch; the cap keeps
+  // a long session at a readable handful of dashes regardless of height.
+  const layout = layoutSlots(fakeNodes(200), 2000);
+  assert.equal(layout.slots.length, MAX_VISIBLE_SLOTS);
+  assert.equal(layout.fillsHeight, true);
+  // Buckets partition every node exactly once, in order.
+  const covered = layout.slots.flatMap((slot) => slot.indexes);
+  assert.deepEqual(covered, fakeNodes(200).map((node) => node.index));
+});
+
+test("short sessions keep one dash per turn under the cap", () => {
+  const layout = layoutSlots(fakeNodes(5), 2000);
+  assert.equal(layout.slots.length, 5);
+  assert.equal(layout.fillsHeight, false);
+  assert.deepEqual(layout.slots.map((slot) => slot.target.index), [0, 1, 2, 3, 4]);
+});
+
+test("a short pane still folds before the dashes touch", () => {
+  // 60px of usable height fits only ~8 slots at the 7px pitch — below the cap,
+  // the height limit must keep deciding.
+  const layout = layoutSlots(fakeNodes(40), 84);
+  assert.ok(layout.slots.length < MAX_VISIBLE_SLOTS);
+  assert.equal(layout.fillsHeight, true);
 });
