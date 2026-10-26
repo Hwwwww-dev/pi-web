@@ -33,10 +33,11 @@ const MINIMAP_PADDING = 12;
 // folds turns into buckets regardless of height, so a long session stays at a
 // readable handful of nodes instead of one dash per turn.
 export const MAX_VISIBLE_SLOTS = 20;
-// The chat pane hides the rail below this width — with the file panel open the
-// centered message column would otherwise run underneath it (mobile hides the
-// rail unconditionally already).
-export const MINIMAP_MIN_PANE_WIDTH = 680;
+// The chat pane hides the rail only below this floor — the message column
+// reserves the rail strip (MINIMAP_RAIL_STRIP) at any width, so overlap is
+// already impossible; the floor just avoids a pane too narrow to read next
+// to the rail. Mobile hides the rail unconditionally already.
+export const MINIMAP_MIN_PANE_WIDTH = 440;
 // The message column reserves this right strip while the rail shows:
 // rail width + its right offset + breathing gap.
 export const MINIMAP_RAIL_STRIP = MINIMAP_WIDTH + 14 + 8;

@@ -528,21 +528,24 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // loaded still show their preview there and page in when clicked. Absent
   // (fetch failed or still loading), the minimap falls back to loaded turns.
   const [minimapTurnIndex, setMinimapTurnIndex] = useState<MinimapTurnDescriptor[]>([]);
-  // The chat pane's width decides whether the minimap shows at all: with the
-  // file panel open the centered message column would run underneath the rail.
-  // Callback ref + element state: the component first renders a loading branch
-  // without the pane, so the observer must start when the pane actually mounts.
+  // The chat pane's width decides whether the minimap shows at all — the
+  // message column reserves the rail strip at any width, so overlap is never
+  // the question. Callback ref + element state: the component first renders a
+  // loading branch without the pane, so the observer must start when the pane
+  // actually mounts. State holds only the visibility decision: dragging the
+  // panel divider fires per pixel, and a boolean keeps every non-crossing
+  // frame a no-op instead of re-rendering the whole chat window.
   const [chatPaneElement, setChatPaneElement] = useState<HTMLDivElement | null>(null);
-  const [chatPaneWidth, setChatPaneWidth] = useState(0);
+  const [minimapPaneWide, setMinimapPaneWide] = useState(false);
   useLayoutEffect(() => {
     if (!chatPaneElement) return;
     const observer = new ResizeObserver((entries) => {
-      setChatPaneWidth(entries[0]?.contentRect.width ?? 0);
+      setMinimapPaneWide((entries[0]?.contentRect.width ?? 0) >= MINIMAP_MIN_PANE_WIDTH);
     });
     observer.observe(chatPaneElement);
     return () => observer.disconnect();
   }, [chatPaneElement]);
-  const minimapVisible = chatPaneWidth >= MINIMAP_MIN_PANE_WIDTH;
+  const minimapVisible = minimapPaneWide;
   useEffect(() => {
     const sid = session?.id;
     if (!sid) {
@@ -1512,7 +1515,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           className="scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-gutter:stable]"
           style={{ visibility: pendingScrollRestore ? "hidden" : undefined }}
         >
-          <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING + (minimapVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${CHAT_COLUMN_PADDING}px` }}>
+          <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING + (minimapPaneWide ? MINIMAP_RAIL_STRIP : 0)}px 0 ${CHAT_COLUMN_PADDING}px` }}>
             <div ref={messageContentRef} onPointerUp={captureQuotedSelection} style={{ width: "100%", minWidth: 0, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
             {hasMoreRendered && (
               <div ref={setSentinel} className="py-3 text-center text-xs text-text-muted">
