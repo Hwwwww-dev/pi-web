@@ -133,18 +133,22 @@ export function layoutSlots(allNodes: NodeInfo[], minimapHeight: number): SlotLa
 
   // Long sessions fold turns into buckets: one dash per bucket keeps the rail
   // readable instead of collapsing into a solid line once the 3px dashes meet.
+  // The cap bounds the count only — the geometry stays the same tight, centered
+  // block short sessions get; a tall rail must not stretch the gaps apart.
   if (allNodes.length > maxSlots && maxSlots > 1) {
-    const gap = usableHeight / (maxSlots - 1);
+    const spread = usableHeight / (maxSlots - 1);
+    const gap = Math.min(MAX_NODE_GAP, spread);
+    const top = MINIMAP_PADDING + Math.max(0, (usableHeight - gap * (maxSlots - 1)) / 2);
     const slots = Array.from({ length: maxSlots }, (_, slotIndex) => {
       const from = Math.floor((slotIndex * allNodes.length) / maxSlots);
       const to = Math.floor(((slotIndex + 1) * allNodes.length) / maxSlots);
       return {
-        topRatio: (MINIMAP_PADDING + slotIndex * gap) / height,
+        topRatio: (top + slotIndex * gap) / height,
         target: allNodes[from + Math.floor((to - from - 1) / 2)],
         indexes: allNodes.slice(from, to).map((node) => node.index),
       };
     });
-    return { slots, gap, fillsHeight: true };
+    return { slots, gap, fillsHeight: spread <= MAX_NODE_GAP };
   }
 
   if (allNodes.length === 1) {
