@@ -32,7 +32,7 @@ const MINIMAP_PADDING = 12;
 // A tall viewport must not multiply the dashes: past this many slots the rail
 // folds turns into buckets regardless of height, so a long session stays at a
 // readable handful of nodes instead of one dash per turn.
-export const MAX_VISIBLE_SLOTS = 18;
+export const MAX_VISIBLE_SLOTS = 20;
 // The chat pane hides the rail below this width — with the file panel open the
 // centered message column would otherwise run underneath it (mobile hides the
 // rail unconditionally already).
@@ -142,9 +142,18 @@ export function layoutSlots(allNodes: NodeInfo[], minimapHeight: number): SlotLa
     const slots = Array.from({ length: maxSlots }, (_, slotIndex) => {
       const from = Math.floor((slotIndex * allNodes.length) / maxSlots);
       const to = Math.floor(((slotIndex + 1) * allNodes.length) / maxSlots);
+      // The rail's endpoints must be the conversation's: the first dash
+      // represents turn 1 and the last dash the final turn, so jumping to
+      // either edge can never skip the true ends; interior dashes take their
+      // bucket's middle turn.
+      const target = slotIndex === 0
+        ? allNodes[from]
+        : slotIndex === maxSlots - 1
+          ? allNodes[allNodes.length - 1]
+          : allNodes[from + Math.floor((to - from - 1) / 2)];
       return {
         topRatio: (top + slotIndex * gap) / height,
-        target: allNodes[from + Math.floor((to - from - 1) / 2)],
+        target,
         indexes: allNodes.slice(from, to).map((node) => node.index),
       };
     });
