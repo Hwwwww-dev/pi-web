@@ -530,18 +530,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const [minimapTurnIndex, setMinimapTurnIndex] = useState<MinimapTurnDescriptor[]>([]);
   // The chat pane's width decides whether the minimap shows at all: with the
   // file panel open the centered message column would run underneath the rail.
-  // Measured in a layout effect so the first paint already matches.
-  const chatPaneRef = useRef<HTMLDivElement | null>(null);
+  // Callback ref + element state: the component first renders a loading branch
+  // without the pane, so the observer must start when the pane actually mounts.
+  const [chatPaneElement, setChatPaneElement] = useState<HTMLDivElement | null>(null);
   const [chatPaneWidth, setChatPaneWidth] = useState(0);
   useLayoutEffect(() => {
-    const pane = chatPaneRef.current;
-    if (!pane) return;
+    if (!chatPaneElement) return;
     const observer = new ResizeObserver((entries) => {
       setChatPaneWidth(entries[0]?.contentRect.width ?? 0);
     });
-    observer.observe(pane);
+    observer.observe(chatPaneElement);
     return () => observer.disconnect();
-  }, []);
+  }, [chatPaneElement]);
   const minimapVisible = chatPaneWidth >= MINIMAP_MIN_PANE_WIDTH;
   useEffect(() => {
     const sid = session?.id;
@@ -1488,7 +1488,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} onDismiss={dismissNotice} />
       </div>
 
-      <div ref={chatPaneRef} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div ref={setChatPaneElement} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {extensionDialog && (
           <ExtensionDialog
             key={extensionDialog.id}
