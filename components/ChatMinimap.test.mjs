@@ -67,14 +67,11 @@ function fakeNodes(count) {
 test("a tall rail folds long sessions into at most MAX_VISIBLE_SLOTS dashes", () => {
   // 2000px of rail height would fit ~280 slots at the 7px pitch; the cap keeps
   // a long session at a readable handful of dashes regardless of height. The
-  // dashes spread across the full height — top dash = turn 1, bottom dash =
-  // the final turn — so no stretch of the track sits empty.
+  // block stays compact (natural pitch, centered) instead of stretching apart.
   const layout = layoutSlots(fakeNodes(200), 2000);
   assert.equal(layout.slots.length, MAX_VISIBLE_SLOTS);
-  const firstY = layout.slots[0].topRatio * 2000;
-  const lastY = layout.slots[layout.slots.length - 1].topRatio * 2000;
-  assert.ok(Math.abs(firstY - 12) < 2);
-  assert.ok(Math.abs(lastY - 1988) < 2);
+  assert.equal(layout.fillsHeight, false);
+  assert.equal(layout.gap, 12);
   // Buckets partition every node exactly once, in order.
   const covered = layout.slots.flatMap((slot) => slot.indexes);
   assert.deepEqual(covered, fakeNodes(200).map((node) => node.index));
@@ -82,25 +79,25 @@ test("a tall rail folds long sessions into at most MAX_VISIBLE_SLOTS dashes", ()
   // the last dash the final turn (interior dashes take bucket middles).
   assert.equal(layout.slots[0].target.index, 0);
   assert.equal(layout.slots[layout.slots.length - 1].target.index, 199);
+  // Centered block: last dash sits symmetric to the first around the middle.
+  const firstY = layout.slots[0].topRatio * 2000;
+  const lastY = layout.slots[layout.slots.length - 1].topRatio * 2000;
+  assert.ok(Math.abs(firstY + lastY - 2000) < 2);
 });
 
 test("short sessions keep one dash per turn under the cap", () => {
   const layout = layoutSlots(fakeNodes(5), 2000);
   assert.equal(layout.slots.length, 5);
+  assert.equal(layout.fillsHeight, false);
   assert.deepEqual(layout.slots.map((slot) => slot.target.index), [0, 1, 2, 3, 4]);
-  // Few dashes still fill the track: first at the top, last at the bottom.
-  assert.ok(Math.abs(layout.slots[0].topRatio * 2000 - 12) < 2);
-  assert.ok(Math.abs(layout.slots[4].topRatio * 2000 - 1988) < 2);
 });
 
 test("a short pane still folds before the dashes touch", () => {
   // 84px rail: 60px usable fits only ~8 slots at the 7px pitch — below the cap,
-  // the height limit must keep deciding, and the dashes fill the short rail.
+  // the height limit must keep deciding, and the block fills the short rail.
   const layout = layoutSlots(fakeNodes(40), 84);
   assert.ok(layout.slots.length < MAX_VISIBLE_SLOTS);
+  assert.equal(layout.fillsHeight, true);
   const covered = layout.slots.flatMap((slot) => slot.indexes);
   assert.deepEqual(covered, fakeNodes(40).map((node) => node.index));
-  const firstY = layout.slots[0].topRatio * 84;
-  const lastY = layout.slots[layout.slots.length - 1].topRatio * 84;
-  assert.ok(lastY - firstY >= 84 - 24 - 2);
 });

@@ -23,6 +23,9 @@ interface Props {
 }
 
 const MINIMAP_WIDTH = 36;
+// Turns sit in one tight rail: a wide cap left the dashes stranded at the top of
+// an otherwise empty column.
+const MAX_NODE_GAP = 12;
 // Below this pitch the 3px dashes would touch, so turns fold into buckets first.
 const MIN_SLOT_PITCH = 7;
 const MINIMAP_PADDING = 12;
@@ -117,50 +120,68 @@ interface MinimapSlot {
 interface SlotLayout {
   slots: MinimapSlot[];
   gap: number;
+  fillsHeight: boolean;
 }
 
 export function layoutSlots(allNodes: NodeInfo[], minimapHeight: number): SlotLayout {
   if (allNodes.length === 0) {
-    return { slots: [], gap: 0 };
-  }
-
-  if (allNodes.length === 1) {
-    return {
-      slots: [{ topRatio: 0.5, target: allNodes[0], indexes: [allNodes[0].index] }],
-      gap: 0,
-    };
+    return { slots: [], gap: MAX_NODE_GAP, fillsHeight: false };
   }
 
   const height = Math.max(1, minimapHeight);
   const usableHeight = Math.max(0, height - MINIMAP_PADDING * 2);
   const maxSlots = Math.min(MAX_VISIBLE_SLOTS, Math.max(1, Math.floor(usableHeight / MIN_SLOT_PITCH)));
 
-  // The rail is the whole conversation: dashes spread from the first turn to
-  // the last across the full height — top dash = turn 1, bottom dash = the
-  // final turn — so no stretch of the track sits empty and hovering or
-  // dragging anywhere on the rail maps to a turn. Long sessions fold turns
-  // into buckets (one dash per bucket) so the 3px dashes stay readable;
-  // short sessions map one dash per turn. Both anchor the endpoints.
-  const count = Math.min(allNodes.length, maxSlots);
-  const gap = usableHeight / (count - 1);
-  const slots = Array.from({ length: count }, (_, slotIndex) => {
-    const from = Math.floor((slotIndex * allNodes.length) / count);
-    const to = Math.floor(((slotIndex + 1) * allNodes.length) / count);
-    // The rail's endpoints are the conversation's: the first dash is turn 1
-    // and the last dash the final turn, so jumping to either edge can never
-    // skip the true ends; interior dashes take their bucket's middle turn.
-    const target = slotIndex === 0
-      ? allNodes[from]
-      : slotIndex === count - 1
-        ? allNodes[allNodes.length - 1]
-        : allNodes[from + Math.floor((to - from - 1) / 2)];
+  // Long sessions fold turns into buckets: one dash per bucket keeps the rail
+  // readable instead of collapsing into a solid line once the 3px dashes meet.
+  // The cap bounds the count only — the geometry stays the same tight, centered
+  // block short sessions get; a tall rail must not stretch the gaps apart.
+  if (allNodes.length > maxSlots && maxSlots > 1) {
+    const spread = usableHeight / (maxSlots - 1);
+    const gap = Math.min(MAX_NODE_GAP, spread);
+    const top = MINIMAP_PADDING + Math.max(0, (usableHeight - gap * (maxSlots - 1)) / 2);
+    const slots = Array.from({ length: maxSlots }, (_, slotIndex) => {
+      const from = Math.floor((slotIndex * allNodes.length) / maxSlots);
+      const to = Math.floor(((slotIndex + 1) * allNodes.length) / maxSlots);
+      // The rail's endpoints must be the conversation's: the first dash
+      // represents turn 1 and the last dash the final turn, so jumping to
+      // either edge can never skip the true ends; interior dashes take their
+      // bucket's middle turn.
+      const target = slotIndex === 0
+        ? allNodes[from]
+        : slotIndex === maxSlots - 1
+          ? allNodes[allNodes.length - 1]
+          : allNodes[from + Math.floor((to - from - 1) / 2)];
+      return {
+        topRatio: (top + slotIndex * gap) / height,
+        target,
+        indexes: allNodes.slice(from, to).map((node) => node.index),
+      };
+    });
+    return { slots, gap, fillsHeight: spread <= MAX_NODE_GAP };
+  }
+
+  if (allNodes.length === 1) {
     return {
-      topRatio: (MINIMAP_PADDING + slotIndex * gap) / height,
-      target,
-      indexes: allNodes.slice(from, to).map((node) => node.index),
+      slots: [{ topRatio: 0.5, target: allNodes[0], indexes: [allNodes[0].index] }],
+      gap: MAX_NODE_GAP,
+      fillsHeight: false,
     };
-  });
-  return { slots, gap };
+  }
+
+  const naturalGap = usableHeight / (allNodes.length - 1);
+  const gap = Math.min(MAX_NODE_GAP, naturalGap);
+  // A short session keeps one tight block instead of spreading across the rail.
+  const top = MINIMAP_PADDING + Math.max(0, (usableHeight - gap * (allNodes.length - 1)) / 2);
+  return {
+    slots: allNodes.map((node, index) => ({
+      topRatio: (top + index * gap) / height,
+      target: node,
+      indexes: [node.index],
+    })),
+    gap,
+    fillsHeight: naturalGap <= MAX_NODE_GAP,
+  };
 }
 
 export const ChatMinimap = memo(function ChatMinimap({
@@ -184,7 +205,8 @@ export const ChatMinimap = memo(function ChatMinimap({
   const allNodesRef = useRef<NodeInfo[]>([]);
   const slotLayoutRef = useRef<SlotLayout>({
     slots: [],
-    gap: 0,
+    gap: MAX_NODE_GAP,
+    fillsHeight: false,
   });
   const previewBoxRef = useRef<HTMLDivElement>(null);
   const previewItemRefs = useRef(new Map<number, HTMLDivElement>());
@@ -399,17 +421,22 @@ export const ChatMinimap = memo(function ChatMinimap({
   }, [lockActiveNode, onRevealTurn, scrollContainer]);
 
   const findNearestSlot = useCallback((ratio: number): MinimapSlot | null => {
-    const { slots, gap } = slotLayoutRef.current;
+    const { slots, gap, fillsHeight } = slotLayoutRef.current;
     const height = containerRef.current?.clientHeight ?? 0;
     if (slots.length === 0 || height <= 0) return null;
 
-    // The dashes spread from the first turn to the last across the whole
-    // rail, so every position on it maps to a slot.
     const pointerY = Math.max(0, Math.min(height, ratio * height));
     const firstSlotY = slots[0].topRatio * height;
     const rawIndex = gap > 0 ? Math.round((pointerY - firstSlotY) / gap) : 0;
     const slotIndex = Math.max(0, Math.min(slots.length - 1, rawIndex));
-    return slots[slotIndex];
+    const slot = slots[slotIndex];
+
+    if (!fillsHeight) {
+      const slotY = slot.topRatio * height;
+      const hitRadius = Math.max(10, gap / 2);
+      if (Math.abs(pointerY - slotY) > hitRadius) return null;
+    }
+    return slot;
   }, []);
 
   const cancelPreviewHide = useCallback(() => {
