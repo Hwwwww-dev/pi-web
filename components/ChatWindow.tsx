@@ -74,8 +74,6 @@ interface Props {
   /** Keep-alive background slot: skip AppShell-wide state reporting so background instances cannot overwrite the visible session's state. */
   background?: boolean;
   onSessionStatsChange?: (stats: SessionStatsInfo | null) => void;
-  /** Whether this chat's pane is wide enough to show the minimap rail; the top panels keep clear of it. */
-  onMinimapPaneChange?: (wide: boolean) => void;
   onSessionStatsPanelOpen?: () => void;
   /** Opens Settings on a section: a bare `/mcp` that pi's built-in MCP extension owns opens Settings › MCP. */
   onOpenSettings?: (section: SettingsSection) => void;
@@ -249,7 +247,7 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
 // polling, panel toggles) does not re-render every chat instance, including
 // the keep-alive background slots. Props are hook state and stable
 // useCallback handlers in AppShell.
-export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onMinimapPaneChange, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
+export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, background = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const completionNotificationsEnabled = session?.relation?.kind !== "subagent";
@@ -861,13 +859,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     onSessionStatsChange?.(sessionStatsRef.current);
   }, [background, statsKey, onSessionStatsChange]);
   useEffect(() => () => { onSessionStatsChange?.(null); }, [onSessionStatsChange]);
-
-  // Let the shell's top panels keep clear of the minimap rail.
-  useEffect(() => {
-    if (background) return;
-    onMinimapPaneChange?.(minimapPaneWide);
-  }, [background, minimapPaneWide, onMinimapPaneChange]);
-  useEffect(() => () => { onMinimapPaneChange?.(false); }, [onMinimapPaneChange]);
 
   // Push context usage up to AppShell as well.
   const ctxKey = contextUsage
