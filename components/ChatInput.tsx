@@ -132,6 +132,16 @@ const COMPOSITION_END_ENTER_GRACE_MS = 100;
 const TEXT_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 const ANCHORED_MENU_GAP = 8;
 
+// Auto-grow a textarea to fit its content, capped at 200px. The `auto` reset
+// expands the box to its full content height, which silently resets its
+// internal scrollTop — restore it so the caret line stays visible once the
+// content overflows and a scrollbar appears.
+function autoresizeTextarea(ta: HTMLTextAreaElement) {
+  ta.style.height = "auto";
+  ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+  ta.scrollTop = ta.scrollHeight;
+}
+
 export function getUpwardMenuMaxHeight(menuBottom: number, visibleTop: number, gap = ANCHORED_MENU_GAP): number {
   return Math.max(0, Math.floor(menuBottom - visibleTop - gap));
 }
@@ -843,8 +853,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       requestAnimationFrame(() => {
         if (!ta) return;
         ta.focus();
-        ta.style.height = "auto";
-        ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+        autoresizeTextarea(ta);
       });
     },
     replaceMessage(message: UserMessage) {
@@ -866,8 +875,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       requestAnimationFrame(() => {
         if (!ta) return;
         ta.focus();
-        ta.style.height = "auto";
-        ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+        autoresizeTextarea(ta);
       });
     },
     prependText(text: string) {
@@ -884,8 +892,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         if (!ta) return;
         ta.focus();
         ta.setSelectionRange(combined.length, combined.length);
-        ta.style.height = "auto";
-        ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+        autoresizeTextarea(ta);
       });
     },
     prependQueuedMessage(text: string, images: ChatDraftImage[]) {
@@ -913,8 +920,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         if (!input) return;
         input.focus();
         input.setSelectionRange(combined.length, combined.length);
-        input.style.height = "auto";
-        input.style.height = `${Math.min(input.scrollHeight, 200)}px`;
+        autoresizeTextarea(input);
       });
     },
     rekeyDraft(previousKey: string, nextKey: string) {
@@ -1009,8 +1015,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         if (!ta) return;
         ta.focus();
         ta.setSelectionRange(ta.value.length, ta.value.length);
-        ta.style.height = "auto";
-        ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+        autoresizeTextarea(ta);
       });
     },
     // The caret goes after a draft that came back, so typing continues it.
@@ -1146,6 +1151,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     if (!ta) return;
     ta.style.height = "auto";
     if (ta.value) ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+    ta.scrollTop = ta.scrollHeight;
   }, []);
 
   useLayoutEffect(resizeTextarea, [value, fontSize, uiFontFamily, uiWeight, resizeTextarea]);
@@ -1410,8 +1416,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       if (!ta) return;
       ta.focus();
       ta.setSelectionRange(text.length, text.length);
-      ta.style.height = "auto";
-      ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+      autoresizeTextarea(ta);
     });
   }, []);
 
@@ -1425,8 +1430,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       if (!ta) return;
       ta.focus();
       ta.setSelectionRange(nextValue.length, nextValue.length);
-      ta.style.height = "auto";
-      ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+      autoresizeTextarea(ta);
     });
   }, []);
 
@@ -1664,8 +1668,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const handleInput = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+    autoresizeTextarea(ta);
   }, []);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
