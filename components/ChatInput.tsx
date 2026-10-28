@@ -2409,7 +2409,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               isStreaming && onFollowUp
                 ? t("chat.steerPlaceholder")
                 : isStreaming ? t("chat.agentPlaceholder")
-                : t("chat.messagePlaceholder")
+                : t(isMobile ? "chat.messagePlaceholderShort" : "chat.messagePlaceholder")
             }
             rows={1}
             style={{
