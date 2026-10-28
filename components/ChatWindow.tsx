@@ -679,39 +679,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return () => window.removeEventListener(COLLAPSIBLE_EXPANDED_EVENT, onExpanded);
   }, [scrollContainerRef, scrollToBottom]);
 
-  // A growing composer (multi-line input, queued rows, banners) shrinks the
-  // scroll viewport without firing a scroll event, so the tail silently drops
-  // below the fold. Sync the tail state on scroll, then compensate resize
-  // deltas while the user reads the tail.
-  const composerWrapperRef = useRef<HTMLDivElement>(null);
-  const atTailRef = useRef(true);
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const sync = () => {
-      atTailRef.current = isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight);
-    };
-    sync();
-    container.addEventListener("scroll", sync, { passive: true });
-    return () => container.removeEventListener("scroll", sync);
-  }, [scrollContainerRef]);
-  useEffect(() => {
-    const composer = composerWrapperRef.current;
-    if (!composer) return;
-    let previousHeight = composer.offsetHeight;
-    const observer = new ResizeObserver(() => {
-      const height = composer.offsetHeight;
-      const delta = height - previousHeight;
-      previousHeight = height;
-      if (delta <= 0) return;
-      const container = scrollContainerRef.current;
-      if (!container || !atTailRef.current) return;
-      container.scrollTop += delta;
-    });
-    observer.observe(composer);
-    return () => observer.disconnect();
-  }, [scrollContainerRef]);
-
   useEffect(() => {
     const position = pendingScrollRestore;
     const sessionId = session?.id;
@@ -1697,7 +1664,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         document.body,
       )}
 
-      <div ref={composerWrapperRef} className="relative shrink-0" style={{ padding: `12px ${CHAT_COLUMN_PADDING + (minimapVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${CHAT_COLUMN_PADDING}px` }}>
+      <div className="relative shrink-0" style={{ padding: `12px ${CHAT_COLUMN_PADDING + (minimapVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${CHAT_COLUMN_PADDING}px` }}>
         {!isEmptyNew && (
           <div
             style={{
