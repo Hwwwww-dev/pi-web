@@ -20,6 +20,10 @@ interface Props {
   /** Whole-branch turn index, oldest first: turns before the loaded window
    *  list from it and page their messages in on click. */
   turnIndex?: MinimapTurnDescriptor[];
+  /** The rail's own visibility decision (the scroll handler and the measure
+   *  path both set it), reported up so the host can reserve the strip for the
+   *  same fact. */
+  onVisibleChange?: (visible: boolean) => void;
 }
 
 const MINIMAP_WIDTH = 36;
@@ -190,6 +194,7 @@ export const ChatMinimap = memo(function ChatMinimap({
   scrollContainer,
   messageRefs,
   onRevealTurn,
+  onVisibleChange,
   turnsBefore = 0,
   turnIndex = EMPTY_TURN_INDEX,
 }: Props) {
@@ -267,8 +272,9 @@ export const ChatMinimap = memo(function ChatMinimap({
     const scrollable = scrollEl.scrollHeight - scrollEl.clientHeight;
     const currentNodes = allNodesRef.current;
     setVisible(scrollable > 20);
+    onVisibleChange?.(scrollable > 20);
     syncActiveNode(scrollEl, currentNodes);
-  }, [scrollContainer, syncActiveNode]);
+  }, [scrollContainer, syncActiveNode, onVisibleChange]);
 
   const measureThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const measureNodes = useCallback(() => {
@@ -349,7 +355,9 @@ export const ChatMinimap = memo(function ChatMinimap({
       setMinimapHeight(minimapEl.clientHeight);
       allNodesRef.current = nextNodes;
       setAllNodes(nextNodes);
-      setVisible(scrollEl.scrollHeight - scrollEl.clientHeight > 20);
+      const nextVisible = scrollEl.scrollHeight - scrollEl.clientHeight > 20;
+      setVisible(nextVisible);
+      onVisibleChange?.(nextVisible);
       syncActiveNode(scrollEl, nextNodes);
 
       const pendingNavigation = pendingNavigationRef.current;
@@ -365,7 +373,7 @@ export const ChatMinimap = memo(function ChatMinimap({
         scrollEl.scrollTo({ top: Math.max(0, targetTop - targetOffset), behavior: "smooth" });
       }
     }, 150);
-  }, [getStreamingMessage, lockActiveNode, messageRefs, scrollContainer, syncActiveNode, turnIndex, turnsBefore]);
+  }, [getStreamingMessage, lockActiveNode, messageRefs, onVisibleChange, scrollContainer, syncActiveNode, turnIndex, turnsBefore]);
 
   useEffect(() => {
     const el = scrollContainer.current;

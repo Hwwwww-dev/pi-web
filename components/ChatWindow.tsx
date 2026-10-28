@@ -545,22 +545,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     observer.observe(chatPaneElement);
     return () => observer.disconnect();
   }, [chatPaneElement]);
-  // The rail renders only when the conversation overflows — ChatMinimap hides
-  // itself otherwise — so the reserved strip (and the centering shift it
-  // causes) must key on the same fact, or short sessions get an empty 58px
-  // right gutter and a left-shifted column with no rail in sight.
-  const [chatScrollable, setChatScrollable] = useState(false);
-  useLayoutEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const sync = () => setChatScrollable(container.scrollHeight - container.clientHeight > 20);
-    sync();
-    const observer = new ResizeObserver(sync);
-    observer.observe(container);
-    if (container.firstElementChild) observer.observe(container.firstElementChild);
-    return () => observer.disconnect();
-  }, [scrollContainerRef]);
-  const minimapVisible = minimapPaneWide && chatScrollable;
+  // The rail's own visibility lives in ChatMinimap (scroll-handler + measure
+  // path on one source of truth); it reports up so the reserved strip — and
+  // the centering shift it causes — keys on the same fact instead of a
+  // duplicate computation with its own lifecycle holes.
+  const [minimapRailVisible, setMinimapRailVisible] = useState(false);
   useEffect(() => {
     const sid = session?.id;
     if (!sid) {
@@ -1531,7 +1520,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           className="scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-gutter:stable]"
           style={{ visibility: pendingScrollRestore ? "hidden" : undefined }}
         >
-          <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING + (minimapVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${CHAT_COLUMN_PADDING}px` }}>
+          <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${CHAT_COLUMN_PADDING}px` }}>
             <div ref={messageContentRef} onPointerUp={captureQuotedSelection} style={{ width: "100%", minWidth: 0, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
             {hasMoreRendered && (
               <div ref={setSentinel} className="py-3 text-center text-xs text-text-muted">
@@ -1571,13 +1560,14 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </div>
           </div>
         </div>
-        {isMobile || pendingScrollRestore || !minimapVisible ? null : (
+        {isMobile || pendingScrollRestore || !minimapPaneWide ? null : (
           <ChatMinimap
             messages={messages}
             getStreamingMessage={getStreamingMessage}
             scrollContainer={scrollContainerRef}
             messageRefs={messageRefs}
             onRevealTurn={revealTurnForMinimap}
+            onVisibleChange={setMinimapRailVisible}
             turnsBefore={earlierTurnCount}
             turnIndex={minimapTurnIndex}
           />
@@ -1664,7 +1654,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         document.body,
       )}
 
-      <div className="relative shrink-0" style={{ padding: `12px ${CHAT_COLUMN_PADDING + (minimapVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${CHAT_COLUMN_PADDING}px` }}>
+      <div className="relative shrink-0" style={{ padding: `12px ${CHAT_COLUMN_PADDING + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${CHAT_COLUMN_PADDING}px` }}>
         {!isEmptyNew && (
           <div
             style={{
