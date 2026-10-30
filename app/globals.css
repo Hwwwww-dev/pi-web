@@ -1683,7 +1683,9 @@ pre, code {
   background: var(--bg-hover);
   color: var(--accent);
 }
-.activity-row-error .activity-row-label {
+/* Scope to the row's own header: a failed call inside a group must not paint
+   the sibling children's labels — each child row colors by its own result. */
+.activity-row-error > .activity-row-header .activity-row-label {
   color: #ef4444;
 }
 .activity-row-dim {
