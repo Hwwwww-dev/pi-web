@@ -6,6 +6,7 @@ import {
   getRunningRpcSessionIds,
 } from "@/lib/rpc-manager";
 import { getSessionUiStateRevision } from "@/lib/session-ui-state";
+import { getSessionIdsWithUnsettledSubagentRuns } from "@/lib/subagent-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ export const dynamic = "force-dynamic";
 // session files or hand out partial rows.
 // sessionUiStateRevision (null when unreadable) tells the sidebar its pins and
 // archive changed elsewhere; it costs one stat while the file is unchanged.
+// subagentsActiveSessionIds: sessions whose subagents can still start a run
+// there, so the sidebar announces their completion only after the last one.
 export async function GET() {
   return NextResponse.json(
     {
@@ -23,6 +26,7 @@ export async function GET() {
       runningSessionIds: getRunningRpcSessionIds(),
       awaitingInputSessionIds: getAwaitingInputRpcSessionIds(),
       completionNotificationSuppressedSessionIds: getCompletionNotificationSuppressedRpcSessionIds(),
+      subagentsActiveSessionIds: getSessionIdsWithUnsettledSubagentRuns(),
       sessionUiStateRevision: getSessionUiStateRevision(),
     },
     { headers: { "Cache-Control": "no-store" } },

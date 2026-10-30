@@ -35,6 +35,7 @@ import { CODEMODE_TOOL_NAME, codemodeCalls, codemodeScript, codemodeScriptPrevie
 import { toolFieldsOfInput, type ToolField } from "@/lib/tool-fields";
 import { mcpToolLabel, prettyMcpResultText } from "@/lib/mcp-tool-display";
 import { CodemodeCallList } from "./CodemodeToolView";
+import { parseStreamingJson } from "@earendil-works/pi-ai/utils/json-parse";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
 import { formatUsage, type ActivityItem, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
 import { UsageBar } from "./UsageBar";
@@ -245,6 +246,14 @@ function ToolRowPreview({ block, result, cwd, onOpenFile }: {
   return <>{preview}</>;
 }
 
+/** A patch over exactly one file names it, for calls whose input names no file. */
+function singlePatchPath(text: string | undefined): string | null {
+  if (!text) return null;
+  const files = parseUnifiedPatch(text);
+  if (!files || files.length !== 1) return null;
+  return files[0].newPath || files[0].oldPath || null;
+}
+
 export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, cwd, onOpenFile, onOpenSubagent, isStreaming }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
@@ -303,12 +312,18 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
     : null;
   // Flat arguments as rows instead of a JSON blob, unless the card has a view of
   // its own (a write's file text, codemode, an applied patch, a terminal pair).
+  // Streamed input is incomplete JSON: pi's partial parse shows the fields it
+  // has so far, and a nested argument begun keeps the raw text.
   const toolFields =
-    !isStreamingInput && writtenFileText === null && codemode === null && patchFiles === null && combinedTerminalText === null
-      ? toolFieldsOfInput(block.input)
+    writtenFileText === null && codemode === null && patchFiles === null && combinedTerminalText === null
+      ? isStreamingInput
+        ? toolFieldsOfInput(parseStreamingJson(block.rawInput))
+        : toolFieldsOfInput(block.input)
       : null;
 
   const label = category === "other" ? block.toolName : t(TOOL_CATEGORY_LABEL_KEYS[category]);
+  // The result's single-file patch names the call when its input has no file.
+  const patchLabel = getToolFilePaths(block.input).length === 0 ? singlePatchPath(resultDiff?.text) : null;
 
   return (
     <div className={`activity-row${isError ? " activity-row-error" : ""}${active ? " activity-row-active" : ""}`} data-activity-tool={block.toolName}>
@@ -320,15 +335,17 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
           onClick={toggleExpanded}
         >
           <span className="activity-row-icon"><ToolCategoryIcon category={category} isError={isError} /></span>
-          <span className="activity-row-label" title={mcpLabel ? block.toolName : undefined}>
-            {mcpLabel ? `${mcpLabel.server}/${mcpLabel.tool}` : label}
+          <span className="activity-row-label" title={mcpLabel || patchLabel ? block.toolName : undefined}>
+            {mcpLabel ? `${mcpLabel.server}/${mcpLabel.tool}` : patchLabel ?? label}
           </span>
           <span className="activity-row-preview">
             {isStreamingInput
               ? t("chat.generatingToolInput")
               : codemode
                 ? codemodeScriptPreview(codemode.code)
-                : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
+                : patchLabel
+                  ? null
+                  : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
           </span>
           {codemodeCallCount > 0 && (
             <span className="activity-row-meta">

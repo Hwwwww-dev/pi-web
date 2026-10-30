@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { ModelsConfigReadError, readModelsConfig, writeModelsConfig } from "@/lib/models-config-store";
 import { ContextWindowError, normalizeContextWindowOverrides } from "@/lib/model-context";
+import { checkProviderEntries, ProviderEntryError } from "@/lib/model-provider-check";
+import { checkImageMaxBytes, ImageMaxBytesError } from "@/lib/model-image-limits";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +25,13 @@ export async function PUT(req: Request) {
     if (typeof body !== "object" || body === null || Array.isArray(body)) {
       return NextResponse.json({ error: "models config must be a JSON object" }, { status: 400 });
     }
-    writeModelsConfig(normalizeContextWindowOverrides(body as Record<string, unknown>));
+    const config = normalizeContextWindowOverrides(body as Record<string, unknown>);
+    checkProviderEntries(config);
+    checkImageMaxBytes(config);
+    writeModelsConfig(config);
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (error instanceof ContextWindowError) {
+    if (error instanceof ContextWindowError || error instanceof ProviderEntryError || error instanceof ImageMaxBytesError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     if (error instanceof ModelsConfigReadError) {

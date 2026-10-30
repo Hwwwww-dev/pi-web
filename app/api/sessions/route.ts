@@ -11,6 +11,7 @@ import {
   getCompletionNotificationSuppressedRpcSessionIds,
   getRpcSessionInfos,
   getRunningRpcSessionIds,
+  withSubagentDisplayStatus,
 } from "@/lib/rpc-manager";
 import { startServerPerf } from "@/lib/perf";
 
@@ -29,7 +30,7 @@ export async function GET(req: Request) {
     ]);
     perf?.span("scan+projects");
     const body = {
-      sessions: mergeSessionLists(persistedSessions, runtimeSessions),
+      sessions: withSubagentDisplayStatus(mergeSessionLists(persistedSessions, runtimeSessions)),
       sessionListVersion,
       runningSessionIds: getRunningRpcSessionIds(),
       awaitingInputSessionIds: getAwaitingInputRpcSessionIds(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useRef, useEffect, useMemo } from "react";
+import { Fragment, memo, useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import {
@@ -11,7 +11,7 @@ import {
   ToolRow,
   loadThinkingContent,
 } from "./ActivityRows";
-import { formatUsage } from "@/lib/turn-view";
+import { formatNoticeTokens } from "@/lib/transcript-notices";
 import { ThinkingIcon } from "./ThinkingIcon";
 import ReactMarkdown from "react-markdown";
 import { copyText } from "@/lib/clipboard";
@@ -21,7 +21,7 @@ import { formatTurnDuration } from "@/lib/turn-duration";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
-import { skillExpansionToCommand } from "@/lib/slash-display";
+import { skillExpansionContent, skillExpansionToCommand } from "@/lib/slash-display";
 import { streamRateKey, streamRateStart, streamTokensPerSecond, type StreamRateStart } from "@/lib/stream-token-rate";
 import type {
   AgentMessage,
@@ -416,7 +416,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                 )}
               </div>
               {expanded && (
-                <MarkdownBody className="markdown-user-message" keepLineBreaks cwd={cwd} onOpenFile={onOpenFile}>{content}</MarkdownBody>
+                <MarkdownBody className="markdown-user-message" keepLineBreaks cwd={cwd} onOpenFile={onOpenFile}>{skillExpansionContent(content) ?? content}</MarkdownBody>
               )}
             </div>
           ) : (
@@ -671,6 +671,13 @@ function AssistantMessageView({
     .map((b) => b.text)
     .join("\n");
 
+  const stats = message.usage ? formatUsage(message.usage) : [];
+  if (turnDurationMs !== undefined) {
+    if (stats.length > 0) stats.push({ text: "\u00b7" });
+    const time = formatTurnDuration(turnDurationMs);
+    stats.push(formatDurationPart(t("chat.turnDuration", { time }), time));
+  }
+
   const copyContent = () => {
     copyText(textContent).then(() => {
       setCopied(true);
@@ -871,11 +878,12 @@ function AssistantMessageView({
           display: "flex", alignItems: "center", gap: 8, marginTop: 4,
         }}>
           {(message.usage || turnDurationMs !== undefined) && !isStreaming && (
-            <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-              {[
-                message.usage ? formatUsage(message.usage) : null,
-                turnDurationMs !== undefined ? t("chat.turnDuration", { time: formatTurnDuration(turnDurationMs) }) : null,
-              ].filter(Boolean).join("\u00b7 ")}
+            // One item per count: a single space at 11px ran them together. The
+            // spaces stay in the text for copying; the flex gap draws the room.
+            <div style={{ display: "flex", flexWrap: "wrap", columnGap: 7, fontSize: 11, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>
+              {stats.map((part, index) => (
+                <Fragment key={index}>{index > 0 && " "}<UsagePart part={part} /></Fragment>
+              ))}
             </div>
           )}
           {textContent && !isStreaming && !hideCopy && (
@@ -1090,7 +1098,81 @@ import { TOOL_DURATION_MIN_MS } from "./ActivityRows";
 
 
 
+function formatUsage(usage: {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: { total: number };
+}): StatPart[] {
+  // pi's TUI footer: ↑1.2k ↓567 R8.9k W12, with its formatTokens().
+  const parts: StatPart[] = [];
+  if (usage.input) parts.push({ icon: "up", before: "↑", text: formatNoticeTokens(usage.input) });
+  if (usage.output) parts.push({ icon: "down", before: "↓", text: formatNoticeTokens(usage.output) });
+  if (usage.cacheRead) parts.push({ text: `R${formatNoticeTokens(usage.cacheRead)}` });
+  if (usage.cacheWrite) parts.push({ text: `W${formatNoticeTokens(usage.cacheWrite)}` });
+  if (usage.cost?.total) parts.push({ text: `$${usage.cost.total.toFixed(4)}` });
+  return parts;
+}
+
+// "took 12s" as a clock and "12s": the words around the time stay as hidden
+// text, wherever the language puts them.
+function formatDurationPart(label: string, time: string): StatPart {
+  const index = label.indexOf(time);
+  if (index < 0) return { text: label };
+  return { icon: "clock", before: label.slice(0, index), text: time, after: label.slice(index + time.length) };
+}
+
+/** One count of the stats line; `before`/`after` are copied and read aloud, not shown. */
+interface StatPart {
+  text: string;
+  icon?: "up" | "down" | "clock";
+  before?: string;
+  after?: string;
+}
+
+const STAT_ICON_PATHS = {
+  up: "M6 10.5V1.5M2.5 5 6 1.5 9.5 5",
+  down: "M6 1.5v9M2.5 7 6 10.5 9.5 7",
+  clock: "M6 1.25a4.75 4.75 0 1 0 0 9.5 4.75 4.75 0 1 0 0-9.5M6 3.5V6l1.75 1",
+};
+
+// Unseen but still text: font-size 0 stays in a copied selection, where a
+// zero-width overflow box drops it and sr-only's absolute box adds a line break.
+const HIDDEN_STAT_TEXT: CSSProperties = { fontSize: 0 };
+
+// ↑ and ↓ come from whatever font has them: Segoe UI or a CJK fallback on
+// Windows draws them small, heavy or off the baseline. The icons are drawn
+// here instead; their text stays, zero-width, for copying and screen readers.
+// Everything stays inline: a block or flex box would copy as a line break
+// between the icon and its count.
+function UsagePart({ part }: { part: StatPart }) {
+  if (!part.icon) return <span>{part.text}</span>;
+  return (
+    <span>
+      {part.before && <span style={HIDDEN_STAT_TEXT}>{part.before}</span>}
+      <svg
+        width={part.icon === "clock" ? 10 : 9}
+        height={part.icon === "clock" ? 10 : 9}
+        viewBox="0 0 12 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+        style={{ display: "inline", verticalAlign: part.icon === "clock" ? "-0.1em" : "-0.05em", marginRight: part.icon === "clock" ? 3 : 1 }}
+      >
+        <path d={STAT_ICON_PATHS[part.icon]} />
+      </svg>
+      {part.text}
+      {part.after && <span style={HIDDEN_STAT_TEXT}>{part.after}</span>}
+    </span>
+  );
+}
+
 function BashExecutionView({ message, sessionId }: { message: BashExecutionMessage; sessionId?: string }) {
+  const { t } = useI18n();
   const [fullOutput, setFullOutput] = useState<string | null>(null);
   const [loadingFull, setLoadingFull] = useState(false);
   const [fullError, setFullError] = useState<string | null>(null);
@@ -1154,14 +1236,14 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
               disabled={loadingFull}
               style={{ background: "none", border: "none", color: "var(--accent)", cursor: loadingFull ? "default" : "pointer", fontSize: 11, padding: 0, textDecoration: "underline" }}
             >
-              {loadingFull ? "loading…" : "view full output"}
+              {loadingFull ? t("chat.loadingFullOutput") : t("chat.viewFullOutput")}
             </button>
           )}
           <a
             href={`${fullOutputUrl}&download=1`}
             style={{ marginLeft: showFullButton ? 10 : 0, color: "var(--accent)", fontSize: 11, textDecoration: "underline" }}
           >
-            download full output
+            {t("chat.downloadFullOutput")}
           </a>
           {fullError && <span style={{ marginLeft: 6, color: "var(--text-dim)", fontSize: 11 }}>({fullError})</span>}
         </div>
