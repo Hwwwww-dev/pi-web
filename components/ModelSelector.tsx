@@ -146,7 +146,7 @@ export function ModelSelector({
     if (!open) return;
     let cancelled = false;
     const now = Date.now();
-    const providers = [...new Set(optionsRef.current.map((option) => option.provider))].filter(isProviderUsageId).slice(0, 8);
+    const providers = [...new Set(optionsRef.current.map((option) => option.provider))].filter(isProviderUsageId);
     const seed: Record<string, number> = {};
     const stale: string[] = [];
     for (const provider of providers) {
@@ -158,9 +158,11 @@ export function ModelSelector({
         stale.push(provider);
       }
     }
+    // Cache snapshots render for every provider; only the network refresh stays capped.
+    const refresh = stale.slice(0, 8);
     setUsagePercent(seed);
     void (async () => {
-      for (const provider of stale) {
+      for (const provider of refresh) {
         try {
           const response = await fetch("/api/provider-usage/query", {
             method: "POST",
@@ -375,9 +377,9 @@ export function ModelSelector({
                 </div>
               ) : modelsByProvider.map((group, index) => (
                 <div key={group.provider}>
-                  {modelsByProvider.length > 1 && (
+                  {(modelsByProvider.length > 1 || usagePercent[group.provider] !== undefined) && (
                     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "6px 12px 4px", borderTop: index > 0 || onClear ? "1px solid var(--border)" : "none", color: "var(--text-dim)", fontSize: 10, fontWeight: 600, letterSpacing: 0, textTransform: "uppercase" }}>
-                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.provider}</span>
+                      {modelsByProvider.length > 1 && <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.provider}</span>}
                       {usagePercent[group.provider] !== undefined && (
                         <span title={t("providerUsage.usage")} style={{ flexShrink: 0, fontWeight: 500, textTransform: "none", letterSpacing: 0, color: usagePercent[group.provider] > 90 ? "#f87171" : usagePercent[group.provider] > 70 ? "#fbbf24" : "var(--text-dim)" }}>
                           {usagePercent[group.provider]}%
