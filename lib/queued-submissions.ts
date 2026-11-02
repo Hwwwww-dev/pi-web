@@ -276,3 +276,25 @@ export function splitClearedQueue(
   }
   return remaining;
 }
+
+/**
+ * Moves the entry matching `behavior`+`text` past its nearest same-behavior
+ * neighbor (first match wins, so duplicate texts are interchangeable).
+ * Returns the reordered list, or null when there is no neighbor to swap with.
+ */
+export function moveQueuedEntry<T extends { behavior: QueuedBehavior; text: string }>(
+  items: T[],
+  behavior: QueuedBehavior,
+  text: string,
+  direction: "up" | "down",
+): T[] | null {
+  const same = items.map((item, index) => ({ item, index })).filter((entry) => entry.item.behavior === behavior);
+  const position = same.findIndex((entry) => entry.item.text === text);
+  if (position < 0) return null;
+  const target = direction === "up" ? position - 1 : position + 1;
+  if (target < 0 || target >= same.length) return null;
+  const result = [...items];
+  result[same[position].index] = same[target].item;
+  result[same[target].index] = same[position].item;
+  return result;
+}

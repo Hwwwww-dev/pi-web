@@ -3674,3 +3674,11 @@ span.token.table {
     display: none !important;
   }
 }
+
+/* 性能: 离屏消息块跳过布局与绘制。contain-intrinsic-size 的 auto 关键字让浏览器
+   记住渲染过的真实高度,占位估算只用于从未滚动到的区域并随访问收敛;minimap 对
+   未测量锚点本就按插值处理,位置随之收敛。 */
+.cv-block {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+}

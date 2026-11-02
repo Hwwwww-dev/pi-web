@@ -777,6 +777,31 @@ test("while a run streams, a bare /mcp opens Settings or is queued as before", a
   assert.deepEqual(await run("/copy", true), { builtin: ["/copy"], prompts: [], cleared: 0 });
 });
 
+test("queueFollowUp refuses an images-only submission: pi's queue holds texts only", () => {
+  const run = (value, images) => {
+    const calls = { steered: [], cleared: 0 };
+    const sendQueued = chatInputCallback("queueFollowUp", {
+      value,
+      attachedImages: images,
+      onAudioUnlock() {},
+      clearInput() { calls.cleared += 1; },
+      onBuiltinCommand: async () => ({ handled: false }),
+      canRunBuiltinSlashCommandWhileStreaming,
+      isBareMcpCommand,
+      runBuiltinCommand: async () => ({ handled: false }),
+      onPromptWithStreamingBehavior: () => { throw new Error("must not queue"); },
+      onSteer: (message) => { calls.steered.push(message); },
+      onFollowUp() { throw new Error("must not queue"); },
+    });
+    sendQueued("steer");
+    return calls;
+  };
+  // Empty text with images would be silently dropped by pi's queue.
+  assert.deepEqual(run("   ", [{ data: "aGk=", mimeType: "image/png" }]), { steered: [], cleared: 0 });
+  // Fully empty submissions stay no-ops as before.
+  assert.deepEqual(run("", []), { steered: [], cleared: 0 });
+});
+
 test("handleSend lets a handled /mcp through while streaming and sends an unowned one when idle", async () => {
   const run = async (value, { isStreaming, handled }) => {
     const calls = { builtin: [], sent: [] };

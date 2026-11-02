@@ -95,7 +95,7 @@ interface Props {
   queuedSubmissions?: QueuedSubmission[];
   inputHistory?: string[];
   /** Steer a pending message into the running turn, or take it back for editing. */
-  onQueuedAction?: (id: string, action: "toggle" | "edit") => void;
+  onQueuedAction?: (id: string, action: "toggle" | "edit" | "moveUp" | "moveDown") => void;
   slashCommands?: SlashCommandInfo[];
   slashCommandsLoading?: boolean;
   onLoadSlashCommands?: () => Promise<SlashCommandInfo[]> | SlashCommandInfo[];
@@ -141,12 +141,14 @@ const ANCHORED_MENU_GAP = 8;
 
 // Auto-grow a textarea to fit its content, capped at 200px. The `auto` reset
 // expands the box to its full content height, which silently resets its
-// internal scrollTop — restore it so the caret line stays visible once the
-// content overflows and a scrollbar appears.
+// internal scrollTop — restore where the user actually was instead of
+// snapping to the bottom: a snap fights the browser's scroll-to-caret and
+// bounces while editing text above the fold once the scrollbar appears.
 function autoresizeTextarea(ta: HTMLTextAreaElement) {
+  const keepScroll = ta.scrollTop;
   ta.style.height = "auto";
   ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
-  ta.scrollTop = ta.scrollHeight;
+  ta.scrollTop = keepScroll;
 }
 
 export function getUpwardMenuMaxHeight(menuBottom: number, visibleTop: number, gap = ANCHORED_MENU_GAP): number {
@@ -609,9 +611,13 @@ function QueueActionButton({ label, title, onClick, children }: {
 function QueuedMessageRow({
   item,
   onAction,
+  canMoveUp,
+  canMoveDown,
 }: {
   item: QueuedSubmission;
-  onAction?: (id: string, action: "toggle" | "edit") => void;
+  onAction?: (id: string, action: "toggle" | "edit" | "moveUp" | "moveDown") => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 }) {
   const { t } = useI18n();
   const isSteer = item.behavior === "steer";
@@ -668,6 +674,20 @@ function QueuedMessageRow({
           </button>
         ) : (
           <span style={behaviorChipStyle}>{behaviorLabel}</span>
+        )}
+        {onAction && canMoveUp && (
+          <QueueActionButton label={t("chat.moveQueuedUp")} title={t("chat.moveQueuedUp")} onClick={() => onAction(item.id, "moveUp")}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m18 15-6-6-6 6" />
+            </svg>
+          </QueueActionButton>
+        )}
+        {onAction && canMoveDown && (
+          <QueueActionButton label={t("chat.moveQueuedDown")} title={t("chat.moveQueuedDown")} onClick={() => onAction(item.id, "moveDown")}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </QueueActionButton>
         )}
         {onAction && (
           <QueueActionButton label={t("chat.editQueued")} title={t("chat.editQueuedTitle")} onClick={() => onAction(item.id, "edit")}>
@@ -1185,9 +1205,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
+    const keepScroll = ta.scrollTop;
     ta.style.height = "auto";
     if (ta.value) ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
-    ta.scrollTop = ta.scrollHeight;
+    ta.scrollTop = keepScroll;
   }, []);
 
   useLayoutEffect(resizeTextarea, [value, fontSize, uiFontFamily, uiWeight, resizeTextarea]);
@@ -1472,6 +1493,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const queueFollowUp = useCallback((mode: "steer" | "followup" = "followup") => {
     const msg = value.trim();
     if (!msg && !attachedImages.length) return;
+    // pi's run queue carries texts only — an images-only submission is accepted
+    // by the API but never queued (verified against pi 1.5.0), so it would
+    // silently vanish. Keep the composer instead.
+    if (!msg && attachedImages.length) return;
     onAudioUnlock?.();
     const images = attachedImages.length ? attachedImages : undefined;
     const queue = () => {
@@ -1972,8 +1997,14 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               overflowY: "auto",
               overscrollBehavior: "contain",
             }}>
-              {queuedSubmissions.map((item) => (
-                <QueuedMessageRow key={item.id} item={item} onAction={onQueuedAction} />
+              {queuedSubmissions.map((item, index) => (
+                <QueuedMessageRow
+                  key={item.id}
+                  item={item}
+                  onAction={onQueuedAction}
+                  canMoveUp={queuedSubmissions.some((other, otherIndex) => otherIndex < index && other.behavior === item.behavior)}
+                  canMoveDown={queuedSubmissions.some((other, otherIndex) => otherIndex > index && other.behavior === item.behavior)}
+                />
               ))}
             </div>
           </div>
@@ -2531,7 +2562,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   }}
                 >
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M21 12a8 8 0 0 1-8 8H5.5a2 2 0 0 1-1.4-3.4A8 8 0 1 1 21 12z" /><path d="M13 8.5v7M9.5 12h7" />
+                    <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z" /><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" />
                   </svg>
                 </button>
               )}

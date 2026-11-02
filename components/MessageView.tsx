@@ -319,6 +319,8 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             <img
               src={src}
               alt=""
+              loading="lazy"
+              decoding="async"
               style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid var(--user-border)" }}
             />
           </ImagePreview>

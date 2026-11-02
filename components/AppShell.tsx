@@ -56,6 +56,7 @@ import {
 } from "@/lib/new-session-context";
 import {
   DEFAULT_KEEP_ALIVE_CONFIG,
+  DORMANT_AFTER_MS,
   loadKeepAliveConfig,
   loadKeepAliveSlotRecords,
   saveKeepAliveConfig,
@@ -201,6 +202,8 @@ export function AppShell() {
     [selectedSession?.id, sessionsWithSelection],
   );
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
+  // Dormant keep-alive slots: hidden beyond the window drop their message DOM and reload on reactivation.
+  const [dormantSlotIds, setDormantSlotIds] = useState<Set<string>>(() => new Set());
   const handleRunningSessionIdsChange = useCallback((ids: Set<string>) => {
     setRunningSessionIds((previous) => {
       if (previous.size === ids.size && [...ids].every((id) => previous.has(id))) return previous;
@@ -434,6 +437,7 @@ export function AppShell() {
 
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [systemTools, setSystemTools] = useState<ToolEntry[] | null>(null);
+  const [mcpServers, setMcpServers] = useState<{ total: number; ready: number; needsAuth: number } | null>(null);
   const [systemInfoLoading, setSystemInfoLoading] = useState(false);
   const systemInfoLoaderRef = useRef<(() => Promise<void>) | null>(null);
   const systemInfoLoadIdRef = useRef(0);
@@ -446,6 +450,10 @@ export function AppShell() {
 
   const handleSystemToolsChange = useCallback((tools: ToolEntry[] | null) => {
     setSystemTools(tools);
+  }, []);
+
+  const handleMcpServersChange = useCallback((summary: { total: number; ready: number; needsAuth: number } | null) => {
+    setMcpServers(summary);
   }, []);
 
   const handleSystemInfoLoaderChange = useCallback((loader: (() => Promise<void>) | null) => {
@@ -1636,6 +1644,24 @@ export function AppShell() {
   const activeSlot = selectedSession
     ? keepAliveSlots.find((slot) => slot.session.id === selectedSession.id) ?? null
     : null;
+  // Recompute dormancy on a slow interval and whenever slots/running sets move;
+  // dormant slots keep their instance (drafts, identity) but lose the message list.
+  useEffect(() => {
+    const recompute = () => {
+      const now = Date.now();
+      const next = new Set<string>();
+      for (const slot of keepAliveSlots) {
+        if (slot.session.id === activeSlot?.session.id) continue;
+        if (runningSessionIds.has(slot.session.id)) continue;
+        if (now - slot.lastActiveAt <= DORMANT_AFTER_MS) continue;
+        next.add(slot.session.id);
+      }
+      setDormantSlotIds((prev) => (prev.size === next.size && [...next].every((id) => prev.has(id))) ? prev : next);
+    };
+    recompute();
+    const timer = setInterval(recompute, 60_000);
+    return () => clearInterval(timer);
+  }, [keepAliveSlots, runningSessionIds, activeSlot]);
   const activeChatSession = activeSlot ? activeSlot.session : selectedSession;
   const projectTrustCwd = selectedSession?.cwd ?? effectiveNewSessionCwd;
   // While restoring initial session from URL, don't show the placeholder
@@ -2219,6 +2245,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: systemTools?.some((tool) => tool.active) ? "var(--accent)" : "var(--text-dim)", flexShrink: 0 }} aria-hidden="true">
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z" />
           </svg>
+          {mcpServers && mcpServers.total > 0 && (
+            <span title={translate("tools.mcpTooltip", { ready: mcpServers.ready, total: mcpServers.total })} style={{ fontSize: 10, fontWeight: 600, color: mcpServers.needsAuth > 0 ? "rgba(234,179,8,0.95)" : mcpServers.ready > 0 ? "var(--accent)" : "var(--text-dim)", flexShrink: 0 }}>
+              MCP {mcpServers.ready}/{mcpServers.total}
+            </span>
+          )}
           {!mobile && <span>{translate("tools.label")}</span>}
         </button>
       </div>
@@ -2928,6 +2959,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       key={`${slot.session.id}:${slot.epoch}`}
                       session={slot.session}
                       background={!isActive}
+                      dormant={dormantSlotIds.has(slot.session.id)}
                       sessionRunning={runningSessionIds.has(slot.session.id)}
                       searchTarget={isActive && searchTarget?.sessionId === slot.session.id ? searchTarget : null}
                       onSearchTargetHandled={handleSearchTargetHandled}
@@ -2944,6 +2976,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       onBranchDataChange={isActive ? handleBranchDataChange : undefined}
                       onSystemPromptChange={isActive ? handleSystemPromptChange : undefined}
                       onSystemToolsChange={isActive ? handleSystemToolsChange : undefined}
+                      onMcpServersChange={isActive ? handleMcpServersChange : undefined}
                       onSystemInfoLoaderChange={isActive ? handleSystemInfoLoaderChange : undefined}
                       onDebugSnapshotReaderChange={isActive ? handleDebugSnapshotReaderChange : undefined}
                       onSessionStatsChange={isActive ? handleSessionStatsChange : undefined}
@@ -2992,6 +3025,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     onBranchDataChange={handleBranchDataChange}
                     onSystemPromptChange={handleSystemPromptChange}
                     onSystemToolsChange={handleSystemToolsChange}
+                    onMcpServersChange={handleMcpServersChange}
                     onSystemInfoLoaderChange={handleSystemInfoLoaderChange}
                     onDebugSnapshotReaderChange={handleDebugSnapshotReaderChange}
                     onSessionStatsChange={handleSessionStatsChange}

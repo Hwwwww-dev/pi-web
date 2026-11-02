@@ -25,6 +25,45 @@ type UsageResponse = { providerId: string; status: "ready" | "auth-unavailable" 
 
 const STORAGE_PREFIX = "pi-web:provider-usage:";
 
+export type ProviderUsageSnapshot = UsageResponse;
+
+/** Reads the shared localStorage snapshot the summary panel writes; null when absent or malformed. */
+export function readProviderUsageSnapshot(providerId: string): ProviderUsageSnapshot | null {
+  let cached: string | null;
+  try {
+    cached = localStorage.getItem(`${STORAGE_PREFIX}${providerId}`);
+  } catch {
+    return null; // Storage unavailable (private mode): treat as no snapshot.
+  }
+  if (!cached) return null;
+  try {
+    const parsed = JSON.parse(cached) as ProviderUsageSnapshot;
+    if (parsed?.status === "ready" && parsed.report && Array.isArray(parsed.report.buckets) && Array.isArray(parsed.report.metrics)) return parsed;
+  } catch {
+    return null; // Corrupt snapshot: the next successful query overwrites it.
+  }
+  try {
+    localStorage.removeItem(`${STORAGE_PREFIX}${providerId}`);
+  } catch {
+    return null; // Removal is cosmetic: the stale entry lingers but reads stay null.
+  }
+  return null;
+}
+
+export function writeProviderUsageSnapshot(providerId: string, snapshot: ProviderUsageSnapshot): void {
+  try {
+    localStorage.setItem(`${STORAGE_PREFIX}${providerId}`, JSON.stringify(snapshot));
+  } catch {
+    console.debug("provider usage snapshot not persisted", providerId); // Quota or private mode.
+  }
+}
+
+/** The headline percent bucket's used value, or null when the report carries no percent usage. */
+export function primaryUsagePercent(report: UsageReport): number | null {
+  const bucket = report.buckets.find((entry) => entry.unit === "percent" && typeof entry.used === "number");
+  return bucket ? Math.round(bucket.used as number) : null;
+}
+
 export function ProviderUsageSummary({ providerId, enabled }: { providerId: string; enabled: boolean }) {
   if (!isProviderUsageId(providerId)) return null;
   return <ProviderUsageContent providerId={providerId} enabled={enabled} />;
@@ -41,18 +80,7 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
   useEffect(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     setRefreshDone(false);
-    setSnapshot(null);
-    try {
-      const cached = localStorage.getItem(`${STORAGE_PREFIX}${providerId}`);
-      if (cached) {
-        const parsed = JSON.parse(cached) as UsageResponse;
-        if (parsed?.status === "ready" && parsed.report && Array.isArray(parsed.report.buckets) && Array.isArray(parsed.report.metrics)) {
-          setSnapshot(parsed);
-        }
-      }
-    } catch {
-      try { localStorage.removeItem(`${STORAGE_PREFIX}${providerId}`); } catch {}
-    }
+    setSnapshot(readProviderUsageSnapshot(providerId));
     setError(null);
     return () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
@@ -72,7 +100,7 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
       if (!response.ok) throw new Error(result.error ?? `HTTP ${response.status}`);
       if (result.status === "ready") {
         setSnapshot(result);
-        try { localStorage.setItem(`${STORAGE_PREFIX}${providerId}`, JSON.stringify(result)); } catch {}
+        writeProviderUsageSnapshot(providerId, result);
         setRefreshDone(true);
         if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
         refreshTimerRef.current = setTimeout(() => setRefreshDone(false), 2000);

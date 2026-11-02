@@ -4,6 +4,11 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { SelectorRow } from "./SelectorRow";
+import { isProviderUsageId } from "@/lib/provider-usage-ids";
+import { primaryUsagePercent, readProviderUsageSnapshot, writeProviderUsageSnapshot, type ProviderUsageSnapshot } from "./ProviderUsageSummary";
+
+/** localStorage snapshots older than this are re-queried on open. */
+const PROVIDER_USAGE_CACHE_TTL_MS = 5 * 60_000;
 
 export interface ModelSelectorOption {
   provider: string;
@@ -130,6 +135,50 @@ export function ModelSelector({
     setOpen(false);
     setFilter("");
   }, [locked]);
+
+  // Provider usage badges: the selector shows each provider's headline quota
+  // percent from the same localStorage snapshots the Settings panel writes,
+  // re-querying stale ones (bounded, sequential) through the usage route.
+  const [usagePercent, setUsagePercent] = useState<Record<string, number>>({});
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const now = Date.now();
+    const providers = [...new Set(optionsRef.current.map((option) => option.provider))].filter(isProviderUsageId).slice(0, 8);
+    const seed: Record<string, number> = {};
+    const stale: string[] = [];
+    for (const provider of providers) {
+      const snapshot = readProviderUsageSnapshot(provider);
+      if (snapshot?.report && now - snapshot.report.capturedAt < PROVIDER_USAGE_CACHE_TTL_MS) {
+        const percent = primaryUsagePercent(snapshot.report);
+        if (percent !== null) seed[provider] = percent;
+      } else {
+        stale.push(provider);
+      }
+    }
+    setUsagePercent(seed);
+    void (async () => {
+      for (const provider of stale) {
+        try {
+          const response = await fetch("/api/provider-usage/query", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ providerId: provider }),
+          });
+          const result = await response.json() as ProviderUsageSnapshot;
+          if (cancelled || result.status !== "ready" || !result.report) continue;
+          writeProviderUsageSnapshot(provider, result);
+          const percent = primaryUsagePercent(result.report);
+          if (percent !== null) setUsagePercent((prev) => ({ ...prev, [provider]: percent }));
+        } catch {
+          // The badge is best-effort; a failed quota query just leaves it off.
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open]);
 
   const buttonStyle: CSSProperties = variant === "field"
     ? {
@@ -327,8 +376,13 @@ export function ModelSelector({
               ) : modelsByProvider.map((group, index) => (
                 <div key={group.provider}>
                   {modelsByProvider.length > 1 && (
-                    <div style={{ padding: "6px 12px 4px", borderTop: index > 0 || onClear ? "1px solid var(--border)" : "none", color: "var(--text-dim)", fontSize: 10, fontWeight: 600, letterSpacing: 0, textTransform: "uppercase" }}>
-                      {group.provider}
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "6px 12px 4px", borderTop: index > 0 || onClear ? "1px solid var(--border)" : "none", color: "var(--text-dim)", fontSize: 10, fontWeight: 600, letterSpacing: 0, textTransform: "uppercase" }}>
+                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.provider}</span>
+                      {usagePercent[group.provider] !== undefined && (
+                        <span title={t("providerUsage.usage")} style={{ flexShrink: 0, fontWeight: 500, textTransform: "none", letterSpacing: 0, color: usagePercent[group.provider] > 90 ? "#f87171" : usagePercent[group.provider] > 70 ? "#fbbf24" : "var(--text-dim)" }}>
+                          {usagePercent[group.provider]}%
+                        </span>
+                      )}
                     </div>
                   )}
                   {group.options.map((option) => {

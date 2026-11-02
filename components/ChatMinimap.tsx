@@ -59,6 +59,8 @@ interface TurnInfo {
   usageCost: number | null;
  /** Set on index-listed turns whose messages are not loaded (or rendered) yet. */
   timestamp?: number;
+  /** A compaction boundary sits directly before this turn. */
+  afterCompaction?: boolean;
 }
 
 interface NodeInfo {
@@ -304,12 +306,17 @@ export const ChatMinimap = memo(function ChatMinimap({
       const measuredTurns: TurnInfo[] = [];
       let refIndex = 0;
       let currentTurn: TurnInfo | null = null;
+      let compactionPending = false;
 
       const streamingMessage = getStreamingMessage();
       const allMessages: (AgentMessage | Partial<AgentMessage>)[] = streamingMessage
         ? [...messagesRef.current, streamingMessage]
         : messagesRef.current;
       for (const message of allMessages) {
+        if (message.role === "custom" && (message as { customType?: string }).customType === "compaction") {
+          compactionPending = true;
+          continue;
+        }
         const isAnchor = isMessageGroupAnchor(message);
         if (!isAnchor && message.role !== "assistant") continue;
         if (isAnchor) {
@@ -325,7 +332,9 @@ export const ChatMinimap = memo(function ChatMinimap({
             toolCount: 0,
             usageTokens: null,
             usageCost: null,
+            afterCompaction: compactionPending,
           };
+          compactionPending = false;
           measuredTurns.push(currentTurn);
           continue;
         }
@@ -569,6 +578,7 @@ export const ChatMinimap = memo(function ChatMinimap({
       {positionedSlots.map((slot) => {
         const isNearest = minimapHovered && nearestSlot === slot;
         const isActive = activeSlot === slot;
+        const slotHasCompaction = slot.indexes.some((i) => allNodes[i]?.targetTurn.afterCompaction);
         // The dashes are the minimap when nothing is hovered: without them the
         // trigger zone is invisible, so there is nothing to aim for.
         const width = isNearest ? 18 : minimapHovered || isActive ? 12 : 8;
@@ -601,6 +611,22 @@ export const ChatMinimap = memo(function ChatMinimap({
               zIndex: 2,
             }}
           >
+            {slotHasCompaction && (
+              <div
+                aria-hidden="true"
+                title={t("chatMinimap.compactionBoundary")}
+                style={{
+                  width: 5,
+                  height: 5,
+                  marginRight: 5,
+                  transform: "rotate(45deg)",
+                  borderRadius: 1,
+                  background: "var(--accent)",
+                  opacity: minimapHovered ? 0.9 : 0.55,
+                  transition: "opacity 0.12s ease",
+                }}
+              />
+            )}
             <div
               style={{
                 width,
@@ -627,6 +653,7 @@ export const ChatMinimap = memo(function ChatMinimap({
             const isLocated = nearestNodeIndex === node.index;
             const turn = node.targetTurn;
             const metaParts: string[] = [];
+            if (turn.afterCompaction) metaParts.push(t("chatMinimap.compactionBoundary"));
             if (turn.scrollTop === null) {
               // Unloaded turn: identify it by time and offer the jump.
               if (turn.timestamp) metaParts.push(formatTurnTime(turn.timestamp));

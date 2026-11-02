@@ -173,7 +173,7 @@ type ExtensionCommandContextActionsLike = {
 };
 
 // `debugSnapshot` is optional: a host built before a hot reload lacks it.
-type WrapperMcpHost = Pick<McpHost, "prepareForPrompt" | "dispose"> & Partial<Pick<McpHost, "debugSnapshot">>;
+type WrapperMcpHost = Pick<McpHost, "prepareForPrompt" | "dispose"> & Partial<Pick<McpHost, "debugSnapshot" | "serverStates">>;
 
 type AgentSessionWrapperOptions = {
   exactSystemPrompt?: () => string;
@@ -999,6 +999,7 @@ export class AgentSessionWrapper {
 
   /** A copy of a side chat would be read as one, or show its parent's history as a new session. */
   private refuseForkOfSideChat(): void {
+    // SAFETY: SDK entries mirror the app's SessionEntry shape (lib/pi-types.ts); hasSideMetadata only reads the pi-web:side metadata field.
     if (hasSideMetadata(this.inner.sessionManager.getEntries() as unknown as SessionEntry[])) {
       throw new Error("A side chat cannot be forked");
     }
@@ -1387,6 +1388,15 @@ export class AgentSessionWrapper {
           contextUsage: contextUsage
             ? { percent: contextUsage.percent, contextWindow: contextUsage.contextWindow, tokens: contextUsage.tokens }
             : null,
+          mcpServers: (() => {
+            const states = this.mcpHost?.serverStates?.();
+            if (!states) return undefined;
+            return {
+              total: states.length,
+              ready: states.filter((s) => s.state === "ready").length,
+              needsAuth: states.filter((s) => s.state === "needs-auth").length,
+            };
+          })(),
           // Computed from the live entries on every read, like `GET /api/sessions/[id]`
           // does for a snapshot: the SDK's stats carry no active time, and a panel that
           // kept a snapshot while messages streamed in showed the pre-gap value for the
@@ -2834,6 +2844,7 @@ export async function setRpcSessionTools(
     if (readSubagentSessionResources(toSessionEntries(manager.getEntries()))) {
       throw new Error("Subagent tool selection is fixed by its profile");
     }
+    // SAFETY: same SDK-entry-to-SessionEntry bridge; the reader only inspects side metadata.
     if (hasSideMetadata(manager.getEntries() as unknown as SessionEntry[])) {
       throw new Error("Side chat tools are fixed when it is forked");
     }
@@ -2848,6 +2859,7 @@ export async function setRpcSessionTools(
   if (readSubagentSessionResources(toSessionEntries(existing.inner.sessionManager.getEntries()))) {
     throw new Error("Subagent tool selection is fixed by its profile");
   }
+  // SAFETY: same SDK-entry-to-SessionEntry bridge; the reader only inspects side metadata.
   if (hasSideMetadata(existing.inner.sessionManager.getEntries() as unknown as SessionEntry[])) {
     throw new Error("Side chat tools are fixed when it is forked");
   }
@@ -2945,6 +2957,8 @@ export function getRpcSessionInfos(options: { includeTransient?: boolean } = {})
     const firstUserMessage = messages.find((entry) => entry.message.role === "user");
     const sessionFile = manager.getSessionFile() ?? session.sessionFile;
     const persisted = Boolean(sessionFile && existsSync(sessionFile));
+    // SAFETY: SDK raw entries mirror the app's SessionEntry shape (lib/pi-types.ts).
+    // SAFETY: readSubagentRun reads only headers/parent chain, readSideRelation only the pi-web:side metadata.
     const subagent = readSubagentRun(entries as unknown as SessionEntry[], header?.id ?? session.sessionId, sessionFile ?? "");
     const side = subagent ? null : readSideRelation(entries as unknown as SessionEntry[]);
 

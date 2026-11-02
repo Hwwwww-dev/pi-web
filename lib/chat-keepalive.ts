@@ -62,6 +62,9 @@ export interface KeepAliveSlot {
   epoch: number;
 }
 
+/** A slot hidden this long unloads its message list until it is shown again. */
+export const DORMANT_AFTER_MS = 10 * 60_000;
+
 /**
  * Insert or touch the slot for `session`, refresh its snapshot, and evict
  * least-recently-active slots beyond `maxSessions`. The just-selected session

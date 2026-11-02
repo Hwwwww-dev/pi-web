@@ -47,8 +47,24 @@ export function ExtensionStatusButton({ statuses }: { statuses: ExtensionStatusI
   const { t } = useI18n();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  // The popover is right-anchored to the button, but the button often sits mid-row
+  // (更多/YOLO to its right): a width capped only by 100vw still hangs past the
+  // viewport's LEFT edge on phones. Clamp the width to the space left of the
+  // button's right edge (240px floor beats an unusably narrow panel).
+  const [popoverMaxWidth, setPopoverMaxWidth] = useState(420);
   const { statuses: entries } = splitExtensionStatuses(statuses);
   const label = t("chat.extensionStatus");
+
+  useEffect(() => {
+    if (!open) return;
+    const clampToViewport = () => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (rect) setPopoverMaxWidth(Math.max(240, Math.min(420, Math.round(rect.right) - 12)));
+    };
+    clampToViewport();
+    window.addEventListener("resize", clampToViewport);
+    return () => window.removeEventListener("resize", clampToViewport);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -78,7 +94,7 @@ export function ExtensionStatusButton({ statuses }: { statuses: ExtensionStatusI
         {summary}
       </button>
       {expanded && (
-        <div className="extension-status-popover" role="dialog" aria-label={label}>
+        <div className="extension-status-popover" role="dialog" aria-label={label} style={{ maxWidth: popoverMaxWidth }}>
           {entries.map((status) => (
             <div key={status.key} className="extension-status-entry">
               <span

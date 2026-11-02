@@ -502,8 +502,10 @@ declare global {
  * produce on disk; production never reassigns these.
  */
 export const SM_CACHE_LIMITS = {
-  /** Most sessions held at once. */
-  maxEntries: 12,
+  /** Most sessions held at once. Keep-alive alone parks up to 10 slots; 24
+   * leaves room for the selected session plus stats/list walks before the
+   * byte budget below starts evicting. */
+  maxEntries: 24,
   /** Summed on-disk size of cached sessions. */
   maxTotalBytes: 256 * 1024 * 1024,
   /** A session larger than this is never cached — it would evict everything else. */

@@ -38,6 +38,7 @@ import {
   queuedImageRecallFromEntries,
   reconcileQueuedSubmissions,
   splitClearedQueue,
+  moveQueuedEntry,
   type QueuedBehavior,
   type QueuedMessages,
   type QueuedSnapshotEntry,
@@ -123,6 +124,7 @@ interface LastAssistantTextResponse {
 type AgentStateResponse = {
   model?: { provider: string; id: string };
   contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null;
+  mcpServers?: { total: number; ready: number; needsAuth: number } | null;
   /** Active time over the live wrapper's entries (the snapshot carries the same field). */
   totalActiveMs?: number;
   systemPrompt?: string;
@@ -239,10 +241,13 @@ export interface UseAgentSessionOptions {
   onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void, locked: boolean) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
   onSystemToolsChange?: (tools: ToolEntry[] | null) => void;
+  onMcpServersChange?: (summary: { total: number; ready: number; needsAuth: number } | null) => void;
   /** Registers an action that lazily starts the session and loads its prompt and tools. */
   onSystemInfoLoaderChange?: (loader: (() => Promise<void>) | null) => void;
   /** Keep-alive background slot: skips AppShell-wide state reporting (branch tree, system info panel, stats) so background instances cannot overwrite the visible session's state. */
   background?: boolean;
+  /** Dormant keep-alive slot: hidden so long its message list was unloaded to free DOM; reactivation reloads the session once. */
+  dormant?: boolean;
   /** Registers the debug panel's reader of this page's stream and lease: it reads refs only, never a request. */
   onDebugSnapshotReaderChange?: (reader: (() => DebugClientSession) | null) => void;
   onSessionStatsPanelOpen?: () => void;
@@ -286,7 +291,16 @@ const PROMPT_SETTLE_POLL_MS = 600;
 const PROMPT_SETTLE_MAX_MS = 20_000;
 const EVENT_STREAM_IDLE_GRACE_MS = 30_000;
 const AGENT_STATE_RECONCILE_MS = 15_000;
+/** While queue rows are visible the state poll tightens to this: a paused or closed SSE stream leaves rows stale until the next read. */
+const QUEUE_FAST_RECONCILE_MS = 3_000;
 const IDLE_FOLLOW_POLL_MS = 5_000;
+// Keep-alive slots hidden behind the dock probe less often: 20s while fresh,
+// backing off to 60s once the slot has been background for 5 minutes. Becoming
+// active again probes immediately (activation compensation), so the selected
+// session keeps its instant catch-up while idle slots cost ~3-12× less.
+const IDLE_FOLLOW_BACKGROUND_POLL_MS = 20_000;
+const IDLE_FOLLOW_BACKGROUND_BACKOFF_MS = 60_000;
+const IDLE_FOLLOW_BACKGROUND_BACKOFF_AFTER_MS = 5 * 60_000;
 const BASH_STATE_RECONCILE_MS = 1_000;
 const EVENT_STREAM_READY_TIMEOUT_MS = 60_000;
 const EVENT_STREAM_RECONNECT_DELAY_MS = 1_000;
@@ -432,7 +446,7 @@ type SlashCommandsResponse = {
 export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, newSessionDraftKey, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
-    modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen, background = false,
+    modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen, background = false, dormant = false,
     onOpenSettings, onDebugSnapshotReaderChange,
   } = opts;
 
@@ -487,6 +501,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // Highest request id whose reply was applied. A reply applies only when it
   // is newer, so a failed newer read never discards an older good one.
   const contextUsageAppliedIdRef = useRef(0);
+  // Kept in a ref: syncLiveModel is deliberately empty-deps, and the callback is gated
+  // per tab in AppShell, so its identity may flip without a session reload.
+  const onMcpServersChangeRef = useRef(onMcpServersChange);
+  onMcpServersChangeRef.current = onMcpServersChange;
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [forkingEntryId, setForkingEntryId] = useState<string | null>(null);
   const [currentModelOverride, setCurrentModelOverride] = useState<{ provider: string; modelId: string } | null>(null);
@@ -604,6 +622,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const sessionToolsPinnedRef = useRef(false);
   const browsingHistoryRef = useRef(false);
   const followProbeInFlightRef = useRef(false);
+  // Last tick's background flag, so the idle-follow effect can tell an
+  // activation (slot becoming selected) from an ordinary re-run and probe at once.
+  const prevBackgroundRef = useRef<boolean | null>(null);
   const agentRunningRef = useRef(false);
   const sdkAgentActiveRef = useRef(false);
   const rpcPromptPendingRef = useRef(false);
@@ -751,6 +772,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (state?.thinkingLevel !== undefined) {
       setLiveThinkingLevel(asConcreteThinkingLevel(state.thinkingLevel));
     }
+    // Ride-along parse: every state read flows through here, so the toolbar's MCP
+    // badge stays current without a second command (same pattern as contextUsage).
+    onMcpServersChangeRef.current?.(state?.mcpServers ?? null);
   }, []);
 
   const resolveComposerDraftKey = useCallback((key: string | undefined) => {
@@ -1833,7 +1857,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // foreground or the network comes back.
   useEffect(() => {
     if (!agentRunning) return;
+    let lastReconcile = Date.now();
     const reconcile = () => {
+      lastReconcile = Date.now();
       // Read the ref on every tick: for brand-new sessions the id is
       // assigned only after ensure_session returns.
       const sid = sessionIdRef.current;
@@ -1842,7 +1868,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const onVisible = () => {
       if (document.visibilityState === "visible") reconcile();
     };
-    const interval = setInterval(reconcile, AGENT_STATE_RECONCILE_MS);
+    // queue_update over SSE is the instant channel, but a paused or closed
+    // stream leaves queue rows stale until the next state read — shorten that
+    // window to 3s while rows are on screen (and the page is visible).
+    const tick = () => {
+      const due = queuedSubmissionsRef.current.length > 0 && document.visibilityState === "visible"
+        ? QUEUE_FAST_RECONCILE_MS
+        : AGENT_STATE_RECONCILE_MS;
+      if (Date.now() - lastReconcile >= due) reconcile();
+    };
+    const interval = setInterval(tick, 1_000);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", reconcile);
     return () => {
@@ -1861,8 +1896,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // (SSE/reconcile covers that); paused while the user pages back through
   // history so a reload cannot yank the viewport to the leaf path.
   useEffect(() => {
-    if (!session || agentRunning) return;
+    // Dormant slots have no message list to keep warm; reactivation reloads everything.
+    if (!session || agentRunning || dormant) return;
     const sid = session.id;
+    const startedAt = Date.now();
+    const becameActive = prevBackgroundRef.current === true && background;
+    prevBackgroundRef.current = background;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const probe = async () => {
       if (document.visibilityState !== "visible") return;
       if (followProbeInFlightRef.current || browsingHistoryRef.current) return;
@@ -1884,20 +1925,50 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         followProbeInFlightRef.current = false;
       }
     };
-    const interval = setInterval(() => void probe(), IDLE_FOLLOW_POLL_MS);
+    // Recurring delay instead of a fixed interval: the tier depends on the
+    // slot's background age, and the chain recomputes after every tick.
+    const schedule = () => {
+      if (disposed) return;
+      const delay = background
+        ? Date.now() - startedAt > IDLE_FOLLOW_BACKGROUND_BACKOFF_AFTER_MS
+          ? IDLE_FOLLOW_BACKGROUND_BACKOFF_MS
+          : IDLE_FOLLOW_BACKGROUND_POLL_MS
+        : IDLE_FOLLOW_POLL_MS;
+      timer = setTimeout(() => { void probe().finally(schedule); }, delay);
+    };
+    if (becameActive) void probe();
+    schedule();
     const onVisible = () => {
       if (document.visibilityState === "visible") void probe();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      clearInterval(interval);
+      disposed = true;
+      if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [session, agentRunning, loadSession]);
+  }, [session, agentRunning, loadSession, background, dormant]);
 
   useEffect(() => {
     agentRunningRef.current = agentRunning;
   }, [agentRunning]);
+
+  // Dormancy: a keep-alive slot hidden beyond DORMANT_AFTER_MS unloads its
+  // message list (the DOM is the memory cost); reactivation reloads once.
+  // Running slots never go dormant and the probe effect idles while dormant,
+  // so nothing refills the list until the slot is shown again.
+  const dormantUnloadRef = useRef(false);
+  useEffect(() => {
+    if (!dormant || agentRunningRef.current || session === null || messages.length === 0) return;
+    setMessages([]);
+    setEntryIds([]);
+    dormantUnloadRef.current = true;
+  }, [dormant, session, messages.length]);
+  useEffect(() => {
+    if (dormant || !dormantUnloadRef.current || session === null) return;
+    dormantUnloadRef.current = false;
+    void loadSession(session.id);
+  }, [dormant, session, loadSession]);
 
   const handleAgentEvent = useCallback((event: AgentEvent) => {
     switch (event.type) {
@@ -2976,7 +3047,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return () => timers.forEach(clearTimeout);
   }, [agentRunning, session?.id]);
 
-  const handleQueuedAction = useCallback(async (id: string, action: "toggle" | "edit") => {
+  const handleQueuedAction = useCallback(async (id: string, action: "toggle" | "edit" | "moveUp" | "moveDown") => {
     const sid = sessionIdRef.current;
     if (!sid) return;
     const records = queuedSubmissionsRef.current;
@@ -2999,13 +3070,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // the rebuild starts from `cleared`, not from the local records.
     const remaining = splitClearedQueue(cleared, records, action === "edit" ? id : undefined);
     const toggledBehavior: QueuedBehavior = target.behavior === "steer" ? "followUp" : "steer";
-    const nextRecords = remaining.map((item) => createQueuedSubmission(
+    let nextRecords = remaining.map((item) => createQueuedSubmission(
       item.text,
       action === "toggle" && item.text === target.text && item.behavior === target.behavior
         ? toggledBehavior
         : item.behavior,
       item.images,
     ));
+    if (action === "moveUp" || action === "moveDown") {
+      nextRecords = moveQueuedEntry(nextRecords, target.behavior, target.text, action === "moveUp" ? "up" : "down") ?? nextRecords;
+    }
     queuedSubmissionsRef.current = nextRecords;
     setQueuedSubmissions(nextRecords);
     // The rows just replaced the queue pi had, and no snapshot confirms that
