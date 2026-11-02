@@ -1603,7 +1603,7 @@ const TOOL_FIELD_BLOCK: CSSProperties = {
 
 function ToolFieldRows({ fields }: { fields: ToolField[] }) {
   return (
-    <table style={{ borderCollapse: "collapse" }}>
+    <table className="tool-field-table" style={{ borderCollapse: "collapse" }}>
       <tbody>
         {fields.map((field) => (
           <tr key={field.key}>

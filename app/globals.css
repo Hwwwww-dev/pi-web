@@ -1839,6 +1839,18 @@ pre, code {
     pointer-events: auto !important;
   }
 }
+
+/* Narrow screens: a tool call's argument labels stop squeezing the value
+   column and stack above it (block-level table rows). */
+@media (max-width: 640px) {
+  .tool-field-table tr,
+  .tool-field-table td {
+    display: block;
+  }
+  .tool-field-table td + td {
+    padding-top: 0;
+  }
+}
 .activity-spinner {
   display: inline-block;
   width: 11px;
