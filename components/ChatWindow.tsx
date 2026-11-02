@@ -704,6 +704,40 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return () => window.removeEventListener(COLLAPSIBLE_EXPANDED_EVENT, onExpanded);
   }, [scrollContainerRef, scrollToBottom]);
 
+  // Focusing the composer on a phone opens the keyboard, and the browser then
+  // scrolls every ancestor it can to reveal the caret — the message list lands
+  // somewhere the user never asked for (queue rows make the composer taller and
+  // the jump worse). Put the list back where it was: once after layout settles
+  // and again on the keyboard's first viewport resize. At the tail the restore
+  // clamps to the new (shorter) maximum, so tail-stick survives; mid-list the
+  // reading position holds.
+  useEffect(() => {
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.matches?.("[data-chat-composer]")) return;
+      const container = scrollContainerRef.current;
+      const containerTop = container?.scrollTop ?? null;
+      const pageTop = window.scrollY;
+      let seenViewportResize = false;
+      const restore = () => {
+        if (container && containerTop !== null) container.scrollTop = containerTop;
+        window.scrollTo(0, pageTop);
+      };
+      const viewport = window.visualViewport;
+      const onViewportResize = () => {
+        if (seenViewportResize) return;
+        seenViewportResize = true;
+        restore();
+        viewport?.removeEventListener("resize", onViewportResize);
+      };
+      requestAnimationFrame(() => requestAnimationFrame(restore));
+      viewport?.addEventListener("resize", onViewportResize);
+      window.setTimeout(() => viewport?.removeEventListener("resize", onViewportResize), 800);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, [scrollContainerRef]);
+
   useEffect(() => {
     const position = pendingScrollRestore;
     const sessionId = session?.id;

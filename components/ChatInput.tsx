@@ -2457,6 +2457,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           <textarea
             ref={textareaRef}
             className="chat-input-textarea"
+            data-chat-composer=""
             aria-label={compact ? t("chat.askInSideChat") : undefined}
             value={value}
             onChange={(e) => {
