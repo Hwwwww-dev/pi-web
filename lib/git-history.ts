@@ -100,6 +100,11 @@ export async function readCommitLog(repoRoot: string, limit: number, offset: num
       "--pretty=format:%H%x1f%h%x1f%an%x1f%at%x1f%s%x1f%b%x1e",
       `--max-count=${limit + 1}`,
       `--skip=${offset}`,
+      // A trailing `--` pins a bare ref to the revision side: a repo may hold
+      // both a branch and a file with the same name (git then dies with
+      // "ambiguous argument"). It must come after the options - everything
+      // past the separator is a pathspec.
+      ...(ref ? ["--"] : []),
     ]);
   } catch (error) {
     if (isEmptyRepositoryError(error)) return { commits: [], hasMore: false };
