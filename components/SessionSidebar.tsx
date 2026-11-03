@@ -109,6 +109,7 @@ import {
   ForkIcon,
   OpenInNewTabIcon,
   PencilIcon,
+  PencilSparkleIcon,
   PinIcon,
   PinOffIcon,
   PlusIcon,
@@ -357,7 +358,7 @@ function sessionActionIcon(id: SessionMenuActionId): ReactNode {
     case "pin": return <PinIcon />;
     case "unpin": return <PinOffIcon />;
     case "rename": return <PencilIcon />;
-    case "auto-name": return <PencilIcon />;
+    case "auto-name": return <PencilSparkleIcon />;
     case "fork": return <ForkIcon />;
     case "mark-read": return <DotOutlineIcon />;
     case "mark-unread": return <DotIcon />;

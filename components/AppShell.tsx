@@ -589,10 +589,12 @@ export function AppShell() {
   }, [isMobile]);
 
   const handleMobileToolbarMoreToggle = useCallback(() => {
-    setSidebarOpen(false);
+    // The drawer folds only on phones; on desktop the ⋯ dropdown must not
+    // touch the sidebar.
+    if (isMobile) setSidebarOpen(false);
     setActiveTopPanel(null);
     setMobileToolbarMoreOpen((open) => !open);
-  }, []);
+  }, [isMobile]);
 
   const handleRightPanelToggle = useCallback(() => {
     if (isMobile) {
@@ -2725,7 +2727,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               <div ref={desktopToolbarMoreRef} style={{ position: "relative", display: "flex", alignItems: "stretch", height: "100%" }}>
                 {renderToolbarMoreButton()}
                 {mobileToolbarMoreOpen && (
-                  <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 500, minWidth: 230, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                  // A detached toolbar segment: same height as the bar, so the
+                  // row-styled buttons keep their full target size.
+                  <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 500, height: "var(--top-bar-height)", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", overflow: "hidden", display: "flex" }}>
                     {renderChatToolbarActions(false, "overflow")}
                   </div>
                 )}
