@@ -18,7 +18,7 @@ import { cwdMissingBody } from "@/lib/missing-cwd";
 
 export const dynamic = "force-dynamic";
 
-async function loadModels(cwd: string): Promise<ModelsData> {
+async function loadModels(cwd: string, scopeAll = false): Promise<ModelsData> {
   const nameMap = new Map<string, string>();
   let modelList: { id: string; name: string; provider: string }[] = [];
   let defaultModel: { provider: string; modelId: string } | null = null;
@@ -42,7 +42,7 @@ async function loadModels(cwd: string): Promise<ModelsData> {
   // way the CLI does instead of comparing pattern strings literally (#307).
   const scope = await resolveVisibleModels(
     withDeferredProviderModels(services.modelRuntime),
-    settings.getEnabledModels(),
+    scopeAll ? undefined : settings.getEnabledModels(),
   );
   const { visible, thinkingLevelPins, warnings } = scope;
   modelList = orderSelectorModels(scope).map((m) => ({
@@ -86,6 +86,7 @@ async function loadModels(cwd: string): Promise<ModelsData> {
       thinkingLevelMaps,
       thinkingLevelPins,
       ...(warnings.length > 0 ? { modelScopeWarnings: warnings } : {}),
+      isScoped: scopeAll ? false : scope.scopedModels.length > 0,
     },
     modelError,
   );
@@ -100,14 +101,18 @@ const EMPTY_MODELS: ModelsData = {
   thinkingLevels: {},
   thinkingLevelMaps: {},
   thinkingLevelPins: {},
+  isScoped: false,
 };
 
 export async function GET(req: Request) {
   // req.url is synthesized by Next.js and is normally well-formed; fall back to
   // the process cwd rather than letting a malformed URL 500 the whole route.
   let requestedCwd: string;
+  let scopeAll = false;
   try {
-    requestedCwd = new URL(req.url).searchParams.get("cwd") || process.cwd();
+    const url = new URL(req.url);
+    requestedCwd = url.searchParams.get("cwd") || process.cwd();
+    scopeAll = url.searchParams.get("scope") === "all";
   } catch {
     requestedCwd = process.cwd();
   }
@@ -138,7 +143,8 @@ export async function GET(req: Request) {
   }
 
   try {
-    return Response.json(await loadModelsWithCache(cwd, () => loadModels(cwd)));
+    const cacheKey = scopeAll ? `${cwd}#all` : cwd;
+    return Response.json(await loadModelsWithCache(cacheKey, () => loadModels(cwd, scopeAll)));
   } catch (error) {
     // The ambiguity message is constructed in this repo (lib/model-scope.ts)
     // and already names every matching provider/modelId plus the fix — it is

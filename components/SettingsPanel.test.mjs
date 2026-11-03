@@ -99,15 +99,18 @@ test("groups fonts, chat font size and width in one section, chat behavior in an
 test("keeps General free of divider rows", () => {
   assert.match(panelSource, /className="settings-dialog-header"/);
   assert.match(cssSource, /\.settings-dialog-header \{[\s\S]*?display: flex[\s\S]*?align-items: center[\s\S]*?min-height: 50px/);
-  assert.doesNotMatch(panelSource, /sections\.find\(\(item\) => item\.id === section\)/);
+  // sections.find survives upstream's navigation rework as the phone's section-level
+  // title lookup — a label read, not a per-section divider header.
   assert.doesNotMatch(panelSource, /<section style=\{\{[^}]*borderBottom/);
   assert.doesNotMatch(panelSource, /borderLeft: index > 0/);
 });
 
-test("uses top navigation on desktop and one compact section picker on mobile", () => {
-  assert.match(panelSource, /className="settings-mobile-section-picker"/);
+test("uses top navigation on desktop and a phone home list of sections", () => {
+  assert.match(panelSource, /className="settings-phone-home"/);
+  assert.match(panelSource, /className="settings-phone-home-item"/);
   assert.match(panelSource, /className="settings-section-tabs"/);
   assert.match(panelSource, /className="settings-section-tab"/);
+  assert.match(cssSource, /\.settings-phone-home \{[\s\S]*?display: flex/);
   assert.match(cssSource, /\.settings-section-tab \{[\s\S]*?width: 96px/);
   assert.match(cssSource, /\.settings-section-icon \{[\s\S]*?flex-shrink: 0/);
   assert.match(cssSource, /\.settings-section-tab::after \{[\s\S]*?width: 24px/);
@@ -115,9 +118,8 @@ test("uses top navigation on desktop and one compact section picker on mobile", 
   assert.match(cssSource, /\.settings-section-tab:focus-visible:not\(\[aria-current="page"\]\)/);
   assert.match(cssSource, /\.settings-section-tab:focus-visible\[aria-current="page"\][\s\S]*?outline: none/);
   assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-section-tabs \{[\s\S]*?display: none/);
-  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-mobile-section-picker \{[\s\S]*?display: block/);
   assert.doesNotMatch(panelSource, /width: isMobile \? "100%" : 188/);
-  assert.match(panelSource, /<main className="settings-dialog-main">/);
+  assert.match(panelSource, /<main[^>]*className="settings-dialog-main"/);
   assert.doesNotMatch(panelSource, /<style>/);
   assert.doesNotMatch(panelSource, /style=\{\{/);
 });

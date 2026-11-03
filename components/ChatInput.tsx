@@ -67,6 +67,10 @@ interface Props {
   missingCwd?: string | null;
   /** Diagnostics from resolving `enabledModels`, e.g. a pattern that matched nothing. */
   modelScopeWarnings?: string[];
+  /** Every available model, once loaded for the selector's "all" scope. */
+  allModelList?: { id: string; name: string; provider: string }[] | null;
+  /** Set only while `enabledModels` narrows the list: loads `allModelList`. */
+  onLoadAllModels?: () => void;
   onModelChange?: (provider: string, modelId: string) => void;
   modelSwitching?: boolean;
   /** The model new sessions start with, starred in the model selector. */
@@ -100,6 +104,8 @@ interface Props {
   slashCommandsLoading?: boolean;
   onLoadSlashCommands?: () => Promise<SlashCommandInfo[]> | SlashCommandInfo[];
   onBuiltinCommand?: (message: string) => Promise<BuiltinSlashCommandResult>;
+  soundEnabled?: boolean;
+  onSoundToggle?: () => void;
   onAudioUnlock?: () => void;
   draftKey?: string;
   /** Session working directory — enables the @ file autocomplete menu */
@@ -810,7 +816,7 @@ export function ModelScopeWarningBanner({ warnings }: { warnings?: string[] }) {
 // renders keeps the queue rows (and their image thumbnails) from re-rendering
 // per chunk while streaming.
 export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatInput({
-  onSend, onAbort, onSteer, onSideChat, onFollowUp, isStreaming, model, isAutoModelSelection, modelNames, modelList, modelError, missingCwd, modelScopeWarnings, onModelChange, modelSwitching,
+  onSend, onAbort, onSteer, onSideChat, onFollowUp, isStreaming, model, isAutoModelSelection, modelNames, modelList, modelError, missingCwd, modelScopeWarnings, allModelList, onLoadAllModels, onModelChange, modelSwitching,
   defaultModel, onSetDefaultModel,
   onCompact, onAbortCompaction, isCompacting, compactError, onDismissCompactError, compactResult, toolPreset, onToolPresetChange,
   thinkingLevel, isAutoThinkingSelection = false, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
@@ -818,7 +824,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   retryInfo, queuedSubmissions, inputHistory = [], onQueuedAction,
   slashCommands, slashCommandsLoading, onLoadSlashCommands,
   onBuiltinCommand,
-  onAudioUnlock,
+  soundEnabled, onSoundToggle, onAudioUnlock,
   onPromptWithStreamingBehavior,
   draftKey,
   cwd,
@@ -830,6 +836,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const { fontSize } = useChatAppearance();
   const { ui: uiFontFamily, uiWeight } = useFontPreferences();
   const isMobile = useIsMobile();
+  // The controls row under the composer: a finger's 44px on a phone.
+  const controlSize = isMobile ? 44 : 32;
   const enterSendMode = useEnterSendMode();
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
@@ -2620,11 +2628,27 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           <div style={{ flex: isMobile ? "1 1 auto" : "0 0 auto", minWidth: 0, display: "flex", alignItems: "center", gap: 2 }}>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="composer-chip"
               title={t("chat.attachFiles")}
-              style={{ width: 32, padding: 0, justifyContent: "center", color: attachedImages.length ? "var(--accent)" : undefined }}
+              style={{
+                flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                width: controlSize, height: controlSize, padding: 0,
+                background: "none", border: "none",
+                borderRadius: 9,
+                color: attachedImages.length ? "var(--accent)" : "var(--text-muted)",
+                cursor: "pointer",
+                opacity: 1,
+                transition: "background 0.12s, color 0.12s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-hover)";
+                e.currentTarget.style.color = attachedImages.length ? "var(--accent)" : "var(--text)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "none";
+                e.currentTarget.style.color = attachedImages.length ? "var(--accent)" : "var(--text-muted)";
+              }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg width={isMobile ? 18 : 15} height={isMobile ? 18 : 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <polyline points="21 15 16 10 5 21" />
@@ -2642,6 +2666,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 isAutoSelection={isAutoModelSelection}
                 defaultValue={defaultModel}
                 onSetDefault={onSetDefaultModel}
+                allOptions={allModelList?.map((m) => ({ provider: m.provider, modelId: m.id, name: m.name }))}
+                onShowAll={onLoadAllModels}
               />
             )}
           </div>
@@ -2659,6 +2685,49 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             position: "relative",
             marginLeft: isMobile ? 0 : "auto",
           }}>
+            {isMobile && (
+              <button
+                type="button"
+                title={controlsMenuOpen ? undefined : t("chat.moreControls")}
+                aria-label={t("chat.moreControls")}
+                aria-expanded={controlsMenuOpen}
+                aria-hidden={controlsMenuOpen || undefined}
+                tabIndex={controlsMenuOpen ? -1 : undefined}
+                onClick={() => {
+                  setControlsMenuOpen(true);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "100%",
+                  height: controlSize,
+                  padding: "8px 10px",
+                  background: "none",
+                  border: "none",
+                  borderRadius: 9,
+                  color: "var(--text-muted)",
+                  cursor: controlsMenuOpen ? "default" : "pointer",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  visibility: controlsMenuOpen ? "hidden" : "visible",
+                  pointerEvents: controlsMenuOpen ? "none" : "auto",
+                  transition: "background 0.12s, color 0.12s",
+                }}
+                onMouseEnter={(e) => {
+                  if (controlsMenuOpen) return;
+                  e.currentTarget.style.background = "var(--bg-hover)";
+                  e.currentTarget.style.color = "var(--text)";
+                }}
+                onMouseLeave={(e) => {
+                  if (controlsMenuOpen) return;
+                  e.currentTarget.style.background = "none";
+                  e.currentTarget.style.color = "var(--text-muted)";
+                }}
+              >
+                {t("chat.moreControls")}
+              </button>
+            )}
             <div style={{
               display: isMobile ? (controlsMenuOpen ? "flex" : "none") : "flex",
               alignItems: "center",
@@ -2688,8 +2757,28 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     ? t("chat.currentReasoning", { level: thinkingDisplayLabel })
                     : t("chat.changeReasoning", { level: thinkingDisplayLabel })}
                   aria-label={t("chat.changeReasoningLabel")}
-                  className="composer-chip"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    padding: isMobile ? "0 10px" : "8px 12px",
+                    width: isMobile ? "auto" : undefined,
+                    height: controlSize,
+                    background: thinkingDropdownOpen ? "var(--bg-hover)" : "none",
+                    border: "none",
+                    borderRadius: 9,
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    transition: "background 0.12s, color 0.12s",
+                  }}
                   aria-expanded={thinkingDropdownOpen}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--bg-hover)";
+                    e.currentTarget.style.color = "var(--text)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = thinkingDropdownOpen ? "var(--bg-hover)" : "none";
+                    e.currentTarget.style.color = "var(--text-muted)";
+                  }}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.7.78 3.21 2 4.21V14a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-2.29c1.22-1 2-2.51 2-4.21A5.5 5.5 0 0 0 9.5 2z" />
@@ -2769,8 +2858,30 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     ? t("chat.currentToolPreset", { preset: toolPresetLabel })
                     : t("chat.changeToolPreset") + `: ${toolPresetLabel}`}
                   aria-label={t("chat.changeToolPreset")}
-                  className="composer-chip"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    padding: isMobile ? "0 10px" : "8px 12px",
+                    width: isMobile ? "auto" : undefined,
+                    height: controlSize,
+                    background: toolDropdownOpen ? "var(--bg-hover)" : "none",
+                    border: "none",
+                    borderRadius: 9,
+                    color: "var(--text-muted)",
+                    cursor: isStreaming ? "not-allowed" : "pointer",
+                    fontSize: 12,
+                    opacity: isStreaming ? 0.5 : 1,
+                    transition: "background 0.12s, color 0.12s",
+                  }}
                   aria-expanded={toolDropdownOpen}
+                  onMouseEnter={(e) => {
+                    if (isStreaming) return;
+                    e.currentTarget.style.background = "var(--bg-hover)";
+                    e.currentTarget.style.color = "var(--text)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = toolDropdownOpen ? "var(--bg-hover)" : "none";
+                    e.currentTarget.style.color = "var(--text-muted)";
+                  }}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
@@ -2827,21 +2938,114 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             )}
 
             {(!isStreaming || isCompacting) && onCompact && (
+
+              <div>
+                <button
+                  onClick={isCompacting ? onAbortCompaction : (e) => { if (!isStrayClick(e)) onCompact(); }}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    padding: isMobile ? "0 10px" : "8px 12px",
+                    width: isMobile ? "auto" : undefined,
+                    height: controlSize,
+                    background: isCompacting ? "rgba(239,68,68,0.08)" : "none",
+                    border: "none",
+                    borderRadius: 9,
+                    color: isCompacting ? "#ef4444" : "var(--text-muted)",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    transition: "background 0.12s, color 0.12s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = isCompacting ? "rgba(239,68,68,0.16)" : "var(--bg-hover)";
+                    e.currentTarget.style.color = isCompacting ? "#ef4444" : "var(--text)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = isCompacting ? "rgba(239,68,68,0.08)" : "none";
+                    e.currentTarget.style.color = isCompacting ? "#ef4444" : "var(--text-muted)";
+                  }}
+                   title={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
+                   aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
+                >
+                  {isCompacting ? (
+                    <><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" fill="currentColor" /></svg>{(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{t("chat.compacting")}</span>}</>
+                  ) : (
+                    <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
+                      <line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" />
+                    </svg>{(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{t("chat.compact")}</span>}</>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {isStreaming && (
               <button
-                onClick={isCompacting ? onAbortCompaction : (e) => { if (!isStrayClick(e)) onCompact(); }}
-                disabled={isCompacting && !onAbortCompaction}
-                className="composer-chip"
-                style={isCompacting ? { color: "var(--danger)" } : undefined}
-                 title={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
-                 aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
+                onClick={onAbort}
+                 title={t("chat.stopAgent")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 14px",
+                  height: controlSize,
+                  background: "rgba(239,68,68,0.08)",
+                  border: "1px solid rgba(239,68,68,0.3)",
+                  borderRadius: 9,
+                  color: "#ef4444",
+                  cursor: "pointer",
+                  fontSize: 12, fontWeight: 600,
+                  whiteSpace: "nowrap", letterSpacing: "-0.01em",
+                  transition: "background 0.12s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.16)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
               >
-                {isCompacting ? (
-                  <><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" fill="currentColor" /></svg>{(!isMobile || controlsMenuOpen) && <span>{t("chat.compacting")}</span>}</>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
+                </svg>
+                 {t("chat.stop")}
+              </button>
+            )}
+
+            {onSoundToggle !== undefined && (
+              <button
+                onClick={onSoundToggle}
+                 title={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}
+                 aria-label={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  width: controlSize,
+                  height: controlSize,
+                  padding: 0,
+                  background: "none",
+                  border: "none",
+                  borderRadius: 9,
+                  color: soundEnabled ? "var(--text-muted)" : "var(--text-dim)",
+                  cursor: "pointer",
+                  opacity: soundEnabled ? 1 : 0.55,
+                  transition: "background 0.12s, color 0.12s, opacity 0.12s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--bg-hover)";
+                  e.currentTarget.style.color = "var(--text)";
+                  e.currentTarget.style.opacity = "1";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "none";
+                  e.currentTarget.style.color = soundEnabled ? "var(--text-muted)" : "var(--text-dim)";
+                  e.currentTarget.style.opacity = soundEnabled ? "1" : "0.55";
+                }}
+              >
+                {soundEnabled ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                  </svg>
                 ) : (
-                  <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
-                    <line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" />
-                  </svg>{(!isMobile || controlsMenuOpen) && <span>{t("chat.compact")}</span>}</>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    <line x1="23" y1="9" x2="17" y2="15" />
+                    <line x1="17" y1="9" x2="23" y2="15" />
+                  </svg>
                 )}
               </button>
             )}
@@ -2858,7 +3062,29 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   setThinkingDropdownOpen(false);
                   setControlsMenuOpen(false);
                 }}
-                style={{ width: 36, padding: 0, justifyContent: "center" }}
+
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: isMobile ? controlSize : 36,
+                  height: controlSize,
+                  padding: 0,
+                  marginLeft: 0,
+                  background: "var(--bg-hover)",
+                  border: "none",
+                  borderLeft: "1px solid color-mix(in srgb, var(--border) 72%, transparent)",
+                  borderRadius: "0 9px 9px 0",
+                  color: "var(--text)",
+                  cursor: "pointer",
+                  transition: "background 0.12s, color 0.12s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--bg-selected)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "var(--bg-hover)";
+                }}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                   <line x1="18" y1="6" x2="6" y2="18" />

@@ -971,6 +971,8 @@ test("keeps the compaction control reachable while a turn is auto-compacting", (
   // The "streaming but not compacting" state is now unreachable, so its disabled styling
   // must be gone rather than left as dead branches.
   assert.doesNotMatch(controlBlock, /isStreaming && !isCompacting/);
-  // The chip carries the pointer affordance in CSS instead of inline.
-  assert.match(controlBlock, /className="composer-chip"/);
+  // Upstream's touch-friendly restyle (v0.14.2) inlines the control styles: the
+  // pointer affordance and the compacting danger tint live in the style block.
+  assert.match(controlBlock, /cursor: "pointer"/);
+  assert.match(controlBlock, /isCompacting \? "#ef4444" : "var\(--text-muted\)"/);
 });

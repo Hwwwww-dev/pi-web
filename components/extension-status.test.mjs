@@ -156,7 +156,9 @@ test("keeps the status label and the permissive chip in the composer's controls 
   const chatInput = await readFile(new URL("./ChatInput.tsx", import.meta.url), "utf8");
   const chatWindow = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
 
-  const moreIndex = chatInput.indexOf('{t("chat.moreControls")}');
+  // Upstream v0.14.2 renders a second More trigger inside the mobile controls menu;
+  // the row-order assertion concerns the composer row's own More button (the last one).
+  const moreIndex = chatInput.lastIndexOf('{t("chat.moreControls")}');
   const statusIndex = chatInput.indexOf("<ExtensionStatusButton statuses=");
   const chipIndex = chatInput.indexOf("{permissiveStatus && <PermissiveModeChip");
 
