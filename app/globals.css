@@ -3198,24 +3198,9 @@ span.token.table {
   to   { opacity: 1; transform: scale(1); }
 }
 
-@keyframes drop-icon-float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-6px); }
-}
-
-@keyframes drop-ring-pulse {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50%       { opacity: 1;   transform: scale(1.06); }
-}
-
 @keyframes drop-ripple {
   0%   { transform: scale(0); opacity: 0.6; }
   100% { transform: scale(1); opacity: 0; }
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
 }
 
 @keyframes spin {
@@ -3476,9 +3461,6 @@ span.token.table {
 
 /* Mobile sidebar: slide in/out as overlay */
 @media (max-width: 640px) {
-  .chat-stats-center {
-    display: none !important;
-  }
   .sidebar-container {
     position: fixed !important;
     top: 0;
@@ -3754,11 +3736,6 @@ span.token.table {
    row for them and is not a container. */
 .chat-composer-row {
   container-type: inline-size;
-}
-@container (max-width: 480px) {
-  .chat-composer-run-label {
-    display: none;
-  }
 }
 
 /* While the software keyboard is up (set by useViewportHeight), only a few
