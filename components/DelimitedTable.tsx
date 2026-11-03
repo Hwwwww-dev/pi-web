@@ -1,50 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties, type RefObject } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 import { measureColumnWidths, parseDelimitedTable, visibleRowRange } from "@/lib/delimited-table";
+import { cn } from "@/lib/utils";
 
 const ROW_HEIGHT = 26;
 const GUTTER_WIDTH = 56;
 const OVERSCAN_ROWS = 20;
 
-const ROW: CSSProperties = {
-  display: "flex",
-  height: ROW_HEIGHT,
-  boxSizing: "border-box",
-  borderBottom: "1px solid var(--border)",
-};
+const ROW_CLASSES = "flex h-[26px] border-b border-border";
 
 // The source view's line-number gutter, kept beside the columns while they
-// scroll sideways. Opaque (--bg-panel), or cells would show through it.
-const GUTTER: CSSProperties = {
-  position: "sticky",
-  left: 0,
-  zIndex: 1,
-  boxSizing: "border-box",
-  width: GUTTER_WIDTH,
-  flexShrink: 0,
-  padding: "0 10px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-end",
-  color: "var(--text-dim)",
-  background: "var(--bg-panel)",
-  borderRight: "1px solid var(--border)",
-  fontSize: 11,
-  fontVariantNumeric: "tabular-nums",
-  userSelect: "none",
-};
+// scroll sideways. Opaque (bg-card), or cells would show through it.
+const GUTTER_CLASSES =
+  "sticky left-0 z-[1] flex w-14 shrink-0 select-none items-center justify-end border-r border-border bg-card px-2.5 text-xs text-dim tabular-nums";
 
-const CELL: CSSProperties = {
-  boxSizing: "border-box",
-  flexShrink: 0,
-  padding: "0 10px",
-  lineHeight: `${ROW_HEIGHT - 1}px`,
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  borderRight: "1px solid var(--border)",
-};
+const CELL_CLASSES = "shrink-0 truncate border-r border-border px-2.5 leading-[25px]"; /* leading = ROW_HEIGHT - 1 */
 
 /**
  * A `.csv` / `.tsv` file as a table: the first record is a sticky header, the
@@ -118,13 +89,14 @@ export function DelimitedTable({
         key={index}
         role="row"
         aria-rowindex={index + 2}
-        style={{ ...ROW, position: "absolute", top: index * ROW_HEIGHT, left: 0, width: totalWidth }}
+        className={cn(ROW_CLASSES, "absolute left-0")}
+        style={{ top: index * ROW_HEIGHT, width: totalWidth }} /* 虚拟化行位与总列宽为测量/计算值 */
       >
-        <div role="rowheader" style={GUTTER}>{table.rowLines[index]}</div>
+        <div role="rowheader" className={GUTTER_CLASSES}>{table.rowLines[index]}</div>
         {widths.map((width, cellIndex) => {
           const value = row[cellIndex] ?? "";
           return (
-            <div key={cellIndex} role="cell" style={{ ...CELL, width }} title={value || undefined}>
+            <div key={cellIndex} role="cell" className={CELL_CLASSES} style={{ width }} /* 列宽为实测值 */ title={value || undefined}>
               {value}
             </div>
           );
@@ -138,38 +110,23 @@ export function DelimitedTable({
       role="table"
       aria-rowcount={table.rows.length + 1}
       aria-colcount={table.columns.length}
-      style={{
-        width: totalWidth,
-        minWidth: "100%",
-        fontFamily: "var(--font-mono)",
-        fontWeight: "var(--font-mono-weight)",
-        fontSize: 12,
-        color: "var(--text-muted)",
-        background: "var(--bg)",
-      }}
+      className="min-w-full bg-background font-mono text-xs text-muted-foreground"
+      style={{ width: totalWidth, fontWeight: "var(--font-mono-weight)" }} /* 总列宽为测量值；字重来自主题 mono 变量 */
     >
       <div
         role="row"
         aria-rowindex={1}
-        style={{
-          ...ROW,
-          position: "sticky",
-          top: 0,
-          zIndex: 2,
-          width: totalWidth,
-          background: "var(--bg-panel)",
-          color: "var(--text)",
-          fontWeight: 600,
-        }}
+        className={cn(ROW_CLASSES, "sticky top-0 z-[2] bg-card font-semibold text-foreground")}
+        style={{ width: totalWidth }} /* 总列宽为测量值 */
       >
-        <div role="rowheader" style={GUTTER}>{table.headerLine}</div>
+        <div role="rowheader" className={GUTTER_CLASSES}>{table.headerLine}</div>
         {table.columns.map((column, index) => (
-          <div key={index} role="columnheader" style={{ ...CELL, width: widths[index] }} title={column || undefined}>
+          <div key={index} role="columnheader" className={CELL_CLASSES} style={{ width: widths[index] }} /* 列宽为实测值 */ title={column || undefined}>
             {column}
           </div>
         ))}
       </div>
-      <div style={{ position: "relative", height: table.rows.length * ROW_HEIGHT }}>
+      <div className="relative" style={{ height: table.rows.length * ROW_HEIGHT }} /* 虚拟化总高为计算值 */>
         {rows}
       </div>
     </div>

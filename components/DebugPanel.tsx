@@ -8,7 +8,7 @@ import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
 import { StatusIcon } from "./AgentSessionPanel";
 import { MCP_SESSION_STATE_KEYS } from "./mcp-config-helpers";
 import { sessionRowTitle } from "./SessionTree";
-import { FolderIcon, LoaderCircleIcon } from "lucide-react";
+import { CircleXIcon, FolderIcon, LoaderCircleIcon, ServerIcon, TriangleAlertIcon } from "lucide-react";
 import {
   DEBUG_CLOSE_REASON_KEYS,
   DEBUG_LEASE_OUTCOME_KEYS,
@@ -115,7 +115,7 @@ export class DebugPanelBoundary extends Component<{ fallback: string; children: 
     return (
       <div
         role="status"
-        style={{ padding: "10px 16px", background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", color: "var(--text-muted)", fontSize: 12 }}
+        className="border-b border-border bg-card px-4 py-2.5 text-xs text-muted-foreground"
       >
         {this.props.fallback}
       </div>
@@ -319,12 +319,18 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
   const ctx: Ctx = { t, now, clock, myHolder, titleOf };
 
   return (
-    <section ref={sectionRef} className="debug-panel" aria-label={t("debug.panelLabel")}>
-      <div className="debug-panel-header">
-        <span className="debug-panel-heading" title={t("debug.readOnly")}>{t("debug.title")}</span>
+    // The top bar's drop-down panel: the floating-layer recipe (shadcn popover
+    // surface); the embedded parts below stay on the card tint.
+    <section
+      ref={sectionRef}
+      className="debug-panel flex max-h-[min(720px,80dvh)] flex-col rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+      aria-label={t("debug.panelLabel")}
+    >
+      <div className="debug-panel-header flex min-w-0 shrink-0 items-center gap-3 border-b border-border px-4 py-2 text-xs">
+        <span className="debug-panel-heading shrink-0 cursor-help font-bold text-foreground" title={t("debug.readOnly")}>{t("debug.title")}</span>
         {/* Plain text, no live region: a screen reader would read out every change. */}
         <VerdictView verdict={verdict} t={t} />
-        <button type="button" className="debug-panel-copy" onClick={onCopy} title={t("debug.copyTitle")}>
+        <button type="button" className="debug-panel-copy ml-auto shrink-0 cursor-pointer rounded-sm border border-border bg-transparent px-2 py-0.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground" onClick={onCopy} title={t("debug.copyTitle")}>
           {copied ? t("debug.copied") : t("debug.copyJson")}
         </button>
       </div>
@@ -356,42 +362,12 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
 
 type GlyphKind = "server" | "warning" | "error";
 
-/** One 24-grid stroke glyph in `currentColor`; decorative, the text beside it says what it is. */
-function Glyph({ kind, size = 12 }: { kind: GlyphKind; size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {kind === "server" && (
-        <>
-          <rect x="3" y="3" width="18" height="8" rx="2" />
-          <rect x="3" y="13" width="18" height="8" rx="2" />
-          <path d="M7 7h.01M7 17h.01" />
-        </>
-      )}
-      {kind === "warning" && (
-        <>
-          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-          <path d="M12 9v4" />
-          <path d="M12 17h.01" />
-        </>
-      )}
-      {kind === "error" && (
-        <>
-          <circle cx="12" cy="12" r="9" />
-          <path d="M15 9l-6 6M9 9l6 6" />
-        </>
-      )}
-    </svg>
-  );
+const GLYPH_ICONS = { server: ServerIcon, warning: TriangleAlertIcon, error: CircleXIcon } as const;
+
+/** One lucide glyph in `currentColor`; decorative, the text beside it says what it is. */
+function Glyph({ kind, size = 13 }: { kind: GlyphKind; size?: number }) {
+  const Icon = GLYPH_ICONS[kind];
+  return <Icon size={size} strokeWidth={1.8} className="shrink-0" aria-hidden="true" />;
 }
 
 interface BadgeItem {
@@ -441,7 +417,9 @@ function BadgeRun({ text, items, cap, label, plain = false }: {
 
 // Small marks for a page's browser and system, 24-grid strokes in currentColor like Glyph, drawn
 // to be told apart at 12px; the title says the words. The systems are filled shapes (Simple
-// Icons, CC0), which read at that size where outlines blur.
+// Icons, CC0), which read at that size where outlines blur. Brand marks, not UI icons: lucide has
+// no Safari/Firefox/Edge equivalents, and its all-outline set is exactly what was replaced here,
+// so these stay hand-drawn (docs/agents/sessions.md, Debug panel).
 const CLIENT_GLYPHS: Record<string, ReactNode> = {
   Chrome: (
     <>
@@ -541,6 +519,8 @@ function Bar({ fraction, tone, width, height = 4, notches, title, className }: {
   className?: string;
 }) {
   return (
+    // The bar's size and the fill/notch offsets are computed measures (fractions
+    // of a timeout, heartbeats on a scale), not presentation: they stay inline.
     <span className={`debug-bar is-${tone}${className ? ` ${className}` : ""}`} style={{ width, height }} title={title} aria-hidden="true">
       <span className="debug-bar-fill" style={{ width: `${fraction * 100}%` }} />
       {notches?.map((notch) => <span key={notch} className="debug-bar-notch" style={{ left: `${notch * 100}%` }} />)}
@@ -559,9 +539,10 @@ const BAR_WIDTH = 120;
 function Sparkline({ samples, label }: { samples: readonly DebugSample[]; label: string }) {
   const shown = samples.slice(-DEBUG_SAMPLE_COUNT);
   return (
+    // A data chart (one rect per round trip on a baseline), not an icon: stays an svg.
     <span className="debug-spark" role="img" aria-label={label} title={label}>
       <svg width="120" height="15" viewBox="0 0 120 15" aria-hidden="true">
-        <rect x="0" y="14" width="120" height="1" style={{ fill: "var(--border)" }} />
+        <rect x="0" y="14" width="120" height="1" className="fill-border" />
         {shown.map((sample, index) => {
           const height = sample.failed ? 14 : Math.max(1, Math.round(sparkHeight(sample.ms) * 14));
           return (
@@ -615,11 +596,11 @@ function VerdictView({ verdict, t }: { verdict: DebugVerdict; t: Translate }) {
     ok: () => t("debug.health.ok"),
   }[verdict.kind]();
   return (
-    <span className={`debug-panel-status is-${verdict.kind === "ok" ? "muted" : verdict.tone}`}>
+    <span className={`debug-panel-status inline-flex min-w-0 items-center gap-1.5 tabular-nums is-${verdict.kind === "ok" ? "muted" : verdict.tone}`}>
       {verdict.kind === "issues" && <Glyph kind={verdict.tone === "error" ? "error" : "warning"} />}
       {verdict.kind === "ok" && <Dot tone="ok" />}
       {(verdict.kind === "hidden" || verdict.kind === "waiting") && <Dot tone="dim" ring />}
-      <span className="debug-panel-status-text">{text}</span>
+      <span className="debug-panel-status-text min-w-0 truncate">{text}</span>
     </span>
   );
 }
@@ -1472,19 +1453,14 @@ function SessionRowCells({ summary, mine, remaining, idleTimeoutMs, t, badges, i
 // classes setting `color`, and every mark is drawn in currentColor. No transitions: bars and rings
 // jump once a second. Narrow rules follow the panel's own width, not the window's.
 const DEBUG_PANEL_CSS = `
+  /* Tones read the theme's state tokens; the container declaration stays here
+     because the panel's own width, not the window's, drives the rules below. */
   .debug-panel {
-    --dbg-ok: #16a34a;
-    --dbg-warn: #d97706;
-    --dbg-err: #ef4444;
+    --dbg-ok: var(--ok);
+    --dbg-warn: var(--warning);
+    --dbg-err: var(--danger);
     container-type: inline-size;
     container-name: debug-panel;
-    display: flex;
-    max-height: min(720px, 80dvh);
-    flex-direction: column;
-    background: var(--bg-panel);
-    border-bottom: 1px solid var(--border);
-    box-shadow: 0 10px 28px rgba(0,0,0,0.10);
-    color: var(--text);
   }
   .debug-panel .is-ok { color: var(--dbg-ok); }
   .debug-panel .is-warning { color: var(--dbg-warn); }
@@ -1492,53 +1468,6 @@ const DEBUG_PANEL_CSS = `
   .debug-panel .is-accent { color: var(--accent); }
   .debug-panel .is-muted { color: var(--text-muted); }
   .debug-panel .is-dim { color: var(--text-dim); }
-  .debug-panel-header {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-    padding: 8px 16px;
-    border-bottom: 1px solid var(--border);
-    font-size: 12px;
-  }
-  .debug-panel-heading {
-    flex-shrink: 0;
-    color: var(--text);
-    cursor: help;
-    font-weight: 700;
-  }
-  .debug-panel-status {
-    display: inline-flex;
-    min-width: 0;
-    align-items: center;
-    gap: 6px;
-    font-variant-numeric: tabular-nums;
-  }
-  .debug-panel-status svg {
-    flex-shrink: 0;
-  }
-  .debug-panel-status-text {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .debug-panel-copy {
-    flex-shrink: 0;
-    margin-left: auto;
-    padding: 2px 8px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 11px;
-  }
-  .debug-panel-copy:hover {
-    background: var(--bg-hover);
-    color: var(--text);
-  }
   .debug-panel-scroll {
     display: flex;
     min-height: 0;
@@ -1600,7 +1529,6 @@ const DEBUG_PANEL_CSS = `
     background: color-mix(in srgb, currentColor 8%, var(--bg-panel));
   }
   .debug-issue > svg {
-    flex-shrink: 0;
     margin-top: 3px;
   }
   .debug-issue-text {

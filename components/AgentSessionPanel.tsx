@@ -3,12 +3,24 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { countRunningSubagents, sideChatTitle } from "@/lib/session-family";
-import { MessageSquarePlusIcon, MessagesSquareIcon } from "lucide-react";
+import {
+  BotIcon,
+  CircleCheckIcon,
+  CircleStopIcon,
+  CircleXIcon,
+  ClockIcon,
+  LoaderCircleIcon,
+  MessageSquarePlusIcon,
+  MessagesSquareIcon,
+  PanelRightIcon,
+  Trash2Icon,
+  UserIcon,
+} from "lucide-react";
 import type { SessionUsageSummary } from "@/lib/session-stats";
 import { formatActiveDuration, formatCompactCount, formatCostShort } from "@/lib/session-stats-format";
 import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { DeleteConfirm } from "./SessionTree";
-import { Trash2Icon } from "lucide-react";
 
 interface Props {
   rootSession: SessionInfo;
@@ -88,26 +100,24 @@ function usageTooltip(usage: SessionUsageSummary, t: (key: string) => string, lo
   ].join("\n");
 }
 
-function UsageLine({ usage, style }: { usage: SessionUsageSummary; style?: React.CSSProperties }) {
+function UsageLine({ usage, className }: { usage: SessionUsageSummary; className?: string }) {
   const { locale, t } = useI18n();
   const cost = formatCostShort(usage.cost);
   return (
     <span
       title={usageTooltip(usage, t, locale)}
-      style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, color: "var(--text-dim)", fontSize: 11, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", ...style }}
+      className={cn("flex min-w-0 items-center gap-2.5 whitespace-nowrap text-xs text-dim tabular-nums", className)}
     >
       {usage.totalActiveMs > 0 && (
-        <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
-          </svg>
+        <span className="flex items-center gap-[3px]">
+          <ClockIcon size={13} strokeWidth={1.8} />
           {formatActiveDuration(usage.totalActiveMs)}
         </span>
       )}
       {usage.tokens.total > 0 && (
         <span>{t("agentSwitcher.tokens", { count: formatCompactCount(usage.tokens.total) })}</span>
       )}
-      {cost && <span style={{ color: "var(--text-muted)" }}>{cost}</span>}
+      {cost && <span className="text-muted-foreground">{cost}</span>}
     </span>
   );
 }
@@ -133,42 +143,26 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(elapsedHours / 24), "day");
 }
 
-export function statusColor(status: SubagentSessionStatus): string {
-  if (status === "running" || status === "starting") return "var(--accent)";
-  if (status === "completed") return "#16a34a";
-  if (status === "failed") return "#dc2626";
-  if (status === "aborted") return "#d97706";
-  return "var(--text-dim)";
+/** Run status → token classes (was hardcoded #16a34a / #dc2626 / #d97706 hex). */
+function statusTextClass(status: SubagentSessionStatus): string {
+  if (status === "running" || status === "starting") return "text-primary";
+  if (status === "completed") return "text-success";
+  if (status === "failed") return "text-destructive";
+  if (status === "aborted") return "text-warning";
+  return "text-dim";
 }
 
 export function StatusIcon({ status }: { status: SubagentSessionStatus }) {
   if (status === "running" || status === "starting") {
-    return (
-      <svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.25" />
-        <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    );
+    return <LoaderCircleIcon className="size-[13px] animate-spin motion-reduce:animate-none" strokeWidth={1.8} />;
   }
   if (status === "failed") {
-    return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" /><path d="m9 9 6 6M15 9l-6 6" />
-      </svg>
-    );
+    return <CircleXIcon size={13} strokeWidth={1.8} />;
   }
   if (status === "aborted" || status === "interrupted") {
-    return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" /><path d="M9 9h6v6H9z" />
-      </svg>
-    );
+    return <CircleStopIcon size={13} strokeWidth={1.8} />;
   }
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" />
-    </svg>
-  );
+  return <CircleCheckIcon size={13} strokeWidth={1.8} />;
 }
 
 function AgentRow({
@@ -227,17 +221,8 @@ function AgentRow({
     return (
       // The sidebar's confirmation, in a row as tall as the one it replaces.
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          height: confirmHeight,
-          minHeight: 56,
-          padding: "7px 12px",
-          borderBottom: "1px solid var(--border)",
-          background: "rgba(239, 68, 68, 0.06)",
-          boxShadow: "inset 0 0 0 1px rgba(239, 68, 68, 0.35)",
-        }}
+        className="flex min-h-14 items-center gap-[5px] border-b border-border bg-destructive/[0.06] px-3 py-[7px] shadow-[inset_0_0_0_1px_var(--danger-border)]"
+        style={{ height: confirmHeight /* 测量值：Delete 时记录的行高，确认框与被替换行等高，列表不跳动 */ }}
         onKeyDown={(event) => {
           if (event.key !== "Escape") return;
           event.preventDefault();
@@ -259,62 +244,45 @@ function AgentRow({
   return (
     <div
       ref={rowRef}
-      style={{
-        display: "flex",
-        borderBottom: "1px solid var(--border)",
-        borderLeft: selected ? "2px solid var(--accent)" : "2px solid transparent",
-        background: selected ? "var(--bg-selected)" : "transparent",
-      }}
+      className={cn(
+        "flex border-b border-l-2 border-border",
+        selected ? "border-l-primary bg-accent" : "border-l-transparent",
+      )}
     >
       <button
         type="button"
         role="option"
         aria-selected={selected}
         onClick={onSelect}
-        className={selected ? "bg-transparent" : "bg-transparent hover:bg-secondary"}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          minHeight: 56,
-          display: "grid",
-          gridTemplateColumns: "28px minmax(0, 1fr) auto",
-          alignItems: "center",
-          gap: 9,
-          padding: "7px 12px",
-          border: "none",
-          color: "var(--text)",
-          cursor: "pointer",
-          textAlign: "left",
-        }}
+        className={cn(
+          "grid min-h-14 min-w-0 flex-1 cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-[9px] px-3 py-[7px] text-left text-foreground",
+          !selected && "hover:bg-secondary",
+        )}
       >
-        <span style={{ width: 28, height: 28, display: "grid", placeItems: "center", color: main ? "var(--text-muted)" : "var(--accent)" }}>
+        <span className={cn("grid size-7 place-items-center", main ? "text-muted-foreground" : "text-primary")}>
           {main ? (
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" />
-            </svg>
+            <UserIcon size={17} strokeWidth={1.8} />
           ) : side ? (
             <MessagesSquareIcon size={17} strokeWidth={1.8} />
           ) : (
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" />
-            </svg>
+            <BotIcon size={17} strokeWidth={1.8} />
           )}
         </span>
-        <span style={{ minWidth: 0 }}>
-          <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: selected ? 600 : 500 }} title={primary}>
+        <span className="min-w-0">
+          <span className={cn("block truncate text-xs", selected ? "font-semibold" : "font-medium")} title={primary}>
             {primary}
           </span>
-          <span style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 2, minWidth: 0, whiteSpace: "nowrap", color: "var(--text-dim)", fontSize: 11 }} title={secondaryTitle}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", flexShrink: modelId && !main ? 0 : 1, maxWidth: modelId && !main ? "40%" : undefined }}>{secondary}</span>
+          <span className="mt-0.5 flex min-w-0 items-baseline gap-1 whitespace-nowrap text-xs text-dim" title={secondaryTitle}>
+            <span className={cn("truncate", modelId && !main && "max-w-[40%] shrink-0")}>{secondary}</span>
             {!main && modelId && <>
               <span aria-hidden="true">·</span>
-              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{modelId}</span>
+              <span className="min-w-0 truncate">{modelId}</span>
             </>}
-            {!main && thinkingLevel && <span style={{ flexShrink: 0 }}>· {thinkingLevel}</span>}
+            {!main && thinkingLevel && <span className="shrink-0">· {thinkingLevel}</span>}
           </span>
-          {hasUsage(usage) && <UsageLine usage={usage} style={{ marginTop: 3 }} />}
+          {hasUsage(usage) && <UsageLine usage={usage} className="mt-[3px]" />}
         </span>
-        <span style={{ display: "flex", alignItems: "center", gap: 6, color: (main || side) && !running ? "var(--text-dim)" : statusColor(status), fontSize: 11, whiteSpace: "nowrap" }}>
+        <span className={cn("flex items-center gap-1.5 whitespace-nowrap text-xs", (main || side) && !running ? "text-dim" : statusTextClass(status))}>
           {(main || side) && !running ? (
             selected ? t("agentSwitcher.current") : null
           ) : (
@@ -339,10 +307,10 @@ function AgentRow({
           disabled={selected}
           onClick={onToggleTab}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M15 4v16" />
-            {tabShown && <path d="M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4z" fill="currentColor" />}
-          </svg>
+          {/* Filled right pane while the panel shows this row (side-sessions.md). */}
+          <PanelRightIcon size={14} strokeWidth={1.8} aria-hidden="true">
+            {tabShown ? <rect x="15" y="4" width="5.5" height="16" rx="1.5" fill="currentColor" stroke="none" /> : null}
+          </PanelRightIcon>
         </RowSideButton>
       )}
       {onDelete && (
@@ -384,8 +352,7 @@ function RowSideButton({ title, pressed, danger, disabled, onClick, children }: 
       aria-label={title}
       aria-pressed={pressed}
       disabled={disabled}
-      className={`bg-transparent ${state}`}
-      style={{ width: 36, display: "grid", placeItems: "center", border: "none", borderLeft: "1px solid var(--border)", flexShrink: 0 }}
+      className={cn("grid w-9 shrink-0 place-items-center border-l border-border bg-transparent", state)}
     >
       {children}
     </button>
@@ -467,57 +434,45 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
     <div
       role="listbox"
       aria-label={t("agentSwitcher.title")}
-      style={{
-        background: "var(--bg-panel)",
-        borderLeft: "1px solid var(--border)",
-        borderRight: "1px solid var(--border)",
-        borderBottom: "1px solid var(--border)",
-        borderRadius: "0 0 6px 6px",
-        boxShadow: "0 10px 28px rgba(0,0,0,0.10)",
-        overflow: "hidden",
-      }}
+      className="overflow-hidden rounded-b-sm border-x border-b border-border bg-card shadow-md"
     >
       <div>
-        <div style={{ minHeight: 44, display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", borderBottom: "1px solid var(--border)" }}>
-          <strong style={{ fontSize: 12, fontWeight: 600 }}>{t("agentSwitcher.title")}</strong>
+        <div className="flex min-h-11 items-center gap-2 border-b border-border px-3 py-[7px]">
+          <strong className="text-xs font-semibold">{t("agentSwitcher.title")}</strong>
           {subagents.length > 0 && (
-            <span style={{ color: "var(--text-dim)", fontSize: 11 }}>
+            <span className="text-xs text-dim">
               {subagents.length === 1
                 ? t("agentSwitcher.countOne", { count: subagents.length })
                 : t("agentSwitcher.count", { count: subagents.length })}
             </span>
           )}
-          <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <span className="ms-auto flex min-w-0 items-center gap-2.5">
             {familyUsage && (
-              <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, overflow: "hidden" }}>
-                <span style={{ color: "var(--text-dim)", fontSize: 11, whiteSpace: "nowrap" }} title={t("agentSwitcher.totalUsageHint")}>{t("agentSwitcher.totalUsage")}</span>
+              <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                <span className="whitespace-nowrap text-xs text-dim" title={t("agentSwitcher.totalUsageHint")}>{t("agentSwitcher.totalUsage")}</span>
                 <UsageLine usage={familyUsage} />
               </span>
             )}
             {runningCount > 0 && (
-              <span style={{ color: "var(--accent)", fontSize: 11, whiteSpace: "nowrap" }}>
+              <span className="whitespace-nowrap text-xs text-primary">
                 {t("agentSwitcher.runningCount", { count: runningCount })}
               </span>
             )}
           </span>
         </div>
         {subagents.length > 8 && (
-          <div style={{ padding: 8, borderBottom: "1px solid var(--border)" }}>
+          <div className="border-b border-border p-2">
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("agentSwitcher.search")}
               aria-label={t("agentSwitcher.search")}
-              style={{
-                width: "100%", height: 32, padding: "0 10px",
-                border: "1px solid var(--border)", borderRadius: 6,
-                background: "var(--bg)", color: "var(--text)", fontSize: 12, outline: "none",
-              }}
+              className="h-8 w-full rounded-sm border border-border bg-background px-2.5 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             />
           </div>
         )}
-        <div style={{ maxHeight: "min(58dvh, 480px)", overflowY: "auto" }}>
+        <div className="max-h-[min(58dvh,480px)] overflow-y-auto">
           <AgentRow
             session={rootSession}
             main
@@ -529,7 +484,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
             newSideChatPending={newSideChatPending}
           />
           {(newSideChatError || deleteSideChatError) && (
-            <div role="alert" style={{ padding: "6px 12px", borderBottom: "1px solid var(--border)", color: "#dc2626", fontSize: 12, overflowWrap: "anywhere" }}>
+            <div role="alert" className="border-b border-border px-3 py-1.5 text-xs text-destructive [overflow-wrap:anywhere]">
               {newSideChatError ?? deleteSideChatError}
             </div>
           )}
@@ -557,7 +512,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
             />
           ))}
           {subagents.length > 0 && visibleSubagents.length === 0 && (
-            <div style={{ padding: "22px 12px", color: "var(--text-dim)", fontSize: 12, textAlign: "center" }}>
+            <div className="px-3 py-[22px] text-center text-xs text-dim">
               {t("agentSwitcher.noMatches")}
             </div>
           )}

@@ -267,7 +267,7 @@ function render(props = {}) {
 
 test("a quiet page reads OK: no issue list, the meter's scale in its label, every section", () => {
   const html = render();
-  assert.match(html, /<span class="debug-panel-status is-muted"><span class="debug-dot is-ok" aria-hidden="true"><\/span><span class="debug-panel-status-text">OK<\/span><\/span>/);
+  assert.match(html, /<span class="debug-panel-status[^"]*is-muted"><span class="debug-dot is-ok" aria-hidden="true"><\/span><span class="debug-panel-status-text[^"]*">OK<\/span><\/span>/);
   assert.doesNotMatch(html, /<ul/, "no issues, no list");
   // The meter's name says what its slots count: the slots' own titles are not read inside an image.
   assert.ok(ariaLabels(html).includes("http/1.1 · six connections per origin, shared by all tabs · 2/6 · Agent 1 · File watch 1"), ariaLabels(html).join("\n"));
@@ -278,8 +278,8 @@ test("a quiet page reads OK: no issue list, the meter's scale in its label, ever
   const text = visibleText(html);
   assert.doesNotMatch(text, /six connections|every 15s|timeout 10m|stale after/);
   assert.doesNotMatch(html, /<dl|<dt|debug-panel-footer/);
-  assert.match(html, /<span class="debug-panel-heading" title="Read-only: [^"]+">Debug<\/span>/);
-  assert.match(html, /<button type="button" class="debug-panel-copy"[^>]*>Copy JSON<\/button>/);
+  assert.match(html, /<span class="debug-panel-heading[^"]*" title="Read-only: [^"]+">Debug<\/span>/);
+  assert.match(html, /<button type="button" class="debug-panel-copy[^"]*"[^>]*>Copy JSON<\/button>/);
   // No live region: a screen reader would read every change out.
   assert.doesNotMatch(html, /role="status"|aria-live/);
 });
@@ -296,7 +296,7 @@ test("the meter names what it holds on h2 and with no protocol known, not a bare
 
 test("a timeout: the verdict counts it and its sentence is written once", () => {
   const html = render({ server: server({ failure: { kind: "timeout", status: null, at: LOCAL - SECOND } }) });
-  assert.match(html, /<span class="debug-panel-status is-warning"><svg[^>]*>.*?<\/svg><span class="debug-panel-status-text">Issues: 1<\/span>/);
+  assert.match(html, /<span class="debug-panel-status[^"]*is-warning"><svg[^>]*>.*?<\/svg><span class="debug-panel-status-text[^"]*">Issues: 1<\/span>/);
   // The tone's mark and the sentence: no mark for what it is about, the sentence names it.
   assert.match(html, /<ul class="debug-issues"><li class="debug-issue is-warning"><svg[^>]*>(?:<path [^>]*><\/path>)+<\/svg><span class="debug-issue-text">/);
   const sentence = `${t("debug.poll.timeout")} · 1s ago`;
@@ -496,7 +496,7 @@ test("a chat that moved on waits for its own answer; a hidden page pauses", () =
   assert.doesNotMatch(list, /debug-detail/);
 
   const hidden = render({ page: page({ visibility: { ...page().visibility, state: "hidden" } }) });
-  assert.match(hidden, /<span class="debug-panel-status is-dim"><span class="debug-dot is-dim is-ring" aria-hidden="true"><\/span><span class="debug-panel-status-text">Paused while the page is hidden<\/span>/);
+  assert.match(hidden, /<span class="debug-panel-status[^"]*is-dim"><span class="debug-dot is-dim is-ring" aria-hidden="true"><\/span><span class="debug-panel-status-text[^"]*">Paused while the page is hidden<\/span>/);
 
   // Nor does a hidden page read or render each second; it reads again as it comes back.
   const tick = panelSource.slice(panelSource.indexOf("const tick = window.setInterval("), panelSource.indexOf("}, DEBUG_TICK_MS);"));
@@ -603,7 +603,7 @@ test("notable states show in place and leave the verdict at OK", () => {
     page: page({ client: client({ released: { active: true, count: 1, lastAt: LOCAL - MINUTE }, graceDueAt: LOCAL + 24 * SECOND }) }),
     server: closingAfterStop(),
   });
-  assert.match(html, /<span class="debug-panel-status-text">OK<\/span>/);
+  assert.match(html, /<span class="debug-panel-status-text[^"]*">OK<\/span>/);
   assert.doesNotMatch(html, /<ul/);
   const list = sessionList(html);
   const row = list.slice(list.indexOf("debug-row is-current"), list.indexOf("debug-detail"));
@@ -655,9 +655,9 @@ test("the sparklines draw the poll samples against the 5 s timeout", () => {
   assert.equal(zhCNLocale.messages["debug.duration.ms"], "{count} ms");
   assert.ok(labels.includes("40 polls · 1 failed · not yet"));
   // A faint baseline under the bars, the chart's full width: a few short answers are no dashed line.
-  assert.match(html, /<svg width="120" height="15" viewBox="0 0 120 15" aria-hidden="true"><rect x="0" y="14" width="120" height="1" style="fill:var\(--border\)"><\/rect><rect class="is-dim"/);
+  assert.match(html, /<svg width="120" height="15" viewBox="0 0 120 15" aria-hidden="true"><rect x="0" y="14" width="120" height="1" class="fill-border"><\/rect><rect class="is-dim"/);
   const empty = section(html, "page", "server").split('aria-label="40 polls')[1];
-  assert.match(empty, /^[^>]*><svg[^>]*><rect x="0" y="14" width="120" height="1" style="fill:var\(--border\)"><\/rect><\/svg>/, "drawn before the first sample");
+  assert.match(empty, /^[^>]*><svg[^>]*><rect x="0" y="14" width="120" height="1" class="fill-border"><\/rect><\/svg>/, "drawn before the first sample");
   // Newest on the right, standing on the baseline; 41 ms and 20 ms are 1px stubs, 1 s is 6px, a failure is a full bar.
   assert.match(html, /<rect class="is-dim" x="105" y="13" width="3" height="1" fill="currentColor"><\/rect>/);
   assert.match(html, /<rect class="is-dim" x="109" y="8" width="3" height="6" fill="currentColor"><\/rect>/);
@@ -675,13 +675,17 @@ test("without a chat or with a reader that throws, the panel says so and still s
   assert.ok(visibleText(none).includes(t("debug.stream.noChat")));
   assert.ok(visibleText(none).includes(t("debug.server.noSession")));
   const before = render({ page: null });
-  assert.match(before, /<span class="debug-panel-status-text">Reading…<\/span>/);
+  assert.match(before, /<span class="debug-panel-status-text[^"]*">Reading…<\/span>/);
   assert.doesNotMatch(before, /<div class="debug-panel-scroll">/);
 });
 
-test("the panel keeps to the theme and to Safari 16.2: tokens, the three state colors, no :has or nesting", () => {
+test("the panel keeps to the theme and to Safari 16.2: theme tokens for every color, no :has or nesting", () => {
+  // The state colors read the theme's tokens (--ok / --warning / --danger) through --dbg-*:
+  // no hardcoded hex anywhere in the panel.
   const colors = new Set((panelSource.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).map((color) => color.toLowerCase()));
-  assert.deepEqual([...colors].sort(), ["#16a34a", "#d97706", "#ef4444"]);
+  assert.deepEqual([...colors].sort(), []);
+  const dbgTones = panelSource.slice(panelSource.indexOf("--dbg-ok:"), panelSource.indexOf(".debug-panel .is-ok"));
+  assert.match(dbgTones, /--dbg-ok: var\(--ok\);\s*--dbg-warn: var\(--warning\);\s*--dbg-err: var\(--danger\);/);
   assert.doesNotMatch(panelSource, /AbortSignal\.(any|timeout)|\(\?<[=!]/, "Safari 16.2");
   const css = panelSource.slice(panelSource.indexOf("const DEBUG_PANEL_CSS"));
   assert.doesNotMatch(css, /:has\(|&|transition/);
@@ -744,7 +748,7 @@ test("the Debug button only toggles its panel, left of the session stats", () =>
 });
 
 test("Escape with focus in the panel gives it back to the Debug button, after the panel left the page", () => {
-  assert.match(panelSource, /<section ref=\{sectionRef\} className="debug-panel"/);
+  assert.match(panelSource, /<section\s+ref=\{sectionRef\}\s+className="debug-panel/);
   assert.match(panelSource, /createDebugPanelEscapeListener\(\s*document,\s*\(\) => sectionRef\.current,\s*\(restoreFocus\) => onCloseRef\.current\(restoreFocus\),\s*\)/);
   const button = between(shellSource, "const renderDebugButton = (mobile: boolean) => {", "const renderMainFileToggle");
   assert.match(button, /<button\s+ref=\{debugButtonRef\}/);

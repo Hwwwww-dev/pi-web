@@ -1,8 +1,26 @@
 "use client";
 
 import { forwardRef, useState, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import {
+  AtSignIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  CircleAlertIcon,
+  CircleMinusIcon,
+  DownloadIcon,
+  ExternalLinkIcon,
+  FolderTreeIcon,
+  ListIcon,
+  LoaderCircleIcon,
+  LoaderIcon,
+  SearchIcon,
+  TriangleAlertIcon,
+  UploadIcon,
+  XIcon,
+} from "lucide-react";
 import { getFileIcon, FolderIcon } from "./FileIcons";
 import { DismissButton } from "./DismissButton";
+import { cn } from "@/lib/utils";
 import {
   encodeFilePathForApi,
   getFileDirectory,
@@ -144,13 +162,15 @@ const GIT_STATUS_KEYS: Record<GitFileStatusKind, string> = {
   conflict: "files.conflict",
 };
 
-const GIT_STATUS_COLORS: Record<GitFileStatusKind, string> = {
-  modified: "#d6a84b",
-  added: "#4ade80",
-  deleted: "#f87171",
-  renamed: "#60a5fa",
-  untracked: "#4ade80",
-  conflict: "#f87171",
+// Git 状态取色走 token 工具类（modified/amber→warning、added/renamed-green→success、
+// deleted/red→destructive、renamed/blue→primary），由状态键查类名，保持单一来源。
+const GIT_STATUS_TEXT_CLASSES: Record<GitFileStatusKind, string> = {
+  modified: "text-warning",
+  added: "text-success",
+  deleted: "text-destructive",
+  renamed: "text-primary",
+  untracked: "text-success",
+  conflict: "text-destructive",
 };
 
 function GitStatusBadge({ status, t }: { status: GitFileStatus; t: Translate }) {
@@ -158,46 +178,18 @@ function GitStatusBadge({ status, t }: { status: GitFileStatus; t: Translate }) 
     <span
       title={t(GIT_STATUS_KEYS[status.status])}
       aria-label={t(GIT_STATUS_KEYS[status.status])}
-      style={{
-        width: 14,
-        height: 14,
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: GIT_STATUS_COLORS[status.status],
-        fontFamily: "var(--font-mono)",
-        fontSize: 11,
-        fontWeight: 600,
-      }}
+      className={cn(
+        "flex size-3.5 shrink-0 items-center justify-center font-mono text-xs font-semibold",
+        GIT_STATUS_TEXT_CLASSES[status.status],
+      )}
     >
       {status.code}
     </span>
   );
 }
 
-function MentionIcon({ size = 11 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
-    </svg>
-  );
-}
-
-function OutsideLinkIcon({ size = 11 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M15 3h6v6" />
-      <path d="M10 14 21 3" />
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    </svg>
-  );
-}
-
 // Listed only while the explorer shows ignored files: dimmed like VS Code's
 // ignored entries, the reason in the name's tooltip.
-const HIDDEN_ENTRY_OPACITY = 0.55;
 const HIDDEN_REASON_KEYS = {
   ignored: "files.hiddenIgnored",
   excluded: "files.hiddenExcluded",
@@ -366,50 +358,32 @@ export function TreeNode({
           onDropTargetChange?.(null);
           onDropFiles?.(node.fullPath, droppedItems(event.dataTransfer));
         } : undefined}
-        style={{
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          paddingLeft: 8 + depth * 14,
-          paddingRight: 8,
-          height: "var(--file-row-height)",
-          cursor: "pointer",
-          background: isDropTarget
-            ? "color-mix(in srgb, var(--accent) 16%, transparent)"
-            : hovered
-              ? "var(--bg-hover)"
-              : "transparent",
-          outline: isDropTarget ? "1px dashed var(--accent)" : "none",
-          outlineOffset: -1,
-          borderRadius: 4,
-          userSelect: "none",
-        }}
+        className={cn(
+          "relative flex h-[var(--file-row-height)] cursor-pointer items-center gap-1 rounded-sm pr-2 select-none",
+          // 拖拽目标虚线框优先于行悬停底色（hovered 态不触发于拖拽中，二者不冲突）
+          isDropTarget &&
+            "bg-[color-mix(in_srgb,var(--accent)_16%,transparent)] outline-1 outline-dashed outline-primary -outline-offset-1",
+          !isDropTarget && hovered && "bg-secondary",
+        )}
+        style={{ paddingLeft: 8 + depth * 14 }} /* 树深度缩进为逐行计算值 */
       >
         {node.isDir && (
-          <svg
-            width="10" height="10" viewBox="0 0 10 10" fill="none"
-            stroke="var(--text-dim)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-            style={{ flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.1s" }}
-          >
-            <polyline points="3 2 7 5 3 8" />
-          </svg>
+          <ChevronRightIcon
+            size={13}
+            strokeWidth={1.8}
+            className={cn("shrink-0 text-dim transition-transform duration-100", open && "rotate-90")}
+          />
         )}
-        {!node.isDir && <span style={{ width: 10, flexShrink: 0 }} />}
-        <span style={{ flexShrink: 0, display: "flex", alignItems: "center", opacity: hidden ? HIDDEN_ENTRY_OPACITY : 1 }}>
+        {!node.isDir && <span className="w-2.5 shrink-0" />}
+        <span className={cn("flex shrink-0 items-center", hidden && "opacity-55")}>
           {node.isDir ? <FolderIcon size={14} open={open} /> : getFileIcon(node.name, 14)}
         </span>
         <span
           data-hidden-reason={hidden}
-          style={{
-            fontSize: 12,
-            color: hidden ? "var(--text-muted)" : "var(--text)",
-            opacity: hidden ? HIDDEN_ENTRY_OPACITY : 1,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            flex: 1,
-          }}
+          className={cn(
+            "min-w-0 flex-1 truncate text-xs",
+            hidden ? "text-muted-foreground opacity-55" : "text-foreground",
+          )}
           title={hidden ? `${node.fullPath}\n${t(HIDDEN_REASON_KEYS[hidden])}` : node.fullPath}
         >
           {node.name}
@@ -418,18 +392,18 @@ export function TreeNode({
           <span
             title={t("files.outsideLink", { target: pendingLinkTarget })}
             aria-label={t("files.outsideLink", { target: pendingLinkTarget })}
-            style={{ width: 14, height: 14, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)" }}
+            className="flex size-3.5 shrink-0 items-center justify-center text-dim"
           >
-            <OutsideLinkIcon />
+            <ExternalLinkIcon size={13} strokeWidth={1.8} />
           </span>
         )}
         {highlighted && (
           <span
             title={t("files.newlyUploaded")}
             aria-label={t("files.newlyUploaded")}
-            style={{ width: 14, height: 14, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+            className="flex size-3.5 shrink-0 items-center justify-center"
           >
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3b82f6" }} />
+            <span className="size-1.5 rounded-full bg-primary" />
           </span>
         )}
         {!hovered && !node.isDir && gitStatus && (
@@ -439,22 +413,13 @@ export function TreeNode({
           <span
             title={t("files.containsChangedFiles")}
             aria-label={t("files.containsChangedFiles")}
-            style={{
-              width: 14,
-              height: 14,
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className="flex size-3.5 shrink-0 items-center justify-center"
           >
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#d6a84b" }} />
+            <span className="size-1.5 rounded-full bg-warning" />
           </span>
         )}
         {loading && (
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" />
-          </svg>
+          <LoaderIcon size={13} strokeWidth={1.8} className="shrink-0 text-dim" />
         )}
         {onAtMention && hovered && (
           <button
@@ -463,28 +428,13 @@ export function TreeNode({
               onAtMention(getRelativeFilePath(node.fullPath, cwd), node.isDir);
             }}
             title={t("files.insertPath")}
-            style={{
-              position: "absolute",
-              right: !node.isDir ? 28 : 4,
-              top: "50%",
-              transform: "translateY(-50%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-              padding: "0 8px",
-              height: "calc(var(--file-row-height) - 4px)",
-              background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              color: "var(--accent)",
-              cursor: "pointer",
-              fontSize: 11,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-            }}
+            className={cn(
+              "absolute top-1/2 flex h-[calc(var(--file-row-height)-4px)] -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-sm border border-border bg-card px-2 py-0 text-xs font-semibold whitespace-nowrap text-primary",
+              "outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+              node.isDir ? "right-1" : "right-7",
+            )}
           >
-            <MentionIcon />
+            <AtSignIcon size={13} strokeWidth={1.8} />
             {t("files.mention")}
           </button>
         )}
@@ -494,78 +444,32 @@ export function TreeNode({
             download
             onClick={(e) => e.stopPropagation()}
             title={t("files.download")}
-            style={{
-              position: "absolute",
-              right: 4,
-              top: "50%",
-              transform: "translateY(-50%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-              padding: "0 5px",
-              height: "calc(var(--file-row-height) - 4px)",
-              background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              fontSize: 11,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-              textDecoration: "none",
-            }}
+            className="absolute right-1 top-1/2 flex h-[calc(var(--file-row-height)-4px)] -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-sm border border-border bg-card px-[5px] py-0 text-xs font-semibold text-muted-foreground no-underline outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
+            <DownloadIcon size={13} strokeWidth={1.8} />
           </a>
         )}
       </div>
       {node.isDir && open && pendingLinkTarget && (
         <div
-          style={{
-            paddingLeft: 8 + (depth + 1) * 14,
-            paddingRight: 8,
-            paddingTop: 3,
-            paddingBottom: 5,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: 4,
-            fontSize: 11,
-            color: "var(--text-dim)",
-          }}
+          className="flex flex-col items-start gap-1 pb-[5px] pr-2 pt-[3px] text-xs text-dim"
+          style={{ paddingLeft: 8 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
         >
-          <span style={{ wordBreak: "break-all" }}>{t("files.outsideLink", { target: pendingLinkTarget })}</span>
+          <span className="break-all">{t("files.outsideLink", { target: pendingLinkTarget })}</span>
           {node.outsideLinkEncloses && (
-            <span style={{ color: "#f59e0b" }}>{t("files.outsideLinkEncloses")}</span>
+            <span className="text-warning">{t("files.outsideLinkEncloses")}</span>
           )}
           <button
             type="button"
+            title={t("files.allowOutsideLinkTitle", { target: pendingLinkTarget })}
+            className="h-[calc(var(--file-row-height)-4px)] rounded-sm border border-border bg-card px-2 py-0 text-xs font-semibold whitespace-nowrap text-primary outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-60"
             onClick={handleAllowLink}
             disabled={allowingLink}
-            title={t("files.allowOutsideLinkTitle", { target: pendingLinkTarget })}
-            style={{
-              height: "calc(var(--file-row-height) - 4px)",
-              padding: "0 8px",
-              background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              color: "var(--accent)",
-              cursor: allowingLink ? "default" : "pointer",
-              opacity: allowingLink ? 0.6 : 1,
-              fontSize: 11,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-            }}
           >
             {t("files.allowOutsideLink")}
           </button>
           {allowLinkError && (
-            <span role="alert" style={{ color: "#f87171", wordBreak: "break-word" }}>{allowLinkError}</span>
+            <span role="alert" className="break-words text-destructive">{allowLinkError}</span>
           )}
         </div>
       )}
@@ -594,7 +498,10 @@ export function TreeNode({
             />
           ))}
           {children.length === 0 && loaded && !loadError && (
-            <div style={{ paddingLeft: 8 + (depth + 1) * 14, fontSize: 11, color: "var(--text-dim)", height: 22, display: "flex", alignItems: "center" }}>
+            <div
+              className="flex h-[22px] items-center text-xs text-dim"
+              style={{ paddingLeft: 8 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
+            >
               empty
             </div>
           )}
@@ -603,20 +510,11 @@ export function TreeNode({
               role="alert"
               onClick={(e) => { e.stopPropagation(); void loadChildren(true); }}
               title={`${loadError} — click to retry`}
-              style={{
-                paddingLeft: 8 + (depth + 1) * 14,
-                fontSize: 11,
-                color: "#f87171",
-                height: 22,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                cursor: "pointer",
-                minWidth: 0,
-              }}
+              className="flex h-[22px] min-w-0 cursor-pointer items-center gap-1 text-xs text-destructive"
+              style={{ paddingLeft: 8 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
             >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loadError}</span>
-              <span style={{ flexShrink: 0 }}>↻</span>
+              <span className="truncate">{loadError}</span>
+              <span className="shrink-0">↻</span>
             </div>
           )}
         </div>
@@ -659,59 +557,28 @@ function ChangeRow({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={status.filePath}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: treeMode ? 4 : 6,
-        paddingLeft: treeMode ? 8 + depth * 14 : 10,
-        paddingRight: 8,
-        height: "var(--file-row-height)",
-        cursor: "pointer",
-        background: hovered ? "var(--bg-hover)" : "transparent",
-        borderRadius: 4,
-        userSelect: "none",
-        position: "relative",
-      }}
+      className={cn(
+        "relative flex h-[var(--file-row-height)] cursor-pointer items-center rounded-sm pr-2 select-none",
+        treeMode ? "gap-1" : "gap-1.5",
+        hovered && "bg-secondary",
+      )}
+      style={{ paddingLeft: treeMode ? 8 + depth * 14 : 10 }} /* 树深度缩进为逐行计算值 */
     >
       <GitStatusBadge status={status} t={t} />
-      {treeMode && <span style={{ width: 10, flexShrink: 0 }} />}
-      <span style={{ flexShrink: 0, display: "flex", alignItems: "center", opacity: 0.85 }}>
+      {treeMode && <span className="w-2.5 shrink-0" />}
+      <span className="flex shrink-0 items-center opacity-85">
         {getFileIcon(name, 13)}
       </span>
       <span
         title={status.filePath}
-        style={{
-          fontSize: 12,
-          color: "var(--text)",
-          display: "flex",
-          alignItems: "center",
-          minWidth: 0,
-          flex: 1,
-        }}
+        className="flex min-w-0 flex-1 items-center text-xs text-foreground"
       >
         {dirPart && (
-          <span
-            style={{
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              flex: "0 1 auto",
-              minWidth: 0,
-              color: "var(--text-dim)",
-            }}
-          >
+          <span className="min-w-0 flex-[0_1_auto] truncate text-dim">
             {dirPart}
           </span>
         )}
-        <span
-          style={{
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            flexShrink: treeMode ? 1 : 0,
-            maxWidth: "100%",
-          }}
-        >
+        <span className={cn("max-w-full truncate", treeMode ? "shrink" : "shrink-0")}>
           {baseName}
         </span>
       </span>
@@ -722,28 +589,9 @@ function ChangeRow({
             onAtMention(rel, false);
           }}
           title={t("files.insertPath")}
-          style={{
-            position: "absolute",
-            right: 4,
-            top: "50%",
-            transform: "translateY(-50%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 4,
-            padding: "0 8px",
-            height: "calc(var(--file-row-height) - 4px)",
-            background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
-            color: "var(--accent)",
-            cursor: "pointer",
-            fontSize: 11,
-            fontWeight: 600,
-            whiteSpace: "nowrap",
-          }}
+          className="absolute right-1 top-1/2 flex h-[calc(var(--file-row-height)-4px)] -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-sm border border-border bg-card px-2 py-0 text-xs font-semibold whitespace-nowrap text-primary outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
-          <MentionIcon />
+          <AtSignIcon size={13} strokeWidth={1.8} />
           {t("files.mention")}
         </button>
       )}
@@ -769,40 +617,21 @@ function ChangesFolderRow({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={node.path}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
-        paddingLeft: 8 + depth * 14,
-        paddingRight: 8,
-        height: "var(--file-row-height)",
-        cursor: "pointer",
-        background: hovered ? "var(--bg-hover)" : "transparent",
-        borderRadius: 4,
-        userSelect: "none",
-      }}
+      className={cn(
+        "flex h-[var(--file-row-height)] cursor-pointer items-center gap-1 rounded-sm pr-2 select-none",
+        hovered && "bg-secondary",
+      )}
+      style={{ paddingLeft: 8 + depth * 14 }} /* 树深度缩进为逐行计算值 */
     >
-      <svg
-        width="10" height="10" viewBox="0 0 10 10" fill="none"
-        stroke="var(--text-dim)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-        style={{ flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.1s" }}
-        aria-hidden="true"
-      >
-        <polyline points="3 2 7 5 3 8" />
-      </svg>
-      <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
+      <ChevronRightIcon
+        size={13}
+        strokeWidth={1.8}
+        className={cn("shrink-0 text-dim transition-transform duration-100", open && "rotate-90")}
+      />
+      <span className="flex shrink-0 items-center">
         <FolderIcon size={14} open={open} />
       </span>
-      <span
-        style={{
-          fontSize: 12,
-          color: "var(--text)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          flex: 1,
-        }}
-      >
+      <span className="min-w-0 flex-1 truncate text-xs text-foreground">
         {node.name}
       </span>
     </div>
@@ -881,22 +710,10 @@ function ChangesTreeRows({
 function ChangesViewToggleIcon({ mode }: { mode: ChangesViewMode }) {
   if (mode === "tree") {
     // List icon: switching back to the flat list
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" />
-        <path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" />
-      </svg>
-    );
+    return <ListIcon size={14} strokeWidth={1.8} />;
   }
   // Tree icon: switching to the folder tree
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 3v12" /><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-      <path d="M6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-      <path d="M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-      <path d="M9 12h6" /><path d="M12 12v3" />
-    </svg>
-  );
+  return <FolderTreeIcon size={14} strokeWidth={1.8} />;
 }
 
 export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileExplorer({
@@ -1308,7 +1125,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
 
   return (
     <div
-      style={{ minHeight: "100%" }}
+      className="min-h-full"
       onDragEnter={handleExplorerDragEnter}
       onDragOver={handleExplorerDragOver}
       onDragLeave={handleExplorerDragLeave}
@@ -1316,49 +1133,43 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
     >
       <input ref={uploadInputRef} type="file" multiple hidden onChange={handleUploadInput} />
       {showUploadFeedback && (
-        <div style={{ padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>
+        <div className="border-b border-border px-2 py-1.5">
         {uploadBusy && (
           <div role="status" aria-live="polite" aria-label={uploadPhase === "checking" ? t("files.checking") : t("files.uploading", { progress: uploadProgress })}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 14, color: "var(--text-muted)" }}>
+            <div className="flex min-h-[14px] items-center justify-between gap-2 text-muted-foreground">
               {uploadPhase === "checking" ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" style={{ animation: "spin 0.8s linear infinite" }} aria-hidden="true">
-                  <path d="M21 12a9 9 0 1 1-5.7-8.4" />
-                </svg>
+                <LoaderCircleIcon size={13} strokeWidth={1.8} className="animate-spin" />
               ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 16V4" />
-                  <path d="m7 9 5-5 5 5" />
-                  <path d="M5 20h14" />
-                </svg>
+                <UploadIcon size={13} strokeWidth={1.8} />
               )}
-              {uploadPhase === "uploading" && <span style={{ fontSize: 10 }}>{uploadProgress}%</span>}
+              {uploadPhase === "uploading" && <span className="text-[10px]">{uploadProgress}%</span>}
             </div>
             {uploadPhase === "uploading" && (
-              <div style={{ height: 3, marginTop: 4, overflow: "hidden", borderRadius: 2, background: "var(--border)" }}>
-                <div style={{ width: `${uploadProgress}%`, height: "100%", background: "var(--text-muted)", transition: "width 120ms ease" }} />
+              <div className="mt-1 h-[3px] overflow-hidden rounded-[2px] bg-border">
+                <div className="h-full bg-muted-foreground transition-[width] duration-[120ms]" style={{ width: `${uploadProgress}%` }} /* 进度百分比为动态测量值 */ />
               </div>
             )}
           </div>
         )}
 
         {pendingConflict && (
-          <div role="alert" style={{ padding: 7, border: "1px solid color-mix(in srgb, #f59e0b 55%, var(--border))", borderRadius: 4, background: "color-mix(in srgb, #f59e0b 9%, var(--bg-panel))" }}>
-            <div style={{ fontSize: 11, color: "var(--text)", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+          <div role="alert" className="rounded-sm border border-[color-mix(in_srgb,var(--warning)_55%,var(--border))] bg-[color-mix(in_srgb,var(--warning)_9%,var(--bg-panel))] p-[7px]">
+            <div className="text-xs leading-[1.35] text-foreground [overflow-wrap:anywhere]">
               {t("files.conflictSummary", { count: pendingConflict.conflicts.length, countSuffix: pendingConflict.conflicts.length === 1 ? "" : "s", files: pendingConflict.conflicts.join(", ") })}
             </div>
             {pendingConflict.nonReplaceable.length > 0 && (
-              <div style={{ marginTop: 3, fontSize: 10, color: "#f59e0b", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+              <div className="mt-[3px] text-[10px] leading-[1.35] text-warning [overflow-wrap:anywhere]">
                 {t("files.cannotReplace", { files: pendingConflict.nonReplaceable.join(", ") })}
               </div>
             )}
-            <div style={{ display: "flex", gap: 5, marginTop: 7 }}>
-              <button type="button" onClick={() => void performUpload(pendingConflict.files, "overwrite", pendingConflict.directory)} style={{ height: 22, padding: "0 7px", border: "1px solid #ef4444", borderRadius: 4, background: "transparent", color: "#ef4444", cursor: "pointer", fontSize: 10 }}>
+            <div className="mt-[7px] flex gap-[5px]">
+              <button type="button" onClick={() => void performUpload(pendingConflict.files, "overwrite", pendingConflict.directory)} className="h-[22px] cursor-pointer rounded-sm border border-destructive bg-transparent px-[7px] py-0 text-[10px] text-destructive outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
                 {t("files.replace")}
               </button>
-              <button type="button" onClick={() => void performUpload(pendingConflict.files, "skip", pendingConflict.directory)} style={{ height: 22, padding: "0 7px", border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontSize: 10 }}>
+              <button type="button" onClick={() => void performUpload(pendingConflict.files, "skip", pendingConflict.directory)} className="h-[22px] cursor-pointer rounded-sm border border-border bg-card px-[7px] py-0 text-[10px] text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
                 {t("files.skipExisting")}
               </button>
-              <button type="button" onClick={() => setPendingConflict(null)} style={{ height: 22, padding: "0 7px", border: "none", borderRadius: 4, background: "transparent", color: "var(--text-muted)", cursor: "pointer", fontSize: 10 }}>
+              <button type="button" onClick={() => setPendingConflict(null)} className="h-[22px] cursor-pointer rounded-sm border-none bg-transparent px-[7px] py-0 text-[10px] text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
                 {t("files.cancel")}
               </button>
             </div>
@@ -1366,40 +1177,31 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         )}
 
         {uploadError && (
-          <div role="alert" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11, lineHeight: 1.35, color: "#f87171" }}>
-            <span style={{ minWidth: 0, flex: 1, overflowWrap: "anywhere" }}>{uploadError}</span>
+          <div role="alert" className="flex items-start gap-1.5 text-xs leading-[1.35] text-destructive">
+            <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{uploadError}</span>
             <DismissButton onClick={() => setUploadError(null)} title={t("files.dismissError")} />
           </div>
         )}
 
         {uploadSummary && (
           <div aria-live="polite">
-            <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 22, fontSize: 11 }}>
-              <div style={{ minWidth: 0, flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="flex min-h-[22px] items-center gap-2 text-xs">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 {uploadSummary.uploaded.length > 0 && (
-                  <span title={t("files.uploadedCount", { count: uploadSummary.uploaded.length })} aria-label={t("files.uploadedCount", { count: uploadSummary.uploaded.length })} style={{ display: "flex", alignItems: "center", gap: 3, color: "#22c55e" }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="m5 12 4 4L19 6" />
-                    </svg>
+                  <span title={t("files.uploadedCount", { count: uploadSummary.uploaded.length })} aria-label={t("files.uploadedCount", { count: uploadSummary.uploaded.length })} className="flex items-center gap-[3px] text-success">
+                    <CheckIcon size={13} strokeWidth={1.8} />
                     <span>{uploadSummary.uploaded.length}</span>
                   </span>
                 )}
                 {uploadSummary.skipped.length > 0 && (
-                  <span title={t("files.skippedCount", { count: uploadSummary.skipped.length })} aria-label={t("files.skippedCount", { count: uploadSummary.skipped.length })} style={{ display: "flex", alignItems: "center", gap: 3, color: "var(--text-dim)" }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                      <circle cx="12" cy="12" r="9" />
-                      <path d="M8 12h8" />
-                    </svg>
+                  <span title={t("files.skippedCount", { count: uploadSummary.skipped.length })} aria-label={t("files.skippedCount", { count: uploadSummary.skipped.length })} className="flex items-center gap-[3px] text-dim">
+                    <CircleMinusIcon size={13} strokeWidth={1.8} />
                     <span>{uploadSummary.skipped.length}</span>
                   </span>
                 )}
                 {uploadSummary.errors.length > 0 && (
-                  <span title={t("files.failedCount", { count: uploadSummary.errors.length })} aria-label={t("files.failedCount", { count: uploadSummary.errors.length })} style={{ display: "flex", alignItems: "center", gap: 3, color: "#f87171" }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M12 3 2.5 20h19L12 3Z" />
-                      <path d="M12 9v4" />
-                      <path d="M12 17h.01" />
-                    </svg>
+                  <span title={t("files.failedCount", { count: uploadSummary.errors.length })} aria-label={t("files.failedCount", { count: uploadSummary.errors.length })} className="flex items-center gap-[3px] text-destructive">
+                    <TriangleAlertIcon size={13} strokeWidth={1.8} />
                     <span>{uploadSummary.errors.length}</span>
                   </span>
                 )}
@@ -1410,22 +1212,18 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
                   onClick={addUploadedFilesToChat}
                   title={uploadSummary.uploaded.length === 1 ? t("files.addUploadedFile") : t("files.addAllUploadedFiles")}
                   aria-label={uploadSummary.uploaded.length === 1 ? t("files.addUploadedFile") : t("files.addAllUploadedFiles")}
-                  style={{ height: 22, padding: "0 7px", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, flexShrink: 0, border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-panel)", color: "var(--accent)", cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}
+                  className="flex h-[22px] shrink-0 cursor-pointer items-center justify-center gap-1 rounded-sm border border-border bg-card px-[7px] py-0 text-xs font-semibold whitespace-nowrap text-primary outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
-                  <MentionIcon />
+                  <AtSignIcon size={13} strokeWidth={1.8} />
                   {t("files.mention")}
                 </button>
               )}
               <DismissButton onClick={() => setUploadSummary(null)} title={t("files.dismissUploadResults")} />
             </div>
             {uploadSummary.errors.map((item) => (
-              <div key={item.name} title={item.error} style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3, minWidth: 0, fontSize: 10, color: "#f87171" }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 8v5" />
-                  <path d="M12 17h.01" />
-                </svg>
-                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+              <div key={item.name} title={item.error} className="mt-[3px] flex min-w-0 items-center gap-1 text-[10px] text-destructive">
+                <CircleAlertIcon size={13} strokeWidth={1.8} className="shrink-0" />
+                <span className="min-w-0 truncate">{item.name}</span>
               </div>
             ))}
           </div>
@@ -1434,11 +1232,9 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
       )}
 
       {fileSearchOpen && (
-      <div style={{ padding: "2px 8px 6px" }}>
-        <div style={{ position: "relative" }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", pointerEvents: "none" }}>
-            <circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" />
-          </svg>
+      <div className="px-2 pb-1.5 pt-0.5">
+        <div className="relative">
+          <SearchIcon size={13} strokeWidth={1.8} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-dim" />
           <input
             ref={searchInputRef}
             id="file-search-input"
@@ -1452,7 +1248,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
             }}
             placeholder={t("sidebar.searchFilesPlaceholder")}
             aria-label={t("sidebar.searchFiles")}
-            style={{ width: "100%", boxSizing: "border-box", padding: "6px 24px", border: "1px solid var(--border)", borderRadius: 8, outline: "none", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-mono)", fontSize: 11 }}
+            className="w-full rounded-md border border-border bg-background px-6 py-1.5 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           />
           {searchQuery && (
             <button
@@ -1460,21 +1256,17 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
               onClick={() => setSearchQuery("")}
               title={t("sidebar.clearSearch")}
               aria-label={t("sidebar.clearSearch")}
-              style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, padding: 0, border: "none", borderRadius: 4, background: "none", color: "var(--text-dim)", cursor: "pointer" }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text-dim)"; }}
+              className="absolute right-1 top-1/2 flex size-[18px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent p-0 text-dim outline-none transition-colors enabled:hover:bg-secondary enabled:hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-              </svg>
+              <XIcon size={13} strokeWidth={1.8} />
             </button>
           )}
         </div>
         {hasSearchQuery && (
-          <div style={{ paddingTop: 3 }}>
-            {searchLoading && <div role="status" style={{ padding: "6px 2px", fontSize: 10, color: "var(--text-dim)" }}>{t("sidebar.searchingFiles")}</div>}
-            {!searchLoading && searchError && <div role="alert" style={{ padding: "6px 2px", fontSize: 10, color: "#f87171" }}>{t("i18n.networkError")}</div>}
-            {!searchLoading && !searchError && searchPaths.length === 0 && <div style={{ padding: "6px 2px", fontSize: 10, color: "var(--text-dim)" }}>{t("sidebar.noMatchingFiles")}</div>}
+          <div className="pt-[3px]">
+            {searchLoading && <div role="status" className="px-[2px] py-1.5 text-[10px] text-dim">{t("sidebar.searchingFiles")}</div>}
+            {!searchLoading && searchError && <div role="alert" className="px-[2px] py-1.5 text-[10px] text-destructive">{t("i18n.networkError")}</div>}
+            {!searchLoading && !searchError && searchPaths.length === 0 && <div className="px-[2px] py-1.5 text-[10px] text-dim">{t("sidebar.noMatchingFiles")}</div>}
             {!searchLoading && !searchError && searchPaths.length > 0 && (
               <div>
                 {searchRoots.map((node) => (
@@ -1510,43 +1302,28 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
       )}
 
       {!changesCollapsed && gitFiles.length > 0 && (
-        <div style={{ padding: "0 4px 2px" }}>
+        <div className="px-1 pb-0.5">
           <div
             aria-label={t("files.changeStats", {
               count: gitFiles.length,
               additions: gitLineStats.additions,
               deletions: gitLineStats.deletions,
             })}
-            style={{ display: "flex", alignItems: "center", gap: 6, height: 24, padding: "0 6px 0 10px", fontSize: 12 }}
+            className="flex h-6 items-center gap-1.5 pl-2.5 pr-1.5 text-xs"
           >
-            <span style={{ color: "var(--text-dim)" }}>
+            <span className="text-dim">
               {t("files.changedCount", { count: gitFiles.length })}
             </span>
-            <span style={{ color: GIT_STATUS_COLORS.added, fontFamily: "var(--font-mono)" }}>+{gitLineStats.additions}</span>
-            <span style={{ color: GIT_STATUS_COLORS.deleted, fontFamily: "var(--font-mono)" }}>-{gitLineStats.deletions}</span>
-            <span style={{ flex: 1 }} />
+            <span className="font-mono text-success">+{gitLineStats.additions}</span>
+            <span className="font-mono text-destructive">-{gitLineStats.deletions}</span>
+            <span className="flex-1" />
             <button
               type="button"
               onClick={handleChangesViewModeToggle}
               title={changesViewMode === "list" ? t("files.viewAsTree") : t("files.viewAsList")}
               aria-label={changesViewMode === "list" ? t("files.viewAsTree") : t("files.viewAsList")}
               aria-pressed={changesViewMode === "tree"}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 22,
-                height: 22,
-                padding: 0,
-                border: "none",
-                borderRadius: 4,
-                background: "transparent",
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-dim)"; }}
+              className="flex size-[22px] shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent p-0 text-dim outline-none transition-colors enabled:hover:bg-secondary enabled:hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
               <ChangesViewToggleIcon mode={changesViewMode} />
             </button>
@@ -1579,11 +1356,11 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
       )}
 
       {(changesCollapsed || gitFiles.length === 0) && (!fileSearchOpen || !hasSearchQuery) && (
-        <div style={{ padding: "2px 4px" }}>
+        <div className="px-1 py-[2px]">
           {loading ? (
-            <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-dim)" }}>{t("files.loading")}</div>
+            <div className="px-3 py-2 text-xs text-dim">{t("files.loading")}</div>
           ) : error ? (
-            <div style={{ padding: "8px 12px", fontSize: 11, color: "#f87171" }}>{error}</div>
+            <div className="px-3 py-2 text-xs text-destructive">{error}</div>
           ) : (
             roots.map((node) => (
               <TreeNode
@@ -1608,7 +1385,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
             ))
           )}
           {!loading && !error && roots.length === 0 && (
-            <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-dim)" }}>
+            <div className="px-3 py-2 text-xs text-dim">
               {t("files.noFiles")}
             </div>
           )}
@@ -1621,27 +1398,9 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         <div
           role="status"
           aria-live="polite"
-          style={{
-            position: "sticky",
-            bottom: 0,
-            zIndex: 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "6px 8px",
-            borderTop: "1px solid var(--border)",
-            background: "var(--bg-panel)",
-            fontSize: 11,
-            color: "var(--accent)",
-            userSelect: "none",
-            pointerEvents: "none",
-          }}
+          className="pointer-events-none sticky bottom-0 z-[1] flex select-none items-center gap-1.5 border-t border-border bg-card px-2 py-1.5 text-xs text-primary"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-            <path d="M12 16V4" />
-            <path d="m7 9 5-5 5 5" />
-            <path d="M5 20h14" />
-          </svg>
+          <UploadIcon size={13} strokeWidth={1.8} className="shrink-0" />
           {t("files.dropToUpload", {
             directory: dropTargetPath
               ? (getRelativeFilePath(dropTargetPath, cwd) || dropTargetPath)

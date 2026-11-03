@@ -1,11 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowDownToLineIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  FolderIcon,
+  GitBranchIcon,
+  RotateCwIcon,
+} from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsNarrowMobile } from "@/hooks/useIsMobile";
 import { formatFileSize } from "@/lib/file-types";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import { getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
+import { cn } from "@/lib/utils";
 import { DiffView } from "./DiffView";
 import { PathLabel } from "./PathLabel";
 import { FileMentionButton, FileToolbar, FILE_MODE_LABELS } from "./FileToolbar";
@@ -68,17 +78,22 @@ type GitView =
 
 const LOG_PAGE_SIZE = 20;
 
-const STATUS_COLORS: Record<string, string> = {
-  A: "#4caf50",
-  M: "#e2b93d",
-  D: "#e06c60",
-  R: "#61afef",
-  C: "#61afef",
-  T: "#e2b93d",
+/** Status letter → theme-token classes (added/modified/deleted/renamed/copied/typechange). */
+const STATUS_CLASSES: Record<string, string> = {
+  A: "border-success text-success",
+  M: "border-warning text-warning",
+  D: "border-destructive text-destructive",
+  R: "border-primary text-primary",
+  C: "border-primary text-primary",
+  T: "border-warning text-warning",
 };
 
-const LIST_ROW_MIN_HEIGHT = 36;
-const CONTROL_MIN_HEIGHT = 36;
+/** Shared panel button: 36px touch target, token palette, hover/disabled per §5.6. */
+const buttonClass =
+  "inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-sm border border-border px-2.5 text-xs text-muted-foreground enabled:hover:bg-secondary enabled:hover:text-foreground disabled:pointer-events-none disabled:opacity-50";
+
+/** Toolbar pickers take the whole row on narrow phones (was `useIsNarrowMobile`). */
+const NARROW_FULL_ROW = "max-[480px]:flex-[1_1_100%]";
 
 interface DropdownOption {
   value: string;
@@ -87,15 +102,15 @@ interface DropdownOption {
 }
 
 /** Custom dropdown (no native select), modeled after the sidebar branch switcher. */
-function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, stretch, disabled = false }: {
+function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, disabled = false, className }: {
   value: string | null;
   options: DropdownOption[];
   onSelect: (value: string) => void;
   ariaLabel: string;
   placeholder: string;
   icon: React.ReactNode;
-  stretch: boolean;
   disabled?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -118,7 +133,7 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, s
 
   const selected = options.find((option) => option.value === value) ?? null;
   return (
-    <div ref={rootRef} style={{ position: "relative", flex: stretch ? "1 1 100%" : 1, minWidth: 0 }}>
+    <div ref={rootRef} className={cn("relative min-w-0 flex-1", className)}>
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -126,41 +141,28 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, s
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
-        style={{
-          width: "100%", minHeight: CONTROL_MIN_HEIGHT,
-          display: "flex", alignItems: "center", gap: 6, padding: "0 10px",
-          background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 6,
-          color: "var(--text)", fontSize: 12, cursor: disabled ? "default" : "pointer", textAlign: "left",
-        }}
+        className="flex min-h-9 w-full cursor-pointer items-center gap-1.5 rounded-sm border border-border bg-card px-2.5 text-left text-xs text-foreground enabled:hover:bg-secondary disabled:pointer-events-none disabled:opacity-50"
       >
-        <span style={{ display: "flex", alignItems: "center", flexShrink: 0, color: "var(--text-dim)" }} aria-hidden="true">{icon}</span>
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span className="flex shrink-0 items-center text-dim" aria-hidden="true">{icon}</span>
+        <span className="min-w-0 flex-1 truncate">
           {selected ? selected.primary : placeholder}
         </span>
         {selected?.secondary && (
-          <span style={{
-            flexShrink: 0, maxWidth: "45%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)",
-          }}>{selected.secondary}</span>
+          <span className="max-w-[45%] shrink-0 truncate font-mono text-[10px] text-dim">{selected.secondary}</span>
         )}
-        <svg
-          width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor"
-          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-          style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
-        >
-          <polyline points="2 3.5 5 6.5 8 3.5" />
-        </svg>
+        <ChevronDownIcon
+          className={cn("size-[13px] shrink-0 transition-transform", open && "rotate-180")}
+          strokeWidth={1.8}
+        />
       </button>
       {open && (
         <div
           role="listbox"
-          style={{
-            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 100,
-            background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8,
-            boxShadow: "0 6px 20px rgba(0,0,0,0.10)", overflow: "hidden",
-          }}
+          // 定位锚定：自定义下拉（见 GitPanel.test：不用 native select / Radix），
+          // 面板锚在触发器正下方并随触发器宽度拉伸。
+          className="absolute inset-x-0 top-[calc(100%+4px)] z-[100] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
         >
-          <div style={{ maxHeight: "min(40vh, 300px)", overflowY: "auto", touchAction: "pan-y" }}>
+          <div className="max-h-[min(40vh,300px)] touch-pan-y overflow-y-auto">
             {options.map((option) => {
               const isSelected = option.value === value;
               return (
@@ -170,27 +172,19 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, s
                   role="option"
                   aria-selected={isSelected}
                   onClick={() => { setOpen(false); onSelect(option.value); }}
-                  style={{
-                    display: "flex", width: "100%", alignItems: "center", gap: 7,
-                    minHeight: LIST_ROW_MIN_HEIGHT, padding: "6px 10px",
-                    background: "var(--bg)", border: "none", borderBottom: "1px solid var(--border)",
-                    color: isSelected ? "var(--text)" : "var(--text-muted)",
-                    cursor: "pointer", textAlign: "left", fontSize: 12,
-                  }}
+                  className={cn(
+                    "flex min-h-9 w-full cursor-pointer items-center gap-[7px] border-b border-border px-2.5 py-1.5 text-left text-xs hover:bg-secondary",
+                    isSelected ? "text-foreground" : "text-muted-foreground",
+                  )}
                 >
                   {isSelected ? (
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
-                      <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                    </svg>
+                    <CheckIcon className="size-[13px] shrink-0 text-primary" strokeWidth={1.8} />
                   ) : (
-                    <span style={{ width: 10, flexShrink: 0 }} />
+                    <span className="w-[13px] shrink-0" />
                   )}
-                  <span style={{ flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{option.primary}</span>
+                  <span className="shrink-0 truncate">{option.primary}</span>
                   {option.secondary && (
-                    <span style={{
-                      flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", textAlign: "right",
-                    }}>{option.secondary}</span>
+                    <span className="min-w-0 flex-1 truncate text-right font-mono text-xs text-dim">{option.secondary}</span>
                   )}
                 </button>
               );
@@ -469,105 +463,75 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
     setView({ type: "log" });
   };
 
-  const buttonStyle: React.CSSProperties = {
-    display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-    minHeight: CONTROL_MIN_HEIGHT,
-    padding: "0 10px",
-    flexShrink: 0,
-    whiteSpace: "nowrap",
-    background: "transparent",
-    border: "1px solid var(--border)",
-    borderRadius: 6,
-    color: "var(--text-muted)",
-    fontSize: 12,
-    cursor: "pointer",
-  };
-
   const renderError = (message: string, retry: () => void) => (
-    <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-      <div style={{ color: "var(--text-muted)", fontSize: 12, wordBreak: "break-word" }}>
+    <div className="flex flex-col items-start gap-2 p-3">
+      <div className="break-words text-xs text-muted-foreground">
         {t("gitPanel.error", { message })}
       </div>
-      <button type="button" onClick={retry} style={buttonStyle}>{t("gitPanel.retry")}</button>
+      <button type="button" onClick={retry} className={buttonClass}>{t("gitPanel.retry")}</button>
     </div>
   );
 
   const renderDetailLayer = (commit: CommitSummary) => (
-    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, minWidth: 0, wordBreak: "break-word" }}>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5">
+        <span className="min-w-0 break-words text-xs font-semibold">
           {commit.subject}
         </span>
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", touchAction: "pan-y" }}>
-        <div style={{
-          padding: "8px 12px", borderBottom: "1px solid var(--border)",
-          display: "flex", flexDirection: "column", gap: 5,
-        }}>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", wordBreak: "break-all" }}>
+      <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto">
+        <div className="flex flex-col gap-[5px] border-b border-border px-3 py-2">
+          <span className="break-all font-mono text-xs text-dim">
             {commit.hash}
           </span>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "2px 8px", fontSize: 11, color: "var(--text-dim)" }}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{commit.author}</span>
-            <span title={new Date(commit.timestamp * 1000).toLocaleString()} style={{ flexShrink: 0 }}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-dim">
+            <span className="truncate">{commit.author}</span>
+            <span title={new Date(commit.timestamp * 1000).toLocaleString()} className="shrink-0">
               {formatRelativeTime(new Date(commit.timestamp * 1000), locale)}
             </span>
-            <span style={{
-              flexShrink: 0, fontSize: 10, padding: "1px 6px", borderRadius: 8,
-              border: `1px solid ${commit.pushed ? "var(--border)" : "#e2b93d"}`,
-              color: commit.pushed ? "var(--text-dim)" : "#e2b93d",
-            }}>
+            <span className={cn(
+              "shrink-0 rounded-full border px-1.5 py-px text-[10px]",
+              commit.pushed ? "border-border text-dim" : "border-warning text-warning",
+            )}>
               {t(commit.pushed ? "gitPanel.pushed" : "gitPanel.notPushed")}
             </span>
             {!filesLoading && files.length > 0 && (
-              <span style={{ flexShrink: 0, fontFamily: "var(--font-mono)" }}>
+              <span className="shrink-0 font-mono">
                 {t("gitPanel.filesChanged", { count: files.length })}
-                <span style={{ color: "var(--diff-add)" }}>{` +${totals.additions}`}</span>
-                <span style={{ color: "var(--diff-del)" }}>{` −${totals.deletions}`}</span>
+                <span className="text-diff-add">{` +${totals.additions}`}</span>
+                <span className="text-diff-del">{` −${totals.deletions}`}</span>
               </span>
             )}
           </div>
           {commit.body !== "" && (
-            <div style={{
-              fontSize: 11, color: "var(--text-muted)", lineHeight: 1.45,
-              whiteSpace: "pre-wrap", wordBreak: "break-word",
-            }}>
+            <div className="whitespace-pre-wrap break-words text-xs leading-[1.45] text-muted-foreground">
               {commit.body}
             </div>
           )}
         </div>
-        {filesLoading && <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>}
+        {filesLoading && <div className="p-3 text-xs text-dim">{t("gitPanel.loading")}</div>}
         {filesError && renderError(filesError, () => setView({ type: "detail", commit }))}
         {!filesError && !filesLoading && files.length === 0 && (
-          <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.emptyFiles")}</div>
+          <div className="p-3 text-xs text-dim">{t("gitPanel.emptyFiles")}</div>
         )}
         {files.map((file) => (
           <button
             key={`${file.status}:${file.path}`}
             type="button"
             onClick={() => openCommitFile(commit, file)}
-            style={{
-              display: "flex", width: "100%", alignItems: "center", gap: 8, textAlign: "left",
-              minHeight: LIST_ROW_MIN_HEIGHT,
-              padding: "6px 12px",
-              background: "transparent", border: "none", borderBottom: "1px solid var(--border)",
-              color: "var(--text)", cursor: "pointer",
-            }}
+            className="flex min-h-9 w-full cursor-pointer items-center gap-2 border-b border-border px-3 py-1.5 text-left text-foreground"
           >
-            <span style={{
-              fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, flexShrink: 0,
-              width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center",
-              borderRadius: 4,
-              color: STATUS_COLORS[file.status] ?? "var(--text-muted)",
-              border: `1px solid ${STATUS_COLORS[file.status] ?? "var(--border)"}`,
-            }}>
+            <span className={cn(
+              "flex size-[18px] shrink-0 items-center justify-center rounded-sm border font-mono text-[10px] font-semibold",
+              STATUS_CLASSES[file.status] ?? "border-border text-muted-foreground",
+            )}>
               {file.status}
             </span>
-            <PathLabel text={file.previousPath ? `${file.previousPath} → ${file.path}` : file.path} style={{ flex: 1, minWidth: 0, fontSize: 12, fontFamily: "var(--font-mono)" }} />
+            <PathLabel text={file.previousPath ? `${file.previousPath} → ${file.path}` : file.path} className="min-w-0 flex-1 font-mono text-xs" />
             {file.additions !== null && file.deletions !== null && (
-              <span style={{ flexShrink: 0, fontSize: 10, fontFamily: "var(--font-mono)" }}>
-                <span style={{ color: "var(--diff-add)" }}>+{file.additions}</span>{" "}
-                <span style={{ color: "var(--diff-del)" }}>−{file.deletions}</span>
+              <span className="shrink-0 font-mono text-[10px]">
+                <span className="text-diff-add">+{file.additions}</span>{" "}
+                <span className="text-diff-del">−{file.deletions}</span>
               </span>
             )}
           </button>
@@ -593,7 +557,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
     );
 
     return (
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <FileToolbar
           pathLabel={relativePath}
           meta={meta}
@@ -616,16 +580,14 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
               aria-label={t("i18n.downloadFile")}
               className="file-viewer-icon-button"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" />
-              </svg>
+              <ArrowDownToLineIcon className="size-[14px]" strokeWidth={1.8} />
             </a>
           )}
         />
-        <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: "var(--bg)" }}>
+        <div className="min-h-0 flex-1 overflow-auto bg-background">
           {showSource ? (
             <>
-              {sourceLoading && <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>}
+              {sourceLoading && <div className="p-3 text-xs text-dim">{t("gitPanel.loading")}</div>}
               {sourceError && renderError(sourceError, () => setView({ type: "diff", commit, file }))}
               {!sourceError && !sourceLoading && sourceFile && (
                 <SourceCodeView content={sourceFile.content} language={sourceFile.language} wrapLines={wrapLines} />
@@ -633,7 +595,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
             </>
           ) : (
             <>
-              {patchLoading && <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>}
+              {patchLoading && <div className="p-3 text-xs text-dim">{t("gitPanel.loading")}</div>}
               {patchError && renderError(patchError, () => setView({ type: "diff", commit, file }))}
               {!patchError && !patchLoading && patch !== null && <DiffView patch={patch} wrapLines={wrapLines} />}
             </>
@@ -647,15 +609,12 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
     <div
       data-gitpanel-view={view.type}
       data-gitpanel-narrow={narrowMobile ? "true" : "false"}
-      style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", color: "var(--text)" }}
+      className="flex h-full flex-col overflow-hidden text-foreground"
     >
       {/* The row that never scrolls away owns the one back affordance. */}
       <div
         data-gitpanel-toolbar
-        style={{
-          display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center",
-          flexShrink: 0, padding: 8, borderBottom: "1px solid var(--border)",
-        }}
+        className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border p-2"
       >
         {view.type !== "log" && (
           <button
@@ -663,24 +622,18 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
             onClick={goBack}
             title={t("gitPanel.back")}
             aria-label={t("gitPanel.back")}
-            style={{ ...buttonStyle, width: CONTROL_MIN_HEIGHT, padding: 0 }}
+            className={cn(buttonClass, "w-9 p-0")}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
+            <ChevronLeftIcon className="size-[14px]" strokeWidth={1.8} />
           </button>
         )}
         <GitDropdown
-          stretch={narrowMobile}
+          className={NARROW_FULL_ROW}
           value={selectedRepo}
           disabled={repositories.length === 0}
           ariaLabel={t("gitPanel.selectRepository")}
           placeholder={reposLoading ? t("gitPanel.loading") : t("gitPanel.noRepositories")}
-          icon={
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            </svg>
-          }
+          icon={<FolderIcon className="size-[13px]" strokeWidth={1.8} />}
           options={repositories.map((repo) => ({
             value: repo.repositoryRoot,
             primary: repo.name,
@@ -688,23 +641,15 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
           }))}
           onSelect={selectRepository}
         />
-        <div style={{ display: "flex", flex: narrowMobile ? "1 1 100%" : 1, minWidth: 0, gap: 8, alignItems: "center" }}>
+        <div className={cn("flex min-w-0 flex-1 items-center gap-2", NARROW_FULL_ROW)}>
           <GitDropdown
-            stretch={false}
             value={selectedBranch}
-          disabled={branches.length === 0}
-          ariaLabel={t("gitPanel.selectBranch")}
-          placeholder={t("gitPanel.branch")}
-          icon={
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="6" y1="3" x2="6" y2="15" />
-              <circle cx="18" cy="6" r="3" />
-              <circle cx="6" cy="18" r="3" />
-              <path d="M18 9a9 9 0 0 1-9 9" />
-            </svg>
-          }
-          options={branches.map((branch) => ({ value: branch, primary: branch }))}
-          onSelect={selectBranch}
+            disabled={branches.length === 0}
+            ariaLabel={t("gitPanel.selectBranch")}
+            placeholder={t("gitPanel.branch")}
+            icon={<GitBranchIcon className="size-[13px]" strokeWidth={1.8} />}
+            options={branches.map((branch) => ({ value: branch, primary: branch }))}
+            onSelect={selectBranch}
           />
           <button
             type="button"
@@ -712,11 +657,9 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
             disabled={reposLoading}
             title={t("gitPanel.refresh")}
             aria-label={t("gitPanel.refresh")}
-            style={{ ...buttonStyle, flexShrink: 0, width: 36, padding: 0 }}
+            className={cn(buttonClass, "w-9 p-0")}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M21 12a9 9 0 1 1-2.64-6.36" /><polyline points="21 3 21 9 15 9" />
-            </svg>
+            <RotateCwIcon className="size-[14px]" strokeWidth={1.8} />
           </button>
         </div>
       </div>
@@ -725,61 +668,48 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
 
       {/* Log layer */}
       {view.type === "log" && selectedRepo && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", touchAction: "pan-y" }}>
+        <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto">
           {reposLoading && repositories.length === 0 && (
-            <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.loading")}</div>
+            <div className="p-3 text-xs text-dim">{t("gitPanel.loading")}</div>
           )}
           {commitsError && renderError(commitsError, () => { void loadCommits(selectedRepo, selectedBranch ?? "", 0); })}
           {!commitsError && !commitsLoading && commits.length === 0 && (
-            <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 12 }}>{t("gitPanel.emptyLog")}</div>
+            <div className="p-3 text-xs text-dim">{t("gitPanel.emptyLog")}</div>
           )}
           {commits.map((commit, index) => (
             <button
               key={commit.hash}
               type="button"
               onClick={() => setView({ type: "detail", commit })}
-              style={{
-                display: "block", width: "100%", textAlign: "left",
-                minHeight: LIST_ROW_MIN_HEIGHT,
-                padding: "7px 12px",
-                background: "transparent", border: "none", borderBottom: "1px solid var(--border)",
-                color: "var(--text)", cursor: "pointer",
-              }}
+              className="block min-h-9 w-full cursor-pointer border-b border-border px-3 py-[7px] text-left text-foreground"
             >
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8,
-                fontSize: 12, fontWeight: 600, minWidth: 0,
-              }}>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+              <div className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+                <span className="min-w-0 flex-1 truncate">
                   {commit.subject}
                 </span>
                 {(index === 0 || commits[index - 1].pushed !== commit.pushed) && (
-                  <span style={{
-                    flexShrink: 0, fontSize: 10, fontWeight: 400, padding: "0 6px", borderRadius: 8,
-                    border: `1px solid ${commit.pushed ? "var(--border)" : "#e2b93d"}`,
-                    color: commit.pushed ? "var(--text-dim)" : "#e2b93d",
-                  }}>
+                  <span className={cn(
+                    "shrink-0 rounded-full border px-1.5 text-[10px] font-normal",
+                    commit.pushed ? "border-border text-dim" : "border-warning text-warning",
+                  )}>
                     {t(commit.pushed ? "gitPanel.pushed" : "gitPanel.notPushed")}
                   </span>
                 )}
               </div>
-              <div style={{
-                display: "flex", alignItems: "baseline", gap: 6,
-                marginTop: 3, fontSize: 11, color: "var(--text-dim)", minWidth: 0,
-              }}>
-                <span style={{ fontFamily: "var(--font-mono)", flexShrink: 0 }}>{commit.shortHash}</span>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{commit.author}</span>
-                <span style={{ flexShrink: 0 }}>{formatRelativeTime(new Date(commit.timestamp * 1000), locale)}</span>
+              <div className="mt-[3px] flex min-w-0 items-baseline gap-1.5 text-xs text-dim">
+                <span className="shrink-0 font-mono">{commit.shortHash}</span>
+                <span className="min-w-0 flex-1 truncate">{commit.author}</span>
+                <span className="shrink-0">{formatRelativeTime(new Date(commit.timestamp * 1000), locale)}</span>
               </div>
             </button>
           ))}
           {hasMore && (
-            <div style={{ padding: 8 }}>
+            <div className="p-2">
               <button
                 type="button"
                 onClick={() => { void loadCommits(selectedRepo, selectedBranch ?? "", commits.length); }}
                 disabled={commitsLoading}
-                style={{ ...buttonStyle, width: "100%" }}
+                className={cn(buttonClass, "w-full")}
               >
                 {commitsLoading ? t("gitPanel.loading") : t("gitPanel.loadMore")}
               </button>
@@ -793,11 +723,11 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
 
       {/* Diff layer: desktop full-width splits list above patch, otherwise single column */}
       {view.type === "diff" && fullWidth && (
-        <div data-gitpanel-split style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", borderBottom: "1px solid var(--border)" }}>
+        <div data-gitpanel-split className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-border">
             {renderDetailLayer(view.commit)}
           </div>
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {renderDiffLayer(view.commit, view.file)}
           </div>
         </div>
