@@ -750,6 +750,8 @@ test("while a run streams, a bare /mcp opens Settings or is queued as before", a
     const sendQueued = chatInputCallback("queueFollowUp", {
       value,
       attachedImages: images,
+      pendingImageTailRef: { current: Promise.resolve() },
+      attachedImagesRef: { current: images },
       onAudioUnlock() {},
       clearInput() { calls.cleared += 1; },
       onBuiltinCommand: async () => ({ handled }),
@@ -802,12 +804,41 @@ test("queueFollowUp refuses an images-only submission: pi's queue holds texts on
   assert.deepEqual(run("", []), { steered: [], cleared: 0 });
 });
 
+test("queueFollowUp waits for in-flight paste decodes and queues the settled attachments", async () => {
+  const calls = { steered: [], cleared: 0 };
+  let releaseTail;
+  const pendingImageTailRef = { current: new Promise((resolve) => { releaseTail = resolve; }) };
+  const images = [{ data: "aGk=", mimeType: "image/png" }];
+  const sendQueued = chatInputCallback("queueFollowUp", {
+    value: "look",
+    attachedImages: [], // decode still in flight
+    pendingImageTailRef,
+    attachedImagesRef: { current: images }, // attachments land before the tail resolves
+    onAudioUnlock() {},
+    clearInput() { calls.cleared += 1; },
+    onBuiltinCommand: async () => ({ handled: false }),
+    canRunBuiltinSlashCommandWhileStreaming,
+    isBareMcpCommand,
+    runBuiltinCommand: async () => { throw new Error("must not run"); },
+    onPromptWithStreamingBehavior: () => { throw new Error("must not queue"); },
+    onSteer: (message, attached) => { calls.steered.push([message, attached?.length ?? 0]); },
+    onFollowUp() { throw new Error("must not queue"); },
+  });
+  const queued = sendQueued("steer");
+  releaseTail(); // the decode finishes before the queued prompt runs
+  await queued;
+  assert.deepEqual(calls.steered, [["look", 1]]);
+  assert.equal(calls.cleared, 1);
+});
+
 test("handleSend lets a handled /mcp through while streaming and sends an unowned one when idle", async () => {
   const run = async (value, { isStreaming, handled }) => {
     const calls = { builtin: [], sent: [] };
     const handleSend = chatInputCallback("handleSend", {
       value,
       attachedImages: [],
+      pendingImageTailRef: { current: Promise.resolve() },
+      attachedImagesRef: { current: [] },
       onAudioUnlock() {},
       isStreaming,
       offersBuiltinSlashCommandWhileStreaming,

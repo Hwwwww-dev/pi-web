@@ -845,7 +845,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const { ui: uiFontFamily, uiWeight } = useFontPreferences();
   const isMobile = useIsMobile();
   // The controls row under the composer: a finger's 44px on a phone.
-  const controlSize = isMobile ? 44 : 32;
+  const controlSize = isMobile ? 34 : 32;
   const enterSendMode = useEnterSendMode();
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
@@ -900,6 +900,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const valueRef = useRef(value);
   const attachedImagesRef = useRef(attachedImages);
   const pendingImageCountRef = useRef(0);
+  // Tail of in-flight paste decodes: submissions await it so attachments ride
+  // with the message instead of popping back into the cleared composer.
+  const pendingImageTailRef = useRef<Promise<void>>(Promise.resolve());
+  const [attachError, setAttachError] = useState<string | null>(null);
   valueRef.current = value;
   attachedImagesRef.current = attachedImages;
 
@@ -1115,35 +1119,50 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     },
   }));
 
-  const processImageFiles = useCallback(async (files: File[]) => {
+  const processImageFiles = useCallback((files: File[]) => {
     if (compact) return;
+    const imageTypeFiles = files.filter((f) => f.type.startsWith("image/"));
+    const oversizeCount = imageTypeFiles.filter((f) => f.size > MAX_ATTACHED_IMAGE_BYTES).length;
     const remaining = Math.max(
       0,
       MAX_ATTACHED_IMAGES - attachedImagesRef.current.length - pendingImageCountRef.current,
     );
-    const imageFiles = files
-      .filter((f) => f.type.startsWith("image/") && f.size <= MAX_ATTACHED_IMAGE_BYTES)
-      .slice(0, remaining);
+    const withinLimitFiles = imageTypeFiles.filter((f) => f.size <= MAX_ATTACHED_IMAGE_BYTES);
+    const cappedCount = withinLimitFiles.length - Math.min(withinLimitFiles.length, remaining);
+    const imageFiles = withinLimitFiles.slice(0, remaining);
+    const notices: string[] = [];
+    if (oversizeCount) notices.push(t("chat.attachTooLarge", { count: oversizeCount }));
+    if (cappedCount) notices.push(t("chat.attachLimit", { count: cappedCount, max: MAX_ATTACHED_IMAGES }));
+    if (notices.length) setAttachError(notices.join(" "));
     if (!imageFiles.length) return;
     pendingImageCountRef.current += imageFiles.length;
-    try {
-      const newImages = await Promise.all(
-        imageFiles.map(async (file) => ({
-          ...await readImageFile(file, file.type),
-          previewUrl: URL.createObjectURL(file),
-        }))
-      );
-      setAttachedImages((prev) => {
-        const accepted = newImages.slice(0, Math.max(0, MAX_ATTACHED_IMAGES - prev.length));
-        newImages.slice(accepted.length).forEach(revokeImagePreview);
-        const next = [...prev, ...accepted];
-        attachedImagesRef.current = next;
-        return next;
-      });
-    } finally {
-      pendingImageCountRef.current -= imageFiles.length;
-    }
-  }, [compact]);
+    // Settle per file: one unreadable image must not swallow the batch.
+    const run = pendingImageTailRef.current.then(async () => {
+      try {
+        const settled = await Promise.allSettled(
+          imageFiles.map(async (file) => ({
+            ...await readImageFile(file, file.type),
+            previewUrl: URL.createObjectURL(file),
+          })),
+        );
+        const newImages = settled.flatMap((s) => (s.status === "fulfilled" ? [s.value] : []));
+        if (newImages.length) {
+          setAttachedImages((prev) => {
+            const accepted = newImages.slice(0, Math.max(0, MAX_ATTACHED_IMAGES - prev.length));
+            newImages.slice(accepted.length).forEach(revokeImagePreview);
+            const next = [...prev, ...accepted];
+            attachedImagesRef.current = next;
+            return next;
+          });
+        }
+        const failedCount = settled.filter((s) => s.status === "rejected").length;
+        if (failedCount) setAttachError(t("chat.attachFailed", { count: failedCount }));
+      } finally {
+        pendingImageCountRef.current -= imageFiles.length;
+      }
+    });
+    pendingImageTailRef.current = run.catch(() => {});
+  }, [compact, t]);
 
   const handleFilePick = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -1176,6 +1195,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     setValue("");
     setAtQuery(null);
     setHistoryMenuOpen(false);
+    setAttachError(null);
     if (draftKey) clearDraft(draftKey);
     if (draftKeyRef.current && draftKeyRef.current !== draftKey) clearDraft(draftKeyRef.current);
     clearImages();
@@ -1288,11 +1308,16 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     const msg = value.trim();
     if (!msg && !attachedImages.length) return;
     onAudioUnlock?.();
+    // A paste still decoding must ride along, not pop back into the cleared
+    // composer after the message left.
+    await pendingImageTailRef.current;
     const builtinAllowed = !isStreaming || offersBuiltinSlashCommandWhileStreaming(msg);
     if (builtinAllowed && await runBuiltinCommand(msg)) return;
     if (isStreaming) return;
+    const images = attachedImagesRef.current.length ? attachedImagesRef.current : undefined;
+    if (!msg && !images) return;
     clearInput();
-    onSend(msg, attachedImages.length ? attachedImages : undefined);
+    onSend(msg, images);
   }, [value, attachedImages, isStreaming, runBuiltinCommand, onSend, clearInput, onAudioUnlock]);
 
   const slashQuery = !compact && value.startsWith("/") && !/\s/.test(value.slice(1))
@@ -1506,7 +1531,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     onSideChat(msg);
   }, [value, attachedImages, onSideChat, clearInput]);
 
-  const queueFollowUp = useCallback((mode: "steer" | "followup" = "followup") => {
+  const queueFollowUp = useCallback(async (mode: "steer" | "followup" = "followup") => {
     const msg = value.trim();
     if (!msg && !attachedImages.length) return;
     // pi's run queue carries texts only — an images-only submission is accepted
@@ -1514,7 +1539,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     // silently vanish. Keep the composer instead.
     if (!msg && attachedImages.length) return;
     onAudioUnlock?.();
-    const images = attachedImages.length ? attachedImages : undefined;
+    // A paste still decoding must ride along, not pop back into the cleared
+    // composer after the message left.
+    await pendingImageTailRef.current;
+    const images = attachedImagesRef.current.length ? attachedImagesRef.current : undefined;
     const queue = () => {
       const streamingBehavior = mode === "steer" ? "steer" : "followUp";
       if (msg.startsWith("/") && onPromptWithStreamingBehavior) {
@@ -2076,6 +2104,23 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             {onDismissCompactError && <DismissButton onClick={onDismissCompactError} title={t("chat.dismissCompactError")} />}
           </div>
         )}
+        {attachError && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 6,
+            padding: "4px 8px",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            borderRadius: 6,
+            color: "#ef4444",
+            fontSize: 12,
+            lineHeight: 1.5,
+          }}>
+            <span style={{ minWidth: 0, flex: 1, overflowWrap: "anywhere" }}>{attachError}</span>
+            <DismissButton onClick={() => setAttachError(null)} title={t("chat.dismiss")} />
+          </div>
+        )}
         {/* Image previews */}
         {attachedImages.length > 0 && (
           <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
@@ -2633,11 +2678,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           display: isMobile ? "grid" : "flex",
           gridTemplateColumns: isMobile ? "minmax(0, 1fr) auto" : undefined,
           alignItems: "center",
-          gap: 6,
+          gap: 4,
         }}>
 
           {/* LEFT: attach + model selector */}
-          <div style={{ flex: isMobile ? "1 1 auto" : "0 0 auto", minWidth: 0, display: "flex", alignItems: "center", gap: 2 }}>
+          <div style={{ flex: isMobile ? "1 1 auto" : "0 0 auto", minWidth: 0, display: "flex", alignItems: "center", gap: 4 }}>
             <button
               onClick={() => fileInputRef.current?.click()}
               title={t("chat.attachFiles")}
@@ -2645,7 +2690,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
                 width: controlSize, height: controlSize, padding: 0,
                 background: "none", border: "none",
-                borderRadius: 9,
+                borderRadius: 8,
                 color: attachedImages.length ? "var(--accent)" : "var(--text-muted)",
                 cursor: "pointer",
                 opacity: 1,
@@ -2661,7 +2706,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 e.currentTarget.style.color = attachedImages.length ? "var(--accent)" : "var(--text-muted)";
               }}
             >
-              <svg width={isMobile ? 18 : 15} height={isMobile ? 18 : 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <polyline points="21 15 16 10 5 21" />
@@ -2713,16 +2758,14 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: "100%",
                   height: controlSize,
-                  padding: "8px 10px",
+                  padding: "0 8px",
                   background: "none",
                   border: "none",
-                  borderRadius: 9,
+                  borderRadius: 8,
                   color: "var(--text-muted)",
                   cursor: controlsMenuOpen ? "default" : "pointer",
-                  fontSize: 12,
-                  fontWeight: 500,
+                  fontSize: 11,
                   visibility: controlsMenuOpen ? "hidden" : "visible",
                   pointerEvents: controlsMenuOpen ? "none" : "auto",
                   transition: "background 0.12s, color 0.12s",
@@ -2745,7 +2788,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             <div style={{
               display: isMobile ? (controlsMenuOpen ? "flex" : "none") : "flex",
               alignItems: "center",
-              gap: isMobile ? 1 : 2,
+              gap: 4,
               ...(isMobile ? {
                 position: "absolute",
                 right: 0,
@@ -2773,15 +2816,15 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   aria-label={t("chat.changeReasoningLabel")}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    padding: isMobile ? "0 10px" : "8px 12px",
+                    padding: "0 8px",
                     width: isMobile ? "auto" : undefined,
                     height: controlSize,
                     background: thinkingDropdownOpen ? "var(--bg-hover)" : "none",
                     border: "none",
-                    borderRadius: 9,
+                    borderRadius: 8,
                     color: "var(--text-muted)",
                     cursor: "pointer",
-                    fontSize: 12,
+                    fontSize: 11,
                     transition: "background 0.12s, color 0.12s",
                   }}
                   aria-expanded={thinkingDropdownOpen}
@@ -2875,15 +2918,15 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   aria-label={t("chat.changeToolPreset")}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    padding: isMobile ? "0 10px" : "8px 12px",
+                    padding: "0 8px",
                     width: isMobile ? "auto" : undefined,
                     height: controlSize,
                     background: toolDropdownOpen ? "var(--bg-hover)" : "none",
                     border: "none",
-                    borderRadius: 9,
+                    borderRadius: 8,
                     color: "var(--text-muted)",
                     cursor: isStreaming ? "not-allowed" : "pointer",
-                    fontSize: 12,
+                    fontSize: 11,
                     opacity: isStreaming ? 0.5 : 1,
                     transition: "background 0.12s, color 0.12s",
                   }}
@@ -2960,15 +3003,15 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   onClick={isCompacting ? onAbortCompaction : (e) => { if (!isStrayClick(e)) onCompact(); }}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    padding: isMobile ? "0 10px" : "8px 12px",
+                    padding: "0 8px",
                     width: isMobile ? "auto" : undefined,
                     height: controlSize,
                     background: isCompacting ? "rgba(239,68,68,0.08)" : "none",
                     border: "none",
-                    borderRadius: 9,
+                    borderRadius: 8,
                     color: isCompacting ? "#ef4444" : "var(--text-muted)",
                     cursor: "pointer",
-                    fontSize: 12,
+                    fontSize: 11,
                     transition: "background 0.12s, color 0.12s",
                   }}
                   onMouseEnter={(e) => {
@@ -2986,7 +3029,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   {isCompacting ? (
                     <><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" fill="currentColor" /></svg>{(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{t("chat.compacting")}</span>}</>
                   ) : (
-                    <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
                       <line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" />
                     </svg>{(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{t("chat.compact")}</span>}</>
@@ -3007,7 +3050,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   padding: 0,
                   background: "none",
                   border: "none",
-                  borderRadius: 9,
+                  borderRadius: 8,
                   color: soundEnabled ? "var(--text-muted)" : "var(--text-dim)",
                   cursor: "pointer",
                   opacity: soundEnabled ? 1 : 0.55,
@@ -3026,13 +3069,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 }}
               >
                 {soundEnabled ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                     <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
                     <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
                   </svg>
                 ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                     <line x1="23" y1="9" x2="17" y2="15" />
                     <line x1="17" y1="9" x2="23" y2="15" />
@@ -3065,7 +3108,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   background: "var(--bg-hover)",
                   border: "none",
                   borderLeft: "1px solid color-mix(in srgb, var(--border) 72%, transparent)",
-                  borderRadius: "0 9px 9px 0",
+                  borderRadius: "0 8px 8px 0",
                   color: "var(--text)",
                   cursor: "pointer",
                   transition: "background 0.12s, color 0.12s",

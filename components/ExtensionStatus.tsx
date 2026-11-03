@@ -20,7 +20,7 @@ export function PermissiveModeChip({ text }: { text: string }) {
       aria-label={label}
       style={{
         flex: "0 0 auto",
-        padding: "1px 5px",
+        padding: "2px 6px",
         border: "1px solid color-mix(in srgb, #dc2626 35%, transparent)",
         borderRadius: 4,
         background: "color-mix(in srgb, #dc2626 8%, transparent)",
