@@ -8,7 +8,7 @@ import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
 import { StatusIcon } from "./AgentSessionPanel";
 import { MCP_SESSION_STATE_KEYS } from "./mcp-config-helpers";
 import { sessionRowTitle } from "./SessionTree";
-import { FolderIcon, SpinnerIcon } from "./SidebarIcons";
+import { FolderIcon, LoaderCircleIcon } from "lucide-react";
 import {
   DEBUG_CLOSE_REASON_KEYS,
   DEBUG_LEASE_OUTCOME_KEYS,
@@ -593,7 +593,7 @@ function StatusSlot({ state, label }: { state: DebugStatusState; label: string }
   if (state === "running") {
     return (
       <span className="debug-status is-accent" title={label}>
-        <SpinnerIcon size={12} label={label} />
+        <LoaderCircleIcon size={12} strokeWidth={2.8} className="sidebar-spin" role="img" aria-label={label} aria-hidden={false} />
       </span>
     );
   }
@@ -1288,7 +1288,7 @@ const RUN_TONES: Partial<Record<string, DebugTone>> = {
 /** A subagent run's mark: the sidebar's spinner while it runs, the agent switcher's shapes once settled. */
 function RunIcon({ status }: { status: string }) {
   if (status === "running" || status === "starting") {
-    return <span className="debug-run-icon is-accent"><SpinnerIcon size={12} /></span>;
+    return <span className="debug-run-icon is-accent"><LoaderCircleIcon size={12} /></span>;
   }
   const tone = RUN_TONES[status];
   if (tone) return <span className={`debug-run-icon is-${tone}`}><StatusIcon status={status as SubagentSessionStatus} /></span>;

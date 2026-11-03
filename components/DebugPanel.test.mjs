@@ -479,7 +479,7 @@ test("sessions on the server: grouped by project, the chat's first and not repea
   assert.match(panelSource, /\.debug-row\.has-detail \{\s*border-radius: 4px 4px 0 0;/);
   assert.match(panelSource, /\.debug-row\.is-current::before \{\s*content: "";\s*position: absolute;\s*top: 5px;\s*left: 0;\s*width: 3px;\s*height: 14px;/);
   assert.match(list, /<span class="session-tree-awaiting" role="img" aria-label="awaiting input" title="awaiting input"><\/span>/, "the sidebar's awaiting dot");
-  assert.match(list, /<span class="debug-status is-accent" title="running"><svg[^>]*class="sidebar-spin"/, "the sidebar's spinner");
+  assert.match(list, /<span class="debug-status is-accent" title="running"><svg[^>]*class="lucide[^"]*sidebar-spin"/, "the sidebar's spinner");
   assert.match(list, /<span class="debug-status-ring is-closing"><\/span>/);
   assert.match(list, /title="1 event streams" role="img" aria-label="1 event streams"><span class="debug-badge is-muted" title="1 event streams">SSE<\/span><\/span>/);
   // 3 min left when the server answered, 10 s ago.

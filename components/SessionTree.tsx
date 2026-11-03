@@ -38,16 +38,16 @@ import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import type { SidebarMenuAnchor } from "./SidebarMenu";
 import {
   ArchiveIcon,
-  BranchIcon,
-  ChevronIcon,
+  GitBranchIcon,
+  ChevronRightIcon,
   FolderPlusIcon,
-  MoreIcon,
+  MoreHorizontalIcon,
   PinIcon,
   PlusIcon,
-  RestoreIcon,
-  SpinnerIcon,
-  TrashIcon,
-} from "./SidebarIcons";
+  ArchiveRestoreIcon,
+  LoaderCircleIcon,
+  Trash2Icon,
+} from "lucide-react";
 
 /**
  * The sessions tab's tree: the pinned section, every project as a group of
@@ -596,7 +596,7 @@ const SessionRowView = memo(function SessionRowView({
     metaState = " is-awaiting";
     metaTitle = t("sidebar.agentAwaitingInput");
   } else if (status.running) {
-    meta = <SpinnerIcon size={12} label={t("sidebar.agentRunning")} />;
+    meta = <LoaderCircleIcon size={12} strokeWidth={2.8} className="sidebar-spin" role="img" aria-label={t("sidebar.agentRunning")} aria-hidden={false} />;
     metaState = " is-running";
     metaTitle = t("sidebar.agentRunning");
   } else if (status.unread) {
@@ -625,7 +625,7 @@ const SessionRowView = memo(function SessionRowView({
       )}
       {branch && (
         <span className="session-tree-branch">
-          <BranchIcon size={10} className="session-tree-branch-icon" />
+          <GitBranchIcon size={10} className="session-tree-branch-icon" />
           {branch}
         </span>
       )}
@@ -680,7 +680,7 @@ const SessionRowView = memo(function SessionRowView({
                 handlers.current.onRestoreFamily(family);
               }}
             >
-              <RestoreIcon size={13} />
+              <ArchiveRestoreIcon size={13} />
             </button>
           ) : (
             <button
@@ -709,7 +709,7 @@ const SessionRowView = memo(function SessionRowView({
               handlers.current.onOpenRowMenu(row, anchorOf(button), button);
             }}
           >
-            <MoreIcon size={14} />
+            <MoreHorizontalIcon size={14} />
           </button>
         </span>
       )}
@@ -802,7 +802,7 @@ export function DeleteConfirm({
     <>
       <span className="session-tree-confirm-text">{label}</span>
       <button type="button" className="session-tree-confirm-delete" onClick={onConfirm}>
-        <TrashIcon size={12} />
+        <Trash2Icon size={12} />
         {deleteLabel}
       </button>
       <button ref={cancelRef} type="button" className="session-tree-confirm-cancel" onClick={onCancel}>
@@ -828,7 +828,7 @@ export function ActivitySummary({ running, awaiting = 0, unread, t }: { running:
           title={t("sidebar.agentRunning")}
           aria-label={`${t("sidebar.agentRunning")} (${running})`}
         >
-          <SpinnerIcon size={10} />
+          <LoaderCircleIcon size={10} strokeWidth={2.8} className="sidebar-spin" />
           {running}
         </span>
       )}
@@ -940,9 +940,9 @@ const GroupRowView = memo(function GroupRowView({
         {/* A section header, not one more row: the chevron leads in a
             column of its own, so the name starts where the session titles
             below it do and every header's chevron lines up. */}
-        <ChevronIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
+        <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
         <span className="session-tree-group-name">{project.name}</span>
-        {project.pinned && <PinIcon size={10} className="session-tree-group-pin" label={t("sidebar.pinnedProject")} />}
+        {project.pinned && <PinIcon size={10} className="session-tree-group-pin" role="img" aria-label={t("sidebar.pinnedProject")} aria-hidden={false} />}
         {!expanded && <ActivitySummary running={row.running} awaiting={row.awaiting} unread={row.unread} t={t} />}
       </button>
       <span className="session-tree-group-actions">
@@ -970,7 +970,7 @@ const GroupRowView = memo(function GroupRowView({
             handlers.current.onGroupMenu(project, event.currentTarget);
           }}
         >
-          <MoreIcon size={13} />
+          <MoreHorizontalIcon size={13} />
         </button>
       </span>
     </div>
@@ -1004,7 +1004,7 @@ const PlainRowView = memo(function PlainRowView({
             aria-expanded={!row.collapsed}
             onClick={() => handlers.current.onTogglePinned()}
           >
-            <ChevronIcon size={12} strokeWidth={3} className={`session-tree-chevron${row.collapsed ? "" : " is-open"}`} />
+            <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${row.collapsed ? "" : " is-open"}`} />
             <span className="session-tree-pinned-label">{t("sidebar.pinned")}</span>
             <span className="session-tree-pinned-count">· {row.count}</span>
             {row.collapsed && row.running > 0 && (
@@ -1096,7 +1096,7 @@ const PlainRowView = memo(function PlainRowView({
           <button type="button" className="session-tree-footer-button" onClick={() => handlers.current.onOpenArchive()}>
             <ArchiveIcon size={12} />
             <span className="session-tree-footer-label">{t("sidebar.archivedCount", { count: row.count })}</span>
-            <ChevronIcon size={10} className="session-tree-footer-chevron" />
+            <ChevronRightIcon size={10} className="session-tree-footer-chevron" />
           </button>
         </div>
       );
@@ -1137,7 +1137,7 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
         title={project.root}
         onClick={(event) => handlers.current.onToggleArchiveGroup?.(project.key, event.altKey)}
       >
-        <ChevronIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
+        <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
         <span className="session-tree-group-name">{project.name}</span>
         <span className="session-tree-archive-group-count">· {row.count}</span>
       </button>
@@ -1154,7 +1154,7 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
             handlers.current.onArchiveGroupMenu?.(project, event.currentTarget);
           }}
         >
-          <MoreIcon size={13} />
+          <MoreHorizontalIcon size={13} />
         </button>
       </span>
     </div>

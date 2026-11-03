@@ -19,8 +19,6 @@
   --color-text: var(--text);
   --color-text-muted: var(--text-muted);
   --color-text-dim: var(--text-dim);
-  --color-brand: var(--accent);
-  --color-brand-hover: var(--accent-hover);
   --color-user-bg: var(--user-bg);
   --color-assistant-bg: var(--assistant-bg);
   --color-tool-bg: var(--tool-bg);
@@ -49,34 +47,22 @@
   --color-accent-foreground: var(--text);
   --color-destructive: var(--danger);
   --color-ring: var(--accent);
-  --radius-xs: var(--r-xs);
-  --radius-sm: var(--r-xs);
-  --radius-md: var(--r-sm);
-  --radius-lg: var(--r-md);
-  --radius-xl: var(--r-lg);
-  --radius-2xl: var(--r-xl);
+  --color-dim: var(--text-dim);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
 }
 
-/* 全局刻度（§5.2）：radius 收编内联 16 种取值；控件高度、z-index 层级、
-   玻璃配方只走 token，禁止在组件里新写裸值。--r-* 不用 --radius-* 命名：
-   那是 Tailwind 主题变量的命名空间（上面 @theme inline 已映射到本组）。 */
+/* 全局刻度（§5.3/§5.5）：radius 单一真值源按 shadcn 官方派生公式（--radius
+   10px → 6/8/10/14/18）；z-index 只留非浮层层级，浮层交给 Radix portal；
+   玻璃配方为浮层组件变体专用。禁止在组件里新写裸值。 */
 :root {
-  --r-xs: 5px;
-  --r-sm: 7px;
-  --r-md: 8px;
-  --r-lg: 10px;
-  --r-xl: 14px;
-  --r-pill: 999px;
-  --control-h-xs: 26px;
-  --control-h-sm: 28px;
-  --control-h-md: 32px;
-  --control-h-touch: 44px;
+  --radius: 10px;
   --z-sticky: 10;
   --z-shelf: 20;
   --z-panel: 100;
-  --z-popover: 400;
-  --z-dialog: 500;
-  --z-toast: 600;
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(0, 0, 0, 0.08);
   --glass-blur: 24px;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { CloseIcon } from "./SidebarIcons";
+import { XIcon } from "lucide-react";
 
 /**
  * The session sidebar's one-line toast: "Archived “…”" with Undo and View, or
@@ -119,7 +119,7 @@ function SidebarToastCard({ toast, dismissLabel, durationMs, onDismissRef }: Toa
         title={dismissLabel}
         onClick={() => onDismissRef.current()}
       >
-        <CloseIcon size={12} />
+        <XIcon size={12} />
       </button>
     </div>
   );

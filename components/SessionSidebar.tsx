@@ -97,29 +97,28 @@ import { SidebarMenu, type SidebarMenuAnchor, type SidebarMenuItem } from "./Sid
 import { SidebarToast, type SidebarToastAction, type SidebarToastData } from "./SidebarToast";
 import {
   ArchiveIcon,
-  ChangesIcon,
+  GitCommitHorizontalIcon,
   CheckIcon,
-  ChevronIcon,
-  DotIcon,
-  DotOutlineIcon,
+  ChevronRightIcon,
+  CircleIcon,
   EyeIcon,
   FolderIcon,
-  MessageIcon,
-  MoreIcon,
-  ForkIcon,
-  OpenInNewTabIcon,
+  MessageSquareIcon,
+  MoreHorizontalIcon,
+  GitForkIcon,
+  ExternalLinkIcon,
   PencilIcon,
-  PencilSparkleIcon,
+  WandSparklesIcon,
   PinIcon,
   PinOffIcon,
   PlusIcon,
-  RefreshIcon,
-  RestoreIcon,
+  RotateCcwIcon,
+  ArchiveRestoreIcon,
   SearchIcon,
   TerminalIcon,
-  TrashIcon,
+  Trash2Icon,
   UploadIcon,
-} from "./SidebarIcons";
+} from "lucide-react";
 
 interface FileManagerAvailability {
   supported: boolean;
@@ -354,17 +353,17 @@ const SESSION_ACTION_LABEL_KEYS: Record<SessionMenuActionId, string> = {
 
 function sessionActionIcon(id: SessionMenuActionId): ReactNode {
   switch (id) {
-    case "open-new-tab": return <OpenInNewTabIcon />;
-    case "pin": return <PinIcon />;
-    case "unpin": return <PinOffIcon />;
-    case "rename": return <PencilIcon />;
-    case "auto-name": return <PencilSparkleIcon />;
-    case "fork": return <ForkIcon />;
-    case "mark-read": return <DotOutlineIcon />;
-    case "mark-unread": return <DotIcon />;
-    case "archive": return <ArchiveIcon />;
-    case "unarchive": return <RestoreIcon />;
-    case "delete": return <TrashIcon />;
+    case "open-new-tab": return <ExternalLinkIcon size={13} />;
+    case "pin": return <PinIcon size={13} />;
+    case "unpin": return <PinOffIcon size={13} />;
+    case "rename": return <PencilIcon size={13} />;
+    case "auto-name": return <WandSparklesIcon size={13} />;
+    case "fork": return <GitForkIcon size={13} />;
+    case "mark-read": return <CircleIcon size={13} />;
+    case "mark-unread": return <CircleIcon size={13} fill="currentColor" />;
+    case "archive": return <ArchiveIcon size={13} />;
+    case "unarchive": return <ArchiveRestoreIcon size={13} />;
+    case "delete": return <Trash2Icon size={13} />;
   }
 }
 
@@ -2423,13 +2422,13 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       type: "item",
       id,
       label: t("sidebar.renameProject"),
-      icon: <PencilIcon />,
+      icon: <PencilIcon size={13} />,
       onSelect: () => startProjectRename(project),
     } : {
       type: "item",
       id,
       label: t("sidebar.resetProjectName"),
-      icon: <RestoreIcon />,
+      icon: <ArchiveRestoreIcon size={13} />,
       onSelect: () => { void applyUiState({ action: "rename-project", projectKey: project.key, name: null }); },
     }));
     // Three groups, by what they act on: the project itself, its place in the
@@ -2439,7 +2438,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "pin-project",
         label: t(project.pinned ? "sidebar.unpinProject" : "sidebar.pinProject"),
-        icon: project.pinned ? <PinOffIcon /> : <PinIcon />,
+        icon: project.pinned ? <PinOffIcon size={13} /> : <PinIcon size={13} />,
         onSelect: () => { void applyUiState({ action: "pin-project", projectKey: project.key, root: project.root, pinned: !project.pinned }); },
       },
       ...nameItems,
@@ -2447,14 +2446,14 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "open-in-files",
         label: t("sidebar.openInFilesTab"),
-        icon: <FolderIcon />,
+        icon: <FolderIcon size={13} />,
         onSelect: () => openProjectInFiles(project),
       },
       {
         type: "item",
         id: "open-new-tab",
         label: t("sidebar.openInNewTab"),
-        icon: <OpenInNewTabIcon />,
+        icon: <ExternalLinkIcon size={13} />,
         shortcut: "T",
         onSelect: () => openProjectInNewTab(project),
       },
@@ -2463,7 +2462,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "move-up",
         label: t("sidebar.moveProjectUp"),
-        icon: <ChevronIcon className="sidebar-icon-up" />,
+        icon: <ChevronRightIcon size={13} className="sidebar-icon-up" />,
         disabled: up === null,
         onSelect: () => { if (up) moveProject(project.key, up.anchorKey, up.position); },
       },
@@ -2471,7 +2470,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "move-down",
         label: t("sidebar.moveProjectDown"),
-        icon: <ChevronIcon className="sidebar-icon-down" />,
+        icon: <ChevronRightIcon size={13} className="sidebar-icon-down" />,
         disabled: down === null,
         onSelect: () => { if (down) moveProject(project.key, down.anchorKey, down.position); },
       },
@@ -2480,7 +2479,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "collapse-others",
         label: t("sidebar.collapseOtherGroups"),
-        icon: <ChevronIcon />,
+        icon: <ChevronRightIcon size={13} />,
         disabled: model.projects.every((other) => isGroupExpanded(other, shownGroupExpansion) === (other.key === project.key)),
         onSelect: () => setAllGroupsExpanded((other) => other.key === project.key),
       },
@@ -2488,7 +2487,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "expand-all",
         label: t("sidebar.expandAllGroups"),
-        icon: <ChevronIcon className="sidebar-icon-down" />,
+        icon: <ChevronRightIcon size={13} className="sidebar-icon-down" />,
         disabled: model.projects.every((other) => isGroupExpanded(other, shownGroupExpansion)),
         onSelect: () => setAllGroupsExpanded(() => true),
       },
@@ -2497,7 +2496,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "archive-older",
         label: t("sidebar.archiveOlderThanWeek", { count: olderCount }),
-        icon: <ArchiveIcon />,
+        icon: <ArchiveIcon size={13} />,
         disabled: olderCount === 0,
         onSelect: () => archiveOlderSessions(project),
       },
@@ -2505,7 +2504,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "view-archived",
         label: t("sidebar.viewArchived", { count: archivedCount }),
-        icon: <ArchiveIcon />,
+        icon: <ArchiveIcon size={13} />,
         disabled: archivedCount === 0,
         onSelect: () => openArchiveView(project.key),
       },
@@ -2513,7 +2512,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "delete-all",
         label: t("sidebar.deleteProjectSessions", { count: deletable.ids.length }),
-        icon: <TrashIcon />,
+        icon: <Trash2Icon size={13} />,
         danger: true,
         disabled: deletable.ids.length === 0,
         onSelect: ({ keepOpen }) => {
@@ -2572,7 +2571,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "restore-all",
         label: t("sidebar.restoreAllArchived", { count: ids.length }),
-        icon: <RestoreIcon />,
+        icon: <ArchiveRestoreIcon size={13} />,
         disabled: ids.length === 0,
         onSelect: () => restoreFamilies(familiesOf(ids)),
       },
@@ -2581,7 +2580,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "delete-all",
         label: t("sidebar.deleteAllArchived", { count: ids.length }),
-        icon: <TrashIcon />,
+        icon: <Trash2Icon size={13} />,
         danger: true,
         disabled: ids.length === 0,
         onSelect: ({ keepOpen }) => {
@@ -2601,7 +2600,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "collapse-all",
         label: t("sidebar.collapseAllGroups"),
-        icon: <ChevronIcon />,
+        icon: <ChevronRightIcon size={13} />,
         disabled: folded === archiveGroups.length,
         onSelect: () => setAllArchiveGroupsExpanded(false),
       },
@@ -2609,7 +2608,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "expand-all",
         label: t("sidebar.expandAllGroups"),
-        icon: <ChevronIcon className="sidebar-icon-down" />,
+        icon: <ChevronRightIcon size={13} className="sidebar-icon-down" />,
         disabled: folded === 0,
         onSelect: () => setAllArchiveGroupsExpanded(true),
       },
@@ -2618,7 +2617,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "restore-all",
         label: t("sidebar.restoreAllArchived", { count: all.length }),
-        icon: <RestoreIcon />,
+        icon: <ArchiveRestoreIcon size={13} />,
         disabled: all.length === 0,
         onSelect: () => restoreFamilies(familiesOf(all)),
       },
@@ -2626,7 +2625,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "delete-old",
         label: t("sidebar.deleteOldArchived", { count: old.length }),
-        icon: <TrashIcon />,
+        icon: <Trash2Icon size={13} />,
         danger: true,
         disabled: old.length === 0,
         onSelect: ({ keepOpen }) => {
@@ -2638,7 +2637,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "delete-all",
         label: t("sidebar.deleteAllArchived", { count: all.length }),
-        icon: <TrashIcon />,
+        icon: <Trash2Icon size={13} />,
         danger: true,
         disabled: all.length === 0,
         onSelect: ({ keepOpen }) => {
@@ -2834,7 +2833,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       title={t("sidebar.refreshExplorer")}
       done={explorerRefreshDone}
     >
-      {explorerRefreshDone ? <CheckIcon size={keyIconSize} /> : <RefreshIcon size={keyIconSize} />}
+      {explorerRefreshDone ? <CheckIcon size={keyIconSize} /> : <RotateCcwIcon size={keyIconSize} />}
     </ToolbarIconButton>
   );
   const ignoredFilesButton = (className?: string) => (
@@ -2871,7 +2870,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       title={t("sidebar.changedFiles", { count: changesCount })}
       pressed={!changesKeyDisabled && !changesCollapsed}
     >
-      <ChangesIcon size={keyIconSize} />
+      <GitCommitHorizontalIcon size={keyIconSize} />
     </ToolbarIconButton>
   );
 
@@ -2923,7 +2922,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               onClick={() => switchTab("sessions")}
               onKeyDown={handleTabKeyDown}
             >
-              <MessageIcon size={13} className="sidebar-tab-icon" />
+              <MessageSquareIcon size={13} className="sidebar-tab-icon" />
               <span className="sidebar-tab-label">{t("sidebar.tabSessions")}</span>
             </button>
             <button
@@ -3054,7 +3053,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                     aria-label={`${t("sidebar.backToSessions")}: ${t("sidebar.archivedCount", { count: archivedCount })}`}
                     onClick={() => setArchiveView(false)}
                   >
-                    <ChevronIcon size={13} className="sidebar-icon-back" />
+                    <ChevronRightIcon size={13} className="sidebar-icon-back" />
                     <span>{t("sidebar.archived")}</span>
                     <span className="sidebar-archive-count">· {archivedCount}</span>
                   </button>
@@ -3068,7 +3067,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                     disabled={archiveGroups.length === 0}
                     onClick={(event) => openArchiveMenu(event.currentTarget)}
                   >
-                    <MoreIcon size={13} />
+                    <MoreHorizontalIcon size={13} />
                   </button>
                 </div>
                 <SessionTree
@@ -3126,7 +3125,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               title={changedFilesTitle}
               onClick={() => setFilesSectionCollapsed(!filesCollapsed)}
             >
-              <ChevronIcon size={12} strokeWidth={3} className={`session-tree-chevron${filesCollapsed ? "" : " is-open"}`} />
+              <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${filesCollapsed ? "" : " is-open"}`} />
               <span className="sidebar-files-section-label">{t("sidebar.tabFiles")}</span>
               {/* As the pinned section's count; the changes key says it to a screen reader. */}
               {changedFilesTitle && <span className="sidebar-files-section-count" aria-hidden="true">· {changesCount}</span>}

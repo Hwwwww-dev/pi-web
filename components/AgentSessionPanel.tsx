@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { countRunningSubagents, sideChatTitle } from "@/lib/session-family";
-import { MessagePlusIcon, SideChatsIcon } from "./SidebarIcons";
+import { MessageSquarePlusIcon, MessagesSquareIcon } from "lucide-react";
 import type { SessionUsageSummary } from "@/lib/session-stats";
 import { formatActiveDuration, formatCompactCount, formatCostShort } from "@/lib/session-stats-format";
 import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
 import { DeleteConfirm } from "./SessionTree";
-import { TrashIcon } from "./SidebarIcons";
+import { Trash2Icon } from "lucide-react";
 
 interface Props {
   rootSession: SessionInfo;
@@ -271,7 +271,7 @@ function AgentRow({
         role="option"
         aria-selected={selected}
         onClick={onSelect}
-        className={selected ? "bg-transparent" : "bg-transparent hover:bg-bg-hover"}
+        className={selected ? "bg-transparent" : "bg-transparent hover:bg-secondary"}
         style={{
           flex: 1,
           minWidth: 0,
@@ -293,7 +293,7 @@ function AgentRow({
               <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" />
             </svg>
           ) : side ? (
-            <SideChatsIcon size={17} strokeWidth={1.8} />
+            <MessagesSquareIcon size={17} strokeWidth={1.8} />
           ) : (
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" />
@@ -327,7 +327,7 @@ function AgentRow({
       </button>
       {onNewSideChat && (
         <RowSideButton title={t("sideChat.new")} disabled={newSideChatPending} onClick={onNewSideChat}>
-          <MessagePlusIcon size={17} strokeWidth={1.8} />
+          <MessageSquarePlusIcon size={17} strokeWidth={1.8} />
         </RowSideButton>
       )}
       {onToggleTab && (
@@ -354,7 +354,7 @@ function AgentRow({
             onDelete();
           }}
         >
-          <TrashIcon size={14} />
+          <Trash2Icon size={14} />
         </RowSideButton>
       )}
     </div>
@@ -370,12 +370,12 @@ function RowSideButton({ title, pressed, danger, disabled, onClick, children }: 
   children: ReactNode;
 }) {
   const state = disabled
-    ? "cursor-not-allowed text-text-dim opacity-40"
+    ? "cursor-not-allowed text-dim opacity-40"
     : danger
-      ? "cursor-pointer text-text-muted hover:bg-[rgba(239,68,68,0.08)] hover:text-[#ef4444] focus-visible:bg-[rgba(239,68,68,0.08)] focus-visible:text-[#ef4444]"
+      ? "cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive"
       : pressed
-        ? "cursor-pointer text-brand hover:bg-bg-hover"
-        : "cursor-pointer text-text-muted hover:bg-bg-hover hover:text-text";
+        ? "cursor-pointer text-primary hover:bg-secondary"
+        : "cursor-pointer text-muted-foreground hover:bg-secondary hover:text-foreground";
   return (
     <button
       type="button"

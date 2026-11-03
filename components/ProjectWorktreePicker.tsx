@@ -14,7 +14,7 @@ import {
 import { projectNameOf } from "@/lib/session-tree";
 import { ActivitySummary } from "./SessionTree";
 import { SidebarMenu, type SidebarMenuAnchor, type SidebarMenuItem } from "./SidebarMenu";
-import { BranchIcon, ChevronIcon, FolderIcon, FolderPlusIcon, PlusIcon, TrashIcon } from "./SidebarIcons";
+import { GitBranchIcon, ChevronRightIcon, FolderIcon, FolderPlusIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { WorktreeCreateForm } from "./WorktreeCreateForm";
 
 /** The picker's two controls. A pick names the one it came from. */
@@ -505,7 +505,7 @@ export function ProjectWorktreePicker({
       checked: worktree.path === current?.path,
       secondary: onRemoveWorktree && !worktree.isMain ? {
         label: t("sidebar.removeWorktreeTitle", { path: worktree.path }),
-        icon: <TrashIcon size={12} />,
+        icon: <Trash2Icon size={12} />,
         danger: true,
         disabled: menu?.removing,
         onSelect: ({ keepOpen }) => {
@@ -635,7 +635,7 @@ export function ProjectWorktreePicker({
         {otherActivity && (
           <span className="project-picker-activity" role="img" title={t("sidebar.newActivity")} aria-label={t("sidebar.newActivity")} />
         )}
-        {inline && <ChevronIcon size={9} className="project-picker-chevron sidebar-icon-down" />}
+        {inline && <ChevronRightIcon size={9} className="project-picker-chevron sidebar-icon-down" />}
       </button>
       {worktrees && (
         <button
@@ -648,7 +648,7 @@ export function ProjectWorktreePicker({
           onClick={(event) => openMenu("worktree", event.currentTarget)}
         >
           {/* A linked checkout's branch icon in the accent, as the main checkout's is not. */}
-          <BranchIcon size={11} className={current && !current.isMain ? "project-picker-icon is-linked" : "project-picker-icon"} />
+          <GitBranchIcon size={11} className={current && !current.isMain ? "project-picker-icon is-linked" : "project-picker-icon"} />
           <span className="project-picker-path"><span>{current ? current.branch ?? displayPath(current.path, homeDir) : "…"}</span></span>
           {/* Only in the files tab: in the row the box is a share of a
               narrow sidebar and the branch needs the room; inline the
@@ -656,12 +656,12 @@ export function ProjectWorktreePicker({
               linked checkout) still tells the main one. */}
           {current?.isMain && layout === "stacked" && <span className="project-picker-note">{t("sidebar.main")}</span>}
           {stacked && worktrees.length > 1 && <span className="project-picker-note">{worktrees.length}</span>}
-          <ChevronIcon size={9} className="project-picker-chevron sidebar-icon-down" />
+          <ChevronRightIcon size={9} className="project-picker-chevron sidebar-icon-down" />
         </button>
       )}
       {!worktrees && stacked && worktreeHint && (
         <button type="button" aria-disabled="true" tabIndex={-1} title={worktreeHint.title} className="project-picker-button is-inactive">
-          <BranchIcon size={11} className="project-picker-icon" />
+          <GitBranchIcon size={11} className="project-picker-icon" />
           <span className="project-picker-label">{worktreeHint.label}</span>
         </button>
       )}

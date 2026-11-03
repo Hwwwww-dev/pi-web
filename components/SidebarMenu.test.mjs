@@ -21,7 +21,7 @@ const {
   hasCustomMenuBody,
   SIDEBAR_MENU_FILTER_MIN_CHOICES,
 } = await jiti.import("./SidebarMenu.tsx");
-const { SpinnerIcon, MoreIcon, PinIcon, TrashIcon } = await jiti.import("./SidebarIcons.tsx");
+const { LoaderCircleIcon, PinIcon, Trash2Icon } = await jiti.import("lucide-react");
 const css = await readFile(new URL("../app/sidebar-menu.css", import.meta.url), "utf8");
 
 const h = React.createElement;
@@ -241,16 +241,16 @@ test("menu styles parse on Safari 16.2", () => {
   assert.doesNotMatch(css, /@starting-style/);
 });
 
-test("icons are decorative unless labelled, and the spinner turns through a class", () => {
-  const more = renderToStaticMarkup(h(MoreIcon));
-  assert.match(more, /^<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">/);
-  const spinner = renderToStaticMarkup(h(SpinnerIcon, { size: 12, label: "Agent running", className: "row-status" }));
+test("the running spinner turns through sidebar-spin and announces its label", () => {
+  // The status sites' contract (SessionTree, DebugPanel): the lucide spinner
+  // gets the reduced-motion class, the label overrides lucide's default
+  // aria-hidden, and the heavier stroke keeps it legible at 10-12px.
+  const spinner = renderToStaticMarkup(h(LoaderCircleIcon, { size: 12, strokeWidth: 2.8, className: "sidebar-spin", role: "img", "aria-label": "Agent running", "aria-hidden": false }));
   assert.match(spinner, /width="12"/);
   assert.match(spinner, /stroke-width="2\.8"/);
-  assert.match(spinner, /class="sidebar-spin row-status"/);
-  assert.match(spinner, /role="img" aria-label="Agent running"/);
-  assert.doesNotMatch(spinner, /aria-hidden/);
-  assert.match(spinner, /<path d="M21 12a9 9 0 1 1-3\.8-7\.4"><\/path>/);
+  assert.match(spinner, /class="lucide[^"]*sidebar-spin/);
+  assert.match(spinner, /aria-label="Agent running"/);
+  assert.doesNotMatch(spinner, /aria-hidden="true"/);
 });
 
 const projectChoices = Array.from({ length: SIDEBAR_MENU_FILTER_MIN_CHOICES }, (_, index) => ({
@@ -339,7 +339,7 @@ test("an item's secondary action is its own menu item at the row's end; a badge 
       label: "feature/x",
       checked: false,
       title: "/work/app-worktrees/feature-x",
-      secondary: { label: "Remove worktree checkout /work/app-worktrees/feature-x", icon: h(TrashIcon, { size: 12 }), danger: true, onSelect: noop },
+      secondary: { label: "Remove worktree checkout /work/app-worktrees/feature-x", icon: h(Trash2Icon, { size: 12 }), danger: true, onSelect: noop },
       onSelect: noop,
     },
     {
@@ -347,7 +347,7 @@ test("an item's secondary action is its own menu item at the row's end; a badge 
       id: "busy",
       label: "busy",
       checked: false,
-      secondary: { label: "Remove busy", icon: h(TrashIcon, { size: 12 }), disabled: true, onSelect: noop },
+      secondary: { label: "Remove busy", icon: h(Trash2Icon, { size: 12 }), disabled: true, onSelect: noop },
       onSelect: noop,
     },
     { type: "item", id: "app", label: "app", checked: true, note: "Workspace", badge: h("span", { className: "badge" }, "2"), onSelect: noop },
