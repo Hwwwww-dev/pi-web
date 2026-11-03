@@ -12,7 +12,7 @@ test("renders temporary notices once at the top right of the chat column", () =>
   assert.equal(noticeShelfUsages.length, 1);
   assert.match(
     source,
-    /position: "absolute",\s*top: 12,\s*left: 0,\s*right: 0,[\s\S]*?justifyContent: "flex-end",[\s\S]*?<NoticeShelf notices=\{notices\} floating onPauseChange=\{setNoticePaused\} onDismiss=\{dismissNotice\} \/>/,
+    /className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-end"[\s\S]*?<NoticeShelf notices=\{notices\} floating onPauseChange=\{setNoticePaused\} onDismiss=\{dismissNotice\} \/>/,
   );
 });
 
@@ -43,6 +43,8 @@ test("centres a one-line notice in the card the entrance animation pins", () => 
 
 test("measures the notice line box from the card's own font size and line height", () => {
   const lineBox = Number(source.match(/const NOTICE_LINE_BOX_PX = (\d+);/)[1]);
-  const card = source.match(/className="notice-shelf-item"[\s\S]*?fontSize: (\d+),\s*lineHeight: ([\d.]+),/);
-  assert.equal(Number(card[1]) * Number(card[2]), lineBox);
+  // The line box lives in the card's utilities: text-sm (14px) × leading-normal (1.5).
+  const card = source.match(/className="notice-shelf-item[^"]*\btext-sm\b[^"]*\bleading-normal\b/);
+  assert.ok(card, "notice card pins text-sm leading-normal for the 21px line box");
+  assert.equal(14 * 1.5, lineBox);
 });

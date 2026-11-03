@@ -20,6 +20,7 @@
   --color-text-muted: var(--text-muted);
   --color-text-dim: var(--text-dim);
   --color-user-bg: var(--user-bg);
+  --color-user-border: var(--user-border);
   --color-assistant-bg: var(--assistant-bg);
   --color-tool-bg: var(--tool-bg);
   --color-bg-subtle: var(--bg-subtle);
@@ -50,6 +51,11 @@
   --color-dim: var(--text-dim);
   --color-warning: var(--warning);
   --color-success: var(--ok);
+  --color-diff-add-bg: var(--diff-add-bg);
+  --color-diff-del-bg: var(--diff-del-bg);
+  --color-diff-add: var(--diff-add);
+  --color-diff-del: var(--diff-del);
+  --color-diff-hunk-bg: var(--diff-hunk-bg);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);

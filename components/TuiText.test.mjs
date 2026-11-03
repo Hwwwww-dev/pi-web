@@ -22,5 +22,5 @@ test("notifications, dialog titles and option previews fall back to terminal ren
 
 test("tool results stop reflowing when they are terminal output", () => {
   assert.match(activityRows, /const tui = isTuiText\(text\);/);
-  assert.match(activityRows, /whiteSpace: tui \? "pre" : "pre-wrap"/);
+  assert.match(activityRows, /tui \? "whitespace-pre" : "whitespace-pre-wrap break-all"/);
 });

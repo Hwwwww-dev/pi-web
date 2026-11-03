@@ -1,6 +1,9 @@
 "use client";
 
-import { Fragment, memo, useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
+import { Fragment, memo, useState, useRef, useEffect, useMemo } from "react";
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, ClockIcon, CopyIcon, CornerDownRightIcon, GitBranchIcon, XIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "./ui/alert";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import {
@@ -90,10 +93,6 @@ function estimateUpdatedTokens(previous: TokenEstimateCacheEntry | undefined, te
 
 // Messages larger than this skip markdown rendering entirely (guard now lives
 // in ActivityRows.SafeMarkdownBody and is shared with activity prose).
-
-// Cap the user "sent" bubble's height so an abnormally long message does not
-// push the conversation off screen; overflow scrolls inside the bubble.
-const USER_BUBBLE_MAX_HEIGHT = 300;
 
 interface Props {
   message: AgentMessage;
@@ -215,7 +214,7 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
     // spacing of their own; inside grouped activity bodies the rows are spaced
     // by the activity container.
     return (
-      <div style={{ marginBottom: 12 }}>
+      <div className="mb-3">
         {(message as CustomMessage).customType === "compaction"
           ? <CompactionRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} />
           : <CustomRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />}
@@ -300,7 +299,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   const editTarget = commandText ? replaceUserMessageText(message, commandText) : message;
 
   const imageBlocksNode = imageBlocks.length > 0 && (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: content ? 8 : 0 }}>
+    <div className={cn("flex flex-wrap gap-1.5", content && "mb-2")}>
       {imageBlocks.map((img, i) => {
         // SAFETY: pi-ai's on-disk format stores images flat ({data, mimeType}) while
         // lib/types.ts ImageContent nests them under {source:{type,data,media_type,url}};
@@ -321,7 +320,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               alt=""
               loading="lazy"
               decoding="async"
-              style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid var(--user-border)" }}
+              className="block max-h-60 max-w-60 rounded-sm border border-user-border object-contain"
             />
           </ImagePreview>
         );
@@ -340,79 +339,42 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
   return (
     <div
-      style={{ marginBottom: 12, display: "flex", flexDirection: "column", alignItems: "flex-end" }}
+      className="mb-3 flex flex-col items-end"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, maxWidth: "85%" }}>
+      <div className="flex max-w-[85%] items-end gap-1.5">
+        {/* Cap the height so an abnormally long message does not push the
+            conversation off screen; overflow scrolls inside the bubble. */}
         <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            background: isEditing ? "color-mix(in srgb, var(--accent) 14%, var(--user-bg))" : "var(--user-bg)",
-            border: isEditing ? "1px solid color-mix(in srgb, var(--accent) 62%, var(--user-bg))" : "1px solid var(--user-border)",
-            boxShadow: isEditing ? "0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent)" : undefined,
-            borderRadius: 12,
-            padding: "8px 12px",
-            fontSize: "calc(14px + var(--chat-font-size-offset, 0px))",
-            lineHeight: 1.6,
-            color: "var(--text)",
-            wordBreak: "break-word",
-            maxHeight: USER_BUBBLE_MAX_HEIGHT,
-            overflowY: "auto",
-          }}
+          className={cn(
+            "min-w-0 max-h-[300px] flex-1 overflow-y-auto break-words rounded-lg px-3 py-2 text-[length:calc(14px+var(--chat-font-size-offset,0px))] leading-[1.6] text-foreground",
+            isEditing
+              ? "border border-[color-mix(in_srgb,var(--accent)_62%,var(--user-bg))] bg-[color-mix(in_srgb,var(--accent)_14%,var(--user-bg))] ring-2 ring-[color-mix(in_srgb,var(--accent)_16%,transparent)]"
+              : "border border-user-border bg-user-bg",
+          )}
         >
           {commandText ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+            <div className="flex min-w-0 flex-col gap-1.5">
               {imageBlocksNode}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
+              <div className="flex flex-wrap items-start gap-2">
                 <button
                   onClick={() => setExpanded((prev) => !prev)}
                   title={expanded ? t("i18n.collapse") : t("i18n.expand")}
                   aria-expanded={expanded}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    flexShrink: 0,
-                    padding: 0,
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--accent)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "calc(13px + var(--chat-font-size-offset, 0px))",
-                    textAlign: "left",
-                  }}
+                  className="flex shrink-0 cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-left font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-primary"
                 >
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span className="truncate">
                     {commandName}
                   </span>
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ flexShrink: 0, opacity: 0.75, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
+                  <ChevronDownIcon
                     aria-hidden="true"
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
+                    strokeWidth={2}
+                    className={cn("h-[11px] w-[11px] shrink-0 opacity-75 transition-transform", expanded && "rotate-180")}
+                  />
                 </button>
                 {commandArgs && (
-                  <span style={{
-                    color: "var(--text)",
-                    fontSize: "calc(14px + var(--chat-font-size-offset, 0px))",
-                    lineHeight: 1.6,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    minWidth: 0,
-                    flex: 1,
-                  }}>
+                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[length:calc(14px+var(--chat-font-size-offset,0px))] leading-[1.6] text-foreground">
                     {commandArgs}
                   </span>
                 )}
@@ -433,72 +395,30 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
       {/* Bottom row: action buttons + timestamp */}
       {(
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "flex-end",
-          gap: 6, marginTop: 3,
-        }}>
-          <div className="touch-hover-actions" style={{
-            display: "flex", gap: 3,
-            opacity: hovered ? 1 : 0,
-            pointerEvents: hovered ? "auto" : "none",
-            transition: "opacity 0.12s",
-          }}>
+        <div className="mt-[3px] flex items-center justify-end gap-1.5">
+          <div className={cn("touch-hover-actions flex gap-[3px] transition-opacity", hovered ? "opacity-100" : "pointer-events-none opacity-0")}>
             <button
               onClick={copyContent}
               title={t("i18n.copyMessage")}
               aria-label={t("i18n.copyMessage")}
-              style={{
-                display: "flex", alignItems: "center",
-                padding: "3px 6px", height: 22,
-                background: "none", border: "none",
-                borderRadius: 5,
-                color: copied ? "var(--accent)" : "var(--text-dim)",
-                cursor: "pointer",
-                transition: "color 0.12s",
-              }}
-              onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
-              onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = "var(--text-dim)"; }}
-            >
-              {copied ? (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              ) : (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
+              className={cn(
+                "flex h-[22px] cursor-pointer items-center rounded-sm px-1.5 py-[3px] transition-colors",
+                copied ? "text-primary" : "text-dim hover:text-primary",
               )}
+            >
+              {copied ? <CheckIcon className="size-[11px]" strokeWidth={1.8} /> : <CopyIcon className="size-[11px]" strokeWidth={1.8} />}
             </button>
           </div>
           {(canFork || canEdit || canCancelEdit) && (
-            <div className="touch-hover-actions" style={{
-              display: "flex", gap: 3,
-              opacity: (hovered || forking || canCancelEdit) ? 1 : 0,
-              pointerEvents: (hovered || forking || canCancelEdit) ? "auto" : "none",
-              transition: "opacity 0.12s",
-            }}>
+            <div className={cn("touch-hover-actions flex gap-[3px] transition-opacity", hovered || forking || canCancelEdit ? "opacity-100" : "pointer-events-none opacity-0")}>
               {canEdit && !canCancelEdit && (
                 <button
                   onClick={() => onEditContent!(editTarget, entryId!)}
                    title={t("i18n.editFromHereTitle")}
                   aria-label={t("i18n.editFromHere")}
-                  style={{
-                    display: "flex", alignItems: "center",
-                    padding: "3px 6px", height: 22,
-                    background: "none", border: "none",
-                    borderRadius: 5,
-                    color: "var(--text-dim)",
-                    cursor: "pointer",
-                    transition: "color 0.12s",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; }}
+                  className="flex h-[22px] cursor-pointer items-center rounded-sm px-1.5 py-[3px] text-dim transition-colors hover:text-primary"
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 10 20 15 15 20" />
-                    <path d="M4 4v7a4 4 0 0 0 4 4h12" />
-                  </svg>
+                  <CornerDownRightIcon className="size-[11px]" strokeWidth={1.8} />
                 </button>
               )}
               {canCancelEdit && (
@@ -507,20 +427,9 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   onClick={onCancelEdit}
                   title={t("i18n.cancel")}
                   aria-label={t("i18n.cancel")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 4,
-                    padding: "3px 8px", height: 22,
-                    background: "none", border: "none",
-                    borderRadius: 5,
-                    color: "var(--accent)",
-                    cursor: "pointer",
-                    fontSize: 11, fontWeight: 500,
-                    whiteSpace: "nowrap",
-                  }}
+                  className="flex h-[22px] cursor-pointer items-center rounded-sm px-2 py-[3px] text-primary"
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                    <path d="M6 6l12 12M18 6L6 18" />
-                  </svg>
+                  <XIcon className="size-[11px]" strokeWidth={2} />
                 </button>
               )}
               {canFork && (
@@ -529,29 +438,17 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   disabled={forking}
                    title={forking ? t("i18n.creatingSession") : t("i18n.newSessionTitle")}
                   aria-label={t("i18n.newSession")}
-                  style={{
-                    display: "flex", alignItems: "center",
-                    padding: "3px 6px", height: 22,
-                    background: "none", border: "none",
-                    borderRadius: 5,
-                    color: forking ? "var(--accent)" : "var(--text-dim)",
-                    cursor: forking ? "not-allowed" : "pointer",
-                    transition: "color 0.12s",
-                  }}
-                  onMouseEnter={(e) => { if (!forking) e.currentTarget.style.color = "var(--accent)"; }}
-                  onMouseLeave={(e) => { if (!forking) e.currentTarget.style.color = "var(--text-dim)"; }}
+                  className={cn(
+                    "flex h-[22px] items-center rounded-sm px-1.5 py-[3px] transition-colors disabled:cursor-not-allowed",
+                    forking ? "text-primary" : "text-dim hover:text-primary",
+                  )}
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="6" y1="3" x2="6" y2="15" />
-                    <circle cx="18" cy="6" r="3" />
-                    <circle cx="6" cy="18" r="3" />
-                    <path d="M18 9a9 9 0 0 1-9 9" />
-                  </svg>
+                  <GitBranchIcon className="size-[11px]" strokeWidth={1.8} />
                 </button>
               )}
             </div>
           )}
-          {time && <span style={{ fontSize: 10, color: "var(--text-dim)" }}>{time}</span>}
+          {time && <span className="text-[10px] text-dim">{time}</span>}
         </div>
       )}
     </div>
@@ -743,7 +640,7 @@ function AssistantMessageView({
     <div
       data-message-role="assistant"
       data-entry-id={entryId}
-      style={{ marginBottom: 12 }}
+      className="mb-3"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -751,19 +648,13 @@ function AssistantMessageView({
           in the turn meta line / the per-message label for standalone messages. */}
       {(showModelLabel || isStreaming) && (
         <div
-          style={{
-            fontSize: 11,
-            color: "var(--text-dim)",
-            marginBottom: 4,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
+          className={cn(
+            "mb-1 flex items-center gap-1.5 text-xs text-dim",
             // The live-tail streaming message renders next to the activity
             // rows: line its tokens/rate up with the rows' icon column, and
             // keep it clear of the tool row above.
-            paddingLeft: isStreaming && !showModelLabel ? 4 : undefined,
-            marginTop: isStreaming && !showModelLabel ? 6 : undefined,
-          }}
+            isStreaming && !showModelLabel && "mt-1.5 pl-1",
+          )}
         >
           {showModelLabel && message.provider && (
             <span>{getModelDisplayName(message.provider, message.model, modelNames)}</span>
@@ -774,21 +665,24 @@ function AssistantMessageView({
               <>
 
                 {est > 0 && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)" }} title={t("i18n.estimatedTokens")}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 11, fontWeight: 400 }}>
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="5" y1="1.5" x2="5" y2="8.5" /><polyline points="2 6 5 8.5 8 6" />
-                      </svg>
+                  <span className="flex items-center gap-1 text-foreground" title={t("i18n.estimatedTokens")}>
+                    <span className="flex items-center gap-0.5 text-xs font-normal">
+                      <ArrowDownIcon aria-hidden className="size-2.5" strokeWidth={1.5} />
                       {est}
                     </span>
-                    {tps !== null && (() => {
-                      const bg = tps >= 50 ? "#53b3cb" : tps >= 30 ? "#9bc53d" : tps >= 15 ? "#f9c22e" : "#e01a4f";
-                      return (
-                        <span style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 4, background: bg, color: "#fff", fontSize: 11, fontWeight: 400 }}>
-                          {tps.toFixed(1)} t/s
-                        </span>
-                      );
-                    })()}
+                    {tps !== null && (
+                      <span
+                        className={cn(
+                          "ml-1.5 rounded-sm px-1.5 py-px text-xs font-normal",
+                          tps >= 50 ? "bg-primary/15 text-primary"
+                            : tps >= 30 ? "bg-success/15 text-success"
+                            : tps >= 15 ? "bg-warning/15 text-warning"
+                            : "bg-destructive/15 text-destructive",
+                        )}
+                      >
+                        {tps.toFixed(1)} t/s
+                      </span>
+                    )}
                   </span>
                 )}
               </>
@@ -797,7 +691,7 @@ function AssistantMessageView({
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="flex flex-col gap-2">
         {/* Not keyed by the entry id: a message of this run gets one when the file is
             read again, and its blocks keep their state across that read (#1184). */}
         {blockItems.map(({ block, originalIndex }) => (
@@ -806,68 +700,32 @@ function AssistantMessageView({
       </div>
 
       {providerError && (
-        <div
-          role="alert"
-          style={{
-            marginTop: blocks.length > 0 ? 8 : 0,
-            padding: "7px 10px",
-            border: "1px solid var(--danger-border)",
-            borderRadius: 6,
-            background: "var(--danger-bg)",
-            color: "var(--danger)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
-        >
-          Error: {providerError}
-        </div>
+        <Alert variant="destructive" className={cn("font-mono text-xs leading-normal", blocks.length > 0 ? "mt-2" : "mt-0")}>
+          <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
+            Error: {providerError}
+          </AlertDescription>
+        </Alert>
       )}
 
       {truncated && (
-        <div
-          role="alert"
-          style={{
-            marginTop: blocks.length > 0 || providerError ? 8 : 0,
-            padding: "7px 10px",
-            border: "1px solid var(--warning-border)",
-            borderRadius: 6,
-            background: "var(--warning-bg)",
-            color: "var(--warning)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
-        >
-          {t(unansweredTruncation ? "chat.truncatedWithoutAnswer" : "chat.truncatedByOutputLimit")}
-          {unansweredTruncation && onCompact && (
-            <button
-              type="button"
-              onClick={onCompact}
-              disabled={isCompacting}
-              style={{
-                display: "block",
-                marginTop: 8,
-                padding: "3px 8px",
-                border: "1px solid currentColor",
-                borderRadius: 5,
-                background: "transparent",
-                color: "inherit",
-                cursor: isCompacting ? "default" : "pointer",
-                font: "inherit",
-              }}
-            >
-              {t(isCompacting ? "chat.compacting" : "chat.compactContext")}
-            </button>
-          )}
-          {unansweredTruncation && compactError && (
-            <div style={{ marginTop: 8, color: "#ef4444", whiteSpace: "pre-wrap" }}>{compactError}</div>
-          )}
-        </div>
+        <Alert variant="warning" className={cn("font-mono text-xs leading-normal", blocks.length > 0 || providerError ? "mt-2" : "mt-0")}>
+          <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
+            {t(unansweredTruncation ? "chat.truncatedWithoutAnswer" : "chat.truncatedByOutputLimit")}
+            {unansweredTruncation && onCompact && (
+              <button
+                type="button"
+                onClick={onCompact}
+                disabled={isCompacting}
+                className="mt-2 block cursor-pointer rounded-sm border border-current bg-transparent px-2 py-[3px] transition-colors hover:bg-warning/15 disabled:cursor-default"
+              >
+                {t(isCompacting ? "chat.compacting" : "chat.compactContext")}
+              </button>
+            )}
+            {unansweredTruncation && compactError && (
+              <div className="mt-2 whitespace-pre-wrap text-destructive">{compactError}</div>
+            )}
+          </AlertDescription>
+        </Alert>
       )}
 
       {writtenFiles && writtenFiles.length > 0 && (
@@ -875,13 +733,11 @@ function AssistantMessageView({
       )}
 
       {((message.usage && !isStreaming) || (turnDurationMs !== undefined && !isStreaming) || (textContent && !isStreaming && !hideCopy) || (time && !isStreaming)) && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8, marginTop: 4,
-        }}>
+        <div className="mt-1 flex items-center gap-2">
           {(message.usage || turnDurationMs !== undefined) && !isStreaming && (
             // One item per count: a single space at 11px ran them together. The
             // spaces stay in the text for copying; the flex gap draws the room.
-            <div style={{ display: "flex", flexWrap: "wrap", columnGap: 7, fontSize: 11, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>
+            <div className="flex flex-wrap gap-x-[7px] text-xs text-dim tabular-nums">
               {stats.map((part, index) => (
                 <Fragment key={index}>{index > 0 && " "}<UsagePart part={part} /></Fragment>
               ))}
@@ -892,35 +748,17 @@ function AssistantMessageView({
             onClick={copyContent}
             title={t("i18n.copyMessage")}
             aria-label={t("i18n.copyMessage")}
-            className="touch-hover-actions"
-            style={{
-              display: "flex", alignItems: "center",
-              padding: "3px 6px", height: 22,
-              background: "none", border: "none",
-              borderRadius: 5,
-              color: copied ? "var(--accent)" : "var(--text-dim)",
-              cursor: "pointer",
-              opacity: hovered ? 1 : 0,
-              pointerEvents: hovered ? "auto" : "none",
-              transition: "opacity 0.12s, color 0.12s",
-            }}
-            onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
-            onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = "var(--text-dim)"; }}
-          >
-            {copied ? (
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            ) : (
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
+            className={cn(
+              "touch-hover-actions flex h-[22px] cursor-pointer items-center rounded-sm px-1.5 py-[3px] transition-colors",
+              hovered ? "opacity-100" : "pointer-events-none opacity-0",
+              copied ? "text-primary" : "text-dim hover:text-primary",
             )}
+          >
+            {copied ? <CheckIcon className="size-[11px]" strokeWidth={1.8} /> : <CopyIcon className="size-[11px]" strokeWidth={1.8} />}
           </button>
           )}
           {time && !isStreaming && (
-            <span style={{ fontSize: 10, color: "var(--text-dim)", marginLeft: "auto", whiteSpace: "nowrap" }}>{time}</span>
+            <span className="ml-auto whitespace-nowrap text-[10px] text-dim">{time}</span>
           )}
         </div>
       )}
@@ -1026,61 +864,37 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
   }, [expanded, block.deferred, content, sessionId, entryId, blockIndex]);
 
   return (
-    <div style={{
-      display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0,
-      border: "1px solid var(--border)",
-      borderRadius: 7,
-      padding: "6px 10px",
-      background: "var(--bg)",
-      fontFamily: "var(--font-mono)",
-      fontSize: "calc(11px + var(--chat-font-size-offset, 0px))",
-      lineHeight: 1.5,
-    }}>
+    <div className="flex min-w-0 items-start gap-1.5 rounded-sm border border-border bg-background px-2.5 py-1.5 font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))] leading-[1.5]">
       <button
         type="button"
         aria-expanded={expanded}
         aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
         title={t("i18n.thinking")}
         onClick={() => setExpanded((v) => !v)}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          width: expanded ? 14 : "100%",
-          flexShrink: expanded ? 0 : 1,
-          minWidth: 0,
-          minHeight: "1.5em",
-          padding: 0,
-          background: "transparent",
-          border: "none",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          font: "inherit",
-          textAlign: "left",
-        }}
+        className={cn(
+          "inline-flex min-h-[1.5em] min-w-0 cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-left text-muted-foreground",
+          expanded ? "w-3.5 shrink-0" : "w-full",
+        )}
       >
         <ThinkingIcon active={expanded} />
         {!expanded && (
-          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span className="min-w-0 truncate">
             {preview ? <ReactMarkdown allowedElements={[]} unwrapDisallowed skipHtml>{preview}</ReactMarkdown> : "..."}
           </span>
         )}
       </button>
       {expanded && (
         <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            color: error ? "#f87171" : "var(--text-muted)",
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
+          className={cn(
+            "min-w-0 flex-1 whitespace-pre-wrap wrap-anywhere",
+            error ? "text-destructive" : "text-muted-foreground",
+          )}
         >
            {loading ? t("i18n.loadingThinking") : error ?? <ThinkingText text={(block.deferred ? content : block.thinking) ?? ""} />}
         </div>
       )}
       {duration !== undefined && (
-        <span style={{ flexShrink: 0, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>{duration}s</span>
+        <span className="shrink-0 text-dim tabular-nums">{duration}s</span>
       )}
     </div>
   );
@@ -1132,15 +946,9 @@ interface StatPart {
   after?: string;
 }
 
-const STAT_ICON_PATHS = {
-  up: "M6 10.5V1.5M2.5 5 6 1.5 9.5 5",
-  down: "M6 1.5v9M2.5 7 6 10.5 9.5 7",
-  clock: "M6 1.25a4.75 4.75 0 1 0 0 9.5 4.75 4.75 0 1 0 0-9.5M6 3.5V6l1.75 1",
-};
-
 // Unseen but still text: font-size 0 stays in a copied selection, where a
 // zero-width overflow box drops it and sr-only's absolute box adds a line break.
-const HIDDEN_STAT_TEXT: CSSProperties = { fontSize: 0 };
+const HIDDEN_STAT_TEXT = "text-[0px]";
 
 // ↑ and ↓ come from whatever font has them: Segoe UI or a CJK fallback on
 // Windows draws them small, heavy or off the baseline. The icons are drawn
@@ -1149,25 +957,20 @@ const HIDDEN_STAT_TEXT: CSSProperties = { fontSize: 0 };
 // between the icon and its count.
 function UsagePart({ part }: { part: StatPart }) {
   if (!part.icon) return <span>{part.text}</span>;
+  const Icon = part.icon === "clock" ? ClockIcon : part.icon === "up" ? ArrowUpIcon : ArrowDownIcon;
   return (
     <span>
-      {part.before && <span style={HIDDEN_STAT_TEXT}>{part.before}</span>}
-      <svg
-        width={part.icon === "clock" ? 10 : 9}
-        height={part.icon === "clock" ? 10 : 9}
-        viewBox="0 0 12 12"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
+      {part.before && <span className={HIDDEN_STAT_TEXT}>{part.before}</span>}
+      <Icon
         aria-hidden
-        style={{ display: "inline", verticalAlign: part.icon === "clock" ? "-0.1em" : "-0.05em", marginRight: part.icon === "clock" ? 3 : 1 }}
-      >
-        <path d={STAT_ICON_PATHS[part.icon]} />
-      </svg>
+        strokeWidth={2}
+        className={cn(
+          "inline",
+          part.icon === "clock" ? "mr-[3px] size-[10px] align-[-0.1em]" : "mr-px size-[9px] align-[-0.05em]",
+        )}
+      />
       {part.text}
-      {part.after && <span style={HIDDEN_STAT_TEXT}>{part.after}</span>}
+      {part.after && <span className={HIDDEN_STAT_TEXT}>{part.after}</span>}
     </span>
   );
 }
@@ -1227,26 +1030,26 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
       };
 
   return (
-    <div style={{ margin: "6px 0" }}>
+    <div className="my-1.5">
       <ToolRow block={block} result={result} isStreaming={isPending} />
       {message.truncated && fullOutputUrl && (
-        <div style={{ padding: "4px 10px", fontSize: 11, marginTop: -1 }}>
+        <div className="-mt-px px-2.5 py-1 text-xs">
           {showFullButton && (
             <button
               onClick={loadFullOutput}
               disabled={loadingFull}
-              style={{ background: "none", border: "none", color: "var(--accent)", cursor: loadingFull ? "default" : "pointer", fontSize: 11, padding: 0, textDecoration: "underline" }}
+              className="cursor-pointer border-none bg-transparent p-0 text-xs text-primary underline disabled:cursor-default"
             >
               {loadingFull ? t("chat.loadingFullOutput") : t("chat.viewFullOutput")}
             </button>
           )}
           <a
             href={`${fullOutputUrl}&download=1`}
-            style={{ marginLeft: showFullButton ? 10 : 0, color: "var(--accent)", fontSize: 11, textDecoration: "underline" }}
+            className={cn("text-xs text-primary underline", showFullButton && "ml-2.5")}
           >
             {t("chat.downloadFullOutput")}
           </a>
-          {fullError && <span style={{ marginLeft: 6, color: "var(--text-dim)", fontSize: 11 }}>({fullError})</span>}
+          {fullError && <span className="ml-1.5 text-xs text-dim">({fullError})</span>}
         </div>
       )}
     </div>

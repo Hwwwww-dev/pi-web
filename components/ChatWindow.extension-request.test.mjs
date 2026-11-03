@@ -13,11 +13,11 @@ test("confines extension overlays to the content region above the composer", () 
     source,
     /className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden"[\s\S]*?<ExtensionDialog[\s\S]*?<ExtensionCustomPanel[\s\S]*?className="relative flex min-h-0 flex-col shrink-0"[\s\S]*?{chatInputElement}/,
   );
-  assert.match(dialogSource, /position: "absolute"[\s\S]*?inset: 0/);
-  assert.match(dialogSource, /pointerEvents: "none"/);
-  assert.match(dialogSource, /pointerEvents: "auto"/);
-  assert.match(customSource, /position: "absolute"[\s\S]*?inset: 0/);
-  assert.match(customSource, /pointerEvents: "none"/);
+  assert.match(dialogSource, /"absolute inset-0 z-\[90\] flex/);
+  assert.match(dialogSource, /pointer-events-none/);
+  assert.match(dialogSource, /pointer-events-auto/);
+  assert.match(customSource, /"absolute inset-0 z-\[95\] flex/);
+  assert.match(customSource, /pointer-events-none/);
   assert.doesNotMatch(source, /z-\[100\]|zIndex: 100/);
   assert.match(customSource, /ref=\{wrapperRef\}/);
   assert.match(customSource, /const dialogMaxHeight = useDialogMaxHeight\(wrapperRef\);/);
@@ -44,7 +44,7 @@ test("preserves title newlines like pi's TUI and keeps long titles from hiding t
   // #890: a non-shrinkable header grows to its full text height, pushing the
   // option list and the footer past the dialog's overflow edge. The header has
   // to be allowed to shrink and scroll instead.
-  assert.match(header, /flexShrink: 1, minHeight: 0,[\s\S]*?maxHeight: 180, overflowY: "auto" \}\}>/);
+  assert.match(header, /shrink min-h-0[\s\S]*?max-h-\[180px\] overflow-y-auto/);
 });
 
 test("renders option preview blocks in the dialog title as markdown", () => {
@@ -123,6 +123,6 @@ test("fits dialogs to their code blocks and lets the user maximize them (#947)",
 test("shows a custom panel's lines whole instead of scrolling when they are wider than 920px (#947)", () => {
   // The extension wraps its lines to the width it asked for, so the panel only has to be
   // as wide as the widest of them, capped to the content region.
-  assert.match(customSource, /width: "max-content",\s+minWidth: "min\(920px, 100%\)",\s+maxWidth: "100%"/);
+  assert.match(customSource, /w-max min-w-\[min\(920px,100%\)\] max-w-full/);
   assert.doesNotMatch(customSource.slice(0, customSource.indexOf("\n}\n")), /toggleFull|extensionMaximize/);
 });

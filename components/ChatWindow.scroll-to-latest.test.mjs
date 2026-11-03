@@ -32,11 +32,10 @@ test("floats the scroll-to-latest button above the composer at full width", () =
   const container = source.slice(gate, marker);
   const block = elementBlock();
 
-  assert.match(container, /position: "absolute"/);
-  assert.match(container, /bottom: "100%"/);
-  assert.match(container, /right: 0/);
-  assert.match(container, /justifyContent: "center"/);
-  assert.match(container, /pointerEvents: "none"/);
+  assert.match(
+    container,
+    /className="pointer-events-none absolute inset-x-0 bottom-full z-20 flex justify-center pb-2\.5"/,
+  );
   assert.match(cssSource, /\.chat-scroll-to-bottom\.is-visible \{[\s\S]*?pointer-events: auto;/);
   assert.match(cssSource, /\.chat-scroll-to-bottom:focus-visible \{[\s\S]*?outline: 2px solid var\(--accent\)/);
   assert.match(block, /onClick=\{\(\) => scrollToBottom\("smooth"\)\}/);

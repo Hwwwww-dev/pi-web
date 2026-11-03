@@ -1,6 +1,8 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { BotIcon, CheckIcon, ChevronDownIcon, CopyIcon, ExternalLinkIcon, FileIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareMinusIcon, SquareTerminalIcon, TriangleAlertIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
@@ -47,9 +49,10 @@ import type { CustomMessage, ImageContent, TextContent, ThinkingContent, ToolCal
 
 function RowChevron({ expanded }: { expanded: boolean }) {
   return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, opacity: 0.7, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
-      <polyline points="2 3.5 5 6.5 8 3.5" />
-    </svg>
+    <ChevronDownIcon
+      strokeWidth={2}
+      className={cn("h-2.5 w-2.5 shrink-0 opacity-70 transition-transform", expanded && "rotate-180")}
+    />
   );
 }
 
@@ -58,92 +61,26 @@ function RowSpinner() {
 }
 
 function ToolCategoryIcon({ category, isError }: { category: ToolCategory; isError?: boolean }) {
-  const common = {
-    width: 13,
-    height: 13,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: isError ? "var(--danger)" : "currentColor",
-    strokeWidth: 1.8,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    "aria-hidden": true as const,
-    style: { flexShrink: 0 as const },
-  };
+  const className = cn("size-[13px] shrink-0", isError && "text-destructive");
   switch (category) {
     case "view":
-      return (
-        <svg {...common}>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-        </svg>
-      );
+      return <FileIcon className={className} strokeWidth={1.8} />;
     case "search":
-      return (
-        <svg {...common}>
-          <circle cx="11" cy="11" r="7" />
-          <line x1="21" y1="21" x2="16.5" y2="16.5" />
-        </svg>
-      );
+      return <SearchIcon className={className} strokeWidth={1.8} />;
     case "edit":
-      return (
-        <svg {...common}>
-          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-        </svg>
-      );
+      return <PenIcon className={className} strokeWidth={1.8} />;
     case "terminal":
-      return (
-        <svg {...common}>
-          <rect x="2" y="3" width="20" height="18" rx="2" />
-          <polyline points="6 8 10 12 6 16" />
-          <line x1="12" y1="16" x2="17" y2="16" />
-        </svg>
-      );
+      return <SquareTerminalIcon className={className} strokeWidth={1.8} />;
     case "subagent":
-      return (
-        <svg {...common}>
-          <rect x="4" y="8" width="16" height="12" rx="2" />
-          <line x1="12" y1="4" x2="12" y2="8" />
-          <circle cx="12" cy="3" r="1" />
-          <circle cx="9" cy="13" r="0.6" fill="currentColor" />
-          <circle cx="15" cy="13" r="0.6" fill="currentColor" />
-        </svg>
-      );
+      return <BotIcon className={className} strokeWidth={1.8} />;
     case "plan":
-      return (
-        <svg {...common}>
-          <line x1="9" y1="6" x2="21" y2="6" />
-          <line x1="9" y1="12" x2="21" y2="12" />
-          <line x1="9" y1="18" x2="21" y2="18" />
-          <polyline points="3.5 5.5 4.5 6.5 6.5 4.5" />
-          <polyline points="3.5 11.5 4.5 12.5 6.5 10.5" />
-          <polyline points="3.5 17.5 4.5 18.5 6.5 16.5" />
-        </svg>
-      );
+      return <ListChecksIcon className={className} strokeWidth={1.8} />;
     case "compact":
-      return (
-        <svg {...common}>
-          <polyline points="4 9 8 5 12 9" />
-          <line x1="8" y1="5" x2="8" y2="13" />
-          <polyline points="20 15 16 19 12 15" />
-          <line x1="16" y1="19" x2="16" y2="11" />
-        </svg>
-      );
+      return <ShrinkIcon className={className} strokeWidth={1.8} />;
     case "web":
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="9" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <path d="M12 3a13.5 13.5 0 0 1 0 18a13.5 13.5 0 0 1 0-18z" />
-        </svg>
-      );
+      return <GlobeIcon className={className} strokeWidth={1.8} />;
     default:
-      return (
-        <svg {...common}>
-          <rect x="3" y="3" width="18" height="18" rx="3" />
-          <line x1="8" y1="12" x2="16" y2="12" />
-        </svg>
-      );
+      return <SquareMinusIcon className={className} strokeWidth={1.8} />;
   }
 }
 
@@ -163,7 +100,7 @@ function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; o
   const activate = () => onOpenFile!(resolved!);
   return (
     <span
-      className="tool-file-chip"
+      className={cn("tool-file-chip", !clickable && "cursor-default")}
       title={resolved ?? path}
       aria-label={name}
       role={clickable ? "button" : undefined}
@@ -175,7 +112,6 @@ function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; o
         event.preventDefault();
         activate();
       } : undefined}
-      style={clickable ? undefined : { cursor: "default" }}
     >
       {getFileIcon(name, 12)}
       <span className="tool-file-chip-name">{name}</span>
@@ -372,7 +308,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
             title={t("subagent.openTab")}
             aria-label={t("subagent.openTab")}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+            <ExternalLinkIcon className="size-[13px]" strokeWidth={2} />
           </button>
         )}
       </div>
@@ -635,7 +571,7 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
           if (next) window.dispatchEvent(new Event(COLLAPSIBLE_EXPANDED_EVENT));
         }}
       >
-        <span className="activity-row-icon" style={{ color: active ? "var(--warning)" : undefined }}><ThinkingIcon active={expanded || Boolean(active)} /></span>
+        <span className={cn("activity-row-icon", active && "text-warning")}><ThinkingIcon active={expanded || Boolean(active)} /></span>
         <span className="activity-row-label">{t("i18n.thinking")}</span>
         <span className="activity-row-preview">{preview}</span>
         {active ? <RowSpinner /> : duration !== undefined && <span className="activity-row-meta">{duration}s</span>}
@@ -644,8 +580,10 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
       {expanded && (
         <div
           ref={detailRef}
-          className="activity-detail-card"
-          style={{ maxHeight: 380, overflowY: "auto", overscrollBehavior: "contain", whiteSpace: "pre-wrap", overflowWrap: "anywhere", ...(error ? { color: "var(--danger)" } : undefined) }}
+          className={cn(
+            "activity-detail-card max-h-[380px] overflow-y-auto overscroll-contain whitespace-pre-wrap wrap-anywhere",
+            error && "text-destructive",
+          )}
           onScroll={handleDetailScroll}
         >
           {loading ? t("i18n.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
@@ -746,7 +684,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
           onClick={() => setExpanded((v) => !v)}
         >
           <span className="activity-row-icon"><ToolCategoryIcon category={subagent ? "subagent" : "other"} /></span>
-          <span className="activity-row-label" style={dim ? { color: "var(--text-dim)", fontWeight: 400 } : undefined}>{label}</span>
+          <span className={cn("activity-row-label", dim && "font-normal text-dim")}>{label}</span>
           <span className="activity-row-preview">{preview || (isHiddenDisplay ? t("i18n.showExtensionMessage") : null)}</span>
           <RowChevron expanded={expanded} />
         </button>
@@ -758,14 +696,14 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
             title={t("subagent.openTab")}
             aria-label={t("subagent.openTab")}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+            <ExternalLinkIcon className="size-[13px]" strokeWidth={2} />
           </button>
         )}
       </div>
       {expanded && (
         <div className="activity-detail-card">
           {images.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: text ? 8 : 0 }}>
+            <div className={cn("flex flex-wrap gap-1.5", text && "mb-2")}>
               {images.map((img, i) => {
                 const src = imageSource(img);
                 if (!src) return null;
@@ -775,7 +713,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
                     <img
                       src={src}
                       alt=""
-                      style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid var(--border)" }}
+                      className="block max-h-60 max-w-60 rounded-sm border border-border object-contain"
                     />
                   </ImagePreview>
                 );
@@ -784,7 +722,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
           )}
           {text
             ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody>
-            : <span style={{ color: "var(--text-dim)", fontSize: 12 }}>{t("i18n.noMessage")}</span>}
+            : <span className="text-xs text-dim">{t("i18n.noMessage")}</span>}
           {hasDetails && (
             <div className="activity-row-footnote">
               <button type="button" onClick={copyContent} className="activity-row-footnote-button">
@@ -797,7 +735,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
               >
                 {detailsExpanded ? t("i18n.hideDetails") : t("i18n.showDetails")}
               </button>
-              {detailsExpanded && <pre className="activity-detail-pre" style={{ marginTop: 6 }}>{detailsText}</pre>}
+              {detailsExpanded && <pre className="activity-detail-pre mt-1.5">{detailsText}</pre>}
             </div>
           )}
           {!hasDetails && text && (
@@ -872,13 +810,13 @@ export function CompactionSummaryDetails({ summary, cwd, onOpenFile }: {
 
   return (
     <>
-      <div style={{ color: "var(--text)", fontSize: "calc(14px + var(--chat-font-size-offset, 0px))", lineHeight: 1.5 }}>
+      <div className="text-[length:calc(14px+var(--chat-font-size-offset,0px))] leading-[1.5] text-foreground">
         {t("i18n.compactionDescription")}
       </div>
       {parsedSummary.body ? (
         <MarkdownBody className="markdown-compaction-message" cwd={cwd} onOpenFile={onOpenFile}>{parsedSummary.body}</MarkdownBody>
       ) : (
-        <span style={{ color: "var(--text-dim)", fontSize: 12 }}>{t("i18n.noSummary")}</span>
+        <span className="text-xs text-dim">{t("i18n.noSummary")}</span>
       )}
       <CompactionFileMetadata readFiles={parsedSummary.readFiles} modifiedFiles={parsedSummary.modifiedFiles} />
     </>
@@ -963,27 +901,12 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
           }}
           title={t("i18n.copyMessage")}
           aria-label={t("i18n.copyMessage")}
-          style={{
-            marginLeft: "auto",
-            display: "flex", alignItems: "center",
-            padding: 2,
-            background: "none", border: "none",
-            borderRadius: 4,
-            color: copied ? "var(--accent)" : "var(--text-dim)",
-            cursor: "pointer",
-            transition: "color 0.12s",
-          }}
-        >
-          {copied ? (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          ) : (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
+          className={cn(
+            "ml-auto flex cursor-pointer items-center rounded-sm p-0.5 transition-colors",
+            copied ? "text-primary" : "text-dim hover:text-primary",
           )}
+        >
+          {copied ? <CheckIcon className="size-3" strokeWidth={1.8} /> : <CopyIcon className="size-3" strokeWidth={1.8} />}
         </button>
       )}
     </div>
@@ -1010,36 +933,16 @@ export function SafeMarkdownBody({ children, className, ...props }: React.Compon
     return (
       <button
         onClick={() => setShowRaw(true)}
-        style={{
-          display: "block",
-          width: "100%",
-          margin: "4px 0",
-          padding: "7px 10px",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-          background: "var(--bg-panel)",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          fontSize: 12,
-          textAlign: "left",
-        }}
+        className="my-1 block w-full cursor-pointer rounded-sm border border-border bg-card px-2.5 py-[7px] text-left text-xs text-muted-foreground"
       >
-        ⚠ {t("i18n.largeMessageReveal", { size: children.length >= 1_000_000 ? `${(children.length / 1_000_000).toFixed(1)} MB` : children.length >= 1_000 ? `${Math.round(children.length / 1_000)} KB` : `${children.length} B` })}
+        <TriangleAlertIcon aria-hidden className="mr-1.5 inline size-3.5 align-[-0.15em]" />
+        {t("i18n.largeMessageReveal", { size: children.length >= 1_000_000 ? `${(children.length / 1_000_000).toFixed(1)} MB` : children.length >= 1_000 ? `${Math.round(children.length / 1_000)} KB` : `${children.length} B` })}
       </button>
     );
   }
   return (
-    <div className={className} style={{ maxHeight: 420, overflow: "auto", fontSize: "calc(12px + var(--chat-font-size-offset, 0px))", lineHeight: 1.5 }}>
-      <pre
-        style={{
-          margin: 0,
-          padding: "8px 10px",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          fontFamily: "var(--font-mono)",
-          color: "var(--text-muted)",
-        }}
-      >
+    <div className={cn("max-h-[420px] overflow-auto text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.5]", className)}>
+      <pre className="m-0 whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-muted-foreground">
         {children}
       </pre>
     </div>
@@ -1200,30 +1103,17 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
   const showFileHeaders = files.length > 1;
 
   return (
-    <div style={{ maxHeight: 560, overflowY: "auto", overflowX: "hidden", background: "var(--bg)" }}>
+    <div className="max-h-[560px] overflow-x-hidden overflow-y-auto bg-background">
       {files.map((file, fileIndex) => (
         <div
           key={fileIndex}
-          style={{
-            minWidth: 0,
-            borderTop: fileIndex === 0 ? "none" : "1px solid var(--border)",
-            fontFamily: "var(--font-mono)",
-            fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
-            lineHeight: 1.55,
-          }}
+          className={cn(
+            "min-w-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]",
+            fileIndex > 0 && "border-t border-border",
+          )}
         >
           {showFileHeaders && layout === "split" && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                position: "sticky",
-                top: 0,
-                zIndex: 1,
-                background: "var(--bg-subtle)",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
+            <div className="sticky top-0 z-[1] grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] border-b border-border bg-muted">
               <SplitDiffHeader title={file.oldPath || t("i18n.before")} side="left" />
               <SplitDiffHeader title={file.newPath || t("i18n.after")} side="right" />
             </div>
@@ -1232,25 +1122,14 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
           {showFileHeaders && layout === "stacked" && stackedFilePath(file) && (
             <div
               title={stackedFilePath(file)}
-              style={{
-                position: "sticky",
-                top: 0,
-                zIndex: 1,
-                padding: "5px 10px",
-                color: "var(--text-dim)",
-                background: "var(--bg-subtle)",
-                borderBottom: "1px solid var(--border)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
+              className="sticky top-0 z-[1] truncate border-b border-border bg-muted px-2.5 py-[5px] text-dim"
             >
               {stackedFilePath(file)}
             </div>
           )}
 
           {layout === "split" && (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               {file.rows.map((row, rowIndex) => {
                 if (row.type === "hunk") {
                   return null;
@@ -1260,7 +1139,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
                 }
 
                 return (
-                  <div key={rowIndex} style={{ display: "contents" }}>
+                  <div key={rowIndex} className="contents">
                     <SplitDiffCellView cell={row.left} side="left" />
                     <SplitDiffCellView cell={row.right} side="right" />
                   </div>
@@ -1284,17 +1163,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
 function DiffGapRow({ gap }: { gap: SplitDiffGap }) {
   const { t } = useI18n();
   return (
-    <div
-      style={{
-        gridColumn: "1 / -1",
-        padding: "0 10px",
-        color: "var(--text-dim)",
-        background: "var(--bg-subtle)",
-        borderTop: "1px solid var(--border)",
-        borderBottom: "1px solid var(--border)",
-        userSelect: "none",
-      }}
-    >
+    <div className="col-span-full select-none border-y border-border bg-muted px-2.5 text-dim">
       {gap.count === null ? "⋯" : `⋯ ${diffGapLabel(gap.count, t)}`}
     </div>
   );
@@ -1324,14 +1193,7 @@ function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right
   return (
     <div
       title={title}
-      style={{
-        padding: "5px 10px",
-        color: "var(--text-dim)",
-        borderRight: side === "left" ? "1px solid var(--border)" : "none",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-      }}
+      className={cn("truncate px-2.5 py-[5px] text-dim", side === "left" && "border-r border-border")}
     >
       {title}
     </div>
@@ -1339,63 +1201,31 @@ function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right
 }
 
 function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" | "right" }) {
-  const bg =
-    cell.type === "added"
-      ? "var(--diff-add-bg)"
-      : cell.type === "removed"
-      ? "var(--diff-del-bg)"
-      : cell.type === "empty"
-      ? "var(--bg-subtle)"
-      : "transparent";
-  const marker =
-    cell.type === "added" ? "+" : cell.type === "removed" ? "-" : " ";
-  const markerColor =
-    cell.type === "added" ? "var(--diff-add)" : cell.type === "removed" ? "var(--diff-del)" : "var(--text-dim)";
-
+  const marker = cell.type === "added" ? "+" : cell.type === "removed" ? "-" : " ";
   return (
     <div
-      style={{
-        display: "flex",
-        minWidth: 0,
-        background: bg,
-        borderRight: side === "left" ? "1px solid var(--border)" : "none",
-      }}
+      className={cn(
+        "flex min-w-0",
+        cell.type === "added" ? "bg-diff-add-bg" : cell.type === "removed" ? "bg-diff-del-bg" : cell.type === "empty" && "bg-muted",
+        side === "left" && "border-r border-border",
+      )}
     >
-      <span
-        style={{
-          width: 42,
-          padding: "0 6px",
-          textAlign: "right",
-          color: "var(--text-dim)",
-          userSelect: "none",
-          background: "var(--bg-panel)",
-          borderRight: "1px solid var(--border)",
-          flexShrink: 0,
-        }}
-      >
+      <span className="w-[42px] shrink-0 select-none border-r border-border bg-card px-1.5 text-right text-dim">
         {cell.lineNo ?? ""}
       </span>
       <span
-        style={{
-          width: 18,
-          padding: "0 5px",
-          color: markerColor,
-          userSelect: "none",
-          fontWeight: cell.type === "context" || cell.type === "empty" ? 400 : 700,
-          flexShrink: 0,
-        }}
+        className={cn(
+          "w-[18px] shrink-0 select-none px-[5px]",
+          cell.type === "added" ? "font-bold text-diff-add" : cell.type === "removed" ? "font-bold text-diff-del" : "font-normal text-dim",
+        )}
       >
         {marker}
       </span>
       <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          padding: "0 10px 0 0",
-          color: cell.type === "empty" ? "var(--text-dim)" : "var(--text)",
-          whiteSpace: "pre-wrap",
-          overflowWrap: "anywhere",
-        }}
+        className={cn(
+          "min-w-0 flex-1 pr-2.5 whitespace-pre-wrap wrap-anywhere",
+          cell.type === "empty" ? "text-dim" : "text-foreground",
+        )}
       >
         {cell.text || "\u00a0"}
       </span>
@@ -1413,54 +1243,35 @@ function PatchTextView({ text }: { text: string }) {
   const lines = text.split(/\r?\n/);
 
   return (
-    <div style={{ maxHeight: 520, overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-mono)", fontSize: "calc(12px + var(--chat-font-size-offset, 0px))", lineHeight: 1.55, minWidth: 0 }}>
+    <div className="min-w-0 max-h-[520px] overflow-x-hidden overflow-y-auto font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]">
       {lines.map((line, i) => {
         const kind =
           line.startsWith("@@") ? "hunk" :
           line.startsWith("+") && !line.startsWith("+++") ? "added" :
           line.startsWith("-") && !line.startsWith("---") ? "removed" :
           "context";
-        const bg =
-          kind === "added" ? "var(--diff-add-bg)" :
-          kind === "removed" ? "var(--diff-del-bg)" :
-          kind === "hunk" ? "var(--diff-hunk-bg)" :
-          "transparent";
-        const color =
-          kind === "added" ? "var(--diff-add)" :
-          kind === "removed" ? "var(--diff-del)" :
-          kind === "hunk" ? "var(--accent)" :
-          "var(--text)";
+        const bgClass =
+          kind === "added" ? "bg-diff-add-bg" :
+          kind === "removed" ? "bg-diff-del-bg" :
+          kind === "hunk" ? "bg-diff-hunk-bg" :
+          "";
+        const colorClass =
+          kind === "added" ? "text-diff-add" :
+          kind === "removed" ? "text-diff-del" :
+          kind === "hunk" ? "text-primary" :
+          "text-foreground";
+        const borderClass =
+          kind === "added" ? "border-l-diff-add" :
+          kind === "removed" ? "border-l-diff-del" :
+          kind === "hunk" ? "border-l-primary" :
+          "border-l-transparent";
 
         return (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              background: bg,
-              borderLeft: kind === "added"
-                ? "3px solid var(--diff-add)"
-                : kind === "removed"
-                ? "3px solid var(--diff-del)"
-                : kind === "hunk"
-                ? "3px solid var(--accent)"
-                : "3px solid transparent",
-            }}
-          >
-            <span
-              style={{
-                width: 48,
-                padding: "0 8px",
-                color: "var(--text-dim)",
-                background: "var(--bg-panel)",
-                borderRight: "1px solid var(--border)",
-                textAlign: "right",
-                userSelect: "none",
-                flexShrink: 0,
-              }}
-            >
+          <div key={i} className={cn("flex border-l-[3px]", bgClass, colorClass, borderClass)}>
+            <span className="w-12 shrink-0 select-none border-r border-border bg-card px-2 text-right text-dim">
               {i + 1}
             </span>
-            <span style={{ padding: "0 10px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", color }}>
+            <span className={cn("whitespace-pre-wrap wrap-anywhere px-2.5", colorClass)}>
               {line || "\u00a0"}
             </span>
           </div>
@@ -1530,14 +1341,7 @@ function ResultImages({ images }: { images: ImageContent[] }) {
               src={src}
               alt=""
               loading="lazy"
-              style={{
-                display: "block",
-                maxWidth: "min(100%, 720px)",
-                maxHeight: 520,
-                borderRadius: 6,
-                objectFit: "contain",
-                border: "1px solid var(--border)",
-              }}
+              className="block max-h-[520px] max-w-[min(100%,720px)] rounded-sm border border-border object-contain"
             />
           </ImagePreview>
         );
@@ -1557,59 +1361,36 @@ function PairedResult({ text, isEmpty, isError }: {
   const tui = isTuiText(text);
   return (
     <pre
-      className="activity-detail-pre"
-      style={{
-        color: isError ? "#f87171" : (isEmpty ? "var(--text-dim)" : "var(--text-muted)"),
-        whiteSpace: tui ? "pre" : "pre-wrap",
-        wordBreak: tui ? "normal" : "break-all",
-        fontStyle: isEmpty ? "italic" : "normal",
-        opacity: isEmpty ? 0.6 : 1,
-      }}
+      className={cn(
+        "activity-detail-pre",
+        isError ? "text-destructive" : isEmpty ? "text-dim italic opacity-60" : "text-muted-foreground",
+        tui ? "whitespace-pre" : "whitespace-pre-wrap break-all",
+      )}
     >
       {isEmpty ? t("i18n.noOutput") : text}
     </pre>
   );
 }
 
-const TOOL_FIELD_LABEL: CSSProperties = {
-  padding: "4px 12px 4px 0",
-  color: "var(--text-dim)",
-  fontSize: "calc(11px + var(--chat-font-size-offset, 0px))",
-  whiteSpace: "nowrap",
-  verticalAlign: "top",
-};
+const TOOL_FIELD_LABEL =
+  "pr-3 py-1 align-top whitespace-nowrap text-dim text-[length:calc(11px+var(--chat-font-size-offset,0px))]";
 
-const TOOL_FIELD_VALUE: CSSProperties = {
-  padding: "4px 0",
-  color: "var(--text-muted)",
-  fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
-  fontFamily: "var(--font-mono)",
-  overflowWrap: "anywhere",
-};
+const TOOL_FIELD_VALUE =
+  "py-1 font-mono wrap-anywhere text-muted-foreground text-[length:calc(12px+var(--chat-font-size-offset,0px))]";
 
 // A value with newlines of its own keeps them, scrolled in place.
-const TOOL_FIELD_BLOCK: CSSProperties = {
-  margin: 0,
-  padding: "8px 10px",
-  maxHeight: 260,
-  overflow: "auto",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
-  background: "var(--bg)",
-  font: "inherit",
-  lineHeight: 1.5,
-  whiteSpace: "pre-wrap",
-};
+const TOOL_FIELD_BLOCK =
+  "m-0 max-h-[260px] overflow-auto rounded-sm border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
 
 function ToolFieldRows({ fields }: { fields: ToolField[] }) {
   return (
-    <table className="tool-field-table" style={{ borderCollapse: "collapse" }}>
+    <table className="tool-field-table border-collapse">
       <tbody>
         {fields.map((field) => (
           <tr key={field.key}>
-            <td style={TOOL_FIELD_LABEL}>{field.key}</td>
-            <td style={TOOL_FIELD_VALUE}>
-              {field.multiline ? <pre style={TOOL_FIELD_BLOCK}>{field.value}</pre> : field.value}
+            <td className={TOOL_FIELD_LABEL}>{field.key}</td>
+            <td className={TOOL_FIELD_VALUE}>
+              {field.multiline ? <pre className={TOOL_FIELD_BLOCK}>{field.value}</pre> : field.value}
             </td>
           </tr>
         ))}

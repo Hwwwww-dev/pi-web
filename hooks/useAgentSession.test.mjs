@@ -231,7 +231,7 @@ test("forking stays available during a run while in-session branch switches wait
   // in-session edit still waits because pi refuses navigate_tree mid-run.
   assert.match(chatWindowSource, /onFork=\{bashRunning \|\| isNew \? undefined : handleFork\}/);
   assert.match(chatWindowSource, /onEditContent=\{sessionBusy \? undefined : handleEditContent\}/);
-  assert.match(chatWindowSource, /onAskInNewChat && \(\s*<button/);
+  assert.match(chatWindowSource, /onAskInNewChat && \(\s*<Button/);
   assert.match(chatWindowSource, /!quotedSelection\?\.sourceEntryId \|\| !sourceSessionId \|\| !onAskInNewChat/);
   assert.match(forkSource, /addNotice\(\{ type: "error", message:/);
 
@@ -748,7 +748,7 @@ test("restores an in-page session viewport without the default tail jump", () =>
   assert.match(chatWindowSource, /context\.oldestEntryId === position\.oldestEntryId/);
   assert.match(chatWindowSource, /if \(!context\) \{\s*scrollToBottom\("instant"\);\s*setPendingScrollRestore\(null\);/);
   assert.match(chatWindowSource, /scrollToMessage\(element, position\.anchorOffset\)/);
-  assert.match(chatWindowSource, /visibility: pendingScrollRestore \? "hidden" : undefined/);
+  assert.match(chatWindowSource, /pendingScrollRestore && "invisible"/);
 });
 
 test("keeps a newly sent user message at the top while its response starts", () => {
