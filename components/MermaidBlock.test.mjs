@@ -131,8 +131,15 @@ test("CodeBlock owns the pre background without a competing shorthand", () => {
     const html = renderCode({ code: "const x = 1;", lang: "javascript", isStreaming });
     const pre = html.match(/<pre\b[^>]*>/)?.[0];
     assert.ok(pre);
-    assert.match(pre, /background-color:color-mix/);
-    assert.doesNotMatch(pre, /(?:[;\"]|^)background:/);
+    if (isStreaming) {
+      // The streamed pre carries the block background as a utility class and
+      // keeps no inline background of its own.
+      assert.match(pre, /bg-\[color-mix\(in_srgb,var\(--bg\)_92%,var\(--bg-panel\)\)\]/);
+      assert.doesNotMatch(pre, /background/);
+    } else {
+      assert.match(pre, /background-color:color-mix/);
+      assert.doesNotMatch(pre, /(?:[;\"]|^)background:/);
+    }
   }
 });
 
@@ -143,8 +150,8 @@ test("CodeBlock renders plain text without tokenization while streaming", () => 
   assert.match(html, /const x = 1;/);
   // A streamed block wraps its long lines too, instead of scrolling sideways.
   const pre = html.match(/<pre\b[^>]*>/)?.[0];
-  assert.match(pre, /white-space:pre-wrap/);
-  assert.match(pre, /overflow-wrap:anywhere/);
+  assert.match(pre, /whitespace-pre-wrap/);
+  assert.match(pre, /\[overflow-wrap:anywhere\]/);
   assert.doesNotMatch(pre, /overflow-x/);
 });
 

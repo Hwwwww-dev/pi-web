@@ -5,6 +5,10 @@ import { parseUnifiedPatch } from "@/lib/patch";
 import { useI18n } from "@/hooks/useI18n";
 import { SOURCE_HIGHLIGHT_MAX_LINES } from "./SourceCodeView";
 
+// Style objects on purpose: SourceCodeView feeds them to react-syntax-
+// highlighter's customStyle/lineNumberStyle props (an inline-style API whose
+// own theme styles can only be overridden in kind) and FileViewer's rows reuse
+// them; classes cannot express that handoff. All values are token-based.
 export const FILE_CODE_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
   fontWeight: "var(--font-mono-weight)",
@@ -92,7 +96,7 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
   const hasChanges = diff.some((l) => l.type !== "unchanged");
   if (!hasChanges) {
     return (
-      <div style={{ padding: "12px 16px", fontSize: 12, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
+      <div className="px-4 py-3 font-mono text-xs text-dim">
         {t("i18n.noChanges")}
       </div>
     );
@@ -133,26 +137,17 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
     : FILE_LINE_NUMBER_STYLE;
   return (
     <div
-      className="file-diff-view"
-      style={{
-        width: wrapLines ? "100%" : "max-content",
-        minWidth: "100%",
-        ...FILE_CODE_STYLE,
-      }}
+      // FILE_CODE_STYLE is the shared code typography (see its declaration);
+      // the wrap width is this view's own.
+      className={`file-diff-view min-w-full ${wrapLines ? "w-full" : "w-max"}`}
+      style={FILE_CODE_STYLE}
     >
       {segments.map((seg, si) => {
         if (seg.hidden) {
           const result = (
             <div
               key={si}
-              style={{
-                padding: "2px 16px",
-                color: "var(--text-dim)",
-                background: "var(--bg-panel)",
-                fontSize: 11,
-                borderTop: "1px solid var(--border)",
-                borderBottom: "1px solid var(--border)",
-              }}
+              className="border-y border-border bg-card px-4 py-0.5 text-xs text-dim"
             >
               ... {seg.count} unchanged lines ...
             </div>
@@ -160,58 +155,31 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
           return result;
         }
         const lines = seg.lines.map((line, li) => {
-          const bg =
-            line.type === "added"
-              ? "rgba(0,200,80,0.12)"
-              : line.type === "removed"
-              ? "rgba(240,60,60,0.14)"
-              : "transparent";
           const prefix =
             line.type === "added" ? "+" : line.type === "removed" ? "-" : " ";
-          const prefixColor =
-            line.type === "added" ? "#4ade80" : line.type === "removed" ? "#f87171" : "var(--text-dim)";
+          // Added/removed rows take the diff tokens (globals.css); unchanged
+          // rows keep the view's background and a dim marker.
+          const rowTone = line.type === "added"
+            ? "bg-diff-add-bg border-l-diff-add text-diff-add"
+            : line.type === "removed"
+            ? "bg-diff-del-bg border-l-diff-del text-diff-del"
+            : "border-l-transparent text-dim";
 
           return (
             <div
               key={li}
-              className="file-diff-line"
-              style={{
-                display: "flex",
-                minWidth: "100%",
-                background: bg,
-                borderLeft: line.type === "added"
-                  ? "3px solid #4ade80"
-                  : line.type === "removed"
-                  ? "3px solid #f87171"
-                  : "3px solid transparent",
-              }}
+              className={`file-diff-line flex min-w-full border-l-[3px] ${rowTone}`}
             >
-              <span
-                style={lineNumberStyle}
-              >
+              <span style={lineNumberStyle}>
                 {line.type === "removed" ? line.oldLineNo : line.newLineNo}
               </span>
-              <span
-                style={{
-                  minWidth: 16,
-                  padding: "0 6px",
-                  color: prefixColor,
-                  userSelect: "none",
-                  flexShrink: 0,
-                  fontWeight: 600,
-                }}
-              >
+              <span className="min-w-4 shrink-0 select-none px-1.5 font-semibold">
                 {prefix}
               </span>
               <span
-                className="file-diff-line-content"
-                style={{
-                  padding: "0 8px 0 0",
-                  color: "var(--text)",
-                  ...(wrapLines
-                    ? { flex: "1 1 auto", minWidth: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }
-                    : { flexShrink: 0, whiteSpace: "pre" }),
-                }}
+                className={`file-diff-line-content min-w-0 pr-2 text-foreground ${
+                  wrapLines ? "shrink whitespace-pre-wrap [overflow-wrap:anywhere]" : "shrink-0 whitespace-pre"
+                }`}
               >
                 {line.text || "\u00a0"}
               </span>

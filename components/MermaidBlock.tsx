@@ -6,6 +6,7 @@ import renderSyntaxNode from "react-syntax-highlighter/dist/esm/create-element";
 import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
 import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { Maximize, Minus, Plus, X } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useI18n } from "@/hooks/useI18n";
 import { usePrismLanguages } from "@/hooks/usePrismLanguages";
@@ -166,7 +167,7 @@ export function PreviewToggleButton({ isStreaming, previewVisible, onToggle, tit
       onClick={onToggle}
       disabled={isStreaming}
       title={isStreaming ? t("i18n.previewAfterStreaming") : title}
-      className={["markdown-code-action", previewVisible ? "is-active" : ""].filter(Boolean).join(" ")}
+      className={["markdown-code-action", "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50", previewVisible ? "is-active" : ""].filter(Boolean).join(" ")}
     >
       {previewVisible ? t("i18n.source") : t("i18n.preview")}
     </button>
@@ -178,7 +179,7 @@ export function SvgDownloadButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
-      className="markdown-code-action"
+      className="markdown-code-action focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       title={`${t("i18n.downloadFile")} (SVG)`}
       aria-label={`${t("i18n.downloadFile")} (SVG)`}
       onClick={onClick}
@@ -251,9 +252,7 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
                 title={t("i18n.zoomOut")}
                 aria-label={t("i18n.zoomOut")}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                  <path d="M5 12h14" />
-                </svg>
+                <Minus size={13} strokeWidth={1.8} />
               </button>
               <span className="mermaid-zoom-value">{Math.round(zoom * 100)}%</span>
               <button
@@ -263,9 +262,7 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
                 title={t("i18n.zoomIn")}
                 aria-label={t("i18n.zoomIn")}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
+                <Plus size={13} strokeWidth={1.8} />
               </button>
             </div>
             <button
@@ -275,9 +272,7 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
               title={t("i18n.fitToWidth")}
               aria-label={t("i18n.fitToWidth")}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
-              </svg>
+              <Maximize size={13} strokeWidth={1.8} />
             </button>
             <button
               type="button"
@@ -286,9 +281,7 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
               title={t("i18n.close")}
               aria-label={t("i18n.close")}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
+              <X size={13} strokeWidth={1.8} />
             </button>
           </div>
         </div>
@@ -298,6 +291,7 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
             if (event.target === event.currentTarget) onClose();
           }}
         >
+          {/* The zoom factor is a computed width, not a static presentation. */}
           <div className="mermaid-zoom-canvas" style={{ width: `${zoom * 100}%` }}>
             {children}
           </div>
@@ -397,25 +391,15 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
           {headerAction}
           <button
             onClick={copy}
-            className="markdown-code-action"
+            className="markdown-code-action focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             {copied ? t("i18n.copied") : t("i18n.copy")}
           </button>
         </div>
       </div>
       {isStreaming ? (
-        <pre
-          style={{
-            margin: 0,
-            padding: "11px 13px",
-            fontSize: "calc(12.5px + var(--chat-font-size-offset, 0px))",
-            lineHeight: 1.62,
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-            backgroundColor: "color-mix(in srgb, var(--bg) 92%, var(--bg-panel))",
-          }}
-        >
-          <code style={{ fontFamily: "var(--font-mono)" }}>{code}</code>
+        <pre className="m-0 whitespace-pre-wrap [overflow-wrap:anywhere] bg-[color-mix(in_srgb,var(--bg)_92%,var(--bg-panel))] px-[13px] py-[11px] text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] leading-[1.62]">
+          <code className="font-mono">{code}</code>
         </pre>
       ) : (
         <SyntaxHighlighter
@@ -424,6 +408,9 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
           showLineNumbers
           lineNumberStyle={{ color: "var(--text-dim)", fontStyle: "normal", flexShrink: 0 }}
           renderer={renderCodeLines}
+          // Style object by API: the highlighter applies it as inline style on
+          // the <pre> it renders, and its theme's own inline styles can only
+          // be overridden in kind, so this cannot become a utility class.
           customStyle={{
             margin: 0,
             padding: "11px 13px",

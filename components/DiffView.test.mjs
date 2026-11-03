@@ -10,10 +10,13 @@ test("DiffView parses unified patches through the shared parser", () => {
 });
 
 test("DiffView renders added/removed lines with tinted rows and line numbers", () => {
-  assert.match(source, /className="file-diff-view"/);
-  assert.match(source, /className="file-diff-line"/);
-  assert.match(source, /rgba\(0,200,80,0\.12\)/);
-  assert.match(source, /rgba\(240,60,60,0\.14\)/);
+  assert.match(source, /file-diff-view min-w-full/);
+  assert.match(source, /file-diff-line flex min-w-full border-l-\[3px\]/);
+  // Added/removed rows take the diff tokens (globals.css); unchanged rows stay
+  // on the view's own background with a dim marker.
+  assert.match(source, /bg-diff-add-bg border-l-diff-add text-diff-add/);
+  assert.match(source, /bg-diff-del-bg border-l-diff-del text-diff-del/);
+  assert.match(source, /border-l-transparent text-dim/);
   assert.match(source, /line\.type === "removed" \? line\.oldLineNo : line\.newLineNo/);
 });
 

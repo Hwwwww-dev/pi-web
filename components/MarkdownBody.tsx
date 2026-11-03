@@ -80,7 +80,11 @@ function MathDisplay({ source, children }: { source: string; children: ReactNode
   return (
     <div className="markdown-math-display">
       {children}
-      <button type="button" onClick={copy} className="markdown-code-action markdown-math-copy">
+      <button
+        type="button"
+        onClick={copy}
+        className="markdown-code-action markdown-math-copy focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
         {copied ? t("i18n.copied") : t("i18n.copy")}
       </button>
     </div>
