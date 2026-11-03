@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    // No statusBarStyle on purpose: iOS 27 draws an unconditional Liquid
+    // No status-bar style on purpose: iOS 27 draws an unconditional Liquid
     // Glass progressive blur over the top edge of installed PWAs when a
     // status-bar-style meta is present (the iOS 26 "black" bar workaround
     // no longer suppresses it). Apple's guidance (WebKit #317153): omit the
