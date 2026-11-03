@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getFileIcon } from "./FileIcons";
+import { SideChatsIcon } from "./SidebarIcons";
 import { useI18n } from "@/hooks/useI18n";
 import type { FileViewerDisplayMode, FileViewerState } from "@/lib/file-viewer-state";
 
@@ -143,9 +144,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
                   <rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" />
                 </svg>
               ) : tab.kind === "side" ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M15 3v18" />
-                </svg>
+                <SideChatsIcon strokeWidth={2} />
               ) : getFileIcon(tab.label, 13)}
             </span>
             <span

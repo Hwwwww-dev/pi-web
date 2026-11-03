@@ -13,9 +13,11 @@ export interface SidebarIconProps {
   className?: string;
   /** Accessible name; makes the icon an image instead of decoration. */
   label?: string;
+  /** Stroke width on the 24 grid; the sidebar default is 2. */
+  strokeWidth?: number;
 }
 
-function SidebarIcon({ size = 13, className, label, strokeWidth = 2, children }: SidebarIconProps & { strokeWidth?: number; children: ReactNode }) {
+function SidebarIcon({ size = 13, className, label, strokeWidth = 2, children }: SidebarIconProps & { children: ReactNode }) {
   return (
     <svg
       width={size}
@@ -238,6 +240,16 @@ export function EyeIcon(props: SidebarIconProps) {
 
 export function MessageIcon(props: SidebarIconProps) {
   return <SidebarIcon {...props}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></SidebarIcon>;
+}
+
+/** Side chats: two overlapping bubbles (Lucide messages-square). */
+export function SideChatsIcon(props: SidebarIconProps) {
+  return <SidebarIcon {...props}><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z" /><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" /></SidebarIcon>;
+}
+
+/** New side chat: a bubble with a centered plus (Lucide message-square-plus). */
+export function MessagePlusIcon(props: SidebarIconProps) {
+  return <SidebarIcon {...props}><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" /><path d="M12 8v6" /><path d="M9 11h6" /></SidebarIcon>;
 }
 
 /**
