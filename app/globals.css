@@ -1855,16 +1855,14 @@ pre, code {
   }
 }
 
-/* Narrow screens: a tool call's argument labels stop squeezing the value
-   column and stack above it (block-level table rows). */
-@media (max-width: 640px) {
-  .tool-field-table tr,
-  .tool-field-table td {
-    display: block;
-  }
-  .tool-field-table td + td {
-    padding-top: 0;
-  }
+/* A tool call's argument labels stack above their values instead of a
+   two-column table (the label column squeezed long values). */
+.tool-field-table tr,
+.tool-field-table td {
+  display: block;
+}
+.tool-field-table td + td {
+  padding-top: 0;
 }
 .activity-spinner {
   display: inline-block;
