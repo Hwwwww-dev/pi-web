@@ -37,11 +37,12 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    // "black": the status bar becomes an opaque solid bar that SQUEEZES the
-    // layout below it (content never sits under the bar). Per r/iOSBeta
-    // (mastafied): only black-translucent triggers the iOS 26+ progressive
-    // blur over the status-bar strip; default/black are unaffected.
-    statusBarStyle: "black",
+    // No statusBarStyle on purpose: iOS 27 draws an unconditional Liquid
+    // Glass progressive blur over the top edge of installed PWAs when a
+    // status-bar-style meta is present (the iOS 26 "black" bar workaround
+    // no longer suppresses it). Apple's guidance (WebKit #317153): omit the
+    // key entirely — the bar then matches the page color; viewport-fit=cover
+    // stays so env(safe-area-inset-*) keeps its values.
     title: "Pi Web",
   },
   formatDetection: {

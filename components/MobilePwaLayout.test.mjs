@@ -16,9 +16,12 @@ const layoutSource = await readFile(new URL("../app/layout.tsx", import.meta.url
 const appShellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 
 test("configures iOS standalone mode to use the visible viewport below the status bar", () => {
-  // iOS 26+ paints a system-level progressive blur over a black-translucent
-  // status bar strip; the opaque "black" style is the fix (see memory/dev notes).
-  assert.match(layoutSource, /statusBarStyle: "black"/);
+  // iOS 27 draws an unconditional Liquid Glass blur over the top edge of
+  // installed PWAs whenever a status-bar-style meta is present — the iOS 26
+  // "black" bar workaround stopped suppressing it. Apple's guidance
+  // (WebKit #317153): omit the key entirely; the bar matches the page color.
+  assert.doesNotMatch(layoutSource, /statusBarStyle/);
+  // Cover stays: env(safe-area-inset-*) keeps its values for the max() paddings.
   assert.match(layoutSource, /viewportFit: "cover"/);
   assert.match(layoutSource, /interactiveWidget: "resizes-content"/);
   assert.match(cssSource, /@media \(display-mode: standalone\) \{[\s\S]*?--app-viewport-height: 100dvh;/);
