@@ -243,7 +243,7 @@ function AgentRow({
             </svg>
           ) : side ? (
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M6 3v12M18 9a9 9 0 0 1-9 9" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" />
+              <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M15 3v18" />
             </svg>
           ) : (
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -279,7 +279,7 @@ function AgentRow({
       {onNewSideChat && (
         <RowSideButton title={t("sideChat.new")} disabled={newSideChatPending} onClick={onNewSideChat}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M6 3v12M18 9a9 9 0 0 1-9 9" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M17.5 17.5v5M15 20h5" />
+            <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 3v18" /><path d="M16.5 9v6M13.5 12h6" />
           </svg>
         </RowSideButton>
       )}

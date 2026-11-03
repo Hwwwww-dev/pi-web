@@ -1720,7 +1720,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               style={{ width: "auto", height: 35, flex: "0 0 auto", gap: 5, padding: "0 10px", border: "none", fontSize: 12, fontWeight: 500 }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M6 3v12M18 9a9 9 0 0 1-9 9" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" />
+                <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M15 3v18" />
               </svg>
               <span>{t("chat.askInSideChat")}</span>
             </button>
