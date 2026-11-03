@@ -91,10 +91,15 @@ test("keeps theme and language in settings instead of the chat toolbar", () => {
   assert.match(source, /useTheme\(\);/);
 });
 
-test("prioritizes context and cost when the mobile statistics area narrows", () => {
-  assert.match(source, /\.mobile-session-stats \{[\s\S]*?container-type: inline-size/);
-  assert.match(source, /@container \(max-width: 158px\)[\s\S]*?\[data-usage-seg="in"\]/);
-  assert.match(source, /@container \(max-width: 88px\)[\s\S]*?\[data-usage-seg="cost"\]/);
+test("mobile statistics collapse to a context+cost chip with the rest in the popover", () => {
+  // Fixed-content chip: no container-query tiers to reflow segments by width.
+  assert.doesNotMatch(source, /@container \(max-width: 220px\)/);
+  assert.doesNotMatch(source, /@container \(max-width: 158px\)/);
+  assert.doesNotMatch(source, /@container \(max-width: 88px\)/);
+  assert.match(source, /<span style=\{\{ opacity: 0\.75 \}\}>ctx<\/span> \{contextUsage\.percent\.toFixed\(1\)\}%/);
+  assert.match(source, /cost >= 0\.01 \? `\$\$\{cost\.toFixed\(2\)\}`/);
+  // Hover paint is guarded: touch devices latch synthetic mouseenter.
+  assert.match(source, /if \(!canHover\(\)\) return;/);
 });
 
 test("places trust warnings below the mobile toolbar and the file toggle in toolbar flow", () => {

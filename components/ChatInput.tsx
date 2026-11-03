@@ -38,6 +38,7 @@ import { SelectorRow } from "./SelectorRow";
 import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
 import { ExtensionStatusButton, PermissiveModeChip } from "./ExtensionStatus";
 import { splitExtensionStatuses } from "@/lib/extension-status";
+import { canHover } from "@/lib/can-hover";
 
 export { filterModelOptions } from "./ModelSelector";
 
@@ -2542,7 +2543,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 cursor: "pointer",
                 transition: "background 0.15s, border-color 0.15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; }}
+              onMouseEnter={(e) => { if (!canHover()) return; e.currentTarget.style.background = "rgba(239,68,68,0.18)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; }}
             >
               {/* While the run streams the circle stops it, until the user types
@@ -2643,6 +2644,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 transition: "background 0.12s, color 0.12s",
               }}
               onMouseEnter={(e) => {
+                if (!canHover()) return;
                 e.currentTarget.style.background = "var(--bg-hover)";
                 e.currentTarget.style.color = attachedImages.length ? "var(--accent)" : "var(--text)";
               }}
@@ -2718,6 +2720,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   transition: "background 0.12s, color 0.12s",
                 }}
                 onMouseEnter={(e) => {
+                  if (!canHover()) return;
                   if (controlsMenuOpen) return;
                   e.currentTarget.style.background = "var(--bg-hover)";
                   e.currentTarget.style.color = "var(--text)";
@@ -2775,6 +2778,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   }}
                   aria-expanded={thinkingDropdownOpen}
                   onMouseEnter={(e) => {
+                    if (!canHover()) return;
                     e.currentTarget.style.background = "var(--bg-hover)";
                     e.currentTarget.style.color = "var(--text)";
                   }}
@@ -2877,6 +2881,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   }}
                   aria-expanded={toolDropdownOpen}
                   onMouseEnter={(e) => {
+                    if (!canHover()) return;
                     if (isStreaming) return;
                     e.currentTarget.style.background = "var(--bg-hover)";
                     e.currentTarget.style.color = "var(--text)";
@@ -2924,7 +2929,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                             fontWeight: isActive ? 600 : 400,
                             whiteSpace: "nowrap",
                           }}
-                          onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--bg-hover)"; }}
+                          onMouseEnter={(e) => { if (!canHover()) return; if (!isActive) e.currentTarget.style.background = "var(--bg-hover)"; }}
                           onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "none"; }}
                         >
                           {isActive
@@ -2959,6 +2964,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     transition: "background 0.12s, color 0.12s",
                   }}
                   onMouseEnter={(e) => {
+                    if (!canHover()) return;
                     e.currentTarget.style.background = isCompacting ? "rgba(239,68,68,0.16)" : "var(--bg-hover)";
                     e.currentTarget.style.color = isCompacting ? "#ef4444" : "var(--text)";
                   }}
@@ -3000,6 +3006,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   transition: "background 0.12s, color 0.12s, opacity 0.12s",
                 }}
                 onMouseEnter={(e) => {
+                  if (!canHover()) return;
                   e.currentTarget.style.background = "var(--bg-hover)";
                   e.currentTarget.style.color = "var(--text)";
                   e.currentTarget.style.opacity = "1";
@@ -3056,6 +3063,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   transition: "background 0.12s, color 0.12s",
                 }}
                 onMouseEnter={(e) => {
+                  if (!canHover()) return;
                   e.currentTarget.style.background = "var(--bg-selected)";
                 }}
                 onMouseLeave={(e) => {

@@ -90,6 +90,7 @@ import { createSideChat, deleteSideChat } from "@/lib/side-chat-client";
 import { getAgentsBadge, getSessionFamily, isHiddenRelation, sideChatNameFrom, sideChatTitle } from "@/lib/session-family";
 import { getLastSettingsSection, settingsSectionRequiresProject, type SettingsSection } from "@/lib/settings-navigation";
 import { focusIfLost } from "@/lib/stacked-dialog";
+import { canHover } from "@/lib/can-hover";
 
 type SessionCopyField = "file" | "id" | "projectDir" | "gitBranch" | "gitWorktree";
 type AutoNameStatus =
@@ -1874,7 +1875,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 fontSize: 12, opacity: disabled ? 0.35 : 1,
                 transition: "background 0.12s, color 0.12s",
               }}
-              onMouseEnter={(event) => { if (!disabled) { event.currentTarget.style.background = "var(--bg-hover)"; event.currentTarget.style.color = "var(--text)"; } }}
+              onMouseEnter={(event) => { if (!canHover()) return; if (!disabled) { event.currentTarget.style.background = "var(--bg-hover)"; event.currentTarget.style.color = "var(--text)"; } }}
               onMouseLeave={(event) => { event.currentTarget.style.background = "none"; event.currentTarget.style.color = "var(--text-muted)"; }}
             >
               <SettingsSectionIcon section={section} size={14} strokeWidth={2} />
@@ -1896,7 +1897,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             borderRadius: 9, color: "var(--text-muted)", cursor: "pointer",
             fontSize: 12, transition: "background 0.12s, color 0.12s",
           }}
-          onMouseEnter={(event) => { event.currentTarget.style.background = "var(--bg-hover)"; event.currentTarget.style.color = "var(--text)"; }}
+          onMouseEnter={(event) => { if (!canHover()) return; event.currentTarget.style.background = "var(--bg-hover)"; event.currentTarget.style.color = "var(--text)"; }}
           onMouseLeave={(event) => { event.currentTarget.style.background = "none"; event.currentTarget.style.color = "var(--text-muted)"; }}
         >
           <SettingsSectionIcon section="general" size={14} strokeWidth={2} />
@@ -2056,6 +2057,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             transition: "color 0.1s, background 0.1s, opacity 0.1s",
           }}
           onMouseEnter={(event) => {
+            if (!canHover()) return;
             if (!selectedSession) return;
             event.currentTarget.style.color = "var(--text)";
             event.currentTarget.style.background = "var(--bg-hover)";
@@ -2136,6 +2138,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 transition: "color 0.1s, background 0.1s, opacity 0.1s",
               }}
               onMouseEnter={(event) => {
+                if (!canHover()) return;
                 if (disabled) return;
                 event.currentTarget.style.color = isError ? "#dc2626" : "var(--text)";
                 event.currentTarget.style.background = "var(--bg-hover)";
@@ -2229,6 +2232,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
           }}
           onMouseEnter={(event) => {
+            if (!canHover()) return;
             if (mobile && !showChat) return;
             event.currentTarget.style.color = "var(--text)";
           }}
@@ -2268,6 +2272,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
           }}
           onMouseEnter={(event) => {
+            if (!canHover()) return;
             if (mobile && !showChat) return;
             event.currentTarget.style.color = "var(--text)";
           }}
@@ -2385,19 +2390,36 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           transition: "color 0.1s, background 0.1s",
         }}
         onMouseEnter={(event) => {
+          if (!canHover()) return;
           if (showChat && !covered) event.currentTarget.style.color = "var(--text)";
         }}
         onMouseLeave={(event) => {
           event.currentTarget.style.color = activeTopPanel === "session" ? "var(--text)" : "var(--text-muted)";
         }}
       >
-        <UsageBar
-          usage={tokens ? { input: tokens.input, output: tokens.output, cacheRead: tokens.cacheRead, cost } : null}
-          ctx={contextUsage?.contextWindow ? { percent: contextUsage.percent, contextWindow: contextUsage.contextWindow } : undefined}
-          emphasizeCost
-          ctxColor={contextColor}
-          gap={10}
-        />
+        {mobile ? (
+          // Two glanceable values only; the full breakdown (tokens in/out,
+          // cache, exact cost, per-turn rows) lives in the session-info
+          // popover this button opens. Fixed content: no width-driven reflow.
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+            {contextUsage?.contextWindow && contextUsage.percent !== null && (
+              <span style={{ color: contextColor ?? "var(--text-muted)" }}>
+                <span style={{ opacity: 0.75 }}>ctx</span> {contextUsage.percent.toFixed(1)}%
+              </span>
+            )}
+            {cost > 0 && (
+              <span style={{ color: "var(--text)", fontWeight: 500 }}>{cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`}</span>
+            )}
+          </span>
+        ) : (
+          <UsageBar
+            usage={tokens ? { input: tokens.input, output: tokens.output, cacheRead: tokens.cacheRead, cost } : null}
+            ctx={contextUsage?.contextWindow ? { percent: contextUsage.percent, contextWindow: contextUsage.contextWindow } : undefined}
+            emphasizeCost
+            ctxColor={contextColor}
+            gap={10}
+          />
+        )}
       </button>
     );
   };
@@ -2427,6 +2449,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           cursor: "pointer", flexShrink: 0, transition: "color 0.1s, background 0.1s",
         }}
         onMouseEnter={(event) => {
+          if (!canHover()) return;
           event.currentTarget.style.color = "var(--text)";
         }}
         onMouseLeave={(event) => {
@@ -2469,7 +2492,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           color: rightPanelOpen ? "var(--text)" : "var(--text-muted)",
           cursor: "pointer", flexShrink: 0, transition: "color 0.12s, background 0.12s",
         }}
-        onMouseEnter={(event) => { if (!covered) event.currentTarget.style.color = "var(--text)"; }}
+        onMouseEnter={(event) => { if (!canHover()) return; if (!covered) event.currentTarget.style.color = "var(--text)"; }}
         onMouseLeave={(event) => { event.currentTarget.style.color = rightPanelOpen ? "var(--text)" : "var(--text-muted)"; }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -2539,32 +2562,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         .session-info-popover,
         .session-info-popover::after {
           animation: none;
-        }
-      }
-      .mobile-session-stats {
-        container-type: inline-size;
-      }
-      /* One line on phones: the two-line wrap overflows the 44px bar and reads
-         as broken over the transcript. Nowrap clips at the right edge; the
-         tiers below drop the least valuable segments first (cache → in/out →
-         cost) so cost+ctx survive. */
-      .mobile-session-stats > span {
-        flex-wrap: nowrap !important;
-      }
-      @container (max-width: 220px) {
-        .mobile-session-stats [data-usage-seg="cache"] {
-          display: none !important;
-        }
-      }
-      @container (max-width: 158px) {
-        .mobile-session-stats [data-usage-seg="in"],
-        .mobile-session-stats [data-usage-seg="out"] {
-          display: none !important;
-        }
-      }
-      @container (max-width: 88px) {
-        .mobile-session-stats [data-usage-seg="cost"] {
-          display: none !important;
         }
       }
       @media (max-width: 640px) {
@@ -2654,7 +2651,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               background: "none", border: "none", borderRight: "1px solid var(--border)",
               color: "var(--text-muted)", cursor: "pointer", flexShrink: 0, transition: "color 0.12s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
+            onMouseEnter={(e) => { if (!canHover()) return; e.currentTarget.style.color = "var(--text)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
           >
             {sidebarOpen ? (
@@ -2898,6 +2895,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                             transition: "color 0.12s, border-color 0.12s, background 0.12s",
                           }}
                           onMouseEnter={(e) => {
+                            if (!canHover()) return;
                             e.currentTarget.style.color = "var(--accent)";
                             e.currentTarget.style.borderColor = "var(--accent)";
                             e.currentTarget.style.background = "var(--bg-hover)";
@@ -3246,7 +3244,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               background: "var(--bg-selected)", border: "none", borderLeft: "1px solid var(--border)",
               color: "var(--text)", cursor: "pointer", flexShrink: 0, transition: "color 0.12s",
             }}
-            onMouseEnter={(event) => { event.currentTarget.style.color = "var(--accent)"; }}
+            onMouseEnter={(event) => { if (!canHover()) return; event.currentTarget.style.color = "var(--accent)"; }}
             onMouseLeave={(event) => { event.currentTarget.style.color = "var(--text)"; }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
