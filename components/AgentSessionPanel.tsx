@@ -374,7 +374,7 @@ function RowSideButton({ title, pressed, danger, disabled, onClick, children }: 
     : danger
       ? "cursor-pointer text-text-muted hover:bg-[rgba(239,68,68,0.08)] hover:text-[#ef4444] focus-visible:bg-[rgba(239,68,68,0.08)] focus-visible:text-[#ef4444]"
       : pressed
-        ? "cursor-pointer text-accent hover:bg-bg-hover"
+        ? "cursor-pointer text-brand hover:bg-bg-hover"
         : "cursor-pointer text-text-muted hover:bg-bg-hover hover:text-text";
   return (
     <button

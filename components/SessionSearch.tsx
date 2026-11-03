@@ -61,11 +61,11 @@ export function SessionSearch({ open, query, children, selectedSessionId, onSele
           type="button"
           onClick={() => onSelectSession(session, entryId, blockIndex)}
           aria-current={session.id === selectedSessionId ? "true" : undefined}
-          className={`block w-full cursor-pointer border-b border-border px-3 py-2 text-left hover:bg-bg-hover focus-visible:outline-2 focus-visible:outline-accent ${session.id === selectedSessionId ? "bg-bg-selected" : ""}`}
+          className={`block w-full cursor-pointer border-b border-border px-3 py-2 text-left hover:bg-bg-hover focus-visible:outline-2 focus-visible:outline-brand ${session.id === selectedSessionId ? "bg-bg-selected" : ""}`}
         >
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="min-w-0 truncate text-xs font-medium text-text">
-              {titleMatch ? <>{before}<mark className="rounded-sm bg-accent/20 text-text">{match}</mark>{after}</> : session.name || session.firstMessage}
+              {titleMatch ? <>{before}<mark className="rounded-sm bg-brand/20 text-text">{match}</mark>{after}</> : session.name || session.firstMessage}
             </span>
             {archivedSessionIds?.has(session.id) && (
               <span className="shrink-0 rounded-[4px] border border-border px-1 text-[10px] leading-[14px] text-text-dim">{t("sidebar.archived")}</span>
@@ -77,7 +77,7 @@ export function SessionSearch({ open, query, children, selectedSessionId, onSele
           </span>
           {!titleMatch && (
             <span className="mt-1 block text-xs leading-relaxed wrap-anywhere text-text-muted">
-              {before}<mark className="rounded-sm bg-accent/20 text-text">{match}</mark>{after}
+              {before}<mark className="rounded-sm bg-brand/20 text-text">{match}</mark>{after}
             </span>
           )}
         </button>
