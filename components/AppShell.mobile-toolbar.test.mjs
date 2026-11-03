@@ -15,7 +15,8 @@ test("keeps action icons inline in medium mobile sidebars", () => {
 });
 
 test("uses a compact narrow-mobile toolbar with a floating action layer", () => {
-  assert.match(source, /data-mobile-toolbar="true"[\s\S]*?flex: 1,[\s\S]*?minWidth: 0/);
+  // The bar takes the free space and may shrink (flex-1 min-w-0), as the row's toolbar.
+  assert.match(source, /data-mobile-toolbar="true"\s+className="relative flex h-full min-w-0 flex-1 items-stretch"/);
   assert.match(
     source,
     /data-mobile-toolbar-actions="true"[\s\S]*?position: "absolute"[\s\S]*?right: 0,[\s\S]*?left: isNarrowMobile \? `calc\(2 \* \$\{TOP_BAR_ICON_BUTTON_SIZE\}\)` : 0/,
@@ -53,7 +54,8 @@ test("only renders branch toolbar controls for sessions with branches", () => {
 test("keeps covered statistics and file controls out of interaction and focus", () => {
   assert.match(source, /const covered = mobile && mobileToolbarMoreOpen;/);
   assert.match(source, /disabled=\{!showChat \|\| covered\}[\s\S]*?tabIndex=\{covered \? -1 : undefined\}/);
-  assert.match(source, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}[\s\S]*?visibility: covered \? "hidden" : "visible"/);
+  // Covered controls drop out of painting and hit-testing via the invisible/pointer-events classes.
+  assert.match(source, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}[\s\S]*?covered && "invisible pointer-events-none"/);
   assert.match(source, /aria-hidden=\{covered \? true : undefined\}/);
 });
 
@@ -96,10 +98,12 @@ test("mobile statistics collapse to a context+cost chip with the rest in the pop
   assert.doesNotMatch(source, /@container \(max-width: 220px\)/);
   assert.doesNotMatch(source, /@container \(max-width: 158px\)/);
   assert.doesNotMatch(source, /@container \(max-width: 88px\)/);
-  assert.match(source, /<span style=\{\{ opacity: 0\.75 \}\}>ctx<\/span> \{contextUsage\.percent\.toFixed\(1\)\}%/);
+  assert.match(source, /<span className="opacity-75">ctx<\/span> \{contextUsage\.percent\.toFixed\(1\)\}%/);
   assert.match(source, /cost >= 0\.01 \? `\$\$\{cost\.toFixed\(2\)\}`/);
-  // Hover paint is guarded: touch devices latch synthetic mouseenter.
-  assert.match(source, /if \(!canHover\(\)\) return;/);
+  // Hover paint stays off touch devices: the hover: variant is media-gated
+  // (@media (hover: hover)) now that the canHover JS guards went with the
+  // inline styles; enabled: keeps disabled controls unlit.
+  assert.match(source, /enabled:hover:(?:bg-secondary|text-foreground)/);
 });
 
 test("places trust warnings below the mobile toolbar and the file toggle in toolbar flow", () => {

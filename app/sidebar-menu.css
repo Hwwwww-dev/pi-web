@@ -21,10 +21,10 @@
   overscroll-behavior: contain;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+  box-shadow: var(--shadow-md);
   font-size: 12px;
   animation: sidebar-menu-in 0.12s ease-out;
 }
@@ -78,12 +78,12 @@
 
 .sidebar-menu-item.is-danger,
 .sidebar-menu-item.is-danger .sidebar-menu-icon {
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .sidebar-menu-item.is-danger:not([aria-disabled="true"]):hover,
 .sidebar-menu-item.is-danger:focus-visible {
-  background: rgba(239, 68, 68, 0.08);
+  background: var(--danger-bg);
 }
 
 .sidebar-menu-icon {
@@ -184,8 +184,8 @@
 
 .sidebar-menu-secondary.is-danger:not([aria-disabled="true"]):hover,
 .sidebar-menu-secondary.is-danger:focus-visible {
-  background: rgba(239, 68, 68, 0.08);
-  color: #ef4444;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .sidebar-menu-secondary[aria-disabled="true"] {
@@ -370,7 +370,7 @@
   gap: 6px;
   padding: 7px 10px;
   border-bottom: 1px solid var(--border);
-  background: rgba(239, 68, 68, 0.06);
+  background: var(--danger-bg);
 }
 
 .sidebar-worktree-confirm-text {
@@ -770,8 +770,8 @@ html[data-keyboard-open] .sidebar-sheet {
 
 /* Force-removing a checkout discards its changes. */
 .sidebar-worktree-force {
-  border-color: #ef4444;
-  background: #ef4444;
+  border-color: var(--danger);
+  background: var(--danger);
   color: #fff;
   font-weight: 600;
 }
@@ -799,7 +799,7 @@ html[data-keyboard-open] .sidebar-sheet {
 
 .sidebar-worktree-error {
   margin-top: 6px;
-  color: #ef4444;
+  color: var(--danger);
   font-size: 11px;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -862,8 +862,8 @@ html[data-keyboard-open] .sidebar-sheet {
 
 /* Deleting cannot be undone: the red of a row's delete confirmation. */
 .sidebar-menu-question-confirm {
-  border-color: #ef4444;
-  background: #ef4444;
+  border-color: var(--danger);
+  background: var(--danger);
   color: #fff;
   font-weight: 600;
 }

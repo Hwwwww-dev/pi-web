@@ -733,10 +733,11 @@ test("the Debug button only toggles its panel, left of the session stats", () =>
 
   // Desktop: after the chat's actions and the ⋯ overflow, right before the stats.
   assert.match(shellSource, /\{renderChatToolbarActions\(false, "primary"\)\}\s*<div ref=\{desktopToolbarMoreRef\}[\s\S]*?\{renderDebugButton\(false\)\}\s*\{renderSessionStatsButton\(false\)\}/);
-  assert.match(button, /marginLeft: mobile \? 0 : "auto"/);
+  assert.match(button, /mobile \? "border-r border-border" : "ml-auto border-l border-border"/);
   const stats = between(shellSource, "const renderSessionStatsButton = (mobile: boolean) => {", "const renderDebugButton");
-  assert.match(stats, /\n\s*marginLeft: 0,/);
-  assert.match(shellSource, /marginLeft: !mobile && !showChat \? "auto" : 0,/);
+  // The stats button follows the Debug button's ml-auto; it never pushes itself right.
+  assert.doesNotMatch(stats, /ml-auto/);
+  assert.match(shellSource, /!mobile && !showChat && "ml-auto"/);
   // Phones: before the stats on a wide one, in the "more" overlay on a narrow one.
   assert.match(shellSource, /\{!isNarrowMobile && renderChatToolbarActions\(true, "primary"\)\}\s*\{!isNarrowMobile && renderToolbarMoreButton\(\)\}\s*\{!isNarrowMobile && renderDebugButton\(true\)\}\s*\{renderSessionStatsButton\(true\)\}/);
   assert.match(shellSource, /\{renderChatToolbarActions\(true, "primary"\)\}\s*\{renderChatToolbarActions\(true, "overflow"\)\}\s*\{renderDebugButton\(true\)\}\s*<\/div>/);
@@ -774,7 +775,7 @@ test("the sidebar's running poll records its request alone, not the session-list
 
 test("the narrow phone's more overlay scrolls the buttons it cannot fit instead of clipping the last", () => {
   const overlay = between(shellSource, 'data-mobile-toolbar-actions="true"', '{renderChatToolbarActions(true, "primary")}');
-  assert.match(overlay, /overflowX: "auto",\s*overflowY: "hidden",\s*scrollbarWidth: "none",/);
+  assert.match(overlay, /overflow-x-auto[\s\S]*?overflow-y-hidden[\s\S]*?\[scrollbar-width:none\]/);
 });
 
 test("AppShell keeps the chat's reader in a ref and the panel open across session switches", () => {

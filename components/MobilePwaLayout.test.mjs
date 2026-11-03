@@ -29,13 +29,14 @@ test("configures iOS standalone mode to use the visible viewport below the statu
 
 test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(appShellSource, /useViewportHeight\(\)/);
-  assert.match(appShellSource, /paddingTop: "env\(safe-area-inset-top\)"/);
-  assert.match(appShellSource, /paddingBottom: "env\(safe-area-inset-bottom\)"/);
-  assert.match(appShellSource, /paddingLeft: "env\(safe-area-inset-left\)"/);
-  assert.match(appShellSource, /paddingRight: "env\(safe-area-inset-right\)"/);
-  assert.match(appShellSource, /height: "calc\(var\(--top-bar-height\) \+ env\(safe-area-inset-top\)\)"/);
-  assert.match(appShellSource, /\/\* Right panel tab bar \*\/[\s\S]*?height: "calc\(var\(--top-bar-height\) \+ env\(safe-area-inset-top\)\)"/);
-  assert.match(appShellSource, /height: "var\(--app-viewport-height, 100dvh\)"/);
+  assert.match(appShellSource, /pt-\[env\(safe-area-inset-top\)\]/);
+  assert.match(appShellSource, /pb-\[env\(safe-area-inset-bottom\)\]/);
+  assert.match(appShellSource, /pl-\[env\(safe-area-inset-left\)\]/);
+  assert.match(appShellSource, /pr-\[env\(safe-area-inset-right\)\]/);
+  assert.match(appShellSource, /h-\[calc\(var\(--top-bar-height\)_\+_env\(safe-area-inset-top\)\)\]/);
+  // Right panel tab bar.
+  assert.match(appShellSource, /h-\[calc\(var\(--top-bar-height\)_\+_env\(safe-area-inset-top\)\)\] shrink-0/);
+  assert.match(appShellSource, /h-\[var\(--app-viewport-height,100dvh\)\]/);
   assert.match(appShellSource, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}/);
   assert.match(viewportHookSource, /window\.visualViewport/);
   assert.match(viewportHookSource, /window\.requestAnimationFrame\(update\)/);

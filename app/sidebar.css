@@ -26,7 +26,7 @@
 
 .session-tree-message.is-error {
   padding: 12px 14px;
-  color: #f87171;
+  color: var(--danger);
 }
 
 .session-tree-scroll {
@@ -171,11 +171,11 @@
 }
 
 .session-tree-pinned-dot.is-unread {
-  background: #0891b2;
+  background: var(--accent);
 }
 
 .session-tree-pinned-dot.is-awaiting {
-  background: #d97706;
+  background: var(--warning);
 }
 
 /* Session row: title, branch, time; actions take the time's place on
@@ -225,8 +225,8 @@
 
 .session-tree-session.is-confirming {
   gap: 5px;
-  background: rgba(239, 68, 68, 0.06);
-  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.35);
+  background: var(--danger-bg);
+  box-shadow: inset 0 0 0 1px var(--danger-border);
   cursor: default;
 }
 
@@ -259,14 +259,14 @@ a.session-tree-main {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #0891b2;
+  background: var(--accent);
 }
 
 .session-tree-unread::after {
   content: "";
   position: absolute;
   inset: -3px;
-  border: 1.4px solid #0891b2;
+  border: 1.4px solid var(--accent);
   border-radius: 50%;
   opacity: 0.35;
   animation: session-tree-status-pulse 1.6s ease-in-out infinite;
@@ -281,14 +281,14 @@ a.session-tree-main {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #d97706;
+  background: var(--warning);
 }
 
 .session-tree-awaiting::after {
   content: "";
   position: absolute;
   inset: -3px;
-  border: 1.4px solid #d97706;
+  border: 1.4px solid var(--warning);
   border-radius: 50%;
   opacity: 0.35;
   animation: session-tree-status-pulse 1.6s ease-in-out infinite;
@@ -495,8 +495,8 @@ a.session-tree-main {
 }
 
 .session-tree-confirm-delete {
-  border: 1px solid #ef4444;
-  background: #ef4444;
+  border: 1px solid var(--danger);
+  background: var(--danger);
   color: #fff;
   font-weight: 600;
 }
@@ -676,11 +676,11 @@ a.session-tree-main {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #0891b2;
+  background: var(--accent);
 }
 
 .session-tree-summary-dot.is-awaiting {
-  background: #d97706;
+  background: var(--warning);
 }
 
 .session-tree-group-actions {
@@ -1569,7 +1569,7 @@ a.session-tree-main {
   align-items: flex-start;
   gap: 6px;
   padding: 6px 10px 0;
-  color: #f87171;
+  color: var(--danger);
   font-size: 10px;
   line-height: 1.35;
 }

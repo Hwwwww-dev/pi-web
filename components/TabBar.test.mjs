@@ -15,33 +15,29 @@ function renderTabBar(count) {
     React.createElement(TabBar, { tabs, activeTabId: "t0", onSelectTab() {}, onCloseTab() {} })));
 }
 
-/** The inline style of every element with that role, as property maps. */
-function styles(html, role) {
-  return [...html.matchAll(new RegExp(`<div role="${role}"[^>]* style="([^"]*)"`, "g"))].map(([, style]) =>
-    Object.fromEntries(style.split(";").filter(Boolean).map((declaration) => {
-      const colon = declaration.indexOf(":");
-      return [declaration.slice(0, colon), declaration.slice(colon + 1)];
-    })));
+/** The class string of every element with that role. */
+function classes(html, role) {
+  return [...html.matchAll(new RegExp(`<div role="${role}"[^>]* class="([^"]*)"`, "g"))].map(([, cls]) => cls);
 }
 
 test("overflowing tabs keep the whole bar: the strip has no scrollbar", () => {
   // The app's 10px (6px on touch) scrollbar took its height out of the 36px
   // bar: 36px tabs were clipped (#1225), stretched ones squeezed to 26px.
   const html = renderTabBar(12);
-  assert.match(html, /<div role="tablist" class="tabbar-scroll"/);
+  assert.match(html, /<div role="tablist" class="tabbar-scroll/);
   const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(css, /\.tabbar-scroll \{\s*scrollbar-width: none;\s*\}/);
   assert.match(css, /\.tabbar-scroll::-webkit-scrollbar \{\s*display: none;\s*\}/);
-  const [list] = styles(html, "tablist");
+  const [list] = classes(html, "tablist");
   // The bar's height (36px, 44px on a phone or touch screen).
-  assert.equal(list.height, "var(--top-bar-height)");
-  assert.equal(list["overflow-x"], "auto");
-  assert.equal(list["overflow-y"], "hidden");
-  assert.equal(list["align-items"], "stretch");
-  const tabs = styles(html, "tab");
+  assert.match(list, /h-\[var\(--top-bar-height\)\]/);
+  assert.match(list, /overflow-x-auto/);
+  assert.match(list, /overflow-y-hidden/);
+  assert.match(list, /items-stretch/);
+  const tabs = classes(html, "tab");
   assert.equal(tabs.length, 12);
   for (const tab of tabs) {
-    assert.equal(tab.height, undefined);
-    assert.equal(tab["align-items"], "center");
+    assert.doesNotMatch(tab, /\bh-\d/);
+    assert.match(tab, /items-center/);
   }
 });
