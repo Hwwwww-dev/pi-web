@@ -317,6 +317,15 @@ export class WorktreeBranchInUseError extends Error {
   }
 }
 
+/** All local branch names, sorted, for the worktree menu's branch list.
+ *  Branches already checked out in a worktree are included; the menu
+ *  subtracts those so its sections never duplicate an entry. */
+export async function listLocalBranches(cwd: string): Promise<string[]> {
+  const repoRoot = await getRepoRoot(cwd);
+  const out = await git(repoRoot, ["branch", "--format=%(refname:short)"]);
+  return out.split("\n").map((line) => line.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b));
+}
+
 export async function addWorktree(cwd: string, branch: string): Promise<{ path: string; branch: string }> {
   const trimmed = branch.trim();
   if (!trimmed) throw new Error("Branch name is required");

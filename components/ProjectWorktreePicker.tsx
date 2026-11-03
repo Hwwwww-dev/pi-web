@@ -244,6 +244,30 @@ export function ProjectWorktreePicker({
     ? describeProjectChoices(projectChoices(context)).find(({ choice }) => choice.key === project.key)
     : undefined;
 
+  // Branches with no checkout yet, fetched when the worktree menu opens: the
+  // menu lists them below its worktree rows; picking one moves the project
+  // there by creating (or reusing) that branch's worktree.
+  const [branchList, setBranchList] = useState<string[] | null>(null);
+  const [branchBusy, setBranchBusy] = useState<string | null>(null);
+  const worktreeMenuOpen = menu?.kind === "worktree";
+  const branchCwd = current?.path ?? project?.root ?? null;
+  useEffect(() => {
+    if (!worktreeMenuOpen || !branchCwd) return;
+    let cancelled = false;
+    setBranchList(null);
+    fetch(`/api/worktrees?cwd=${encodeURIComponent(branchCwd)}`)
+      .then((res) => (res.ok ? (res.json() as Promise<{ branches?: unknown }>) : Promise.reject(new Error(String(res.status)))))
+      .then((data) => {
+        if (!cancelled) setBranchList(Array.isArray(data.branches) ? data.branches.filter((branch): branch is string => typeof branch === "string") : null);
+      })
+      .catch(() => {
+        if (!cancelled) setBranchList(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [worktreeMenuOpen, branchCwd]);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -347,6 +371,30 @@ export function ProjectWorktreePicker({
     onPickRef.current({ cwd: result.path, projectKey: project.key, projectRoot: project.root }, "worktree");
   };
 
+  // A branch row: create (or reuse) that branch's worktree and move there.
+  // The create form body doubles as the error surface; branchBusy disables
+  // the rows while a checkout is being made.
+  const activateBranch = async (branch: string) => {
+    if (!project || branchBusy) return;
+    const id = menuRef.current?.id;
+    setBranchBusy(branch);
+    let result: { path: string } | { error: string };
+    try {
+      result = await onCreateWorktree(project, branch);
+    } catch (e) {
+      result = { error: e instanceof Error ? e.message : String(e) };
+    }
+    if (!mountedRef.current) return;
+    setBranchBusy(null);
+    if ("error" in result) {
+      showBody({ kind: "create", busy: false, error: result.error });
+      return;
+    }
+    if (menuRef.current?.id !== id) return;
+    setMenu(null);
+    onPickRef.current({ cwd: result.path, projectKey: project.key, projectRoot: project.root }, "worktree");
+  };
+
   const removeWorktree = async (worktree: WorktreeChoice, force: boolean) => {
     const state = menuRef.current;
     if (!state || !project || !onRemoveWorktree) return;
@@ -419,6 +467,22 @@ export function ProjectWorktreePicker({
     ];
   };
 
+  const branchItems = (): SidebarMenuItem[] => {
+    const withoutCheckout = (branchList ?? []).filter((branch) => !(worktrees ?? []).some((worktree) => worktree.branch === branch));
+    return [
+      ...(withoutCheckout.length > 0 ? [{ type: "separator", id: "branch-separator" } as const] : []),
+      ...withoutCheckout.map((branch): SidebarMenuItem => ({
+        type: "item",
+        id: `branch:${branch}`,
+        label: branch,
+        mono: classic,
+        path: classic,
+        disabled: branchBusy !== null,
+        onSelect: () => { void activateBranch(branch); },
+      })),
+    ];
+  };
+
   const worktreeItems = (): SidebarMenuItem[] => [
     ...(worktrees ?? []).map((worktree): SidebarMenuItem => classic && body?.kind === "remove" && body.dirty && body.worktree.path === worktree.path ? {
       type: "custom",
@@ -455,6 +519,9 @@ export function ProjectWorktreePicker({
         }
       },
     }),
+    // Branches with no checkout yet: one row each; picking it moves the
+    // project there by creating (or reusing) that branch's worktree.
+    ...branchItems(),
     // Classic: no line of its own (the rows have theirs), and gone while its form shows below.
     ...(classic ? [] : [{ type: "separator", id: "separator" } as const]),
     ...(classic && body?.kind === "create" ? [] : [{

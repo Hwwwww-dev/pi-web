@@ -201,3 +201,17 @@ test("the force question starts on a Cancel on a desktop and in a sheet, never o
   assert.doesNotMatch(failed, /sidebar-worktree-force/);
   assert.match(failed, /<div class="sidebar-worktree-error" role="alert">locked<\/div>/);
 });
+
+test("the worktree menu lists branches with no checkout and moves on pick", () => {
+  assert.match(source, /branchList/);
+  assert.match(source, /id: `branch:\$\{branch\}`/);
+  assert.match(source, /onCreateWorktree\(project, branch\)/);
+  assert.match(source, /branch-separator/);
+});
+
+test("listLocalBranches returns the repo's local branches", async () => {
+  const { listLocalBranches } = await jiti.import("@/lib/worktree");
+  const branches = await listLocalBranches(process.cwd());
+  assert.ok(branches.length > 0);
+  assert.ok(branches.every((branch) => typeof branch === "string" && branch.length > 0));
+});
