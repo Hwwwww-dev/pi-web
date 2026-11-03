@@ -284,7 +284,7 @@ test("a refused Add says why; host variables are added only through an explicit 
     draft: { text: "https://api.example.com/mcp" },
     failure: { error: "x", reason: "host-env-confirm", names: ["GH_TOKEN"] },
   });
-  assert.match(decode(html), /<div role="alert" class="mcp-add-failure">/);
+  assert.match(decode(html), /<div role="alert" class="flex min-w-0 flex-col gap-1\.5">/);
   assert.match(text(html), /Not added: The server would be sent variables of the computer running Pi Web; confirm that first\./);
   assert.match(text(html), /read GH_TOKEN, which are set on the computer running Pi Web/);
   assert.match(text(html), /Add and send these values/);

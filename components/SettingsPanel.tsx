@@ -1,6 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  BotIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CpuIcon,
+  LayersIcon,
+  LogOutIcon,
+  PuzzleIcon,
+  RotateCcwIcon,
+  ServerIcon,
+  SlidersHorizontalIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useTheme } from "@/hooks/useTheme";
@@ -38,6 +51,7 @@ import { PluginsConfig } from "./PluginsConfig";
 import { McpConfig } from "./McpConfig";
 import {
   ConfigButton,
+  ConfigCard,
   ConfigDetail,
   ConfigDetailHeader,
   ConfigDetailStack,
@@ -77,26 +91,19 @@ interface Props {
   onProjectTrustChanged?: (cwd: string, status: ProjectTrustStatus) => void;
 }
 
-export function SettingsSectionIcon({ section, size = 16, strokeWidth = 1.8 }: { section: SettingsSection; size?: number; strokeWidth?: number }) {
-  const common = {
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    "aria-hidden": true,
-    className: "settings-section-icon",
-  };
+const SECTION_ICONS = {
+  general: SlidersHorizontalIcon,
+  models: CpuIcon,
+  skills: LayersIcon,
+  agents: BotIcon,
+  plugins: PuzzleIcon,
+  mcp: ServerIcon,
+} as const;
 
-  if (section === "general") return <svg {...common}><path d="M20 7h-9M14 17H5" /><circle cx="7" cy="7" r="3" /><circle cx="17" cy="17" r="3" /></svg>;
-  if (section === "models") return <svg {...common}><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" /></svg>;
-  if (section === "skills") return <svg {...common}><path d="m12 2-10 5 10 5 10-5-10-5Z" /><path d="m2 12 10 5 10-5M2 17l10 5 10-5" /></svg>;
-  if (section === "agents") return <svg {...common} className="settings-section-icon is-agent"><rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" /></svg>;
-  if (section === "mcp") return <svg {...common}><rect x="3" y="3" width="18" height="7" rx="2" /><rect x="3" y="14" width="18" height="7" rx="2" /><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6" /></svg>;
-  return <svg {...common}><path d="M9 7V2M15 7V2M6 13V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5a6 6 0 0 1-12 0ZM12 19v3" /></svg>;
+/** A section's glyph (lucide, §6); `strokeWidth` 1.8 keeps the hand-drawn icons' line weight. */
+export function SettingsSectionIcon({ section, size = 16, strokeWidth = 1.8 }: { section: SettingsSection; size?: number; strokeWidth?: number }) {
+  const Icon = SECTION_ICONS[section];
+  return <Icon size={size} strokeWidth={strokeWidth} className="settings-section-icon shrink-0" />;
 }
 
 type GeneralDetail = "appearance" | "chat" | "sidebar" | "shell" | "push" | "language";
@@ -251,6 +258,8 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     { id: "language", label: t("common.language") },
   ];
   const activeDetailLabel = generalDetails.find((item) => item.id === detail)?.label ?? t("settings.appearance");
+  // A label/value row inside a Card (§7.3): 44px keeps the touch target.
+  const optionRowClass = "flex min-h-11 w-full items-center justify-between gap-4 rounded-sm bg-muted px-2.5 text-xs text-foreground";
 
   return (
     <ConfigPanelShell embedded title={t("settings.general")} onClose={onClose}>
@@ -269,14 +278,12 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           </ConfigSidebarList>
           {webAuthEnabled && (
             <ConfigListAction disabled={loggingOut} onClick={() => void logOut()}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M10 17l5-5-5-5M15 12H3M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-              </svg>
+              <LogOutIcon size={14} strokeWidth={1.8} />
               {loggingOut ? t("auth.loggingOut") : t("auth.logOut")}
             </ConfigListAction>
           )}
           {webAuthEnabled && logoutError && (
-            <p role="alert" className="settings-general-error settings-logout-error">{logoutError}</p>
+            <p role="alert" className="mt-2 px-2 text-xs text-destructive">{logoutError}</p>
           )}
         </ConfigSidebar>
         <ConfigDetail>
@@ -334,9 +341,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                       disabled={chatContentWidth === CHAT_CONTENT_WIDTH_DEFAULT}
                       onClick={() => setChatContentWidth(CHAT_CONTENT_WIDTH_DEFAULT)}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" />
-                      </svg>
+                      <RotateCcwIcon size={14} strokeWidth={1.8} />
                     </ConfigButton>
                   </div>
                   <input
@@ -363,9 +368,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                       disabled={fontSize === CHAT_CONTENT_FONT_SIZE_DEFAULT}
                       onClick={() => setFontSize(CHAT_CONTENT_FONT_SIZE_DEFAULT)}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" />
-                      </svg>
+                      <RotateCcwIcon size={14} strokeWidth={1.8} />
                     </ConfigButton>
                   </div>
                   <input
@@ -431,9 +434,14 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                     onChange={(enabled) => void toggleCacheMissNotices(enabled)}
                   />
                 </div>
-                <div className="settings-keepalive">
-                  <p className="settings-general-description">{t("settings.keepAliveDescription")}</p>
-                  <div className="settings-shell-option">
+              </div>
+            )}
+
+            {/* The keep-alive group is a section of its own (§7.3): description, two numeric rows. */}
+            {detail === "chat" && (
+              <ConfigCard description={t("settings.keepAliveDescription")}>
+                <div className="flex flex-col gap-2">
+                  <div className={optionRowClass}>
                     <label htmlFor="settings-keepalive-max-sessions">{t("settings.keepAliveMaxSessions")}</label>
                     <input
                       id="settings-keepalive-max-sessions"
@@ -447,7 +455,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                       }}
                     />
                   </div>
-                  <div className="settings-shell-option">
+                  <div className={optionRowClass}>
                     <label htmlFor="settings-keepalive-idle-timeout">{t("settings.keepAliveIdleTimeout")}</label>
                     <input
                       id="settings-keepalive-idle-timeout"
@@ -462,7 +470,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                     />
                   </div>
                 </div>
-              </div>
+              </ConfigCard>
             )}
 
             {detail === "sidebar" && (
@@ -501,9 +509,11 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             )}
 
             {detail === "shell" && shellSettings && (
-              <>
-                <p className="settings-general-description">{t("settings.shellToolDescription")}</p>
-                <div className="settings-shell-option">
+              <ConfigCard
+                description={t("settings.shellToolDescription")}
+                footer={shellError ? <p role="alert" className="m-0 text-xs text-destructive">{shellError}</p> : undefined}
+              >
+                <div className={optionRowClass}>
                   <span>{t("settings.usePowerShell")}</span>
                   <ConfigSwitch
                     checked={shellSettings.powerShellEnabled}
@@ -512,34 +522,30 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                     onChange={(enabled) => void togglePowerShell(enabled)}
                   />
                 </div>
-                {shellError && <p role="alert" className="settings-general-error">{shellError}</p>}
-              </>
+              </ConfigCard>
             )}
 
             {detail === "push" && (
-              <>
-                <p className="settings-general-description">{t("settings.pushPermissionDescription")}</p>
-                <div className="settings-shell-option">
+              <ConfigCard
+                description={t("settings.pushPermissionDescription")}
+                footer={pushStatus ? (
+                  <p role="status" className={cn("m-0 text-xs", pushStatus.kind === "ok" ? "text-primary" : "text-destructive")}>
+                    {pushStatus.message}
+                  </p>
+                ) : undefined}
+              >
+                <div className={optionRowClass}>
                   <span>{t("settings.pushPermission")}</span>
-                  <button
-                    type="button"
-                    className="config-button config-button-small config-button-secondary"
+                  <ConfigButton
+                    variant="secondary"
+                    size="small"
                     disabled={pushRegistering}
                     onClick={() => void registerPush()}
                   >
                     {pushRegistering ? t("settings.pushRegisterLoading") : t("settings.pushRegister")}
-                  </button>
+                  </ConfigButton>
                 </div>
-                {pushStatus && (
-                  <p
-                    role="status"
-                    className="settings-general-error"
-                    style={pushStatus.kind === "ok" ? { color: "var(--accent)" } : undefined}
-                  >
-                    {pushStatus.message}
-                  </p>
-                )}
-              </>
+              </ConfigCard>
             )}
 
             {detail === "language" && (
@@ -781,14 +787,12 @@ export function SettingsPanel({
             return (
               <button
                 type="button"
-                className="settings-phone-back"
+                className="settings-phone-back flex h-11 max-w-full shrink-0 items-center gap-0.5 bg-transparent pr-1.5 pl-0.5 text-[15px] text-primary"
                 onClick={goUpPhoneLevel}
                 aria-label={t("settings.backTo", { name: backName })}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="m15 18-6-6 6-6" />
-                </svg>
-                <span>{backName}</span>
+                <ChevronLeftIcon size={20} />
+                <span className="truncate">{backName}</span>
               </button>
             );
           })()}
@@ -798,7 +802,13 @@ export function SettingsPanel({
               ? t("settings.title")
               : phone.level === "section" ? sectionLabel : detailTitle}
           </strong>
-          <nav aria-label={t("settings.title")} className="settings-section-tabs">
+          <button type="button" onClick={onClose} title={t("i18n.close")} aria-label={t("i18n.close")} className="config-close-button settings-dialog-close">×</button>
+        </div>
+
+        <div className="settings-dialog-body">
+          {/* §7.3: a desktop picks the section from a fixed rail on the left; a phone
+              hides it (the home level lists the sections) and its header navigates. */}
+          <nav aria-label={t("settings.title")} className="settings-section-rail">
             {sections.map((item) => {
               const selected = section === item.id;
               const disabled = item.requiresProject && !cwd;
@@ -806,64 +816,67 @@ export function SettingsPanel({
                 <button
                   key={item.id}
                   type="button"
-                  className="settings-section-tab"
+                  className={cn(
+                    "settings-section-rail-item flex h-8 shrink-0 items-center gap-2 rounded-md px-2.5 text-left text-xs transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                    "disabled:cursor-default disabled:opacity-40",
+                    selected
+                      ? "bg-accent font-medium text-foreground"
+                      : "bg-transparent text-muted-foreground enabled:hover:bg-secondary",
+                  )}
                   disabled={disabled}
                   title={disabled ? t("settings.projectRequired") : item.label}
                   aria-current={selected ? "page" : undefined}
                   onClick={() => activateSection(item.id)}
                 >
-                  <SettingsSectionIcon section={item.id} />
-                  <span>{item.label}</span>
+                  <SettingsSectionIcon section={item.id} size={16} />
+                  <span className="truncate">{item.label}</span>
                 </button>
               );
             })}
           </nav>
-          <button type="button" onClick={onClose} title={t("i18n.close")} aria-label={t("i18n.close")} className="config-close-button settings-dialog-close">×</button>
+          <main ref={mainRef} className="settings-dialog-main">
+            {isPhone && phone.level === "home" && (
+              <nav aria-label={t("settings.title")} className="settings-phone-home flex flex-1 flex-col overflow-y-auto pb-2">
+                {sections.map((item) => {
+                  const disabled = item.requiresProject && !cwd;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="settings-phone-home-item flex min-h-[52px] w-full items-center gap-3.5 border-b border-border bg-transparent pl-4.5 pr-4 text-left text-[15px] text-foreground active:bg-secondary disabled:cursor-default disabled:text-dim"
+                      disabled={disabled}
+                      aria-describedby={disabled ? `settings-phone-home-${item.id}-note` : undefined}
+                      onClick={() => openSectionFromHome(item.id)}
+                    >
+                      <SettingsSectionIcon section={item.id} size={20} />
+                      <span className="settings-phone-home-label flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span>{item.label}</span>
+                        {disabled && (
+                          <span id={`settings-phone-home-${item.id}-note`} className="settings-phone-home-note text-xs text-dim">
+                            {t("settings.projectRequired")}
+                          </span>
+                        )}
+                      </span>
+                      <ChevronRightIcon size={16} className="settings-phone-home-chevron shrink-0 text-dim" />
+                    </button>
+                  );
+                })}
+              </nav>
+            )}
+            <ConfigDetailNavigationContext.Provider value={detailNavigation}>
+            {sectionHost("general", <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} soundEnabled={soundEnabled} onSoundToggle={onSoundToggle} keepAliveConfig={keepAliveConfig} onKeepAliveConfigChange={onKeepAliveConfigChange} />)}
+            {sectionHost("models", <ModelsConfig embedded cwd={cwd} onClose={onClose} />)}
+            {/* Visited sections stay mounted, so the ones whose answer depends on trust take the page's
+                status and load again in place when trusting from Settings › MCP changes it. */}
+            {cwd && sectionHost("skills", <SkillsConfig embedded key={cwd} cwd={cwd} trust={projectTrust} onClose={onClose} />)}
+            {cwd && sectionHost("agents", <AgentsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
+            {cwd && sectionHost("plugins", <PluginsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
+            {/* No project needed: the global mcp.json is listed alone, and a project adds its group. */}
+            {sectionHost("mcp", <McpConfig embedded key={cwd ?? ""} cwd={cwd} trust={projectTrust} onTrustProject={onOpenTrustDialog} onProjectTrustChanged={onProjectTrustChanged} onClose={onClose} />)}
+            </ConfigDetailNavigationContext.Provider>
+          </main>
         </div>
-
-        <main ref={mainRef} className="settings-dialog-main">
-          {isPhone && phone.level === "home" && (
-            <nav aria-label={t("settings.title")} className="settings-phone-home">
-              {sections.map((item) => {
-                const disabled = item.requiresProject && !cwd;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="settings-phone-home-item"
-                    disabled={disabled}
-                    aria-describedby={disabled ? `settings-phone-home-${item.id}-note` : undefined}
-                    onClick={() => openSectionFromHome(item.id)}
-                  >
-                    <SettingsSectionIcon section={item.id} size={20} />
-                    <span className="settings-phone-home-label">
-                      <span>{item.label}</span>
-                      {disabled && (
-                        <span id={`settings-phone-home-${item.id}-note`} className="settings-phone-home-note">
-                          {t("settings.projectRequired")}
-                        </span>
-                      )}
-                    </span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="settings-phone-home-chevron">
-                      <path d="m9 18 6-6-6-6" />
-                    </svg>
-                  </button>
-                );
-              })}
-            </nav>
-          )}
-          <ConfigDetailNavigationContext.Provider value={detailNavigation}>
-          {sectionHost("general", <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} soundEnabled={soundEnabled} onSoundToggle={onSoundToggle} keepAliveConfig={keepAliveConfig} onKeepAliveConfigChange={onKeepAliveConfigChange} />)}
-          {sectionHost("models", <ModelsConfig embedded cwd={cwd} onClose={onClose} />)}
-          {/* Visited sections stay mounted, so the ones whose answer depends on trust take the page's
-              status and load again in place when trusting from Settings › MCP changes it. */}
-          {cwd && sectionHost("skills", <SkillsConfig embedded key={cwd} cwd={cwd} trust={projectTrust} onClose={onClose} />)}
-          {cwd && sectionHost("agents", <AgentsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
-          {cwd && sectionHost("plugins", <PluginsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
-          {/* No project needed: the global mcp.json is listed alone, and a project adds its group. */}
-          {sectionHost("mcp", <McpConfig embedded key={cwd ?? ""} cwd={cwd} trust={projectTrust} onTrustProject={onOpenTrustDialog} onProjectTrustChanged={onProjectTrustChanged} onClose={onClose} />)}
-          </ConfigDetailNavigationContext.Provider>
-        </main>
       </div>
     </div>
   );

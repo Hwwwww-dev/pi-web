@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useId, useRef } from "react";
+import { Check as CheckIcon, ChevronDown, Cpu, Eye, EyeOff, Plus, Search, X as XIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { cn } from "@/lib/utils";
 import type { ModelCatalogPreset, ModelCatalogRecommendation } from "@/lib/model-catalog";
 import type { DiscoveredModel } from "@/lib/model-discovery";
 import { ContextWindowError, normalizeContextWindowOverrides, withContextWindowOverride } from "@/lib/model-context";
@@ -33,17 +35,18 @@ import {
 } from "./models-config-helpers";
 import {
   ConfigButton,
+  ConfigCard,
   ConfigDetail,
   ConfigDetailActions,
   ConfigDetailHeader,
   ConfigDetailHeaderInfo,
   ConfigDetailStack,
+  ConfigDetailTitle,
   ConfigEmptyState,
   ConfigField,
   ConfigFooter,
   ConfigListAction,
   ConfigPanelShell,
-  ConfigSectionTitle,
   ConfigSidebar,
   ConfigSidebarItem,
   ConfigSidebarList,
@@ -206,21 +209,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <ConfigField label={label}>{children}</ConfigField>;
 }
 
-const inputStyle = {
-  padding: "6px 9px",
-  background: "var(--bg-panel)",
-  border: "1px solid var(--border)",
-  borderRadius: 5,
-  color: "var(--text)",
-  fontSize: 12,
-  outline: "none",
-  width: "100%",
-  boxSizing: "border-box" as const,
-};
+const inputClass =
+  "h-8 w-full rounded-sm border border-border bg-card px-2.5 py-1 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 function TextInput({ value, onChange, placeholder, mono }: { value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean }) {
   return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-    style={{ ...inputStyle, fontFamily: mono ? "var(--font-mono)" : "inherit" }} />;
+    className={cn(inputClass, mono && "font-mono")} />;
 }
 
 function SecretTextInput({
@@ -231,7 +225,7 @@ function SecretTextInput({
   onKeyDown,
   autoComplete = "off",
   spellCheck = false,
-  style,
+  className,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -240,7 +234,7 @@ function SecretTextInput({
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
   autoComplete?: string;
   spellCheck?: boolean;
-  style?: React.CSSProperties;
+  className?: string;
 }) {
   const [visible, setVisible] = useState(false);
   const { t } = useI18n();
@@ -250,14 +244,14 @@ function SecretTextInput({
   }, [value]);
 
   return (
-    <div style={{ position: "relative", width: "100%", ...style }}>
+    <div className={cn("relative w-full", className)}>
       <input
         type={visible ? "text" : "password"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        style={{ ...inputStyle, paddingRight: 34, fontFamily: mono ? "var(--font-mono)" : "inherit" }}
+        className={cn(inputClass, "pr-[34px]", mono && "font-mono")}
         autoComplete={autoComplete}
         spellCheck={spellCheck}
       />
@@ -266,36 +260,9 @@ function SecretTextInput({
         onClick={() => setVisible((v) => !v)}
          aria-label={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
          title={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
-        style={{
-          position: "absolute",
-          right: 5,
-          top: "50%",
-          transform: "translateY(-50%)",
-          width: 24,
-          height: 24,
-          padding: 0,
-          border: "none",
-          background: "transparent",
-          color: "var(--text-dim)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
+        className="absolute right-[5px] top-1/2 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-dim"
       >
-        {visible ? (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.89 1 12a18.45 18.45 0 0 1 5.06-6.94" />
-            <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-            <path d="M14.12 14.12A3 3 0 0 1 9.88 9.88" />
-            <path d="M1 1l22 22" />
-          </svg>
-        ) : (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12Z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-        )}
+        {visible ? <Eye size={15} strokeWidth={1.8} /> : <EyeOff size={15} strokeWidth={1.8} />}
       </button>
     </div>
   );
@@ -303,14 +270,14 @@ function SecretTextInput({
 
 function NumInput({ value, onChange, placeholder, invalid }: { value: string; onChange: (v: string) => void; placeholder?: string; invalid?: boolean }) {
   return <input type="number" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-    aria-invalid={invalid || undefined} style={invalid ? { ...inputStyle, borderColor: "#ef4444" } : inputStyle} />;
+    aria-invalid={invalid || undefined} className={cn(inputClass, invalid && "border-destructive")} />;
 }
 
 function Select({ value, onChange, options, required }: { value: string; onChange: (v: string) => void; options: readonly string[]; required?: boolean }) {
   const { t } = useI18n();
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}
-      style={{ ...inputStyle, color: value ? "var(--text)" : "var(--text-dim)" }}>
+      className={cn(inputClass, value ? "text-foreground" : "text-dim")}>
        {!required && <option value="">— {t("i18n.default")} / none —</option>}
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -319,16 +286,12 @@ function Select({ value, onChange, options, required }: { value: string; onChang
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "var(--text-muted)" }}>
+    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)}
-        style={{ width: 13, height: 13, accentColor: "var(--accent)", cursor: "pointer" }} />
+        className="size-[13px] cursor-pointer accent-primary" />
       {label}
     </label>
   );
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <ConfigSectionTitle>{children}</ConfigSectionTitle>;
 }
 
 // ── Provider detail ───────────────────────────────────────────────────────────
@@ -438,11 +401,11 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div className="config-detail-heading">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
         <ConfigDetailHeader>
           <ConfigDetailHeaderInfo>
-            <SectionTitle>{t("i18n.provider")}</SectionTitle>
+            <ConfigDetailTitle>{t("i18n.provider")}</ConfigDetailTitle>
           </ConfigDetailHeaderInfo>
           <ConfigDetailActions>
             <EnabledModelsProviderSwitch providerId={name} controller={enabledModels} noteId={switchNoteId} />
@@ -452,81 +415,74 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
         <EnabledModelsProviderSwitchNote providerId={name} controller={enabledModels} id={switchNoteId} />
       </div>
 
-       <Field label={t("i18n.providerName")}>
-        <TextInput value={editingName} onChange={onEditingNameChange} placeholder="provider-name" mono />
-        {renameConflict && (
-          <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "var(--error, #e5484d)" }}>
-            {t("modelsConfig.providerNameTaken")}
-          </span>
-        )}
-        {editingName !== name && trimmedName && !renameConflict && (
-          <button onClick={() => onRename(trimmedName)}
-            style={{ marginTop: 4, padding: "3px 10px", background: "var(--accent)", border: "none", borderRadius: 4, color: "var(--accent-contrast)", cursor: "pointer", fontSize: 11, alignSelf: "flex-start" }}>
-             {t("i18n.rename")}
-          </button>
-        )}
-      </Field>
+      <ConfigCard>
+        <div className="flex flex-col gap-4">
+          <Field label={t("i18n.providerName")}>
+            <TextInput value={editingName} onChange={onEditingNameChange} placeholder="provider-name" mono />
+            {renameConflict && (
+              <span className="mt-1 block text-xs text-destructive">
+                {t("modelsConfig.providerNameTaken")}
+              </span>
+            )}
+            {editingName !== name && trimmedName && !renameConflict && (
+              <button onClick={() => onRename(trimmedName)}
+                className="mt-1 self-start rounded-sm border-0 bg-primary px-2.5 py-[3px] text-xs text-primary-foreground">
+                 {t("i18n.rename")}
+              </button>
+            )}
+          </Field>
 
-      <Field label="Base URL">
-        <TextInput value={provider.baseUrl ?? ""} onChange={(v) => set("baseUrl", v || undefined)}
-          placeholder="https://api.example.com/v1" mono />
-      </Field>
+          <Field label="Base URL">
+            <TextInput value={provider.baseUrl ?? ""} onChange={(v) => set("baseUrl", v || undefined)}
+              placeholder="https://api.example.com/v1" mono />
+          </Field>
 
-      <Field label="API Key">
-        <SecretTextInput value={provider.apiKey ?? ""} onChange={(v) => set("apiKey", v || undefined)}
-          placeholder={t("models.apiKeyPlaceholder")} mono />
-      </Field>
+          <Field label="API Key">
+            <SecretTextInput value={provider.apiKey ?? ""} onChange={(v) => set("apiKey", v || undefined)}
+              placeholder={t("models.apiKeyPlaceholder")} mono />
+          </Field>
 
-      <Field label="API">
-        <Select value={provider.api ?? ""} onChange={(v) => set("api", v || undefined)} options={API_OPTIONS} />
-      </Field>
+          <Field label="API">
+            <Select value={provider.api ?? ""} onChange={(v) => set("api", v || undefined)} options={API_OPTIONS} />
+          </Field>
 
-      <Field label="Headers">
-        <HeaderListEditor
-          headers={provider.headers}
-          onChange={(headers) => set("headers", headers)}
-        />
-      </Field>
+          <Field label="Headers">
+            <HeaderListEditor
+              headers={provider.headers}
+              onChange={(headers) => set("headers", headers)}
+            />
+          </Field>
+        </div>
+      </ConfigCard>
 
-      <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-        {discoveryState.phase !== "success" && (
-          <button
-            onClick={handleDiscoverModels}
-            disabled={discoveryState.phase === "loading"}
-            style={{
-              alignSelf: "flex-start", height: 30, padding: "0 12px", border: "1px solid var(--border)", borderRadius: 5,
-              background: "var(--bg-panel)", color: discoveryState.phase === "loading" ? "var(--text-dim)" : "var(--text-muted)",
-              cursor: discoveryState.phase === "loading" ? "not-allowed" : "pointer", fontSize: 11,
-            }}
-          >
+      <ConfigCard
+        actions={discoveryState.phase !== "success" ? (
+          <ConfigButton size="small" onClick={handleDiscoverModels} disabled={discoveryState.phase === "loading"}>
             {discoveryState.phase === "loading" ? t("models.discoveryFetching") : t("models.discoveryFetch")}
-          </button>
-        )}
-
-        {discoveryState.phase === "error" && (
-          <div style={{ padding: "7px 9px", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 5, color: "#ef4444", fontSize: 11, lineHeight: 1.4 }}>
+          </ConfigButton>
+        ) : undefined}
+        footer={discoveryState.phase === "error" ? (
+          <div role="alert" className="rounded-sm border border-destructive/30 px-2.5 py-[7px] text-xs leading-normal text-destructive">
             {discoveryState.message}
           </div>
-        )}
-
+        ) : undefined}
+      >
         {discoveryState.phase === "success" && (
-          <>
+          <div className="flex flex-col gap-2.5">
             <input
               value={discoveryQuery}
               onChange={(event) => setDiscoveryQuery(event.target.value)}
               placeholder={t("models.discoveryFilterPlaceholder", { count: discoveryState.models.length })}
               aria-label={t("models.discoveryFilter")}
-              style={{ ...inputStyle, width: "100%", minWidth: 0 }}
+              className={cn(inputClass, "min-w-0")}
             />
 
-            <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)" }}>
+            <div className="max-h-[220px] overflow-y-auto rounded-sm border border-border bg-card">
               <label
-                style={{
-                  minHeight: 32, padding: "5px 9px", display: "flex", alignItems: "center", gap: 8,
-                  position: "sticky", top: 0, zIndex: 1, borderBottom: "1px solid var(--border)",
-                  background: "var(--bg)", cursor: selectableShownIds.length ? "pointer" : "default",
-                  color: "var(--text-muted)", fontSize: 10, fontWeight: 600,
-                }}
+                className={cn(
+                  "sticky top-0 z-[1] flex min-h-8 items-center gap-2 border-b border-border bg-background px-2.5 py-[5px] text-[10px] font-semibold text-muted-foreground",
+                  selectableShownIds.length ? "cursor-pointer" : "cursor-default",
+                )}
               >
                 <input
                   ref={selectShownRef}
@@ -534,60 +490,61 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
                   checked={allShownSelected}
                   disabled={selectableShownIds.length === 0}
                   onChange={toggleShownModels}
-                  style={{ width: 13, height: 13, accentColor: "var(--accent)", flexShrink: 0 }}
+                  className="size-[13px] shrink-0 accent-primary"
                 />
                 {t("models.discoverySelectShown")}
               </label>
               {shownDiscoveredModels.length === 0 ? (
-                <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 11 }}>{t("models.discoveryNoMatches")}</div>
+                <div className="p-3 text-xs text-dim">{t("models.discoveryNoMatches")}</div>
               ) : shownDiscoveredModels.map((model, index) => {
                 const alreadyAdded = existingModelIds.has(model.id);
                 const checked = selectedModelIds.includes(model.id);
                 return (
                   <label
                     key={model.id}
-                    style={{
-                      minHeight: 36, padding: "6px 9px", display: "flex", alignItems: "center", gap: 8,
-                      borderTop: index === 0 ? "none" : "1px solid var(--border)", cursor: alreadyAdded ? "default" : "pointer",
-                      opacity: alreadyAdded ? 0.65 : 1,
-                    }}
+                    className={cn(
+                      "flex min-h-9 items-center gap-2 px-2.5 py-1.5",
+                      index > 0 && "border-t border-border",
+                      alreadyAdded ? "cursor-default opacity-65" : "cursor-pointer",
+                    )}
                   >
                     <input
                       type="checkbox"
                       checked={checked || alreadyAdded}
                       disabled={alreadyAdded}
                       onChange={() => toggleDiscoveredModel(model.id)}
-                      style={{ width: 13, height: 13, accentColor: "var(--accent)", flexShrink: 0 }}
+                      className="size-[13px] shrink-0 accent-primary"
                     />
-                    <span style={{ minWidth: 0, flex: 1 }}>
-                      <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)", fontSize: 11 }}>{model.name ?? model.id}</span>
-                      {model.name && <code style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)" }}>{model.id}</code>}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs text-foreground">{model.name ?? model.id}</span>
+                      {model.name && <code className="block truncate font-mono text-[10px] text-dim">{model.id}</code>}
                     </span>
-                    {alreadyAdded && <span style={{ color: "var(--text-dim)", fontSize: 10 }}>{t("models.discoveryAdded")}</span>}
+                    {alreadyAdded && <span className="text-[10px] text-dim">{t("models.discoveryAdded")}</span>}
                   </label>
                 );
               })}
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <span title={discoveryState.endpoint} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)", fontSize: 10 }}>
+            <div className="flex items-center justify-between gap-2.5">
+              <span title={discoveryState.endpoint} className="min-w-0 truncate text-[10px] text-dim">
                 {filteredDiscoveredModels.length > shownDiscoveredModels.length
                   ? t("models.discoveryShowing", { shown: shownDiscoveredModels.length, total: filteredDiscoveredModels.length })
                   : t("models.discoveryFetched", { count: discoveryState.models.length })}
               </span>
-              <button
+              <ConfigButton
+                variant="primary"
+                size="small"
                 onClick={addSelectedModels}
                 disabled={selectedCount === 0}
-                style={{ height: 28, padding: "0 11px", border: "none", borderRadius: 5, background: selectedCount ? "var(--accent)" : "var(--bg-panel)", color: selectedCount ? "var(--accent-contrast)" : "var(--text-dim)", cursor: selectedCount ? "pointer" : "not-allowed", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}
               >
                 {selectedCount
                   ? t("models.discoveryAddSelectedCount", { count: selectedCount })
                   : t("models.discoveryAddSelected")}
-              </button>
+              </ConfigButton>
             </div>
-          </>
+          </div>
         )}
-      </div>
+      </ConfigCard>
 
     </div>
   );
@@ -598,14 +555,16 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 type ThinkingLevel = typeof THINKING_LEVELS[number];
 
-const LEVEL_COLORS: Record<ThinkingLevel, string> = {
-  off:     "var(--text-dim)",
-  minimal: "#6b7280",
-  low:     "#60a5fa",
-  medium:  "#a78bfa",
-  high:    "#f472b6",
-  xhigh:   "#fb923c",
-  max:     "#ef4444",
+// Per-level dot palette. off/max ride theme tokens; the middle steps keep a
+// fixed chart palette (pi has no blue/violet/pink/orange tokens to map to).
+const LEVEL_DOT_CLASS: Record<ThinkingLevel, string> = {
+  off:     "bg-dim",
+  minimal: "bg-[#6b7280]",
+  low:     "bg-[#60a5fa]",
+  medium:  "bg-[#a78bfa]",
+  high:    "bg-[#f472b6]",
+  xhigh:   "bg-[#fb923c]",
+  max:     "bg-destructive",
 };
 
 function ThinkingLevelMapEditor({
@@ -628,81 +587,67 @@ function ThinkingLevelMapEditor({
     onChange(Object.keys(next).length ? next : undefined);
   };
 
+  const btnClass = (state: "plain" | "active" | "off") =>
+    cn(
+      "cursor-pointer whitespace-nowrap border-0 px-2.5 py-1 text-[10px] transition-colors",
+      state === "active"
+        ? "bg-primary font-semibold text-primary-foreground"
+        : state === "off"
+          ? "bg-destructive font-semibold text-white"
+          : "bg-card font-normal text-dim",
+    );
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <div className="flex flex-col gap-0.5">
       {THINKING_LEVELS.map((level) => {
         const raw = map[level];
         const state: "omit" | "null" | "string" =
           !(level in map) ? "omit" : raw === null ? "null" : "string";
         const strVal = typeof raw === "string" ? raw : "";
-        const color = LEVEL_COLORS[level];
-
-        const btnBase: React.CSSProperties = {
-          padding: "4px 10px",
-          fontSize: 10,
-          border: "none",
-          cursor: "pointer",
-          fontWeight: 400,
-          transition: "background 0.1s, color 0.1s",
-          whiteSpace: "nowrap",
-          background: "var(--bg-panel)",
-          color: "var(--text-dim)",
-        };
-        const btnActive: React.CSSProperties = {
-          background: "var(--accent)",
-          color: "var(--accent-contrast)",
-          fontWeight: 600,
-        };
-        const btnActiveDisabled: React.CSSProperties = {
-          background: "#ef4444",
-          color: "#fff",
-          fontWeight: 600,
-        };
 
         return (
           <div
             key={level}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "5px 4px",
-              borderRadius: 6,
-              background: "transparent",
-              border: "1px solid transparent",
-            }}
+            className="flex items-center gap-2 rounded-sm border border-transparent px-1 py-[5px]"
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 5, width: 68, flexShrink: 0 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0, opacity: state === "null" ? 0.3 : 1 }} />
-              <span style={{
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                color: state === "null" ? "var(--text-dim)" : "var(--text-muted)",
-                textDecoration: state === "null" ? "line-through" : "none",
-              }}>
+            <div className="flex w-[68px] shrink-0 items-center gap-[5px]">
+              <span
+                className={cn(
+                  "size-1.5 shrink-0 rounded-full",
+                  LEVEL_DOT_CLASS[level],
+                  state === "null" && "opacity-30",
+                )}
+              />
+              <span className={cn(
+                "font-mono text-xs",
+                state === "null" ? "text-dim line-through" : "text-muted-foreground",
+              )}>
                 {level}
               </span>
             </div>
 
-            <div style={{ display: "flex", borderRadius: 5, border: "1px solid var(--border)", overflow: "hidden", flexShrink: 0 }}>
+            <div className="flex shrink-0 overflow-hidden rounded-sm border border-border">
               <button
                 onClick={() => setLevel(level, "omit")}
-                style={{ ...btnBase, ...(state === "omit" ? btnActive : {}) }}
+                className={btnClass(state === "omit" ? "active" : "plain")}
               >
                 {t("i18n.default")}
               </button>
               <button
                 onClick={() => setLevel(level, null)}
-                style={{ ...btnBase, borderLeft: "1px solid var(--border)", ...(state === "null" ? btnActiveDisabled : {}) }}
+                className={cn(btnClass(state === "null" ? "off" : "plain"), "border-l border-border")}
               >
                 {t("i18n.disabled")}
               </button>
             </div>
 
-            <div style={{ display: "flex", borderRadius: 5, border: `1px solid ${state === "string" ? "var(--accent)" : "var(--border)"}`, overflow: "hidden", transition: "border-color 0.1s" }}>
+            <div className={cn(
+              "flex overflow-hidden rounded-sm border transition-colors",
+              state === "string" ? "border-primary" : "border-border",
+            )}>
               <button
                 onClick={() => setLevel(level, strVal || level)}
-                style={{ ...btnBase, ...(state === "string" ? btnActive : {}), borderRight: "1px solid var(--border)", flexShrink: 0 }}
+                className={cn(btnClass(state === "string" ? "active" : "plain"), "shrink-0 border-r border-border")}
               >
                 {t("i18n.custom")}
               </button>
@@ -712,17 +657,10 @@ function ThinkingLevelMapEditor({
                 onFocus={() => { if (state !== "string") setLevel(level, strVal || level); }}
                 placeholder={level}
                 maxLength={10}
-                style={{
-                  width: "12ch",
-                  background: state === "string" ? "var(--bg)" : "var(--bg-panel)",
-                  border: "none",
-                  outline: "none",
-                  color: state === "string" ? "var(--text)" : "var(--text-dim)",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  padding: "4px 7px",
-                  transition: "background 0.1s, color 0.1s",
-                }}
+                className={cn(
+                  "w-[12ch] border-0 py-1 pl-[7px] pr-1.5 font-mono text-xs outline-none transition-colors",
+                  state === "string" ? "bg-background text-foreground" : "bg-card text-dim",
+                )}
               />
             </div>
           </div>
@@ -784,33 +722,27 @@ function HeaderListEditor({ headers, onChange }: {
   const removeEntry = (id: number): void => {
     applyRows(rows.filter((row) => row.id !== id));
   };
-  const rowBtnStyle = {
-    padding: "6px 9px",
-    background: "none",
-    border: "1px solid rgba(239,68,68,0.3)",
-    borderRadius: 4,
-    color: "#ef4444",
-    cursor: "pointer",
-    fontSize: 11,
-    lineHeight: 1,
-  } satisfies React.CSSProperties;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div className="flex flex-col gap-1.5">
       {rows.map((row) => (
-        <div key={row.id} style={{ display: "flex", gap: 6 }}>
+        <div key={row.id} className="flex gap-1.5">
           <input value={row.name} onChange={(e) => setEntry(row.id, { name: e.target.value })}
-            placeholder="Header-Name" style={{ ...inputStyle, fontFamily: "var(--font-mono)", flex: 1 }} />
+            placeholder="Header-Name" className={cn(inputClass, "flex-1 font-mono")} />
           <input value={row.value} onChange={(e) => setEntry(row.id, { value: e.target.value })}
-            placeholder="value" style={{ ...inputStyle, fontFamily: "var(--font-mono)", flex: 1 }} />
-          <button onClick={() => removeEntry(row.id)} style={rowBtnStyle}>✕</button>
+            placeholder="value" className={cn(inputClass, "flex-1 font-mono")} />
+          <button onClick={() => removeEntry(row.id)}
+            className="cursor-pointer rounded-sm border border-destructive/30 bg-transparent px-2.5 py-1 leading-none text-destructive">
+            <XIcon size={12} strokeWidth={1.8} />
+          </button>
         </div>
       ))}
       <button onClick={() => setRows((current) => [
         ...current,
         { id: nextRowIdRef.current++, name: "", value: "" },
       ])}
-        style={{ padding: "5px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-muted)", cursor: "pointer", fontSize: 11, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, alignSelf: "flex-start" }}>
-        + {t("models.addHeader")}
+        className="inline-flex cursor-pointer items-center justify-center gap-1 self-start rounded-sm border border-border bg-transparent px-2.5 py-[5px] text-xs text-muted-foreground">
+        <Plus size={12} strokeWidth={1.8} />
+        {t("models.addHeader")}
       </button>
     </div>
   );
@@ -1042,11 +974,11 @@ function ModelDetail({
   const catalogStatusText = catalogState.phase === "error"
     ? catalogState.message
     : catalogResultSummary;
-  const catalogStatusColor = catalogState.phase === "error"
-    ? "#ef4444"
+  const catalogStatusClass = catalogState.phase === "error"
+    ? "text-destructive"
     : catalogState.phase === "success" && catalogState.recommendation.price.status === "unreliable"
-      ? "#d97706"
-      : "var(--text-dim)";
+      ? "text-warning"
+      : "text-dim";
   const costFields = [
     { key: "input", label: t("models.costInput") },
     { key: "output", label: t("models.costOutput") },
@@ -1092,31 +1024,23 @@ function ModelDetail({
     : t("models.providerDefaults");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="flex flex-col gap-4">
       <ConfigDetailHeader>
         <ConfigDetailHeaderInfo>
-          <SectionTitle>{t("i18n.model")}</SectionTitle>
+          <ConfigDetailTitle>{t("i18n.model")}</ConfigDetailTitle>
         </ConfigDetailHeaderInfo>
         <ConfigDetailActions>
           {testSummary && (
             <span
               title={testSummary}
-              style={{
-                maxWidth: 260,
-                height: 28,
-                padding: "0 8px",
-                border: `1px solid ${testState.phase === "error" ? "#fecaca" : testState.phase === "success" ? "#bbf7d0" : "var(--border)"}`,
-                borderRadius: 4,
-                background: testState.phase === "error" ? "#fee2e2" : testState.phase === "success" ? "#dcfce7" : "#e5e7eb",
-                color: "#111827",
-                fontSize: 11,
-                display: "inline-flex",
-                alignItems: "center",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                boxSizing: "border-box",
-              }}
+              className={cn(
+                "inline-flex h-7 max-w-[260px] items-center truncate rounded-sm border px-2 text-xs",
+                testState.phase === "error"
+                  ? "border-destructive/30 bg-destructive/10 text-foreground"
+                  : testState.phase === "success"
+                    ? "border-success/40 bg-success/10 text-foreground"
+                    : "border-border bg-secondary text-foreground",
+              )}
             >
               {testSummary}
             </span>
@@ -1130,9 +1054,7 @@ function ModelDetail({
             className={testState.phase === "success" ? "is-success" : undefined}
           >
             {testState.phase === "success" && (
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              <CheckIcon size={11} strokeWidth={2.5} className="config-button-success-icon" />
             )}
              {testState.phase === "testing" ? t("i18n.checking") : testState.phase === "success" ? t("common.ok") : t("i18n.test")}
           </ConfigButton>
@@ -1140,251 +1062,230 @@ function ModelDetail({
         </ConfigDetailActions>
       </ConfigDetailHeader>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <Field label="ID *"><TextInput value={model.id} onChange={(v) => set("id", v)} placeholder="model-id" mono /></Field>
-        <Field label="Name"><TextInput value={model.name ?? ""} onChange={(v) => set("name", v || undefined)} placeholder={t("models.displayNamePlaceholder")} /></Field>
-      </div>
-
-      <div style={{ padding: "2px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <button
-            onClick={() => void handleCatalogFill()}
-            disabled={!model.id.trim() || catalogState.phase === "loading"}
-            style={{
-              height: 28, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 5,
-              background: "var(--bg-panel)",
-              color: !model.id.trim() || catalogState.phase === "loading" ? "var(--text-dim)" : "var(--text-muted)",
-              cursor: !model.id.trim() || catalogState.phase === "loading" ? "not-allowed" : "pointer",
-              fontSize: 11,
-            }}
-          >
-            {catalogState.phase === "loading" ? t("models.catalogFilling") : t("models.catalogFill")}
-          </button>
-          <a
-            href="https://github.com/anomalyco/models.dev"
-            target="_blank"
-            rel="noreferrer"
-            style={{ marginLeft: "auto", color: "var(--text-dim)", fontSize: 10, textDecoration: "none" }}
-          >
-            {t("models.catalogSource")}
-          </a>
-        </div>
-
-        {catalogStatusText && (
+      <ConfigCard
+        actions={(
+          <>
+            <ConfigButton
+              size="small"
+              onClick={() => void handleCatalogFill()}
+              disabled={!model.id.trim() || catalogState.phase === "loading"}
+            >
+              {catalogState.phase === "loading" ? t("models.catalogFilling") : t("models.catalogFill")}
+            </ConfigButton>
+            <a
+              href="https://github.com/anomalyco/models.dev"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[10px] text-dim no-underline"
+            >
+              {t("models.catalogSource")}
+            </a>
+          </>
+        )}
+        footer={catalogStatusText ? (
           <div
             aria-live="polite"
-            style={{
-              marginTop: 8, display: "flex", alignItems: "center",
-              justifyContent: "space-between", gap: 8, color: catalogStatusColor, fontSize: 10,
-            }}
+            className={cn("flex items-center justify-between gap-2 text-[10px]", catalogStatusClass)}
           >
-            <span
-              title={catalogStatusText}
-              style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-            >
+            <span title={catalogStatusText} className="min-w-0 truncate">
               {catalogStatusText}
             </span>
             {catalogUndoRef.current && (
               <button
                 onClick={undoCatalogFill}
-                style={{ flexShrink: 0, padding: "0 2px", border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontSize: 10 }}
+                className="shrink-0 cursor-pointer border-0 bg-transparent px-0.5 text-[10px] text-primary"
               >
                 {t("models.catalogUndo")}
               </button>
             )}
           </div>
-        )}
-      </div>
+        ) : undefined}
+      >
+        <div className="grid grid-cols-2 gap-2.5">
+          <Field label="ID *"><TextInput value={model.id} onChange={(v) => set("id", v)} placeholder="model-id" mono /></Field>
+          <Field label="Name"><TextInput value={model.name ?? ""} onChange={(v) => set("name", v || undefined)} placeholder={t("models.displayNamePlaceholder")} /></Field>
+        </div>
+      </ConfigCard>
 
-      <div>
-        <SectionTitle>{t("models.capabilities")}</SectionTitle>
-        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 8 }}>
+      <ConfigCard title={t("models.capabilities")}>
+        <div className="flex flex-wrap gap-5">
           <Check label={t("models.reasoning")} checked={model.reasoning ?? false} onChange={(v) => set("reasoning", v || undefined)} />
           <Check label={t("models.imageInput")} checked={model.input?.includes("image") ?? false}
             onChange={(v) => set("input", v ? ["text", "image"] : undefined)} />
         </div>
-      </div>
+      </ConfigCard>
 
-      <section>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <SectionTitle>{t("models.modelSpecs")}</SectionTitle>
+      <ConfigCard
+        title={t("models.modelSpecs")}
+        actions={(
           <button
             type="button"
             onClick={toggleCostEditing}
             aria-expanded={costEditing}
-            style={{ padding: "2px 4px", border: "none", background: "transparent", color: "var(--accent)", cursor: "pointer", fontSize: 10 }}
+            className="cursor-pointer border-0 bg-transparent px-1 py-0.5 text-[10px] text-primary"
           >
             {costEditing ? t("models.finishEditingCosts") : t("models.editCosts")}
           </button>
-        </div>
-
-        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10 }}>
-          <Field label={t("models.contextWindow")}>
-            <NumInput value={model.contextWindow !== undefined ? String(model.contextWindow) : ""}
-              onChange={(v) => set("contextWindow", v ? parseInt(v) : undefined)} placeholder="128000" />
-          </Field>
-          <Field label={t("models.maxOutputTokens")}>
-            <NumInput value={model.maxTokens !== undefined ? String(model.maxTokens) : ""}
-              onChange={(v) => set("maxTokens", v ? parseInt(v) : undefined)} placeholder="16384" />
-          </Field>
-        </div>
-
-        <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, textTransform: "uppercase" }}>
-            {t("models.costPerMillion")}
+        )}
+      >
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-2.5">
+            <Field label={t("models.contextWindow")}>
+              <NumInput value={model.contextWindow !== undefined ? String(model.contextWindow) : ""}
+                onChange={(v) => set("contextWindow", v ? parseInt(v) : undefined)} placeholder="128000" />
+            </Field>
+            <Field label={t("models.maxOutputTokens")}>
+              <NumInput value={model.maxTokens !== undefined ? String(model.maxTokens) : ""}
+                onChange={(v) => set("maxTokens", v ? parseInt(v) : undefined)} placeholder="16384" />
+            </Field>
           </div>
-          {costEditing ? (
-            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8 }}>
-              {costFields.map(({ key, label }) => (
-                <Field key={key} label={label}>
-                  <NumInput value={costDraft[key]} onChange={(v) => setCost(key, v)} placeholder="0" />
-                </Field>
-              ))}
-              {hasModelCostDraftValue(costDraft) && !parseCompleteModelCost(costDraft) && (
-                <div aria-live="polite" style={{ gridColumn: "1 / -1", color: "#d97706", fontSize: 10 }}>
-                  {t("models.costAllRequired")}
-                </div>
-              )}
+
+          <div>
+            <div className="text-[10px] font-semibold uppercase text-dim">
+              {t("models.costPerMillion")}
             </div>
-          ) : (
-            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(105px, 1fr))", gap: "8px 16px" }}>
-              {costFields.map(({ key, label }) => {
-                const missing = model.cost?.[key] === undefined;
-                return (
-                  <div key={key} style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 10, color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-                    <div style={{ marginTop: 3, color: missing ? "var(--text-dim)" : "var(--text)", fontSize: 12, fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" }}>
-                      {formatCost(key)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section style={{ borderTop: "1px solid var(--border)", paddingTop: 4 }}>
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((open) => !open)}
-          aria-expanded={advancedOpen}
-          aria-controls="model-advanced-settings"
-          style={{
-            width: "100%", minHeight: 48, padding: "8px 0", border: "none", background: "transparent",
-            display: "grid", gridTemplateColumns: "minmax(0, 1fr) 18px", alignItems: "center", gap: 10,
-            color: "var(--text)", cursor: "pointer", textAlign: "left",
-          }}
-        >
-          <span style={{ minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 11, fontWeight: 600 }}>{t("models.advancedSettings")}</span>
-            <span style={{ display: "block", marginTop: 3, color: "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {advancedSummary}
-            </span>
-          </span>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            style={{ color: "var(--text-dim)", transform: advancedOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
-
-        {advancedOpen && (
-          <div id="model-advanced-settings" style={{ display: "flex", flexDirection: "column", gap: 14, padding: "4px 0 16px" }}>
-            <Field label={t("models.baseUrlOverride")}>
-              <TextInput value={model.baseUrl ?? ""} onChange={(v) => set("baseUrl", v.trim() || undefined)}
-                placeholder={provider.baseUrl ?? t("models.providerDefaults")} mono />
-            </Field>
-
-            <Field label={t("models.apiOverride")}>
-              <Select value={model.api ?? ""} onChange={(v) => set("api", v || undefined)} options={API_OPTIONS} />
-            </Field>
-
-            <Field label={t("models.headers")}>
-              <HeaderListEditor
-                headers={model.headers}
-                onChange={(headers) => set("headers", headers)}
-              />
-              <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
-                {t("models.headersHelp")}
-              </span>
-            </Field>
-
-            {(model.input?.includes("image") || imageLimit !== undefined) && (
-              <Field label={t("models.imageMaxBytes")}>
-                <NumInput
-                  value={imageLimit === undefined ? "" : String(imageLimit)}
-                  onChange={(v) => onChange(withImageMaxBytes(model, v.trim() || undefined))}
-                  placeholder={String(DEFAULT_IMAGE_MAX_BYTES)}
-                  invalid={parsedImageLimit === undefined && imageLimit !== undefined}
-                />
-                <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
-                  {parsedImageLimit !== undefined && `${formatImageBytes(parsedImageLimit)} · `}
-                  {t("models.imageMaxBytesHelp", { size: formatImageBytes(DEFAULT_IMAGE_MAX_BYTES) })}
-                </span>
-                <code style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
-                  inputLimits.images.resize.maxBytes
-                </code>
-              </Field>
-            )}
-
-            {model.reasoning && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <SectionTitle>{t("models.compatibility")}</SectionTitle>
-                <Check
-                  label={t("models.deepSeekThinkingCompat")}
-                  checked={hasDeepseekCompat(model)}
-                  onChange={(v) => onChange(setDeepseekCompat(model, v))}
-                />
-                <Check
-                  label={t("models.developerRole")}
-                  checked={effectiveCompat(provider, model)["supportsDeveloperRole"] !== false}
-                  onChange={(v) => onChange(setCompatBool(model, "supportsDeveloperRole", v))}
-                />
-                {(model.api ?? provider.api) === "anthropic-messages" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <Check
-                      label={t("models.adaptiveThinking")}
-                      checked={effectiveCompat(provider, model)["forceAdaptiveThinking"] === true}
-                      onChange={(v) => onChange(setCompatFlag(model, "forceAdaptiveThinking", v, provider.compat?.["forceAdaptiveThinking"] === true))}
-                    />
-                    <code style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", paddingLeft: 19 }}>
-                      compat.forceAdaptiveThinking
-                    </code>
+            {costEditing ? (
+              <div className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-2">
+                {costFields.map(({ key, label }) => (
+                  <Field key={key} label={label}>
+                    <NumInput value={costDraft[key]} onChange={(v) => setCost(key, v)} placeholder="0" />
+                  </Field>
+                ))}
+                {hasModelCostDraftValue(costDraft) && !parseCompleteModelCost(costDraft) && (
+                  <div aria-live="polite" className="col-span-full text-[10px] text-warning">
+                    {t("models.costAllRequired")}
                   </div>
                 )}
-                <div style={{ marginTop: 4 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
-                    <SectionTitle>{t("models.thinkingLevelMap")}</SectionTitle>
-                    {model.thinkingLevelMap && (
-                      <button
-                        type="button"
-                        onClick={() => set("thinkingLevelMap", undefined)}
-                        style={{ fontSize: 10, padding: "2px 5px", background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer" }}
-                      >
-                        {t("models.clearAll")}
-                      </button>
-                    )}
-                  </div>
-                  <ThinkingLevelMapEditor
-                    value={model.thinkingLevelMap}
-                    onChange={(v) => set("thinkingLevelMap", v)}
-                  />
-                </div>
+              </div>
+            ) : (
+              <div className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(105px,1fr))] gap-x-4 gap-y-2">
+                {costFields.map(({ key, label }) => {
+                  const missing = model.cost?.[key] === undefined;
+                  return (
+                    <div key={key} className="min-w-0">
+                      <div className="truncate text-[10px] text-dim">{label}</div>
+                      <div className={cn("mt-[3px] font-mono text-xs tabular-nums", missing ? "text-dim" : "text-foreground")}>
+                        {formatCost(key)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
-        )}
-      </section>
+        </div>
+      </ConfigCard>
+
+      <ConfigCard>
+        <div className="flex flex-col">
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((open) => !open)}
+            aria-expanded={advancedOpen}
+            aria-controls="model-advanced-settings"
+            className="grid min-h-12 w-full cursor-pointer grid-cols-[minmax(0,1fr)_18px] items-center gap-2.5 border-0 bg-transparent py-2 text-left text-foreground"
+          >
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold">{t("models.advancedSettings")}</span>
+              <span className="mt-[3px] block truncate text-[10px] text-dim">
+                {advancedSummary}
+              </span>
+            </span>
+            <ChevronDown
+              size={16}
+              strokeWidth={1.8}
+              className={cn("text-dim transition-transform", advancedOpen && "rotate-180")}
+            />
+          </button>
+
+          {advancedOpen && (
+            <div id="model-advanced-settings" className="flex flex-col gap-3.5 pb-4 pt-1">
+              <Field label={t("models.baseUrlOverride")}>
+                <TextInput value={model.baseUrl ?? ""} onChange={(v) => set("baseUrl", v.trim() || undefined)}
+                  placeholder={provider.baseUrl ?? t("models.providerDefaults")} mono />
+              </Field>
+
+              <Field label={t("models.apiOverride")}>
+                <Select value={model.api ?? ""} onChange={(v) => set("api", v || undefined)} options={API_OPTIONS} />
+              </Field>
+
+              <Field label={t("models.headers")}>
+                <HeaderListEditor
+                  headers={model.headers}
+                  onChange={(headers) => set("headers", headers)}
+                />
+                <span className="mt-0.5 text-[10px] text-dim">
+                  {t("models.headersHelp")}
+                </span>
+              </Field>
+
+              {(model.input?.includes("image") || imageLimit !== undefined) && (
+                <Field label={t("models.imageMaxBytes")}>
+                  <NumInput
+                    value={imageLimit === undefined ? "" : String(imageLimit)}
+                    onChange={(v) => onChange(withImageMaxBytes(model, v.trim() || undefined))}
+                    placeholder={String(DEFAULT_IMAGE_MAX_BYTES)}
+                    invalid={parsedImageLimit === undefined && imageLimit !== undefined}
+                  />
+                  <span className="mt-0.5 text-[10px] text-dim">
+                    {parsedImageLimit !== undefined && `${formatImageBytes(parsedImageLimit)} · `}
+                    {t("models.imageMaxBytesHelp", { size: formatImageBytes(DEFAULT_IMAGE_MAX_BYTES) })}
+                  </span>
+                  <code className="font-mono text-[10px] text-dim">
+                    inputLimits.images.resize.maxBytes
+                  </code>
+                </Field>
+              )}
+
+              {model.reasoning && (
+                <div className="flex flex-col gap-3">
+                  <div className="text-xs font-semibold uppercase text-dim">{t("models.compatibility")}</div>
+                  <Check
+                    label={t("models.deepSeekThinkingCompat")}
+                    checked={hasDeepseekCompat(model)}
+                    onChange={(v) => onChange(setDeepseekCompat(model, v))}
+                  />
+                  <Check
+                    label={t("models.developerRole")}
+                    checked={effectiveCompat(provider, model)["supportsDeveloperRole"] !== false}
+                    onChange={(v) => onChange(setCompatBool(model, "supportsDeveloperRole", v))}
+                  />
+                  {(model.api ?? provider.api) === "anthropic-messages" && (
+                    <div className="flex flex-col gap-[3px]">
+                      <Check
+                        label={t("models.adaptiveThinking")}
+                        checked={effectiveCompat(provider, model)["forceAdaptiveThinking"] === true}
+                        onChange={(v) => onChange(setCompatFlag(model, "forceAdaptiveThinking", v, provider.compat?.["forceAdaptiveThinking"] === true))}
+                      />
+                      <code className="pl-[19px] font-mono text-[10px] text-dim">
+                        compat.forceAdaptiveThinking
+                      </code>
+                    </div>
+                  )}
+                  <div className="mt-1">
+                    <div className="mb-2 flex items-center justify-between gap-2.5">
+                      <div className="text-xs font-semibold uppercase text-dim">{t("models.thinkingLevelMap")}</div>
+                      {model.thinkingLevelMap && (
+                        <button
+                          type="button"
+                          onClick={() => set("thinkingLevelMap", undefined)}
+                          className="cursor-pointer border-0 bg-transparent px-[5px] py-0.5 text-[10px] text-dim"
+                        >
+                          {t("models.clearAll")}
+                        </button>
+                      )}
+                    </div>
+                    <ThinkingLevelMapEditor
+                      value={model.thinkingLevelMap}
+                      onChange={(v) => set("thinkingLevelMap", v)}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </ConfigCard>
     </div>
   );
 }
@@ -1519,15 +1420,15 @@ function OAuthDetail({ provider, onRefresh, enabledModels, contextSettings }: {
     loginState.phase === "prompt" || loginState.phase === "select";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: provider.loggedIn && loginState.phase === "idle" ? 0 : 16 }}>
+    <div className={cn("flex flex-col", provider.loggedIn && loginState.phase === "idle" ? "gap-0" : "gap-4")}>
       <ConfigDetailHeader>
         <ConfigDetailHeaderInfo>
-          <SectionTitle>{t("i18n.subscription")}</SectionTitle>
+          <ConfigDetailTitle>{t("i18n.subscription")}</ConfigDetailTitle>
         </ConfigDetailHeaderInfo>
         <ConfigDetailActions>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.loggedIn ? "#4ade80" : "var(--border)", display: "inline-block" }} />
-            <span style={{ fontSize: 11, color: provider.loggedIn ? "#4ade80" : "var(--text-dim)" }}>
+          <div className="flex items-center gap-1.5">
+            <span className={cn("inline-block size-[7px] rounded-full", provider.loggedIn ? "bg-success" : "bg-border")} />
+            <span className={cn("text-xs", provider.loggedIn ? "text-success" : "text-dim")}>
                {provider.loggedIn ? t("i18n.connected") : t("i18n.notConnected")}
             </span>
           </div>
@@ -1562,83 +1463,87 @@ function OAuthDetail({ provider, onRefresh, enabledModels, contextSettings }: {
       </ConfigDetailHeader>
 
       {/* Status */}
-      <div style={{ minHeight: provider.loggedIn && loginState.phase === "idle" ? 0 : 48 }}>
-        {loginState.phase === "idle" && (
-          !provider.loggedIn && (
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-              {t("models.oauthConnect", { provider: provider.name })}
-            </p>
-          )
-        )}
-        {loginState.phase === "connecting" && (
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{t("i18n.openingBrowser")}</p>
-        )}
-        {loginState.phase === "select" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-              {loginState.message}
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {loginState.options.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => submitSelection(loginState.token, option.id)}
-                  style={{ padding: "6px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", cursor: "pointer", fontSize: 12, textAlign: "left" }}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+      {!(provider.loggedIn && loginState.phase === "idle") && (
+        <ConfigCard>
+          <div className="min-h-12">
+            {loginState.phase === "idle" && (
+              !provider.loggedIn && (
+                <p className="m-0 text-xs leading-normal text-muted-foreground">
+                  {t("models.oauthConnect", { provider: provider.name })}
+                </p>
+              )
+            )}
+            {loginState.phase === "connecting" && (
+                <p className="m-0 text-xs text-muted-foreground">{t("i18n.openingBrowser")}</p>
+            )}
+            {loginState.phase === "select" && (
+              <div className="flex flex-col gap-2.5">
+                <p className="m-0 text-xs leading-normal text-muted-foreground">
+                  {loginState.message}
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {loginState.options.map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => submitSelection(loginState.token, option.id)}
+                      className="cursor-pointer rounded-sm border border-border bg-background px-2.5 py-1.5 text-left text-xs text-foreground"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(loginState.phase === "auth" || loginState.phase === "prompt") && (
+              <OAuthPastePanel
+                message={loginState.phase === "auth"
+                  ? t("models.oauthPasteRedirect")
+                  : loginState.message}
+                hint={loginState.phase === "auth" ? (
+                  <>
+                    {t("models.oauthNoBrowser")}{" "}
+                    <a href={loginState.url} target="_blank" rel="noopener noreferrer">
+                      {t("models.oauthOpenLoginPage")}
+                    </a>
+                    {t("models.oauthOpenLoginPageEnd")}
+                  </>
+                ) : undefined}
+                value={inputValue}
+                placeholder={loginState.phase === "auth" ? "http://localhost:1455/auth/callback?code=…" : (loginState.placeholder ?? t("models.oauthValuePlaceholder"))}
+                submitLabel={t("i18n.submit")}
+                inputRef={inputRef}
+                onValueChange={setInputValue}
+                onSubmit={() => void submitCode(loginState.token, inputValue)}
+              />
+            )}
+            {loginState.phase === "device_code" && (
+              <div className="flex flex-col gap-2.5">
+                <p className="m-0 text-xs leading-normal text-muted-foreground">
+                  {t("models.oauthDeviceCode")}
+                </p>
+                <div className="rounded-sm border border-border bg-background px-2.5 py-2 font-mono text-base font-bold text-foreground">
+                  {loginState.userCode}
+                </div>
+                <p className="m-0 text-xs leading-normal text-dim">
+                  <a href={loginState.verificationUri} target="_blank" rel="noopener noreferrer" className="break-all text-primary">
+                    {loginState.verificationUri}
+                  </a>
+                  {loginState.expiresInSeconds ? ` ${t("models.deviceCodeExpires", { minutes: Math.ceil(loginState.expiresInSeconds / 60) })}` : ""}
+                </p>
+              </div>
+            )}
+            {loginState.phase === "progress" && (
+              <p className="m-0 text-xs text-muted-foreground">{loginState.message}</p>
+            )}
+            {loginState.phase === "success" && (
+                 <p className="m-0 text-xs text-success">{t("i18n.connectedSuccessfully")}</p>
+            )}
+            {loginState.phase === "error" && (
+              <p className="m-0 text-xs text-destructive">{loginState.message}</p>
+            )}
           </div>
-        )}
-        {(loginState.phase === "auth" || loginState.phase === "prompt") && (
-          <OAuthPastePanel
-            message={loginState.phase === "auth"
-              ? t("models.oauthPasteRedirect")
-              : loginState.message}
-            hint={loginState.phase === "auth" ? (
-              <>
-                {t("models.oauthNoBrowser")}{" "}
-                <a href={loginState.url} target="_blank" rel="noopener noreferrer">
-                  {t("models.oauthOpenLoginPage")}
-                </a>
-                {t("models.oauthOpenLoginPageEnd")}
-              </>
-            ) : undefined}
-            value={inputValue}
-            placeholder={loginState.phase === "auth" ? "http://localhost:1455/auth/callback?code=…" : (loginState.placeholder ?? t("models.oauthValuePlaceholder"))}
-            submitLabel={t("i18n.submit")}
-            inputRef={inputRef}
-            onValueChange={setInputValue}
-            onSubmit={() => void submitCode(loginState.token, inputValue)}
-          />
-        )}
-        {loginState.phase === "device_code" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-              {t("models.oauthDeviceCode")}
-            </p>
-            <div style={{ padding: "8px 10px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: 0 }}>
-              {loginState.userCode}
-            </div>
-            <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-              <a href={loginState.verificationUri} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", wordBreak: "break-all" }}>
-                {loginState.verificationUri}
-              </a>
-              {loginState.expiresInSeconds ? ` ${t("models.deviceCodeExpires", { minutes: Math.ceil(loginState.expiresInSeconds / 60) })}` : ""}
-            </p>
-          </div>
-        )}
-        {loginState.phase === "progress" && (
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
-        )}
-        {loginState.phase === "success" && (
-             <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>{t("i18n.connectedSuccessfully")}</p>
-        )}
-        {loginState.phase === "error" && (
-          <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{loginState.message}</p>
-        )}
-      </div>
+        </ConfigCard>
+      )}
 
       <ProviderUsageSummary providerId={provider.id} enabled={provider.loggedIn} />
 
@@ -1710,15 +1615,15 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
   }, [provider.id, onRefresh]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="flex flex-col gap-4">
       <ConfigDetailHeader>
         <ConfigDetailHeaderInfo>
-          <SectionTitle>API Key</SectionTitle>
+          <ConfigDetailTitle>API Key</ConfigDetailTitle>
         </ConfigDetailHeaderInfo>
         <ConfigDetailActions>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.configured ? "#4ade80" : "var(--border)", display: "inline-block" }} />
-            <span style={{ fontSize: 11, color: provider.configured ? "#4ade80" : "var(--text-dim)" }}>
+          <div className="flex items-center gap-1.5">
+            <span className={cn("inline-block size-[7px] rounded-full", provider.configured ? "bg-success" : "bg-border")} />
+            <span className={cn("text-xs", provider.configured ? "text-success" : "text-dim")}>
                {provider.configured ? t("i18n.configured") : t("i18n.notConfigured")}
             </span>
           </div>
@@ -1735,48 +1640,45 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
         </ConfigDetailActions>
       </ConfigDetailHeader>
 
-      {!provider.configured && (
-        <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-          {provider.modelCount === 1
-            ? t("models.apiKeyEnableOne", { provider: provider.displayName })
-            : t("models.apiKeyEnable", { provider: provider.displayName, count: provider.modelCount })}
-        </p>
-      )}
+      <ConfigCard footer={error ? <p className="m-0 text-xs text-destructive">{error}</p> : undefined}>
+        {!provider.configured && (
+          <p className="m-0 pb-2 text-xs leading-normal text-muted-foreground">
+            {provider.modelCount === 1
+              ? t("models.apiKeyEnableOne", { provider: provider.displayName })
+              : t("models.apiKeyEnable", { provider: provider.displayName, count: provider.modelCount })}
+          </p>
+        )}
 
-      <div style={{ display: "flex", gap: 6 }}>
-        <SecretTextInput
-          value={apiKey}
-          onChange={setApiKey}
-          onKeyDown={(e) => { if (e.key === "Enter" && apiKey.trim()) handleSave(); }}
-          placeholder={provider.configured ? t("models.replaceApiKey") : "sk-…"}
-          style={{ flex: 1 }}
-          autoComplete="off"
-          spellCheck={false}
-          mono
-        />
-        <button
-          onClick={handleSave}
-          disabled={saving || !apiKey.trim() || savedOk}
-          style={{
-            padding: "6px 12px",
-            background: savedOk ? "#16a34a" : apiKey.trim() ? "var(--accent)" : "var(--bg-panel)",
-            border: "none", borderRadius: 5,
-            color: savedOk ? "#fff" : apiKey.trim() ? "var(--accent-contrast)" : "var(--text-dim)",
-            cursor: (saving || !apiKey.trim() || savedOk) ? "not-allowed" : "pointer",
-            fontSize: 12, fontWeight: 600, flexShrink: 0,
-            display: "flex", alignItems: "center", gap: 5,
-          }}
-        >
-          {savedOk && (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          )}
-           {savedOk ? t("i18n.saved") : saving ? t("i18n.saving") : t("i18n.save")}
-        </button>
-      </div>
-
-      {error && <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{error}</p>}
+        <div className="flex gap-1.5">
+          <SecretTextInput
+            value={apiKey}
+            onChange={setApiKey}
+            onKeyDown={(e) => { if (e.key === "Enter" && apiKey.trim()) handleSave(); }}
+            placeholder={provider.configured ? t("models.replaceApiKey") : "sk-…"}
+            className="flex-1"
+            autoComplete="off"
+            spellCheck={false}
+            mono
+          />
+          <button
+            onClick={handleSave}
+            disabled={saving || !apiKey.trim() || savedOk}
+            className={cn(
+              "flex shrink-0 cursor-pointer items-center gap-1 rounded-sm border-0 px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50",
+              savedOk
+                ? "bg-success text-white"
+                : apiKey.trim()
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-dim",
+            )}
+          >
+            {savedOk && (
+              <CheckIcon size={12} strokeWidth={2.5} />
+            )}
+             {savedOk ? t("i18n.saved") : saving ? t("i18n.saving") : t("i18n.save")}
+          </button>
+        </div>
+      </ConfigCard>
 
       <ProviderUsageSummary providerId={provider.id} enabled={provider.configured} />
 
@@ -1814,25 +1716,12 @@ function AddProviderPicker({
 
   const totalCount = availableOAuth.length + availableApiKey.length + (showCustom ? 1 : 0);
 
-  const cardStyle: React.CSSProperties = {
-    display: "flex", flexDirection: "row", alignItems: "center", gap: 8,
-    padding: "10px 12px",
-    background: "var(--bg-panel)",
-    border: "1px solid var(--border)",
-    borderRadius: 7,
-    boxSizing: "border-box",
-    cursor: "pointer",
-    minWidth: 0,
-    textAlign: "left",
-    transition: "border-color 0.12s, background 0.12s",
-    width: "100%",
-  };
-
-
+  const cardClass =
+    "flex w-full min-w-0 flex-row items-center gap-2 rounded-sm border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-primary hover:bg-secondary";
 
   return (
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       onKeyDown={(e) => {
         if (e.key !== "Escape" || e.nativeEvent.isComposing || e.keyCode === 229) return;
@@ -1841,78 +1730,68 @@ function AddProviderPicker({
         onClose();
       }}
     >
-      <div style={{ width: 820, maxWidth: "calc(100vw - 32px)", maxHeight: "min(72vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.22)", overflow: "hidden" }}>
+      <div className="flex max-h-[min(72vh,calc(100vh-32px))] w-[820px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-[0_8px_32px_rgba(0,0,0,0.22)]">
         {/* Search */}
-        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-dim)", flexShrink: 0 }}>
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3.5 py-2.5">
+          <Search size={13} strokeWidth={1.8} className="shrink-0 text-dim" />
           <input
             ref={inputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
              placeholder={t("i18n.searchProviders")}
-            style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--text)", fontSize: 13, boxSizing: "border-box" }}
+            className="min-w-0 flex-1 border-0 bg-transparent text-[13px] text-foreground outline-none"
           />
         </div>
 
         {/* Card grid */}
-        <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+        <div className="flex-1 overflow-y-auto p-3.5">
           {totalCount === 0 ? (
-            <div style={{ padding: "20px 0", fontSize: 12, color: "var(--text-dim)", textAlign: "center" }}>{t("i18n.noProviders")}</div>
+            <div className="py-5 text-center text-xs text-dim">{t("i18n.noProviders")}</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))", gap: 8 }}>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-2">
               {showCustom && (
-                 <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{t("i18n.custom")}</div>
+                 <div className="col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-dim">{t("i18n.custom")}</div>
               )}
               {showCustom && (
                 <button
                   onClick={() => { onAddCustom(); onClose(); }}
-                  style={cardStyle}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-panel)"; }}
+                  className={cardClass}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>OpenAI / Anthropic compatible</div>
-                     <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{t("i18n.customEndpoint")}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-semibold leading-[1.3] text-foreground">OpenAI / Anthropic compatible</div>
+                     <div className="mt-0.5 text-[10px] text-dim">{t("i18n.customEndpoint")}</div>
                   </div>
-                  <span style={{ width: 26, height: 26, borderRadius: 5, background: "var(--bg-hover)", border: "1px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-dim)" }}>
-                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
+                  <span className="flex size-[26px] shrink-0 items-center justify-center rounded-sm border border-dashed border-border bg-secondary">
+                    <Plus size={13} strokeWidth={1.8} className="text-dim" />
                   </span>
                 </button>
               )}
 
               {availableOAuth.length > 0 && (
-                 <div style={{ gridColumn: "1 / -1", paddingTop: showCustom ? 6 : 0, fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{t("i18n.subscriptions")}</div>
+                 <div className={cn("col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-dim", showCustom && "pt-1.5")}>{t("i18n.subscriptions")}</div>
               )}
               {availableOAuth.map((p) => (
                 <button key={p.id} onClick={() => { onSelectOAuth(p.id); onClose(); }}
-                  style={cardStyle}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-panel)"; }}
+                  className={cardClass}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>OAuth</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-semibold leading-[1.3] text-foreground">{p.name}</div>
+                    <div className="mt-0.5 text-[10px] text-dim">OAuth</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
                 </button>
               ))}
 
               {availableApiKey.length > 0 && (
-                <div style={{ gridColumn: "1 / -1", paddingTop: availableOAuth.length > 0 ? 6 : 0, fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>API Key</div>
+                <div className={cn("col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-dim", availableOAuth.length > 0 && "pt-1.5")}>API Key</div>
               )}
               {availableApiKey.map((p) => (
                 <button key={p.id} onClick={() => { onSelectApiKey(p.id); onClose(); }}
-                  style={cardStyle}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-panel)"; }}
+                  className={cardClass}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.displayName}</div>
-                    <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{p.modelCount === 1 ? t("models.modelCountOne") : t("models.modelCount", { count: p.modelCount })}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-semibold leading-[1.3] text-foreground">{p.displayName}</div>
+                    <div className="mt-0.5 text-[10px] text-dim">{p.modelCount === 1 ? t("models.modelCountOne") : t("models.modelCount", { count: p.modelCount })}</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
                 </button>
@@ -2304,7 +2183,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
 
               {/* Divider before custom providers, only when there are active managed providers */}
               {(activeOAuth.length > 0 || activeApiKey.length > 0) && providers.length > 0 && (
-                <div style={{ margin: "4px 8px", borderTop: "1px solid var(--border)" }} />
+                <div className="mx-2 my-1 border-t border-border" />
               )}
 
               {/* Custom providers */}
@@ -2312,24 +2191,18 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                 <ConfigSidebarGroupLabel>{t("modelsConfig.groupCustom")}</ConfigSidebarGroupLabel>
               )}
               {loading ? (
-                 <div style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>{t("i18n.loading")}</div>
+                 <div className="px-2 py-2.5 text-xs text-muted-foreground">{t("i18n.loading")}</div>
               ) : providers.map(([pName, pData]) => {
                 const isProviderSelected = selection?.type === "provider" && selection.name === pName;
                 const models = pData.models ?? [];
                 return (
-                  <div key={pName} style={{ marginBottom: 2 }}>
+                  <div key={pName} className="mb-0.5">
                     {/* Provider row */}
                     <ConfigSidebarItem
                       onClick={() => setSelection({ type: "provider", name: pName })}
                       active={isProviderSelected}
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-dim)", flexShrink: 0 }}>
-                        <rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" />
-                        <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
-                        <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
-                        <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
-                        <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
-                      </svg>
+                      <Cpu size={11} strokeWidth={1.8} className="shrink-0 text-dim" />
                       <ConfigSidebarText className="is-grow">
                         {pName}
                       </ConfigSidebarText>
@@ -2346,11 +2219,12 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                           className="models-sidebar-indented-item"
                           onClick={() => setSelection({ type: "model", providerName: pName, index: i })}
                         >
-                          <ConfigSidebarText className="is-grow" style={{ color: m.id ? "var(--text-muted)" : "var(--text-dim)" }}>
+                          <ConfigSidebarText className={cn("is-grow", m.id ? "text-muted-foreground" : "text-dim")}>
                              {modelSidebarLabel(m) || t("i18n.newModel")}
                           </ConfigSidebarText>
+                          {/* Reasoning pin: no pi token for the indigo tint, kept literal. */}
                           {m.reasoning && (
-                            <span style={{ fontSize: 9, padding: "1px 4px", background: "rgba(99,102,241,0.12)", color: "rgba(99,102,241,0.8)", borderRadius: 3, flexShrink: 0 }}>T</span>
+                            <span className="shrink-0 rounded-[3px] bg-[rgba(99,102,241,0.12)] px-1 py-px text-[10px] text-[rgba(99,102,241,0.8)]">T</span>
                           )}
                         </ConfigSidebarItem>
                       );
@@ -2385,7 +2259,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
 
         {/* Footer */}
         <ConfigFooter status={(loadError || saveError) ? (
-          <span style={{ color: "#f87171" }}>
+          <span className="text-destructive">
             {loadError ? t("models.configUnreadable", { error: loadError }) : saveError}
           </span>
         ) : t("models.applyHelp")}>
@@ -2397,10 +2271,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
             className={savedOk ? "is-success" : undefined}
           >
             {savedOk && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
-                className="config-button-success-icon">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              <CheckIcon size={14} strokeWidth={2.5} className="config-button-success-icon" />
             )}
              <span>{savedOk ? t("i18n.saved") : saving ? t("i18n.saving") : t("i18n.save")}</span>
           </ConfigButton>

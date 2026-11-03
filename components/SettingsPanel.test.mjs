@@ -105,19 +105,17 @@ test("keeps General free of divider rows", () => {
   assert.doesNotMatch(panelSource, /borderLeft: index > 0/);
 });
 
-test("uses top navigation on desktop and a phone home list of sections", () => {
-  assert.match(panelSource, /className="settings-phone-home"/);
-  assert.match(panelSource, /className="settings-phone-home-item"/);
-  assert.match(panelSource, /className="settings-section-tabs"/);
-  assert.match(panelSource, /className="settings-section-tab"/);
-  assert.match(cssSource, /\.settings-phone-home \{[\s\S]*?display: flex/);
-  assert.match(cssSource, /\.settings-section-tab \{[\s\S]*?width: 96px/);
-  assert.match(cssSource, /\.settings-section-icon \{[\s\S]*?flex-shrink: 0/);
-  assert.match(cssSource, /\.settings-section-tab::after \{[\s\S]*?width: 24px/);
-  assert.match(cssSource, /\.settings-section-tab\[aria-current="page"\]::after/);
-  assert.match(cssSource, /\.settings-section-tab:focus-visible:not\(\[aria-current="page"\]\)/);
-  assert.match(cssSource, /\.settings-section-tab:focus-visible\[aria-current="page"\][\s\S]*?outline: none/);
-  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-section-tabs \{[\s\S]*?display: none/);
+test("uses a fixed section rail on desktop and a phone home list of sections", () => {
+  assert.match(panelSource, /className="settings-phone-home[ "]/);
+  assert.match(panelSource, /className="settings-phone-home-item[ "]/);
+  assert.match(panelSource, /className="settings-section-rail"/);
+  assert.match(panelSource, /className=\{cn\(\s*"settings-section-rail-item /);
+  // The active section reads as the current page; hover and the focus ring are
+  // the shared recipes (bg-accent / hover:bg-secondary / ring-ring).
+  assert.match(panelSource, /selected\s*\?\s*"bg-accent font-medium text-foreground"\s*:\s*"bg-transparent text-muted-foreground enabled:hover:bg-secondary"/);
+  assert.match(panelSource, /aria-current=\{selected \? "page" : undefined\}/);
+  assert.match(cssSource, /\.settings-section-rail \{[\s\S]*?width: 200px/);
+  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-section-rail \{[\s\S]*?display: none/);
   assert.doesNotMatch(panelSource, /width: isMobile \? "100%" : 188/);
   assert.match(panelSource, /<main[^>]*className="settings-dialog-main"/);
   assert.doesNotMatch(panelSource, /<style>/);
@@ -131,15 +129,17 @@ test("labels agent profiles as sub-agents", () => {
   assert.match(zhSource, /"agents\.new": "新建子代理"/);
 });
 
-test("uses the child-session robot glyph for the sub-agents tab", () => {
-  const robotGlyph = /<rect x="5" y="7" width="14" height="11" rx="2" \/>\s*<path d="M9 11h\.01M15 11h\.01M9 15h6M12 7V4M10 4h4" \/>/;
-  assert.match(panelSource, robotGlyph);
-  assert.match(panelSource, /section === "agents"[\s\S]*?className="settings-section-icon is-agent"/);
-  assert.match(cssSource, /\.settings-section-icon\.is-agent \{[\s\S]*?transform: scale\(1\.25\)/);
-});
-
-test("uses the compact controls glyph for General", () => {
-  assert.match(panelSource, /section === "general"[\s\S]*?<path d="M20 7h-9M14 17H5" \/>[\s\S]*?<circle cx="7" cy="7" r="3" \/>[\s\S]*?<circle cx="17" cy="17" r="3" \/>/);
+test("sections use lucide glyphs: a robot for sub-agents, sliders for General", () => {
+  assert.match(panelSource, /agents: BotIcon/);
+  assert.match(panelSource, /general: SlidersHorizontalIcon/);
+  assert.match(panelSource, /models: CpuIcon/);
+  assert.match(panelSource, /skills: LayersIcon/);
+  assert.match(panelSource, /plugins: PuzzleIcon/);
+  assert.match(panelSource, /mcp: ServerIcon/);
+  assert.match(panelSource, /className="settings-section-icon shrink-0"/);
+  // No hand-drawn svg remains: every icon in the panel is a lucide component.
+  assert.doesNotMatch(panelSource, /<svg/);
+  assert.doesNotMatch(cssSource, /\.settings-section-icon\.is-agent/);
 });
 
 test("keeps password authentication to one login field and one settings action", () => {

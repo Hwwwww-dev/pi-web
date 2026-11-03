@@ -148,7 +148,7 @@ test("with a project, its group comes first and every row names its state", () =
   assert.match(row(html, "legacy"), /aria-label="legacy: Refused by Pi"/);
   // The state is visible text on the row too, never only the dot's color.
   for (const badge of ["untrusted", "off", "refused"]) {
-    assert.match(markup, new RegExp(`class="mcp-sidebar-badge is-[a-z]+">${badge}<`), badge);
+    assert.match(markup, new RegExp(`class="shrink-0 max-w-\\[45%\\] truncate text-\\[10px\\] text-[a-z-]+">${badge}<`), badge);
   }
   // The untrusted project gets the trust notice, which also says its servers cannot be changed
   // here; without a Trust handler it has no button.
@@ -184,7 +184,7 @@ test("a stdio server's detail shows its masked command line, folder, env names a
   assert.match(markup, /<div class="config-detail-title">lint<\/div>/);
   // The Command label says it runs over stdio: no Transport row repeats it.
   assert.doesNotMatch(shown, /Transport/);
-  assert.match(markup, /<div class="config-detail-grid-label">Command<\/div><div class="config-detail-grid-value is-mono mcp-config-code">npx -y @acme\/lint-mcp --api-key=••••<\/div>/);
+  assert.match(markup, /<div class="config-detail-grid-label">Command<\/div><div class="config-detail-grid-value is-mono text-xs">npx -y @acme\/lint-mcp --api-key=••••<\/div>/);
   assert.match(shown, /Working directory tools/);
   assert.match(markup, /<code class="mcp-config-chip">NODE_ENV<\/code><code class="mcp-config-chip">LINT_TOKEN<\/code>/);
   // Names only: the values stay in the file.
@@ -298,7 +298,7 @@ test("MCP being off, a refused project folder, and file problems are said above 
     load: { state: "loaded", data: overview(), projectError: { error: "cwd must be a directory", reason: "cwd-not-directory" } },
   });
   assert.match(text(projectError), /This project's servers are not listed: The project folder no longer exists or is not a folder\./);
-  assert.match(decode(projectError), /class="mcp-sidebar-group-empty">Not listed</);
+  assert.match(decode(projectError), /class="px-2 pt-px pb-\[5px\] text-xs leading-\[1\.4\] text-dim \[overflow-wrap:anywhere\]">Not listed</);
 
   const broken = view({
     load: {
@@ -309,7 +309,7 @@ test("MCP being off, a refused project folder, and file problems are said above 
   const shown = text(broken);
   assert.match(decode(broken), /class="config-footer-status-summary is-error">1 file problem</);
   assert.match(shown, /~\/\.pi\/agent\/mcp\.json The file is not valid JSON, so none of its servers load\. Unexpected token \} in JSON at position 9/);
-  assert.match(decode(broken), /class="mcp-sidebar-group-empty">Not listed: see the file problem below</);
+  assert.match(decode(broken), /class="px-2 pt-px pb-\[5px\] text-xs leading-\[1\.4\] text-dim \[overflow-wrap:anywhere\]">Not listed: see the file problem below</);
   // The detail pane agrees: the servers are hidden by the problem, not missing.
   assert.match(shown, /No servers could be listed: see the file problems below\./);
   assert.doesNotMatch(shown, /No MCP servers yet/);
@@ -488,7 +488,7 @@ test("Always on is disabled with a visible reason while no session could offer C
   assert.match(down, /Turned off by -builtin:codemode in ~\/\.pi\/agent\/settings\.json\./);
   const html = view({ load: { state: "loaded", data: overview({ codemode: { sandbox: { state: "unavailable", error: "x" }, builtinDisabled: false, preference: "automatic" } }) } });
   assert.match(row(html, "Code mode"), /aria-label="Code mode: Unavailable"/);
-  assert.match(decode(html), /class="mcp-sidebar-badge is-error">Unavailable</);
+  assert.match(decode(html), /class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-destructive">Unavailable</);
 });
 
 test("a trusted project that turns Code mode off for itself leaves Always on, a global choice, available", () => {
@@ -572,7 +572,7 @@ test("the container shows that it is loading before the first answer", () => {
 test("the Code mode pane's budget field saves a whole number, or empty for pi's default", () => {
   const budget = { settingsPath: "/Users/me/.pi/agent/settings.json", default: 3000, max: 1_000_000 };
   const info = (inlineBudget, extra = {}) => ({ sandbox: { state: "available" }, builtinDisabled: false, preference: "automatic", inlineBudget, ...extra });
-  const field = (html) => decode(html).match(/<form class="mcp-codemode-budget">([\s\S]*?)<\/form>/)?.[1];
+  const field = (html) => decode(html).match(/<form class="flex min-w-0 flex-wrap items-center gap-1\.5">([\s\S]*?)<\/form>/)?.[1];
   const input = (html) => field(html).match(/<input[^>]*>/)[0];
   const save = (html) => field(html).match(/<button type="submit"[^>]*>/)[0];
 
@@ -718,7 +718,7 @@ test("every string the panel shows is translated", () => {
 /** The selected server's exposure dropdown: its opening tag, and each option with whether it is selected. */
 function exposureSelect(html) {
   const markup = decode(html);
-  const match = markup.match(/(<select[^>]*class="mcp-add-input mcp-exposure-select"[^>]*>)([\s\S]*?)<\/select>/);
+  const match = markup.match(/(<select[^>]*class="mcp-add-input w-auto max-w-full \[font-family:inherit\]"[^>]*>)([\s\S]*?)<\/select>/);
   assert.ok(match, "the Tools row holds the exposure dropdown");
   return {
     tag: match[1],
@@ -762,7 +762,7 @@ test("a server's Tools row chooses its exposure, saying in one line what each co
 
   // A refused entry has no exposure to choose.
   const refused = view({ selected: "global\0bad", load: { state: "loaded", data: overview({ servers: [server({ name: "bad", invalidError: "x" })] }) } });
-  assert.doesNotMatch(refused, /mcp-exposure-select/);
+  assert.doesNotMatch(refused, /mcp-add-input w-auto/);
 });
 
 test("the exposure dropdown waits like a switch, and points at why it cannot be changed", () => {
@@ -774,7 +774,7 @@ test("the exposure dropdown waits like a switch, and points at why it cannot be 
   // While any change is on its way it waits; the one for this server says it is saving.
   const saving = validated({ view: { busy: "exposure:global\0docs" } });
   assert.match(exposureSelect(saving).tag, /disabled=""/);
-  assert.match(decode(saving), /<span class="mcp-exposure-choice"><select[^>]*>[\s\S]*?<\/select><span role="status" class="mcp-config-line is-dim">Saving…<\/span><\/span>/);
+  assert.match(decode(saving), /<span class="flex min-w-0 flex-wrap items-center gap-1\.5"><select[^>]*>[\s\S]*?<\/select><span role="status" class="mcp-config-line is-dim">Saving…<\/span><\/span>/);
   assert.match(exposureSelect(validated({ view: { busy: "switch:global\0pw" } })).tag, /disabled=""/);
   assert.doesNotMatch(exposureSelect(validated()).tag, /disabled/);
   // Where no change may be written, it points at the note that says why.
@@ -1059,7 +1059,7 @@ test("an untested server offers Test in its header, beside Remove", () => {
   const header = statusRow(testView({ commandFields: [{ kind: "header", name: "Authorization" }] }));
   assert.match(header.text, /It runs a shell command, so its test waits/);
   // No listed tools before a test connected.
-  assert.doesNotMatch(decode(testView()), /mcp-test-tools/);
+  assert.doesNotMatch(decode(testView()), /<ul class="mt-1 flex min-w-0 flex-col gap-1\.5">/);
 });
 
 test("a connected test shows what it listed, and the row reads connected", () => {
@@ -1091,11 +1091,11 @@ test("a connected test shows what it listed, and the row reads connected", () =>
   // The tools it listed go under the Tools row's choice, in the same row.
   const tools = markup.match(/<div class="config-detail-grid-label">Tools<\/div><div class="config-detail-grid-value">([\s\S]*?)<\/div>/)?.[1];
   assert.ok(tools, "a Tools row");
-  assert.match(tools, /<select[\s\S]*<\/select>[\s\S]*<ul class="mcp-test-tools">/);
-  assert.match(tools, /<li class="mcp-test-tool"><span class="mcp-config-chips"><code class="mcp-config-chip">search<\/code><span class="mcp-test-tool-tag">read-only<\/span><\/span><span class="mcp-config-line is-dim">Search the docs\.<\/span><\/li>/);
+  assert.match(tools, /<select[\s\S]*<\/select>[\s\S]*<ul class="mt-1 flex min-w-0 flex-col gap-1\.5">/);
+  assert.match(tools, /<li class="flex min-w-0 flex-col gap-0\.5"><span class="mcp-config-chips"><code class="mcp-config-chip">search<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">read-only<\/span><\/span><span class="mcp-config-line is-dim">Search the docs\.<\/span><\/li>/);
   // A tool whose exposure differs from its server's says so; one like its server's does not.
-  assert.match(tools, /<code class="mcp-config-chip">publish<\/code><span class="mcp-test-tool-tag">direct<\/span>/);
-  assert.doesNotMatch(tools, /<span class="mcp-test-tool-tag">Code mode<\/span>/);
+  assert.match(tools, /<code class="mcp-config-chip">publish<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">direct<\/span>/);
+  assert.doesNotMatch(tools, /<span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">Code mode<\/span>/);
   // A tool name is the server's text: hidden characters are shown as codes.
   assert.match(tools, /bidi\\u\{202E\}tool/);
   // More tools than listed say how many are not shown.
@@ -1116,17 +1116,17 @@ test("a stdio server's test names the folder it ran in", () => {
 test("a failed test shows the error and stderr, a sign-in, and no answer, each with visible text", () => {
   const failed = testView({ status: testedStatus("failed", { error: "spawn lint-mcp ENOENT", stderr: "line one\nline\u0007two", durationMs: 1_250 }) });
   assert.match(row(failed, "docs"), /aria-label="docs: Did not connect when tested"/);
-  assert.match(decode(failed), /<span class="mcp-sidebar-badge is-error">failed<\/span>/);
+  assert.match(decode(failed), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-destructive">failed<\/span>/);
   const { label, value } = statusRow(failed);
   assert.equal(label, "Did not connect when tested");
   assert.match(value, /^<span class="mcp-config-line">Gave up after 1\.3 s, tested at/);
   assert.match(value, /<span class="mcp-config-line is-error">Error: <code class="mcp-config-chip">spawn lint-mcp ENOENT<\/code><\/span>/);
   // The stderr tail keeps its lines, and its control characters are shown as codes.
-  assert.match(value, /<span class="mcp-config-line is-dim">The last lines it wrote to stderr:<\/span><pre class="mcp-test-output">line one\nline\\u\{0007\}two<\/pre>/);
+  assert.match(value, /<span class="mcp-config-line is-dim">The last lines it wrote to stderr:<\/span><pre class="max-h-\[160px\][^"]*">line one\nline\\u\{0007\}two<\/pre>/);
 
   const signIn = testView({ status: testedStatus("needs-auth") });
   assert.match(row(signIn, "docs"), /aria-label="docs: Needs sign-in"/);
-  assert.match(decode(signIn), /<span class="mcp-sidebar-badge is-warning">sign-in<\/span>/);
+  assert.match(decode(signIn), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-warning">sign-in<\/span>/);
   assert.match(statusRow(signIn).value, /^<span class="mcp-config-line">The server asked for an OAuth sign-in\. Tested at/);
   // The panel's own Sign in, not a chat command, is where to sign in.
   assert.match(text(decode(signIn)), /Status Needs sign-in The server asked for an OAuth sign-in\./);
@@ -1240,21 +1240,21 @@ test("a session's report names the state in the row and says which session saw i
   assert.match(value, /^<span class="mcp-config-line">A session in ~\/repo connected it at [^.]+\.<\/span>/);
   assert.match(text(decode(connected)), /Status Connected in a session A session in ~\/repo connected it/);
   // A session lists no tools for the panel; only a test does.
-  assert.doesNotMatch(decode(connected), /mcp-test-tools/);
+  assert.doesNotMatch(decode(connected), /<ul class="mt-1 flex min-w-0 flex-col gap-1\.5">/);
   assert.equal(button.label, "Test connection", "Test stays offered beside a session's report");
 
   const failed = testView({ transport: "stdio", url: undefined, command: "node", status: sessionStatus("failed", { error: "spawn lint ENOENT", stderr: "no\nconfig" }) });
   assert.match(row(failed, "docs"), /aria-label="docs: Did not connect in a session"/);
-  assert.match(decode(failed), /<span class="mcp-sidebar-badge is-error">failed<\/span>/);
+  assert.match(decode(failed), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-destructive">failed<\/span>/);
   const failedRow = statusRow(failed).value;
   assert.match(failedRow, /^<span class="mcp-config-line">A session in ~\/repo could not connect it at/);
   assert.match(failedRow, /<span class="mcp-config-line is-error">Error: <code class="mcp-config-chip">spawn lint ENOENT<\/code><\/span>/);
-  assert.match(failedRow, /<pre class="mcp-test-output">no\nconfig<\/pre>/);
+  assert.match(failedRow, /<pre class="max-h-\[160px\][^"]*">no\nconfig<\/pre>/);
   assert.match(text(decode(failed)), /Status Did not connect in a session A session in ~\/repo could not connect it/);
 
   const signIn = testView({ status: sessionStatus("needs-auth") });
   assert.match(row(signIn, "docs"), /aria-label="docs: Needs sign-in"/);
-  assert.match(decode(signIn), /<span class="mcp-sidebar-badge is-warning">sign-in<\/span>/);
+  assert.match(decode(signIn), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-warning">sign-in<\/span>/);
   assert.match(statusRow(signIn).text, /^The server asked a session in ~\/repo for an OAuth sign-in at/);
   assert.match(text(decode(signIn)), /Status Needs sign-in The server asked a session in ~\/repo for an OAuth sign-in/);
 });
@@ -1282,20 +1282,20 @@ test("a connection the session closed since reads like an untested entry, and sa
 test("connecting, a dropped connection and a name another extension holds each have visible words", () => {
   const connecting = testView({ status: sessionStatus("connecting") });
   assert.match(row(connecting, "docs"), /aria-label="docs: Connecting in a session"/);
-  assert.match(decode(connecting), /<span class="mcp-sidebar-badge is-off">connecting<\/span>/);
+  assert.match(decode(connecting), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-dim">connecting<\/span>/);
   assert.match(statusRow(connecting).text, /^A session in ~\/repo started connecting it at/);
 
   const dropped = testView({ transport: "stdio", url: undefined, command: "node", status: sessionStatus("disconnected", { stderr: "panic: out of memory" }) });
   assert.match(row(dropped, "docs"), /aria-label="docs: Connection dropped in a session"/);
-  assert.match(decode(dropped), /<span class="mcp-sidebar-badge is-warning">dropped<\/span>/);
+  assert.match(decode(dropped), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-warning">dropped<\/span>/);
   assert.match(statusRow(dropped).value, /^<span class="mcp-config-line">The connection of a session in ~\/repo dropped at [^.]+\.<\/span>/);
-  assert.match(statusRow(dropped).value, /<pre class="mcp-test-output">panic: out of memory<\/pre>/);
+  assert.match(statusRow(dropped).value, /<pre class="max-h-\[160px\][^"]*">panic: out of memory<\/pre>/);
   // What happens next follows what the session saw, which it does not repeat.
   assert.match(statusRow(dropped).text, /panic: out of memory That session connects it again at the next call to one of its tools\.$/);
 
   const taken = testView({ status: sessionStatus("conflict", { conflict: "/Users/me/.pi/agent/extensions/jira.ts" }) });
   assert.match(row(taken, "docs"), /aria-label="docs: Name taken by another extension"/);
-  assert.match(decode(taken), /<span class="mcp-sidebar-badge is-error">conflict<\/span>/);
+  assert.match(decode(taken), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-destructive">conflict<\/span>/);
   const takenRow = statusRow(taken).value;
   assert.match(takenRow, /^<span class="mcp-config-line">A session in ~\/repo found the name taken at [^,]+, so it did not connect this entry\.<\/span>/);
   // The owner is named, the home folder shortened as everywhere in the panel.

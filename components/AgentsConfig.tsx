@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
-import { useIsMobile } from "@/hooks/useIsMobile";
 import type { ProjectTrustStatus, SubagentProfilesResponse, SubagentSettingsResponse } from "@/lib/api-types";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { displayPathWithin, shortenPath } from "@/lib/display-path";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/settings-navigation";
 import {
   ConfigButton,
+  ConfigCard,
   ConfigDetail,
   ConfigDetailActions,
   ConfigDetailHeader,
@@ -62,24 +63,13 @@ const EMPTY_PROFILE: EditableProfile = {
   enabled: true,
 };
 
-const inputStyle: CSSProperties = {
-  width: "100%",
-  minWidth: 0,
-  height: 34,
-  padding: "0 9px",
-  border: "1px solid var(--border)",
-  borderRadius: 5,
-  background: "var(--bg)",
-  color: "var(--text)",
-  fontSize: 12,
-  outline: "none",
-};
-
-const disabledInputStyle: CSSProperties = {
-  background: "var(--bg-panel)",
-  color: "var(--text-dim)",
-  cursor: "default",
-};
+/**
+ * The shared control look as utilities; a disabled control falls to its
+ * panel background and dim text. Height stays per control (34px fields, the
+ * taller prompt textarea), so the base carries none.
+ */
+const controlClassName =
+  "min-w-0 rounded-sm border border-border bg-background px-[9px] text-xs text-foreground outline-none disabled:bg-card disabled:text-dim disabled:cursor-default";
 
 function editableProfile(profile: SubagentProfile): EditableProfile {
   return {
@@ -159,7 +149,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Toggle({ checked, disabled, label, onChange }: { checked: boolean; disabled: boolean; label: string; onChange: (checked: boolean) => void }) {
   return (
-    <label style={{ display: "flex", alignItems: "center", gap: 7, color: disabled ? "var(--text-dim)" : "var(--text-muted)", fontSize: 12, cursor: disabled ? "default" : "pointer" }}>
+    <label className={disabled
+      ? "flex cursor-default items-center gap-[7px] text-xs text-dim"
+      : "flex cursor-pointer items-center gap-[7px] text-xs text-muted-foreground"}
+    >
       <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
       {label}
     </label>
@@ -182,7 +175,6 @@ export function AgentsConfig({
   /** The page's trust status for `cwd`; a new decision loads the model list again. */
   trust?: ProjectTrustStatus | null;
 }) {
-  const isMobile = useIsMobile();
   const { t } = useI18n();
   const [profiles, setProfiles] = useState<SubagentProfile[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelsData["modelList"]>([]);
@@ -402,7 +394,6 @@ export function AgentsConfig({
       ? { provider: "", modelId: draftModelBase }
       : { provider: draftModelBase.slice(0, separator), modelId: draftModelBase.slice(separator + 1) };
   })();
-  const controlStyle = disabled ? { ...inputStyle, ...disabledInputStyle } : inputStyle;
   const switchDisabled = creating
     ? disabled
     : !selected || !isTogglableScope(selected.scope) || saving || toggling;
@@ -494,45 +485,50 @@ export function AgentsConfig({
 
   return (
     <ConfigPanelShell embedded={embedded} title={t("common.agents")} subtitle={shortenPath(cwd)} closeLabel={t("agents.close")} onClose={onClose}>
-      <div className="agents-feature-setting">
-        <div className="agents-feature-copy">
-          <strong>{t("agents.builtInTitle")}</strong>
-          <span>{t("agents.builtInDescription")}</span>
-          {reloadNeeded && <span role="status" className="agents-feature-reload-notice">{t("agents.reloadRequired")}</span>}
-        </div>
-        <div className="agents-feature-actions">
-          {reloadNeeded && sessionId && (
-            <ConfigButton size="small" onClick={() => void reloadSession()} disabled={reloading || settingsSaving}>
-              {reloading ? t("agents.reloading") : t("agents.reloadSession")}
-            </ConfigButton>
-          )}
-          <label className="agents-concurrency-control" title={t("agents.maxConcurrentDescription")}>
-            <span>{t("agents.maxConcurrent")}</span>
-            <input
-              aria-label={t("agents.maxConcurrent")}
-              type="number"
-              min={1}
-              max={32}
-              value={maxConcurrent}
-              disabled={settingsLoading || settingsSaving}
-              onChange={(event) => setMaxConcurrent(Number(event.target.value))}
-              onBlur={() => void updateMaxConcurrent(maxConcurrent)}
+      {/* The built-in switch group as a card (§7.3); the class stays the hook
+          the phone-level hide rule targets. */}
+      <ConfigCard
+        className="agents-feature-setting mx-4 mt-4"
+        title={t("agents.builtInTitle")}
+        description={t("agents.builtInDescription")}
+        actions={
+          <>
+            {reloadNeeded && sessionId && (
+              <ConfigButton size="small" onClick={() => void reloadSession()} disabled={reloading || settingsSaving}>
+                {reloading ? t("agents.reloading") : t("agents.reloadSession")}
+              </ConfigButton>
+            )}
+            <label className="agents-concurrency-control" title={t("agents.maxConcurrentDescription")}>
+              <span>{t("agents.maxConcurrent")}</span>
+              <input
+                aria-label={t("agents.maxConcurrent")}
+                type="number"
+                min={1}
+                max={32}
+                value={maxConcurrent}
+                disabled={settingsLoading || settingsSaving}
+                onChange={(event) => setMaxConcurrent(Number(event.target.value))}
+                onBlur={() => void updateMaxConcurrent(maxConcurrent)}
+              />
+            </label>
+            <ConfigSwitch
+              checked={builtInEnabled}
+              disabled={settingsLoading || reloading}
+              loading={settingsSaving}
+              label={t("agents.builtInTitle")}
+              onChange={(enabled) => void toggleBuiltInSubagents(enabled)}
             />
-          </label>
-          <ConfigSwitch
-            checked={builtInEnabled}
-            disabled={settingsLoading || reloading}
-            loading={settingsSaving}
-            label={t("agents.builtInTitle")}
-            onChange={(enabled) => void toggleBuiltInSubagents(enabled)}
-          />
-        </div>
-      </div>
+          </>
+        }
+        footer={reloadNeeded ? (
+          <span role="status" className="agents-feature-reload-notice">{t("agents.reloadRequired")}</span>
+        ) : undefined}
+      />
       <ConfigSplitView>
         <ConfigSidebar>
           <ConfigSidebarList>
               {loading ? (
-                <div style={{ padding: 10, color: "var(--text-dim)", fontSize: 12 }}>{t("agents.loading")}</div>
+                <div className="p-2.5 text-xs text-dim">{t("agents.loading")}</div>
               ) : (["project", "global", "workspace", "builtin"] as const).map((scope) => {
                 const scopedProfiles = profiles.filter((profile) => profile.scope === scope);
                 if (scopedProfiles.length === 0) return null;
@@ -602,29 +598,29 @@ export function AgentsConfig({
                     </ConfigDetailActions>
                   </ConfigDetailHeader>
 
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 12 }}>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <Field label={t("agents.name")}>
                       {creating ? (
-                        <input aria-label={t("agents.name")} value={draft.name} disabled={disabled} onChange={(event) => update("name", event.target.value)} style={inputStyle} />
+                        <input aria-label={t("agents.name")} value={draft.name} disabled={disabled} onChange={(event) => update("name", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
                       ) : (
-                        <code style={{ minHeight: 34, display: "flex", alignItems: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)", fontSize: 12 }}>
+                        <code className="flex min-h-[34px] items-center overflow-hidden text-ellipsis whitespace-nowrap text-xs text-foreground">
                           {draft.name}
                         </code>
                       )}
                     </Field>
                     <Field label={t("agents.displayName")}>
-                      <input aria-label={t("agents.displayName")} value={draft.displayName} disabled={disabled} onChange={(event) => update("displayName", event.target.value)} style={controlStyle} />
+                      <input aria-label={t("agents.displayName")} value={draft.displayName} disabled={disabled} onChange={(event) => update("displayName", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
                     </Field>
                   </div>
                   <Field label={t("agents.description")}>
-                    <input aria-label={t("agents.description")} value={draft.description} disabled={disabled} onChange={(event) => update("description", event.target.value)} style={controlStyle} />
+                    <input aria-label={t("agents.description")} value={draft.description} disabled={disabled} onChange={(event) => update("description", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
                   </Field>
                   <Field label={t("agents.prompt")}>
-                    <textarea className="agents-system-prompt" aria-label={t("agents.prompt")} value={draft.systemPrompt} disabled={disabled} onChange={(event) => update("systemPrompt", event.target.value)} style={{ ...controlStyle, height: 195, minHeight: 195, maxHeight: "60vh", padding: 9, overflow: "auto", resize: disabled ? "none" : "vertical", lineHeight: 1.5 }} />
+                    <textarea className={`${controlClassName} agents-system-prompt h-[195px] min-h-[195px] max-h-[60vh] w-full py-[9px] overflow-auto leading-normal resize-y disabled:resize-none`} aria-label={t("agents.prompt")} value={draft.systemPrompt} disabled={disabled} onChange={(event) => update("systemPrompt", event.target.value)} />
                   </Field>
 
                   <Field label={t("agents.tools")}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2">
                       {TOOL_OPTIONS.map((tool) => (
                         <Toggle key={tool} label={tool} disabled={disabled} checked={draft.tools.includes(tool)} onChange={(checked) => update("tools", checked ? [...draft.tools, tool] : draft.tools.filter((item) => item !== tool))} />
                       ))}
@@ -632,7 +628,7 @@ export function AgentsConfig({
                   </Field>
 
                   <Field label={t("agents.resources")}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px" }}>
+                    <div className="flex flex-wrap gap-x-5 gap-y-2">
                       <Toggle label={t("agents.loadSkills")} disabled={disabled} checked={draft.loadSkills} onChange={(checked) => update("loadSkills", checked)} />
                       <Toggle label={t("agents.loadExtensions")} disabled={disabled} checked={draft.loadExtensions} onChange={(checked) => update("loadExtensions", checked)} />
                       {/* A chat-only child cannot start with MCP on; the switch still turns it off. */}
@@ -640,52 +636,52 @@ export function AgentsConfig({
                     </div>
                     {/* `skills:` and `extensions:` lists are edited in the profile file; show what they load. */}
                     {draft.loadSkills && draft.skills !== undefined && (
-                      <span style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4, overflowWrap: "anywhere" }}>
+                      <span className="[overflow-wrap:anywhere] text-xs leading-[1.4] text-dim">
                         {draft.skills.length > 0
                           ? t("agents.skillsOnly", { skills: draft.skills.join(", ") })
                           : t("agents.skillsNone")}
                       </span>
                     )}
                     {draft.loadExtensions && draft.extensions !== undefined && (
-                      <span style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4, overflowWrap: "anywhere" }}>
+                      <span className="[overflow-wrap:anywhere] text-xs leading-[1.4] text-dim">
                         {draft.extensions.length > 0
                           ? t("agents.extensionsOnly", { extensions: draft.extensions.join(", ") })
                           : t("agents.extensionsNone")}
                       </span>
                     )}
                     {!disabled && chatOnlyDraft ? (
-                      <span style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4 }}>
+                      <span className="text-xs leading-[1.4] text-dim">
                         {t("agents.mcpChatOnly")}
                       </span>
                     ) : draft.mcp === "on" && (
-                      <span style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4 }}>
+                      <span className="text-xs leading-[1.4] text-dim">
                         {t("agents.mcpHint")}
                       </span>
                     )}
                   </Field>
 
                   <Field label={t("agents.codemode")}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div className="flex flex-col gap-1.5">
                       <select
                         aria-label={t("agents.codemode")}
                         value={draft.codemode ?? "off"}
                         disabled={disabled}
                         onChange={(event) => update("codemode", event.target.value as EditableProfile["codemode"])}
-                        style={{ ...controlStyle, width: "auto", minWidth: 180, alignSelf: "flex-start" }}
+                        className={`${controlClassName} h-[34px] w-auto min-w-[180px] self-start`}
                       >
                         <option value="inherit">{t("agents.codemode.inherit")}</option>
                         <option value="on">{t("agents.codemode.on")}</option>
                         <option value="off">{t("agents.codemode.off")}</option>
                       </select>
-                      <span style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4 }}>
+                      <span className="text-xs leading-[1.4] text-dim">
                         {t("agents.codemodeHint")}
                       </span>
                     </div>
                   </Field>
 
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1.5fr) minmax(120px, 0.75fr) minmax(100px, 0.5fr)", gap: 12 }}>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(120px,0.75fr)_minmax(100px,0.5fr)]">
                     <Field label={t("agents.model")}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div className="flex flex-col gap-1">
                         <ModelSelector
                           options={modelSelectorOptions}
                           value={selectedModel}
@@ -700,20 +696,20 @@ export function AgentsConfig({
                           variant="field"
                           placement="auto"
                         />
-                        {modelsError && <span style={{ color: "#ef4444", fontSize: 10 }}>{modelsError}</span>}
+                        {modelsError && <span className="text-[10px] text-destructive">{modelsError}</span>}
                       </div>
                     </Field>
                     <Field label={t("agents.thinking")}>
-                      <select aria-label={t("agents.thinking")} value={draft.thinking ?? ""} disabled={disabled} onChange={(event) => update("thinking", (event.target.value || undefined) as EditableProfile["thinking"])} style={controlStyle}>
+                      <select aria-label={t("agents.thinking")} value={draft.thinking ?? ""} disabled={disabled} onChange={(event) => update("thinking", (event.target.value || undefined) as EditableProfile["thinking"])} className={`${controlClassName} h-[34px] w-full`}>
                         {THINKING_OPTIONS.map((value) => <option key={value || "default"} value={value}>{value || t("agents.inherit")}</option>)}
                       </select>
                     </Field>
                     <Field label={t("agents.maxTurns")}>
-                      <input aria-label={t("agents.maxTurns")} type="number" min={1} value={draft.maxTurns ?? ""} disabled={disabled} onChange={(event) => update("maxTurns", event.target.value ? Number(event.target.value) : undefined)} style={controlStyle} />
+                      <input aria-label={t("agents.maxTurns")} type="number" min={1} value={draft.maxTurns ?? ""} disabled={disabled} onChange={(event) => update("maxTurns", event.target.value ? Number(event.target.value) : undefined)} className={`${controlClassName} h-[34px] w-full`} />
                     </Field>
                   </div>
 
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 20px" }}>
+                  <div className="flex flex-wrap gap-x-5 gap-y-2.5">
                     <Toggle label={t("agents.inheritContext")} disabled={disabled} checked={draft.inheritContext} onChange={(checked) => update("inheritContext", checked)} />
                     <Toggle label={t("agents.background")} disabled={disabled} checked={draft.runInBackground} onChange={(checked) => update("runInBackground", checked)} />
                   </div>
@@ -722,7 +718,7 @@ export function AgentsConfig({
           </ConfigDetailStack>
         </ConfigDetail>
       </ConfigSplitView>
-      <ConfigFooter status={(settingsError || error) && <span role="alert" style={{ color: "#ef4444" }}>{settingsError || error}</span>}>
+      <ConfigFooter status={(settingsError || error) && <span role="alert" className="text-destructive">{settingsError || error}</span>}>
         {editing && (
           <ConfigButton
             variant="primary"
@@ -731,9 +727,7 @@ export function AgentsConfig({
             className={savedOk ? "is-success" : undefined}
           >
             {savedOk && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="config-button-success-icon">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              <CheckIcon size={14} strokeWidth={3} className="config-button-success-icon" />
             )}
             <span>{savedOk ? t("i18n.saved") : saving ? t("agents.saving") : t("agents.save")}</span>
           </ConfigButton>

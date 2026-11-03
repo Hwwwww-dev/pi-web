@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ArrowUpIcon } from "lucide-react";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type {
   PluginPackageInfo,
@@ -19,6 +20,7 @@ import {
 import {
   ConfigAddSourcePanel,
   ConfigButton,
+  ConfigCard,
   ConfigDetail,
   ConfigDetailActions,
   ConfigDetailGrid,
@@ -41,7 +43,6 @@ import {
   ConfigSidebarItem,
   ConfigSidebarList,
   ConfigSidebarText,
-  ConfigSectionTitle,
   ConfigSplitView,
   ConfigStatusDot,
   ConfigSwitch,
@@ -149,11 +150,20 @@ function findInstalledPackage(
     ?? packages.find((pkg) => pkg.scope === scope && pkg.source.endsWith(trimmed));
 }
 
+/** The sidebar dot's fill: raw vars, since ConfigStatusDot takes a color. */
 function statusColor(status: PluginPackageInfo["status"]): string {
   if (status === "loaded") return "var(--accent)";
-  if (status === "installed") return "#f59e0b";
+  if (status === "installed") return "var(--warning)";
   if (status === "disabled") return "var(--text-dim)";
-  return "#ef4444";
+  return "var(--danger)";
+}
+
+/** The detail status row's tone: the same states as token utilities. */
+function statusClassName(status: PluginPackageInfo["status"]): string {
+  if (status === "loaded") return "text-primary";
+  if (status === "installed") return "text-warning";
+  if (status === "disabled") return "text-dim";
+  return "text-destructive";
 }
 
 function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
@@ -173,67 +183,29 @@ function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
 
   if (groups.length === 0) {
     return (
-      <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+      <div className="text-xs text-dim">
         {pkg.disabled ? t("i18n.packageDisabled") : t("i18n.noResolvedResources")}
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
+    <div className="flex flex-col gap-3">
       {groups.map((group, groupIndex) => (
         <div
           key={group.kind}
-          style={{
-            borderTop: groupIndex === 0 ? "none" : "1px solid var(--border)",
-            paddingTop: groupIndex === 0 ? 0 : 12,
-          }}
+          className={groupIndex === 0 ? "" : "border-t border-border pt-3"}
         >
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: "var(--text-dim)",
-              textTransform: "uppercase",
-              marginBottom: 6,
-            }}
-          >
+          <div className="mb-1.5 text-[10px] font-bold uppercase text-dim">
             {group.label}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="flex flex-col gap-1.5">
             {group.resources.map((resource) => (
-              <div key={`${resource.kind}:${resource.path}`} style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text)",
-                    fontFamily: "var(--font-mono)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                  title={resource.path}
-                >
+              <div key={`${resource.kind}:${resource.path}`} className="min-w-0">
+                <div className="truncate font-mono text-xs text-foreground" title={resource.path}>
                   {resource.name}
                 </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "var(--text-dim)",
-                    fontFamily: "var(--font-mono)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    marginTop: 1,
-                  }}
-                  title={resource.path}
-                >
+                <div className="mt-px truncate font-mono text-[10px] text-dim" title={resource.path}>
                   {resource.relativePath}
                 </div>
               </div>
@@ -276,12 +248,14 @@ function AddPluginPanel({
         label: "pi.dev/packages",
         icon: (
           <svg width="28" height="28" viewBox="0 0 800 800" aria-hidden="true" focusable="false">
+            {/* Brand mark, not a UI glyph: no lucide equivalent; currentColor
+                keeps it visible on dark themes (#000 was invisible there). */}
             <path
-              fill="#000"
+              fill="currentColor"
               fillRule="evenodd"
               d="M165.29 165.29H517.36V400H400V517.36H282.65V634.72H165.29ZM282.65 282.65V400H400V282.65Z"
             />
-            <path fill="#000" d="M517.36 400H634.72V634.72H517.36Z" />
+            <path fill="currentColor" d="M517.36 400H634.72V634.72H517.36Z" />
           </svg>
         ),
       }]}
@@ -366,40 +340,15 @@ function PackageDetail({
           <ConfigDetailHeaderInfo>
             <ConfigScopeTag scope={pkg.scope}>{scopeLabel(pkg.scope, t)}</ConfigScopeTag>
             {pkg.disabled ? (
-              <span
-                style={{
-                  fontSize: 10,
-                  padding: "1px 5px",
-                  borderRadius: 3,
-                  background: "rgba(120,120,120,0.12)",
-                  color: "var(--text-dim)",
-                }}
-              >
+              <span className="rounded-[3px] bg-[rgba(120,120,120,0.12)] px-[5px] py-px text-[10px] text-dim">
                 {t("i18n.disabled")}
               </span>
             ) : pkg.filtered && (
-              <span
-                style={{
-                  fontSize: 10,
-                  padding: "1px 5px",
-                  borderRadius: 3,
-                  background: "rgba(245,158,11,0.12)",
-                  color: "#d97706",
-                }}
-              >
+              <span className="rounded-[3px] bg-warning/12 px-[5px] py-px text-[10px] text-warning">
                 {t("i18n.filtered")}
               </span>
             )}
-            <span
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 12,
-                color: "var(--text)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
+            <span className="truncate font-mono text-xs text-foreground">
               {pkg.source}
             </span>
           </ConfigDetailHeaderInfo>
@@ -453,23 +402,25 @@ function PackageDetail({
         )}
       </div>
 
-      <ConfigDetailGrid>
-        {description && (
-          <ConfigDetailGridRow label={t("i18n.description")}>
-            {description}
-          </ConfigDetailGridRow>
-        )}
+      {/* The package's properties as one card (§7.3). */}
+      <ConfigCard>
+        <ConfigDetailGrid>
+          {description && (
+            <ConfigDetailGridRow label={t("i18n.description")}>
+              {description}
+            </ConfigDetailGridRow>
+          )}
         <ConfigDetailGridRow
           label={t("i18n.status")}
           tone="plain"
-          style={{ color: statusColor(pkg.status), textTransform: "capitalize" }}
+          className={`${statusClassName(pkg.status)} capitalize`}
         >
           {statusLabel(pkg.status, t)}
         </ConfigDetailGridRow>
         <ConfigDetailGridRow
           label={t("i18n.version")}
           tone="plain"
-          style={{ display: "flex", flexDirection: "column", gap: 4 }}
+          className="flex flex-col gap-1"
         >
           <div className="skill-version-row">
             <span className="skill-version-value">{versionSummary(pkg, t)}</span>
@@ -499,7 +450,7 @@ function PackageDetail({
             )}
           </div>
           {updateError && (
-            <span style={{ fontSize: 12, color: "#ef4444" }}>{updateError}</span>
+            <span className="text-xs text-destructive">{updateError}</span>
           )}
         </ConfigDetailGridRow>
         <ConfigDetailGridRow label={t("i18n.package")} mono>
@@ -508,26 +459,27 @@ function PackageDetail({
         <ConfigDetailGridRow label={t("i18n.resources")}>
           {resourceSummary(pkg, t)}
         </ConfigDetailGridRow>
-        <ConfigDetailGridRow label={t("i18n.installedPath")} tone={pkg.installedPath ? "muted" : "error"} mono>
-          {pkg.installedPath ? shortenPath(pkg.installedPath) : t("i18n.notFound")}
-        </ConfigDetailGridRow>
-        <ConfigDetailGridRow label={t("i18n.cwd")} tone="dim" mono>
-          {shortenPath(cwd)}
-        </ConfigDetailGridRow>
-      </ConfigDetailGrid>
+          <ConfigDetailGridRow label={t("i18n.installedPath")} tone={pkg.installedPath ? "muted" : "error"} mono>
+            {pkg.installedPath ? shortenPath(pkg.installedPath) : t("i18n.notFound")}
+          </ConfigDetailGridRow>
+          <ConfigDetailGridRow label={t("i18n.cwd")} tone="dim" mono>
+            {shortenPath(cwd)}
+          </ConfigDetailGridRow>
+        </ConfigDetailGrid>
+      </ConfigCard>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <ConfigSectionTitle>{t("i18n.resolvedResources")}</ConfigSectionTitle>
+      {/* Resolved resources as their own card (§7.3). */}
+      <ConfigCard title={t("i18n.resolvedResources")}>
         <ResourceList pkg={pkg} />
-      </div>
+      </ConfigCard>
 
       {actionMessage && (
-        <div style={{ fontSize: 12, color: "#16a34a" }}>
+        <div className="text-xs text-success">
           {actionMessage}
         </div>
       )}
       {actionError && (
-        <div style={{ fontSize: 12, color: "#ef4444", whiteSpace: "pre-wrap" }}>
+        <div className="whitespace-pre-wrap text-xs text-destructive">
           {actionError}
         </div>
       )}
@@ -551,7 +503,7 @@ function StandaloneExtensionDetail({ extension }: { extension: PluginStandaloneE
         <ConfigDetailGridRow
           label={t("i18n.status")}
           tone="plain"
-          style={{ color: extension.enabled ? "var(--accent)" : "var(--text-dim)" }}
+          className={extension.enabled ? "text-primary" : "text-dim"}
         >
           {statusLabel(status, t)}
         </ConfigDetailGridRow>
@@ -980,7 +932,7 @@ export function PluginsConfig({
                               </ConfigSidebarText>
                               {updateStatuses[packageKey(pkg)]?.state === "update-available" && (
                                 <span title={t("i18n.updateAvailable")} className="skill-update-indicator">
-                                  ↑
+                                  <ArrowUpIcon size={13} strokeWidth={1.8} />
                                 </span>
                               )}
                             </ConfigSidebarItem>
@@ -1045,7 +997,7 @@ export function PluginsConfig({
 
         <ConfigFooter status={
             availableUpdateCount > 0 ? (
-              <span style={{ fontSize: 12, color: "var(--accent)" }}>
+              <span className="text-xs text-primary">
                 {availableUpdateCount}{" "}
                 {availableUpdateCount === 1 ? t("i18n.update") : t("i18n.updates")}
               </span>

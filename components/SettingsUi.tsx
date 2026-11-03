@@ -2,6 +2,9 @@
 
 import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect, useRef } from "react";
 import type { ButtonHTMLAttributes, ClipboardEvent, CSSProperties, HTMLAttributes, ReactNode, Ref } from "react";
+import { PlusIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 
 type ConfigButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 type ConfigButtonSize = "small" | "default";
@@ -284,6 +287,49 @@ export function ConfigDetailTitle({ children }: { children: ReactNode }) {
 
 export function ConfigSectionTitle({ children }: { children: ReactNode }) {
   return <div className="config-section-title">{children}</div>;
+}
+
+/**
+ * A settings group as a Card (§7.3): a titled section with an optional
+ * description, its controls, and a footer for state (save target, trust
+ * notice). Density stays tighter than the stock Card: settings panels are
+ * dense surfaces.
+ */
+export function ConfigCard({
+  title,
+  description,
+  actions,
+  footer,
+  children,
+  className,
+}: {
+  title?: ReactNode;
+  description?: ReactNode;
+  /** Controls shown on the title row (a group's switches, an add button). */
+  actions?: ReactNode;
+  /** State line under the content (ConfigSaveTarget, ConfigTrustNotice). */
+  footer?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+}) {
+  const hasHeader = title !== undefined || actions !== undefined || description !== undefined;
+  return (
+    <Card className={cn("gap-0 py-4 shadow-none", className)}>
+      {hasHeader && (
+        <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 pb-3 [.border-b]:pb-3">
+          <div className="min-w-0">
+            {title !== undefined && <CardTitle className="text-sm font-semibold">{title}</CardTitle>}
+            {description !== undefined && <CardDescription className="mt-1 text-xs">{description}</CardDescription>}
+          </div>
+          {actions !== undefined && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        </CardHeader>
+      )}
+      {children !== undefined && <CardContent className="px-4 pb-0">{children}</CardContent>}
+      {footer !== undefined && (
+        <CardFooter className="justify-start px-4 pb-0 pt-3">{footer}</CardFooter>
+      )}
+    </Card>
+  );
 }
 
 export function ConfigField({ label, children, style, ref }: { label: ReactNode; children: ReactNode; style?: CSSProperties; ref?: Ref<HTMLDivElement> }) {
@@ -858,9 +904,7 @@ export function ConfigListAction({ active = false, children, className, onClick,
         aria-current={active ? "page" : undefined}
         className={["config-list-action-button", className].filter(Boolean).join(" ")}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
+        <PlusIcon size={13} strokeWidth={2} className="shrink-0" />
         {children}
       </button>
     </div>

@@ -206,8 +206,8 @@ test("each state has a color, a full label and, when it is not plain on, visible
   for (const state of ["disabled", "replaced", "mcp-off"]) assert.equal(mcpRowStateTone(state), "off", state);
   assert.deepEqual(mcpStatusDot("on"), { active: true });
   assert.deepEqual(mcpStatusDot("off"), { active: false });
-  assert.deepEqual(mcpStatusDot("error"), { color: "#ef4444" });
-  assert.deepEqual(mcpStatusDot("warning"), { color: "#f59e0b" });
+  assert.deepEqual(mcpStatusDot("error"), { color: "var(--danger)" });
+  assert.deepEqual(mcpStatusDot("warning"), { color: "var(--warning)" });
   // A tested server: connected reads like on, needing a sign-in like a warning, a failure like an error.
   assert.equal(mcpRowStateTone("connected"), "on");
   assert.equal(mcpRowStateTone("needs-auth"), "warning");
