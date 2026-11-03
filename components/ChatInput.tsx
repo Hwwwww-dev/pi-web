@@ -598,13 +598,13 @@ function QueueActionButton({ label, title, onClick, children }: {
         display: "flex",
         alignItems: "center",
         gap: 4,
-        padding: "2px 8px",
+        padding: "3px 10px",
         fontSize: 11,
         whiteSpace: "nowrap",
         color: "var(--text)",
-        background: hover ? "var(--bg-hover)" : "transparent",
-        border: `1px solid ${hover ? "color-mix(in srgb, var(--accent) 45%, var(--border))" : "var(--border)"}`,
-        borderRadius: 6,
+        background: hover ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "color-mix(in srgb, var(--text-dim) 7%, transparent)",
+        border: `1px solid ${hover ? "color-mix(in srgb, var(--accent) 45%, transparent)" : "color-mix(in srgb, var(--border) 55%, transparent)"}`,
+        borderRadius: 999,
         cursor: "pointer",
         transition: "background 0.12s, border-color 0.12s",
       }}
@@ -633,9 +633,10 @@ function QueuedMessageRow({
     flexShrink: 0,
     fontSize: 10,
     fontFamily: "var(--font-mono)",
-    padding: "1px 7px",
+    padding: "1px 8px",
     borderRadius: 999,
-    border: `1px solid ${isSteer ? "color-mix(in srgb, var(--accent) 45%, transparent)" : "var(--border)"}`,
+    background: isSteer ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "color-mix(in srgb, var(--text-dim) 8%, transparent)",
+    border: `1px solid ${isSteer ? "color-mix(in srgb, var(--accent) 40%, transparent)" : "color-mix(in srgb, var(--border) 60%, transparent)"}`,
     color: isSteer ? "var(--accent)" : "var(--text-dim)",
   } as const;
   return (
@@ -645,10 +646,16 @@ function QueuedMessageRow({
         display: "flex",
         alignItems: "center",
         gap: 8,
-        padding: "3px 10px",
+        padding: "7px 12px 7px 14px",
         fontSize: 12,
-        color: "var(--text-muted)",
+        color: "color-mix(in srgb, var(--text) 88%, transparent)",
         minWidth: 0,
+        borderRadius: 999,
+        background: "color-mix(in srgb, var(--bg-panel) 62%, transparent)",
+        backdropFilter: "blur(16px) saturate(1.6)",
+        WebkitBackdropFilter: "blur(16px) saturate(1.6)",
+        border: "1px solid color-mix(in srgb, var(--border) 65%, transparent)",
+        boxShadow: "0 1px 1px rgba(0,0,0,0.03), 0 3px 12px rgba(0,0,0,0.06)",
       }}
     >
       {item.images.length > 0 && (
@@ -661,7 +668,7 @@ function QueuedMessageRow({
                 <img
                   src={src}
                   alt=""
-                  style={{ width: 22, height: 22, objectFit: "cover", borderRadius: 4, border: "1px solid var(--border)", display: "block" }}
+                  style={{ width: 22, height: 22, objectFit: "cover", borderRadius: "50%", border: "1px solid color-mix(in srgb, var(--border) 65%, transparent)", display: "block" }}
                 />
               </ImagePreview>
             );
@@ -1979,23 +1986,18 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         })()}
         {/* Pending messages: pi delivers them on upcoming turns */}
         {queuedSubmissions && queuedSubmissions.length > 0 && (
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            minHeight: 72, // the header and one whole row
-            marginBottom: 8,
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "var(--bg-panel)",
-            padding: "5px 0",
-          }}>
-            <div style={{ padding: "2px 10px 4px" }}>
+          <div style={{ marginBottom: 8, display: "flex", flexDirection: "column", gap: 5 }}>
+            <div style={{ display: "flex", justifyContent: "center" }}>
               <span style={{
                 fontSize: 10,
                 fontFamily: "var(--font-mono)",
                 color: "var(--text-dim)",
                 textTransform: "uppercase",
                 letterSpacing: 0.4,
+                padding: "2px 10px",
+                borderRadius: 999,
+                background: "color-mix(in srgb, var(--bg-panel) 55%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
               }}>
                 {t("chat.queued", { count: queuedSubmissions.length })}
               </span>
@@ -2005,6 +2007,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               maxHeight: "min(180px, calc(var(--app-viewport-height, 100dvh) * 0.25))",
               overflowY: "auto",
               overscrollBehavior: "contain",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "stretch",
+              gap: 5,
+              // Keep the capsules' soft shadows inside the scroller's clip.
+              padding: "2px 3px",
             }}>
               {queuedSubmissions.map((item, index) => (
                 <QueuedMessageRow
