@@ -731,15 +731,15 @@ test("the Debug button only toggles its panel, left of the session stats", () =>
   assert.match(button, /if \(!showChat\) return null;/);
   assert.notEqual(enLocale.messages["debug.title"], enLocale.messages["session.title"], "e2e finds the stats button by its own name");
 
-  // Desktop: after the chat's actions, right before the stats, taking the free space.
-  assert.match(shellSource, /\{renderChatToolbarActions\(false\)\}\s*\{renderDebugButton\(false\)\}\s*\{renderSessionStatsButton\(false\)\}/);
+  // Desktop: after the chat's actions and the ⋯ overflow, right before the stats.
+  assert.match(shellSource, /\{renderChatToolbarActions\(false, "primary"\)\}\s*<div ref=\{desktopToolbarMoreRef\}[\s\S]*?\{renderDebugButton\(false\)\}\s*\{renderSessionStatsButton\(false\)\}/);
   assert.match(button, /marginLeft: mobile \? 0 : "auto"/);
   const stats = between(shellSource, "const renderSessionStatsButton = (mobile: boolean) => {", "const renderDebugButton");
   assert.match(stats, /\n\s*marginLeft: 0,/);
   assert.match(shellSource, /marginLeft: !mobile && !showChat \? "auto" : 0,/);
   // Phones: before the stats on a wide one, in the "more" overlay on a narrow one.
-  assert.match(shellSource, /\{!isNarrowMobile && renderChatToolbarActions\(true\)\}\s*\{!isNarrowMobile && renderDebugButton\(true\)\}\s*\{renderSessionStatsButton\(true\)\}/);
-  assert.match(shellSource, /\{renderChatToolbarActions\(true\)\}\s*\{renderDebugButton\(true\)\}\s*<\/div>/);
+  assert.match(shellSource, /\{!isNarrowMobile && renderChatToolbarActions\(true, "primary"\)\}\s*\{!isNarrowMobile && renderToolbarMoreButton\(\)\}\s*\{!isNarrowMobile && renderDebugButton\(true\)\}\s*\{renderSessionStatsButton\(true\)\}/);
+  assert.match(shellSource, /\{renderChatToolbarActions\(true, "primary"\)\}\s*\{renderChatToolbarActions\(true, "overflow"\)\}\s*\{renderDebugButton\(true\)\}\s*<\/div>/);
 });
 
 test("Escape with focus in the panel gives it back to the Debug button, after the panel left the page", () => {
@@ -773,7 +773,7 @@ test("the sidebar's running poll records its request alone, not the session-list
 });
 
 test("the narrow phone's more overlay scrolls the buttons it cannot fit instead of clipping the last", () => {
-  const overlay = between(shellSource, 'data-mobile-toolbar-actions="true"', "{renderChatToolbarActions(true)}");
+  const overlay = between(shellSource, 'data-mobile-toolbar-actions="true"', '{renderChatToolbarActions(true, "primary")}');
   assert.match(overlay, /overflowX: "auto",\s*overflowY: "hidden",\s*scrollbarWidth: "none",/);
 });
 

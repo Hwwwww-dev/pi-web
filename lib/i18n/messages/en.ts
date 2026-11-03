@@ -668,6 +668,8 @@ export const enLocale: LocalePlugin = {
     "sidebar.fork": "Fork",
     "sidebar.openInNewTab": "Open in new tab",
     "sidebar.forkedToast": "Forked “{title}”",
+    "sidebar.autoNamed": "Generated title “{title}”",
+    "sidebar.autoNameFailed": "Title generation failed · {error}",
     "sidebar.forkNotFound": "This session no longer exists",
     "sidebar.forkUnsaved": "This session hasn’t been saved yet. Send a message first.",
     "sidebar.forkEmpty": "Nothing to fork: this branch has no messages yet",

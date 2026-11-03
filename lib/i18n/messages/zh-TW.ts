@@ -668,6 +668,8 @@ export const zhTWLocale: LocalePlugin = {
     "sidebar.fork": "分叉",
     "sidebar.openInNewTab": "在新分頁開啟",
     "sidebar.forkedToast": "已分叉「{title}」",
+    "sidebar.autoNamed": "已生成標題「{title}」",
+    "sidebar.autoNameFailed": "生成標題失敗 · {error}",
     "sidebar.forkNotFound": "此工作階段已不存在",
     "sidebar.forkUnsaved": "此工作階段尚未儲存，請先傳送一則訊息。",
     "sidebar.forkEmpty": "沒有可分叉的內容：此分支還沒有訊息",

@@ -156,16 +156,16 @@ test("keeps the status label and the permissive chip in the composer's controls 
   const chatInput = await readFile(new URL("./ChatInput.tsx", import.meta.url), "utf8");
   const chatWindow = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
 
-  // Upstream v0.14.2 renders a second More trigger inside the mobile controls menu;
-  // the row-order assertion concerns the composer row's own More button (the last one).
-  const moreIndex = chatInput.lastIndexOf('{t("chat.moreControls")}');
+  // The sidebar's duplicate in-row More button was removed (dedup): the top
+  // bar's ⋯ owns overflow, and the row keeps upstream's controls toggle.
+  const controlsIndex = chatInput.indexOf('title={controlsMenuOpen ? undefined : t("chat.moreControls")}');
   const statusIndex = chatInput.indexOf("<ExtensionStatusButton statuses=");
   const chipIndex = chatInput.indexOf("{permissiveStatus && <PermissiveModeChip");
 
-  // Row order: controls → 扩展 → 更多(移动端) → YOLO at the far right.
-  assert.ok(statusIndex > 0 && moreIndex > 0 && chipIndex > 0, "all three sit in the composer row");
-  assert.ok(statusIndex < moreIndex, "the status chip sits before the mobile More button");
-  assert.ok(moreIndex < chipIndex, "YOLO closes the row at the far right");
+  // Row order: 更多控件 → 扩展 → YOLO at the far right.
+  assert.ok(controlsIndex > 0 && statusIndex > 0 && chipIndex > 0, "all three sit in the composer row");
+  assert.ok(controlsIndex < statusIndex, "the controls toggle opens the row");
+  assert.ok(statusIndex < chipIndex, "YOLO closes the row at the far right");
   assert.match(chatInput, /extensionStatuses\?: ExtensionStatusItem\[\]/);
   assert.match(chatWindow, /extensionStatuses=\{extensionStatuses\}/);
 });

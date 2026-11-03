@@ -414,6 +414,7 @@ export function AppShell() {
   const [sideChatPrompts, setSideChatPrompts] = useState<Record<string, string>>({});
   const topBarRef = useRef<HTMLDivElement>(null);
   const mobileToolbarRef = useRef<HTMLDivElement>(null);
+  const desktopToolbarMoreRef = useRef<HTMLDivElement>(null);
   // Branch navigator state — populated by ChatWindow via onBranchDataChange
   const [branchTree, setBranchTree] = useState<SessionTreeNode[]>([]);
   const [branchActiveLeafId, setBranchActiveLeafId] = useState<string | null>(null);
@@ -612,7 +613,9 @@ export function AppShell() {
 
     const handlePointerDown = (event: PointerEvent) => {
       const toolbar = mobileToolbarRef.current;
+      const desktopMore = desktopToolbarMoreRef.current;
       if (toolbar && event.composedPath().includes(toolbar)) return;
+      if (desktopMore && event.composedPath().includes(desktopMore)) return;
       setMobileToolbarMoreOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -2016,10 +2019,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     </button>
   );
 
-  const renderChatToolbarActions = (mobile: boolean) => {
+  const renderChatToolbarActions = (mobile: boolean, section: "primary" | "overflow" = "primary") => {
     if (!mobile && !showChat) return null;
     return (
       <div style={{ display: "flex", alignItems: "stretch", height: "100%" }}>
+        {section === "primary" && (
         <button
           type="button"
           onClick={() => {
@@ -2081,7 +2085,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           </svg>
           {!mobile && <span>{translate("history.label")}</span>}
         </button>
-        {(() => {
+        )}
+        {section === "overflow" && (() => {
           // 上下文压缩后当前消息可能不再包含 user 消息，需同时参考会话文件的消息总数。
           const hasMessages = Boolean(
             selectedSession
@@ -2159,8 +2164,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </button>
           );
         })()}
-        {!(mobile && isNarrowMobile) && renderAgentsButton(mobile)}
-        {sessionHasBranches && (mobile ? (
+        {section === "primary" && !(mobile && isNarrowMobile) && renderAgentsButton(mobile)}
+        {section === "primary" && sessionHasBranches && (mobile ? (
           <button
             type="button"
             onClick={() => toggleTopPanel("branches", true)}
@@ -2199,6 +2204,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             hasSession
           />
         ))}
+        {section === "overflow" && (
         <button
           ref={systemBtnRef}
           type="button"
@@ -2237,6 +2243,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           </svg>
           {!mobile && <span>{translate("system.label")}</span>}
         </button>
+        )}
+        {section === "overflow" && (
         <button
           type="button"
           onClick={() => handleSystemInfoToggle("tools", mobile)}
@@ -2276,9 +2284,44 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           )}
           {!mobile && <span>{translate("tools.label")}</span>}
         </button>
+        )}
       </div>
     );
   };
+
+  // The ⋯ overflow control: mobile rows slide their actions in; desktop gets a
+  // small dropdown. Both host the overflow section of the toolbar actions.
+  const renderToolbarMoreButton = () => (
+    <button
+      type="button"
+      onClick={handleMobileToolbarMoreToggle}
+      title={moreControlsLabel}
+      aria-label={moreControlsLabel}
+      aria-controls="mobile-toolbar-actions"
+      aria-expanded={mobileToolbarMoreOpen}
+      data-mobile-toolbar-more="true"
+      style={{
+        position: "relative",
+        zIndex: mobileToolbarMoreOpen ? 21 : undefined,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        width: TOP_BAR_ICON_BUTTON_SIZE, height: TOP_BAR_ICON_BUTTON_SIZE, padding: 0,
+        background: mobileToolbarMoreOpen ? "var(--bg-selected)" : "none",
+        border: "none", borderRight: "1px solid var(--border)",
+        color: mobileToolbarMoreOpen ? "var(--text)" : "var(--text-muted)",
+        cursor: "pointer", flexShrink: 0, transition: "color 0.12s, background 0.12s",
+      }}
+    >
+      {mobileToolbarMoreOpen ? (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <line x1="5" y1="5" x2="19" y2="19" /><line x1="19" y1="5" x2="5" y2="19" />
+        </svg>
+      ) : (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
+        </svg>
+      )}
+    </button>
+  );
 
   const renderSessionStatsButton = (mobile: boolean) => {
     if (!mobile && (!showChat || (!sessionStats && !contextUsage))) return null;
@@ -2306,7 +2349,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       tooltipParts.push(`${translate("session.context")}: ${percent !== null ? `${percent.toFixed(1)}%` : "?"} / ${contextUsage.contextWindow.toLocaleString(locale)}`);
     }
     const tooltip = tooltipParts.join("  |  ");
-    const covered = mobile && isNarrowMobile && mobileToolbarMoreOpen;
+    const covered = mobile && mobileToolbarMoreOpen;
 
     return (
       <button
@@ -2399,7 +2442,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
   };
 
   const renderMainFileToggle = (mobile: boolean) => {
-    const covered = mobile && isNarrowMobile && mobileToolbarMoreOpen;
+    const covered = mobile && mobileToolbarMoreOpen;
     return (
       <button
         type="button"
@@ -2498,6 +2541,18 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       }
       .mobile-session-stats {
         container-type: inline-size;
+      }
+      /* One line on phones: the two-line wrap overflows the 44px bar and reads
+         as broken over the transcript. Nowrap clips at the right edge; the
+         tiers below drop the least valuable segments first (cache → in/out →
+         cost) so cost+ctx survive. */
+      .mobile-session-stats > span {
+        flex-wrap: nowrap !important;
+      }
+      @container (max-width: 220px) {
+        .mobile-session-stats [data-usage-seg="cache"] {
+          display: none !important;
+        }
       }
       @container (max-width: 158px) {
         .mobile-session-stats [data-usage-seg="in"],
@@ -2624,42 +2679,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               }}
             >
               {isNarrowMobile && renderAgentsButton(true)}
-              {isNarrowMobile && (
-                <button
-                  type="button"
-                  onClick={handleMobileToolbarMoreToggle}
-                  title={moreControlsLabel}
-                  aria-label={moreControlsLabel}
-                  aria-controls="mobile-toolbar-actions"
-                  aria-expanded={mobileToolbarMoreOpen}
-                  data-mobile-toolbar-more="true"
-                  style={{
-                    position: "relative",
-                    zIndex: mobileToolbarMoreOpen ? 21 : undefined,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    width: TOP_BAR_ICON_BUTTON_SIZE, height: TOP_BAR_ICON_BUTTON_SIZE, padding: 0,
-                    background: mobileToolbarMoreOpen ? "var(--bg-selected)" : "none",
-                    border: "none", borderRight: "1px solid var(--border)",
-                    color: mobileToolbarMoreOpen ? "var(--text)" : "var(--text-muted)",
-                    cursor: "pointer", flexShrink: 0, transition: "color 0.12s, background 0.12s",
-                  }}
-                >
-                  {mobileToolbarMoreOpen ? (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                      <line x1="5" y1="5" x2="19" y2="19" /><line x1="19" y1="5" x2="5" y2="19" />
-                    </svg>
-                  ) : (
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
-                    </svg>
-                  )}
-                </button>
-              )}
-              {!isNarrowMobile && renderChatToolbarActions(true)}
+              {isNarrowMobile && renderToolbarMoreButton()}
+              {!isNarrowMobile && renderChatToolbarActions(true, "primary")}
+              {!isNarrowMobile && renderToolbarMoreButton()}
               {!isNarrowMobile && renderDebugButton(true)}
               {renderSessionStatsButton(true)}
               {renderMainFileToggle(true)}
-              {isNarrowMobile && mobileToolbarMoreOpen && (
+              {isMobile && mobileToolbarMoreOpen && (
                 <div
                   id="mobile-toolbar-actions"
                   role="toolbar"
@@ -2670,8 +2696,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     top: 0,
                     right: 0,
                     bottom: 0,
-                    // Right of the Agents and More buttons, which stay in place.
-                    left: `calc(2 * ${TOP_BAR_ICON_BUTTON_SIZE})`,
+                    // Right of the Agents and More buttons, which stay in place
+                    // (narrow); the wide layout slides over the whole row.
+                    left: isNarrowMobile ? `calc(2 * ${TOP_BAR_ICON_BUTTON_SIZE})` : 0,
                     zIndex: 20,
                     display: "flex",
                     alignItems: "stretch",
@@ -2684,7 +2711,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     backdropFilter: "blur(10px)",
                   }}
                 >
-                  {renderChatToolbarActions(true)}
+                  {renderChatToolbarActions(true, "primary")}
+                  {renderChatToolbarActions(true, "overflow")}
                   {renderDebugButton(true)}
                 </div>
               )}
@@ -2693,7 +2721,15 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           {!isMobile && (
             <>
               {renderProjectTrustWarning(false)}
-              {renderChatToolbarActions(false)}
+              {renderChatToolbarActions(false, "primary")}
+              <div ref={desktopToolbarMoreRef} style={{ position: "relative", display: "flex", alignItems: "stretch", height: "100%" }}>
+                {renderToolbarMoreButton()}
+                {mobileToolbarMoreOpen && (
+                  <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 500, minWidth: 230, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                    {renderChatToolbarActions(false, "overflow")}
+                  </div>
+                )}
+              </div>
               {renderDebugButton(false)}
               {renderSessionStatsButton(false)}
             </>

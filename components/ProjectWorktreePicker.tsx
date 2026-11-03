@@ -257,7 +257,7 @@ export function ProjectWorktreePicker({
   };
   const closeMenu = () => setMenu(null);
 
-  const openMenu = (kind: ProjectWorktreeControl, opener: HTMLElement) => {
+  const openMenuAt = (kind: ProjectWorktreeControl, opener: HTMLElement) => {
     const rect = opener.getBoundingClientRect();
     // At least as wide as its box, as main's dropdowns were.
     const width = Math.max(stacked ? STACKED_MENU_MIN_WIDTH : kind === "project" ? 260 : 240, Math.round(rect.width));
@@ -276,6 +276,28 @@ export function ProjectWorktreePicker({
     });
     // Worktrees come and go outside this page (the CLI, another window).
     if (kind === "worktree") onRefreshWorktrees();
+  };
+  // A programmatic open (the sidebar menu's project-list entry) can fire while
+  // the files section is still unfolding: the not-yet-laid-out opener's rect is
+  // all zeros and the menu would land in the viewport's top-left corner. Wait
+  // for a real layout box (bounded, ~1s) instead of opening blind.
+  const openMenu = (kind: ProjectWorktreeControl, opener: HTMLElement) => {
+    const rect = opener.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) {
+      let tries = 0;
+      const wait = () => {
+        if (!opener.isConnected) return;
+        const next = opener.getBoundingClientRect();
+        if (next.width > 0 || next.height > 0) {
+          openMenuRef.current(kind, opener);
+        } else if (tries++ < 60) {
+          requestAnimationFrame(wait);
+        }
+      };
+      requestAnimationFrame(wait);
+      return;
+    }
+    openMenuAt(kind, opener);
   };
   const openMenuRef = useRef(openMenu);
   openMenuRef.current = openMenu;

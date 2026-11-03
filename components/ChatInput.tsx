@@ -2562,11 +2562,14 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   aria-label={t("chat.sideChat")}
                   className={`bg-transparent ${value.trim() && !attachedImages.length ? "cursor-pointer text-text-muted hover:bg-bg-hover hover:text-text" : "cursor-not-allowed text-text-dim"}`}
                   style={{
-                    width: 38,
+                    width: 36,
+                    height: 36,
                     display: "grid", placeItems: "center",
                     padding: 0,
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
+                    alignSelf: "flex-end",
+                    background: "transparent",
+                    border: "none",
+                    borderRadius: "50%",
                     transition: "background 0.12s",
                   }}
                 >
@@ -2978,33 +2981,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </div>
             )}
 
-            {isStreaming && (
-              <button
-                onClick={onAbort}
-                 title={t("chat.stopAgent")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "8px 14px",
-                  height: controlSize,
-                  background: "rgba(239,68,68,0.08)",
-                  border: "1px solid rgba(239,68,68,0.3)",
-                  borderRadius: 9,
-                  color: "#ef4444",
-                  cursor: "pointer",
-                  fontSize: 12, fontWeight: 600,
-                  whiteSpace: "nowrap", letterSpacing: "-0.01em",
-                  transition: "background 0.12s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.16)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
-                </svg>
-                 {t("chat.stop")}
-              </button>
-            )}
-
             {onSoundToggle !== undefined && (
               <button
                 onClick={onSoundToggle}
@@ -3095,26 +3071,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             </div>
 
             <ExtensionStatusButton statuses={extensionStatuses ?? []} />
-            {isMobile && (
-              <button
-                type="button"
-                className="composer-chip"
-                 title={controlsMenuOpen ? undefined : t("chat.moreControls")}
-                 aria-label={t("chat.moreControls")}
-                aria-expanded={controlsMenuOpen}
-                aria-hidden={controlsMenuOpen || undefined}
-                tabIndex={controlsMenuOpen ? -1 : undefined}
-                onClick={() => {
-                  setControlsMenuOpen(true);
-                }}
-                style={{
-                  visibility: controlsMenuOpen ? "hidden" : "visible",
-                  pointerEvents: controlsMenuOpen ? "none" : "auto",
-                }}
-              >
-                {t("chat.moreControls")}
-              </button>
-            )}
             {/* YOLO is a marker, not a control: it carries no box, and it closes
                 the row at the far right. */}
             {permissiveStatus && <PermissiveModeChip text={permissiveStatus} />}

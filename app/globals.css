@@ -3462,6 +3462,18 @@ span.token.table {
   }
 }
 
+/* The composer textarea keeps its scroll but never draws a scrollbar: the
+   pill is small and the bar rides over the send-button column on phones. */
+.chat-input-textarea {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.chat-input-textarea::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 @keyframes extension-drawer-in { from { transform: translateY(16px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
 .extension-drawer-in { animation: extension-drawer-in 0.22s ease-out }
 .extension-option { background: var(--bg-panel) }

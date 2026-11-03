@@ -342,6 +342,7 @@ const SESSION_ACTION_LABEL_KEYS: Record<SessionMenuActionId, string> = {
   pin: "sidebar.pin",
   unpin: "sidebar.unpin",
   rename: "sidebar.rename",
+  "auto-name": "title.generate",
   fork: "sidebar.fork",
   "mark-read": "sidebar.markRead",
   "mark-unread": "sidebar.markUnread",
@@ -356,6 +357,7 @@ function sessionActionIcon(id: SessionMenuActionId): ReactNode {
     case "pin": return <PinIcon />;
     case "unpin": return <PinOffIcon />;
     case "rename": return <PencilIcon />;
+    case "auto-name": return <PencilIcon />;
     case "fork": return <ForkIcon />;
     case "mark-read": return <DotOutlineIcon />;
     case "mark-unread": return <DotIcon />;
@@ -2042,6 +2044,28 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     }
   }, [loadSessions, showToast, t]);
 
+  // Generate a title (the row menu's G): the same auto-name route the chat
+  // toolbar's 生成标题 button calls. The list reloads so the row picks the new
+  // name up; transient rows never show this menu (sessionMenuEntries).
+  const autoNameFamily = useCallback(async (family: SessionFamily) => {
+    const source = family.root;
+    if (source.transient) return;
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(source.id)}/auto-name`, {
+        method: "POST",
+      });
+      const body = (await res.json().catch(() => ({}))) as { title?: string; error?: string };
+      if (!res.ok || !body.title) {
+        showToast(t("sidebar.autoNameFailed", { error: body.error || `HTTP ${res.status}` }));
+        return;
+      }
+      void loadSessions();
+      showToast(t("sidebar.autoNamed", { title: shortTitle(body.title, TOAST_TITLE_MAX) }));
+    } catch (error) {
+      showToast(t("sidebar.autoNameFailed", { error: error instanceof Error ? error.message : String(error) }));
+    }
+  }, [loadSessions, showToast, t]);
+
   // Open in new tab (the row menu's T): the row's session in a browser tab of
   // its own, by the same link its title carries. This tab's selection, cwd and
   // file tabs stay as they are, and nothing is asked of the server here: the
@@ -2061,6 +2085,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       case "pin": setFamilyPinned(family, true); break;
       case "unpin": setFamilyPinned(family, false); break;
       case "rename": startRename(family); break;
+      case "auto-name": void autoNameFamily(family); break;
       case "fork": void forkFamily(row); break;
       case "mark-read": markFamilyRead(family, true); break;
       case "mark-unread": markFamilyRead(family, false); break;

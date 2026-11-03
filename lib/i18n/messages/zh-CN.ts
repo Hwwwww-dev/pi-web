@@ -668,6 +668,8 @@ export const zhCNLocale: LocalePlugin = {
     "sidebar.fork": "分叉",
     "sidebar.openInNewTab": "在新标签页打开",
     "sidebar.forkedToast": "已分叉「{title}」",
+    "sidebar.autoNamed": "已生成标题「{title}」",
+    "sidebar.autoNameFailed": "生成标题失败 · {error}",
     "sidebar.forkNotFound": "该会话已不存在",
     "sidebar.forkUnsaved": "该会话尚未保存，请先发送一条消息。",
     "sidebar.forkEmpty": "没有可分叉的内容：此分支还没有消息",
