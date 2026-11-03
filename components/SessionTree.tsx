@@ -421,6 +421,7 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
         onClickCapture={groupDrag.onClickCapture}
       >
         {!loading && (
+          // Virtualized canvas height: the measured sum of all row offsets.
           <div ref={innerRef} className="session-tree-inner" style={{ height: offsets[rows.length] }}>
             {visibleIndices.map((index) => {
               const row = rows[index];
@@ -468,12 +469,14 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
               return <PlainRowView key={row.key} row={row} top={top} height={height} handlers={handlersRef} onMoreAction={handleMoreAction} />;
             })}
             {dragSource && (
+              // Ghost highlight over the measured row band being dragged.
               <div
                 className="session-tree-drag-source"
                 aria-hidden="true"
                 style={{ top: dragSource.top, height: dragSource.bottom - dragSource.top }}
               />
             )}
+            {/* Drop indicator between rows: the measured Y of the insertion point. */}
             {dropLineY !== null && <div className="session-tree-drop-line" aria-hidden="true" style={{ top: dropLineY }} />}
           </div>
         )}

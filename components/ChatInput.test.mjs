@@ -1095,9 +1095,11 @@ test("selector rows keep the default star and the floating save button in one gu
   assert.match(savable, /role="option"/);
   assert.match(savable, /aria-label="Save as default"/);
   // Hidden until hover or focus, but kept out of the row's text by the gutter.
-  assert.match(savable, /opacity:0/);
+  assert.match(savable, /opacity-0/);
   assert.match(savable, /tabindex="-1"/);
-  assert.match(savable, /padding:7px 36px 7px 12px/);
+  assert.match(savable, /py-\[7px\]/);
+  assert.match(savable, /\bpl-3\b/);
+  assert.match(savable, /\bpr-9\b/);
   assert.doesNotMatch(savable, /aria-label="Default"/);
 
   // The default row shows a static marker in the same spot and no button.
@@ -1108,9 +1110,10 @@ test("selector rows keep the default star and the floating save button in one gu
 
   const plain = row({});
   assert.doesNotMatch(plain, /Save as default|aria-label="Default"/);
-  assert.match(plain, /padding:7px 12px/);
+  assert.match(plain, /\bpr-3\b/);
+  assert.doesNotMatch(plain, /\bpr-9\b/);
   // Rows without a star still line up with starred ones in the same menu.
-  assert.match(row({ gutter: true }), /padding:7px 36px 7px 12px/);
+  assert.match(row({ gutter: true }), /\bpr-9\b/);
 
   const active = row({ active: true });
   assert.match(active, /aria-selected="true"/);

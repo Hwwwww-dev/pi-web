@@ -91,8 +91,8 @@
 
 .session-tree button:focus-visible,
 .session-tree a.session-tree-main:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 /*
@@ -188,7 +188,7 @@
   right: var(--session-tree-inset-right);
   left: var(--session-tree-inset-left);
   padding: 0 4px 0 20px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   overflow: hidden;
 }
@@ -214,6 +214,7 @@
   bottom: 7px;
   left: 0;
   width: 3px;
+  /* 2px micro radius below the token scale, kept literal */
   border-radius: 0 2px 2px 0;
   background: var(--accent);
 }
@@ -397,7 +398,7 @@ a.session-tree-main {
   height: 24px;
   margin-left: 2px;
   padding: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-dim);
 }
 
@@ -458,7 +459,7 @@ a.session-tree-main {
   padding: 0 8px;
   box-sizing: border-box;
   border: 1px solid var(--accent);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   outline: none;
   background: var(--bg);
   color: var(--text);
@@ -488,7 +489,7 @@ a.session-tree-main {
   gap: 4px;
   height: 24px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
@@ -497,6 +498,7 @@ a.session-tree-main {
 .session-tree-confirm-delete {
   border: 1px solid var(--danger);
   background: var(--danger);
+  /* white on --danger, kept literal: no danger-contrast token */
   color: #fff;
   font-weight: 600;
 }
@@ -525,7 +527,7 @@ a.session-tree-main {
   left: var(--session-tree-inset-left);
   gap: 2px;
   padding: 0 4px 0 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -543,6 +545,7 @@ a.session-tree-main {
 /* Picked up by a long-press, before the finger moves. */
 .session-tree-group.is-drag-armed {
   background: var(--bg-selected);
+  /* neutral black shadow, kept literal: no shadow token */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
@@ -554,7 +557,7 @@ a.session-tree-main {
   position: absolute;
   right: var(--session-tree-inset-right);
   left: var(--session-tree-inset-left);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--bg-panel) 55%, transparent);
   pointer-events: none;
 }
@@ -565,6 +568,7 @@ a.session-tree-main {
   left: var(--session-tree-inset-left);
   height: 2px;
   margin-top: -1px;
+  /* 1px micro radius below the token scale, kept literal */
   border-radius: 1px;
   background: var(--accent);
   pointer-events: none;
@@ -595,8 +599,10 @@ a.session-tree-main {
   height: 22px;
   padding: 0 10px;
   border: 1px solid var(--border);
+  /* 11px pill (half of the 22px height); no radius token at this size */
   border-radius: 11px;
   background: var(--bg-panel);
+  /* neutral black shadow, kept literal: no shadow token */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
   color: var(--text);
   font-size: 12px;
@@ -737,7 +743,7 @@ a.session-tree-main {
   width: 22px;
   height: 22px;
   padding: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-dim);
 }
 
@@ -812,7 +818,7 @@ a.session-tree-main {
   gap: 3px;
   min-width: 0;
   padding: 0 4px 0 5px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   color: var(--text-dim);
   font-size: 12px;
   text-align: left;
@@ -1050,7 +1056,7 @@ a.session-tree-main {
   margin: 0 0 0 7px;
   padding: 2px 4px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   font-family: var(--font-mono);
@@ -1072,8 +1078,8 @@ a.session-tree-main {
 }
 
 .sidebar-brand:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 .sidebar-header-spacer {
@@ -1093,6 +1099,8 @@ a.session-tree-main {
 .sidebar-new-button:disabled {
   color: var(--text-dim);
   cursor: not-allowed;
+  /* title carries the disabled reason: keep pointer events for it */
+  opacity: 0.4;
 }
 
 /* Where the labels do not fit (useHeaderFit measures them: their widths
@@ -1131,8 +1139,8 @@ a.session-tree-main {
 .sidebar-archive-menu-button:focus-visible,
 .sidebar-tool-button:focus-visible,
 .sidebar-files-section-toggle:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 .sidebar-panel {
@@ -1255,7 +1263,7 @@ a.session-tree-main {
   padding: 0 5px;
   overflow: hidden;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   font: inherit;
@@ -1313,7 +1321,7 @@ a.session-tree-main {
   min-width: 18px;
   max-width: 26px;
   height: 26px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 /* Under that row (or the whole files tab): the head, then the tree filling
@@ -1339,7 +1347,7 @@ a.session-tree-main {
   padding: 0 10px;
   box-sizing: border-box;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
   font: inherit;
@@ -1347,7 +1355,8 @@ a.session-tree-main {
 }
 
 .sidebar-search-input:focus {
-  outline: 2px solid var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 /* The tree and the archive view under the search, in one cell: the archive
@@ -1422,7 +1431,7 @@ a.session-tree-main {
   height: 26px;
   padding: 0 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   font-size: 12px;
@@ -1450,7 +1459,7 @@ a.session-tree-main {
   margin-left: auto;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
@@ -1533,7 +1542,7 @@ a.session-tree-main {
   height: 32px;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
@@ -1559,7 +1568,8 @@ a.session-tree-main {
 
 .sidebar-tool-button:disabled {
   cursor: default;
-  opacity: 0.6;
+  /* disabled keys keep their titles (the disabled reason) */
+  opacity: 0.4;
 }
 
 /* Under the head's line, on the boxes' edges. */

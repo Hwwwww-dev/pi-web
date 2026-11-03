@@ -214,12 +214,12 @@ test("keeps the status button a compact single-line chip", async () => {
   assert.match(source, /className="composer-chip"/);
   assert.match(chipRule, /height:\s*32px/);
   assert.match(chipRule, /white-space:\s*nowrap/);
-  assert.match(chipRule, /border-radius:\s*8px/);
+  assert.match(chipRule, /border-radius:\s*var\(--radius-md\)/);
   // Flat by design: a box per control is what made the row look like a wall of
   // buttons; hover supplies the only background.
   assert.match(chipRule, /background:\s*none/);
   assert.match(chipRule, /border:\s*0/);
   assert.doesNotMatch(chipRule, /text-overflow/);
   assert.match(dotRule, /border-radius:\s*50%/);
-  assert.match(css, /\.extension-status-dot\[data-tone="error"\]\s*\{\s*background:\s*#dc2626;\s*\}/);
+  assert.match(css, /\.extension-status-dot\[data-tone="error"\]\s*\{\s*background:\s*var\(--danger\);\s*\}/);
 });

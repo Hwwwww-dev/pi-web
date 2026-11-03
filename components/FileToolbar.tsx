@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { AtSign, WrapText } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { PathLabel } from "./PathLabel";
 
@@ -33,10 +34,7 @@ export function FileMentionButton({ onClick, title, disabled }: { onClick: () =>
       disabled={disabled}
       className="file-viewer-icon-button"
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="4" />
-        <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
-      </svg>
+      <AtSign size={14} strokeWidth={1.8} />
     </button>
   );
 }
@@ -69,32 +67,15 @@ export function FileToolbar<Mode extends string = string>({
   const { t } = useI18n();
 
   return (
-    <div
-      className="file-viewer-toolbar"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "5px 12px",
-        borderBottom: "1px solid var(--border)",
-        fontSize: 11,
-        color: "var(--text-dim)",
-        background: "var(--bg)",
-        flexShrink: 0,
-      }}
-    >
-      <PathLabel className="file-viewer-path" text={pathLabel} title={pathTitle ?? pathLabel} style={{ fontFamily: "var(--font-mono)" }} />
+    <div className="file-viewer-toolbar flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-[5px] text-xs text-dim">
+      <PathLabel className="file-viewer-path font-mono" text={pathLabel} title={pathTitle ?? pathLabel} />
 
       <span className="file-viewer-meta" title={metaTitle ?? meta}>{meta}</span>
       {live !== undefined && (
         <span
           title={live ? t("i18n.liveSync") : t("i18n.notWatching")}
           aria-label={live ? t("i18n.liveSync") : t("i18n.notWatching")}
-          className="file-viewer-live-indicator"
-          style={{
-            background: live ? "#4ade80" : "var(--border)",
-            boxShadow: live ? "0 0 4px #4ade80" : "none",
-          }}
+          className={`file-viewer-live-indicator ${live ? "bg-success shadow-[0_0_4px_var(--color-success)]" : "bg-border"}`}
         />
       )}
 
@@ -110,11 +91,7 @@ export function FileToolbar<Mode extends string = string>({
                   onClick={() => onSelectMode(mode)}
                   title={title}
                   aria-pressed={active}
-                  className="file-viewer-mode-button"
-                  style={{
-                    background: active ? "var(--bg-selected)" : "transparent",
-                    color: active ? "var(--text)" : "var(--text-muted)",
-                  }}
+                  className={`file-viewer-mode-button ${active ? "bg-accent text-foreground" : "text-muted-foreground"}`}
                 >
                   {label}
                 </button>
@@ -133,17 +110,12 @@ export function FileToolbar<Mode extends string = string>({
               aria-label={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
               aria-pressed={wrapLines}
               className="file-viewer-icon-button"
-              style={{
-                background: wrapLines ? "var(--bg-selected)" : "transparent",
-                color: wrapLines ? "var(--text)" : "var(--text-muted)",
-              }}
+              // The unlayered `.file-viewer-icon-button` rule sets background/color, so
+              // the active state must stay an inline override to win over it (and keep
+              // losing to its own :hover rule).
+              style={wrapLines ? { background: "var(--bg-selected)", color: "var(--text)" } : undefined}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 6h18" />
-                <path d="M3 12h15a3 3 0 1 1 0 6h-4" />
-                <path d="m16 16-2 2 2 2" />
-                <path d="M3 18h7" />
-              </svg>
+              <WrapText size={14} strokeWidth={1.8} />
             </button>
           )}
         </div>

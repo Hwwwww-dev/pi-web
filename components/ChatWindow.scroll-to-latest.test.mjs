@@ -37,7 +37,7 @@ test("floats the scroll-to-latest button above the composer at full width", () =
     /className="pointer-events-none absolute inset-x-0 bottom-full z-20 flex justify-center pb-2\.5"/,
   );
   assert.match(cssSource, /\.chat-scroll-to-bottom\.is-visible \{[\s\S]*?pointer-events: auto;/);
-  assert.match(cssSource, /\.chat-scroll-to-bottom:focus-visible \{[\s\S]*?outline: 2px solid var\(--accent\)/);
+  assert.match(cssSource, /\.chat-scroll-to-bottom:focus-visible \{[\s\S]*?box-shadow: 0 0 0 3px color-mix\(in srgb, var\(--accent\) 50%, transparent\)/);
   assert.match(block, /onClick=\{\(\) => scrollToBottom\("smooth"\)\}/);
 });
 

@@ -1919,6 +1919,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         className="hidden"
         onChange={handleFilePick}
       />}
+      {/* Column width comes from the shared chat-content CSS variable. */}
       <div
         className="mx-auto w-full min-w-0"
         style={{ maxWidth: "var(--chat-content-max-width, 820px)" }}
@@ -2065,6 +2066,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             <div
               ref={slashMenuRef}
               className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 flex max-h-[min(72.8vh,598px)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
+              // Clamped by the measured free space above the composer.
               style={{
                 maxHeight: slashMenuMaxHeight === null
                   ? "min(72.8vh, 598px)"
@@ -2145,6 +2147,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               <div
                 ref={atMenuRef}
                 className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 flex max-h-[min(48vh,400px)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
+                // Clamped by the measured free space above the composer.
                 style={{
                   maxHeight: atMenuMaxHeight === null
                     ? "min(48vh, 400px)"

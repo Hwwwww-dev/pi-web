@@ -18,7 +18,7 @@ export function TurnWrittenFiles({ files, onOpenFile }: {
   if (files.length === 0) return null;
 
   return (
-    <div aria-label={t("chat.filesWritten")} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 6 }}>
+    <div aria-label={t("chat.filesWritten")} className="mt-1.5 flex flex-wrap items-center gap-1.5">
       {files.map(({ filePath }) => {
         const name = getFileName(filePath);
         return (
@@ -28,19 +28,7 @@ export function TurnWrittenFiles({ files, onOpenFile }: {
             title={filePath}
             aria-label={t("chat.openWrittenFile", { name })}
             onClick={() => onOpenFile?.(filePath)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              padding: "2px 8px",
-              fontSize: 12,
-              fontFamily: "var(--font-mono)",
-              color: "var(--text)",
-              background: "var(--bg-subtle)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
+            className="inline-flex cursor-pointer items-center gap-1 rounded-sm border border-border bg-muted px-2 py-0.5 font-mono text-xs text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           >
             {getFileIcon(name, 12)}
             <span>{name}</span>

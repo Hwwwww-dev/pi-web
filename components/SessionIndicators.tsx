@@ -1,5 +1,6 @@
 "use client";
 
+import { LoaderCircleIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 
 /**
@@ -12,34 +13,9 @@ export function RunningSessionIndicator() {
     <span
       title={t("sidebar.agentRunning")}
       aria-label={t("sidebar.agentRunning")}
-      style={{
-        width: 14,
-        height: 14,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        color: "var(--accent)",
-      }}
+      className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-primary"
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ display: "block" }}>
-        <g>
-          <path
-            d="M21 12a9 9 0 1 1-3.8-7.4"
-            stroke="currentColor"
-            strokeWidth="2.8"
-            strokeLinecap="round"
-          />
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            from="0 12 12"
-            to="360 12 12"
-            dur="0.9s"
-            repeatCount="indefinite"
-          />
-        </g>
-      </svg>
+      <LoaderCircleIcon size={14} strokeWidth={2.8} className="sidebar-spin" />
     </span>
   );
 }
@@ -50,23 +26,12 @@ export function UnreadSessionIndicator() {
     <span
       title={t("sidebar.newActivity")}
       aria-label={t("sidebar.newSessionActivity")}
-      style={{
-        width: 14,
-        height: 14,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        color: "#0891b2",
-      }}
+      className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-primary"
     >
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{ display: "block" }}>
-        <circle cx="7" cy="7" r="2.5" fill="currentColor" />
-        <circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.4" opacity="0.32">
-          <animate attributeName="r" values="3;6;3" dur="1.6s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.32;0;0.32" dur="1.6s" repeatCount="indefinite" />
-        </circle>
-      </svg>
+      <span className="relative flex h-3.5 w-3.5 items-center justify-center">
+        <span className="absolute h-2 w-2 rounded-full bg-primary opacity-40 motion-safe:animate-ping" />
+        <span className="relative h-[5px] w-[5px] rounded-full bg-primary" />
+      </span>
     </span>
   );
 }

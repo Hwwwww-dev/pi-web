@@ -561,6 +561,8 @@ export const ChatMinimap = memo(function ChatMinimap({
         if (findNearestSlot(ratio)) showPreview();
         else if (!draggingRef.current) schedulePreviewHide();
       }}
+      // Canvas anchoring: the rail hugs the chat pane's right edge at the shared
+      // MINIMAP_WIDTH layout constant — measured positioning, kept as a style.
       style={{
         position: "absolute",
         top: 0,
@@ -570,10 +572,8 @@ export const ChatMinimap = memo(function ChatMinimap({
         right: 14,
         width: MINIMAP_WIDTH,
         zIndex: 25,
-        cursor: "pointer",
-        userSelect: "none",
-        overflow: "visible",
       }}
+      className="cursor-pointer select-none overflow-visible"
     >
       {positionedSlots.map((slot) => {
         const isNearest = minimapHovered && nearestSlot === slot;
@@ -581,14 +581,7 @@ export const ChatMinimap = memo(function ChatMinimap({
         const slotHasCompaction = slot.indexes.some((i) => allNodes[i]?.targetTurn.afterCompaction);
         // The dashes are the minimap when nothing is hovered: without them the
         // trigger zone is invisible, so there is nothing to aim for.
-        const width = isNearest ? 18 : minimapHovered || isActive ? 12 : 8;
-        const background = isActive
-          ? "var(--accent)"
-          : isNearest
-            ? "color-mix(in srgb, var(--accent) 55%, transparent)"
-            : minimapHovered
-              ? "color-mix(in srgb, var(--text-muted) 38%, transparent)"
-              : "color-mix(in srgb, var(--text-muted) 24%, transparent)";
+        const widthClass = isNearest ? "w-[18px]" : minimapHovered || isActive ? "w-3" : "w-2";
 
         return (
           <div
@@ -596,45 +589,35 @@ export const ChatMinimap = memo(function ChatMinimap({
             data-minimap-node-index={slot.indexes[0]}
             data-minimap-node-span={slot.indexes.length > 1 ? slot.indexes.length : undefined}
             data-minimap-node-active={isActive ? "" : undefined}
+            // Tick placement: top/height come from the slot layout's measured pitch.
             style={{
               position: "absolute",
               top: `${slot.topRatio * 100}%`,
               transform: "translateY(-50%)",
-              left: 0,
-              right: 0,
               height: Math.max(1, slotGap),
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              paddingRight: 9,
-              pointerEvents: "none",
               zIndex: 2,
             }}
+            className="pointer-events-none inset-x-0 flex items-center justify-end pr-[9px]"
           >
             {slotHasCompaction && (
               <div
                 aria-hidden="true"
                 title={t("chatMinimap.compactionBoundary")}
-                style={{
-                  width: 5,
-                  height: 5,
-                  marginRight: 5,
-                  transform: "rotate(45deg)",
-                  borderRadius: 1,
-                  background: "var(--accent)",
-                  opacity: minimapHovered ? 0.9 : 0.55,
-                  transition: "opacity 0.12s ease",
-                }}
+                className={`mr-[5px] h-[5px] w-[5px] rotate-45 rounded-[1px] bg-primary transition-opacity duration-[120ms] ${
+                  minimapHovered ? "opacity-90" : "opacity-55"
+                }`}
               />
             )}
             <div
-              style={{
-                width,
-                height: 3,
-                borderRadius: 999,
-                background,
-                transition: "width 0.12s ease, background 0.12s ease",
-              }}
+              className={`h-[3px] rounded-full transition-[width,background-color] duration-[120ms] ${widthClass} ${
+                isActive
+                  ? "bg-primary"
+                  : isNearest
+                    ? "bg-primary/55"
+                    : minimapHovered
+                      ? "bg-muted-foreground/38"
+                      : "bg-muted-foreground/24"
+              }`}
             />
           </div>
         );

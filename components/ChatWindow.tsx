@@ -1513,12 +1513,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       onDrop={handleDrop}
     >
       {isDragOver && (
-        <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] items-center justify-center bg-primary/[0.06] backdrop-blur-[1px]">
+        <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] motion-reduce:animate-none items-center justify-center bg-primary/[0.06] backdrop-blur-[1px]">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             {[0, 0.8, 1.6].map((delay) => (
               <div
                 key={delay}
-                className="absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid border-primary/50 animate-[drop-ripple_2.4s_ease-out_infinite_backwards]"
+                className="absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid border-primary/50 animate-[drop-ripple_2.4s_ease-out_infinite_backwards] motion-reduce:animate-none"
                 style={{ transformOrigin: "center", animationDelay: `${delay}s` }}
               />
             ))}
@@ -1591,13 +1591,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
             {(agentRunning || isCompacting) && !hasStreamingContent && (agentPhase || isCompacting) && !liveActivityRendered && (
               <div className="break-words py-2 text-[13px] text-muted-foreground">
-                <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t, isCompacting, queuedSubmissions.length)}</span>
+                <span className="animate-[pulse_1.5s_infinite] motion-reduce:animate-none">{phaseLabel(agentPhase, t, isCompacting, queuedSubmissions.length)}</span>
               </div>
             )}
 
             {bashRunning && !pendingBash && (
               <div className="py-2 text-[13px] text-muted-foreground">
-                 <span className="animate-[pulse_1.5s_infinite]">{t("chat.runningCommand")}</span>
+                 <span className="animate-[pulse_1.5s_infinite] motion-reduce:animate-none">{t("chat.runningCommand")}</span>
               </div>
             )}
 

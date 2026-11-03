@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { TriangleAlert } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import {
   formatCacheWarmCost,
@@ -9,9 +10,6 @@ import {
   type CacheMissSummary,
   type TranscriptNotice,
 } from "@/lib/transcript-notices";
-
-// pi's TUI draws these lines in its warning color, cache warming dim (#1265).
-export const TRANSCRIPT_NOTICE_WARNING_COLOR = "#d97706";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
@@ -53,34 +51,26 @@ export function cacheMissSummaryText(t: Translate, summary: CacheMissSummary): s
   return t(summary.count === 1 ? "transcriptNotice.foldCacheMiss" : "transcriptNotice.foldCacheMisses", params);
 }
 
-/** One line per notice, under the message they follow. A compaction's cost is drawn in its card. */
+/**
+ * One line per notice, under the message they follow. A compaction's cost is
+ * drawn in its card. Warnings render in the warning token — pi's TUI draws
+ * these lines in its warning color, cache warming dim (#1265).
+ */
 export const TranscriptNoticeLines = memo(function TranscriptNoticeLines({ notices }: { notices: readonly TranscriptNotice[] }) {
   const { t } = useI18n();
   const shown = notices.filter((notice) => !(notice.kind === "summary_cost" && notice.source === "compaction"));
   if (shown.length === 0) return null;
   return (
-    <div className="transcript-notices" style={{ display: "flex", flexDirection: "column", gap: 2, margin: "-6px 0 12px" }}>
+    <div className="transcript-notices -mt-1.5 mb-3 flex flex-col gap-0.5">
       {shown.map((notice, index) => {
         const warning = notice.kind !== "cache_warm";
         return (
           <div
             key={index}
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 6,
-              fontSize: 12,
-              lineHeight: 1.5,
-              color: warning ? TRANSCRIPT_NOTICE_WARNING_COLOR : "var(--text-dim)",
-              overflowWrap: "anywhere",
-            }}
+            className={`flex items-start gap-1.5 text-xs leading-normal wrap-anywhere ${warning ? "text-warning" : "text-dim"}`}
           >
             {warning && (
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 3 }}>
-                <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
+              <TriangleAlert size={13} strokeWidth={1.8} className="mt-[3px] shrink-0" />
             )}
             <span>{transcriptNoticeText(t, notice)}</span>
           </div>
