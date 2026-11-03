@@ -2448,7 +2448,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               border: compact ? "none" : `1px solid ${bashMode ? "var(--tool-bg)" : isStreaming && onFollowUp
                 ? "rgba(234,179,8,0.4)"
                 : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
-              borderRadius: compact ? 0 : 14,
+              borderRadius: compact ? 12 : 14,
               padding: compact ? 0 : isMobile ? "6px 6px 6px 12px" : "10px 10px 10px 14px",
               boxShadow: compact ? "none" : "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
               transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
