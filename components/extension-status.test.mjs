@@ -158,7 +158,7 @@ test("keeps the status label and the permissive chip in the composer's controls 
 
   // The sidebar's duplicate in-row More button was removed (dedup): the top
   // bar's ⋯ owns overflow, and the row keeps upstream's controls toggle.
-  const controlsIndex = chatInput.indexOf('title={controlsMenuOpen ? undefined : t("chat.moreControls")}');
+  const controlsIndex = chatInput.indexOf('aria-label={t("chat.moreControls")}');
   const statusIndex = chatInput.indexOf("<ExtensionStatusButton statuses=");
   const chipIndex = chatInput.indexOf("{permissiveStatus && <PermissiveModeChip");
 

@@ -57,7 +57,8 @@ test("contains chat content and inputs within the mobile viewport", () => {
   assert.match(chatWindowSource, /import \{ useDialogMaxHeight \} from "@\/hooks\/useDialogMaxHeight";/);
   assert.match(chatWindowSource, /const dialogMaxHeight = useDialogMaxHeight\(wrapperRef\);/);
   assert.match(chatWindowSource, /maxHeight: dialogMaxHeight/);
-  assert.match(chatInputSource, /flex: stackedComposer \? "none" : 1,\s*minWidth: 0,\s*width: "100%",/);
+  assert.match(chatInputSource, /stackedComposer \? undefined : "flex-1"/);
+  assert.match(chatInputSource, /"chat-input-textarea w-full min-w-0/);
 });
 
 test("prevents iOS focus zoom from widening the layout", () => {
@@ -79,8 +80,8 @@ test("collapses secondary composer chrome while the mobile keyboard is open", ()
 test("every class the keyboard-open rules target exists on its component", () => {
   // Every selector the keyboard rules target must exist on the element it
   // means; a renamed class would otherwise leave the rule silently dead.
-  assert.match(chatInputSource, /className="chat-input-controls"/);
-  assert.match(chatInputSource, /className=\{compact \? undefined : "chat-input-shell"\}/);
+  assert.match(chatInputSource, /className="chat-input-controls[^"]*"/);
+  assert.match(chatInputSource, /compact \? "shrink-0" : "chat-input-shell /);
   assert.match(extensionStatusBarSource, /className=\{`extension-status-shelf/);
   assert.match(chatWindowSource, /className="chat-content /);
   // Phone landscape exceeds the 640px breakpoint but has the least height.

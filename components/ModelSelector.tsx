@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { ChevronDownIcon, CpuIcon, LoaderCircleIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { SelectorRow } from "./SelectorRow";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { isProviderUsageId } from "@/lib/provider-usage-ids";
 import { primaryUsagePercent, readProviderUsageSnapshot, writeProviderUsageSnapshot, type ProviderUsageSnapshot } from "./ProviderUsageSummary";
 
@@ -198,35 +201,6 @@ export function ModelSelector({
     return () => { cancelled = true; };
   }, [open]);
 
-  const buttonStyle: CSSProperties = variant === "field"
-    ? {
-        display: "flex",
-        alignItems: "center",
-        gap: 7,
-        width: "100%",
-        minWidth: 0,
-        height: 34,
-        padding: "0 9px",
-        overflow: "hidden",
-        border: "1px solid var(--border)",
-        borderRadius: 5,
-        background: locked ? "var(--bg-panel)" : "var(--bg)",
-        color: locked ? "var(--text-dim)" : "var(--text)",
-        cursor: locked ? "default" : "pointer",
-        fontSize: 12,
-        textAlign: "left",
-      }
-    : {
-        justifyContent: isMobile ? "flex-start" : undefined,
-        // Height, padding, radius and type size come from the composer-chip
-        // class: one box recipe shared with every other control in the row.
-        width: isMobile ? "100%" : undefined,
-        maxWidth: isMobile ? "100%" : 260,
-        overflow: "hidden",
-        cursor: locked ? "not-allowed" : "pointer",
-        opacity: locked ? 0.5 : 1,
-      };
-
   const choose = (option: ModelSelectorOption) => {
     const active = option.modelId === value?.modelId && option.provider === value?.provider;
     setOpen(false);
@@ -244,8 +218,10 @@ export function ModelSelector({
   return (
     <div
       ref={rootRef}
-      className={`model-selector is-${variant}${locked ? " is-disabled" : ""}`}
-      style={{ position: "relative", width: variant === "field" ? "100%" : undefined, minWidth: 0, flex: variant === "toolbar" && isMobile ? "1 1 auto" : undefined }}
+      className={cn(
+        "model-selector relative min-w-0",
+        variant === "field" ? "w-full" : "max-md:flex-[1_1_auto]",
+      )}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || !open) return;
         event.preventDefault();
@@ -254,61 +230,63 @@ export function ModelSelector({
         setOpen(false);
       }}
     >
-      <button
-        type="button"
-        className={variant === "toolbar" ? "composer-chip" : undefined}
-        aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-busy={busy || undefined}
-        disabled={locked}
-        title={busy ? t("chat.switchingModel") : locked ? currentName : options.length > 0 || onClear ? t("chat.changeModel") : t("chat.noAvailableModels")}
-        style={buttonStyle}
-        onClick={(event) => {
-          const rect = event.currentTarget.getBoundingClientRect();
-          setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
-          setOpen((current) => {
-            if (current) setFilter("");
-            else setShowAll(false);
-            return !current;
-          });
-        }}
-        onMouseEnter={variant === "field" ? (event) => {
-          if (locked) return;
-          event.currentTarget.style.background = "var(--bg-hover)";
-          event.currentTarget.style.color = "var(--text)";
-        } : undefined}
-        onMouseLeave={variant === "field" ? (event) => {
-          if (locked) {
-            event.currentTarget.style.background = "var(--bg-panel)";
-            event.currentTarget.style.color = "var(--text-dim)";
-            return;
-          }
-          event.currentTarget.style.background = open ? "var(--bg-hover)" : "var(--bg)";
-          event.currentTarget.style.color = "var(--text)";
-        } : undefined}
-      >
-        {busy ? (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" style={{ animation: "spin 0.8s linear infinite", flexShrink: 0 }} aria-hidden="true">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-          </svg>
-        ) : (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-            <rect x="4" y="4" width="16" height="16" rx="2" />
-            <rect x="9" y="9" width="6" height="6" />
-            <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
-            <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
-            <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
-            <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
-          </svg>
-        )}
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentName}</span>
-        {variant === "field" && (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, color: "var(--text-dim)" }}>
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        )}
-      </button>
+      {variant === "toolbar" ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label={ariaLabel}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-busy={busy || undefined}
+          disabled={locked}
+          title={busy ? t("chat.switchingModel") : locked ? currentName : options.length > 0 || onClear ? t("chat.changeModel") : t("chat.noAvailableModels")}
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
+            setOpen((current) => {
+              if (current) setFilter("");
+              else setShowAll(false);
+              return !current;
+            });
+          }}
+          className="max-w-[260px] gap-1.5 overflow-hidden px-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground max-md:max-w-full disabled:pointer-events-auto disabled:cursor-not-allowed"
+        >
+          {busy
+            ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
+            : <CpuIcon className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />}
+          <span className="min-w-0 flex-1 truncate">{currentName}</span>
+        </Button>
+      ) : (
+        <button
+          type="button"
+          className={cn(
+            "flex h-[34px] w-full min-w-0 items-center gap-[7px] overflow-hidden rounded-md border border-border px-[9px] text-left text-xs transition-colors",
+            locked ? "cursor-default bg-card text-dim" : "cursor-pointer bg-background text-foreground hover:bg-secondary",
+          )}
+          aria-label={ariaLabel}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-busy={busy || undefined}
+          disabled={locked}
+          title={busy ? t("chat.switchingModel") : locked ? currentName : options.length > 0 || onClear ? t("chat.changeModel") : t("chat.noAvailableModels")}
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
+            setOpen((current) => {
+              if (current) setFilter("");
+              else setShowAll(false);
+              return !current;
+            });
+          }}
+        >
+          {busy
+            ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
+            : <CpuIcon className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />}
+          <span className="min-w-0 flex-1 truncate">{currentName}</span>
+          <ChevronDownIcon className="size-3 shrink-0 text-dim" strokeWidth={2} aria-hidden="true" />
+        </button>
+      )}
 
       {open && anchorRect && (() => {
         // Fixed coordinates belong to the layout viewport, which a phone
@@ -336,48 +314,36 @@ export function ModelSelector({
             ref={panelRef}
             role="listbox"
             aria-label={ariaLabel}
+            className="fixed z-[500] flex flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
             style={{
-              position: "fixed",
               ...verticalPosition,
               ...horizontalPosition,
-              zIndex: 500,
-              display: "flex",
-              flexDirection: "column",
               maxHeight,
-              overflow: "hidden",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              background: "var(--bg)",
-              boxShadow: openAbove ? "0 -4px 16px rgba(0,0,0,0.10)" : "0 4px 16px rgba(0,0,0,0.10)",
             }}
           >
             {onShowAll && (
-              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 8px 0", fontSize: 11 }}>
+              <div className="flex items-center gap-1 px-2 pb-0 pt-1.5 text-xs">
                 {[false, true].map((all) => (
                   <button
                     key={String(all)}
                     type="button"
                     aria-pressed={showAll === all}
                     onClick={() => { if (showAll !== all) switchScope(); }}
-                    style={{
-                      padding: "2px 7px",
-                      border: "1px solid",
-                      borderColor: showAll === all ? "var(--border)" : "transparent",
-                      borderRadius: 4,
-                      background: showAll === all ? "var(--bg-hover)" : "none",
-                      color: showAll === all ? "var(--text)" : "var(--text-muted)",
-                      cursor: "pointer",
-                      fontSize: 11,
-                    }}
+                    className={cn(
+                      "cursor-pointer rounded-sm border px-[7px] py-0.5 text-xs transition-colors",
+                      showAll === all
+                        ? "border-border bg-secondary text-foreground"
+                        : "border-transparent bg-transparent text-muted-foreground hover:text-foreground",
+                    )}
                   >
                     {t(all ? "chat.modelScopeAll" : "chat.modelScopeScoped")}
                   </button>
                 ))}
-                {!isMobile && <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 10 }}>Tab</span>}
+                {!isMobile && <span className="ml-auto font-mono text-[10px] text-dim">Tab</span>}
               </div>
             )}
             {showFilter && (
-              <div style={{ flexShrink: 0, padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>
+              <div className="shrink-0 border-b p-2">
                 <input
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
@@ -394,23 +360,11 @@ export function ModelSelector({
                   autoFocus={!isMobile}
                   autoComplete="off"
                   spellCheck={false}
-                  style={{
-                    boxSizing: "border-box",
-                    width: "100%",
-                    minWidth: isMobile ? 0 : 220,
-                    padding: "5px 8px",
-                    border: "1px solid var(--border)",
-                    borderRadius: 5,
-                    outline: "none",
-                    background: "var(--bg)",
-                    color: "var(--text)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
-                  }}
+                  className="box-border w-full min-w-0 rounded-sm border border-border bg-background px-2 py-[5px] font-mono text-xs text-foreground outline-none max-md:min-w-0"
                 />
               </div>
             )}
-            <div style={{ minHeight: 0, overflowY: "auto" }}>
+            <div className="min-h-0 overflow-y-auto">
               {onClear && !filter.trim() && (
                 <SelectorRow active={!value} gutter={Boolean(onSetDefault)} onSelect={() => {
                   setOpen(false);
@@ -421,16 +375,22 @@ export function ModelSelector({
                 </SelectorRow>
               )}
               {modelsByProvider.length === 0 ? (
-                <div style={{ padding: "8px 12px", color: "var(--text-dim)", fontSize: 12, whiteSpace: "nowrap" }}>
+                <div className="whitespace-nowrap px-3 py-2 text-xs text-dim">
                   {!listed ? t("agents.modelsLoading") : filter.trim() ? t("chat.noMatchingModels") : t("chat.noAvailableModels")}
                 </div>
               ) : modelsByProvider.map((group, index) => (
                 <div key={group.provider}>
                   {(modelsByProvider.length > 1 || usagePercent[group.provider] !== undefined) && (
-                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "6px 12px 4px", borderTop: index > 0 || onClear ? "1px solid var(--border)" : "none", color: "var(--text-dim)", fontSize: 10, fontWeight: 600, letterSpacing: 0, textTransform: "uppercase" }}>
-                      {modelsByProvider.length > 1 && <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.provider}</span>}
+                    <div className={cn("flex items-baseline justify-between gap-2 px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase text-dim", (index > 0 || onClear) && "border-t border-border")}>
+                      {modelsByProvider.length > 1 && <span className="min-w-0 truncate">{group.provider}</span>}
                       {usagePercent[group.provider] !== undefined && (
-                        <span title={t("providerUsage.usage")} style={{ flexShrink: 0, fontWeight: 500, textTransform: "none", letterSpacing: 0, color: usagePercent[group.provider] > 90 ? "#f87171" : usagePercent[group.provider] > 70 ? "#fbbf24" : "var(--text-dim)" }}>
+                        <span
+                          title={t("providerUsage.usage")}
+                          className={cn(
+                            "shrink-0 font-medium normal-case tracking-normal",
+                            usagePercent[group.provider] > 90 ? "text-destructive" : usagePercent[group.provider] > 70 ? "text-warning" : "text-dim",
+                          )}
+                        >
                           {usagePercent[group.provider]}%
                         </span>
                       )}
@@ -465,5 +425,5 @@ export function ModelSelector({
 }
 
 function OptionLabel({ label }: { label: string }) {
-  return <span title={label} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>;
+  return <span title={label} className="min-w-0 truncate">{label}</span>;
 }

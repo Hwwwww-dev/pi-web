@@ -48,6 +48,8 @@
   --color-destructive: var(--danger);
   --color-ring: var(--accent);
   --color-dim: var(--text-dim);
+  --color-warning: var(--warning);
+  --color-success: var(--ok);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -71,6 +73,16 @@
 html.dark {
   --glass-bg: rgba(30, 30, 30, 0.72);
   --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+/* 液态玻璃胶囊（§7.1 队列胶囊）：浮层玻璃配方落在 --glass-* token 上，
+   组件只负责圆角与内容排版。 */
+.glass-capsule {
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  box-shadow: 0 1px 1px rgb(0 0 0 / 3%), 0 3px 12px rgb(0 0 0 / 6%);
 }
 
 :root,
@@ -3514,6 +3526,8 @@ span.token.table {
 /* The composer textarea keeps its scroll but never draws a scrollbar: the
    pill is small and the bar rides over the send-button column on phones. */
 .chat-input-textarea {
+  font-size: var(--chat-content-font-size, 14px);
+  line-height: 1.6;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }

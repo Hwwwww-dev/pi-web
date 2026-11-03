@@ -962,7 +962,7 @@ test("keeps the compaction control reachable while a turn is auto-compacting", (
   // the control behind `!isStreaming` left only the generic stop button, which aborts the
   // whole prompt instead of the compaction.
   const controlBlock = chatInputSource.slice(
-    chatInputSource.indexOf("onClick={isCompacting ? onAbortCompaction : (e) => { if (!isStrayClick(e)) onCompact(); }}") - 200,
+    chatInputSource.indexOf("onClick={isCompacting ? onAbortCompaction : (e) => { if (!isStrayClick(e)) onCompact(); }}") - 420,
     chatInputSource.indexOf('aria-label={isCompacting ? t("chat.stopCompaction")'),
   );
 
@@ -971,8 +971,8 @@ test("keeps the compaction control reachable while a turn is auto-compacting", (
   // The "streaming but not compacting" state is now unreachable, so its disabled styling
   // must be gone rather than left as dead branches.
   assert.doesNotMatch(controlBlock, /isStreaming && !isCompacting/);
-  // Upstream's touch-friendly restyle (v0.14.2) inlines the control styles: the
-  // pointer affordance and the compacting danger tint live in the style block.
-  assert.match(controlBlock, /cursor: "pointer"/);
-  assert.match(controlBlock, /isCompacting \? "#ef4444" : "var\(--text-muted\)"/);
+  // The control is a shadcn Button now: the pointer affordance and the
+  // compacting danger tint live in its variant/className.
+  assert.match(controlBlock, /<Button/);
+  assert.match(chatInputSource, /isCompacting && "gap-1 px-2 text-destructive/);
 });

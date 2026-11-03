@@ -318,7 +318,7 @@ test("scrolls a long queue inside its own box, under the count and Recall (#1428
       ],
     })),
   );
-  const rows = html.match(/<div style="max-height:min\(180px[^"]*overflow-y:auto[^"]*">(.*)$/s);
+  const rows = html.match(/<div class="[^"]*max-h-\[min\(180px[^"]*overflow-y-auto[^"]*">(.*)$/s);
   assert.ok(rows, "queued rows sit in a capped scroll box");
   assert.match(html.slice(0, rows.index), /Queued · 20<\/span>/);
   assert.deepEqual([...rows[1].matchAll(/<div title="([^"]+)"/g)].map((match) => match[1]),
@@ -466,7 +466,7 @@ test("renders the compact composer with the standard Send button and no session 
 
   assert.match(html, /<textarea/);
   assert.match(html, /aria-label="Send"/);
-  assert.match(html, /border-radius:50%/);
+  assert.match(html, /rounded-full/);
   assert.equal((html.match(/<button\b/g) ?? []).length, 1);
   assert.doesNotMatch(html, /type="file"|Attach files|Change tool preset/);
 });
@@ -480,7 +480,7 @@ test("the attach button takes any file when the chat handles them, and images on
   const fileInput = (html) => html.match(/<input[^>]*type="file"[^>]*>/)?.[0] ?? "";
 
   const html = render({ onAttachFiles() {} });
-  assert.match(html, /title="Attach files"/);
+  assert.match(html, /aria-label="Attach files"/);
   assert.match(fileInput(html), /multiple=""/);
   // No accept list and no capture: phones offer files, the photo library and the camera.
   assert.doesNotMatch(fileInput(html), /accept=|capture=/);
@@ -529,7 +529,7 @@ test("shows and locks the optimistic model while a switch is pending", () => {
   assert.match(html, /aria-busy="true"/);
   assert.match(html, /disabled=""/);
   assert.match(html, />DeepSeek V4 Flash</);
-  assert.match(html, /animation:spin 0\.8s linear infinite/);
+  assert.match(html, /animate-spin/);
 });
 
 test("the live model selector can reapply its current model without changing draft-field selection behavior", () => {
@@ -600,7 +600,7 @@ test("renders the shared field model selector as a disabled gray control", () =>
 
   assert.match(html, /aria-label="Model override"/);
   assert.match(html, /disabled=""/);
-  assert.match(html, /background:var\(--bg-panel\)/);
+  assert.match(html, /bg-card/);
   assert.match(html, />Parent default</);
 });
 
@@ -999,7 +999,7 @@ test("renders compact errors above the input as a wrapping alert", () => {
   assert.match(html, /role="alert"/);
   assert.match(html, /Compaction failed: OpenAI API error/);
   assert.match(html, /&lt;html&gt;request forbidden&lt;\/html&gt;/);
-  assert.match(html, /white-space:pre-wrap/);
+  assert.match(html, /whitespace-pre-wrap/);
   assert.ok(html.indexOf('role="alert"') < html.indexOf("<textarea"));
 });
 
