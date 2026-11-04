@@ -11,7 +11,6 @@ import test from "node:test";
 
 const source = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
 const appShellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
-const sonnerSource = await readFile(new URL("./ui/sonner.tsx", import.meta.url), "utf8");
 
 /** The body of SessionSidebar's `showToast` callback. */
 function showToastBody() {
