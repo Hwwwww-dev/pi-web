@@ -5,92 +5,95 @@ import test from "node:test";
 const source = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 const mobileHookSource = await readFile(new URL("../hooks/useIsMobile.ts", import.meta.url), "utf8");
 
-test("keeps action icons inline in medium mobile sidebars", () => {
+test("keeps action pills inline in medium mobile toolbars", () => {
   assert.match(mobileHookSource, /NARROW_MOBILE_QUERY = "\(max-width: 480px\)"/);
   assert.match(source, /const isNarrowMobile = useIsNarrowMobile\(\);/);
-  assert.match(source, /\{!isNarrowMobile && renderChatToolbarActions\(true, "primary"\)\}/);
-  assert.match(source, /\{!isNarrowMobile && renderToolbarMoreButton\(\)\}/);
-  assert.match(source, /\{isNarrowMobile && renderToolbarMoreButton\(\)\}/);
+  // The toolbar row renders the same pills on every width; a narrow phone's
+  // branch/history segments live in its ⋯ menu instead of the capsule.
+  assert.match(source, /\{renderAgentsButton\(true\)\}/);
+  assert.match(source, /\{renderToolbarBGroup\(true\)\}/);
+  assert.match(source, /\{\(!mobile \|\| !isNarrowMobile\) && sessionHasBranches && \(/);
+  assert.match(source, /\{\(!mobile \|\| !isNarrowMobile\) && \(\n        <button/);
   assert.match(source, /data-mobile-toolbar-more="true"/);
 });
 
-test("uses a compact narrow-mobile toolbar with a floating action layer", () => {
-  // The bar takes the free space and may shrink (flex-1 min-w-0), as the row's toolbar.
-  assert.match(source, /data-mobile-toolbar="true"\s+className="relative flex h-full min-w-0 flex-1 items-stretch"/);
-  assert.match(
-    source,
-    /data-mobile-toolbar-actions="true"[\s\S]*?position: "absolute"[\s\S]*?right: 0,[\s\S]*?left: isNarrowMobile \? `calc\(2 \* \$\{TOP_BAR_ICON_BUTTON_SIZE\}\)` : 0/,
-  );
+test("uses a compact mobile toolbar row with a Radix overflow menu", () => {
+  // The row is a column item of the title row's wrapper (items-stretch), so
+  // it takes the free width and may shrink (min-w-0), and wraps under the
+  // title row on a phone.
+  assert.match(source, /data-mobile-toolbar="true"\s+className="flex h-10 min-w-0 flex-wrap items-center gap-1\.5 pb-1"/);
+  // The menu is Radix-controlled and end-aligned to its ⋯ trigger; the old
+  // slide-in layer is gone.
+  assert.doesNotMatch(source, /position: "absolute",\s*top: 0,\s*right: 0,\s*bottom: 0/);
+  assert.match(source, /<DropdownMenu open=\{mobileToolbarMoreOpen\} onOpenChange=\{handleMobileToolbarMoreOpenChange\}>/);
+  assert.match(source, /align="end"\s+id="mobile-toolbar-actions"/);
+  assert.match(source, /data-mobile-toolbar-actions="true"/);
 
-  for (const action of ["history", "name", "agents", "branches", "system", "tools"]) {
+  for (const action of ["history", "name", "agents", "branches", "system", "tools", "debug"]) {
     assert.match(source, new RegExp(`data-mobile-toolbar-action=(?:\\{mobile \\? )?"${action}"`));
   }
 });
 
 test("only renders the Agents switcher when the active session family has subagents", () => {
   assert.match(source, /const agentsBadge = activeSessionFamily \? getAgentsBadge\(activeSessionFamily\.subagents, runningSessionIds\) : null;/);
-  // Upstream v0.14.2: on a narrow phone the Agents button leaves the More menu, so it
+  // Upstream v0.14.2: on a narrow phone the Agents pill leaves the More menu, so it
   // passes mobile && !isNarrowMobile and keeps that menu's state untouched.
-  assert.match(source, /onClick=\{\(\) => toggleTopPanel\("agents", mobile && !isNarrowMobile\)\}\s*disabled=\{!activeSessionFamily\}/);
-  assert.match(source, /activeTopPanel === "agents" && activeSessionFamily && selectedSession/);
-});
-
-test("keeps the Agents panel open while switching sessions and positions it at the left", () => {
-  assert.match(source, /const AGENT_PANEL_WIDTH = 420/);
   assert.match(
     source,
-    /if \(activeTopPanel === "agents"\)[\s\S]*?left: topBarRect\.left[\s\S]*?width: Math\.min\(AGENT_PANEL_WIDTH, topBarRect\.width\)/,
+    /onOpenChange=\{\(\) => toggleTopPanel\("agents", mobile && !isNarrowMobile\)\}\s*>\s*<PopoverTrigger asChild>\s*<button\s+type="button"\s+disabled=\{!activeSessionFamily\}/,
   );
+  // The panel itself renders only while the family and the selected session exist.
+  assert.match(source, /\{activeSessionFamily && selectedSession && \(\n            <AgentSessionPanel/);
+});
+
+test("keeps the Agents panel open while switching sessions and bounds it to the bar's width budget", () => {
+  assert.match(source, /const AGENT_PANEL_WIDTH = 420/);
+  // The Popover is driven by the single active-panel state; its transparent
+  // content carries the panel at the AGENT_PANEL_WIDTH budget.
+  assert.match(source, /open=\{activeTopPanel === "agents" && Boolean\(activeSessionFamily\)\}/);
+  assert.match(source, /w-\[var\(--agent-panel-width\)\] max-w-\[calc\(100vw-1\.5rem\)\]/);
+  assert.match(source, /"\-\-agent-panel-width": `\$\{AGENT_PANEL_WIDTH\}px`/);
   assert.match(source, /<AgentSessionPanel[\s\S]*?onSelectSession=\{handleSelectSession\}/);
 });
 
 test("only renders branch toolbar controls for sessions with branches", () => {
   assert.match(source, /const sessionHasBranches = hasSessionBranches\(branchTree\)/);
-  assert.match(source, /\{section === "primary" && sessionHasBranches && \(mobile \? \(/);
-  assert.match(source, /\{isMobile && sessionHasBranches && \(/);
+  assert.match(source, /\{sessionHasBranches && \(\n            <BranchNavigator/);
   assert.match(source, /panel === "branches" \? null : panel/);
+  assert.match(source, /hideInlineButton/);
 });
 
-test("keeps covered statistics and file controls out of interaction and focus", () => {
-  assert.match(source, /const covered = mobile && mobileToolbarMoreOpen;/);
-  assert.match(source, /disabled=\{!showChat \|\| covered\}[\s\S]*?tabIndex=\{covered \? -1 : undefined\}/);
-  // Covered controls drop out of painting and hit-testing via the invisible/pointer-events classes.
-  assert.match(source, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}[\s\S]*?covered && "invisible pointer-events-none"/);
-  assert.match(source, /aria-hidden=\{covered \? true : undefined\}/);
-});
-
-test("closes the mobile action layer on outside click, Escape, layout changes, and session changes", () => {
-  assert.match(source, /event\.composedPath\(\)\.includes\(toolbar\)/);
-  assert.match(source, /document\.addEventListener\("pointerdown", handlePointerDown, true\)/);
-  assert.match(source, /event\.key !== "Escape"[\s\S]*?setMobileToolbarMoreOpen\(false\)/);
+test("the ⋯ menu is Radix-controlled: outside clicks and Escape close it", () => {
+  // The old document-level capture listeners are gone; Radix owns dismissal.
+  assert.doesNotMatch(source, /document\.addEventListener\("pointerdown", handlePointerDown, true\)/);
+  assert.doesNotMatch(source, /event\.key !== "Escape"[\s\S]*?setMobileToolbarMoreOpen\(false\)/);
+  // Opening folds the drawer on a phone and closes any top panel; closing is
+  // a plain state write.
+  assert.match(source, /const handleMobileToolbarMoreOpenChange = useCallback\(\(open: boolean\) => \{\s*if \(isMobile && open\) setSidebarOpen\(false\);\s*if \(open\) setActiveTopPanel\(null\);\s*setMobileToolbarMoreOpen\(open\);/);
+  // Layout and session changes still close it.
   assert.match(source, /\}, \[isMobile, isNarrowMobile, selectedSession\?\.id, newSessionDraftId\]\);/);
 });
 
-test("keeps the mobile action layer open after using an expanded action", () => {
-  const toggleTopPanel = source.match(/const toggleTopPanel = useCallback\([\s\S]*?\n  \}, \[isMobile, isNarrowMobile\]\);/)?.[0];
-  const historyHandler = source.match(/onClick=\{\(\) => \{[\s\S]*?handleViewFullHistory\(\);[\s\S]*?\n          \}\}/)?.[0];
-  const autoNameHandler = source.match(/onClick=\{\(\) => \{[\s\S]*?void handleAutoName\(\);[\s\S]*?\n              \}\}/)?.[0];
-
-  for (const handler of [toggleTopPanel, historyHandler, autoNameHandler]) {
-    assert.ok(handler);
-    assert.doesNotMatch(handler, /setMobileToolbarMoreOpen\(false\)/);
-    assert.match(handler, /setMobileToolbarMoreOpen\(true\)/);
-  }
-
+test("keeps the naming menu open while the title generates", () => {
+  // The generate-title item cancels its select so Radix leaves the menu open
+  // and the status (generating / updated / failed) stays visible.
+  const nameItem = source.match(/<DropdownMenuItem\s*\/\/ Generating keeps its feedback visible in the menu[\s\S]*?data-mobile-toolbar-action=\{mobile \? "name" : undefined\}/)?.[0];
+  assert.ok(nameItem);
+  assert.match(nameItem, /event\.preventDefault\(\);\s*void handleAutoName\(\);/);
+  assert.doesNotMatch(nameItem, /setMobileToolbarMoreOpen\(false\)/);
   assert.match(source, /toggleTopPanel\("branches", true\)/);
-  assert.match(source, /handleSystemInfoToggle\("system", mobile\)/);
-  assert.match(source, /handleSystemInfoToggle\("tools", mobile\)/);
+  assert.match(source, /handleSystemInfoToggle\("system"\)/);
+  assert.match(source, /handleSystemInfoToggle\("tools"\)/);
   assert.match(source, /onClick=\{\(\) => toggleTopPanel\("session"\)\}/);
 });
 
-test("keeps theme and language in settings instead of the chat toolbar", () => {
-  assert.doesNotMatch(source, /renderThemeButton/);
+test("keeps language out of the chat toolbar; the theme pill writes the shared preference", () => {
   assert.doesNotMatch(source, /renderLanguageButton/);
   assert.doesNotMatch(source, /toggleTopPanel\("language"/);
-  assert.doesNotMatch(source, /data-mobile-toolbar-action=\{mobile \? "theme"/);
   assert.doesNotMatch(source, /data-mobile-toolbar-action=\{mobile \? "language"/);
   assert.match(source, /import \{ useTheme \} from "@\/hooks\/useTheme"/);
-  assert.match(source, /useTheme\(\);/);
+  assert.match(source, /setThemePreference\(theme === "dark" \? "light" : "dark"\)/);
+  assert.match(source, /title=\{translate\("settings\.appearance"\)\}/);
 });
 
 test("mobile statistics collapse to a context+cost chip with the rest in the popover", () => {
@@ -103,14 +106,13 @@ test("mobile statistics collapse to a context+cost chip with the rest in the pop
   // Hover paint stays off touch devices: the hover: variant is media-gated
   // (@media (hover: hover)) now that the canHover JS guards went with the
   // inline styles; enabled: keeps disabled controls unlit.
-  assert.match(source, /enabled:hover:(?:bg-secondary|text-foreground)/);
+  assert.match(source, /enabled:hover:(?:bg-secondary|bg-accent|text-foreground)/);
 });
 
 test("places trust warnings below the mobile toolbar and the file toggle in toolbar flow", () => {
   assert.match(source, /\{isMobile && renderProjectTrustWarning\(true\)\}/);
   assert.match(source, /data-mobile-trust-banner=\{mobileBanner \? "true" : undefined\}/);
-  assert.doesNotMatch(source, /File panel toggle — always visible at top-right/);
-  assert.doesNotMatch(source, /position: "fixed", top: "env\(safe-area-inset-top\)"/);
+  assert.match(source, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}/);
 });
 
 test("closes top-bar dropdowns when the file panel expands to full width", () => {

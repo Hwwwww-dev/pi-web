@@ -45,7 +45,6 @@ import {
   PinIcon,
   PlusIcon,
   ArchiveRestoreIcon,
-  LoaderCircleIcon,
   Trash2Icon,
 } from "lucide-react";
 
@@ -599,7 +598,7 @@ const SessionRowView = memo(function SessionRowView({
     metaState = " is-awaiting";
     metaTitle = t("sidebar.agentAwaitingInput");
   } else if (status.running) {
-    meta = <LoaderCircleIcon size={12} strokeWidth={2.8} className="sidebar-spin" role="img" aria-label={t("sidebar.agentRunning")} aria-hidden={false} />;
+    meta = <span className="session-tree-running" role="img" aria-label={t("sidebar.agentRunning")} aria-hidden={false} />;
     metaState = " is-running";
     metaTitle = t("sidebar.agentRunning");
   } else if (status.unread) {
@@ -816,7 +815,7 @@ export function DeleteConfirm({
 }
 
 /**
- * Spinner + count, amber dot + count (awaiting input) and dot + count; the
+ * Running dot + count, amber dot + count (awaiting input) and dot + count; the
  * label carries the count for screen readers. Also a project's badge in the
  * project menus (ProjectWorktreePicker), which counts no awaiting.
  */
@@ -831,7 +830,7 @@ export function ActivitySummary({ running, awaiting = 0, unread, t }: { running:
           title={t("sidebar.agentRunning")}
           aria-label={`${t("sidebar.agentRunning")} (${running})`}
         >
-          <LoaderCircleIcon size={10} strokeWidth={2.8} className="sidebar-spin" />
+          <span className="session-tree-summary-dot is-running" />
           {running}
         </span>
       )}

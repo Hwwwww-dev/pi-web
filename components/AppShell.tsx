@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } fr
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftIcon,
+  ArrowUpIcon,
   BotIcon,
   BugIcon,
   CheckIcon,
@@ -14,26 +15,37 @@ import {
   HistoryIcon,
   LoaderCircleIcon,
   MenuIcon,
+  MoonIcon,
   PanelLeftIcon,
   PanelRightIcon,
   PenLineIcon,
   ShieldAlertIcon,
+  SunIcon,
   WrenchIcon,
-  XIcon,
 } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "./ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { cn } from "@/lib/utils";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
 import { KeepAliveDock } from "./KeepAliveDock";
 import { ChatWindow } from "./ChatWindow";
 import { NewSessionContextBar, type NewSessionContextControl } from "./NewSessionContextBar";
-import { UsageBar } from "./UsageBar";
 import type { ChatScrollPosition } from "@/lib/chat-scroll-position";
 import { FileViewer } from "./FileViewer";
 import { GitPanel } from "./GitPanel";
 import { TabBar, type Tab } from "./TabBar";
 import { openFileTab, saveFileViewerState, saveParkedFileViewerState, switchFileWorkspace, type ParkedFileWorkspace } from "./file-tab-state";
 import { SettingsPanel, SettingsSectionIcon } from "./SettingsPanel";
+import { Toaster } from "./ui/sonner";
 import { ProjectTrustDialog, type ProjectTrustFailure } from "./ProjectTrustDialog";
 import { BranchNavigator, hasSessionBranches } from "./BranchNavigator";
 import { SystemPromptPanel } from "./SystemPromptPanel";
@@ -118,13 +130,22 @@ type AutoNameStatus =
   | { kind: "success" }
   | { kind: "error"; message: string };
 
-// app/globals.css: 36px, 44px on a phone or touch screen.
-const TOP_BAR_ICON_BUTTON_SIZE = "var(--top-bar-height)";
+// R2-1 header pills (the draft's .pm-pill): a quiet capsule that raises onto
+// the bar (border + surface + shadow) while its panel is open. Shared by the
+// Agents pill, the toolbar segments and the debug/theme group.
+const HEADER_PILL = "flex h-7 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 text-xs font-medium whitespace-nowrap text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-45";
+const HEADER_PILL_OPEN = "border-border bg-background text-foreground shadow-sm";
+// The connected capsule (the draft's .pm-bgroup) around related segments.
+const HEADER_BGROUP = "flex h-7 shrink-0 items-center gap-0.5 rounded-full border border-border bg-background p-0.5 shadow-xs";
+const HEADER_BGROUP_SEGMENT = "flex h-full w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-45";
 
 /** Right-panel Git tab id; closing it removes the tab, the sidebar entry reopens it. It owns no FileViewer. */
 const GIT_TAB_ID = "git";
 const GIT_PANEL_TAB: Tab = { id: GIT_TAB_ID, label: "", filePath: "", kind: "git" };
 const AGENT_PANEL_WIDTH = 420;
+// The footer's version readout (the draft's mono version at the row's end).
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0";
+const PI_VERSION = process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0";
 // pi's built-in tools that never change a file; any other tool may (#1144).
 const READ_ONLY_TOOL_NAMES = new Set(PRESET_READ_ONLY);
 const TOOL_END_REFRESH_MS = 1000;
@@ -139,8 +160,9 @@ export function AppShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [initialNavigation, setInitialNavigation] = useState(() => getInitialNavigation(searchParams));
-  // Keep the system-theme subscription mounted for the lifetime of the app.
-  useTheme();
+  // The system-theme subscription stays mounted for the app's lifetime; the
+  // header's light/dark pill writes through the same hook.
+  const { theme, setThemePreference } = useTheme();
   // Restore fonts even when Settings and the chat composer have not been opened.
   useFontPreferences();
   const { locale, t: translate } = useI18n();
@@ -420,6 +442,12 @@ export function AppShell() {
   useEffect(() => {
     setSidebarOpen(isMobile ? false : desktopSidebarOpenRef.current);
   }, [isMobile]);
+  // The sidebar's toast is sonner's, fixed to the viewport (outside this
+  // drawer): on a phone, closing the drawer dismisses it, where the old
+  // in-sidebar toast slid away with the drawer.
+  useEffect(() => {
+    if (isMobile && !sidebarOpen) toast.dismiss();
+  }, [isMobile, sidebarOpen]);
   useEffect(() => {
     setMobileSidebarReady(true);
   }, []);
@@ -433,8 +461,6 @@ export function AppShell() {
   const [pendingQuotePrompt, setPendingQuotePrompt] = useState<{ sessionId: string; text: string } | null>(null);
   const [sideChatPrompts, setSideChatPrompts] = useState<Record<string, string>>({});
   const topBarRef = useRef<HTMLDivElement>(null);
-  const mobileToolbarRef = useRef<HTMLDivElement>(null);
-  const desktopToolbarMoreRef = useRef<HTMLDivElement>(null);
   // Branch navigator state — populated by ChatWindow via onBranchDataChange
   const [branchTree, setBranchTree] = useState<SessionTreeNode[]>([]);
   const [branchActiveLeafId, setBranchActiveLeafId] = useState<string | null>(null);
@@ -459,7 +485,6 @@ export function AppShell() {
   const [systemInfoLoading, setSystemInfoLoading] = useState(false);
   const systemInfoLoaderRef = useRef<(() => Promise<void>) | null>(null);
   const systemInfoLoadIdRef = useRef(0);
-  const systemBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleSystemPromptChange = useCallback((prompt: string | null) => {
     setSystemPrompt(prompt);
@@ -525,7 +550,6 @@ export function AppShell() {
 
   // Single active panel — only one dropdown open at a time
   const [activeTopPanel, setActiveTopPanel] = useState<"agents" | "branches" | "system" | "tools" | "session" | "debug" | null>(null);
-  const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     if (!sessionHasBranches) {
@@ -608,12 +632,13 @@ export function AppShell() {
     });
   }, [isMobile]);
 
-  const handleMobileToolbarMoreToggle = useCallback(() => {
-    // The drawer folds only on phones; on desktop the ⋯ dropdown must not
-    // touch the sidebar.
-    if (isMobile) setSidebarOpen(false);
-    setActiveTopPanel(null);
-    setMobileToolbarMoreOpen((open) => !open);
+  // The ⋯ toolbar menu (Radix DropdownMenu) reports its next state here; the
+  // drawer folds only on phones and only when the menu is opening, and no top
+  // panel may stay open under it.
+  const handleMobileToolbarMoreOpenChange = useCallback((open: boolean) => {
+    if (isMobile && open) setSidebarOpen(false);
+    if (open) setActiveTopPanel(null);
+    setMobileToolbarMoreOpen(open);
   }, [isMobile]);
 
   const handleRightPanelToggle = useCallback(() => {
@@ -631,53 +656,8 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
-    if (!mobileToolbarMoreOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const toolbar = mobileToolbarRef.current;
-      const desktopMore = desktopToolbarMoreRef.current;
-      if (toolbar && event.composedPath().includes(toolbar)) return;
-      if (desktopMore && event.composedPath().includes(desktopMore)) return;
-      setMobileToolbarMoreOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      setMobileToolbarMoreOpen(false);
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    document.addEventListener("keydown", handleKeyDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true);
-      document.removeEventListener("keydown", handleKeyDown, true);
-    };
-  }, [mobileToolbarMoreOpen]);
-
-  useEffect(() => {
     setMobileToolbarMoreOpen(false);
   }, [isMobile, isNarrowMobile, selectedSession?.id, newSessionDraftId]);
-
-  useEffect(() => {
-    if (!activeTopPanel || !topBarRef.current) return;
-    const update = () => {
-      const topBarRect = topBarRef.current!.getBoundingClientRect();
-      if (activeTopPanel === "agents") {
-        setTopPanelPos({
-          top: topBarRect.bottom,
-          left: topBarRect.left,
-          width: Math.min(AGENT_PANEL_WIDTH, topBarRect.width),
-        });
-        return;
-      }
-      setTopPanelPos({ top: topBarRect.bottom, left: topBarRect.left, width: topBarRect.width });
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(topBarRef.current);
-    return () => ro.disconnect();
-  }, [activeTopPanel, isMobile]);
 
   // Files unmount when inactive; workspace terminals stay mounted until closed.
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
@@ -1873,7 +1853,22 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         onSessionsChange={handleSessionsChange}
         onUnreadSessionIdsChange={handleUnreadSessionIdsChange}
       />
-      <div className="flex shrink-0 justify-between gap-1 p-2">
+      {/* Draft footer: one settings row, the models/skills shortcuts beside it,
+          the version at the end. */}
+      <div className="flex shrink-0 items-center gap-1 border-t border-sidebar-border px-2.5 pb-2.5 pt-2">
+        <button
+          type="button"
+          onClick={() => {
+            setSettingsOpenAtHome(true);
+            setSettingsSection(getLastSettingsSection(projectTrustCwd));
+          }}
+          title={translate("common.settings")}
+          aria-label={translate("common.settings")}
+          className="flex h-8 min-w-0 shrink cursor-pointer items-center gap-1.5 rounded-full bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <SettingsSectionIcon section="general" size={14} strokeWidth={2} />
+          <span className="truncate">{translate("common.settings")}</span>
+        </button>
         {([
           ["models", translate("common.models")],
           ["skills", translate("common.skills")],
@@ -1888,30 +1883,22 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               title={disabled ? translate("settings.projectRequired") : label}
               aria-label={label}
               className={cn(
-                "flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md p-0 text-xs text-muted-foreground transition-colors",
+                "flex size-8 shrink-0 items-center justify-center rounded-full bg-transparent p-0 text-muted-foreground transition-colors",
                 disabled
                   ? "cursor-default opacity-35"
-                  : "bg-transparent enabled:hover:bg-secondary enabled:hover:text-foreground",
+                  : "hover:bg-accent hover:text-foreground",
               )}
             >
               <SettingsSectionIcon section={section} size={14} strokeWidth={2} />
-              <span>{label}</span>
             </button>
           );
         })}
-        <button
-          type="button"
-          onClick={() => {
-            setSettingsOpenAtHome(true);
-            setSettingsSection(getLastSettingsSection(projectTrustCwd));
-          }}
-          title={translate("common.settings")}
-          aria-label={translate("common.settings")}
-          className="flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-transparent p-0 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        <span
+          className="ml-auto shrink-0 font-mono text-[11px] leading-none tabular-nums text-muted-foreground opacity-70"
+          title={`pi-web ${APP_VERSION} · pi ${PI_VERSION}`}
         >
-          <SettingsSectionIcon section="general" size={14} strokeWidth={2} />
-          <span>{translate("common.settings")}</span>
-        </button>
+          v{APP_VERSION}
+        </span>
       </div>
     </>
   );
@@ -1928,7 +1915,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           "flex shrink-0 cursor-pointer items-center gap-1.5 text-left text-[11px] leading-[1.35] text-warning",
           mobileBanner
             ? "min-h-8 w-full justify-start border-b border-border bg-warning/10 px-3 py-1.5"
-            : "h-full justify-center border-r border-border px-3",
+            : "h-8 self-center justify-center rounded-full border border-warning/40 bg-warning/10 px-3",
         )}
         data-mobile-trust-banner={mobileBanner ? "true" : undefined}
       >
@@ -1938,291 +1925,273 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     );
   };
 
-  // While subagents run: their count, ringed by a spinner; otherwise all of them.
-  const renderAgentsBadge = (badge: { count: number; running: boolean }, mobile: boolean) => (
+  // Subagent count beside the Agents pill (the draft's green-tinted count).
+  const renderAgentsBadge = (badge: { count: number; running: boolean }) => (
     <span
       aria-hidden="true"
-      className={cn(
-        "grid place-items-center rounded-sm text-[10px] leading-none tabular-nums text-primary",
-        mobile
-          ? "absolute top-[3px] right-[3px] h-[13px] min-w-[13px] px-[3px]"
-          : "relative h-[15px] min-w-[15px] px-1",
-        badge.running ? "bg-primary/20 font-semibold" : "bg-accent",
-      )}
+      className="grid h-4 min-w-4 shrink-0 place-items-center rounded-full bg-success/15 px-1 text-[10px] font-semibold leading-none tabular-nums text-success"
     >
-      {badge.running && (
-        <LoaderCircleIcon
-          className="pointer-events-none absolute -top-[3px] -left-[3px] size-[calc(100%_+_6px)] animate-spin motion-reduce:animate-none"
-          strokeWidth={2}
-        />
-      )}
       {badge.count}
     </span>
   );
 
-  // The Agents switcher's button. A narrow phone shows it left of the More button instead of
-  // folding it into that menu: the bar has the room, and the badge stays in sight.
+  // The Agents switcher's pill (Popover). A narrow phone shows it beside the
+  // More menu instead of folding it into that menu: the bar has the room, and
+  // the badge stays in sight. A run lights the 5px breathing dot.
   const renderAgentsButton = (mobile: boolean) => (
-    <button
-      type="button"
-      // On a narrow phone it sits outside the More menu, so it leaves that menu as it is.
-      onClick={() => toggleTopPanel("agents", mobile && !isNarrowMobile)}
-      disabled={!activeSessionFamily}
-      title={agentsButtonLabel}
-      aria-label={agentsButtonLabel}
-      aria-pressed={activeTopPanel === "agents"}
-      className={cn(
-        "relative flex h-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-[11px] transition-colors",
-        "border-r border-border border-t-2",
-        mobile ? "w-[var(--top-bar-height)] p-0" : "px-3",
-        activeTopPanel === "agents"
-          ? "border-t-primary bg-accent text-foreground"
-          : cn("bg-transparent", activeSessionFamily ? "text-muted-foreground" : "text-dim"),
-        activeSessionFamily ? "cursor-pointer" : "cursor-not-allowed opacity-45",
-      )}
-      data-mobile-toolbar-action={mobile ? "agents" : undefined}
+    <Popover
+      open={activeTopPanel === "agents" && Boolean(activeSessionFamily)}
+      onOpenChange={() => toggleTopPanel("agents", mobile && !isNarrowMobile)}
     >
-      <BotIcon className={mobile ? "size-4" : "size-3.5"} strokeWidth={1.9} />
-      {!mobile && <span>{translate("agentSwitcher.title")}</span>}
-      {agentsBadge && agentsBadge.count > 0 && renderAgentsBadge(agentsBadge, mobile)}
-    </button>
-  );
-
-  const renderChatToolbarActions = (mobile: boolean, section: "primary" | "overflow" = "primary") => {
-    if (!mobile && !showChat) return null;
-    return (
-      <div className="flex h-full items-stretch">
-        {section === "primary" && (
+      <PopoverTrigger asChild>
         <button
           type="button"
-          onClick={() => {
-            handleViewFullHistory();
-            if (mobile && isNarrowMobile) setMobileToolbarMoreOpen(true);
-          }}
+          disabled={!activeSessionFamily}
+          title={agentsButtonLabel}
+          aria-label={agentsButtonLabel}
+          aria-pressed={activeTopPanel === "agents"}
+          className={cn(HEADER_PILL, activeTopPanel === "agents" && HEADER_PILL_OPEN)}
+          data-mobile-toolbar-action={mobile ? "agents" : undefined}
+        >
+          <BotIcon className="size-3.5" strokeWidth={1.9} />
+          {agentsBadge?.running && (
+            <span aria-hidden="true" className="size-[5px] shrink-0 rounded-full bg-success motion-safe:animate-pulse" />
+          )}
+          {agentsBadge && agentsBadge.count > 0 && renderAgentsBadge(agentsBadge)}
+          <span className="hidden min-[1240px]:inline">{translate("agentSwitcher.title")}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        // 承载容器透明：视觉仍由 AgentSessionPanel 自己的卡片给出，这里只负责
+        // 定位（贴触发钮右缘）与宽度（AGENT_PANEL_WIDTH）；z-500 维持旧面板
+        // 高于引用工具栏的层序。
+        align="end"
+        className="z-[500] w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] rounded-lg border-none bg-transparent p-0 shadow-none"
+        style={{ "--agent-panel-width": `${AGENT_PANEL_WIDTH}px` } as React.CSSProperties}
+      >
+        {/* The panel hangs off the bar (no top border/rounding); the wrapper
+            turns it into a free-floating card. */}
+        <div className="[&>*]:rounded-lg [&>*]:border [&>*]:shadow-lg">
+          {activeSessionFamily && selectedSession && (
+            <AgentSessionPanel
+              rootSession={activeSessionFamily.root}
+              subagents={activeSessionFamily.subagents}
+              selectedSessionId={selectedSession.id}
+              runningSessionIds={runningSessionIds}
+              onSelectSession={handleSelectSession}
+              openSubagentTabIds={openSubagentTabIds}
+              onToggleSubagentTab={handleToggleSubagentTab}
+              onNewSideChat={() => handleNewSideChat(activeSessionFamily.root.id)}
+              onDeleteSideChat={(sessionId) => handleDeleteSideChat(sessionId, activeSessionFamily.root)}
+            />
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
+  // The connected branch/history/⋯ capsule (the draft's .pm-bgroup). The
+  // BranchNavigator dropdown hangs under the whole bar (containerRef), so the
+  // branch segment only toggles it.
+  const renderToolbarBGroup = (mobile: boolean) => (
+    <div className={HEADER_BGROUP} role="group">
+      {/* A narrow phone keeps only the ⋯ segment: branch and history live in
+          its menu there. */}
+      {(!mobile || !isNarrowMobile) && sessionHasBranches && (
+        <button
+          type="button"
+          onClick={() => toggleTopPanel("branches", mobile)}
+          title={translate("i18n.branches")}
+          aria-label={translate("i18n.branches")}
+          aria-pressed={activeTopPanel === "branches"}
+          className={cn(HEADER_BGROUP_SEGMENT, activeTopPanel === "branches" && "bg-accent text-foreground")}
+          data-mobile-toolbar-action={mobile ? "branches" : undefined}
+        >
+          <GitBranchIcon
+            className={cn("size-3.5", branchTree.length > 0 ? "text-primary" : "text-dim")}
+            strokeWidth={2}
+          />
+        </button>
+      )}
+      {(!mobile || !isNarrowMobile) && (
+        <button
+          type="button"
+          onClick={handleViewFullHistory}
           disabled={!selectedSession}
           title={selectedSession ? translate("history.full") : translate("history.unsaved")}
           aria-label={translate("history.full")}
-          className={cn(
-            "flex h-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-[11px] transition-colors",
-            "border-r border-border border-t-2 border-t-transparent",
-            mobile ? "w-[var(--top-bar-height)] p-0" : "px-3",
-            selectedSession
-              ? "cursor-pointer bg-transparent text-muted-foreground enabled:hover:bg-secondary enabled:hover:text-foreground"
-              : "cursor-not-allowed bg-transparent text-dim opacity-45",
-          )}
+          className={HEADER_BGROUP_SEGMENT}
           data-mobile-toolbar-action={mobile ? "history" : undefined}
         >
-          <HistoryIcon className={mobile ? "size-4" : "size-3"} strokeWidth={2} />
-          {!mobile && <span>{translate("history.label")}</span>}
+          <HistoryIcon className="size-3.5" strokeWidth={2} />
         </button>
-        )}
-        {section === "overflow" && (() => {
-          // 上下文压缩后当前消息可能不再包含 user 消息，需同时参考会话文件的消息总数。
-          const hasMessages = Boolean(
-            selectedSession
-            && ((sessionStats?.userMessages ?? 0) > 0 || selectedSession.messageCount > 0),
-          );
-          const disabled = !selectedSession || selectedSession.transient || !hasMessages || autoNameStatus.kind === "naming";
-          const isSuccess = autoNameStatus.kind === "success";
-          const isError = autoNameStatus.kind === "error";
-          const label = autoNameStatus.kind === "naming"
-            ? translate("title.generating")
-            : isSuccess
-              ? translate("title.updated")
-              : isError
-                ? translate("title.failed")
-                : translate("title.generate");
-          const title = !selectedSession || selectedSession.transient
-            ? translate("title.unsaved")
-            : !hasMessages
-              ? translate("title.noMessages")
-              : isError
-                ? autoNameStatus.message
-                : translate("title.generateSession");
-
-          return (
-            <button
-              type="button"
-              onClick={() => {
-                void handleAutoName();
-                if (mobile && isNarrowMobile) setMobileToolbarMoreOpen(true);
-              }}
-              disabled={disabled}
-              title={title}
-              aria-label={label}
-              className={cn(
-                "flex h-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-[11px] transition-colors",
-                "border-r border-border border-t-2 border-t-transparent",
-                mobile ? "w-[var(--top-bar-height)] p-0" : "px-3",
-                isError
-                  ? "cursor-not-allowed bg-transparent text-destructive"
-                  : cn(
-                      "bg-transparent",
-                      isSuccess ? "text-primary" : disabled ? "text-dim" : "text-muted-foreground",
-                      disabled
-                        ? "cursor-not-allowed"
-                        : "cursor-pointer enabled:hover:bg-secondary enabled:hover:text-foreground",
-                    ),
-                disabled && autoNameStatus.kind !== "naming" ? "opacity-45" : undefined,
-              )}
-              data-mobile-toolbar-action={mobile ? "name" : undefined}
-            >
-              {autoNameStatus.kind === "naming" ? (
-                <LoaderCircleIcon className={cn("animate-spin", mobile ? "size-4" : "size-3.5")} strokeWidth={2} />
-              ) : isSuccess ? (
-                <CheckIcon className={mobile ? "size-4" : "size-3.5"} strokeWidth={2} />
-              ) : (
-                <PenLineIcon className={mobile ? "size-4" : "size-3.5"} strokeWidth={2} />
-              )}
-              {!mobile && <span>{label}</span>}
-            </button>
-          );
-        })()}
-        {section === "primary" && !(mobile && isNarrowMobile) && renderAgentsButton(mobile)}
-        {section === "primary" && sessionHasBranches && (mobile ? (
+      )}
+      <DropdownMenu open={mobileToolbarMoreOpen} onOpenChange={handleMobileToolbarMoreOpenChange}>
+        <DropdownMenuTrigger asChild>
           <button
             type="button"
-            onClick={() => toggleTopPanel("branches", true)}
-            title={translate("i18n.branches")}
-            aria-label={translate("i18n.branches")}
-            aria-pressed={activeTopPanel === "branches"}
-            className={cn(
-              "flex w-[var(--top-bar-height)] shrink-0 cursor-pointer items-center justify-center p-0 transition-colors",
-              "h-full border-r border-border border-t-2",
-              activeTopPanel === "branches"
-                ? "border-t-primary bg-accent text-foreground"
-                : "border-t-transparent bg-transparent text-muted-foreground",
-            )}
-            data-mobile-toolbar-action="branches"
+            title={moreControlsLabel}
+            aria-label={moreControlsLabel}
+            aria-expanded={mobileToolbarMoreOpen}
+            data-mobile-toolbar-more="true"
+            className={cn(HEADER_BGROUP_SEGMENT, mobileToolbarMoreOpen && "bg-accent text-foreground")}
           >
-            <GitBranchIcon
-              className={cn("size-4", branchTree.length > 0 ? "text-primary" : "text-dim")}
+            <EllipsisIcon className="size-4" strokeWidth={2} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          id="mobile-toolbar-actions"
+          className="w-64 p-1.5"
+          data-mobile-toolbar-actions="true"
+        >
+          {(() => {
+            // 上下文压缩后当前消息可能不再包含 user 消息，需同时参考会话文件的消息总数。
+            const hasMessages = Boolean(
+              selectedSession
+              && ((sessionStats?.userMessages ?? 0) > 0 || selectedSession.messageCount > 0),
+            );
+            const disabled = !selectedSession || selectedSession.transient || !hasMessages || autoNameStatus.kind === "naming";
+            const isSuccess = autoNameStatus.kind === "success";
+            const isError = autoNameStatus.kind === "error";
+            const label = autoNameStatus.kind === "naming"
+              ? translate("title.generating")
+              : isSuccess
+                ? translate("title.updated")
+                : isError
+                  ? translate("title.failed")
+                  : translate("title.generate");
+            const title = !selectedSession || selectedSession.transient
+              ? translate("title.unsaved")
+              : !hasMessages
+                ? translate("title.noMessages")
+                : isError
+                  ? autoNameStatus.message
+                  : translate("title.generateSession");
+            return (
+              <DropdownMenuItem
+                // Generating keeps its feedback visible in the menu: the select
+                // is cancelled so Radix leaves the menu open while it runs.
+                onSelect={(event) => {
+                  event.preventDefault();
+                  void handleAutoName();
+                }}
+                disabled={disabled}
+                title={title}
+                className="gap-2"
+                data-mobile-toolbar-action={mobile ? "name" : undefined}
+              >
+                {autoNameStatus.kind === "naming" ? (
+                  <LoaderCircleIcon className="size-3.5 shrink-0 animate-spin" strokeWidth={2} />
+                ) : isSuccess ? (
+                  <CheckIcon className="size-3.5 shrink-0" strokeWidth={2} />
+                ) : (
+                  <PenLineIcon className="size-3.5 shrink-0" strokeWidth={2} />
+                )}
+                <span className="min-w-0 flex-1">{label}</span>
+                {isError && <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-destructive" />}
+              </DropdownMenuItem>
+            );
+          })()}
+          <DropdownMenuItem
+            onSelect={() => handleSystemInfoToggle("system")}
+            disabled={mobile && !showChat}
+            title={translate("system.prompt")}
+            className="gap-2"
+            data-mobile-toolbar-action={mobile ? "system" : undefined}
+          >
+            <FileTextIcon
+              className={cn("size-3.5 shrink-0", systemPrompt ? "text-primary" : "text-dim")}
               strokeWidth={2}
             />
-          </button>
-        ) : (
-          <BranchNavigator
-            tree={branchTree}
-            activeLeafId={branchActiveLeafId}
-            onLeafChange={handleBranchLeafChange}
-            locked={branchSwitchLocked}
-            inline
-            containerRef={topBarRef}
-            open={activeTopPanel === "branches"}
-            onToggle={() => toggleTopPanel("branches")}
-            hasSession
-          />
-        ))}
-        {section === "overflow" && (
-        <button
-          ref={systemBtnRef}
-          type="button"
-          onClick={() => handleSystemInfoToggle("system", mobile)}
-          disabled={mobile && !showChat}
-          title={translate("system.prompt")}
-          aria-label={translate("system.prompt")}
-          aria-pressed={activeTopPanel === "system"}
-          className={cn(
-            "flex h-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-[11px] transition-colors",
-            "border-r border-border border-t-2",
-            mobile ? "w-[var(--top-bar-height)] p-0" : "px-3",
-            activeTopPanel === "system"
-              ? "border-t-primary bg-accent text-foreground"
-              : "border-t-transparent bg-transparent text-muted-foreground",
-            mobile && !showChat ? "cursor-not-allowed opacity-45" : "cursor-pointer enabled:hover:text-foreground",
-          )}
-          data-mobile-toolbar-action={mobile ? "system" : undefined}
-        >
-          <FileTextIcon
-            className={cn("shrink-0", mobile ? "size-4" : "size-3", systemPrompt ? "text-primary" : "text-dim")}
-            strokeWidth={2}
-          />
-          {!mobile && <span>{translate("system.label")}</span>}
-        </button>
-        )}
-        {section === "overflow" && (
-        <button
-          type="button"
-          onClick={() => handleSystemInfoToggle("tools", mobile)}
-          disabled={mobile && !showChat}
-          title={translate("tools.title")}
-          aria-label={translate("tools.title")}
-          aria-pressed={activeTopPanel === "tools"}
-          className={cn(
-            "flex h-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-[11px] transition-colors",
-            "border-r border-border border-t-2",
-            mobile ? "w-[var(--top-bar-height)] p-0" : "px-3",
-            activeTopPanel === "tools"
-              ? "border-t-primary bg-accent text-foreground"
-              : "border-t-transparent bg-transparent text-muted-foreground",
-            mobile && !showChat ? "cursor-not-allowed opacity-45" : "cursor-pointer enabled:hover:text-foreground",
-          )}
-          data-mobile-toolbar-action={mobile ? "tools" : undefined}
-        >
-          <WrenchIcon
-            className={cn(
-              "shrink-0",
-              mobile ? "size-4" : "size-3",
-              systemTools?.some((tool) => tool.active) ? "text-primary" : "text-dim",
-            )}
-            strokeWidth={2}
-          />
-          {mcpServers && mcpServers.total > 0 && (
-            <span
-              title={translate("tools.mcpTooltip", { ready: mcpServers.ready, total: mcpServers.total })}
+            <span className="min-w-0 flex-1">{translate("system.label")}</span>
+            {systemPrompt && <CheckIcon className="size-3.5 shrink-0 text-success" strokeWidth={2} />}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => handleSystemInfoToggle("tools")}
+            disabled={mobile && !showChat}
+            title={translate("tools.title")}
+            className="gap-2"
+            data-mobile-toolbar-action={mobile ? "tools" : undefined}
+          >
+            <WrenchIcon
               className={cn(
-                "shrink-0 text-[10px] font-semibold",
-                mcpServers.needsAuth > 0 ? "text-warning" : mcpServers.ready > 0 ? "text-primary" : "text-dim",
+                "size-3.5 shrink-0",
+                systemTools?.some((tool) => tool.active) ? "text-primary" : "text-dim",
               )}
-            >
-              MCP {mcpServers.ready}/{mcpServers.total}
-            </span>
+              strokeWidth={2}
+            />
+            <span className="min-w-0 flex-1">{translate("tools.label")}</span>
+            {mcpServers && mcpServers.total > 0 && (
+              <span
+                title={translate("tools.mcpTooltip", { ready: mcpServers.ready, total: mcpServers.total })}
+                className={cn(
+                  "shrink-0 font-mono text-[10px] font-semibold tabular-nums",
+                  mcpServers.needsAuth > 0 ? "text-warning" : mcpServers.ready > 0 ? "text-primary" : "text-dim",
+                )}
+              >
+                MCP {mcpServers.ready}/{mcpServers.total}
+              </span>
+            )}
+          </DropdownMenuItem>
+          {/* On a phone the bar holds only the Agents pill, the file toggle
+              and this menu: the rest of the row's actions live here too. */}
+          {mobile && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={handleViewFullHistory}
+                disabled={!selectedSession}
+                title={selectedSession ? translate("history.full") : translate("history.unsaved")}
+                className="gap-2"
+                data-mobile-toolbar-action="history"
+              >
+                <HistoryIcon className="size-3.5 shrink-0" strokeWidth={2} />
+                <span className="min-w-0 flex-1">{translate("history.label")}</span>
+              </DropdownMenuItem>
+              {sessionHasBranches && (
+                <DropdownMenuItem
+                  onSelect={() => toggleTopPanel("branches", true)}
+                  title={translate("i18n.branches")}
+                  className="gap-2"
+                  data-mobile-toolbar-action="branches"
+                >
+                  <GitBranchIcon
+                    className={cn("size-3.5 shrink-0", branchTree.length > 0 ? "text-primary" : "text-dim")}
+                    strokeWidth={2}
+                  />
+                  <span className="min-w-0 flex-1">{translate("i18n.branches")}</span>
+                </DropdownMenuItem>
+              )}
+              {showChat && (
+                <DropdownMenuItem
+                  onSelect={() => toggleTopPanel("debug", mobile)}
+                  title={translate("debug.title")}
+                  className="gap-2"
+                  data-mobile-toolbar-action="debug"
+                >
+                  <BugIcon className="size-3.5 shrink-0" strokeWidth={2} />
+                  <span className="min-w-0 flex-1">{translate("debug.title")}</span>
+                </DropdownMenuItem>
+              )}
+            </>
           )}
-          {!mobile && <span>{translate("tools.label")}</span>}
-        </button>
-        )}
-      </div>
-    );
-  };
-
-  // The ⋯ overflow control: mobile rows slide their actions in; desktop gets a
-  // small dropdown. Both host the overflow section of the toolbar actions.
-  const renderToolbarMoreButton = () => (
-    <button
-      type="button"
-      onClick={handleMobileToolbarMoreToggle}
-      title={moreControlsLabel}
-      aria-label={moreControlsLabel}
-      aria-controls="mobile-toolbar-actions"
-      aria-expanded={mobileToolbarMoreOpen}
-      data-mobile-toolbar-more="true"
-      className={cn(
-        "relative flex shrink-0 cursor-pointer items-center justify-center p-0 transition-colors",
-        "h-[var(--top-bar-height)] w-[var(--top-bar-height)] border-r border-border",
-        mobileToolbarMoreOpen ? "z-[21] bg-accent text-foreground" : "bg-transparent text-muted-foreground",
-      )}
-    >
-      {mobileToolbarMoreOpen ? (
-        <XIcon className="size-3.5" strokeWidth={2} />
-      ) : (
-        <EllipsisIcon className="size-4" strokeWidth={2} />
-      )}
-    </button>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 
-  const renderSessionStatsButton = (mobile: boolean) => {
+  // Session stats: on a phone the two glanceable values in one chip; on the
+  // desktop the draft's badge row (tokens, cost, context with its meter) —
+  // the whole group folds away under 1240px. The ctx badge opens the
+  // session-info popover, where the full breakdown lives.
+  const renderSessionStats = (mobile: boolean) => {
     if (!mobile && (!showChat || (!sessionStats && !contextUsage))) return null;
 
     const tokens = sessionStats?.tokens;
     const cost = sessionStats?.cost ?? 0;
 
-    let contextColor: string | undefined;
-    if (contextUsage?.contextWindow) {
-      const percent = contextUsage.percent;
-      if (percent !== null && percent > 90) contextColor = "var(--danger)";
-      else if (percent !== null && percent > 70) contextColor = "var(--warning)";
-    }
-    // Same thresholds as contextColor, as the mobile chip's span classes.
+    // Same thresholds as the old contextColor, as tone classes.
     const contextTone = contextUsage?.contextWindow && contextUsage.percent !== null
       ? (contextUsage.percent > 90
         ? "text-destructive"
@@ -2242,116 +2211,146 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       tooltipParts.push(`${translate("session.context")}: ${percent !== null ? `${percent.toFixed(1)}%` : "?"} / ${contextUsage.contextWindow.toLocaleString(locale)}`);
     }
     const tooltip = tooltipParts.join("  |  ");
-    const covered = mobile && mobileToolbarMoreOpen;
+    const badgeClass = "h-7 gap-1 rounded-lg px-2.5 font-mono text-[11.5px] font-normal tabular-nums text-muted-foreground";
 
-    return (
-      <button
-        type="button"
-        onClick={() => toggleTopPanel("session")}
-        disabled={!showChat || covered}
-        tabIndex={covered ? -1 : undefined}
-        title={tooltip || translate("session.title")}
-        aria-label={translate("session.title")}
-        aria-pressed={activeTopPanel === "session"}
-        aria-hidden={covered ? true : undefined}
-        className={cn(
-          "flex h-full min-w-0 items-center justify-end overflow-hidden whitespace-nowrap text-[11px] text-muted-foreground transition-colors",
-          "border-t-2",
-          mobile ? "flex-1 px-1.5" : "px-3",
-          activeTopPanel === "session"
-            ? "border-t-primary bg-accent text-foreground"
-            : "border-t-transparent bg-transparent",
-          showChat ? "cursor-pointer enabled:hover:text-foreground" : "cursor-default",
-          covered && "invisible pointer-events-none",
-          mobile && "mobile-session-stats",
-        )}
-        data-mobile-toolbar-stats={mobile ? "true" : undefined}
-      >
-        {mobile ? (
-          // Two glanceable values only; the full breakdown (tokens in/out,
-          // cache, exact cost, per-turn rows) lives in the session-info
-          // popover this button opens. Fixed content: no width-driven reflow.
+    if (mobile) {
+      return (
+        <button
+          type="button"
+          onClick={() => toggleTopPanel("session")}
+          disabled={!showChat}
+          title={tooltip || translate("session.title")}
+          aria-label={translate("session.title")}
+          aria-pressed={activeTopPanel === "session"}
+          className={cn(
+            "flex h-7 min-w-0 flex-1 items-center justify-end overflow-hidden whitespace-nowrap rounded-full border border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors",
+            showChat ? "cursor-pointer enabled:hover:bg-accent enabled:hover:text-foreground" : "cursor-default",
+            activeTopPanel === "session" && HEADER_PILL_OPEN,
+            "mobile-session-stats",
+          )}
+          data-mobile-toolbar-stats="true"
+        >
+          {/* Fixed content: no width-driven reflow. */}
           <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
             {contextUsage?.contextWindow && contextUsage.percent !== null && (
-              <span className={contextTone}>
+              <span className={cn("text-[11.5px]", contextTone)}>
                 <span className="opacity-75">ctx</span> {contextUsage.percent.toFixed(1)}%
               </span>
             )}
             {cost > 0 && (
-              <span className="font-medium text-foreground">{cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`}</span>
+              <span className="font-mono text-[11.5px] font-medium text-foreground">{cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`}</span>
             )}
           </span>
-        ) : (
-          <UsageBar
-            usage={tokens ? { input: tokens.input, output: tokens.output, cacheRead: tokens.cacheRead, cost } : null}
-            ctx={contextUsage?.contextWindow ? { percent: contextUsage.percent, contextWindow: contextUsage.contextWindow } : undefined}
-            emphasizeCost
-            ctxColor={contextColor}
-            gap={10}
-          />
+        </button>
+      );
+    }
+
+    const meterPercent = contextUsage?.contextWindow && contextUsage.percent !== null
+      ? Math.max(2, Math.min(100, contextUsage.percent))
+      : 0;
+    return (
+      <div className="hidden min-[1240px]:flex shrink-0 items-center gap-1.5">
+        {tokens && (
+          <Badge variant="secondary" className={badgeClass}>
+            <ArrowUpIcon className="size-3" strokeWidth={2} />
+            {formatCompactCount(tokens.total)}
+          </Badge>
         )}
-      </button>
+        {cost > 0 && (
+          <Badge variant="secondary" className={badgeClass}>
+            {`$${cost >= 0.01 ? cost.toFixed(2) : cost.toFixed(4)}`}
+          </Badge>
+        )}
+        {contextUsage?.contextWindow && (
+          <button
+            type="button"
+            onClick={() => toggleTopPanel("session")}
+            title={tooltip || translate("session.title")}
+            aria-label={translate("session.title")}
+            aria-pressed={activeTopPanel === "session"}
+            className={cn(
+              "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border border-transparent bg-secondary px-2.5 font-mono text-[11.5px] tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+              activeTopPanel === "session" && "border-border bg-background text-foreground shadow-sm",
+            )}
+          >
+            <span className={contextTone}>{contextUsage.percent !== null ? `${contextUsage.percent.toFixed(1)}%` : "?"}</span>
+            <span aria-hidden="true" className="text-dim">·</span>
+            <span>{formatCompactCount(contextUsage.contextWindow)}</span>
+            <span aria-hidden="true" className="h-1 w-11 overflow-hidden rounded-full bg-foreground/15">
+              <span
+                style={{ width: `${meterPercent}%` }}
+                className={cn(
+                  "block h-full rounded-full",
+                  contextUsage.percent !== null && contextUsage.percent > 90
+                    ? "bg-destructive/70"
+                    : contextUsage.percent !== null && contextUsage.percent > 70 ? "bg-warning/70" : "bg-foreground/70",
+                )}
+              />
+            </span>
+          </button>
+        )}
+      </div>
     );
   };
 
-  // Icon only, right of the chat's actions; on a desktop it takes the bar's free space, so it
-  // sits left of the session stats. It only opens or closes its panel: nothing is loaded here.
-  const renderDebugButton = (mobile: boolean) => {
-    if (!showChat) return null;
+  // The debug/theme capsule (the draft's right-end .pm-bgroup). Debug only
+  // opens or closes its panel: nothing is loaded here. The theme pill flips
+  // light/dark through the same preference Settings writes.
+  const renderDebugThemeGroup = () => {
     const open = activeTopPanel === "debug";
     return (
-      <button
-        ref={debugButtonRef}
-        type="button"
-        onClick={() => toggleTopPanel("debug", mobile)}
-        title={translate("debug.title")}
-        aria-label={translate("debug.title")}
-        aria-pressed={open}
-        className={cn(
-          "flex shrink-0 cursor-pointer items-center justify-center p-0 transition-colors hover:text-foreground",
-          "h-full w-[var(--top-bar-height)] border-t-2",
-          mobile ? "border-r border-border" : "ml-auto border-l border-border",
-          open
-            ? "border-t-primary bg-accent text-foreground"
-            : "border-t-transparent bg-transparent text-muted-foreground",
+      <div className={HEADER_BGROUP} role="group">
+        {showChat && (
+          <button
+            ref={debugButtonRef}
+            type="button"
+            onClick={() => toggleTopPanel("debug")}
+            title={translate("debug.title")}
+            aria-label={translate("debug.title")}
+            aria-pressed={open}
+            className={cn(HEADER_BGROUP_SEGMENT, open && "bg-accent text-foreground")}
+          >
+            <BugIcon
+              className={cn("size-3.5 shrink-0", open ? "text-primary" : "text-dim")}
+              strokeWidth={2}
+            />
+          </button>
         )}
-        data-mobile-toolbar-action={mobile ? "debug" : undefined}
-      >
-        <BugIcon
-          className={cn("shrink-0", mobile ? "size-4" : "size-3.5", open ? "text-primary" : "text-dim")}
-          strokeWidth={2}
-        />
-      </button>
+        <button
+          type="button"
+          onClick={() => setThemePreference(theme === "dark" ? "light" : "dark")}
+          title={translate("settings.appearance")}
+          aria-label={translate("settings.appearance")}
+          className={HEADER_BGROUP_SEGMENT}
+        >
+          {theme === "dark" ? (
+            <SunIcon className="size-3.5 shrink-0" strokeWidth={2} />
+          ) : (
+            <MoonIcon className="size-3.5 shrink-0" strokeWidth={2} />
+          )}
+        </button>
+      </div>
     );
   };
 
-  const renderMainFileToggle = (mobile: boolean) => {
-    const covered = mobile && mobileToolbarMoreOpen;
-    return (
-      <button
-        type="button"
-        onClick={handleRightPanelToggle}
-        disabled={covered}
-        tabIndex={covered ? -1 : undefined}
-        aria-controls="file-panel"
-        aria-expanded={rightPanelOpen}
-        aria-hidden={covered ? true : undefined}
-        title={rightPanelOpen ? translate("files.hidePanel") : translate("files.showPanel")}
-        aria-label={rightPanelOpen ? translate("files.hidePanel") : translate("files.showPanel")}
-        data-mobile-toolbar-file={mobile ? "true" : undefined}
-        className={cn(
-          "flex shrink-0 cursor-pointer items-center justify-center p-0 transition-colors",
-          "h-[var(--top-bar-height)] w-[var(--top-bar-height)] border-l border-border",
-          !mobile && !showChat && "ml-auto",
-          rightPanelOpen ? "bg-accent text-foreground" : "bg-transparent text-muted-foreground",
-          "enabled:hover:text-foreground",
-          covered && "invisible pointer-events-none",
-        )}
-      >
-        <PanelRightIcon className="size-4" strokeWidth={2} />
-      </button>
-    );
-  };
+  const renderMainFileToggle = (mobile: boolean) => (
+    <button
+      type="button"
+      onClick={handleRightPanelToggle}
+      aria-controls="file-panel"
+      aria-expanded={rightPanelOpen}
+      title={rightPanelOpen ? translate("files.hidePanel") : translate("files.showPanel")}
+      aria-label={rightPanelOpen ? translate("files.hidePanel") : translate("files.showPanel")}
+      data-mobile-toolbar-file={mobile ? "true" : undefined}
+      className={cn(
+        HEADER_PILL,
+        !mobile && !showChat && "ml-auto",
+        rightPanelOpen && HEADER_PILL_OPEN,
+      )}
+    >
+      <PanelRightIcon className="size-3.5" strokeWidth={2} />
+    </button>
+  );
 
   return (
     <>
@@ -2426,6 +2425,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         }
       }
     `}</style>
+    {/* The sidebar's toast (SessionSidebar's showToast): sonner portals it to
+        the body, at the viewport's bottom-right, outside the drawer's
+        transform below. */}
+    <Toaster />
     <div className="flex h-[var(--app-viewport-height,100dvh)] w-full overflow-hidden bg-background pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       {/* Mobile overlay backdrop */}
       <div
@@ -2472,81 +2475,76 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             skips the blur entirely. Visually a no-op: the bar is already the
             first element. */}
         <div ref={topBarRef} className="sticky top-0 z-[5] shrink-0 bg-card">
-        <div className="relative flex h-[calc(var(--top-bar-height)_+_env(safe-area-inset-top))] items-center border-b border-border pt-[env(safe-area-inset-top)]">
-          <button
-            onClick={handleSidebarToggle}
-             title={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
-             aria-label={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
-            className="flex h-[var(--top-bar-height)] w-[var(--top-bar-height)] shrink-0 cursor-pointer items-center justify-center border-r border-border bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {sidebarOpen ? (
-              <PanelLeftIcon className="size-4" strokeWidth={2} />
-            ) : (
-              <MenuIcon className="size-4.5" strokeWidth={2} />
-            )}
-          </button>
-          {isMobile && (
-            <div
-              ref={mobileToolbarRef}
-              data-mobile-toolbar="true"
-              className="relative flex h-full min-w-0 flex-1 items-stretch"
-            >
-              {isNarrowMobile && renderAgentsButton(true)}
-              {isNarrowMobile && renderToolbarMoreButton()}
-              {!isNarrowMobile && renderChatToolbarActions(true, "primary")}
-              {!isNarrowMobile && renderToolbarMoreButton()}
-              {!isNarrowMobile && renderDebugButton(true)}
-              {renderSessionStatsButton(true)}
-              {renderMainFileToggle(true)}
-              {isMobile && mobileToolbarMoreOpen && (
-                <div
-                  id="mobile-toolbar-actions"
-                  role="toolbar"
-                  aria-label={translate("chat.moreControls")}
-                  data-mobile-toolbar-actions="true"
-                  className="flex items-stretch overflow-x-auto overflow-y-hidden bg-[color-mix(in_srgb,var(--bg-panel)_94%,var(--bg))] shadow-[4px_0_18px_rgba(0,0,0,0.12)] backdrop-blur-[10px] [scrollbar-width:none]"
-                  // 定位锚定属于行为：浮层钉在工具栏行内，左锚点随 narrow 布局的
-                  // Agents/More 两个按钮宽度移动。定位属性保留 inline。
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    right: 0,
-                    bottom: 0,
-                    left: isNarrowMobile ? `calc(2 * ${TOP_BAR_ICON_BUTTON_SIZE})` : 0,
-                    zIndex: 20,
-                  }}
+        {/* The draft's header: 52px, title + crumb left, the pills right. On a
+            phone it folds into two rows — the title row, then the controls. */}
+        <div className="relative flex min-h-[52px] flex-wrap items-center border-b border-border px-3 pt-[env(safe-area-inset-top)]">
+          {isMobile ? (
+            // 手机：两行结构显式成树——标题行（☰ 同行）与控件行各占一行，
+            // 不依赖 flex-wrap 断行（basis-full / 断行元素都会被算序挤变形）。
+            <div className="flex min-w-0 flex-1 flex-col items-stretch">
+              <div className="flex h-10 min-w-0 items-center gap-2">
+                <button
+                  onClick={handleSidebarToggle}
+                  title={translate("sidebar.show")}
+                  aria-label={translate("sidebar.show")}
+                  className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
-                  {renderChatToolbarActions(true, "primary")}
-                  {renderChatToolbarActions(true, "overflow")}
-                  {renderDebugButton(true)}
-                </div>
-              )}
+                  <MenuIcon className="size-4.5" strokeWidth={2} />
+                </button>
+                <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">
+                  {activeSessionTitle ?? "Pi Web"}
+                </span>
+              </div>
+              <div
+                data-mobile-toolbar="true"
+                className="flex h-10 min-w-0 flex-wrap items-center gap-1.5 pb-1"
+              >
+                {renderSessionStats(true)}
+                {renderAgentsButton(true)}
+                {renderToolbarBGroup(true)}
+                {renderMainFileToggle(true)}
+              </div>
             </div>
+          ) : (
+            <>
+              <button
+                onClick={handleSidebarToggle}
+                title={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
+                aria-label={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
+                className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                {sidebarOpen ? (
+                  <PanelLeftIcon className="size-4" strokeWidth={2} />
+                ) : (
+                  <MenuIcon className="size-4.5" strokeWidth={2} />
+                )}
+              </button>
+              <div className="flex h-10 min-w-0 flex-1 items-center gap-2">
+                <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">
+                  {activeSessionTitle ?? "Pi Web"}
+                </span>
+                {selectedSession && (
+                  <span className="hidden min-[1240px]:inline min-w-0 truncate font-mono text-[11.5px] text-muted-foreground">
+                    {[
+                      getFileName(selectedSession.projectRoot ?? selectedSession.cwd),
+                      selectedSession.branch,
+                    ].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </div>
+            </>
           )}
           {!isMobile && (
             <>
               {renderProjectTrustWarning(false)}
-              {renderChatToolbarActions(false, "primary")}
-              <div ref={desktopToolbarMoreRef} className="relative flex h-full items-stretch">
-                {renderToolbarMoreButton()}
-                {mobileToolbarMoreOpen && (
-                  // A detached toolbar segment: same height as the bar, so the
-                  // row-styled buttons keep their full target size.
-                  <div
-                    // 定位锚定属于行为：下拉钉在 More 按钮下沿，保留定位 inline。
-                    style={{ position: "absolute", top: "100%", right: 0, zIndex: 500 }}
-                    className="flex h-[var(--top-bar-height)] overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md"
-                  >
-                    {renderChatToolbarActions(false, "overflow")}
-                  </div>
-                )}
-              </div>
-              {renderDebugButton(false)}
-              {renderSessionStatsButton(false)}
+              {renderAgentsButton(false)}
+              {renderToolbarBGroup(false)}
+              {renderSessionStats(false)}
+              {renderDebugThemeGroup()}
+              {renderMainFileToggle(false)}
             </>
           )}
-          {!isMobile && renderMainFileToggle(false)}
-          {isMobile && sessionHasBranches && (
+          {sessionHasBranches && (
             <BranchNavigator
               tree={branchTree}
               activeLeafId={branchActiveLeafId}
@@ -2561,201 +2559,149 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               hideInlineButton
             />
           )}
-          {/* Top panel dropdown — shared, only one active at a time */}
-          {activeTopPanel && topPanelPos && (
+          {/* Top panels — anchored under the header (the draft's sheet); only
+              one open at a time. The inline zIndex stays below the quote
+              toolbar's 260 (ChatWindow). */}
+          {activeTopPanel === "system" && (
+            <div className="absolute inset-x-0 top-full" style={{ zIndex: 240 }}>
+              <SystemPromptPanel
+                loading={systemInfoLoading}
+                prompt={systemPrompt}
+                translate={translate}
+              />
+            </div>
+          )}
+          {activeTopPanel === "tools" && (
+            <div className="absolute inset-x-0 top-full" style={{ zIndex: 240 }}>
+              <ToolDefinitionsPanel
+                loading={systemInfoLoading}
+                tools={systemTools}
+                translate={translate}
+              />
+            </div>
+          )}
+          {activeTopPanel === "session" && (
             <div
-              // top/left/width/maxHeight 来自 topBar 实测 rect（测量值），保留 inline。
-              style={{
-                position: "fixed",
-                top: topPanelPos.top,
-                left: topPanelPos.left,
-                width: topPanelPos.width,
-                maxHeight: `calc(100dvh - ${topPanelPos.top}px)`,
-              }}
-              className="z-[500] overflow-y-auto"
+              className="session-info-popover absolute top-full right-0 max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-xl border border-border bg-popover shadow-lg"
+              style={{ zIndex: 240 }}
             >
-              {activeTopPanel === "agents" && activeSessionFamily && selectedSession && (
-                <AgentSessionPanel
-                  rootSession={activeSessionFamily.root}
-                  subagents={activeSessionFamily.subagents}
-                  selectedSessionId={selectedSession.id}
-                  runningSessionIds={runningSessionIds}
-                  onSelectSession={handleSelectSession}
-                  openSubagentTabIds={openSubagentTabIds}
-                  onToggleSubagentTab={handleToggleSubagentTab}
-                  onNewSideChat={() => handleNewSideChat(activeSessionFamily.root.id)}
-                  onDeleteSideChat={(sessionId) => handleDeleteSideChat(sessionId, activeSessionFamily.root)}
-                />
-              )}
-              {activeTopPanel === "system" && (
-                <SystemPromptPanel
-                  loading={systemInfoLoading}
-                  prompt={systemPrompt}
-                  translate={translate}
-                />
-              )}
-              {activeTopPanel === "tools" && (
-                <ToolDefinitionsPanel
-                  loading={systemInfoLoading}
-                  tools={systemTools}
-                  translate={translate}
-                />
-              )}
-              {activeTopPanel === "session" && (
-                <div className="session-info-popover overflow-x-auto border-b border-border bg-popover px-4 py-3 shadow-md">
-                  {sessionStats ? (() => {
-                    const totalActiveMs = sessionStats.totalActiveMs ?? 0;
-                    const ws = selectedSession;
-                    const sessionRows = [
-                       ...(sessionStats.sessionName ? [{ label: translate("session.name"), value: sessionStats.sessionName, copyField: null }] : []),
-                       { label: translate("session.file"), value: sessionStats.sessionFile ?? translate("session.inMemory"), copyField: "file" as const },
-                       { label: translate("session.id"), value: sessionStats.sessionId, copyField: "id" as const },
-                       ...(totalActiveMs > 0 ? [{ label: translate("session.totalActive"), value: formatActiveDuration(totalActiveMs), copyField: null }] : []),
-                    ];
-                    const projectRows = [
-                      ...(ws ? [{ label: translate("session.projectDir"), value: ws.projectRoot ?? ws.cwd, copyField: "projectDir" as const }] : []),
-                      ...(ws?.branch ? [{ label: translate("session.gitBranch"), value: ws.branch, copyField: "gitBranch" as const }] : []),
-                      ...(ws?.isWorktree ? [{ label: translate("session.gitWorktree"), value: ws.cwd, copyField: "gitWorktree" as const }] : []),
-                    ];
-                    const messageRows = [
-                       [translate("session.user"), sessionStats.userMessages.toLocaleString(locale)],
-                       [translate("session.assistant"), sessionStats.assistantMessages.toLocaleString(locale)],
-                       [translate("session.toolCalls"), sessionStats.toolCalls.toLocaleString(locale)],
-                       [translate("session.toolResults"), sessionStats.toolResults.toLocaleString(locale)],
-                       [translate("session.total"), sessionStats.totalMessages.toLocaleString(locale)],
-                    ];
-                    const tokenRows = [
-                       [translate("session.input"), sessionStats.tokens.input.toLocaleString(locale)],
-                       [translate("session.output"), sessionStats.tokens.output.toLocaleString(locale)],
-                       ...(sessionStats.tokens.cacheRead > 0 ? [[translate("session.cacheRead"), sessionStats.tokens.cacheRead.toLocaleString(locale)]] : []),
-                       ...(sessionStats.tokens.cacheWrite > 0 ? [[translate("session.cacheWrite"), sessionStats.tokens.cacheWrite.toLocaleString(locale)]] : []),
-                       [translate("session.total"), sessionStats.tokens.total.toLocaleString(locale)],
-                    ];
-                    const ctx = contextUsage ?? sessionStats.contextUsage;
-                    const extraTokenRows = [
-                       ...(sessionStats.cost > 0 ? [[translate("session.cost"), `$${sessionStats.cost.toFixed(4)}`]] : []),
-                       ...(ctx?.contextWindow ? [[translate("session.context"), `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} / ${formatCompactCount(ctx.contextWindow)}`]] : []),
-                       // Cache hit rate = cache reads / (input + cache writes + cache reads) — the denominator covers all input-class tokens.
-                       ...(sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite > 0 && sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input > 0
-                         ? [[translate("session.cacheHitRate"), `${(sessionStats.tokens.cacheRead / (sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input) * 100).toFixed(1)}%`]]
-                         : []),
-                    ];
-                    const section = (
-                      title: string,
-                      sectionRows: string[][],
-                      valueAlign: "left" | "right" = "left",
-                      compact = false,
-                    ) => (
-                        <div className="min-w-0">
-                          <div className="mb-1.5 text-[11px] font-bold text-foreground">{title}</div>
-                          <div className={cn(
-                            "grid gap-y-1",
-                            compact
-                              ? "grid-cols-[max-content_max-content] justify-start gap-x-3.5"
-                              : "grid-cols-[auto_minmax(0,1fr)] gap-x-3",
-                          )}>
-                            {sectionRows.map(([label, value]) => (
-                              <div key={`${title}:${label}`} className="contents">
-                                <div className="whitespace-nowrap text-dim">{label}</div>
-                                <div className={cn(
-                                  "min-w-0 text-muted-foreground",
-                                  compact ? "[overflow-wrap:normal]" : "[overflow-wrap:anywhere]",
-                                  valueAlign === "right" ? "whitespace-nowrap text-right" : "whitespace-normal text-left",
-                                )}>{value}</div>
-                              </div>
-                            ))}
+              {sessionStats ? (() => {
+                const totalActiveMs = sessionStats.totalActiveMs ?? 0;
+                const ws = selectedSession;
+                const sessionRows = [
+                   ...(sessionStats.sessionName ? [{ label: translate("session.name"), value: sessionStats.sessionName, copyField: null }] : []),
+                   { label: translate("session.file"), value: sessionStats.sessionFile ?? translate("session.inMemory"), copyField: "file" as const },
+                   { label: translate("session.id"), value: sessionStats.sessionId, copyField: "id" as const },
+                   ...(totalActiveMs > 0 ? [{ label: translate("session.totalActive"), value: formatActiveDuration(totalActiveMs), copyField: null }] : []),
+                ];
+                const projectRows = [
+                  ...(ws ? [{ label: translate("session.projectDir"), value: ws.projectRoot ?? ws.cwd, copyField: "projectDir" as const }] : []),
+                  ...(ws?.branch ? [{ label: translate("session.gitBranch"), value: ws.branch, copyField: "gitBranch" as const }] : []),
+                  ...(ws?.isWorktree ? [{ label: translate("session.gitWorktree"), value: ws.cwd, copyField: "gitWorktree" as const }] : []),
+                ];
+                const messageRows = [
+                   [translate("session.user"), sessionStats.userMessages.toLocaleString(locale)],
+                   [translate("session.assistant"), sessionStats.assistantMessages.toLocaleString(locale)],
+                   [translate("session.toolCalls"), sessionStats.toolCalls.toLocaleString(locale)],
+                   [translate("session.toolResults"), sessionStats.toolResults.toLocaleString(locale)],
+                   [translate("session.total"), sessionStats.totalMessages.toLocaleString(locale)],
+                ];
+                const tokenRows = [
+                   [translate("session.input"), sessionStats.tokens.input.toLocaleString(locale)],
+                   [translate("session.output"), sessionStats.tokens.output.toLocaleString(locale)],
+                   ...(sessionStats.tokens.cacheRead > 0 ? [[translate("session.cacheRead"), sessionStats.tokens.cacheRead.toLocaleString(locale)]] : []),
+                   ...(sessionStats.tokens.cacheWrite > 0 ? [[translate("session.cacheWrite"), sessionStats.tokens.cacheWrite.toLocaleString(locale)]] : []),
+                   [translate("session.total"), sessionStats.tokens.total.toLocaleString(locale)],
+                ];
+                const ctx = contextUsage ?? sessionStats.contextUsage;
+                const extraTokenRows = [
+                   ...(sessionStats.cost > 0 ? [[translate("session.cost"), `$${sessionStats.cost.toFixed(4)}`]] : []),
+                   ...(ctx?.contextWindow ? [[translate("session.context"), `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} / ${formatCompactCount(ctx.contextWindow)}`]] : []),
+                   // Cache hit rate = cache reads / (input + cache writes + cache reads) — the denominator covers all input-class tokens.
+                   ...(sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite > 0 && sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input > 0
+                     ? [[translate("session.cacheHitRate"), `${(sessionStats.tokens.cacheRead / (sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input) * 100).toFixed(1)}%`]]
+                     : []),
+                ];
+                const copyTitleKey: Record<SessionCopyField, string> = {
+                  file: "session.copyFile",
+                  id: "session.copyId",
+                  projectDir: "session.copyProjectDir",
+                  gitBranch: "session.copyGitBranch",
+                  gitWorktree: "session.copyGitWorktree",
+                };
+                const copyButton = (field: SessionCopyField, value: string) => {
+                  const copied = copiedSessionField === field;
+                  return (
+                    <button
+                      type="button"
+                      title={copied ? translate("session.copied") : translate(copyTitleKey[field])}
+                      onClick={() => handleCopySessionField(field, value)}
+                      className={cn(
+                        "-mt-0.5 inline-flex h-[22px] w-[22px] flex-none cursor-pointer items-center justify-center self-start rounded-[4px] border bg-transparent transition-colors",
+                        "hover:border-primary hover:bg-secondary hover:text-primary",
+                        copied ? "border-primary text-primary" : "border-border text-dim",
+                      )}
+                    >
+                      {copied ? (
+                        <CheckIcon className="size-3" strokeWidth={2} />
+                      ) : (
+                        <CopyIcon className="size-3" strokeWidth={2} />
+                      )}
+                    </button>
+                  );
+                };
+                // The draft's pop rows: label left, mono value right, the copy
+                // button at the row's end.
+                const section = (
+                  title: string,
+                  sectionRows: { label: string; value: string; copyField?: SessionCopyField | null }[],
+                  valueAlign: "left" | "right" = "left",
+                ) => (
+                    <div className="min-w-0">
+                      <div className="mb-1.5 text-[11px] font-bold text-foreground">{title}</div>
+                      <div className="grid grid-cols-[max-content_minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5">
+                        {sectionRows.map((row) => (
+                          <div key={`${title}:${row.label}`} className="contents">
+                            <div className="whitespace-nowrap text-[11px] text-dim">{row.label}</div>
+                            <div className={cn(
+                              "min-w-0 font-mono text-[11.5px] text-muted-foreground [overflow-wrap:anywhere]",
+                              valueAlign === "right" ? "whitespace-nowrap text-right" : "whitespace-normal text-left",
+                            )}>{row.value}</div>
+                            <div>{row.copyField ? copyButton(row.copyField, row.value) : null}</div>
                           </div>
-                        </div>
-                      );
-                    const copyTitleKey: Record<SessionCopyField, string> = {
-                      file: "session.copyFile",
-                      id: "session.copyId",
-                      projectDir: "session.copyProjectDir",
-                      gitBranch: "session.copyGitBranch",
-                      gitWorktree: "session.copyGitWorktree",
-                    };
-                    const copyButton = (field: SessionCopyField, value: string) => {
-                      const copied = copiedSessionField === field;
-                      return (
-                        <button
-                          type="button"
-                          title={copied ? translate("session.copied") : translate(copyTitleKey[field])}
-                          onClick={() => handleCopySessionField(field, value)}
-                          className={cn(
-                            "-mt-0.5 inline-flex h-[22px] w-[22px] flex-none cursor-pointer items-center justify-center self-start rounded-[4px] border bg-transparent transition-colors",
-                            "hover:border-primary hover:bg-secondary hover:text-primary",
-                            copied ? "border-primary text-primary" : "border-border text-dim",
-                          )}
-                        >
-                          {copied ? (
-                            <CheckIcon className="size-3" strokeWidth={2} />
-                          ) : (
-                            <CopyIcon className="size-3" strokeWidth={2} />
-                          )}
-                        </button>
-                      );
-                    };
-                    const sessionInfoSection = (
-                      <div className="min-w-0">
-                         <div className="mb-1.5 text-[11px] font-bold text-foreground">{translate("session.infoSection")}</div>
-                        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
-                          {sessionRows.map((row) => (
-                            <div key={`session-info:${row.label}`} className="contents">
-                              <div className="whitespace-nowrap text-dim">{row.label}</div>
-                              <div className="min-w-0 whitespace-normal text-muted-foreground [overflow-wrap:anywhere] [word-break:break-word]">{row.value}</div>
-                              <div>{row.copyField ? copyButton(row.copyField, row.value) : null}</div>
-                            </div>
-                          ))}
-                        </div>
+                        ))}
                       </div>
-                    );
-                    const projectInfoSection = projectRows.length > 0 ? (
-                      <div className="min-w-0">
-                        <div className="mb-1.5 text-[11px] font-bold text-foreground">{translate("session.projectSection")}</div>
-                        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
-                          {projectRows.map((row) => (
-                            <div key={`project-info:${row.label}`} className="contents">
-                              <div className="whitespace-nowrap text-dim">{row.label}</div>
-                              <div className="min-w-0 whitespace-normal text-muted-foreground [overflow-wrap:anywhere] [word-break:break-word]">{row.value}</div>
-                              <div>{row.copyField ? copyButton(row.copyField, row.value) : null}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null;
-
-                    return (
-                      <div className={cn(
-                        "grid gap-4 font-mono text-xs leading-normal md:gap-6",
-                        isMobile
-                          ? "grid-cols-1"
-                          : "grid-cols-[minmax(360px,1.7fr)_minmax(140px,0.55fr)_minmax(190px,0.75fr)]",
-                      )}>
-                        <div className="flex flex-col gap-4 md:gap-5">
-                          {sessionInfoSection}
-                          {projectInfoSection}
-                        </div>
-                         {section(translate("session.messages"), messageRows)}
-                         {section(translate("session.tokens"), [...tokenRows, ...extraTokenRows], "right", true)}
-                      </div>
-                    );
-                  })() : (
-                    <div className="text-xs italic text-muted-foreground">
-                       {translate("session.load")}
                     </div>
-                  )}
+                  );
+                return (
+                  <div className="flex flex-col gap-4 p-3.5 font-mono text-xs leading-normal">
+                    {section(translate("session.infoSection"), sessionRows)}
+                    {projectRows.length > 0 && section(translate("session.projectSection"), projectRows)}
+                    {section(translate("session.messages"), messageRows.map(([label, value]) => ({ label, value })))}
+                    {section(
+                      translate("session.tokens"),
+                      [...tokenRows, ...extraTokenRows].map(([label, value]) => ({ label, value })),
+                      "right",
+                    )}
+                  </div>
+                );
+              })() : (
+                <div className="p-3.5 text-xs italic text-muted-foreground">
+                   {translate("session.load")}
                 </div>
               )}
-              {activeTopPanel === "debug" && (
-                <DebugPanelBoundary fallback={translate("debug.failed")}>
-                  <DebugPanel
-                    readerRef={debugSnapshotReaderRef}
-                    selectedSessionId={selectedSession?.id ?? null}
-                    sessions={sessionsWithSelection}
-                    onClose={closeDebugPanel}
-                  />
-                </DebugPanelBoundary>
-              )}
+            </div>
+          )}
+          {activeTopPanel === "debug" && (
+            <div className="absolute inset-x-0 top-full" style={{ zIndex: 240 }}>
+              <DebugPanelBoundary fallback={translate("debug.failed")}>
+                <DebugPanel
+                  readerRef={debugSnapshotReaderRef}
+                  selectedSessionId={selectedSession?.id ?? null}
+                  sessions={sessionsWithSelection}
+                  onClose={closeDebugPanel}
+                />
+              </DebugPanelBoundary>
             </div>
           )}
 
@@ -2954,9 +2900,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         // 可拖拽宽度经 CSS 变量注入（useResizablePanel 写 --right-panel-width），保留 inline。
         style={{ "--right-panel-width": `${rightPanelResizer.width}px` } as React.CSSProperties}
       >
-        {/* Right panel tab bar */}
-        <div className="flex h-[calc(var(--top-bar-height)_+_env(safe-area-inset-top))] shrink-0 items-center border-b border-border bg-card pt-[env(safe-area-inset-top)]">
-          <div className="flex-1 overflow-hidden">
+        {/* Right panel tab bar — the draft's 46px bar with pill tabs. */}
+        <div className="flex h-[calc(46px_+_env(safe-area-inset-top))] shrink-0 items-center border-b border-border bg-card pt-[env(safe-area-inset-top)]">
+          <div className="min-w-0 flex-1 overflow-hidden">
             <TabBar
               tabs={panelTabs}
               activeTabId={activeFileTabId ?? ""}
@@ -2966,12 +2912,15 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           </div>
           <button
             type="button"
-            className="file-panel-expand-button"
             onClick={handleRightPanelExpandToggle}
             aria-controls="file-panel"
             aria-pressed={rightPanelFullWidth}
             title={translate(rightPanelFullWidth ? "files.restorePanelWidth" : "files.expandPanel")}
             aria-label={translate(rightPanelFullWidth ? "files.restorePanelWidth" : "files.expandPanel")}
+            className={cn(
+              "mr-1 hidden h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:flex",
+              rightPanelFullWidth && "text-primary",
+            )}
           >
             {/* 动态 path（随 rightPanelFullWidth 切换展开/收起箭头）无 lucide 等价四角图形，按例外保留。 */}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -2987,7 +2936,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             aria-expanded={rightPanelOpen}
             title={translate("files.hidePanel")}
             aria-label={translate("files.hidePanel")}
-            className="flex h-[var(--top-bar-height)] w-[var(--top-bar-height)] shrink-0 cursor-pointer items-center justify-center border-l border-border bg-accent p-0 text-foreground transition-colors hover:text-primary"
+            className="mr-1.5 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <PanelRightIcon className="size-4" strokeWidth={2} />
           </button>

@@ -226,11 +226,11 @@ test("a fork's row keeps its name's suffix in view; other titles stay one span",
   }
 });
 
-test("a running row shows the labelled spinner and cannot be archived from the row", () => {
+test("a running row shows the labelled breathing dot and cannot be archived from the row", () => {
   const html = rowMarkup(render({ rows: [sessionRow(session("run"), { status: { running: true, unread: true } })] }), "session:group:run");
-  // The spinner takes the time's place at the right, and the row says it is running.
+  // The dot takes the time's place at the right, and the row says it is running.
   assert.match(html, /class="session-tree-row session-tree-session is-running"/);
-  assert.match(html, /<span class="session-tree-title">first run<\/span><span class="session-tree-meta is-running" title="Agent running…"><svg[^>]*class="lucide[^"]*sidebar-spin" role="img" aria-label="Agent running…"/);
+  assert.match(html, /<span class="session-tree-title">first run<\/span><span class="session-tree-meta is-running" title="Agent running…"><span class="session-tree-running" role="img" aria-label="Agent running…" aria-hidden="false"><\/span><\/span>/);
   assert.doesNotMatch(html, /session-tree-slot/);
   assert.doesNotMatch(html, /session-tree-unread/);
   assert.doesNotMatch(html, /aria-label="Archive"/);
@@ -521,11 +521,12 @@ test("row CSS stays flat, themed and quiet", () => {
   const colors = new Set((css.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).map((color) => color.toLowerCase()));
   for (const color of colors) assert.ok(["#fff"].includes(color), `unexpected color ${color}`);
   // Three text colors: content, labels, meta (plus the accent for states,
-  // the danger token for errors and the delete button's white). No mixes of
-  // their own; error red follows the theme through var(--danger).
+  // the danger token for errors, the delete button's white and the New
+  // pill's on-accent contrast). No mixes of their own; error red follows the
+  // theme through var(--danger).
   const textColors = new Set([...css.matchAll(/(?:^|[\s;{])color: ([^;]+);/g)].map((match) => match[1]));
   for (const color of textColors) {
-    assert.ok(["var(--text)", "var(--text-muted)", "var(--text-dim)", "var(--accent)", "var(--danger)", "inherit", "#fff"].includes(color), `unexpected text color ${color}`);
+    assert.ok(["var(--text)", "var(--text-muted)", "var(--text-dim)", "var(--accent)", "var(--danger)", "var(--accent-contrast)", "inherit", "#fff"].includes(color), `unexpected text color ${color}`);
   }
   assert.doesNotMatch(css, /color: color-mix\(in srgb, var\(--text\)/);
 });

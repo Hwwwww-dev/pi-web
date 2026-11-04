@@ -169,7 +169,7 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
         <div
           className={cn(
             "mr-1.5 size-[7px] shrink-0 rounded-full transition-colors duration-100",
-            isActive ? "border-0 bg-primary" : isOnPath ? "border border-dim bg-muted-foreground" : "border border-dim bg-border",
+            isActive ? "border-0 bg-primary" : isOnPath ? "border border-muted-foreground/50 bg-muted-foreground" : "border border-muted-foreground/50 bg-border",
           )}
         />
 
@@ -180,7 +180,7 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
               "mr-[5px] shrink-0 rounded-[3px] border px-1 font-mono text-[10px] leading-4",
               role === "user"
                 ? "border-primary/20 bg-primary/8 text-primary"
-                : "border-border bg-secondary text-dim",
+                : "border-border bg-secondary text-muted-foreground",
             )}
           >
             {role === "user" ? "U" : "A"}
@@ -189,7 +189,7 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
 
         {/* Skipped indicator */}
         {skipped > 0 && (
-          <span className="mr-[5px] shrink-0 text-[10px] text-dim">
+          <span className="mr-[5px] shrink-0 text-[10px] text-muted-foreground">
             +{skipped}
           </span>
         )}
@@ -198,7 +198,7 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-xs",
-            isActive ? "font-medium text-foreground" : isOnPath ? "font-normal text-muted-foreground" : "font-normal text-dim",
+            isActive ? "font-medium text-foreground" : isOnPath ? "font-normal text-muted-foreground" : "font-normal text-muted-foreground/70",
           )}
         >
           {label}
@@ -253,7 +253,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   const selectBranch = locked ? undefined : handleSelect;
 
   const lockedNotice = locked && (
-    <div className="pt-0.5 pb-1 text-xs italic text-dim">
+    <div className="pt-0.5 pb-1 text-xs italic text-muted-foreground">
       {t("i18n.branchesLockedWhileRunning")}
     </div>
   );
@@ -268,14 +268,14 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   const hasContent = !noBranchReason && topLevel.length > 0;
 
   const branchIcon = (
-    <GitBranchIcon size={12} strokeWidth={2} className={cn("shrink-0", hasContent ? "text-primary" : "text-dim")} />
+    <GitBranchIcon size={12} strokeWidth={2} className={cn("shrink-0", hasContent ? "text-primary" : "text-muted-foreground")} />
   );
 
   const chevron = (
     <ChevronDownIcon
       size={10}
       strokeWidth={1.8}
-      className={cn("ml-0.5 text-dim transition-transform duration-150", open && "rotate-180")}
+      className={cn("ml-0.5 text-muted-foreground transition-transform duration-150", open && "rotate-180")}
     />
   );
 
