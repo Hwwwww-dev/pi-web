@@ -33,8 +33,10 @@ test("adds collapse without replacing cancel", () => {
 
 test("renders extension confirmation and options as markdown", () => {
   assert.match(source, /import \{ MarkdownBody \} from "\.\/MarkdownBody"/);
-  assert.match(dialogSource, /<MarkdownBody>\{request\.message\}<\/MarkdownBody>/);
-  assert.match(dialogSource, /role="button"[\s\S]*?data-extension-option[\s\S]*?<div inert>[\s\S]*?<MarkdownBody>\{option\}<\/MarkdownBody>/);
+  // Dialog and option texts are stripped of ANSI codes before markdown
+  // rendering (the styled header keeps its TUI rendering elsewhere).
+  assert.match(dialogSource, /<MarkdownBody>\{stripAnsi\(request\.message\)\}<\/MarkdownBody>/);
+  assert.match(dialogSource, /role="button"[\s\S]*?data-extension-option[\s\S]*?<div inert>[\s\S]*?<MarkdownBody>\{stripAnsi\(option\)\}<\/MarkdownBody>/);
   assert.match(dialogSource, /ref=\{index === 0 \? focusFirstOption : undefined\}/);
 });
 

@@ -11,6 +11,7 @@ const jiti = createJiti(import.meta.url, {
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const {
+  AssistantMessageHeader,
   CompactionSummaryDetails,
   MessageView,
   formatToolDuration,
@@ -47,6 +48,28 @@ test("a message's actions are icon-only and keep their titles", () => {
   for (const title of ["Copy message", "Edit from here — branches within this session", "New session — creates an independent copy from here"]) {
     assert.ok(html.includes(`title="${title}"`), title);
   }
+});
+
+test("streaming headers preserve counts and speed without showing empty metrics", () => {
+  const renderHeader = (props) => renderToStaticMarkup(React.createElement(
+    I18nProvider, null, React.createElement(AssistantMessageHeader, { modelName: "Test Model", ...props }),
+  ));
+  for (const props of [{}, { estimatedTokens: 0, tps: 20 }]) {
+    const html = renderHeader(props);
+    assert.match(html, />Test Model<\/span>/);
+    assert.doesNotMatch(html, /t\/s|Estimated token count while streaming/);
+  }
+  const tokensOnly = renderHeader({ estimatedTokens: 100 });
+  assert.match(tokensOnly, />100<\/span>/);
+  assert.doesNotMatch(tokensOnly, /t\/s/);
+  const streaming = renderHeader({ estimatedTokens: 1234567, tps: 12345.6 });
+  assert.match(streaming, />1234567<\/span>/);
+  assert.match(streaming, /12345\.6 t\/s/);
+
+  const message = { role: "assistant", provider: "test", model: "model", content: [{ type: "text", text: "Response" }] };
+  const complete = renderMessage(message);
+  assert.doesNotMatch(complete, /Estimated token count while streaming/);
+  assert.match(renderMessage(message, { isStreaming: true }), /Estimated token count while streaming/);
 });
 
 test("matches response model aliases and otherwise includes the provider", () => {

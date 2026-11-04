@@ -11,7 +11,7 @@ test("the Git tab is opened from the sidebar and removed by its close button", (
   assert.match(appShellSource, /const GIT_PANEL_TAB: Tab = \{ id: GIT_TAB_ID, label: "", filePath: "", kind: "git" \};/);
   // The tab only exists in the bar while open; × removes it instead of deactivating it.
   assert.match(appShellSource, /const \[gitPanelOpen, setGitPanelOpen\] = useState\(false\);/);
-  assert.match(appShellSource, /const panelTabs: Tab\[\] = \[\.\.\.\(gitPanelOpen \? \[GIT_PANEL_TAB\] : \[\]\), \.\.\.fileTabs/);
+  assert.match(appShellSource, /const panelTabs: Tab\[\] = orderPanelTabs\(\[\s*\.\.\.\(gitPanelOpen \? \[GIT_PANEL_TAB\] : \[\]\),\s*\.\.\.fileTabs/);
   assert.match(appShellSource, /if \(tabId === GIT_TAB_ID\) \{\s*setGitPanelOpen\(false\);\s*setActiveFileTabId\(\(current\) => current === GIT_TAB_ID \? null : current\);\s*if \(!fileTabs\.length && !terminalTabs\.length\) setRightPanelOpen\(false\);\s*return;\s*\}/);
   // A page refresh with the Git tab active restores it: the git branch wins
   // before the terminal-id whitelist branch in the same restore effect.

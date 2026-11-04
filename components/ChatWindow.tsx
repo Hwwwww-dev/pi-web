@@ -6,7 +6,7 @@ import Image from "next/image";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage } from "@/lib/types";
-import { isTuiText, normalizeCustomPanelLines } from "@/lib/ansi";
+import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
 import { splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
@@ -1960,9 +1960,9 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
 type ExtensionDialogRequest = Extract<ExtensionUiRequest, { method: "select" | "confirm" | "input" | "editor" }>;
 
 function getExtensionDialogSummary(request: ExtensionDialogRequest): string | undefined {
-  if (request.method === "select" && request.options.length > 0) return request.options[0];
+  if (request.method === "select" && request.options.length > 0) return stripAnsi(request.options[0]);
   if (request.method === "confirm") {
-    const firstLine = request.message.split("\n").find((line) => line.trim());
+    const firstLine = stripAnsi(request.message).split("\n").find((line) => line.trim());
     return firstLine?.trim();
   }
   return undefined;
@@ -2304,7 +2304,7 @@ function ExtensionDialog({
             {t("chat.extensionPending")}
           </span>
           <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
-            {request.title}
+            {stripAnsi(request.title)}
           </span>
           {summary && (
             <span style={{ fontSize: 12, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "34%", flexShrink: 1 }}>
@@ -2321,7 +2321,7 @@ function ExtensionDialog({
       <div
         ref={dialogRef}
         role="dialog"
-        aria-label={request.title}
+        aria-label={stripAnsi(request.title)}
         className="extension-drawer-in"
         style={{
           pointerEvents: "auto",
@@ -2453,7 +2453,7 @@ function ExtensionDialog({
           <>
           {request.method === "confirm" && (
             <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-              <MarkdownBody>{request.message}</MarkdownBody>
+              <MarkdownBody>{stripAnsi(request.message)}</MarkdownBody>
             </div>
           )}
           {request.method === "select" && (
@@ -2487,7 +2487,7 @@ function ExtensionDialog({
                   tabIndex={0}
                   data-extension-option
                   className={`extension-option${tone === "neutral" ? "" : ` tone-${tone}`}${selected ? " selected" : ""}`}
-                  aria-label={option}
+                  aria-label={stripAnsi(option)}
                   aria-pressed={selected}
                   ref={index === 0 ? focusFirstOption : undefined}
                   onClick={() => setSelectedOption((current) => current === option ? null : option)}
@@ -2520,7 +2520,7 @@ function ExtensionDialog({
                   }}
                 >
                   <div inert>
-                    <MarkdownBody>{option}</MarkdownBody>
+                    <MarkdownBody>{stripAnsi(option)}</MarkdownBody>
                   </div>
                 </div>
                 );
@@ -2765,7 +2765,7 @@ function ExtensionCustomPanel({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const dialogMaxHeight = useDialogMaxHeight(wrapperRef);
   const displayLines = normalizeCustomPanelLines(request.lines);
-  const summary = displayLines.find((line) => line.trim())?.trim();
+  const summary = displayLines.map(stripAnsi).find((line) => line.trim())?.trim();
 
   useEffect(() => {
     if (!collapsed) inputRef.current?.focus();

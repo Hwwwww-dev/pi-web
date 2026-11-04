@@ -12,8 +12,16 @@ const PROVIDER_USAGE_CACHE_TTL_MS = 5 * 60_000;
 
 export interface ModelSelectorOption {
   provider: string;
+  /** The provider's display name; falls back to `provider` in the group heading. */
+  providerName?: string;
   modelId: string;
   name: string;
+}
+
+export interface ModelSelectorGroup {
+  provider: string;
+  providerName: string;
+  options: ModelSelectorOption[];
 }
 
 interface ModelSelectorProps {
@@ -48,10 +56,31 @@ export function filterModelOptions(options: ModelSelectorOption[], query: string
   if (!normalizedQuery) return options;
 
   return options.filter((option) => (
-    `${option.name} ${option.modelId} ${option.provider}/${option.modelId}`
+    `${option.name} ${option.providerName ?? ""} ${option.modelId} ${option.provider}/${option.modelId}`
       .toLocaleLowerCase()
       .includes(normalizedQuery)
   ));
+}
+
+/** Groups in first-appearance order; never re-sorts, so a models.json provider keeps its file's order (#783). */
+export function groupModelOptions(options: ModelSelectorOption[]): ModelSelectorGroup[] {
+  const groups: ModelSelectorGroup[] = [];
+  for (const option of options) {
+    const existing = groups.find((group) => group.provider === option.provider);
+    if (existing) {
+      existing.options.push(option);
+      if (existing.providerName === existing.provider && option.providerName?.trim()) {
+        existing.providerName = option.providerName.trim();
+      }
+    } else {
+      groups.push({
+        provider: option.provider,
+        providerName: option.providerName?.trim() || option.provider,
+        options: [option],
+      });
+    }
+  }
+  return groups;
 }
 
 export function ModelSelector({
@@ -95,13 +124,7 @@ export function ModelSelector({
     if (!showAll) onShowAll?.();
     setShowAll(!showAll);
   };
-  const modelsByProvider: { provider: string; options: ModelSelectorOption[] }[] = [];
-
-  for (const option of filteredOptions) {
-    const group = modelsByProvider.find((item) => item.provider === option.provider);
-    if (group) group.options.push(option);
-    else modelsByProvider.push({ provider: option.provider, options: [option] });
-  }
+  const modelsByProvider = groupModelOptions(filteredOptions);
 
   const currentName = selectedLabel ?? (value
     ? (isListed(options, value) ?? isListed(allOptions, value))?.name ?? value.modelId
@@ -428,7 +451,7 @@ export function ModelSelector({
                 <div key={group.provider}>
                   {(modelsByProvider.length > 1 || usagePercent[group.provider] !== undefined) && (
                     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "6px 12px 4px", borderTop: index > 0 || onClear ? "1px solid var(--border)" : "none", color: "var(--text-dim)", fontSize: 10, fontWeight: 600, letterSpacing: 0, textTransform: "uppercase" }}>
-                      {modelsByProvider.length > 1 && <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.provider}</span>}
+                      {modelsByProvider.length > 1 && <span title={group.providerName === group.provider ? undefined : group.provider} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textTransform: group.providerName === group.provider ? "uppercase" : "none" }}>{group.providerName}</span>}
                       {usagePercent[group.provider] !== undefined && (
                         <span title={t("providerUsage.usage")} style={{ flexShrink: 0, fontWeight: 500, textTransform: "none", letterSpacing: 0, color: usagePercent[group.provider] > 90 ? "#f87171" : usagePercent[group.provider] > 70 ? "#fbbf24" : "var(--text-dim)" }}>
                           {usagePercent[group.provider]}%
