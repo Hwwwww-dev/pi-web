@@ -12,12 +12,16 @@ import {
   RotateCcwIcon,
   ServerIcon,
   SlidersHorizontalIcon,
+  XIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useTheme } from "@/hooks/useTheme";
 import { THEME_OPTIONS } from "@/lib/theme";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import {
   CHAT_CONTENT_WIDTH_DEFAULT,
   CHAT_CONTENT_WIDTH_MAX,
@@ -43,7 +47,6 @@ import {
   setThinkingExpandedByDefault,
 } from "@/lib/thinking-expansion-preference";
 import { ModelsConfig } from "./ModelsConfig";
-import { ThemeIcon } from "./ThemeIcon";
 import { setupPushSubscription } from "@/lib/push-client";
 import { SkillsConfig } from "./SkillsConfig";
 import { AgentsConfig } from "./AgentsConfig";
@@ -258,8 +261,8 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     { id: "language", label: t("common.language") },
   ];
   const activeDetailLabel = generalDetails.find((item) => item.id === detail)?.label ?? t("settings.appearance");
-  // A label/value row inside a Card (§7.3): 44px keeps the touch target.
-  const optionRowClass = "flex min-h-11 w-full items-center justify-between gap-4 rounded-sm bg-muted px-2.5 text-xs text-foreground";
+  // A label/value row inside a Card (§7.3): label 13px on the left, the control on the right.
+  const optionRowClass = "flex min-h-9 w-full items-center justify-between gap-4 text-[13px] text-foreground";
 
   return (
     <ConfigPanelShell embedded title={t("settings.general")} onClose={onClose}>
@@ -298,6 +301,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                   return (
                     <label
                       key={option.id}
+                      data-theme-option={option.id}
                       className="settings-theme-option"
                     >
                       <input
@@ -308,7 +312,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                         onChange={() => setThemePreference(option.id)}
                         className="sr-only"
                       />
-                      <ThemeIcon preference={option.id} />
+                      <span className="settings-theme-swatch" aria-hidden="true" />
                       <span className="settings-theme-option-label">{t(option.label)}</span>
                     </label>
                   );
@@ -397,32 +401,21 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                     onChange={() => onSoundToggle()}
                   />
                 </div>
-                <div className="settings-chat-option settings-chat-switch-option" role="radiogroup" aria-label={t("settings.enterSendMode")}>
+                <div className="settings-chat-option settings-chat-switch-option">
                   <span>{t("settings.enterSendMode")}</span>
-                  <div className="settings-send-mode-options">
-                    <label className="settings-send-mode-option">
-                      <input
-                        type="radio"
-                        name="enter-send-mode"
-                        value="enter"
-                        checked={enterSendMode === "enter"}
-                        onChange={() => setEnterSendMode("enter")}
-                        className="sr-only"
-                      />
-                      <span className="settings-send-mode-label">{t("settings.enterSendModeEnter")}</span>
-                    </label>
-                    <label className="settings-send-mode-option">
-                      <input
-                        type="radio"
-                        name="enter-send-mode"
-                        value="ctrlEnter"
-                        checked={enterSendMode === "ctrlEnter"}
-                        onChange={() => setEnterSendMode("ctrlEnter")}
-                        className="sr-only"
-                      />
-                      <span className="settings-send-mode-label">{t("settings.enterSendModeCtrlEnter")}</span>
-                    </label>
-                  </div>
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    size="sm"
+                    value={enterSendMode}
+                    aria-label={t("settings.enterSendMode")}
+                    onValueChange={(value) => {
+                      if (value === "enter" || value === "ctrlEnter") setEnterSendMode(value);
+                    }}
+                  >
+                    <ToggleGroupItem value="enter" className="px-2.5 text-xs">{t("settings.enterSendModeEnter")}</ToggleGroupItem>
+                    <ToggleGroupItem value="ctrlEnter" className="px-2.5 text-xs">{t("settings.enterSendModeCtrlEnter")}</ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
                 <div className="settings-chat-option settings-chat-switch-option">
                   <span>{t("settings.cacheMissNotices")}</span>
@@ -443,12 +436,13 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                 <div className="flex flex-col gap-2">
                   <div className={optionRowClass}>
                     <label htmlFor="settings-keepalive-max-sessions">{t("settings.keepAliveMaxSessions")}</label>
-                    <input
+                    <Input
                       id="settings-keepalive-max-sessions"
                       type="number"
                       min={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.min}
                       max={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.max}
                       value={keepAliveConfig.maxSessions}
+                      className="h-8 w-20 text-right text-[13px]"
                       onChange={(event) => {
                         const value = Number(event.target.value);
                         if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, maxSessions: value });
@@ -457,12 +451,13 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
                   </div>
                   <div className={optionRowClass}>
                     <label htmlFor="settings-keepalive-idle-timeout">{t("settings.keepAliveIdleTimeout")}</label>
-                    <input
+                    <Input
                       id="settings-keepalive-idle-timeout"
                       type="number"
                       min={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.min}
                       max={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.max}
                       value={keepAliveConfig.idleTimeoutMinutes}
+                      className="h-8 w-20 text-right text-[13px]"
                       onChange={(event) => {
                         const value = Number(event.target.value);
                         if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, idleTimeoutMinutes: value });
@@ -476,35 +471,22 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             {detail === "sidebar" && (
               <div
                 className="settings-chat-option settings-chat-switch-option"
-                role="radiogroup"
-                aria-label={t("settings.filesPlacement")}
                 aria-describedby="settings-files-placement-description"
               >
                 <span>{t("settings.filesPlacement")}</span>
-                <div className="settings-send-mode-options">
-                  <label className="settings-send-mode-option">
-                    <input
-                      type="radio"
-                      name="files-placement"
-                      value="below"
-                      checked={filesPlacement === "below"}
-                      onChange={() => setFilesPlacement("below")}
-                      className="sr-only"
-                    />
-                    <span className="settings-send-mode-label">{t("settings.filesPlacementBelow")}</span>
-                  </label>
-                  <label className="settings-send-mode-option">
-                    <input
-                      type="radio"
-                      name="files-placement"
-                      value="tab"
-                      checked={filesPlacement === "tab"}
-                      onChange={() => setFilesPlacement("tab")}
-                      className="sr-only"
-                    />
-                    <span className="settings-send-mode-label">{t("settings.filesPlacementTab")}</span>
-                  </label>
-                </div>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={filesPlacement}
+                  aria-label={t("settings.filesPlacement")}
+                  onValueChange={(value) => {
+                    if (value === "below" || value === "tab") setFilesPlacement(value);
+                  }}
+                >
+                  <ToggleGroupItem value="below" className="px-2.5 text-xs">{t("settings.filesPlacementBelow")}</ToggleGroupItem>
+                  <ToggleGroupItem value="tab" className="px-2.5 text-xs">{t("settings.filesPlacementTab")}</ToggleGroupItem>
+                </ToggleGroup>
               </div>
             )}
 
@@ -780,34 +762,51 @@ export function SettingsPanel({
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
       className="settings-dialog-backdrop"
     >
-      <div className="settings-dialog-surface">
-        <div ref={headerRef} className="settings-dialog-header">
-          {isPhone && phone.level !== "home" && (() => {
-            const backName = phone.level === "detail" ? sectionLabel : t("settings.title");
-            return (
-              <button
-                type="button"
-                className="settings-phone-back flex h-11 max-w-full shrink-0 items-center gap-0.5 bg-transparent pr-1.5 pl-0.5 text-[15px] text-primary"
-                onClick={goUpPhoneLevel}
-                aria-label={t("settings.backTo", { name: backName })}
-              >
-                <ChevronLeftIcon size={20} />
-                <span className="truncate">{backName}</span>
-              </button>
-            );
-          })()}
-          {/* A phone names the level it shows: Settings, the section, the detail's row. */}
-          <strong className="settings-dialog-title">
-            {!isPhone || phone.level === "home"
-              ? t("settings.title")
-              : phone.level === "section" ? sectionLabel : detailTitle}
-          </strong>
-          <button type="button" onClick={onClose} title={t("i18n.close")} aria-label={t("i18n.close")} className="config-close-button settings-dialog-close">×</button>
-        </div>
+      <div className="settings-dialog-surface" data-phone-level={isPhone ? phone.level : undefined}>
+        {/* The close floats alone in the surface's top-right corner (§4.4): over the
+            scrolling body on a desktop, alone in the phone's 50px header area. */}
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onClose}
+          title={t("i18n.close")}
+          aria-label={t("i18n.close")}
+          className="settings-dialog-close"
+        >
+          <XIcon aria-hidden="true" />
+        </Button>
+
+        {/* A phone's 50px header area: Back names where it returns, the title names
+            the level shown; a desktop has no header (the rail carries the sections). */}
+        {isPhone && (
+          <div ref={headerRef} className="settings-dialog-header">
+            {phone.level !== "home" && (() => {
+              const backName = phone.level === "detail" ? sectionLabel : t("settings.title");
+              return (
+                <button
+                  type="button"
+                  className="settings-phone-back flex h-11 max-w-full shrink-0 items-center gap-0.5 bg-transparent pr-1.5 pl-0.5 text-[15px] text-primary"
+                  onClick={goUpPhoneLevel}
+                  aria-label={t("settings.backTo", { name: backName })}
+                >
+                  <ChevronLeftIcon size={20} />
+                  <span className="truncate">{backName}</span>
+                </button>
+              );
+            })()}
+            {/* A phone names the level it shows: Settings, the section, the detail's row. */}
+            <strong className="settings-dialog-title">
+              {phone.level === "home"
+                ? t("settings.title")
+                : phone.level === "section" ? sectionLabel : detailTitle}
+            </strong>
+          </div>
+        )}
 
         <div className="settings-dialog-body">
           {/* §7.3: a desktop picks the section from a fixed rail on the left; a phone
-              hides it (the home level lists the sections) and its header navigates. */}
+              shows it as a horizontal chip row at the section level (its home level
+              lists the sections, its detail level keeps the Back button). */}
           <nav aria-label={t("settings.title")} className="settings-section-rail">
             {sections.map((item) => {
               const selected = section === item.id;
@@ -817,19 +816,19 @@ export function SettingsPanel({
                   key={item.id}
                   type="button"
                   className={cn(
-                    "settings-section-rail-item flex h-8 shrink-0 items-center gap-2 rounded-md px-2.5 text-left text-xs transition-colors",
+                    "settings-section-rail-item inline-flex min-w-0 items-center gap-2 text-left transition-colors",
                     "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                     "disabled:cursor-default disabled:opacity-40",
                     selected
-                      ? "bg-accent font-medium text-foreground"
-                      : "bg-transparent text-muted-foreground enabled:hover:bg-secondary",
+                      ? "is-selected bg-accent font-medium text-accent-foreground"
+                      : "bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                   )}
                   disabled={disabled}
                   title={disabled ? t("settings.projectRequired") : item.label}
                   aria-current={selected ? "page" : undefined}
                   onClick={() => activateSection(item.id)}
                 >
-                  <SettingsSectionIcon section={item.id} size={16} />
+                  <SettingsSectionIcon section={item.id} size={15} />
                   <span className="truncate">{item.label}</span>
                 </button>
               );

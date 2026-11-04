@@ -92,7 +92,7 @@ test("groups fonts, chat font size and width in one section, chat behavior in an
   }
   assert.doesNotMatch(panelSource, /ThinkingIcon|settings-thinking-/);
   const chatOptionStyles = cssSource.match(/\.settings-chat-option \{[\s\S]*?\}/)?.[0] ?? "";
-  assert.match(chatOptionStyles, /font-size: 12px/);
+  assert.match(chatOptionStyles, /font-size: 13px/);
   assert.doesNotMatch(chatOptionStyles, /background/);
 });
 
@@ -110,12 +110,16 @@ test("uses a fixed section rail on desktop and a phone home list of sections", (
   assert.match(panelSource, /className="settings-phone-home-item[ "]/);
   assert.match(panelSource, /className="settings-section-rail"/);
   assert.match(panelSource, /className=\{cn\(\s*"settings-section-rail-item /);
-  // The active section reads as the current page; hover and the focus ring are
-  // the shared recipes (bg-accent / hover:bg-secondary / ring-ring).
-  assert.match(panelSource, /selected\s*\?\s*"bg-accent font-medium text-foreground"\s*:\s*"bg-transparent text-muted-foreground enabled:hover:bg-secondary"/);
+  // The active section reads as the current page (bg-accent + font-medium);
+  // hover and the focus ring are the shared recipes.
+  assert.match(panelSource, /selected\s*\?\s*"is-selected bg-accent font-medium text-accent-foreground"\s*:\s*"bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"/);
   assert.match(panelSource, /aria-current=\{selected \? "page" : undefined\}/);
-  assert.match(cssSource, /\.settings-section-rail \{[\s\S]*?width: 200px/);
+  // §4.4: the desktop rail is a 176px column; a phone turns it into horizontal
+  // chips at the section level (hidden at home/detail via data-phone-level).
+  assert.match(cssSource, /\.settings-section-rail \{[\s\S]*?width: 176px/);
   assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-section-rail \{[\s\S]*?display: none/);
+  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-dialog-surface\[data-phone-level="section"\] \.settings-section-rail \{[\s\S]*?flex-direction: row/);
+  assert.match(panelSource, /data-phone-level=\{isPhone \? phone\.level : undefined\}/);
   assert.doesNotMatch(panelSource, /width: isMobile \? "100%" : 188/);
   assert.match(panelSource, /<main[^>]*className="settings-dialog-main"/);
   assert.doesNotMatch(panelSource, /<style>/);

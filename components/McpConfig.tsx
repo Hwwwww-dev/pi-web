@@ -1772,7 +1772,7 @@ function McpStatusOutput({ error, stderr }: { error?: string; stderr?: string })
       {stderr && (
         <>
           <span className="mcp-config-line is-dim">{t("mcp.test.stderr")}</span>
-          <pre className="max-h-[160px] max-w-full overflow-auto whitespace-pre-wrap rounded-sm border border-border bg-card px-2 py-1.5 font-mono text-xs leading-[1.45] text-muted-foreground [overflow-wrap:anywhere]">{revealLines(stderr)}</pre>
+          <pre className="max-h-[160px] max-w-full overflow-auto whitespace-pre-wrap rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs leading-[1.45] text-muted-foreground [overflow-wrap:anywhere]">{revealLines(stderr)}</pre>
         </>
       )}
     </>

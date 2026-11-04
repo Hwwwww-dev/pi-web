@@ -210,7 +210,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputClass =
-  "h-8 w-full rounded-sm border border-border bg-card px-2.5 py-1 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  "h-8 w-full rounded-md border border-border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 function TextInput({ value, onChange, placeholder, mono }: { value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean }) {
   return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
@@ -1717,7 +1717,7 @@ function AddProviderPicker({
   const totalCount = availableOAuth.length + availableApiKey.length + (showCustom ? 1 : 0);
 
   const cardClass =
-    "flex w-full min-w-0 flex-row items-center gap-2 rounded-sm border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-primary hover:bg-secondary";
+    "flex w-full min-w-0 flex-row items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-primary hover:bg-accent/50";
 
   return (
     <div

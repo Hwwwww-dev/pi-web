@@ -9,6 +9,15 @@ import { displayPathWithin, shortenPath } from "@/lib/display-path";
 import type { ModelsData } from "@/lib/models-cache";
 import { isSubagentProfileOverridden } from "@/lib/subagent-profile-precedence";
 import { PathLabel } from "./PathLabel";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import type { SubagentProfile, SubagentScope, SubagentWritableScope } from "@/lib/subagents";
 import {
   getLastSettingsSelection,
@@ -69,7 +78,7 @@ const EMPTY_PROFILE: EditableProfile = {
  * taller prompt textarea), so the base carries none.
  */
 const controlClassName =
-  "min-w-0 rounded-sm border border-border bg-background px-[9px] text-xs text-foreground outline-none disabled:bg-card disabled:text-dim disabled:cursor-default";
+  "min-w-0 rounded-md border border-border bg-background px-[9px] text-xs text-foreground outline-none disabled:bg-card disabled:text-dim disabled:cursor-default";
 
 function editableProfile(profile: SubagentProfile): EditableProfile {
   return {
@@ -196,6 +205,7 @@ export function AgentsConfig({
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [reloadNeeded, setReloadNeeded] = useState(false);
   const [reloading, setReloading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const selected = useMemo(
     () => profiles.find((profile) => profileKey(profile) === selectedKey) ?? null,
@@ -353,7 +363,7 @@ export function AgentsConfig({
 
   const remove = async () => {
     if (!selected || !isWritableScope(selected.scope)) return;
-    if (!window.confirm(t("agents.deleteConfirm", { name: selected.displayName }))) return;
+    setDeleteConfirmOpen(false);
     setSaving(true);
     setError(null);
     try {
@@ -593,7 +603,7 @@ export function AgentsConfig({
                     </ConfigDetailHeaderInfo>
                     <ConfigDetailActions>
                       {selected && (mode === "view" || mode === "edit") && <ConfigButton size="small" onClick={beginDuplicate} disabled={saving || toggling}>{t("agents.duplicate")}</ConfigButton>}
-                      {selected && isWritableScope(selected.scope) && mode === "edit" && <ConfigButton variant="danger" size="small" onClick={() => void remove()} disabled={saving || toggling}>{t("agents.delete")}</ConfigButton>}
+                      {selected && isWritableScope(selected.scope) && mode === "edit" && <ConfigButton variant="danger" size="small" onClick={() => setDeleteConfirmOpen(true)} disabled={saving || toggling}>{t("agents.delete")}</ConfigButton>}
                       <ConfigSwitch checked={draft.enabled} disabled={switchDisabled} label={draft.enabled ? t("agents.disable") : t("agents.enable")} onChange={(checked) => void toggleEnabled(checked)} />
                     </ConfigDetailActions>
                   </ConfigDetailHeader>
@@ -733,6 +743,19 @@ export function AgentsConfig({
           </ConfigButton>
         )}
       </ConfigFooter>
+      {deleteConfirmOpen && selected && (
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("agents.deleteConfirm", { name: selected.displayName })}</AlertDialogTitle>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("i18n.cancel")}</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={() => void remove()}>{t("agents.delete")}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </ConfigPanelShell>
   );
 }

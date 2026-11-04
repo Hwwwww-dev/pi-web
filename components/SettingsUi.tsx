@@ -290,10 +290,10 @@ export function ConfigSectionTitle({ children }: { children: ReactNode }) {
 }
 
 /**
- * A settings group as a Card (§7.3): a titled section with an optional
+ * A settings group as a Card (§4.4/§7.3): a titled section with an optional
  * description, its controls, and a footer for state (save target, trust
  * notice). Density stays tighter than the stock Card: settings panels are
- * dense surfaces.
+ * dense surfaces (header 13.5px title, body a 10px-gap column).
  */
 export function ConfigCard({
   title,
@@ -314,19 +314,19 @@ export function ConfigCard({
 }) {
   const hasHeader = title !== undefined || actions !== undefined || description !== undefined;
   return (
-    <Card className={cn("gap-0 py-4 shadow-none", className)}>
+    <Card className={cn("gap-0 overflow-hidden py-0 shadow-none", className)}>
       {hasHeader && (
-        <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 pb-3 [.border-b]:pb-3">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 pt-3.5 pb-1">
           <div className="min-w-0">
-            {title !== undefined && <CardTitle className="text-sm font-semibold">{title}</CardTitle>}
-            {description !== undefined && <CardDescription className="mt-1 text-xs">{description}</CardDescription>}
+            {title !== undefined && <CardTitle className="text-[13.5px] leading-snug font-semibold">{title}</CardTitle>}
+            {description !== undefined && <CardDescription className="mt-0.5 text-xs">{description}</CardDescription>}
           </div>
           {actions !== undefined && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </CardHeader>
       )}
-      {children !== undefined && <CardContent className="px-4 pb-0">{children}</CardContent>}
+      {children !== undefined && <CardContent className="flex flex-col gap-2.5 px-4 pt-3.5 pb-3.5">{children}</CardContent>}
       {footer !== undefined && (
-        <CardFooter className="justify-start px-4 pb-0 pt-3">{footer}</CardFooter>
+        <CardFooter className="justify-start px-4 pt-1 pb-3.5">{footer}</CardFooter>
       )}
     </Card>
   );
