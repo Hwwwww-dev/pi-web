@@ -304,7 +304,7 @@ test("a message waiting in the composer keeps the main button on send", () => {
   // send affordance (which queues a follow-up) instead of only stop.
   const source = readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8");
   assert.match(source, /const canSubmit = hasInputText \|\| attachedImages\.length > 0;/);
-  assert.match(source, /\{isStreaming && !canSubmit \? \(/);
+  assert.match(source, /\bisStreaming && !canSubmit \? \(/);
   assert.match(source, /onClick=\{isStreaming \? \(\) => queueFollowUp\(\) : handleSend\}/);
 });
 
@@ -1135,11 +1135,11 @@ test("grows the composer to its text and hides the scrollbar until the text is t
 
   const oneLine = fake("hi", 24, 24);
   autoGrowTextarea(oneLine);
-  assert.equal(oneLine.style.height, "24px");
+  assert.equal(oneLine.style.height, "26px");
   assert.equal(oneLine.style.overflowY, "hidden");
 
   const tall = fake("lots", 320, 24);
   autoGrowTextarea(tall);
-  assert.equal(tall.style.height, "200px", "the box caps at 200 px");
+  assert.equal(tall.style.height, "120px", "the box caps at 120 px");
   assert.equal(tall.style.overflowY, "auto", "capped text scrolls");
 });

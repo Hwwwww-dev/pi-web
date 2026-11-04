@@ -33,9 +33,11 @@ test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(appShellSource, /pb-\[env\(safe-area-inset-bottom\)\]/);
   assert.match(appShellSource, /pl-\[env\(safe-area-inset-left\)\]/);
   assert.match(appShellSource, /pr-\[env\(safe-area-inset-right\)\]/);
-  assert.match(appShellSource, /h-\[calc\(var\(--top-bar-height\)_\+_env\(safe-area-inset-top\)\)\]/);
-  // Right panel tab bar.
-  assert.match(appShellSource, /h-\[calc\(var\(--top-bar-height\)_\+_env\(safe-area-inset-top\)\)\] shrink-0/);
+  // The header keeps its safe-area compensation; the draft's 52px min-height
+  // (its two phone rows size themselves).
+  assert.match(appShellSource, /relative flex min-h-\[52px\] flex-wrap items-center border-b border-border px-3 pt-\[env\(safe-area-inset-top\)\]/);
+  // Right panel tab bar: the draft's 46px bar with its safe-area compensation.
+  assert.match(appShellSource, /h-\[calc\(46px_\+_\env\(safe-area-inset-top\)\)\] shrink-0/);
   assert.match(appShellSource, /h-\[var\(--app-viewport-height,100dvh\)\]/);
   assert.match(appShellSource, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}/);
   assert.match(viewportHookSource, /window\.visualViewport/);
@@ -58,7 +60,9 @@ test("contains chat content and inputs within the mobile viewport", () => {
   assert.match(chatWindowSource, /import \{ useDialogMaxHeight \} from "@\/hooks\/useDialogMaxHeight";/);
   assert.match(chatWindowSource, /const dialogMaxHeight = useDialogMaxHeight\(wrapperRef\);/);
   assert.match(chatWindowSource, /maxHeight: dialogMaxHeight/);
-  assert.match(chatInputSource, /stackedComposer \? undefined : "flex-1"/);
+  // The draft composer is always stacked: the textarea row and the tool
+  // capsule row are siblings, and the capsule row never wraps.
+  assert.match(chatInputSource, /"chat-input-controls flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto/);
   assert.match(chatInputSource, /"chat-input-textarea w-full min-w-0/);
 });
 
@@ -82,7 +86,7 @@ test("every class the keyboard-open rules target exists on its component", () =>
   // Every selector the keyboard rules target must exist on the element it
   // means; a renamed class would otherwise leave the rule silently dead.
   assert.match(chatInputSource, /className="chat-input-controls[^"]*"/);
-  assert.match(chatInputSource, /compact \? "shrink-0" : "chat-input-shell /);
+  assert.match(chatInputSource, /compact\s*\?\s*"shrink-0"[\s\S]*?:\s*"chat-input-shell /);
   assert.match(extensionStatusBarSource, /className=\{`extension-status-shelf/);
   assert.match(chatWindowSource, /className="chat-content /);
   // Phone landscape exceeds the 640px breakpoint but has the least height.

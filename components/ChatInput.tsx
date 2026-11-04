@@ -47,6 +47,7 @@ import {
   LightbulbIcon,
   MessagesSquareIcon,
   PencilIcon,
+  PlusIcon,
   RotateCcwIcon,
   ShrinkIcon,
   SquareIcon,
@@ -178,15 +179,16 @@ const COMPOSITION_END_ENTER_GRACE_MS = 100;
 const TEXT_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 const ANCHORED_MENU_GAP = 8;
 
-// Auto-grow a textarea to fit its content, capped at 200px. The `auto` reset
-// expands the box to its full content height, which silently resets its
-// internal scrollTop — restore where the user actually was instead of
-// snapping to the bottom: a snap fights the browser's scroll-to-caret and
-// bounces while editing text above the fold once the scrollbar appears.
+// Auto-grow a textarea to fit its content, capped at 120px (the visual draft's
+// composer box). The `auto` reset expands the box to its full content height,
+// which silently resets its internal scrollTop — restore where the user
+// actually was instead of snapping to the bottom: a snap fights the browser's
+// scroll-to-caret and bounces while editing text above the fold once the
+// scrollbar appears.
 function autoresizeTextarea(ta: HTMLTextAreaElement) {
   const keepScroll = ta.scrollTop;
   ta.style.height = "auto";
-  ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+  ta.style.height = `${Math.min(ta.scrollHeight + 2, 120)}px`;
   ta.scrollTop = keepScroll;
 }
 
@@ -271,8 +273,9 @@ export function replaceLinksWithMarkdown(
 }
 
 /**
- * The composer's auto-grow step: fit the text to 200 px, then let a scrollbar
- * appear only when the text is still taller than the box.
+ * The composer's auto-grow step: fit the text to 120 px (the visual draft's
+ * composer box), then let a scrollbar appear only when the text is still
+ * taller than the box.
  *
  * The height comes from the value, not from scrollHeight: a wrapped
  * placeholder counts toward scrollHeight too, so an empty box would grow to
@@ -281,7 +284,7 @@ export function replaceLinksWithMarkdown(
  */
 export function autoGrowTextarea(ta: HTMLTextAreaElement): void {
   ta.style.height = "auto";
-  ta.style.height = `${ta.value ? Math.min(ta.scrollHeight, 200) : ta.clientHeight}px`;
+  ta.style.height = `${ta.value ? Math.min(ta.scrollHeight + 2, 120) : ta.clientHeight}px`;
   ta.style.overflowY = ta.value && ta.scrollHeight > ta.clientHeight ? "auto" : "hidden";
 }
 
@@ -612,8 +615,7 @@ function revokeImagePreview(image: AttachedImage): void {
   }
 }
 
-function QueueActionButton({ label, title, onClick, children }: {
-  label: string;
+function QueueActionButton({ title, onClick, children }: {
   title: string;
   onClick: () => void;
   children: React.ReactNode;
@@ -623,10 +625,10 @@ function QueueActionButton({ label, title, onClick, children }: {
       type="button"
       onClick={onClick}
       title={title}
-      className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-border/60 bg-transparent px-2.5 py-0.5 text-xs text-foreground transition-colors hover:border-ring/50 hover:bg-accent"
+      aria-label={title}
+      className="inline-flex size-5 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
     >
       {children}
-      {label}
     </button>
   );
 }
@@ -646,15 +648,20 @@ function QueuedMessageRow({
   const isSteer = item.behavior === "steer";
   const behaviorLabel = isSteer ? t("chat.queueBehaviorSteer") : t("chat.queueBehaviorFollowUp");
   const behaviorChipClass = cn(
-    "shrink-0 whitespace-nowrap rounded-full px-2 py-px font-mono text-[10px]",
+    "shrink-0 whitespace-nowrap rounded-full px-[7px] py-px text-[10.5px] font-semibold leading-[1.4]",
     isSteer
-      ? "border border-ring/40 bg-primary/10 text-primary"
-      : "border border-border/60 bg-secondary/50 text-dim",
+      ? "bg-primary text-primary-foreground"
+      : "bg-muted text-muted-foreground",
   );
   return (
     <div
       title={item.text}
-      className="glass-capsule flex min-w-0 items-center gap-2 rounded-full py-[7px] pl-3.5 pr-3 text-xs text-foreground/90"
+      className={cn(
+        "flex min-w-0 max-w-full items-center gap-2 self-start rounded-full py-1 pl-1.5 pr-2.5 text-[12.5px]",
+        isSteer
+          ? "border border-primary/45 bg-background text-foreground"
+          : "bg-secondary text-secondary-foreground",
+      )}
     >
       {item.images.length > 0 && (
         <span className="flex shrink-0 gap-[3px]">
@@ -673,33 +680,33 @@ function QueuedMessageRow({
           })}
         </span>
       )}
+      {onAction ? (
+        <button
+          type="button"
+          title={t("chat.queueBehaviorHint")}
+          onClick={() => onAction(item.id, "toggle")}
+          className={cn(behaviorChipClass, "cursor-pointer transition-opacity hover:opacity-80")}
+        >
+          {behaviorLabel}
+        </button>
+      ) : (
+        <span className={behaviorChipClass}>{behaviorLabel}</span>
+      )}
       <span className="min-w-0 truncate">{item.text}</span>
-      <span className="ml-auto flex shrink-0 items-center gap-1">
-        {onAction ? (
-          <button
-            type="button"
-            title={t("chat.queueBehaviorHint")}
-            onClick={() => onAction(item.id, "toggle")}
-            className={cn(behaviorChipClass, "cursor-pointer bg-transparent transition-colors hover:border-ring/40 hover:bg-primary/10")}
-          >
-            {behaviorLabel}
-          </button>
-        ) : (
-          <span className={behaviorChipClass}>{behaviorLabel}</span>
-        )}
+      <span className="ml-auto flex shrink-0 items-center gap-0.5">
         {onAction && canMoveUp && (
-          <QueueActionButton label={t("chat.moveQueuedUp")} title={t("chat.moveQueuedUp")} onClick={() => onAction(item.id, "moveUp")}>
-            <ChevronUpIcon size={10} strokeWidth={2} aria-hidden="true" />
+          <QueueActionButton title={t("chat.moveQueuedUp")} onClick={() => onAction(item.id, "moveUp")}>
+            <ChevronUpIcon className="size-3" strokeWidth={2} aria-hidden="true" />
           </QueueActionButton>
         )}
         {onAction && canMoveDown && (
-          <QueueActionButton label={t("chat.moveQueuedDown")} title={t("chat.moveQueuedDown")} onClick={() => onAction(item.id, "moveDown")}>
-            <ChevronDownIcon size={10} strokeWidth={2} aria-hidden="true" />
+          <QueueActionButton title={t("chat.moveQueuedDown")} onClick={() => onAction(item.id, "moveDown")}>
+            <ChevronDownIcon className="size-3" strokeWidth={2} aria-hidden="true" />
           </QueueActionButton>
         )}
         {onAction && (
-          <QueueActionButton label={t("chat.editQueued")} title={t("chat.editQueuedTitle")} onClick={() => onAction(item.id, "edit")}>
-            <PencilIcon size={10} strokeWidth={2} aria-hidden="true" />
+          <QueueActionButton title={t("chat.editQueuedTitle")} onClick={() => onAction(item.id, "edit")}>
+            <PencilIcon className="size-3" strokeWidth={2} aria-hidden="true" />
           </QueueActionButton>
         )}
       </span>
@@ -714,7 +721,7 @@ function ModelNoticeBanner({ tone, title, body, onClose }: { tone: "error" | "wa
       role="alert"
       variant={tone === "error" ? "destructive" : "warning"}
       className={cn(
-        "mb-2 max-h-[120px] items-start gap-x-2 overflow-y-auto rounded-md px-2.5 py-1.5 text-xs leading-[1.45]",
+        "max-h-[120px] items-start gap-x-2 overflow-y-auto rounded-md px-2.5 py-1.5 text-xs leading-[1.45]",
         tone === "error" && "border-destructive/30 bg-destructive/[0.07]",
       )}
     >
@@ -1288,7 +1295,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     : t(slashQuery ? "chat.matches" : "chat.commands", { count: filteredSlashCommands.length });
   const hasInputText = Boolean(value.trim());
   const canSubmit = hasInputText || attachedImages.length > 0;
-  const stackedComposer = stacksComposerLayout(compact, isMobile, isStreaming);
   // Warn when images are attached but the selected model is known not to accept
   // image input (#584), including a resolved default. Unknown models stay silent.
   const showImageUnsupportedWarning = (
@@ -1900,13 +1906,79 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
 
   const permissiveStatus = compact ? null : splitExtensionStatuses(extensionStatuses ?? []).permissive;
 
+  // The composer's main button follows the input: a message waiting to be
+  // sent is always the primary action — while a turn runs that queues a
+  // follow-up, the same thing Enter does — and only an empty composer
+  // leaves it as stop. Idle stays muted; anything sendable or running is
+  // primary. It is a sibling of the pill row so it can never be squeezed out.
+  const sendCluster = isStreaming && !canSubmit ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="default"
+          size="icon"
+          onClick={onAbort}
+          aria-label={t("chat.stopAgent")}
+          className="size-[30px] shrink-0 rounded-full"
+        >
+          {/* While the run streams the circle stops it, until the user types
+              something to send. */}
+          <SquareIcon className="size-3 fill-current" aria-hidden="true" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{t("chat.stopAgent")}</TooltipContent>
+    </Tooltip>
+  ) : (
+    <div className="flex shrink-0 items-center gap-1">
+      {isStreaming && onSideChat && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={sendToSideChat}
+              disabled={!value.trim() || attachedImages.length > 0}
+              aria-label={t("chat.sideChat")}
+              className="size-[30px] rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              <MessagesSquareIcon className="size-4" strokeWidth={1.8} aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("chat.sideChatHint")}</TooltipContent>
+        </Tooltip>
+      )}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            onClick={isStreaming ? () => queueFollowUp() : handleSend}
+            disabled={!canSubmit}
+            aria-label={t("chat.send")}
+            className={cn(
+              "size-[30px] shrink-0 rounded-full",
+              canSubmit || isStreaming
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
+            )}
+          >
+            <ArrowUpIcon className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t("chat.send")}</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+
   return (
     <fieldset
       disabled={builtinCommandPending}
       aria-busy={builtinCommandPending}
       className={cn(
         "m-0 border-0 bg-transparent p-0",
-        compact ? "shrink-0" : "chat-input-shell flex min-h-0 flex-col px-4 pb-2",
+        compact
+          ? "shrink-0"
+          // Composer gutter and bottom inset from the visual draft (§4.3); the
+          // horizontal padding matches the message column's (ChatWindow).
+          : "chat-input-shell flex min-h-0 flex-col px-7 pb-3.5 pt-1.5 max-sm:px-2.5 max-sm:pb-[max(12px,env(safe-area-inset-bottom))]",
         builtinCommandPending && "opacity-50 transition-opacity duration-150",
       )}
     >
@@ -1919,11 +1991,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         className="hidden"
         onChange={handleFilePick}
       />}
-      {/* Column width comes from the shared chat-content CSS variable. */}
-      <div
-        className="mx-auto w-full min-w-0"
-        style={{ maxWidth: "var(--chat-content-max-width, 820px)" }}
-      >
+      {/* Column width matches the message column's drafted 700px. */}
+      <div className="mx-auto flex w-full min-w-0 max-w-[700px] flex-col gap-2">
         <MissingCwdBanner cwd={missingCwd} />
         <ModelErrorBanner error={modelError} />
         <ModelScopeWarningBanner warnings={modelScopeWarnings} />
@@ -1938,14 +2007,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             />
           );
         })()}
-        {/* Pending messages: pi delivers them on upcoming turns */}
+        {/* Pending messages: pi delivers them on upcoming turns. The pills sit
+            on the composer's axis, one inner step (13px) in from the card. */}
         {queuedSubmissions && queuedSubmissions.length > 0 && (
-          <div className="mb-2 flex flex-col gap-1.5">
-            <div className="flex justify-center">
-              <span className="rounded-full border border-border/50 bg-card/55 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.4px] text-dim">
-                {t("chat.queued", { count: queuedSubmissions.length })}
-              </span>
-            </div>
+          <div className="flex flex-col gap-1.5 px-[13px] max-sm:px-[9px]">
+            <span className="w-fit rounded-full px-1 font-mono text-[10.5px] uppercase tracking-[0.4px] text-muted-foreground">
+              {t("chat.queued", { count: queuedSubmissions.length })}
+            </span>
             {/* Only the rows scroll: a long queue must not push the input and its buttons off screen (#1428). */}
             <div className="flex max-h-[min(180px,calc(var(--app-viewport-height,100dvh)*0.25))] flex-col items-stretch gap-1.5 overflow-y-auto overscroll-contain px-[3px] py-0.5">
               {queuedSubmissions.map((item, index) => (
@@ -1962,7 +2030,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         )}
         {/* Retry banner */}
         {retryInfo && (
-          <Alert variant="warning" className="mb-2 items-center gap-x-1.5 rounded-md px-2.5 py-1 text-xs leading-normal">
+          <Alert variant="warning" className="items-center gap-x-1.5 rounded-md px-2.5 py-1 text-xs leading-normal">
             <RotateCcwIcon className="size-3.5 translate-y-0 shrink-0" />
             <span className="col-start-2">
               {t("chat.retrying", { attempt: retryInfo.attempt, max: retryInfo.maxAttempts })}
@@ -1971,13 +2039,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           </Alert>
         )}
         {compactResultText && (
-          <Alert className="mb-2 items-center gap-x-1.5 rounded-md border-success/25 bg-success/10 px-2.5 py-1 text-xs leading-normal text-success">
+          <Alert className="items-center gap-x-1.5 rounded-md border-success/25 bg-success/10 px-2.5 py-1 text-xs leading-normal text-success">
             <CheckIcon className="size-3.5 translate-y-0 shrink-0" />
             <span className="col-start-2">{compactResultText}</span>
           </Alert>
         )}
         {compactError && (
-          <Alert variant="destructive" className="mb-2 items-start rounded-md border-destructive/30 bg-destructive/[0.07] px-2.5 py-1 font-mono text-xs leading-normal">
+          <Alert variant="destructive" className="items-start rounded-md border-destructive/30 bg-destructive/[0.07] px-2.5 py-1 font-mono text-xs leading-normal">
             <AlertDescription className="col-start-2 row-start-1 min-w-0 whitespace-pre-wrap wrap-anywhere text-destructive/90">
               {compactError}
             </AlertDescription>
@@ -1985,38 +2053,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           </Alert>
         )}
         {attachError && (
-          <Alert variant="destructive" className="mb-1.5 items-center rounded-md border-destructive/40 bg-destructive/[0.06] px-2 py-1 text-xs leading-normal">
+          <Alert variant="destructive" className="items-center rounded-md border-destructive/40 bg-destructive/[0.06] px-2 py-1 text-xs leading-normal">
             <span className="col-start-2 row-start-1 min-w-0 wrap-anywhere">{attachError}</span>
             <DismissButton onClick={() => setAttachError(null)} title={t("chat.dismiss")} />
           </Alert>
         )}
-        {/* Image previews */}
-        {attachedImages.length > 0 && (
-          <div className="mb-1.5 flex flex-wrap gap-1.5">
-            {attachedImages.map((img, i) => (
-              <div key={i} className="relative shrink-0">
-                <ImagePreview key={img.previewUrl} src={img.previewUrl}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img.previewUrl}
-                    alt=""
-                    className="block size-14 rounded-md border border-border object-cover"
-                  />
-                </ImagePreview>
-                <button
-                  type="button"
-                  onClick={() => removeImage(i)}
-                  title={t("chat.dismiss")}
-                  aria-label={t("chat.dismiss")}
-                  className="absolute -right-1 -top-1 flex size-4 cursor-pointer items-center justify-center rounded-full border border-border bg-card p-0 text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <XIcon className="size-2" strokeWidth={2.5} aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Main input */}
         <div className="relative min-w-0">
           {historyMenuOpen && inputHistory.length > 0 && (
@@ -2205,22 +2246,59 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </div>
             );
           })()}
+          {/* The drafted composer card: attachments, then the input, then one
+              pill row with the send button physically pinned to its right. */}
           <div
             className={cn(
-              "chat-composer-row min-w-0 rounded-xl border border-border bg-background shadow-sm transition-shadow focus-within:ring-[3px] focus-within:ring-ring/50",
+              "chat-composer-row min-w-0 rounded-[18px] border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-colors focus-within:border-[color-mix(in_oklch,var(--foreground)_30%,var(--border))]",
               compact
-                ? "p-1"
-                : stackedComposer
-                  ? "flex flex-col items-stretch gap-2 py-1.5 pl-3 pr-1.5"
-                  : "flex flex-row items-end gap-2 py-2.5 pl-3.5 pr-2.5",
+                ? "flex flex-row items-center gap-1 rounded-xl p-1"
+                : "flex flex-col gap-2 p-2.5 px-3",
             )}
           >
+          {attachedImages.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {attachedImages.map((img, i) => (
+                <div key={i} className="relative shrink-0">
+                  <ImagePreview key={img.previewUrl} src={img.previewUrl}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img.previewUrl}
+                      alt=""
+                      className="block size-14 rounded-md border border-border object-cover"
+                    />
+                  </ImagePreview>
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    title={t("chat.dismiss")}
+                    aria-label={t("chat.dismiss")}
+                    className="absolute -right-1 -top-1 flex size-4 cursor-pointer items-center justify-center rounded-full border border-border bg-card p-0 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <XIcon className="size-2" strokeWidth={2.5} aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+              {!compact && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title={t("chat.attachFiles")}
+                  aria-label={t("chat.attachFiles")}
+                  className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-full border border-dashed border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  <PlusIcon className="size-3" strokeWidth={2} aria-hidden="true" />
+                  {t("chat.attachFiles")}
+                </button>
+              )}
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             className={cn(
-              "chat-input-textarea w-full min-w-0 border-none bg-transparent outline-none resize-none text-foreground max-h-[200px] overflow-auto",
+              "chat-input-textarea w-full min-w-0 border-none bg-transparent outline-none resize-none text-foreground max-h-[120px] overflow-auto placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0",
+              "text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.55]",
               compact ? "min-h-24" : "min-h-6",
-              stackedComposer ? undefined : "flex-1",
             )}
             data-chat-composer=""
             aria-label={compact ? t("chat.askInSideChat") : undefined}
@@ -2258,113 +2336,49 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             rows={1}
           />
 
-          {/* The composer's main button follows the input: a message waiting to be
-              sent is always the primary action — while a turn runs that queues a
-              follow-up, the same thing Enter does — and only an empty composer
-              leaves it as stop. */}
-          {isStreaming && !canSubmit ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onAbort}
-                  aria-label={t("chat.stopAgent")}
-                  className="size-9 shrink-0 rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
-                >
-                  {/* While the run streams the circle stops it, until the user types
-                      something to send. */}
-                  <SquareIcon className="size-3 fill-current" aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("chat.stopAgent")}</TooltipContent>
-            </Tooltip>
-          ) : (
-            <div className="flex shrink-0 items-center gap-1.5 self-end">
-              {isStreaming && onSideChat && (
+          {compact ? sendCluster : (
+            <div className="flex min-w-0 items-center gap-2">
+              {/* One pill row: the pills scroll horizontally instead of wrapping,
+                  and the send button is a sibling so it can never be squeezed
+                  out. chat-input-controls keeps the keyboard-open collapse. */}
+              <div className="chat-input-controls flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
-                      size="icon"
-                      onClick={sendToSideChat}
-                      disabled={!value.trim() || attachedImages.length > 0}
-                      aria-label={t("chat.sideChat")}
-                      className="size-9 rounded-full"
+                      size="icon-sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      aria-label={t("chat.attachFiles")}
+                      className={cn(
+                        "size-7 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        attachedImages.length > 0 && "text-primary",
+                      )}
                     >
-                      <MessagesSquareIcon className="size-4" strokeWidth={1.8} aria-hidden="true" />
+                      <ImageIcon className="size-4" strokeWidth={1.8} aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{t("chat.sideChatHint")}</TooltipContent>
+                  <TooltipContent>{t("chat.attachFiles")}</TooltipContent>
                 </Tooltip>
-              )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                onClick={isStreaming ? () => queueFollowUp() : handleSend}
-                disabled={!canSubmit}
-                aria-label={t("chat.send")}
-                className="size-9 shrink-0 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-              >
-                <ArrowUpIcon className="size-4" strokeWidth={2.2} aria-hidden="true" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("chat.send")}</TooltipContent>
-          </Tooltip>
-            </div>
-          )}
-          </div>
-        </div>
-
-        {/* Bash mode status label */}
-        {bashMode && (
-          <div className={cn("mt-1 px-2 text-xs", bashExcluded ? "text-muted-foreground" : "text-primary")}>
-             {t("chat.shell")} · {bashExcluded ? t("chat.outputLocal") : t("chat.outputModel")}
-          </div>
-        )}
-
-        {/* Bottom bar: left (attach + model) | right (reasoning, tools, compact, sound) */}
-        {!compact && <div className="chat-input-controls mt-2 flex items-center gap-1 max-md:mt-1 max-md:grid max-md:grid-cols-[minmax(0,1fr)_auto]">
-
-          <div className="flex min-w-0 items-center gap-1 max-md:flex-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  aria-label={t("chat.attachFiles")}
-                  className={cn(
-                    "rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground",
-                    attachedImages.length > 0 && "text-primary",
-                  )}
-                >
-                  <ImageIcon className="size-4" strokeWidth={1.8} aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("chat.attachFiles")}</TooltipContent>
-            </Tooltip>
-            {/* Model selector - visible always, disabled while the session or switch is busy */}
-            {(modelOptions.length > 0 || model || modelError) && onModelChange && (
-              <ModelSelector
-                options={modelOptions}
-                value={model}
-                onChange={onModelChange}
-                onReselect={onModelChange}
-                disabled={isStreaming}
-                busy={modelSwitching}
-                isAutoSelection={isAutoModelSelection}
-                defaultValue={defaultModel}
-                onSetDefault={onSetDefaultModel}
-                allOptions={allModelList?.map((m) => ({ provider: m.provider, modelId: m.id, name: m.name }))}
-                onShowAll={onLoadAllModels}
-              />
-            )}
-          </div>
-
-          {/* RIGHT: reasoning + tools + compact + sound as Radix menus; on a
-              phone they collapse behind one More menu. */}
-          <div className="flex items-center justify-end gap-1 md:ml-auto">
+                {/* Model selector - visible always, disabled while the session or switch is busy.
+                    flex-shrink 8: the model pill gives up width first; the other pills only truncate. */}
+                {(modelOptions.length > 0 || model || modelError) && onModelChange && (
+                  <div className="flex min-w-0 overflow-hidden [flex-shrink:8]">
+                    <ModelSelector
+                      options={modelOptions}
+                      value={model}
+                      onChange={onModelChange}
+                      onReselect={onModelChange}
+                      disabled={isStreaming}
+                      busy={modelSwitching}
+                      isAutoSelection={isAutoModelSelection}
+                      defaultValue={defaultModel}
+                      onSetDefault={onSetDefaultModel}
+                      allOptions={allModelList?.map((m) => ({ provider: m.provider, modelId: m.id, name: m.name }))}
+                      onShowAll={onLoadAllModels}
+                    />
+                  </div>
+                )}
             {!isMobile && onThinkingLevelChange && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -2375,10 +2389,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       ? t("chat.currentReasoning", { level: thinkingDisplayLabel })
                       : t("chat.changeReasoning", { level: thinkingDisplayLabel })}
                     aria-label={t("chat.changeReasoningLabel")}
-                    className="gap-1 px-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    className="h-7 min-w-0 flex-[0_1_auto] gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
-                    <LightbulbIcon className="size-4" strokeWidth={1.8} aria-hidden="true" />
-                    <span>{thinkingDisplayLabel}</span>
+                    <LightbulbIcon className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+                    <span className="min-w-0 truncate">{thinkingDisplayLabel}</span>
+                    <ChevronDownIcon className="size-3 shrink-0 opacity-60" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="end" sideOffset={6} className="min-w-[180px]">
@@ -2450,10 +2465,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     size="sm"
                     title={t("chat.changeToolPreset") + `: ${toolPresetLabel}`}
                     aria-label={t("chat.changeToolPreset")}
-                    className="gap-1 px-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    className="h-7 min-w-0 flex-[0_1_auto] gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
-                    <WrenchIcon className="size-4" strokeWidth={1.8} aria-hidden="true" />
-                    <span>{toolPresetLabel}</span>
+                    <WrenchIcon className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+                    <span className="min-w-0 truncate">{toolPresetLabel}</span>
+                    <ChevronDownIcon className="size-3 shrink-0 opacity-60" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="end" sideOffset={6} className="min-w-[120px]">
@@ -2493,8 +2509,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     title={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
                     aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
                     className={cn(
-                      "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                      isCompacting && "gap-1 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive",
+                      "size-7 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      isCompacting && "h-7 w-auto gap-1 rounded-full px-2 text-destructive hover:bg-destructive/10 hover:text-destructive",
                     )}
                   >
                     {isCompacting ? (
@@ -2517,8 +2533,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     onClick={onSoundToggle}
                     aria-label={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}
                     className={cn(
-                      "rounded-md hover:bg-secondary",
-                      soundEnabled ? "text-muted-foreground hover:text-foreground" : "text-dim opacity-55 hover:opacity-100",
+                      "size-7 rounded-full hover:bg-accent",
+                      soundEnabled ? "text-muted-foreground hover:text-accent-foreground" : "text-muted-foreground/55 hover:text-accent-foreground",
                     )}
                   >
                     {soundEnabled
@@ -2537,10 +2553,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     variant="ghost"
                     size="sm"
                     aria-label={t("chat.moreControls")}
-                    className="px-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    className="h-7 gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
                     {t("chat.moreControls")}
-                    <ChevronUpIcon className="size-3.5" aria-hidden="true" />
+                    <ChevronUpIcon className="size-3 shrink-0 opacity-60" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="end" sideOffset={6} className="max-w-[calc(100vw-16px)]">
@@ -2642,13 +2658,24 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </DropdownMenu>
             )}
 
-            <ExtensionStatusButton statuses={extensionStatuses ?? []} />
-            {/* YOLO is a marker, not a control: it carries no box, and it closes
-                the row at the far right. */}
-            {permissiveStatus && <PermissiveModeChip text={permissiveStatus} />}
-          </div>
+                <ExtensionStatusButton statuses={extensionStatuses ?? []} />
+                {/* YOLO is a marker, not a control: it carries no box, and it closes
+                    the row at the far right. */}
+                {permissiveStatus && <PermissiveModeChip text={permissiveStatus} />}
+              </div>
 
-        </div>}
+              {sendCluster}
+            </div>
+          )}
+          </div>
+        </div>
+
+        {/* Bash mode status label */}
+        {bashMode && (
+          <div className={cn("mt-1 px-1 text-xs", bashExcluded ? "text-muted-foreground" : "text-primary")}>
+             {t("chat.shell")} · {bashExcluded ? t("chat.outputLocal") : t("chat.outputModel")}
+          </div>
+        )}
       </div>
     </fieldset>
   );

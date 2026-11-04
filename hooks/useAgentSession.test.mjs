@@ -94,8 +94,8 @@ test("opening System or Tools lazily starts a dormant session without sending a 
   assert.match(loaderEffectSource, /if \(background\) return;/);
   assert.match(loaderEffectSource, /onSystemInfoLoaderChange\?\.\(loadSystemInfo\)/);
   assert.match(loaderEffectSource, /onSystemInfoLoaderChange\?\.\(null\)/);
-  assert.match(appShellSource, /onClick=\{\(\) => handleSystemInfoToggle\("system", mobile\)\}/);
-  assert.match(appShellSource, /onClick=\{\(\) => handleSystemInfoToggle\("tools", mobile\)\}/);
+  assert.match(appShellSource, /onSelect=\{\(\) => handleSystemInfoToggle\("system"\)\}/);
+  assert.match(appShellSource, /onSelect=\{\(\) => handleSystemInfoToggle\("tools"\)\}/);
   assert.match(appShellSource, /systemInfoLoaderRef\.current/);
   assert.doesNotMatch(appShellSource, /systemPrompt !== null \|\| systemInfoLoading/);
   assert.match(appShellSource, /const loadId = \+\+systemInfoLoadIdRef\.current/);
@@ -239,7 +239,7 @@ test("forking stays available during a run while in-session branch switches wait
   assert.match(source, /const branchSwitchLocked = agentRunning \|\| bashRunning \|\| isCompacting;/);
   assert.match(source, /onBranchDataChange\(data\?\.tree \?\? \[\], activeLeafId, handleLeafChange, branchSwitchLocked\)/);
   assert.match(appShellSource, /setBranchSwitchLocked\(locked\)/);
-  assert.equal((appShellSource.match(/locked=\{branchSwitchLocked\}/g) ?? []).length, 2);
+  assert.equal((appShellSource.match(/locked=\{branchSwitchLocked\}/g) ?? []).length, 1);
 });
 
 test("first user messages expose both branch actions and edit before their own entry", () => {
@@ -812,7 +812,7 @@ test("keeps prompt anchor measurement outside the React update cycle", () => {
   assert.match(anchorLifecycleEffectSource, /promptAnchorMeasureFrameRef\.current = requestAnimationFrame\(\(\) => \{\s*promptAnchorMeasureFrameRef\.current = null;\s*updatePromptAnchorSpacer\(\)/);
   assert.match(anchorLifecycleEffectSource, /disposed = true;[\s\S]*?promptAnchorUpdateRef\.current === updatePromptAnchorSpacer[\s\S]*?cancelAnimationFrame\(promptAnchorMeasureFrameRef\.current\)/);
   assert.match(anchorSyncEffectSource, /const updatePromptAnchor = useCallback\(\(\) => \{\s*promptAnchorUpdateRef\.current\?\.\(\);\s*\}, \[\]\);\s*useLayoutEffect\(updatePromptAnchor, \[isStreaming, hasStreamingContent, updatePromptAnchor\]\)/);
-  assert.match(chatWindowSource, /<div ref=\{messageContentRef\}[^>]*style=\{\{/);
+  assert.match(chatWindowSource, /<div\s+ref=\{messageContentRef\}[^>]*style=\{\{/);
 });
 
 test("uses the prompt anchor as the only trailing message spacer", () => {
@@ -974,5 +974,5 @@ test("keeps the compaction control reachable while a turn is auto-compacting", (
   // The control is a shadcn Button now: the pointer affordance and the
   // compacting danger tint live in its variant/className.
   assert.match(controlBlock, /<Button/);
-  assert.match(chatInputSource, /isCompacting && "gap-1 px-2 text-destructive/);
+  assert.match(chatInputSource, /isCompacting && "h-7 w-auto gap-1 rounded-full px-2 text-destructive/);
 });

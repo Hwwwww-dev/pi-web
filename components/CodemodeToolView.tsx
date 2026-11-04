@@ -21,7 +21,7 @@ const STATUS_STYLE: Record<CodemodeCallStatus, { icon: string; className: string
   running: { icon: "…", className: "text-warning" },
   ok: { icon: "✓", className: "text-success" },
   error: { icon: "✗", className: "text-destructive" },
-  cancelled: { icon: "⊘", className: "text-dim" },
+  cancelled: { icon: "⊘", className: "text-muted-foreground" },
 };
 
 function CallRow({ call }: { call: CodemodeCallView }) {
@@ -41,15 +41,15 @@ function CallRow({ call }: { call: CodemodeCallView }) {
         </span>
         <span className="shrink-0 font-semibold text-muted-foreground">{call.name}</span>
         {call.args && (
-          <span className="min-w-0 flex-1 truncate text-dim">
+          <span className="min-w-0 flex-1 truncate text-muted-foreground/70">
             {call.args}
           </span>
         )}
         {duration && (
-          <span className="ml-auto shrink-0 text-dim tabular-nums">{duration}</span>
+          <span className="ml-auto shrink-0 text-muted-foreground/70 tabular-nums">{duration}</span>
         )}
         {call.cost !== undefined && (
-          <span className="shrink-0 text-dim tabular-nums">{formatCodemodeCost(call.cost)}</span>
+          <span className="shrink-0 text-muted-foreground/70 tabular-nums">{formatCodemodeCost(call.cost)}</span>
         )}
       </div>
       {call.error && (
@@ -75,14 +75,14 @@ export function CodemodeCallList({ calls, omitted, isError }: {
   return (
     // fontSize: the chat font-size offset is a CSS variable, so the size stays a style injection.
     <div
-      className={`flex min-w-0 flex-col gap-[3px] border-t bg-muted px-2.5 py-1.5 font-mono leading-normal ${
-        isError ? "border-t-destructive/25" : "border-t-success/20"
+      className={`flex min-w-0 flex-col gap-[3px] rounded-md border bg-muted/50 px-2.5 py-1.5 font-mono leading-normal ${
+        isError ? "border-destructive/30" : "border-border/60"
       }`}
       style={{ fontSize: "calc(12px + var(--chat-font-size-offset, 0px))" }}
     >
-      <div className="text-xs text-dim">{t("codemode.calls")}</div>
+      <div className="text-xs text-muted-foreground">{t("codemode.calls")}</div>
       {omitted > 0 && (
-        <div className="text-dim">{t("codemode.omittedCalls", { count: omitted })}</div>
+        <div className="text-muted-foreground/70">{t("codemode.omittedCalls", { count: omitted })}</div>
       )}
       {hidden > 0 && (
         <button
@@ -99,7 +99,7 @@ export function CodemodeCallList({ calls, omitted, isError }: {
         ))}
       </ul>
       {totalCost !== null && (
-        <div className="text-dim">{t("codemode.modelCost", { cost: formatCodemodeCost(totalCost) })}</div>
+        <div className="text-muted-foreground/70">{t("codemode.modelCost", { cost: formatCodemodeCost(totalCost) })}</div>
       )}
     </div>
   );

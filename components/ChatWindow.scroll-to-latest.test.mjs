@@ -24,7 +24,7 @@ test("shows the scroll-to-latest button only when the viewport is detached from 
   );
 });
 
-test("floats the scroll-to-latest button above the composer at full width", () => {
+test("floats the scroll-to-latest button above the composer's right edge", () => {
   const gate = source.indexOf("{!isEmptyNew && (");
   const marker = source.indexOf('className={`chat-scroll-to-bottom', gate);
   assert.notEqual(gate, -1);
@@ -34,7 +34,7 @@ test("floats the scroll-to-latest button above the composer at full width", () =
 
   assert.match(
     container,
-    /className="pointer-events-none absolute inset-x-0 bottom-full z-20 flex justify-center pb-2\.5"/,
+    /className="pointer-events-none absolute bottom-full right-4 z-20 max-sm:right-2\.5"/,
   );
   assert.match(cssSource, /\.chat-scroll-to-bottom\.is-visible \{[\s\S]*?pointer-events: auto;/);
   assert.match(cssSource, /\.chat-scroll-to-bottom:focus-visible \{[\s\S]*?box-shadow: 0 0 0 3px color-mix\(in srgb, var\(--accent\) 50%, transparent\)/);

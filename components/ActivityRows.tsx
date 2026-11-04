@@ -1,8 +1,20 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BotIcon, CheckIcon, ChevronDownIcon, CopyIcon, ExternalLinkIcon, FileIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareMinusIcon, SquareTerminalIcon, TriangleAlertIcon } from "lucide-react";
+import { BookOpenIcon, BotIcon, CheckIcon, CircleXIcon, CopyIcon, ExternalLinkIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareTerminalIcon, TriangleAlertIcon, WrenchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CodeBlock, CodeBlockContent } from "./ui/code-block";
+import { Spinner } from "./ui/spinner";
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "./ui/trace";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
@@ -47,24 +59,15 @@ import type { CustomMessage, ImageContent, TextContent, ThinkingContent, ToolCal
 // Shared row primitives
 // ─────────────────────────────────────────────────────────────────────────────
 
-function RowChevron({ expanded }: { expanded: boolean }) {
-  return (
-    <ChevronDownIcon
-      strokeWidth={2}
-      className={cn("h-2.5 w-2.5 shrink-0 opacity-70 transition-transform", expanded && "rotate-180")}
-    />
-  );
+function RowSpinner({ className }: { className?: string }) {
+  return <Spinner aria-hidden="true" className={cn("size-3.5 shrink-0 text-muted-foreground", className)} />;
 }
 
-function RowSpinner() {
-  return <span className="activity-spinner" aria-hidden="true" />;
-}
-
-function ToolCategoryIcon({ category, isError }: { category: ToolCategory; isError?: boolean }) {
-  const className = cn("size-[13px] shrink-0", isError && "text-destructive");
+function ToolCategoryIcon({ category }: { category: ToolCategory }) {
+  const className = "size-[14px] shrink-0";
   switch (category) {
     case "view":
-      return <FileIcon className={className} strokeWidth={1.8} />;
+      return <BookOpenIcon className={className} strokeWidth={1.8} />;
     case "search":
       return <SearchIcon className={className} strokeWidth={1.8} />;
     case "edit":
@@ -80,8 +83,16 @@ function ToolCategoryIcon({ category, isError }: { category: ToolCategory; isErr
     case "web":
       return <GlobeIcon className={className} strokeWidth={1.8} />;
     default:
-      return <SquareMinusIcon className={className} strokeWidth={1.8} />;
+      return <WrenchIcon className={className} strokeWidth={1.8} />;
   }
+}
+
+/** A row's leading icon: spinner while running, the error glyph on failure. */
+function RowStatusIcon({ category, isError, active }: { category?: ToolCategory; isError?: boolean; active?: boolean }) {
+  if (active) return <RowSpinner className="text-warning" />;
+  if (isError) return <CircleXIcon className="size-[14px] shrink-0 text-destructive" strokeWidth={1.8} />;
+  if (category) return <ToolCategoryIcon category={category} />;
+  return null;
 }
 
 /** A clickable file reference inside a tool row, opening the file viewer.
@@ -262,108 +273,111 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   const patchLabel = getToolFilePaths(block.input).length === 0 ? singlePatchPath(resultDiff?.text) : null;
 
   return (
-    <div className={`activity-row${isError ? " activity-row-error" : ""}${active ? " activity-row-active" : ""}`} data-activity-tool={block.toolName}>
-      <div className="activity-row-line">
-        <button
-          type="button"
-          className="activity-row-header"
-          aria-expanded={expanded}
-          onClick={toggleExpanded}
+    <Trace data-activity-tool={block.toolName}>
+      <div className="flex max-w-full min-w-0 items-center gap-1">
+        <TraceCollapsible
+          open={expanded}
+          onOpenChange={toggleExpanded}
+          className="w-auto min-w-0 flex-[0_1_auto]"
         >
-          <span className="activity-row-icon"><ToolCategoryIcon category={category} isError={isError} /></span>
-          <span className="activity-row-label" title={mcpLabel || patchLabel ? block.toolName : undefined}>
-            {mcpLabel ? `${mcpLabel.server}/${mcpLabel.tool}` : patchLabel ?? label}
-          </span>
-          <span className="activity-row-preview">
-            {isStreamingInput
-              ? t("chat.generatingToolInput")
-              : codemode
-                ? codemodeScriptPreview(codemode.code)
-                : patchLabel
-                  ? null
-                  : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
-          </span>
-          {codemodeCallCount > 0 && (
-            <span className="activity-row-meta">
-              {codemodeCallCount === 1 ? t("codemode.callCountOne") : t("codemode.callCount", { count: codemodeCallCount })}
-            </span>
-          )}
-          {diffStat && (
-            <span className="diff-stat" aria-hidden="true">
-              <span className="diff-stat-added">+{diffStat.added}</span>
-              <span className="diff-stat-removed">−{diffStat.removed}</span>
-            </span>
-          )}
-          {active ? <RowSpinner /> : duration !== undefined && <span className="activity-row-meta">{formatToolDuration(duration)}</span>}
-          {!active && isError && result && (
-            <span className="activity-row-meta activity-row-failed">{t("chat.activity.failed")}</span>
-          )}
-          <RowChevron expanded={expanded} />
-        </button>
+          <TraceCollapsibleTrigger title={mcpLabel || patchLabel ? block.toolName : undefined}>
+            <TraceLine status={active ? "running" : isError ? "error" : undefined}>
+              <TraceIcon><RowStatusIcon category={category} isError={isError} active={active} /></TraceIcon>
+              <TraceTitle className="font-medium">
+                {mcpLabel ? `${mcpLabel.server}/${mcpLabel.tool}` : patchLabel ?? label}
+              </TraceTitle>
+              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+                {isStreamingInput
+                  ? t("chat.generatingToolInput")
+                  : codemode
+                    ? codemodeScriptPreview(codemode.code)
+                    : patchLabel
+                      ? null
+                      : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
+              </TraceDescription>
+              {codemodeCallCount > 0 && (
+                <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                  {codemodeCallCount === 1 ? t("codemode.callCountOne") : t("codemode.callCount", { count: codemodeCallCount })}
+                </TraceDescription>
+              )}
+              {diffStat && (
+                <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] font-medium" aria-hidden="true">
+                  <span className="rounded-full bg-success/15 px-1.5 text-success">+{diffStat.added}</span>
+                  <span className="rounded-full bg-destructive/10 px-1.5 text-destructive">−{diffStat.removed}</span>
+                </span>
+              )}
+              {!active && duration !== undefined && (
+                <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                  {formatToolDuration(duration)}
+                </TraceDescription>
+              )}
+              {!active && isError && result && (
+                <TraceDescription className="shrink-0 font-medium text-destructive [font-variant-numeric:normal]">
+                  {t("chat.activity.failed")}
+                </TraceDescription>
+              )}
+            </TraceLine>
+          </TraceCollapsibleTrigger>
+          <TraceCollapsibleContent>
+            <div className="flex flex-col gap-2">
+              {usage && (
+                <div className="text-[length:calc(11px+var(--chat-font-size-offset,0px))]">
+                  <UsageBar
+                    usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
+                    ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
+                  />
+                </div>
+              )}
+              {codemode ? (
+                <>
+                  <CodeBlock size="sm"><CodeBlockContent wrap>{codemode.code.replace(/\r/g, "").trimEnd()}</CodeBlockContent></CodeBlock>
+                  <CodemodeCallList calls={codemode.calls} omitted={codemode.omitted} isError={isError} />
+                  {result && (resultText !== null && !resultIsEmpty || resultImages.length > 0) && (
+                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                  )}
+                </>
+              ) : combinedTerminalText !== null ? (
+                <CodeBlock size="sm" variant={isError ? "destructive" : "default"}>
+                  <CodeBlockContent wrap={false}>{combinedTerminalText}</CodeBlockContent>
+                </CodeBlock>
+              ) : (
+                <>
+                  {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
+                    toolFields ? (
+                      <ToolFieldRows fields={toolFields} />
+                    ) : (
+                      <CodeBlock size="sm"><CodeBlockContent wrap>{writtenFileText ?? inputStr}</CodeBlockContent></CodeBlock>
+                    )
+                  )}
+                  {patchFiles && <SplitFilesView files={patchFiles} />}
+                  {result && patchFiles && isError && (
+                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                  )}
+                  {result && !patchFiles && combinedTerminalText === null && (
+                    resultDiff ? <SplitPatchView text={resultDiff.text} /> : (!resultIsEmpty || resultImages.length === 0) && (
+                      <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                    )
+                  )}
+                </>
+              )}
+            </div>
+          </TraceCollapsibleContent>
+        </TraceCollapsible>
         {subagent && onOpenSubagent && (
           <button
             type="button"
-            className="activity-row-action"
+            className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
             title={t("subagent.openTab")}
             aria-label={t("subagent.openTab")}
           >
-            <ExternalLinkIcon className="size-[13px]" strokeWidth={2} />
+            <ExternalLinkIcon className="size-3.5" strokeWidth={2} />
           </button>
         )}
       </div>
 
       {resultImages.length > 0 && <ResultImages images={resultImages} />}
-
-      {expanded && (
-        <div className="activity-row-detail">
-          {usage && (
-            <div className="activity-usage-line">
-              <UsageBar
-                usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
-                ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
-              />
-            </div>
-          )}
-          <div className="activity-detail-card">
-            {codemode ? (
-              <>
-                <pre className="activity-detail-pre">{codemode.code.replace(/\r/g, "").trimEnd()}</pre>
-                <CodemodeCallList calls={codemode.calls} omitted={codemode.omitted} isError={isError} />
-                {result && (resultText !== null && !resultIsEmpty || resultImages.length > 0) && (
-                  <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
-                )}
-              </>
-            ) : combinedTerminalText !== null ? (
-              <PairedResult
-                text={combinedTerminalText}
-                isEmpty={false}
-                isError={isError}
-              />
-            ) : (
-              <>
-                {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
-                  toolFields ? (
-                    <ToolFieldRows fields={toolFields} />
-                  ) : (
-                    <pre className="activity-detail-pre">{writtenFileText ?? inputStr}</pre>
-                  )
-                )}
-                {patchFiles && <SplitFilesView files={patchFiles} />}
-                {result && patchFiles && isError && (
-                  <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
-                )}
-                {result && !patchFiles && combinedTerminalText === null && (
-                  resultDiff ? <SplitPatchView text={resultDiff.text} /> : (!resultIsEmpty || resultImages.length === 0) && (
-                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
-                  )
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+    </Trace>
   );
 }
 
@@ -402,38 +416,46 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
     || (isApplyPatchToolName(call.block.toolName) && applyPatchResultHasFailures(call.result?.details)));
 
   return (
-    <div className={`activity-row${isError ? " activity-row-error" : ""}`} data-activity-group={category}>
-      <button
-        type="button"
-        className="activity-row-header"
-        aria-expanded={expanded}
-        onClick={toggleExpanded}
+    <Trace data-activity-group={category}>
+      <TraceCollapsible
+        open={expanded}
+        onOpenChange={toggleExpanded}
+        className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <span className="activity-row-icon"><ToolCategoryIcon category={category} isError={isError} /></span>
-        <span className="activity-row-label">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</span>
-        <span className="activity-row-preview">{summaryCount}</span>
-        {hasPending ? <RowSpinner /> : totalDuration > 0 && <span className="activity-row-meta">{formatToolDuration(totalDuration)}</span>}
-        <RowChevron expanded={expanded} />
-      </button>
-      {expanded && (
-        <div className="activity-row-children">
-          {calls.map((call, index) => (
-            <ToolRow
-              key={call.block.toolCallId ?? index}
-              block={call.block}
-              result={call.result}
-              duration={call.duration}
-              usage={call.usage}
-              ctxTokens={call.ctxTokens}
-              ctxWindow={ctxWindow}
-              cwd={cwd}
-              onOpenFile={onOpenFile}
-              onOpenSubagent={onOpenSubagent}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+        <TraceCollapsibleTrigger>
+          <TraceLine status={hasPending ? "running" : isError ? "error" : undefined}>
+            <TraceIcon><RowStatusIcon category={category} isError={isError} active={hasPending} /></TraceIcon>
+            <TraceTitle className="font-medium">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</TraceTitle>
+            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+              {summaryCount}
+            </TraceDescription>
+            {!hasPending && totalDuration > 0 && (
+              <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                {formatToolDuration(totalDuration)}
+              </TraceDescription>
+            )}
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
+          <div className="flex flex-col gap-0.5 py-0.5">
+            {calls.map((call, index) => (
+              <ToolRow
+                key={call.block.toolCallId ?? index}
+                block={call.block}
+                result={call.result}
+                duration={call.duration}
+                usage={call.usage}
+                ctxTokens={call.ctxTokens}
+                ctxWindow={ctxWindow}
+                cwd={cwd}
+                onOpenFile={onOpenFile}
+                onOpenSubagent={onOpenSubagent}
+              />
+            ))}
+          </div>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }
 
@@ -554,14 +576,10 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
   }, []);
 
   return (
-    <div className="activity-row" data-activity="thinking">
-      <button
-        type="button"
-        className="activity-row-header"
-        aria-expanded={expanded}
-        aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
-        title={t("i18n.thinking")}
-        onClick={() => {
+    <Trace data-activity="thinking">
+      <TraceCollapsible
+        open={expanded}
+        onOpenChange={() => {
           const next = !expanded;
           // Expanding mid-stream means "show me the live tail"; expanding a
           // finished block opens from the top for reading.
@@ -570,26 +588,39 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
           setExpanded(next);
           if (next) window.dispatchEvent(new Event(COLLAPSIBLE_EXPANDED_EVENT));
         }}
+        className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <span className={cn("activity-row-icon", active && "text-warning")}><ThinkingIcon active={expanded || Boolean(active)} /></span>
-        <span className="activity-row-label">{t("i18n.thinking")}</span>
-        <span className="activity-row-preview">{preview}</span>
-        {active ? <RowSpinner /> : duration !== undefined && <span className="activity-row-meta">{duration}s</span>}
-        <RowChevron expanded={expanded} />
-      </button>
-      {expanded && (
-        <div
-          ref={detailRef}
-          className={cn(
-            "activity-detail-card max-h-[380px] overflow-y-auto overscroll-contain whitespace-pre-wrap wrap-anywhere",
-            error && "text-destructive",
-          )}
-          onScroll={handleDetailScroll}
+        <TraceCollapsibleTrigger
+          aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
+          title={t("i18n.thinking")}
         >
-          {loading ? t("i18n.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
-        </div>
-      )}
-    </div>
+          <TraceLine status={active ? "running" : undefined}>
+            <TraceIcon className={cn(active && "text-warning")}><ThinkingIcon active={expanded || Boolean(active)} /></TraceIcon>
+            <TraceTitle className="font-medium">{t("i18n.thinking")}</TraceTitle>
+            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+              {preview}
+            </TraceDescription>
+            {!active && duration !== undefined && (
+              <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                {duration}s
+              </TraceDescription>
+            )}
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
+          <div
+            ref={detailRef}
+            className={cn(
+              "max-h-[380px] min-w-0 overflow-y-auto overscroll-contain whitespace-pre-wrap wrap-anywhere",
+              error && "text-destructive",
+            )}
+            onScroll={handleDetailScroll}
+          >
+            {loading ? t("i18n.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
+          </div>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }
 
@@ -675,79 +706,85 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
   };
 
   return (
-    <div className={`activity-row${isHiddenDisplay ? " activity-row-dim" : ""}`} data-activity-custom={message.customType}>
-      <div className="activity-row-line">
-        <button
-          type="button"
-          className="activity-row-header"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((v) => !v)}
+    <Trace data-activity-custom={message.customType} className={isHiddenDisplay ? "opacity-75" : undefined}>
+      <div className="flex max-w-full min-w-0 items-center gap-1">
+        <TraceCollapsible
+          open={expanded}
+          onOpenChange={() => setExpanded((v) => !v)}
+          className="w-auto min-w-0 flex-[0_1_auto]"
         >
-          <span className="activity-row-icon"><ToolCategoryIcon category={subagent ? "subagent" : "other"} /></span>
-          <span className={cn("activity-row-label", dim && "font-normal text-dim")}>{label}</span>
-          <span className="activity-row-preview">{preview || (isHiddenDisplay ? t("i18n.showExtensionMessage") : null)}</span>
-          <RowChevron expanded={expanded} />
-        </button>
+          <TraceCollapsibleTrigger>
+            <TraceLine>
+              <TraceIcon><ToolCategoryIcon category={subagent ? "subagent" : "other"} /></TraceIcon>
+              <TraceTitle className={cn("font-medium", dim && "font-normal")}>{label}</TraceTitle>
+              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+                {preview || (isHiddenDisplay ? t("i18n.showExtensionMessage") : null)}
+              </TraceDescription>
+            </TraceLine>
+          </TraceCollapsibleTrigger>
+          <TraceCollapsibleContent>
+            <div className="flex flex-col gap-2">
+              {images.length > 0 && (
+                <div className={cn("flex flex-wrap gap-1.5", text && "mb-2")}>
+                  {images.map((img, i) => {
+                    const src = imageSource(img);
+                    if (!src) return null;
+                    return (
+                      <ImagePreview key={i} src={src}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={src}
+                          alt=""
+                          className="block max-h-60 max-w-60 rounded-md border border-border object-contain"
+                        />
+                      </ImagePreview>
+                    );
+                  })}
+                </div>
+              )}
+              {text
+                ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody>
+                : <span className="text-xs text-muted-foreground">{t("i18n.noMessage")}</span>}
+              {hasDetails && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <button type="button" onClick={copyContent} className="cursor-pointer border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground">
+                    {copied ? t("i18n.copied") : t("i18n.copy")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDetailsExpanded((v) => !v)}
+                    className="cursor-pointer border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {detailsExpanded ? t("i18n.hideDetails") : t("i18n.showDetails")}
+                  </button>
+                  {detailsExpanded && (
+                    <CodeBlock size="sm" className="mt-1.5"><CodeBlockContent wrap>{detailsText}</CodeBlockContent></CodeBlock>
+                  )}
+                </div>
+              )}
+              {!hasDetails && text && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <button type="button" onClick={copyContent} className="cursor-pointer border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground">
+                    {copied ? t("i18n.copied") : t("i18n.copy")}
+                  </button>
+                </div>
+              )}
+            </div>
+          </TraceCollapsibleContent>
+        </TraceCollapsible>
         {subagent && onOpenSubagent && (
           <button
             type="button"
-            className="activity-row-action"
+            className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
             title={t("subagent.openTab")}
             aria-label={t("subagent.openTab")}
           >
-            <ExternalLinkIcon className="size-[13px]" strokeWidth={2} />
+            <ExternalLinkIcon className="size-3.5" strokeWidth={2} />
           </button>
         )}
       </div>
-      {expanded && (
-        <div className="activity-detail-card">
-          {images.length > 0 && (
-            <div className={cn("flex flex-wrap gap-1.5", text && "mb-2")}>
-              {images.map((img, i) => {
-                const src = imageSource(img);
-                if (!src) return null;
-                return (
-                  <ImagePreview key={i} src={src}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={src}
-                      alt=""
-                      className="block max-h-60 max-w-60 rounded-sm border border-border object-contain"
-                    />
-                  </ImagePreview>
-                );
-              })}
-            </div>
-          )}
-          {text
-            ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody>
-            : <span className="text-xs text-dim">{t("i18n.noMessage")}</span>}
-          {hasDetails && (
-            <div className="activity-row-footnote">
-              <button type="button" onClick={copyContent} className="activity-row-footnote-button">
-                {copied ? t("i18n.copied") : t("i18n.copy")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailsExpanded((v) => !v)}
-                className="activity-row-footnote-button"
-              >
-                {detailsExpanded ? t("i18n.hideDetails") : t("i18n.showDetails")}
-              </button>
-              {detailsExpanded && <pre className="activity-detail-pre mt-1.5">{detailsText}</pre>}
-            </div>
-          )}
-          {!hasDetails && text && (
-            <div className="activity-row-footnote">
-              <button type="button" onClick={copyContent} className="activity-row-footnote-button">
-                {copied ? t("i18n.copied") : t("i18n.copy")}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    </Trace>
   );
 }
 
@@ -771,32 +808,31 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
     : previewText(parsedSummary.body, 120);
 
   return (
-    <div className="activity-row" data-activity-custom="compaction">
-      <button
-        type="button"
-        className="activity-row-header"
-        aria-expanded={expanded}
-        title={expanded ? t("i18n.collapse") : t("i18n.expand")}
-        onClick={() => setExpanded((v) => !v)}
+    <Trace data-activity-custom="compaction">
+      <TraceCollapsible
+        open={expanded}
+        onOpenChange={() => setExpanded((v) => !v)}
+        className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <span className="activity-row-icon"><ToolCategoryIcon category="compact" /></span>
-        <span className="activity-row-label">{t("i18n.conversationCompacted")}</span>
-        <span className="activity-row-preview">
-          {preview}
-          {typeof tokensBefore === "number" && Number.isFinite(tokensBefore) && (
-            <>
-              {" · "}{t("i18n.compactedFromTokens", { tokens: tokensBefore.toLocaleString() })}
-            </>
-          )}
-        </span>
-        <RowChevron expanded={expanded} />
-      </button>
-      {expanded && (
-        <div className="activity-detail-card">
+        <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
+          <TraceLine>
+            <TraceIcon><ToolCategoryIcon category="compact" /></TraceIcon>
+            <TraceTitle className="font-medium">{t("i18n.conversationCompacted")}</TraceTitle>
+            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+              {preview}
+              {typeof tokensBefore === "number" && Number.isFinite(tokensBefore) && (
+                <>
+                  {" · "}{t("i18n.compactedFromTokens", { tokens: tokensBefore.toLocaleString() })}
+                </>
+              )}
+            </TraceDescription>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
           <CompactionSummaryDetails summary={summary} cwd={cwd} onOpenFile={onOpenFile} />
-        </div>
-      )}
-    </div>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }
 
@@ -810,13 +846,13 @@ export function CompactionSummaryDetails({ summary, cwd, onOpenFile }: {
 
   return (
     <>
-      <div className="text-[length:calc(14px+var(--chat-font-size-offset,0px))] leading-[1.5] text-foreground">
+      <div className="text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground">
         {t("i18n.compactionDescription")}
       </div>
       {parsedSummary.body ? (
         <MarkdownBody className="markdown-compaction-message" cwd={cwd} onOpenFile={onOpenFile}>{parsedSummary.body}</MarkdownBody>
       ) : (
-        <span className="text-xs text-dim">{t("i18n.noSummary")}</span>
+        <span className="text-xs text-muted-foreground">{t("i18n.noSummary")}</span>
       )}
       <CompactionFileMetadata readFiles={parsedSummary.readFiles} modifiedFiles={parsedSummary.modifiedFiles} />
     </>
@@ -903,7 +939,7 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
           aria-label={t("i18n.copyMessage")}
           className={cn(
             "ml-auto flex cursor-pointer items-center rounded-sm p-0.5 transition-colors",
-            copied ? "text-primary" : "text-dim hover:text-primary",
+            copied ? "text-primary" : "text-muted-foreground hover:text-foreground",
           )}
         >
           {copied ? <CheckIcon className="size-3" strokeWidth={1.8} /> : <CopyIcon className="size-3" strokeWidth={1.8} />}
@@ -1325,7 +1361,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function ResultImages({ images }: { images: ImageContent[] }) {
   return (
     <div
-      className="activity-row-images"
+      className="flex flex-wrap gap-1.5 py-1"
     >
       {images.map((image, index) => {
         const src = imageSource(image);
@@ -1362,8 +1398,10 @@ function PairedResult({ text, isEmpty, isError }: {
   return (
     <pre
       className={cn(
-        "activity-detail-pre",
-        isError ? "text-destructive" : isEmpty ? "text-dim italic opacity-60" : "text-muted-foreground",
+        "max-h-[420px] min-w-0 overflow-auto rounded-lg border px-2.5 py-2 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]",
+        isError
+          ? "border-destructive/30 text-destructive"
+          : isEmpty ? "border-border/60 italic text-muted-foreground/60" : "border-border/60 text-muted-foreground",
         tui ? "whitespace-pre" : "whitespace-pre-wrap break-all",
       )}
     >
@@ -1373,14 +1411,14 @@ function PairedResult({ text, isEmpty, isError }: {
 }
 
 const TOOL_FIELD_LABEL =
-  "pr-3 py-1 align-top whitespace-nowrap text-dim text-[length:calc(11px+var(--chat-font-size-offset,0px))]";
+  "pr-3 py-1 align-top whitespace-nowrap text-muted-foreground text-[length:calc(11px+var(--chat-font-size-offset,0px))]";
 
 const TOOL_FIELD_VALUE =
   "py-1 font-mono wrap-anywhere text-muted-foreground text-[length:calc(12px+var(--chat-font-size-offset,0px))]";
 
 // A value with newlines of its own keeps them, scrolled in place.
 const TOOL_FIELD_BLOCK =
-  "m-0 max-h-[260px] overflow-auto rounded-sm border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
+  "m-0 max-h-[260px] overflow-auto rounded-lg border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
 
 function ToolFieldRows({ fields }: { fields: ToolField[] }) {
   return (

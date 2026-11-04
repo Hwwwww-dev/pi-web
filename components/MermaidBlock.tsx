@@ -153,6 +153,10 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
 // What a previewed fence (mermaid here, svg in components/SvgBlock.tsx) shares:
 // the header with its toggle and download button, and the zoom viewer.
 
+/** Header tool buttons: ghost icon-button form (spec §4.5), active = accent. */
+const GHOST_TOOL_BUTTON =
+  "inline-flex h-6 cursor-pointer items-center justify-center rounded-md bg-transparent px-2 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
+
 export function PreviewToggleButton({ isStreaming, previewVisible, onToggle, title }: {
   isStreaming?: boolean;
   previewVisible: boolean;
@@ -167,7 +171,8 @@ export function PreviewToggleButton({ isStreaming, previewVisible, onToggle, tit
       onClick={onToggle}
       disabled={isStreaming}
       title={isStreaming ? t("i18n.previewAfterStreaming") : title}
-      className={["markdown-code-action", "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50", previewVisible ? "is-active" : ""].filter(Boolean).join(" ")}
+      aria-pressed={previewVisible}
+      className={[GHOST_TOOL_BUTTON, previewVisible ? "bg-accent text-foreground" : ""].filter(Boolean).join(" ")}
     >
       {previewVisible ? t("i18n.source") : t("i18n.preview")}
     </button>
@@ -179,7 +184,7 @@ export function SvgDownloadButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
-      className="markdown-code-action focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className={GHOST_TOOL_BUTTON}
       title={`${t("i18n.downloadFile")} (SVG)`}
       aria-label={`${t("i18n.downloadFile")} (SVG)`}
       onClick={onClick}
@@ -191,7 +196,7 @@ export function SvgDownloadButton({ onClick }: { onClick: () => void }) {
 
 export function PreviewFrame({ lang, actions, children }: { lang: string; actions: ReactNode; children: ReactNode }) {
   return (
-    <div className="markdown-code-block">
+    <div className="markdown-code-block rounded-xl!">
       <div className="markdown-code-header">
         <span className="markdown-code-lang">{lang}</span>
         <div className="markdown-code-actions">{actions}</div>
@@ -384,14 +389,14 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
   };
 
   return (
-    <div className="markdown-code-block">
+    <div className="markdown-code-block rounded-xl!">
       <div className="markdown-code-header">
         <span className="markdown-code-lang">{lang || "text"}</span>
         <div className="markdown-code-actions">
           {headerAction}
           <button
             onClick={copy}
-            className="markdown-code-action focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className={GHOST_TOOL_BUTTON}
           >
             {copied ? t("i18n.copied") : t("i18n.copy")}
           </button>

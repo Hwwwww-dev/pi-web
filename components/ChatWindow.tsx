@@ -111,7 +111,11 @@ interface Props {
   holdAudio?: () => () => void;
 }
 
-const CHAT_COLUMN_PADDING = 16;
+// The message column's page gutter and width, from the visual draft (§4.2):
+// 28px around a 700px column on desktop, half the gutter on phones.
+const CHAT_COLUMN_PADDING = 28;
+const CHAT_COLUMN_PADDING_MOBILE = 14;
+const CHAT_COLUMN_MAX_WIDTH = 700;
 
 // One update check per page. Every fresh composer mounts the header again
 // (each move of the new-session bar does), and a link that turned up late
@@ -224,7 +228,7 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
       onOpenChange={(open) => {
         if (!reveal) setExpanded(open);
       }}
-      className="mb-3"
+      className="mb-5"
     >
       <CollapsibleTrigger
         className="flex max-w-full min-h-6 cursor-pointer items-center gap-2 border-0 bg-transparent px-0 py-0.5 text-left text-xs text-muted-foreground"
@@ -252,6 +256,7 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
 export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, panel = false, onSideSession, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onDebugSnapshotReaderChange, background = false, dormant = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
+  const columnPadding = isMobile ? CHAT_COLUMN_PADDING_MOBILE : CHAT_COLUMN_PADDING;
   const completionNotificationsEnabled = !isHiddenRelation(session?.relation);
 
   // Wrap onAgentEnd to play the completion sound. This is more reliable than
@@ -1546,7 +1551,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
       <div
         className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-end"
-        style={{ padding: `0 ${CHAT_COLUMN_PADDING}px` }}
+        style={{ padding: `0 ${columnPadding}px` }}
       >
         <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} onDismiss={dismissNotice} />
       </div>
@@ -1573,12 +1578,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           // A stable gutter keeps the centred column from shifting when a short
           // session grows past one screen.
           className={cn(
-            "scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-gutter:stable]",
+            "scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-[22px] pb-2 max-sm:pt-4 [scrollbar-gutter:stable]",
             pendingScrollRestore && "invisible",
           )}
         >
-          <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${CHAT_COLUMN_PADDING}px` }}>
-            <div ref={messageContentRef} onPointerUp={captureQuotedSelection} className="mx-auto w-full min-w-0" style={{ maxWidth: "var(--chat-content-max-width, 820px)" }}>
+          <div style={{ minWidth: 0, padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
+            <div
+              ref={messageContentRef}
+              onPointerUp={captureQuotedSelection}
+              className="mx-auto w-full min-w-0 text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] max-sm:text-[length:calc(14px+var(--chat-font-size-offset,0px))]"
+              style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH }}
+            >
             {hasMoreRendered && (
               <div ref={setSentinel} className="py-3 text-center text-xs text-muted-foreground">
                 {t("chat.loadEarlier")}
@@ -1713,14 +1723,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         document.body,
       )}
 
-      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `12px ${CHAT_COLUMN_PADDING + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${CHAT_COLUMN_PADDING}px` }}>
+      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
         {!isEmptyNew && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-full z-20 flex justify-center pb-2.5">
+          <div className="pointer-events-none absolute bottom-full right-4 z-20 max-sm:right-2.5">
             <button
               type="button"
               className={`chat-scroll-to-bottom${showScrollToBottom && !pendingScrollRestore ? " is-visible" : ""}`}
               title={t("chat.scrollToLatest")}
               aria-label={t("chat.scrollToLatest")}
+              style={{ width: 34, height: 34, marginBottom: isMobile ? 10 : 14 }}
               onClick={() => scrollToBottom("smooth")}
             >
               <ArrowDownIcon size={16} strokeWidth={2} aria-hidden="true" />
@@ -1734,7 +1745,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             width are inline here). */}
         {isEmptyNew && (
           <div className="new-session-hero max-md:px-4 md:pr-[52px] md:pl-4">
-            <div className="new-session-hero-inner max-w-[var(--chat-content-max-width,820px)]">
+            <div className="new-session-hero-inner max-w-[min(var(--chat-content-max-width,820px),700px)]">
               <div className="new-session-brand">
                 <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo" />
                 <div className="new-session-brand-text">

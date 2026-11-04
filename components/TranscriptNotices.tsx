@@ -67,7 +67,7 @@ export const TranscriptNoticeLines = memo(function TranscriptNoticeLines({ notic
         return (
           <div
             key={index}
-            className={`flex items-start gap-1.5 text-xs leading-normal wrap-anywhere ${warning ? "text-warning" : "text-dim"}`}
+            className={`flex items-start gap-1.5 text-xs leading-normal wrap-anywhere ${warning ? "text-warning" : "text-muted-foreground"}`}
           >
             {warning && (
               <TriangleAlert size={13} strokeWidth={1.8} className="mt-[3px] shrink-0" />

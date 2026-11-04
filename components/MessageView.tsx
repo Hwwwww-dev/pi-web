@@ -4,6 +4,7 @@ import { Fragment, memo, useState, useRef, useEffect, useMemo } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, ClockIcon, CopyIcon, CornerDownRightIcon, GitBranchIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "./ui/alert";
+import { Bubble, BubbleContent } from "./ui/bubble";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import {
@@ -214,7 +215,7 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
     // spacing of their own; inside grouped activity bodies the rows are spaced
     // by the activity container.
     return (
-      <div className="mb-3">
+      <div className="mb-5">
         {(message as CustomMessage).customType === "compaction"
           ? <CompactionRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} />
           : <CustomRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />}
@@ -263,7 +264,6 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   isEditing?: boolean;
 }) {
   const { t } = useI18n();
-  const [hovered, setHovered] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -320,7 +320,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               alt=""
               loading="lazy"
               decoding="async"
-              className="block max-h-60 max-w-60 rounded-sm border border-user-border object-contain"
+              className="block max-h-60 max-w-60 rounded-md border border-border object-contain"
             />
           </ImagePreview>
         );
@@ -329,6 +329,9 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   );
   const canEdit = !!entryId && !!onEditContent;
   const canCancelEdit = !!isEditing && !!onCancelEdit;
+  // Edit-in-progress and its cancel stay visible without hover; the rest reveal
+  // on the row's hover (touch screens keep them always on via pointer-coarse).
+  const pinnedActions = forking || canCancelEdit;
 
   const copyContent = () => {
     copyText(copyTarget).then(() => {
@@ -338,20 +341,14 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   };
 
   return (
-    <div
-      className="mb-3 flex flex-col items-end"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div className="flex max-w-[85%] items-end gap-1.5">
+    <div className="group mb-5 flex flex-col items-end gap-1">
+      <Bubble variant="secondary" align="end" className="max-w-[82%] max-sm:max-w-[86%]">
         {/* Cap the height so an abnormally long message does not push the
             conversation off screen; overflow scrolls inside the bubble. */}
-        <div
+        <BubbleContent
           className={cn(
-            "min-w-0 max-h-[300px] flex-1 overflow-y-auto break-words rounded-lg px-3 py-2 text-[length:calc(14px+var(--chat-font-size-offset,0px))] leading-[1.6] text-foreground",
-            isEditing
-              ? "border border-[color-mix(in_srgb,var(--accent)_62%,var(--user-bg))] bg-[color-mix(in_srgb,var(--accent)_14%,var(--user-bg))] ring-2 ring-[color-mix(in_srgb,var(--accent)_16%,transparent)]"
-              : "border border-user-border bg-user-bg",
+            "max-h-[300px] overflow-y-auto rounded-[18px] px-4 py-[9px] text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
+            isEditing && "bg-[color-mix(in_srgb,var(--accent)_14%,var(--secondary))] ring-2 ring-[color-mix(in_srgb,var(--accent)_16%,transparent)]",
           )}
         >
           {commandText ? (
@@ -374,7 +371,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   />
                 </button>
                 {commandArgs && (
-                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[length:calc(14px+var(--chat-font-size-offset,0px))] leading-[1.6] text-foreground">
+                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground">
                     {commandArgs}
                   </span>
                 )}
@@ -389,66 +386,64 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
           {content && <SafeMarkdownBody className="markdown-user-message" keepLineBreaks cwd={cwd} onOpenFile={onOpenFile}>{content}</SafeMarkdownBody>}
           </>
           )}
-        </div>
-
-      </div>
+        </BubbleContent>
+      </Bubble>
 
       {/* Bottom row: action buttons + timestamp */}
       {(
-        <div className="mt-[3px] flex items-center justify-end gap-1.5">
-          <div className={cn("touch-hover-actions flex gap-[3px] transition-opacity", hovered ? "opacity-100" : "pointer-events-none opacity-0")}>
+        <div className={cn(
+          "flex items-center justify-end gap-1 transition-opacity",
+          pinnedActions
+            ? "opacity-100"
+            : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
+        )}>
+          <button
+            onClick={copyContent}
+            title={t("i18n.copyMessage")}
+            aria-label={t("i18n.copyMessage")}
+            className={cn(
+              "inline-flex size-[26px] cursor-pointer items-center justify-center rounded-lg transition-colors",
+              copied ? "text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
+          >
+            {copied ? <CheckIcon className="size-[13px]" strokeWidth={1.8} /> : <CopyIcon className="size-[13px]" strokeWidth={1.8} />}
+          </button>
+          {canEdit && !canCancelEdit && (
             <button
-              onClick={copyContent}
-              title={t("i18n.copyMessage")}
-              aria-label={t("i18n.copyMessage")}
+              onClick={() => onEditContent!(editTarget, entryId!)}
+               title={t("i18n.editFromHereTitle")}
+              aria-label={t("i18n.editFromHere")}
+              className="inline-flex size-[26px] cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <CornerDownRightIcon className="size-[13px]" strokeWidth={1.8} />
+            </button>
+          )}
+          {canCancelEdit && (
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              title={t("i18n.cancel")}
+              aria-label={t("i18n.cancel")}
+              className="inline-flex size-[26px] cursor-pointer items-center justify-center rounded-lg text-primary"
+            >
+              <XIcon className="size-[13px]" strokeWidth={2} />
+            </button>
+          )}
+          {canFork && (
+            <button
+              onClick={() => { onFork!(entryId!); }}
+              disabled={forking}
+               title={forking ? t("i18n.creatingSession") : t("i18n.newSessionTitle")}
+              aria-label={t("i18n.newSession")}
               className={cn(
-                "flex h-[22px] cursor-pointer items-center rounded-sm px-1.5 py-[3px] transition-colors",
-                copied ? "text-primary" : "text-dim hover:text-primary",
+                "inline-flex size-[26px] cursor-pointer items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed",
+                forking ? "text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
               )}
             >
-              {copied ? <CheckIcon className="size-[11px]" strokeWidth={1.8} /> : <CopyIcon className="size-[11px]" strokeWidth={1.8} />}
+              <GitBranchIcon className="size-[13px]" strokeWidth={1.8} />
             </button>
-          </div>
-          {(canFork || canEdit || canCancelEdit) && (
-            <div className={cn("touch-hover-actions flex gap-[3px] transition-opacity", hovered || forking || canCancelEdit ? "opacity-100" : "pointer-events-none opacity-0")}>
-              {canEdit && !canCancelEdit && (
-                <button
-                  onClick={() => onEditContent!(editTarget, entryId!)}
-                   title={t("i18n.editFromHereTitle")}
-                  aria-label={t("i18n.editFromHere")}
-                  className="flex h-[22px] cursor-pointer items-center rounded-sm px-1.5 py-[3px] text-dim transition-colors hover:text-primary"
-                >
-                  <CornerDownRightIcon className="size-[11px]" strokeWidth={1.8} />
-                </button>
-              )}
-              {canCancelEdit && (
-                <button
-                  type="button"
-                  onClick={onCancelEdit}
-                  title={t("i18n.cancel")}
-                  aria-label={t("i18n.cancel")}
-                  className="flex h-[22px] cursor-pointer items-center rounded-sm px-2 py-[3px] text-primary"
-                >
-                  <XIcon className="size-[11px]" strokeWidth={2} />
-                </button>
-              )}
-              {canFork && (
-                <button
-                  onClick={() => { onFork!(entryId!); }}
-                  disabled={forking}
-                   title={forking ? t("i18n.creatingSession") : t("i18n.newSessionTitle")}
-                  aria-label={t("i18n.newSession")}
-                  className={cn(
-                    "flex h-[22px] items-center rounded-sm px-1.5 py-[3px] transition-colors disabled:cursor-not-allowed",
-                    forking ? "text-primary" : "text-dim hover:text-primary",
-                  )}
-                >
-                  <GitBranchIcon className="size-[11px]" strokeWidth={1.8} />
-                </button>
-              )}
-            </div>
           )}
-          {time && <span className="text-[10px] text-dim">{time}</span>}
+          {time && <span className="text-[10px] text-muted-foreground">{time}</span>}
         </div>
       )}
     </div>
@@ -505,7 +500,6 @@ function AssistantMessageView({
   const providerError = getAssistantErrorMessage(message, { isStreaming });
   const truncated = isAssistantTruncated(message, { isStreaming });
   const unansweredTruncation = truncated && !hasAssistantAnswer(message);
-  const [hovered, setHovered] = useState(false);
   const [copied, setCopied] = useState(false);
   const streamStartRef = useRef<StreamRateStart | null>(null);
   const rateKey = streamRateKey(message);
@@ -640,16 +634,14 @@ function AssistantMessageView({
     <div
       data-message-role="assistant"
       data-entry-id={entryId}
-      className="mb-3"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className="group mb-5"
     >
       {/* Streaming status (estimated tokens + throughput); the model name lives
           in the turn meta line / the per-message label for standalone messages. */}
       {(showModelLabel || isStreaming) && (
         <div
           className={cn(
-            "mb-1 flex items-center gap-1.5 text-xs text-dim",
+            "mb-1 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground",
             // The live-tail streaming message renders next to the activity
             // rows: line its tokens/rate up with the rows' icon column, and
             // keep it clear of the tool row above.
@@ -666,14 +658,14 @@ function AssistantMessageView({
 
                 {est > 0 && (
                   <span className="flex items-center gap-1 text-foreground" title={t("i18n.estimatedTokens")}>
-                    <span className="flex items-center gap-0.5 text-xs font-normal">
+                    <span className="flex items-center gap-0.5 text-[11px] font-normal">
                       <ArrowDownIcon aria-hidden className="size-2.5" strokeWidth={1.5} />
                       {est}
                     </span>
                     {tps !== null && (
                       <span
                         className={cn(
-                          "ml-1.5 rounded-sm px-1.5 py-px text-xs font-normal",
+                          "ml-1.5 rounded-full px-1.5 py-px text-[11px] font-normal",
                           tps >= 50 ? "bg-primary/15 text-primary"
                             : tps >= 30 ? "bg-success/15 text-success"
                             : tps >= 15 ? "bg-warning/15 text-warning"
@@ -691,7 +683,7 @@ function AssistantMessageView({
         </div>
       )}
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2.5">
         {/* Not keyed by the entry id: a message of this run gets one when the file is
             read again, and its blocks keep their state across that read (#1184). */}
         {blockItems.map(({ block, originalIndex }) => (
@@ -733,11 +725,11 @@ function AssistantMessageView({
       )}
 
       {((message.usage && !isStreaming) || (turnDurationMs !== undefined && !isStreaming) || (textContent && !isStreaming && !hideCopy) || (time && !isStreaming)) && (
-        <div className="mt-1 flex items-center gap-2">
+        <div className="mt-1.5 flex items-center gap-2">
           {(message.usage || turnDurationMs !== undefined) && !isStreaming && (
             // One item per count: a single space at 11px ran them together. The
             // spaces stay in the text for copying; the flex gap draws the room.
-            <div className="flex flex-wrap gap-x-[7px] text-xs text-dim tabular-nums">
+            <div className="flex flex-wrap gap-x-[7px] font-mono text-[11px] text-muted-foreground tabular-nums">
               {stats.map((part, index) => (
                 <Fragment key={index}>{index > 0 && " "}<UsagePart part={part} /></Fragment>
               ))}
@@ -749,16 +741,16 @@ function AssistantMessageView({
             title={t("i18n.copyMessage")}
             aria-label={t("i18n.copyMessage")}
             className={cn(
-              "touch-hover-actions flex h-[22px] cursor-pointer items-center rounded-sm px-1.5 py-[3px] transition-colors",
-              hovered ? "opacity-100" : "pointer-events-none opacity-0",
-              copied ? "text-primary" : "text-dim hover:text-primary",
+              "inline-flex size-[26px] shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors",
+              "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
+              copied ? "text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
             )}
           >
-            {copied ? <CheckIcon className="size-[11px]" strokeWidth={1.8} /> : <CopyIcon className="size-[11px]" strokeWidth={1.8} />}
+            {copied ? <CheckIcon className="size-[13px]" strokeWidth={1.8} /> : <CopyIcon className="size-[13px]" strokeWidth={1.8} />}
           </button>
           )}
           {time && !isStreaming && (
-            <span className="ml-auto whitespace-nowrap text-[10px] text-dim">{time}</span>
+            <span className="ml-auto whitespace-nowrap text-[10px] text-muted-foreground">{time}</span>
           )}
         </div>
       )}
@@ -1030,10 +1022,10 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
       };
 
   return (
-    <div className="my-1.5">
+    <div className="mb-5">
       <ToolRow block={block} result={result} isStreaming={isPending} />
       {message.truncated && fullOutputUrl && (
-        <div className="-mt-px px-2.5 py-1 text-xs">
+        <div className="-mt-px px-1 py-1 text-xs">
           {showFullButton && (
             <button
               onClick={loadFullOutput}
@@ -1049,7 +1041,7 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
           >
             {t("chat.downloadFullOutput")}
           </a>
-          {fullError && <span className="ml-1.5 text-xs text-dim">({fullError})</span>}
+          {fullError && <span className="ml-1.5 text-xs text-muted-foreground">({fullError})</span>}
         </div>
       )}
     </div>

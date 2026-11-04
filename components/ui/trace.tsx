@@ -60,7 +60,9 @@ function TraceTitle({ className, ...props }: React.ComponentProps<"span">) {
     <span
       data-slot="trace-title"
       className={cn(
-        "cn-trace-title min-w-0 truncate motion-reduce:shimmer-none",
+        // 草稿语义：标题 flex:none 不换行不被截断，摘要行承担收缩
+        // （官方默认相反——标题 truncate 摘要 shrink-0，视觉核验后调换）。
+        "cn-trace-title shrink-0 whitespace-nowrap motion-reduce:shimmer-none",
         className
       )}
       {...props}
@@ -76,7 +78,7 @@ function TraceDescription({
     <span
       data-slot="trace-description"
       className={cn(
-        "cn-trace-description shrink-0 text-muted-foreground/70 tabular-nums",
+        "cn-trace-description min-w-0 truncate text-muted-foreground/70 tabular-nums",
         className
       )}
       {...props}

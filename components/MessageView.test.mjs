@@ -627,9 +627,9 @@ test("marks apply_patch returned failures as errors even when isError is unset",
     content: [block],
   }, { toolResults: new Map([[block.toolCallId, failed]]) });
 
-  assert.match(html, /activity-row-error/);
+  assert.match(html, /data-status="error"/);
   assert.match(html, /data-activity-tool="apply_patch"/);
-  assert.doesNotMatch(html, /activity-row-error.*rgba\(34,197,94/s);
+  assert.doesNotMatch(html, /data-status="error"[\s\S]*text-success/);
 });
 
 test("collapses a displayed custom message from its header alone", () => {
@@ -911,7 +911,7 @@ test("collapses the compaction summary to its title and token count, as pi's TUI
   };
   const html = renderMessage(message);
 
-  assert.match(html, /<button type="button" class="activity-row-header" aria-expanded="false" title="Expand"/);
+  assert.match(html, /<button type="button" aria-expanded="false" data-state="closed"[^>]*title="Expand"/);
   assert.match(html, /Conversation compacted/);
   assert.ok(html.includes(`Compacted from ${(123456).toLocaleString()} tokens`));
   // The collapsed header also shows the dev file-context counts next to the tokens.
