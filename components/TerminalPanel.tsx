@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import { LinkIcon, MoonIcon, RotateCwIcon, SunIcon } from "lucide-react";
+import { LinkIcon, MoonIcon, RotateCwIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
 import { terminalFontSize, useChatAppearance } from "@/hooks/useChatAppearance";
 import { useI18n } from "@/hooks/useI18n";
 import { setTerminalTheme, useTerminalTheme } from "@/hooks/useTerminalTheme";
@@ -281,28 +281,43 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
 
   const nextTheme = theme === "dark" ? "light" : "dark";
   const themeLabel = nextTheme === "light" ? "terminal.lightTheme" : "terminal.darkTheme";
+  // The CodeBlock title names the shell; the server picks the real binary.
+  const shellLabel = typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent) ? "shell" : "zsh";
 
   return (
-    <section className="terminal-panel" data-terminal-theme={theme} aria-label={t("terminal.title")}>
-      <header className="terminal-panel-header">
-        <div className="terminal-panel-path">
-          <span className={`terminal-status-dot is-${status}`} title={t(`terminal.${status}`)} />
-          <PathLabel text={cwd} />
-        </div>
-        <div className="terminal-panel-actions">
+    // The CodeBlock sm container, kept on the section so the terminal grid,
+    // data-terminal-theme and its own xterm palette stay untouched.
+    <section
+      className="terminal-panel cn-code-block group/code-block relative flex w-full min-w-0 flex-col overflow-hidden rounded-lg border border-input text-xs dark:bg-input/30"
+      data-terminal-theme={theme}
+      aria-label={t("terminal.title")}
+    >
+      <header className="flex min-w-0 shrink-0 items-center gap-2 px-2.5 text-muted-foreground">
+        <span
+          className={`terminal-status-dot is-${status}`}
+          title={t(`terminal.${status}`)}
+          aria-label={t(`terminal.${status}`)}
+        />
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 font-sans text-xs font-medium text-foreground">
+          <SquareTerminalIcon aria-hidden="true" size={14} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
+          <span className="shrink-0">{shellLabel}</span>
+          <span aria-hidden="true" className="shrink-0 font-normal text-muted-foreground">·</span>
+          <PathLabel text={cwd} className="min-w-0 font-normal text-muted-foreground" />
+        </span>
+        <div className="pointer-coarse:opacity-100 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-focus-within/code-block:opacity-100 group-hover/code-block:opacity-100">
           {status === "error" && (
-            <button type="button" onClick={() => setReconnectKey((key) => key + 1)} disabled={Boolean(tab.closing)} title={t("terminal.reconnect")} aria-label={t("terminal.reconnect")}>
+            <button type="button" onClick={() => setReconnectKey((key) => key + 1)} disabled={Boolean(tab.closing)} title={t("terminal.reconnect")} aria-label={t("terminal.reconnect")} className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
               <LinkIcon size={14} strokeWidth={1.8} />
             </button>
           )}
-          <button type="button" onClick={() => setTerminalTheme(nextTheme)} title={t(themeLabel)} aria-label={t(themeLabel)}>
+          <button type="button" onClick={() => setTerminalTheme(nextTheme)} title={t(themeLabel)} aria-label={t(themeLabel)} className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
             {nextTheme === "light" ? (
               <SunIcon size={14} strokeWidth={1.8} />
             ) : (
               <MoonIcon size={14} strokeWidth={1.8} />
             )}
           </button>
-          <button type="button" onClick={onRestart} disabled={Boolean(tab.closing)} title={t("terminal.restart")} aria-label={t("terminal.restart")}>
+          <button type="button" onClick={onRestart} disabled={Boolean(tab.closing)} title={t("terminal.restart")} aria-label={t("terminal.restart")} className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
             <RotateCwIcon size={14} strokeWidth={1.8} />
           </button>
         </div>

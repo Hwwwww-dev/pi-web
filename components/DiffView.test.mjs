@@ -9,15 +9,19 @@ test("DiffView parses unified patches through the shared parser", () => {
   assert.match(source, /const files = parseUnifiedPatch\(patch\);/);
 });
 
-test("DiffView renders added/removed lines with tinted rows and line numbers", () => {
+test("DiffView renders added/removed lines with the official CodeBlock line variants", () => {
   assert.match(source, /file-diff-view min-w-full/);
-  assert.match(source, /file-diff-line flex min-w-full border-l-\[3px\]/);
-  // Added/removed rows take the diff tokens (globals.css); unchanged rows stay
-  // on the view's own background with a dim marker.
-  assert.match(source, /bg-diff-add-bg border-l-diff-add text-diff-add/);
-  assert.match(source, /bg-diff-del-bg border-l-diff-del text-diff-del/);
-  assert.match(source, /border-l-transparent text-dim/);
+  // Rows are the vendored CodeBlock lines: the shared line class carries the
+  // gutter layout, the variant carries the tint; the variant's absolute ::after
+  // marker is dropped for the aligned marker column.
+  assert.match(source, /cn-code-block-line file-diff-line flex min-w-full after:content-none/);
+  assert.match(source, /cn-code-block-line-variant-added/);
+  assert.match(source, /cn-code-block-line-variant-removed/);
+  // Unchanged rows stay on the view's own background, no variant.
+  assert.match(source, /rowTone = line\.type === "added"/);
   assert.match(source, /line\.type === "removed" \? line\.oldLineNo : line\.newLineNo/);
+  // Collapsed hunks take the highlighted variant.
+  assert.match(source, /cn-code-block-line-variant-highlighted/);
 });
 
 test("DiffView collapses unchanged regions around 3 lines of context", () => {

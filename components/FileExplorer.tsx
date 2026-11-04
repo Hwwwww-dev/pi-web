@@ -18,9 +18,19 @@ import {
   UploadIcon,
   XIcon,
 } from "lucide-react";
-import { getFileIcon, FolderIcon } from "./FileIcons";
+import { getFileIcon, TreeFolderIcon } from "./FileIcons";
 import { DismissButton } from "./DismissButton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import {
   encodeFilePathForApi,
   getFileDirectory,
@@ -162,15 +172,16 @@ const GIT_STATUS_KEYS: Record<GitFileStatusKind, string> = {
   conflict: "files.conflict",
 };
 
-// Git 状态取色走 token 工具类（modified/amber→warning、added/renamed-green→success、
+// Git 状态取色走 token 工具类（modified/amber→warning、added/untracked-green→success、
 // deleted/red→destructive、renamed/blue→primary），由状态键查类名，保持单一来源。
-const GIT_STATUS_TEXT_CLASSES: Record<GitFileStatusKind, string> = {
-  modified: "text-warning",
-  added: "text-success",
-  deleted: "text-destructive",
-  renamed: "text-primary",
-  untracked: "text-success",
-  conflict: "text-destructive",
+// 徽标形态：10.5px/600 胶囊，底色 = 同色 15%（删除 10%），对齐草稿 .pm-git。
+const GIT_STATUS_BADGE_CLASSES: Record<GitFileStatusKind, string> = {
+  modified: "text-warning bg-warning/15",
+  added: "text-success bg-success/15",
+  deleted: "text-destructive bg-destructive/10",
+  renamed: "text-primary bg-primary/15",
+  untracked: "text-success bg-success/15",
+  conflict: "text-destructive bg-destructive/10",
 };
 
 function GitStatusBadge({ status, t }: { status: GitFileStatus; t: Translate }) {
@@ -179,8 +190,8 @@ function GitStatusBadge({ status, t }: { status: GitFileStatus; t: Translate }) 
       title={t(GIT_STATUS_KEYS[status.status])}
       aria-label={t(GIT_STATUS_KEYS[status.status])}
       className={cn(
-        "flex size-3.5 shrink-0 items-center justify-center font-mono text-xs font-semibold",
-        GIT_STATUS_TEXT_CLASSES[status.status],
+        "inline-flex h-4 shrink-0 items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold leading-none",
+        GIT_STATUS_BADGE_CLASSES[status.status],
       )}
     >
       {status.code}
@@ -250,6 +261,7 @@ export function TreeNode({
   const [allowedLinkTarget, setAllowedLinkTarget] = useState<string | null>(null);
   const [allowingLink, setAllowingLink] = useState(false);
   const [allowLinkError, setAllowLinkError] = useState<string | null>(null);
+  const [linkConfirmOpen, setLinkConfirmOpen] = useState(false);
   // A link leading outside the project is refused until the operator allows
   // its target, so it asks for that instead of listing (#748).
   const pendingLinkTarget = node.outsideLinkTarget && node.outsideLinkTarget !== allowedLinkTarget
@@ -317,14 +329,8 @@ export function TreeNode({
     }
   }, [node.isDir, node.fullPath, node.name, loaded, open, pendingLinkTarget, loadChildren, onOpenFile, onToggleExpanded]);
 
-  const handleAllowLink = useCallback(async (event: React.MouseEvent) => {
-    event.stopPropagation();
+  const allowLink = useCallback(async () => {
     if (!pendingLinkTarget) return;
-    // A link to `/`, `~` or a parent of the project opens far more than a
-    // sibling folder, and a cloned repository can contain one.
-    if (node.outsideLinkEncloses && !window.confirm(t("files.allowEnclosingLinkConfirm", { target: pendingLinkTarget }))) {
-      return;
-    }
     setAllowingLink(true);
     setAllowLinkError(null);
     try {
@@ -336,7 +342,19 @@ export function TreeNode({
     } finally {
       setAllowingLink(false);
     }
-  }, [node.fullPath, node.outsideLinkEncloses, pendingLinkTarget, loadChildren, t]);
+  }, [node.fullPath, pendingLinkTarget, loadChildren]);
+
+  const handleAllowLink = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!pendingLinkTarget) return;
+    // A link to `/`, `~` or a parent of the project opens far more than a
+    // sibling folder, and a cloned repository can contain one.
+    if (node.outsideLinkEncloses) {
+      setLinkConfirmOpen(true);
+      return;
+    }
+    void allowLink();
+  }, [node.outsideLinkEncloses, pendingLinkTarget, allowLink]);
 
   return (
     <div>
@@ -359,29 +377,39 @@ export function TreeNode({
           onDropFiles?.(node.fullPath, droppedItems(event.dataTransfer));
         } : undefined}
         className={cn(
-          "relative flex h-[var(--file-row-height)] cursor-pointer items-center gap-1 rounded-sm pr-2 select-none",
+          "relative flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg pr-2 text-[12.5px] text-foreground",
           // 拖拽目标虚线框优先于行悬停底色（hovered 态不触发于拖拽中，二者不冲突）
           isDropTarget &&
             "bg-[color-mix(in_srgb,var(--accent)_16%,transparent)] outline-1 outline-dashed outline-primary -outline-offset-1",
-          !isDropTarget && hovered && "bg-secondary",
+          !isDropTarget && hovered && "bg-sidebar-accent",
         )}
-        style={{ paddingLeft: 8 + depth * 14 }} /* 树深度缩进为逐行计算值 */
+        style={{ paddingLeft: 4 + depth * 14 }} /* 树深度缩进为逐行计算值 */
       >
-        {node.isDir && (
+        {/* 缩进线：每级一条 border-l，位置与行内缩进同一套树深度计算值 */}
+        {Array.from({ length: depth }, (_, level) => (
+          <span
+            key={level}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-[5px] w-px bg-sidebar-border/70"
+            style={{ left: 10 + level * 14 }}
+          />
+        ))}
+        {node.isDir ? (
           <ChevronRightIcon
             size={13}
             strokeWidth={1.8}
-            className={cn("shrink-0 text-dim transition-transform duration-100", open && "rotate-90")}
+            className={cn("shrink-0 text-muted-foreground transition-transform duration-100", open && "rotate-90")}
           />
+        ) : (
+          <span className="w-[13px] shrink-0" />
         )}
-        {!node.isDir && <span className="w-2.5 shrink-0" />}
         <span className={cn("flex shrink-0 items-center", hidden && "opacity-55")}>
-          {node.isDir ? <FolderIcon size={14} open={open} /> : getFileIcon(node.name, 14)}
+          {node.isDir ? <TreeFolderIcon open={open} /> : getFileIcon(node.name)}
         </span>
         <span
           data-hidden-reason={hidden}
           className={cn(
-            "min-w-0 flex-1 truncate text-xs",
+            "min-w-0 flex-1 truncate",
             hidden ? "text-muted-foreground opacity-55" : "text-foreground",
           )}
           title={hidden ? `${node.fullPath}\n${t(HIDDEN_REASON_KEYS[hidden])}` : node.fullPath}
@@ -392,7 +420,7 @@ export function TreeNode({
           <span
             title={t("files.outsideLink", { target: pendingLinkTarget })}
             aria-label={t("files.outsideLink", { target: pendingLinkTarget })}
-            className="flex size-3.5 shrink-0 items-center justify-center text-dim"
+            className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground"
           >
             <ExternalLinkIcon size={13} strokeWidth={1.8} />
           </span>
@@ -419,7 +447,7 @@ export function TreeNode({
           </span>
         )}
         {loading && (
-          <LoaderIcon size={13} strokeWidth={1.8} className="shrink-0 text-dim" />
+          <LoaderIcon size={13} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
         )}
         {onAtMention && hovered && (
           <button
@@ -429,7 +457,7 @@ export function TreeNode({
             }}
             title={t("files.insertPath")}
             className={cn(
-              "absolute top-1/2 flex h-[calc(var(--file-row-height)-4px)] -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-sm border border-border bg-card px-2 py-0 text-xs font-semibold whitespace-nowrap text-primary",
+              "absolute top-1/2 flex h-7 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm",
               "outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
               node.isDir ? "right-1" : "right-7",
             )}
@@ -444,7 +472,7 @@ export function TreeNode({
             download
             onClick={(e) => e.stopPropagation()}
             title={t("files.download")}
-            className="absolute right-1 top-1/2 flex h-[calc(var(--file-row-height)-4px)] -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-sm border border-border bg-card px-[5px] py-0 text-xs font-semibold text-muted-foreground no-underline outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="absolute right-1 top-1/2 flex h-7 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-[5px] py-0 text-xs font-medium text-muted-foreground shadow-sm no-underline outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             <DownloadIcon size={13} strokeWidth={1.8} />
           </a>
@@ -452,8 +480,8 @@ export function TreeNode({
       </div>
       {node.isDir && open && pendingLinkTarget && (
         <div
-          className="flex flex-col items-start gap-1 pb-[5px] pr-2 pt-[3px] text-xs text-dim"
-          style={{ paddingLeft: 8 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
+          className="flex flex-col items-start gap-1 pb-[5px] pr-2 pt-[3px] text-xs text-muted-foreground"
+          style={{ paddingLeft: 4 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
         >
           <span className="break-all">{t("files.outsideLink", { target: pendingLinkTarget })}</span>
           {node.outsideLinkEncloses && (
@@ -462,7 +490,7 @@ export function TreeNode({
           <button
             type="button"
             title={t("files.allowOutsideLinkTitle", { target: pendingLinkTarget })}
-            className="h-[calc(var(--file-row-height)-4px)] rounded-sm border border-border bg-card px-2 py-0 text-xs font-semibold whitespace-nowrap text-primary outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-60"
+            className="h-7 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-60"
             onClick={handleAllowLink}
             disabled={allowingLink}
           >
@@ -470,6 +498,19 @@ export function TreeNode({
           </button>
           {allowLinkError && (
             <span role="alert" className="break-words text-destructive">{allowLinkError}</span>
+          )}
+          {linkConfirmOpen && (
+            <AlertDialog open={linkConfirmOpen} onOpenChange={setLinkConfirmOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("files.allowEnclosingLinkConfirm", { target: pendingLinkTarget })}</AlertDialogTitle>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t("files.cancel")}</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => void allowLink()}>{t("files.allowOutsideLink")}</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       )}
@@ -499,8 +540,8 @@ export function TreeNode({
           ))}
           {children.length === 0 && loaded && !loadError && (
             <div
-              className="flex h-[22px] items-center text-xs text-dim"
-              style={{ paddingLeft: 8 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
+              className="flex h-[22px] items-center text-xs text-muted-foreground"
+              style={{ paddingLeft: 4 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
             >
               empty
             </div>
@@ -511,7 +552,7 @@ export function TreeNode({
               onClick={(e) => { e.stopPropagation(); void loadChildren(true); }}
               title={`${loadError} — click to retry`}
               className="flex h-[22px] min-w-0 cursor-pointer items-center gap-1 text-xs text-destructive"
-              style={{ paddingLeft: 8 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
+              style={{ paddingLeft: 4 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
             >
               <span className="truncate">{loadError}</span>
               <span className="shrink-0">↻</span>
@@ -558,23 +599,23 @@ function ChangeRow({
       onMouseLeave={() => setHovered(false)}
       title={status.filePath}
       className={cn(
-        "relative flex h-[var(--file-row-height)] cursor-pointer items-center rounded-sm pr-2 select-none",
-        treeMode ? "gap-1" : "gap-1.5",
-        hovered && "bg-secondary",
+        "relative flex h-8 cursor-pointer select-none items-center rounded-lg pr-2 text-[12.5px] text-foreground",
+        treeMode ? "gap-2" : "gap-1.5",
+        hovered && "bg-accent/50",
       )}
-      style={{ paddingLeft: treeMode ? 8 + depth * 14 : 10 }} /* 树深度缩进为逐行计算值 */
+      style={{ paddingLeft: treeMode ? 4 + depth * 14 : 10 }} /* 树深度缩进为逐行计算值 */
     >
       <GitStatusBadge status={status} t={t} />
-      {treeMode && <span className="w-2.5 shrink-0" />}
-      <span className="flex shrink-0 items-center opacity-85">
-        {getFileIcon(name, 13)}
+      {treeMode && <span className="w-[13px] shrink-0" />}
+      <span className="flex shrink-0 items-center">
+        {getFileIcon(name)}
       </span>
       <span
         title={status.filePath}
-        className="flex min-w-0 flex-1 items-center text-xs text-foreground"
+        className="flex min-w-0 flex-1 items-center"
       >
         {dirPart && (
-          <span className="min-w-0 flex-[0_1_auto] truncate text-dim">
+          <span className="min-w-0 flex-[0_1_auto] truncate text-muted-foreground">
             {dirPart}
           </span>
         )}
@@ -589,7 +630,7 @@ function ChangeRow({
             onAtMention(rel, false);
           }}
           title={t("files.insertPath")}
-          className="absolute right-1 top-1/2 flex h-[calc(var(--file-row-height)-4px)] -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-sm border border-border bg-card px-2 py-0 text-xs font-semibold whitespace-nowrap text-primary outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="absolute right-1 top-1/2 flex h-7 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
           <AtSignIcon size={13} strokeWidth={1.8} />
           {t("files.mention")}
@@ -618,20 +659,18 @@ function ChangesFolderRow({
       onMouseLeave={() => setHovered(false)}
       title={node.path}
       className={cn(
-        "flex h-[var(--file-row-height)] cursor-pointer items-center gap-1 rounded-sm pr-2 select-none",
-        hovered && "bg-secondary",
+        "flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg pr-2 text-[12.5px] text-foreground",
+        hovered && "bg-accent/50",
       )}
-      style={{ paddingLeft: 8 + depth * 14 }} /* 树深度缩进为逐行计算值 */
+      style={{ paddingLeft: 4 + depth * 14 }} /* 树深度缩进为逐行计算值 */
     >
       <ChevronRightIcon
         size={13}
         strokeWidth={1.8}
-        className={cn("shrink-0 text-dim transition-transform duration-100", open && "rotate-90")}
+        className={cn("shrink-0 text-muted-foreground transition-transform duration-100", open && "rotate-90")}
       />
-      <span className="flex shrink-0 items-center">
-        <FolderIcon size={14} open={open} />
-      </span>
-      <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+      <TreeFolderIcon open={open} />
+      <span className="min-w-0 flex-1 truncate">
         {node.name}
       </span>
     </div>
@@ -1153,7 +1192,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         )}
 
         {pendingConflict && (
-          <div role="alert" className="rounded-sm border border-[color-mix(in_srgb,var(--warning)_55%,var(--border))] bg-[color-mix(in_srgb,var(--warning)_9%,var(--bg-panel))] p-[7px]">
+          <div role="alert" className="rounded-lg border border-warning/55 bg-warning/10 p-2">
             <div className="text-xs leading-[1.35] text-foreground [overflow-wrap:anywhere]">
               {t("files.conflictSummary", { count: pendingConflict.conflicts.length, countSuffix: pendingConflict.conflicts.length === 1 ? "" : "s", files: pendingConflict.conflicts.join(", ") })}
             </div>
@@ -1162,14 +1201,14 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
                 {t("files.cannotReplace", { files: pendingConflict.nonReplaceable.join(", ") })}
               </div>
             )}
-            <div className="mt-[7px] flex gap-[5px]">
-              <button type="button" onClick={() => void performUpload(pendingConflict.files, "overwrite", pendingConflict.directory)} className="h-[22px] cursor-pointer rounded-sm border border-destructive bg-transparent px-[7px] py-0 text-[10px] text-destructive outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
+            <div className="mt-2 flex gap-1.5">
+              <button type="button" onClick={() => void performUpload(pendingConflict.files, "overwrite", pendingConflict.directory)} className="inline-flex h-7 cursor-pointer items-center justify-center gap-2 rounded-md border border-destructive/40 bg-transparent px-3 py-0 text-xs font-medium whitespace-nowrap text-destructive outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
                 {t("files.replace")}
               </button>
-              <button type="button" onClick={() => void performUpload(pendingConflict.files, "skip", pendingConflict.directory)} className="h-[22px] cursor-pointer rounded-sm border border-border bg-card px-[7px] py-0 text-[10px] text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
+              <button type="button" onClick={() => void performUpload(pendingConflict.files, "skip", pendingConflict.directory)} className="inline-flex h-7 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-0 text-xs font-medium whitespace-nowrap text-foreground shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-accent disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
                 {t("files.skipExisting")}
               </button>
-              <button type="button" onClick={() => setPendingConflict(null)} className="h-[22px] cursor-pointer rounded-sm border-none bg-transparent px-[7px] py-0 text-[10px] text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
+              <button type="button" onClick={() => setPendingConflict(null)} className="inline-flex h-7 cursor-pointer items-center justify-center gap-2 rounded-md bg-transparent px-3 py-0 text-xs font-medium whitespace-nowrap text-muted-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-accent enabled:hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
                 {t("files.cancel")}
               </button>
             </div>
@@ -1194,7 +1233,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
                   </span>
                 )}
                 {uploadSummary.skipped.length > 0 && (
-                  <span title={t("files.skippedCount", { count: uploadSummary.skipped.length })} aria-label={t("files.skippedCount", { count: uploadSummary.skipped.length })} className="flex items-center gap-[3px] text-dim">
+                  <span title={t("files.skippedCount", { count: uploadSummary.skipped.length })} aria-label={t("files.skippedCount", { count: uploadSummary.skipped.length })} className="flex items-center gap-[3px] text-muted-foreground">
                     <CircleMinusIcon size={13} strokeWidth={1.8} />
                     <span>{uploadSummary.skipped.length}</span>
                   </span>
@@ -1212,7 +1251,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
                   onClick={addUploadedFilesToChat}
                   title={uploadSummary.uploaded.length === 1 ? t("files.addUploadedFile") : t("files.addAllUploadedFiles")}
                   aria-label={uploadSummary.uploaded.length === 1 ? t("files.addUploadedFile") : t("files.addAllUploadedFiles")}
-                  className="flex h-[22px] shrink-0 cursor-pointer items-center justify-center gap-1 rounded-sm border border-border bg-card px-[7px] py-0 text-xs font-semibold whitespace-nowrap text-primary outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="flex h-7 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   <AtSignIcon size={13} strokeWidth={1.8} />
                   {t("files.mention")}
@@ -1233,9 +1272,8 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
 
       {fileSearchOpen && (
       <div className="px-2 pb-1.5 pt-0.5">
-        <div className="relative">
-          <SearchIcon size={13} strokeWidth={1.8} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-dim" />
-          <input
+        <InputGroup className="h-8 rounded-full bg-muted">
+          <InputGroupInput
             ref={searchInputRef}
             id="file-search-input"
             value={searchQuery}
@@ -1248,25 +1286,28 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
             }}
             placeholder={t("sidebar.searchFilesPlaceholder")}
             aria-label={t("sidebar.searchFiles")}
-            className="w-full rounded-md border border-border bg-background px-6 py-1.5 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           />
+          <InputGroupAddon>
+            <SearchIcon size={13} strokeWidth={1.8} className="text-muted-foreground" />
+          </InputGroupAddon>
           {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              title={t("sidebar.clearSearch")}
-              aria-label={t("sidebar.clearSearch")}
-              className="absolute right-1 top-1/2 flex size-[18px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent p-0 text-dim outline-none transition-colors enabled:hover:bg-secondary enabled:hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <XIcon size={13} strokeWidth={1.8} />
-            </button>
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                size="icon-xs"
+                onClick={() => setSearchQuery("")}
+                title={t("sidebar.clearSearch")}
+                aria-label={t("sidebar.clearSearch")}
+              >
+                <XIcon size={13} strokeWidth={1.8} />
+              </InputGroupButton>
+            </InputGroupAddon>
           )}
-        </div>
+        </InputGroup>
         {hasSearchQuery && (
           <div className="pt-[3px]">
-            {searchLoading && <div role="status" className="px-[2px] py-1.5 text-[10px] text-dim">{t("sidebar.searchingFiles")}</div>}
+            {searchLoading && <div role="status" className="px-[2px] py-1.5 text-[10px] text-muted-foreground">{t("sidebar.searchingFiles")}</div>}
             {!searchLoading && searchError && <div role="alert" className="px-[2px] py-1.5 text-[10px] text-destructive">{t("i18n.networkError")}</div>}
-            {!searchLoading && !searchError && searchPaths.length === 0 && <div className="px-[2px] py-1.5 text-[10px] text-dim">{t("sidebar.noMatchingFiles")}</div>}
+            {!searchLoading && !searchError && searchPaths.length === 0 && <div className="px-[2px] py-1.5 text-[10px] text-muted-foreground">{t("sidebar.noMatchingFiles")}</div>}
             {!searchLoading && !searchError && searchPaths.length > 0 && (
               <div>
                 {searchRoots.map((node) => (
@@ -1311,7 +1352,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
             })}
             className="flex h-6 items-center gap-1.5 pl-2.5 pr-1.5 text-xs"
           >
-            <span className="text-dim">
+            <span className="text-muted-foreground">
               {t("files.changedCount", { count: gitFiles.length })}
             </span>
             <span className="font-mono text-success">+{gitLineStats.additions}</span>
@@ -1323,7 +1364,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
               title={changesViewMode === "list" ? t("files.viewAsTree") : t("files.viewAsList")}
               aria-label={changesViewMode === "list" ? t("files.viewAsTree") : t("files.viewAsList")}
               aria-pressed={changesViewMode === "tree"}
-              className="flex size-[22px] shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent p-0 text-dim outline-none transition-colors enabled:hover:bg-secondary enabled:hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-transparent p-0 text-muted-foreground outline-none transition-colors enabled:hover:bg-accent enabled:hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
               <ChangesViewToggleIcon mode={changesViewMode} />
             </button>
@@ -1358,7 +1399,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
       {(changesCollapsed || gitFiles.length === 0) && (!fileSearchOpen || !hasSearchQuery) && (
         <div className="px-1 py-[2px]">
           {loading ? (
-            <div className="px-3 py-2 text-xs text-dim">{t("files.loading")}</div>
+            <div className="px-3 py-2 text-xs text-muted-foreground">{t("files.loading")}</div>
           ) : error ? (
             <div className="px-3 py-2 text-xs text-destructive">{error}</div>
           ) : (
@@ -1385,7 +1426,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
             ))
           )}
           {!loading && !error && roots.length === 0 && (
-            <div className="px-3 py-2 text-xs text-dim">
+            <div className="px-3 py-2 text-xs text-muted-foreground">
               {t("files.noFiles")}
             </div>
           )}

@@ -78,19 +78,21 @@ type GitView =
 
 const LOG_PAGE_SIZE = 20;
 
-/** Status letter → theme-token classes (added/modified/deleted/renamed/copied/typechange). */
+/** Status letter → status-pill classes (added/modified/deleted/renamed/copied/typechange). */
 const STATUS_CLASSES: Record<string, string> = {
-  A: "border-success text-success",
-  M: "border-warning text-warning",
-  D: "border-destructive text-destructive",
-  R: "border-primary text-primary",
-  C: "border-primary text-primary",
-  T: "border-warning text-warning",
+  A: "text-success bg-success/15",
+  M: "text-warning bg-warning/15",
+  D: "text-destructive bg-destructive/10",
+  R: "text-primary bg-primary/15",
+  C: "text-primary bg-primary/15",
+  T: "text-warning bg-warning/15",
 };
+
+const STATUS_FALLBACK_CLASS = "text-muted-foreground bg-muted";
 
 /** Shared panel button: 36px touch target, token palette, hover/disabled per §5.6. */
 const buttonClass =
-  "inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-sm border border-border px-2.5 text-xs text-muted-foreground enabled:hover:bg-secondary enabled:hover:text-foreground disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-accent enabled:hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0";
 
 /** Toolbar pickers take the whole row on narrow phones (was `useIsNarrowMobile`). */
 const NARROW_FULL_ROW = "max-[480px]:flex-[1_1_100%]";
@@ -141,14 +143,14 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex min-h-9 w-full cursor-pointer items-center gap-1.5 rounded-sm border border-border bg-card px-2.5 text-left text-xs text-foreground enabled:hover:bg-secondary disabled:pointer-events-none disabled:opacity-50"
+        className="flex min-h-9 w-full cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-left text-xs text-foreground shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
       >
-        <span className="flex shrink-0 items-center text-dim" aria-hidden="true">{icon}</span>
+        <span className="flex shrink-0 items-center text-muted-foreground" aria-hidden="true">{icon}</span>
         <span className="min-w-0 flex-1 truncate">
           {selected ? selected.primary : placeholder}
         </span>
         {selected?.secondary && (
-          <span className="max-w-[45%] shrink-0 truncate font-mono text-[10px] text-dim">{selected.secondary}</span>
+          <span className="max-w-[45%] shrink-0 truncate font-mono text-[10px] text-muted-foreground">{selected.secondary}</span>
         )}
         <ChevronDownIcon
           className={cn("size-[13px] shrink-0 transition-transform", open && "rotate-180")}
@@ -160,7 +162,7 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
           role="listbox"
           // 定位锚定：自定义下拉（见 GitPanel.test：不用 native select / Radix），
           // 面板锚在触发器正下方并随触发器宽度拉伸。
-          className="absolute inset-x-0 top-[calc(100%+4px)] z-[100] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+          className="absolute inset-x-0 top-[calc(100%+4px)] z-[100] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
         >
           <div className="max-h-[min(40vh,300px)] touch-pan-y overflow-y-auto">
             {options.map((option) => {
@@ -173,7 +175,7 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
                   aria-selected={isSelected}
                   onClick={() => { setOpen(false); onSelect(option.value); }}
                   className={cn(
-                    "flex min-h-9 w-full cursor-pointer items-center gap-[7px] border-b border-border px-2.5 py-1.5 text-left text-xs hover:bg-secondary",
+                    "flex min-h-9 w-full cursor-pointer items-center gap-[7px] rounded-sm px-2 py-1.5 text-left text-xs outline-none focus-visible:bg-accent hover:bg-accent",
                     isSelected ? "text-foreground" : "text-muted-foreground",
                   )}
                 >
@@ -184,7 +186,7 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
                   )}
                   <span className="shrink-0 truncate">{option.primary}</span>
                   {option.secondary && (
-                    <span className="min-w-0 flex-1 truncate text-right font-mono text-xs text-dim">{option.secondary}</span>
+                    <span className="min-w-0 flex-1 truncate text-right font-mono text-xs text-muted-foreground">{option.secondary}</span>
                   )}
                 </button>
               );
@@ -481,17 +483,17 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
       </div>
       <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto">
         <div className="flex flex-col gap-[5px] border-b border-border px-3 py-2">
-          <span className="break-all font-mono text-xs text-dim">
+          <span className="break-all font-mono text-xs text-muted-foreground">
             {commit.hash}
           </span>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-dim">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span className="truncate">{commit.author}</span>
             <span title={new Date(commit.timestamp * 1000).toLocaleString()} className="shrink-0">
               {formatRelativeTime(new Date(commit.timestamp * 1000), locale)}
             </span>
             <span className={cn(
-              "shrink-0 rounded-full border px-1.5 py-px text-[10px]",
-              commit.pushed ? "border-border text-dim" : "border-warning text-warning",
+              "inline-flex h-4 shrink-0 items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold leading-none",
+              commit.pushed ? "text-muted-foreground bg-muted" : "text-warning bg-warning/15",
             )}>
               {t(commit.pushed ? "gitPanel.pushed" : "gitPanel.notPushed")}
             </span>
@@ -509,21 +511,21 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
             </div>
           )}
         </div>
-        {filesLoading && <div className="p-3 text-xs text-dim">{t("gitPanel.loading")}</div>}
+        {filesLoading && <div className="p-3 text-xs text-muted-foreground">{t("gitPanel.loading")}</div>}
         {filesError && renderError(filesError, () => setView({ type: "detail", commit }))}
         {!filesError && !filesLoading && files.length === 0 && (
-          <div className="p-3 text-xs text-dim">{t("gitPanel.emptyFiles")}</div>
+          <div className="p-3 text-xs text-muted-foreground">{t("gitPanel.emptyFiles")}</div>
         )}
         {files.map((file) => (
           <button
             key={`${file.status}:${file.path}`}
             type="button"
             onClick={() => openCommitFile(commit, file)}
-            className="flex min-h-9 w-full cursor-pointer items-center gap-2 border-b border-border px-3 py-1.5 text-left text-foreground"
+            className="flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50"
           >
             <span className={cn(
-              "flex size-[18px] shrink-0 items-center justify-center rounded-sm border font-mono text-[10px] font-semibold",
-              STATUS_CLASSES[file.status] ?? "border-border text-muted-foreground",
+              "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-mono text-[10.5px] font-semibold leading-none",
+              STATUS_CLASSES[file.status] ?? STATUS_FALLBACK_CLASS,
             )}>
               {file.status}
             </span>
@@ -587,7 +589,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
         <div className="min-h-0 flex-1 overflow-auto bg-background">
           {showSource ? (
             <>
-              {sourceLoading && <div className="p-3 text-xs text-dim">{t("gitPanel.loading")}</div>}
+              {sourceLoading && <div className="p-3 text-xs text-muted-foreground">{t("gitPanel.loading")}</div>}
               {sourceError && renderError(sourceError, () => setView({ type: "diff", commit, file }))}
               {!sourceError && !sourceLoading && sourceFile && (
                 <SourceCodeView content={sourceFile.content} language={sourceFile.language} wrapLines={wrapLines} />
@@ -595,7 +597,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
             </>
           ) : (
             <>
-              {patchLoading && <div className="p-3 text-xs text-dim">{t("gitPanel.loading")}</div>}
+              {patchLoading && <div className="p-3 text-xs text-muted-foreground">{t("gitPanel.loading")}</div>}
               {patchError && renderError(patchError, () => setView({ type: "diff", commit, file }))}
               {!patchError && !patchLoading && patch !== null && <DiffView patch={patch} wrapLines={wrapLines} />}
             </>
@@ -670,18 +672,18 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
       {view.type === "log" && selectedRepo && (
         <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto">
           {reposLoading && repositories.length === 0 && (
-            <div className="p-3 text-xs text-dim">{t("gitPanel.loading")}</div>
+            <div className="p-3 text-xs text-muted-foreground">{t("gitPanel.loading")}</div>
           )}
           {commitsError && renderError(commitsError, () => { void loadCommits(selectedRepo, selectedBranch ?? "", 0); })}
           {!commitsError && !commitsLoading && commits.length === 0 && (
-            <div className="p-3 text-xs text-dim">{t("gitPanel.emptyLog")}</div>
+            <div className="p-3 text-xs text-muted-foreground">{t("gitPanel.emptyLog")}</div>
           )}
           {commits.map((commit, index) => (
             <button
               key={commit.hash}
               type="button"
               onClick={() => setView({ type: "detail", commit })}
-              className="block min-h-9 w-full cursor-pointer border-b border-border px-3 py-[7px] text-left text-foreground"
+              className="block min-h-9 w-full cursor-pointer rounded-lg px-2.5 py-[7px] text-left text-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50"
             >
               <div className="flex min-w-0 items-center gap-2 text-xs font-semibold">
                 <span className="min-w-0 flex-1 truncate">
@@ -689,14 +691,14 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
                 </span>
                 {(index === 0 || commits[index - 1].pushed !== commit.pushed) && (
                   <span className={cn(
-                    "shrink-0 rounded-full border px-1.5 text-[10px] font-normal",
-                    commit.pushed ? "border-border text-dim" : "border-warning text-warning",
+                    "inline-flex h-4 shrink-0 items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold leading-none",
+                    commit.pushed ? "text-muted-foreground bg-muted" : "text-warning bg-warning/15",
                   )}>
                     {t(commit.pushed ? "gitPanel.pushed" : "gitPanel.notPushed")}
                   </span>
                 )}
               </div>
-              <div className="mt-[3px] flex min-w-0 items-baseline gap-1.5 text-xs text-dim">
+              <div className="mt-[3px] flex min-w-0 items-baseline gap-1.5 text-xs text-muted-foreground">
                 <span className="shrink-0 font-mono">{commit.shortHash}</span>
                 <span className="min-w-0 flex-1 truncate">{commit.author}</span>
                 <span className="shrink-0">{formatRelativeTime(new Date(commit.timestamp * 1000), locale)}</span>

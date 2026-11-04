@@ -58,14 +58,14 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
     else if (right > strip.right) list.scrollLeft += right - strip.right;
   }, [activeTabId, tabs.length]);
 
-  // The scrollbar is hidden (globals.css .tabbar-scroll): it would take its
-  // height out of the bar (--top-bar-height), squeezing the tabs or clipping
-  // their tops (#1225).
+  // One tab, one pill: inactive pills sit muted, the active one raises onto the
+  // bar with a border. The scrollbar is hidden (globals.css .tabbar-scroll):
+  // it would squeeze the pills or clip their tops (#1225).
   return (
     <div
       ref={listRef}
       role="tablist"
-      className="tabbar-scroll flex h-[var(--top-bar-height)] shrink-0 items-stretch overflow-x-auto overflow-y-hidden bg-card"
+      className="tabbar-scroll flex h-[46px] shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden"
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
@@ -101,10 +101,10 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               if (!tab.closing) onCloseTab(tab.id);
             }}
             className={cn(
-              "flex min-w-20 max-w-[180px] shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-r border-border pl-3 pr-1.5 text-xs transition-colors",
+              "flex h-[30px] min-w-20 max-w-[180px] shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-full border pl-[11px] pr-1 whitespace-nowrap text-xs transition-colors",
               isActive
-                ? "bg-background text-foreground"
-                : "bg-card text-muted-foreground hover:bg-secondary hover:text-foreground",
+                ? "border-border bg-card font-medium text-foreground shadow-sm"
+                : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
             )}
           >
             <span className={cn("flex shrink-0 items-center", isActive ? "opacity-100" : "opacity-70")}>
@@ -119,7 +119,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               ) : getFileIcon(tab.label, 13)}
             </span>
             <span
-              className={cn("min-w-0 flex-1 truncate", isActive ? "font-medium" : "font-normal")}
+              className={cn("min-w-0 flex-1 truncate font-mono text-[11.5px]", isActive ? "font-medium" : "font-normal")}
               title={tab.filePath}
             >
               {tab.kind === "git" ? t("gitPanel.title") : tab.label}
@@ -127,7 +127,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
             <button
               disabled={tab.closing}
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
-              className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent p-0 text-dim transition-colors hover:bg-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+              className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent p-0 text-dim transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
               title={t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")}
               aria-label={`${t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")} ${tab.kind === "git" ? t("gitPanel.title") : tab.label}`}
             >

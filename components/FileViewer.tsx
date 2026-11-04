@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo, type MouseEvent } from "react";
-import { DownloadIcon } from "lucide-react";
+import { AtSign, DownloadIcon, FileIcon, WrapText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import {
   DOCX_PREVIEW_MAX_BYTES,
@@ -26,7 +26,10 @@ import { CodeBlock, MermaidBlock } from "./MermaidBlock";
 import { FILE_CODE_STYLE, FILE_LINE_NUMBER_STYLE, FILE_PINNED_LINE_NUMBER_STYLE } from "./DiffView";
 import { DelimitedTable } from "./DelimitedTable";
 import { PathLabel } from "./PathLabel";
-import { FileMentionButton, FileToolbar, FILE_MODE_LABELS } from "./FileToolbar";
+import { FILE_MODE_LABELS } from "./FileToolbar";
+import { CodeBlock as CodeBlockShell, CodeBlockActions, CodeBlockCopyButton, CodeBlockHeader, CodeBlockTitle } from "./ui/code-block";
+import { Button } from "./ui/button";
+import { cn } from "@/lib/utils";
 import { SourceCodeView } from "./SourceCodeView";
 import { isDelimitedTablePath } from "@/lib/delimited-table";
 import { FrontmatterCard } from "./FrontmatterCard";
@@ -162,7 +165,7 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
       download={getFileName(filePath)}
       title={t("i18n.downloadFile")}
       aria-label={t("i18n.downloadFile")}
-      className="file-viewer-icon-button"
+      className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
     >
       <DownloadIcon className="size-3.5" strokeWidth={1.8} />
     </a>
@@ -190,7 +193,7 @@ function DiffView({ patch, wrapLines }: { patch: string; wrapLines: boolean }) {
   const hasChanges = diff.some(isChange);
   if (!hasChanges) {
     return (
-      <div className="px-4 py-3 font-mono text-xs text-dim">
+      <div className="px-3 py-3 font-mono text-xs text-muted-foreground">
         {t("i18n.noChanges")}
       </div>
     );
@@ -244,31 +247,37 @@ function DiffView({ patch, wrapLines }: { patch: string; wrapLines: boolean }) {
     >
       {segments.map((seg, si) => {
         if (seg.hidden) {
-          const result = (
-            <div
+          // Collapsed hunks take the CodeBlock highlighted row: muted band,
+          // sans-serif note, no gutter columns of its own.
+          return (
+            <span
               key={si}
-              className="border-y border-border bg-card px-4 py-0.5 text-xs text-dim"
+              data-slot="code-block-line"
+              className="cn-code-block-line cn-code-block-line-variant-highlighted flex min-w-full items-center py-0.5 font-sans text-xs text-muted-foreground after:content-none"
             >
-              {seg.count === null ? "⋯" : `⋯ ${diffGapLabel(seg.count, t)}`}
-            </div>
+              <span aria-hidden="true" className="min-w-4 shrink-0 select-none px-1.5">⋯</span>
+              <span className="shrink-0 px-1.5">{seg.count === null ? "⋯" : diffGapLabel(seg.count, t)}</span>
+            </span>
           );
-          return result;
         }
         const lines = seg.lines.map((line, li) => {
           const prefix =
             line.type === "added" ? "+" : line.type === "removed" ? "-" : " ";
-          // Added/removed rows take the diff tokens (globals.css); unchanged
-          // rows stay on the viewer's own background.
+          // The rows are the official CodeBlock line variants (vendored nova
+          // classes); the +/- marker stays an aligned column instead of the
+          // variant's absolute ::after so wrapped text keeps clearing it, and
+          // content-none drops that second marker.
           const rowTone = line.type === "added"
-            ? "bg-diff-add-bg border-l-diff-add text-diff-add"
+            ? "cn-code-block-line-variant-added"
             : line.type === "removed"
-            ? "bg-diff-del-bg border-l-diff-del text-diff-del"
-            : "border-l-transparent";
+            ? "cn-code-block-line-variant-removed"
+            : "";
 
           return (
-            <div
+            <span
               key={li}
-              className={`file-diff-line flex min-w-full border-l-[3px] ${rowTone}`}
+              data-slot="code-block-line"
+              className={`cn-code-block-line file-diff-line flex min-w-full after:content-none ${rowTone}`}
             >
               <span
                 style={lineNumberStyle}
@@ -279,13 +288,13 @@ function DiffView({ patch, wrapLines }: { patch: string; wrapLines: boolean }) {
                 {prefix}
               </span>
               <span
-                className={`file-diff-line-content min-w-0 pr-2 text-foreground ${
+                className={`file-diff-line-content min-w-0 pr-3 text-foreground ${
                   wrapLines ? "shrink whitespace-pre-wrap [overflow-wrap:anywhere]" : "shrink-0 whitespace-pre"
                 }`}
               >
                 {line.text || "\u00a0"}
               </span>
-            </div>
+            </span>
           );
         });
         return <div key={si}>{lines}</div>;
@@ -389,14 +398,14 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-dim">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-muted-foreground">
         <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} className="font-mono" />
         <span className="ml-auto">{ext || "image"}</span>
         {naturalSize && <span>{naturalSize.w} × {naturalSize.h}</span>}
         {formatSizeStr && <span>{formatSizeStr}</span>}
         <span
           title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-          className={`flex items-center gap-1 ${watching ? "text-success" : "text-dim"}`}
+          className={`flex items-center gap-1 ${watching ? "text-success" : "text-muted-foreground"}`}
         >
           <span
             className={`inline-block size-[7px] rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
@@ -531,14 +540,14 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-dim">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-muted-foreground">
         <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} className="font-mono" />
         <span className="ml-auto">{ext || "audio"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatFileSize(size)}</span>}
         <span
           title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-          className={`flex items-center gap-1 ${watching ? "text-success" : "text-dim"}`}
+          className={`flex items-center gap-1 ${watching ? "text-success" : "text-muted-foreground"}`}
         >
           <span
             className={`inline-block size-[7px] rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
@@ -662,14 +671,14 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-dim">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-muted-foreground">
         <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} className="font-mono" />
         <span className="ml-auto">{ext || "video"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatFileSize(size)}</span>}
         <span
           title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-          className={`flex items-center gap-1 ${watching ? "text-success" : "text-dim"}`}
+          className={`flex items-center gap-1 ${watching ? "text-success" : "text-muted-foreground"}`}
         >
           <span
             className={`inline-block size-[7px] rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
@@ -827,14 +836,14 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-dim">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-muted-foreground">
         <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} className="font-mono" />
         <span className="ml-auto">{ext === "docx" ? "docx preview" : "pdf"}</span>
         {size != null && <span>{formatFileSize(size)}</span>}
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
         <span
           title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-          className={`flex shrink-0 items-center gap-1 ${watching ? "text-success" : "text-dim"}`}
+          className={`flex shrink-0 items-center gap-1 ${watching ? "text-success" : "text-muted-foreground"}`}
         >
           <span
             className={`inline-block size-[7px] rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
@@ -854,7 +863,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
             sandbox={isPdf ? undefined : "allow-same-origin"}
             title={t("i18n.previewFile", { file: getFileName(filePath) })}
             // The DOCX converter's own paper white behind the converted page.
-            className={`h-full w-full border-0 ${isPdf ? "bg-background" : "bg-[#eef1f5]"}`}
+            className={`h-full w-full border-0 ${isPdf ? "bg-background" : "bg-white"}`}
           />
         )}
       </div>
@@ -1388,53 +1397,106 @@ function TextFileViewer({
       : `${language} · ${lines.length} lines · ${formatFileSize(data!.size)}`;
 
   return (
-    <div className="file-viewer-shell relative flex h-full flex-col overflow-hidden">
-      <FileToolbar
-        pathLabel={getRelativeFilePath(filePath, cwd)}
-        pathTitle={filePath}
-        meta={metadata}
-        live={isDeletedDiff ? undefined : watching}
-        modes={displayModes.map((mode) => ({
-          mode,
-          label: FILE_MODE_LABELS[mode],
-          title: mode === "diff" ? t("i18n.compareHead") : undefined,
-        }))}
-        activeMode={effectiveDisplayMode}
-        onSelectMode={updateDisplayMode}
-        actions={(
-          <>
-            {(onAtMention || onMentionLines) && (
-              <FileMentionButton
-                disabled={!onAtMention && !onMentionLines}
-                onClick={() => {
-                  // Mention selected lines when a range is active (and line
-                  // mention is wired up); otherwise fall back to a whole-file
-                  // @mention. Same button, behavior follows the selection.
-                  if (selectedLineRange && onMentionLines) {
-                    mentionLineRange(selectedLineRange);
-                  } else {
-                    onAtMention?.(getRelativeFilePath(filePath, cwd), false);
-                  }
-                }}
-                title={
-                  selectedLineRange && onMentionLines
-                    ? `${t("i18n.mentionSelectedLines")} (L${selectedLineRange.startLine}${selectedLineRange.startLine !== selectedLineRange.endLine ? `-L${selectedLineRange.endLine}` : ""})`
-                    : t("files.insertPath")
-                }
-              />
-            )}
-          </>
+    <CodeBlockShell
+      // The panel frame is the viewer's own chrome; the CodeBlock shell keeps
+      // only its official structure (group, header, hover-revealed actions).
+      className="file-viewer-shell h-full rounded-none! border-0! bg-transparent! dark:bg-transparent!"
+    >
+      <CodeBlockHeader className="shrink-0 pb-2">
+        <CodeBlockTitle className="text-[13px]">
+          <FileIcon aria-hidden="true" strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
+          {getFileName(filePath)}
+        </CodeBlockTitle>
+        <PathLabel className="min-w-0 font-mono text-[11.5px]" text={getRelativeFilePath(filePath, cwd)} title={filePath} />
+        <span className="min-w-0 truncate text-[11.5px] text-muted-foreground" title={metadata}>
+          {metadata}
+        </span>
+        {isDeletedDiff ? undefined : (
+          <span
+            title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
+            aria-label={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
+            className={`inline-block size-[7px] shrink-0 rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--color-success)]" : "bg-border"}`}
+          />
         )}
-        wrapLines={wrapLines}
-        onToggleWrapLines={
-          (effectiveDisplayMode === "source" || effectiveDisplayMode === "diff") && !isBinary ? toggleWrapLines : undefined
-        }
-        download={!isDeletedDiff ? <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} /> : undefined}
-      />
+        <CodeBlockActions className="pointer-coarse:opacity-100 opacity-0 transition-opacity group-focus-within/code-block:opacity-100 group-hover/code-block:opacity-100">
+          {displayModes.length > 1 && (
+            <div aria-label={t("i18n.fileViewMode")} className="flex items-center gap-0.5">
+              {displayModes.map((mode) => {
+                const active = effectiveDisplayMode === mode;
+                return (
+                  <Button
+                    key={mode}
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => updateDisplayMode(mode)}
+                    title={mode === "diff" ? t("i18n.compareHead") : undefined}
+                    aria-pressed={active}
+                    className={cn(active ? "text-foreground" : "text-muted-foreground")}
+                  >
+                    {FILE_MODE_LABELS[mode]}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+          {(effectiveDisplayMode === "source" || effectiveDisplayMode === "diff") && !isBinary && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={toggleWrapLines}
+              title={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
+              aria-label={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
+              aria-pressed={wrapLines}
+              className={cn("text-muted-foreground", wrapLines && "bg-accent text-foreground")}
+            >
+              <WrapText className="size-3.5" strokeWidth={1.8} />
+            </Button>
+          )}
+          {(onAtMention || onMentionLines) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              // Keep the composer's selection when the click lands.
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={() => {
+                // Mention selected lines when a range is active (and line
+                // mention is wired up); otherwise fall back to a whole-file
+                // @mention. Same button, behavior follows the selection.
+                if (selectedLineRange && onMentionLines) {
+                  mentionLineRange(selectedLineRange);
+                } else {
+                  onAtMention?.(getRelativeFilePath(filePath, cwd), false);
+                }
+              }}
+              title={
+                selectedLineRange && onMentionLines
+                  ? `${t("i18n.mentionSelectedLines")} (L${selectedLineRange.startLine}${selectedLineRange.startLine !== selectedLineRange.endLine ? `-L${selectedLineRange.endLine}` : ""})`
+                  : t("files.insertPath")
+              }
+              aria-label={t("files.mention")}
+              disabled={!onAtMention && !onMentionLines}
+              className="text-muted-foreground"
+            >
+              <AtSign className="size-3.5" strokeWidth={1.8} />
+            </Button>
+          )}
+          {!isDeletedDiff && !isBinary && (
+            <CodeBlockCopyButton
+              value={viewerContent}
+              title={t("i18n.copy")}
+              className="text-muted-foreground"
+            />
+          )}
+          {!isDeletedDiff && <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />}
+        </CodeBlockActions>
+      </CodeBlockHeader>
 
       {showLoadMore && data?.truncated && (
         <div
-          className="file-viewer-load-more flex items-center justify-center gap-2.5 rounded-md border border-border px-2 py-[5px] text-xs text-dim"
+          className="file-viewer-load-more mx-3 flex shrink-0 items-center justify-center gap-2.5 rounded-md border border-border px-2 py-[5px] text-xs text-muted-foreground"
         >
           <span>{formatFileSize(data.nextOffset)} / {formatFileSize(data.size)}</span>
           <button
@@ -1454,7 +1516,9 @@ function TextFileViewer({
       {/* Content area */}
       <div
         ref={contentRef}
-        className={`file-viewer-content flex-1 overflow-auto bg-background ${showLoadMore ? "pb-12" : ""}`}
+        className={`file-viewer-content min-h-0 min-w-0 flex-1 overflow-auto bg-background ${
+          effectiveDisplayMode === "diff" && hasGitDiff ? "px-3" : ""
+        }${showLoadMore ? " pb-12" : ""}`}
         onScroll={(event) => {
           viewerStateRef.current.scrollTop = event.currentTarget.scrollTop;
           viewerStateRef.current.scrollLeft = event.currentTarget.scrollLeft;
@@ -1463,7 +1527,7 @@ function TextFileViewer({
         {effectiveDisplayMode === "diff" && hasGitDiff ? (
           <DiffView patch={gitDiff.patch!} wrapLines={wrapLines} />
         ) : isHtml && effectiveDisplayMode === "preview" && data?.truncated && !htmlFull?.text ? (
-          <div className="p-6 text-xs text-dim">
+          <div className="p-6 text-xs text-muted-foreground">
             {htmlFull?.error ?? t("i18n.loading")}
           </div>
         ) : isHtml && effectiveDisplayMode === "preview" ? (
@@ -1573,6 +1637,6 @@ function TextFileViewer({
           <SourceCodeView content={viewerContent} language={language} wrapLines={wrapLines} />
         )}
       </div>
-    </div>
+    </CodeBlockShell>
   );
 }

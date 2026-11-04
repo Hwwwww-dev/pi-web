@@ -13,7 +13,7 @@ const ROW_CLASSES = "flex h-[26px] border-b border-border";
 // The source view's line-number gutter, kept beside the columns while they
 // scroll sideways. Opaque (bg-card), or cells would show through it.
 const GUTTER_CLASSES =
-  "sticky left-0 z-[1] flex w-14 shrink-0 select-none items-center justify-end border-r border-border bg-card px-2.5 text-xs text-dim tabular-nums";
+  "sticky left-0 z-[1] flex w-14 shrink-0 select-none items-center justify-end border-r border-border bg-card px-2.5 text-xs text-muted-foreground tabular-nums";
 
 const CELL_CLASSES = "shrink-0 truncate border-r border-border px-2.5 leading-[25px]"; /* leading = ROW_HEIGHT - 1 */
 

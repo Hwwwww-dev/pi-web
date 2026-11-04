@@ -479,7 +479,7 @@ test("sessions on the server: grouped by project, the chat's first and not repea
   assert.match(panelSource, /\.debug-row\.has-detail \{\s*border-radius: 4px 4px 0 0;/);
   assert.match(panelSource, /\.debug-row\.is-current::before \{\s*content: "";\s*position: absolute;\s*top: 5px;\s*left: 0;\s*width: 3px;\s*height: 14px;/);
   assert.match(list, /<span class="session-tree-awaiting" role="img" aria-label="awaiting input" title="awaiting input"><\/span>/, "the sidebar's awaiting dot");
-  assert.match(list, /<span class="debug-status is-accent" title="running"><svg[^>]*class="lucide[^"]*sidebar-spin"/, "the sidebar's spinner");
+  assert.match(list, /<span class="debug-status is-accent" title="running"><svg[^>]*class="lucide[^"]*sidebar-spin[^"]*"/, "the sidebar's spinner");
   assert.match(list, /<span class="debug-status-ring is-closing"><\/span>/);
   assert.match(list, /title="1 event streams" role="img" aria-label="1 event streams"><span class="debug-badge is-muted" title="1 event streams">SSE<\/span><\/span>/);
   // 3 min left when the server answered, 10 s ago.
@@ -725,32 +725,31 @@ test("a tooltip holds the view still: the mouse on a titled element freezes what
   assert.match(panelSource, /const shown = held \?\? \{ page, server, samples \};/);
 });
 
-test("the Debug button only toggles its panel, left of the session stats", () => {
-  const button = between(shellSource, "const renderDebugButton = (mobile: boolean) => {", "const renderMainFileToggle");
-  assert.match(button, /onClick=\{\(\) => toggleTopPanel\("debug", mobile\)\}/);
+test("the Debug button only toggles its panel, beside the theme pill and the stats", () => {
+  const button = between(shellSource, "const renderDebugThemeGroup = () => {", "const renderMainFileToggle");
+  assert.match(button, /onClick=\{\(\) => toggleTopPanel\("debug"\)\}/);
   assert.doesNotMatch(button, /handleSystemInfoToggle|sendAgentCommand|fetch\(|setSessionKey|loadSession|systemInfoLoaderRef/);
   assert.match(button, /aria-label=\{translate\("debug\.title"\)\}/);
   assert.match(button, /aria-pressed=\{open\}/);
-  assert.match(button, /data-mobile-toolbar-action=\{mobile \? "debug" : undefined\}/);
-  assert.match(button, /if \(!showChat\) return null;/);
+  // Only a chat owns a Debug panel; the theme pill renders regardless.
+  assert.match(button, /\{showChat && \(/);
   assert.notEqual(enLocale.messages["debug.title"], enLocale.messages["session.title"], "e2e finds the stats button by its own name");
 
-  // Desktop: after the chat's actions and the ⋯ overflow, right before the stats.
-  assert.match(shellSource, /\{renderChatToolbarActions\(false, "primary"\)\}\s*<div ref=\{desktopToolbarMoreRef\}[\s\S]*?\{renderDebugButton\(false\)\}\s*\{renderSessionStatsButton\(false\)\}/);
-  assert.match(button, /mobile \? "border-r border-border" : "ml-auto border-l border-border"/);
-  const stats = between(shellSource, "const renderSessionStatsButton = (mobile: boolean) => {", "const renderDebugButton");
-  // The stats button follows the Debug button's ml-auto; it never pushes itself right.
+  // Desktop: after the Agents pill and the toolbar capsule, then the stats,
+  // then this group, then the file toggle.
+  assert.match(shellSource, /\{renderAgentsButton\(false\)\}\s*\{renderToolbarBGroup\(false\)\}\s*\{renderSessionStats\(false\)\}\s*\{renderDebugThemeGroup\(\)\}\s*\{renderMainFileToggle\(false\)\}/);
+  const stats = between(shellSource, "const renderSessionStats = (mobile: boolean) => {", "const renderDebugThemeGroup");
+  // The stats group follows the Debug group's place; it never pushes itself right.
   assert.doesNotMatch(stats, /ml-auto/);
   assert.match(shellSource, /!mobile && !showChat && "ml-auto"/);
-  // Phones: before the stats on a wide one, in the "more" overlay on a narrow one.
-  assert.match(shellSource, /\{!isNarrowMobile && renderChatToolbarActions\(true, "primary"\)\}\s*\{!isNarrowMobile && renderToolbarMoreButton\(\)\}\s*\{!isNarrowMobile && renderDebugButton\(true\)\}\s*\{renderSessionStatsButton\(true\)\}/);
-  assert.match(shellSource, /\{renderChatToolbarActions\(true, "primary"\)\}\s*\{renderChatToolbarActions\(true, "overflow"\)\}\s*\{renderDebugButton\(true\)\}\s*<\/div>/);
+  // Phones: the chip leads the toolbar row, the file toggle closes it.
+  assert.match(shellSource, /\{renderSessionStats\(true\)\}\s*\{renderAgentsButton\(true\)\}\s*\{renderToolbarBGroup\(true\)\}\s*\{renderMainFileToggle\(true\)\}/);
 });
 
 test("Escape with focus in the panel gives it back to the Debug button, after the panel left the page", () => {
   assert.match(panelSource, /<section\s+ref=\{sectionRef\}\s+className="debug-panel/);
   assert.match(panelSource, /createDebugPanelEscapeListener\(\s*document,\s*\(\) => sectionRef\.current,\s*\(restoreFocus\) => onCloseRef\.current\(restoreFocus\),\s*\)/);
-  const button = between(shellSource, "const renderDebugButton = (mobile: boolean) => {", "const renderMainFileToggle");
+  const button = between(shellSource, "const renderDebugThemeGroup = () => {", "const renderMainFileToggle");
   assert.match(button, /<button\s+ref=\{debugButtonRef\}/);
   const close = between(shellSource, "const closeDebugPanel = useCallback(", "}, []);");
   assert.match(close, /\(restoreFocus: boolean\) => \{\s*setActiveTopPanel\(\(panel\) => panel === "debug" \? null : panel\);\s*if \(restoreFocus\) requestAnimationFrame\(\(\) => focusIfLost\(document, debugButtonRef\.current\)\);/);
@@ -777,9 +776,10 @@ test("the sidebar's running poll records its request alone, not the session-list
   assert.match(poll, /\} finally \{[^]*?noteRunningPoll\(startedAt, outcome, httpStatus, answeredAt\);\s*\}/);
 });
 
-test("the narrow phone's more overlay scrolls the buttons it cannot fit instead of clipping the last", () => {
-  const overlay = between(shellSource, 'data-mobile-toolbar-actions="true"', '{renderChatToolbarActions(true, "primary")}');
-  assert.match(overlay, /overflow-x-auto[\s\S]*?overflow-y-hidden[\s\S]*?\[scrollbar-width:none\]/);
+test("the ⋯ overflow is a Radix menu: its content scrolls itself, the old overlay is gone", () => {
+  assert.match(shellSource, /<DropdownMenuContent\s+align="end"\s+id="mobile-toolbar-actions"/);
+  assert.doesNotMatch(shellSource, /backdrop-blur-\[10px\]/);
+  assert.doesNotMatch(shellSource, /\[scrollbar-width:none\]/);
 });
 
 test("AppShell keeps the chat's reader in a ref and the panel open across session switches", () => {

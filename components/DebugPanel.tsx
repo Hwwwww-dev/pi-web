@@ -8,6 +8,7 @@ import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
 import { StatusIcon } from "./AgentSessionPanel";
 import { MCP_SESSION_STATE_KEYS } from "./mcp-config-helpers";
 import { sessionRowTitle } from "./SessionTree";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./ui/sheet";
 import { CircleXIcon, FolderIcon, LoaderCircleIcon, ServerIcon, TriangleAlertIcon } from "lucide-react";
 import {
   DEBUG_CLOSE_REASON_KEYS,
@@ -251,17 +252,35 @@ export function DebugPanel({ readerRef, selectedSessionId, sessions, onClose }: 
 
   const shown = held ?? { page, server, samples };
   return (
-    <DebugPanelView
-      page={shown.page}
-      server={shown.server}
-      samples={shown.samples}
-      selectedSessionId={selectedSessionId}
-      sessions={sessions}
-      copied={copied}
-      onCopy={handleCopy}
-      t={t}
-      sectionRef={sectionRef}
-    />
+    // The desktop right sheet. Non-modal (no overlay, nothing locks): the page
+    // keeps scrolling and the chat keeps focus. Radix must not own Escape (the
+    // panel's own document listener does, so it can restore focus) and must
+    // not close on an outside click or steal focus on open.
+    <Sheet open modal={false}>
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        aria-describedby={undefined}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+        className="w-[min(680px,94vw)] gap-0 border-l border-border p-0 sm:max-w-[680px]"
+      >
+        <SheetTitle className="sr-only">{t("debug.title")}</SheetTitle>
+        <SheetDescription className="sr-only">{t("debug.readOnly")}</SheetDescription>
+        <DebugPanelView
+          page={shown.page}
+          server={shown.server}
+          samples={shown.samples}
+          selectedSessionId={selectedSessionId}
+          sessions={sessions}
+          copied={copied}
+          onCopy={handleCopy}
+          t={t}
+          sectionRef={sectionRef}
+        />
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -319,11 +338,10 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
   const ctx: Ctx = { t, now, clock, myHolder, titleOf };
 
   return (
-    // The top bar's drop-down panel: the floating-layer recipe (shadcn popover
-    // surface); the embedded parts below stay on the card tint.
+    // The sheet's content block: the sheet owns the frame, the section fills it.
     <section
       ref={sectionRef}
-      className="debug-panel flex max-h-[min(720px,80dvh)] flex-col rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+      className="debug-panel flex h-full min-h-0 flex-col bg-background text-foreground"
       aria-label={t("debug.panelLabel")}
     >
       <div className="debug-panel-header flex min-w-0 shrink-0 items-center gap-3 border-b border-border px-4 py-2 text-xs">
@@ -574,7 +592,8 @@ function StatusSlot({ state, label }: { state: DebugStatusState; label: string }
   if (state === "running") {
     return (
       <span className="debug-status is-accent" title={label}>
-        <LoaderCircleIcon size={12} strokeWidth={2.8} className="sidebar-spin" role="img" aria-label={label} aria-hidden={false} />
+        {/* sidebar-spin (the retired app/sidebar-menu.css, folded here). */}
+        <LoaderCircleIcon size={12} strokeWidth={2.8} className="sidebar-spin shrink-0 animate-spin [animation-duration:0.9s] motion-reduce:animate-none" role="img" aria-label={label} aria-hidden={false} />
       </span>
     );
   }
@@ -1539,18 +1558,23 @@ const DEBUG_PANEL_CSS = `
   }
 
   /* Three columns when the panel is wide: the page's as wide as its table, the server's and the
-     sessions' each capped, so names never stretch and push the badges to the far edge. */
+     sessions' each capped, so names never stretch and push the badges to the far edge. Each
+     column reads as a card: a rounded panel block with its own border. */
   .debug-cols {
     display: grid;
     grid-template-areas: "page server sessions";
     grid-template-columns: minmax(320px, max-content) minmax(340px, 480px) minmax(360px, 560px);
-    gap: 0;
+    gap: 12px;
   }
   .debug-col {
     display: flex;
     min-width: 0;
     flex-direction: column;
     gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-panel);
   }
   .debug-col-page {
     grid-area: page;
@@ -1560,12 +1584,6 @@ const DEBUG_PANEL_CSS = `
   }
   .debug-col-sessions {
     grid-area: sessions;
-  }
-  .debug-col-server,
-  .debug-col-sessions {
-    margin-left: 20px;
-    padding-left: 20px;
-    border-left: 1px solid var(--border);
   }
   .debug-list,
   .debug-block {
@@ -2128,16 +2146,13 @@ const DEBUG_PANEL_CSS = `
     gap: 3px 4px;
   }
 
-  /* Narrower: the sessions under the server's pages, one border down both; the page's column
-     beside them, its height going to the sessions' row rather than opening a gap under the pages. */
+  /* Narrower: the sessions under the server's card; the page's card beside them,
+     its height going to the sessions' row rather than opening a gap under the pages. */
   @container debug-panel (max-width: 1239px) {
     .debug-cols {
       grid-template-areas: "page server" "page sessions";
       grid-template-columns: minmax(320px, max-content) minmax(0, 560px);
       grid-template-rows: auto 1fr;
-    }
-    .debug-col-sessions {
-      padding-top: 10px;
     }
   }
   @container debug-panel (max-width: 760px) {
@@ -2145,17 +2160,6 @@ const DEBUG_PANEL_CSS = `
       grid-template-areas: "page" "server" "sessions";
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: none;
-    }
-    .debug-col-server {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
-    }
-    .debug-col-server,
-    .debug-col-sessions {
-      margin-left: 0;
-      padding-left: 0;
-      border-left: 0;
     }
   }
   @container debug-panel (max-width: 520px) {

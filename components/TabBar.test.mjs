@@ -21,23 +21,25 @@ function classes(html, role) {
 }
 
 test("overflowing tabs keep the whole bar: the strip has no scrollbar", () => {
-  // The app's 10px (6px on touch) scrollbar took its height out of the 36px
-  // bar: 36px tabs were clipped (#1225), stretched ones squeezed to 26px.
+  // The app's 10px (6px on touch) scrollbar took its height out of the bar:
+  // full-height tabs were clipped (#1225), stretched ones squeezed.
   const html = renderTabBar(12);
   assert.match(html, /<div role="tablist" class="tabbar-scroll/);
   const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(css, /\.tabbar-scroll \{\s*scrollbar-width: none;\s*\}/);
   assert.match(css, /\.tabbar-scroll::-webkit-scrollbar \{\s*display: none;\s*\}/);
   const [list] = classes(html, "tablist");
-  // The bar's height (36px, 44px on a phone or touch screen).
-  assert.match(list, /h-\[var\(--top-bar-height\)\]/);
+  // The pill bar's fixed height (R2-1: the panel bar is 46px).
+  assert.match(list, /h-\[46px\]/);
   assert.match(list, /overflow-x-auto/);
   assert.match(list, /overflow-y-hidden/);
-  assert.match(list, /items-stretch/);
+  assert.match(list, /items-center/);
   const tabs = classes(html, "tab");
   assert.equal(tabs.length, 12);
   for (const tab of tabs) {
-    assert.doesNotMatch(tab, /\bh-\d/);
+    // One tab, one pill: a fixed pill height on every row.
+    assert.match(tab, /h-\[30px\]/);
     assert.match(tab, /items-center/);
+    assert.match(tab, /rounded-full/);
   }
 });

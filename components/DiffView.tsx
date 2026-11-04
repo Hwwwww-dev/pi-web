@@ -96,7 +96,7 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
   const hasChanges = diff.some((l) => l.type !== "unchanged");
   if (!hasChanges) {
     return (
-      <div className="px-4 py-3 font-mono text-xs text-dim">
+      <div className="px-3 py-3 font-mono text-xs text-muted-foreground">
         {t("i18n.noChanges")}
       </div>
     );
@@ -144,31 +144,37 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
     >
       {segments.map((seg, si) => {
         if (seg.hidden) {
-          const result = (
-            <div
+          // Collapsed hunks take the CodeBlock highlighted row: muted band,
+          // sans-serif note, no gutter columns of its own.
+          return (
+            <span
               key={si}
-              className="border-y border-border bg-card px-4 py-0.5 text-xs text-dim"
+              data-slot="code-block-line"
+              className="cn-code-block-line cn-code-block-line-variant-highlighted flex min-w-full items-center py-0.5 font-sans text-xs text-muted-foreground after:content-none"
             >
-              ... {seg.count} unchanged lines ...
-            </div>
+              <span aria-hidden="true" className="min-w-4 shrink-0 select-none px-1.5">⋯</span>
+              <span className="shrink-0 px-1.5">{seg.count} unchanged lines</span>
+            </span>
           );
-          return result;
         }
         const lines = seg.lines.map((line, li) => {
           const prefix =
             line.type === "added" ? "+" : line.type === "removed" ? "-" : " ";
-          // Added/removed rows take the diff tokens (globals.css); unchanged
-          // rows keep the view's background and a dim marker.
+          // The rows are the official CodeBlock line variants (vendored nova
+          // classes); the +/- marker stays an aligned column instead of the
+          // variant's absolute ::after so wrapped text keeps clearing it, and
+          // content-none drops that second marker.
           const rowTone = line.type === "added"
-            ? "bg-diff-add-bg border-l-diff-add text-diff-add"
+            ? "cn-code-block-line-variant-added"
             : line.type === "removed"
-            ? "bg-diff-del-bg border-l-diff-del text-diff-del"
-            : "border-l-transparent text-dim";
+            ? "cn-code-block-line-variant-removed"
+            : "";
 
           return (
-            <div
+            <span
               key={li}
-              className={`file-diff-line flex min-w-full border-l-[3px] ${rowTone}`}
+              data-slot="code-block-line"
+              className={`cn-code-block-line file-diff-line flex min-w-full after:content-none ${rowTone}`}
             >
               <span style={lineNumberStyle}>
                 {line.type === "removed" ? line.oldLineNo : line.newLineNo}
@@ -177,13 +183,13 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
                 {prefix}
               </span>
               <span
-                className={`file-diff-line-content min-w-0 pr-2 text-foreground ${
+                className={`file-diff-line-content min-w-0 pr-3 text-foreground ${
                   wrapLines ? "shrink whitespace-pre-wrap [overflow-wrap:anywhere]" : "shrink-0 whitespace-pre"
                 }`}
               >
                 {line.text || "\u00a0"}
               </span>
-            </div>
+            </span>
           );
         });
         return <div key={si}>{lines}</div>;
