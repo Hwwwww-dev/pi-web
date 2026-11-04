@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { PwaRegistration } from "@/components/PwaRegistration";
 import { CHUNK_RECOVERY_SCRIPT } from "@/lib/chunk-recovery";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
@@ -9,9 +9,15 @@ import "./settings.css";
 import "./sidebar.css";
 import "./sidebar-menu.css";
 
-const notoSansMono = Noto_Sans_Mono({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-noto-mono",
+const geistSans = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist-sans",
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
@@ -67,7 +73,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" translate="no" className={`${notoSansMono.variable} notranslate`} suppressHydrationWarning>
+    <html lang="en" translate="no" className={`${geistSans.variable} ${geistMono.variable} notranslate`} suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         <meta name="google" content="notranslate" />
