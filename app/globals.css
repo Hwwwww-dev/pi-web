@@ -1511,7 +1511,7 @@ pre, code {
   min-width: 0;
   max-width: 100%;
   overflow-x: hidden;
-  font-size: calc(14px + var(--chat-font-size-offset, 0px));
+  font-size: calc(13.5px + var(--chat-font-size-offset, 0px));
   line-height: 1.7;
   color: var(--text);
   word-break: break-word;
@@ -3613,14 +3613,14 @@ span.token.table {
     font-size: 16px !important;
   }
   .chat-input-textarea {
-    font-size: max(16px, var(--chat-content-font-size, 14px)) !important;
+    font-size: max(16px, calc(13.5px + var(--chat-font-size-offset, 0px))) !important;
   }
 }
 
 /* The composer textarea keeps its scroll but never draws a scrollbar: the
    pill is small and the bar rides over the send-button column on phones. */
 .chat-input-textarea {
-  font-size: var(--chat-content-font-size, 14px);
+  font-size: calc(13.5px + var(--chat-font-size-offset, 0px));
   line-height: 1.6;
   scrollbar-width: none;
   -ms-overflow-style: none;
