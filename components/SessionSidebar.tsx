@@ -93,8 +93,8 @@ import { PiWebTitle } from "./PiWebTitle";
 import { ProjectWorktreePicker, type ProjectWorktreePickerHandle, type WorktreeRemoval } from "./ProjectWorktreePicker";
 import { SessionSearch } from "./SessionSearch";
 import { SessionTree, sessionRowTitle, type SessionTreeReveal } from "./SessionTree";
-import { SidebarMenu, type SidebarMenuAnchor, type SidebarMenuItem } from "./SidebarMenu";
-import { SidebarToast, type SidebarToastAction, type SidebarToastData } from "./SidebarToast";
+import { SidebarMenu, SIDEBAR_MENU_FOCUS_RING as FOCUS_RING, type SidebarMenuAnchor, type SidebarMenuItem } from "./SidebarMenu";
+import { toast } from "sonner";
 import {
   ArchiveIcon,
   GitCommitHorizontalIcon,
@@ -320,6 +320,23 @@ const ARCHIVE_OLDER_THAN_MS = 7 * 24 * 60 * 60 * 1000;
 /** The archive bar's "Delete archived over 30 days ago", by archive time. */
 const ARCHIVED_DELETE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const TOAST_TITLE_MAX = 28;
+
+/**
+ * The sidebar's toasts are sonner's (components/ui/sonner.tsx, mounted once in
+ * AppShell): one toast at a time under this fixed id, so a new toast replaces
+ * the one on screen and its actions die with it. Sonner renders it fixed to
+ * the viewport's bottom-right, outside the sidebar, so the phone's drawer
+ * dismisses it on close (AppShell) instead of its sliding away with the drawer.
+ */
+const SIDEBAR_TOAST_ID = "pi-web-sidebar-toast";
+/** Long enough to read the message and reach Undo; sonner pauses on hover and while the page is hidden. */
+const SIDEBAR_TOAST_DURATION_MS = 10_000;
+
+/** A toast's action button. Sonner shows at most two (action + cancel); the sidebar's toasts use at most Undo and View. */
+interface SidebarToastAction {
+  label: string;
+  onClick: () => void;
+}
 
 /**
  * The files section below the sessions (the desktop's default layout). Its
@@ -641,11 +658,30 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   }, []);
   const selectedSessionIdRef = useRef(selectedSessionId);
   selectedSessionIdRef.current = selectedSessionId;
-  const [toast, setToast] = useState<SidebarToastData | null>(null);
-  const toastIdRef = useRef(0);
   const showToast = useCallback((message: string, actions: SidebarToastAction[] = [], tail?: string) => {
-    toastIdRef.current += 1;
-    setToast({ id: toastIdRef.current, message, ...(tail ? { tail } : {}), actions });
+    const [primary, secondary] = actions;
+    toast(message, {
+      id: SIDEBAR_TOAST_ID,
+      description: tail,
+      duration: SIDEBAR_TOAST_DURATION_MS,
+      action: primary && {
+        label: primary.label,
+        onClick: (event) => {
+          // Dismissed first, so a toast the action shows itself (Undo
+          // failed) replaces this one instead of being dismissed with it.
+          event.preventDefault();
+          toast.dismiss(SIDEBAR_TOAST_ID);
+          primary.onClick();
+        },
+      },
+      cancel: secondary && {
+        label: secondary.label,
+        onClick: () => {
+          toast.dismiss(SIDEBAR_TOAST_ID);
+          secondary.onClick();
+        },
+      },
+    });
   }, []);
   const [uiWriteFailures, setUiWriteFailures] = useState(0);
   const shownUiWriteFailuresRef = useRef(0);
@@ -1831,7 +1867,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       : t("sidebar.archivedManyToast", { count: archivable.length });
     showToast(message, [
       {
-        id: "undo",
         label: t("sidebar.undo"),
         onClick: () => {
           for (const entries of chunkForSessionUiRequests(snapshot)) {
@@ -1842,7 +1877,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           focusAfterCommit(() => familyRowButton(archivable[0].root.id));
         },
       },
-      { id: "view", label: t("sidebar.viewArchive"), onClick: () => openArchiveView() },
+      { label: t("sidebar.viewArchive"), onClick: () => openArchiveView() },
     ]);
   }, [applyUiState, focusAfterCommit, familyRowButton, openArchiveView, restoreUnread, showToast, snapshotUiState, t, unreadSessionIds]);
 
@@ -1867,7 +1902,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       : t("sidebar.restoredManyToast", { count: families.length });
     showToast(message, [
       {
-        id: "undo",
         label: t("sidebar.undo"),
         onClick: () => {
           for (const entries of chunkForSessionUiRequests(snapshot)) {
@@ -1906,10 +1940,9 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       });
       void loadSessions();
     } catch {
-      toastIdRef.current += 1;
-      setToast({ id: toastIdRef.current, message: t("sidebar.sessionActionFailed"), actions: [] });
+      showToast(t("sidebar.sessionActionFailed"));
     }
-  }, [loadSessions, t]);
+  }, [loadSessions, showToast, t]);
 
   // A project's display name is pi-web's own (the UI state file): renaming
   // it never selects the project, nor moves, pins or folds its group. The
@@ -2032,7 +2065,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         setAllSessions((current) => (current.some((session) => session.id === forked.id) ? current : [forked, ...current]));
         setUnreadSessionIds((prev) => new Set(prev).add(forked.id));
         void loadSessions();
-        showToast(message, [{ id: "open", label: t("sidebar.open"), onClick: () => openForkedRef.current(forked, null) }], tail);
+        showToast(message, [{ label: t("sidebar.open"), onClick: () => openForkedRef.current(forked, null) }], tail);
         return;
       }
       openForkedRef.current(forked, row.key);
@@ -2533,15 +2566,32 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     onConfirm: () => void;
     onCancel: () => void;
   }): ReactNode => (
-    <div className="sidebar-menu-question">
-      <div className="sidebar-menu-header" title={headingTitle}>{heading}</div>
-      {notes.map((note) => <p key={note} className="sidebar-menu-question-text">{note}</p>)}
-      <div className="sidebar-menu-question-buttons">
-        <button type="button" className="sidebar-menu-question-confirm" disabled={count === 0} onClick={onConfirm}>
+    // The look arrives as variants (the retired app/sidebar-menu.css, folded
+    // here); the sheet's narrower header inset wins over its own header rule.
+    <div className="sidebar-menu-question px-1 pt-0.5 pb-1 [.sidebar-sheet_&]:py-1 [.sidebar-sheet_&]:px-4">
+      <div
+        className="sidebar-menu-header overflow-hidden text-(--text-dim) text-ellipsis whitespace-nowrap px-1 pt-1.5 pb-1 text-[11px] [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs"
+        title={headingTitle}
+      >
+        {heading}
+      </div>
+      {notes.map((note) => <p key={note} className="sidebar-menu-question-text m-0 pt-0.5 px-1 text-(--text) text-xs leading-[1.4] [.sidebar-sheet_&]:text-sm">{note}</p>)}
+      <div className="sidebar-menu-question-buttons flex gap-1.5 mt-2">
+        <button
+          type="button"
+          className={["sidebar-menu-question-confirm", "flex-1 min-w-0 h-[26px] border border-(--danger) rounded-(--radius-sm) bg-(--danger) text-white text-xs font-semibold cursor-pointer", "disabled:cursor-not-allowed disabled:opacity-50", FOCUS_RING, "[.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"].join(" ")}
+          disabled={count === 0}
+          onClick={onConfirm}
+        >
           {t("sidebar.deleteCount", { count })}
         </button>
         {!isMobile && (
-          <button type="button" className="sidebar-menu-question-cancel" data-sidebar-menu-autofocus="" onClick={onCancel}>
+          <button
+            type="button"
+            className={["sidebar-menu-question-cancel", "flex-1 min-w-0 h-[26px] border border-(--border) rounded-(--radius-sm) bg-(--bg) text-(--text-muted) text-xs cursor-pointer hover:bg-(--bg-hover)", FOCUS_RING].join(" ")}
+            data-sidebar-menu-autofocus=""
+            onClick={onCancel}
+          >
             {t("sidebar.cancel")}
           </button>
         )}
@@ -2877,7 +2927,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   return (
     <div
       ref={setSidebarRoot}
-      className={`session-sidebar${stacked ? " is-files-below" : ""}${stacked && filesCollapsed ? " is-files-collapsed" : ""}${stacked && filesFold.moving ? " is-files-folding" : ""}${toast ? " has-toast" : ""}`}
+      className={`session-sidebar${stacked ? " is-files-below" : ""}${stacked && filesCollapsed ? " is-files-collapsed" : ""}${stacked && filesFold.moving ? " is-files-folding" : ""}`}
       style={{ "--sidebar-files-height": `${filesSizer.width}px` } as CSSProperties}
       onFocus={(event) => { sidebarFocusRef.current = event.target; }}
       onBlur={(event) => { if (event.relatedTarget === null && !document.hasFocus()) return; if (!event.currentTarget.contains(event.relatedTarget)) sidebarFocusRef.current = null; }}
@@ -3270,7 +3320,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       >
         {menuBody}
       </SidebarMenu>
-      <SidebarToast toast={toast} onDismiss={() => setToast(null)} dismissLabel={t("sidebar.dismiss")} />
     </div>
   );
 });

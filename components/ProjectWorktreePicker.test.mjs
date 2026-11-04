@@ -189,17 +189,17 @@ function removalSurface({ sheet, dirty = true, error = null }) {
 test("the force question starts on a Cancel on a desktop and in a sheet, never on Force", () => {
   const desktop = removalSurface({ sheet: false });
   assert.equal((desktop.match(/data-sidebar-menu-autofocus=""/g) ?? []).length, 1);
-  assert.match(desktop, /<button type="button" class="sidebar-worktree-cancel" data-sidebar-menu-autofocus="">Cancel<\/button>/);
+  assert.match(desktop, /<button type="button" class="sidebar-worktree-cancel[^"]*" data-sidebar-menu-autofocus="">Cancel<\/button>/);
   // The sheet brings its own Cancel, which takes the focus Force would get as the first control.
   const sheet = removalSurface({ sheet: true });
   assert.equal((sheet.match(/data-sidebar-menu-autofocus=""/g) ?? []).length, 1);
-  assert.match(sheet, /<button type="button" class="sidebar-worktree-force">Force<\/button>/);
-  assert.match(sheet, /<button type="button" class="sidebar-sheet-cancel" data-sidebar-menu-autofocus="">Cancel<\/button><\/div><\/div>$/);
+  assert.match(sheet, /<button type="button" class="sidebar-worktree-force[^"]*">Force<\/button>/);
+  assert.match(sheet, /<button type="button" class="sidebar-sheet-cancel[^"]*" data-sidebar-menu-autofocus="">Cancel<\/button><\/div><\/div>$/);
   assert.doesNotMatch(sheet, /sidebar-worktree-cancel/, "one Cancel in the sheet");
   // A failure without the question: the error, and still Cancel first.
   const failed = removalSurface({ sheet: true, dirty: false, error: "locked" });
   assert.doesNotMatch(failed, /sidebar-worktree-force/);
-  assert.match(failed, /<div class="sidebar-worktree-error" role="alert">locked<\/div>/);
+  assert.match(failed, /<div class="sidebar-worktree-error[^"]*" role="alert">locked<\/div>/);
 });
 
 test("the worktree menu lists branches with no checkout and moves on pick", () => {

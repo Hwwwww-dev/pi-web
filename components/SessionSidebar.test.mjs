@@ -164,7 +164,6 @@ test("the fold's and the archive view's motions in the CSS last as long as the h
   // lasts that long.
   for (const [selector, property] of [
     [".session-sidebar.is-files-below.is-files-folding .sidebar-files-panel", "transition"],
-    [".session-sidebar.is-files-below.is-files-folding .sidebar-toast-region", "transition"],
     [".sidebar-archive-view.is-entering", "animation"],
     [".sidebar-archive-view.is-leaving", "animation"],
   ]) {
@@ -664,7 +663,7 @@ test("archive keeps an undo snapshot and clears unread markers", () => {
   assert.match(body, /\.then\(\(ok\) => \{\s*\/\/[^\n]*\n\s*if \(ok \|\| unreadBefore\.length === 0\) return;\s*const partIds = new Set\(part\.flatMap\(\(family\) => familyIds\(family\)\)\);\s*restoreUnread\(unreadBefore\.filter\(\(id\) => partIds\.has\(id\)\)\);/);
   // The session open by then has been read: its marker stays off.
   assert.match(callbackBody("restoreUnread"), /if \(id !== selectedSessionIdRef\.current\) next\.add\(id\);/);
-  assert.match(body, /\{ id: "view", label: t\("sidebar\.viewArchive"\), onClick: \(\) => openArchiveView\(\) \},/);
+  assert.match(body, /\{ label: t\("sidebar\.viewArchive"\), onClick: \(\) => openArchiveView\(\) \},/);
   assert.match(callbackBody("archiveFamily"), /if \(familyIds\(family\)\.some\(\(id\) => runningSessionIds\.has\(id\)\)\) return;/);
   assert.match(callbackBody("restoreFamily"), /useCallback\(\(family: SessionFamily\) => restoreFamilies\(\[family\]\), \[restoreFamilies\]\)/);
   // A restore is batched the same way, and its Undo puts focus back in the tree.

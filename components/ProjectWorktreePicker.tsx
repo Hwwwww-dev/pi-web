@@ -13,7 +13,7 @@ import {
 } from "@/lib/new-session-context";
 import { projectNameOf } from "@/lib/session-tree";
 import { ActivitySummary } from "./SessionTree";
-import { SidebarMenu, type SidebarMenuAnchor, type SidebarMenuItem } from "./SidebarMenu";
+import { SidebarMenu, SIDEBAR_MENU_FOCUS_RING as FOCUS_RING, type SidebarMenuAnchor, type SidebarMenuItem } from "./SidebarMenu";
 import { GitBranchIcon, ChevronRightIcon, FolderIcon, FolderPlusIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { WorktreeCreateForm } from "./WorktreeCreateForm";
 
@@ -125,24 +125,36 @@ export function WorktreeRemoveForm({
 }) {
   const { t } = useI18n();
   return (
-    <div className="sidebar-worktree-form">
-      {heading && <div className="sidebar-menu-header">{heading}</div>}
-      {dirty && <div className="sidebar-worktree-message">{t("sidebar.forceRemoveCheckout")}</div>}
+    // The sheet's look arrives as variants (the retired app/sidebar-menu.css,
+    // folded here); the body only ever shows in a sheet.
+    <div className="sidebar-worktree-form px-1 pt-0.5 pb-1 [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2.5 [.sidebar-sheet_&]:pb-1">
+      {heading && <div className="sidebar-menu-header overflow-hidden text-(--text-dim) text-ellipsis whitespace-nowrap px-2 pt-1.5 pb-1 text-[11px] [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs">{heading}</div>}
+      {dirty && <div className="sidebar-worktree-message pt-0.5 px-1 text-(--text) text-xs leading-[1.4]">{t("sidebar.forceRemoveCheckout")}</div>}
       {(dirty || showCancel) && (
-        <div className="sidebar-worktree-form-buttons">
+        <div className="sidebar-worktree-form-buttons flex gap-1.5 mt-1.5">
           {dirty && (
-            <button type="button" className="sidebar-worktree-force" disabled={busy} onClick={onForce}>
+            <button
+              type="button"
+              className={["sidebar-worktree-force", "flex-1 h-[26px] border border-(--danger) rounded-(--radius-sm) bg-(--danger) text-white text-xs font-semibold cursor-pointer", "disabled:cursor-not-allowed disabled:opacity-50", FOCUS_RING, "[.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"].join(" ")}
+              disabled={busy}
+              onClick={onForce}
+            >
               {t("sidebar.force")}
             </button>
           )}
           {showCancel && (
-            <button type="button" className="sidebar-worktree-cancel" data-sidebar-menu-autofocus="" onClick={onCancel}>
+            <button
+              type="button"
+              className={["sidebar-worktree-cancel", "flex-1 h-[26px] border border-(--border) rounded-(--radius-sm) bg-(--bg) text-(--text-muted) text-xs cursor-pointer hover:bg-(--bg-hover)", FOCUS_RING, "[.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"].join(" ")}
+              data-sidebar-menu-autofocus=""
+              onClick={onCancel}
+            >
               {t("sidebar.cancel")}
             </button>
           )}
         </div>
       )}
-      {error && <div className="sidebar-worktree-error" role="alert">{error}</div>}
+      {error && <div className="sidebar-worktree-error mt-1.5 text-(--danger) text-[11px] leading-[1.35] [overflow-wrap:anywhere]" role="alert">{error}</div>}
     </div>
   );
 }
@@ -157,8 +169,8 @@ function WorktreeConfirmRow({ busy, onForce, onCancel }: { busy: boolean; onForc
   const { t } = useI18n();
   const questionId = useId();
   return (
-    <div className="sidebar-worktree-confirm">
-      <span id={questionId} className="sidebar-worktree-confirm-text" title={t("sidebar.forceRemoveCheckout")}>
+    <div className="sidebar-worktree-confirm flex items-center gap-1.5 px-2.5 py-[7px] border-b border-(--border) bg-(--danger-bg)">
+      <span id={questionId} className="sidebar-worktree-confirm-text flex-1 min-w-0 overflow-hidden text-(--text) text-[11px] text-ellipsis whitespace-nowrap" title={t("sidebar.forceRemoveCheckout")}>
         {t("sidebar.forceRemoveCheckout")}
       </span>
       <button
@@ -168,7 +180,7 @@ function WorktreeConfirmRow({ busy, onForce, onCancel }: { busy: boolean; onForc
         data-sidebar-menu-item=""
         aria-describedby={questionId}
         aria-disabled={busy ? true : undefined}
-        className="sidebar-worktree-force"
+        className={["sidebar-worktree-force", "flex-none h-auto px-[9px] py-[3px] border border-(--danger) rounded-(--radius-sm) bg-(--danger) text-white text-[11px] font-semibold", "aria-disabled:cursor-not-allowed aria-disabled:opacity-50", FOCUS_RING].join(" ")}
         onClick={() => { if (!busy) onForce(); }}
       >
         {t("sidebar.force")}
@@ -179,7 +191,7 @@ function WorktreeConfirmRow({ busy, onForce, onCancel }: { busy: boolean; onForc
         tabIndex={-1}
         data-sidebar-menu-item=""
         data-sidebar-menu-autofocus=""
-        className="sidebar-worktree-cancel"
+        className={["sidebar-worktree-cancel", "flex-none h-auto px-[9px] py-[3px] border border-(--border) rounded-(--radius-sm) bg-(--bg-hover) text-(--text-muted) text-[11px] cursor-pointer", FOCUS_RING].join(" ")}
         onClick={onCancel}
       >
         {t("sidebar.cancel")}
@@ -548,30 +560,36 @@ export function ProjectWorktreePicker({
     menuTitle = t("sidebar.switchWorktree");
     menuItems = worktreeItems();
     if (body?.kind === "create") {
+      // Escape inside the form goes back to the list, like its Cancel.
       menuFooter = (
-        <WorktreeCreateForm
-          heading={null}
-          busy={body.busy}
-          error={body.error}
-          showCancel
-          onCreate={(branch) => { void createWorktree(branch); }}
-          onCancel={() => showBody(null)}
-        />
+        <div data-sidebar-menu-esc-to-body="" className="contents">
+          <WorktreeCreateForm
+            heading={null}
+            busy={body.busy}
+            error={body.error}
+            showCancel
+            onCreate={(branch) => { void createWorktree(branch); }}
+            onCancel={() => showBody(null)}
+          />
+        </div>
       );
     } else if (body?.kind === "remove" && body.error) {
-      menuFooter = <div className="sidebar-worktree-error" role="alert">{body.error}</div>;
+      menuFooter = <div className="sidebar-worktree-error mt-1.5 text-(--danger) text-[11px] leading-[1.35] [overflow-wrap:anywhere] [.is-classic_&]:m-0 [.is-classic_&]:px-2.5 [.is-classic_&]:pt-[5px] [.is-classic_&]:pb-2" role="alert">{body.error}</div>;
     }
   } else if (body?.kind === "create") {
     menuTitle = newWorktreeTitle;
+    // Escape inside the form goes back to the list, not out of the menu.
     menuBody = (
-      <WorktreeCreateForm
-        heading={mobile ? null : menuTitle}
-        busy={body.busy}
-        error={body.error}
-        showCancel={!mobile}
-        onCreate={(branch) => { void createWorktree(branch); }}
-        onCancel={closeMenu}
-      />
+      <div data-sidebar-menu-esc-to-body="" className="contents">
+        <WorktreeCreateForm
+          heading={mobile ? null : menuTitle}
+          busy={body.busy}
+          error={body.error}
+          showCancel={!mobile}
+          onCreate={(branch) => { void createWorktree(branch); }}
+          onCancel={closeMenu}
+        />
+      </div>
     );
   } else if (body?.kind === "remove") {
     menuTitle = t("sidebar.removeWorktreeHeading", { name: worktreeLabel(body.worktree) });
@@ -681,6 +699,7 @@ export function ProjectWorktreePicker({
         classic={classic}
         footer={menuFooter}
         focusKey={body ? `${body.kind}:${body.kind === "remove" && body.dirty}` : "list"}
+        onBodyEscape={() => showBody(null)}
       >
         {menuBody}
       </SidebarMenu>

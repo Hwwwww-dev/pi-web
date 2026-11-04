@@ -15,7 +15,8 @@ export function RunningSessionIndicator() {
       aria-label={t("sidebar.agentRunning")}
       className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-primary"
     >
-      <LoaderCircleIcon size={14} strokeWidth={2.8} className="sidebar-spin" />
+      {/* sidebar-spin (the retired app/sidebar-menu.css, folded here). */}
+      <LoaderCircleIcon size={14} strokeWidth={2.8} className="sidebar-spin shrink-0 animate-spin [animation-duration:0.9s] motion-reduce:animate-none" />
     </span>
   );
 }
