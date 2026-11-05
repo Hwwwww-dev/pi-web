@@ -1,11 +1,26 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { createJiti } from "jiti";
 import ts from "typescript";
 import vm from "node:vm";
 
-const jiti = createJiti(import.meta.url, { jsx: { runtime: "automatic" }, tsconfigPaths: true });
+// The files-below layout's markup (the desktop setting's one choice),
+// rendered: the hook is aliased to a fixture that answers "below", so these
+// tests keep their meaning whatever the default is (the tabs layout is
+// SessionSidebar.tabs.test.mjs's). The alias takes the module's absolute
+// path without its extension, in the form jiti compares it with (#1211).
+const placementHook = fileURLToPath(new URL("../hooks/useFilesPlacement", import.meta.url))
+  .replaceAll("\\", "/")
+  .replace(/^[a-z]:/, (drive) => drive.toUpperCase());
+const jiti = createJiti(import.meta.url, {
+  jsx: { runtime: "automatic" },
+  tsconfigPaths: true,
+  alias: {
+    [placementHook]: fileURLToPath(new URL("./__fixtures__/files-placement-below.mjs", import.meta.url)),
+  },
+});
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
@@ -123,21 +138,24 @@ test("only Shift skips the session deletion confirmation", () => {
   );
 });
 
-test("on a desktop the files sit below the sessions by default, both in view", () => {
-  // The server renders the default placement on a desktop (useFilesPlacement
-  // and useIsMobile's server snapshots): the stacked layout.
+test("with the files below the sessions, both are in view under the track", () => {
+  // The fixture pins the below placement (the desktop setting's one choice;
+  // useIsMobile's server snapshot is a desktop): the stacked layout.
   const html = render({ selectedCwd: "/work/alpha", onOpenTerminal: noop });
   assert.match(html, /^<div class="session-sidebar is-files-below" style="--sidebar-files-height:320px">/);
-  // No tabs: the brand (its name says the versions a click shows), then New
-  // and the sessions' search. No view options.
+  // The brand row (its name says the versions a click shows), then New and
+  // the search; under it the track, in every layout. No view options.
   assert.match(html, /<div class="sidebar-header"><button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button type="button" class="sidebar-new-button"/);
-  assert.doesNotMatch(html, /role="tablist"|role="tab"|role="tabpanel"|View options|sidebar-title/);
+  assert.match(html, /<div class="sidebar-tabs-list" role="tablist" aria-label="Sidebar view">/);
+  assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
+  assert.doesNotMatch(html, /View options|sidebar-title/);
   assert.match(html, /<span class="sidebar-new-label">New<\/span><\/button><button type="button" title="Search conversations" aria-label="Search conversations" aria-expanded="false" aria-controls="session-search-input" class="sidebar-search-toggle">/);
-  // Two regions, both shown: the sessions, the separator, the files.
+  // Both tab panels shown: the sessions (its tab selected), the separator,
+  // the files section under the tree.
   const sessions = openingTag(html, "session-sidebar-panel-sessions");
   const files = openingTag(html, "session-sidebar-panel-files");
-  assert.equal(sessions, '<div id="session-sidebar-panel-sessions" role="region" aria-label="Sessions" class="sidebar-panel sidebar-sessions-panel">');
-  assert.equal(files, '<div id="session-sidebar-panel-files" role="region" aria-label="Files" class="sidebar-panel sidebar-files-panel">');
+  assert.equal(sessions, '<div id="session-sidebar-panel-sessions" role="tabpanel" aria-labelledby="session-sidebar-tab-sessions" class="sidebar-panel sidebar-sessions-panel">');
+  assert.equal(files, '<div id="session-sidebar-panel-files" role="tabpanel" aria-labelledby="session-sidebar-tab-files" class="sidebar-panel sidebar-files-panel">');
   const separator = html.slice(html.indexOf('role="separator"') - 200, html.indexOf(files));
   assert.ok(html.indexOf(sessions) < html.indexOf('role="separator"') && html.indexOf('role="separator"') < html.indexOf(files), "sessions, separator, files");
   assert.match(separator, /<div aria-label="Resize file browser" aria-orientation="horizontal" aria-valuemax="2000" aria-valuemin="220" aria-valuenow="320" aria-valuetext="320 px" role="separator" tabindex="0" aria-controls="session-sidebar-panel-files" class="panel-resize-handle sidebar-files-resize-handle" data-resize-handle="sidebar-files" title="Resize file browser: Drag to resize\. Double-click or press Enter to reset\."><\/div>$/);
@@ -415,7 +433,7 @@ test("the layout, the tab and the fold chosen last never change the first render
   assert.match(clientHtml, /^<div class="session-sidebar is-files-below" style="--sidebar-files-height:320px">/);
   assert.doesNotMatch(openingTag(clientHtml, "session-sidebar-panel-files"), /hidden/);
   assert.equal(openingTag(clientHtml, "session-sidebar-files-body"), '<div id="session-sidebar-files-body" class="sidebar-files-body">');
-  assert.doesNotMatch(clientHtml, /role="tablist"/);
+  assert.match(clientHtml, /role="tablist"/);
 });
 
 test("the files tab keeps FileExplorer mounted under an always-present scroll container", () => {
@@ -713,12 +731,12 @@ test("the files tab shows the composer bar's picker as two rows, with removal an
   // menu carries activity badges.
   const filesHead = source.slice(source.indexOf('className="sidebar-files-head"'), source.indexOf('className="sidebar-files-actions"'));
   assert.match(filesHead, /<ProjectWorktreePicker\n\s*handleRef=\{filesPickerRef\}/);
-  assert.match(filesHead, /layout=\{stacked \? "row" : "stacked"\}/);
+  assert.match(filesHead, /layout=\{filesBelow \? "row" : "stacked"\}/);
   assert.match(filesHead, /projectActivity=\{projectActivity\}/);
   assert.match(filesHead, /onRemoveWorktree=\{handleRemoveWorktree\}/);
   // The keys under the picker stay in place; the actions row only renders
   // beside the picker when the layout has room for it.
-  assert.match(source, /\{!stacked && explorerCwd && \(\n\s*<div className="sidebar-files-actions"/);
+  assert.match(source, /\{!filesBelow && explorerCwd && \(\n\s*<div className="sidebar-files-actions"/);
 });
 
 test("the files show the composer bar's picker in the tab head, asking for a project until it has one", () => {

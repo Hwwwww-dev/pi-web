@@ -28,17 +28,25 @@ export type SidebarRowKind =
   | "spacer" | "footer-open" | "footer-archived" | "archive-group";
 
 /**
- * Per-kind row heights: one rhythm. Session rows, the section headers (a
- * project's, the pinned section's, the archive's projects), the empty
- * group's note and the footer are one height, 28px (44px on a phone, a
- * finger's minimum for the rows); only "show more" is a step shorter. A
- * spacer opens the list and parts the pinned section from the groups, one
- * group from the next and the groups from the footer.
+ * Per-kind row heights: one rhythm. Session rows and the section headers (a
+ * project's, the archive's projects) are one height, 34px — the draft
+ * item's (.pm-item) — with the pinned section's label, the empty group's
+ * note and the footer a step shorter at 28px; only "show more" is shorter
+ * still. On a phone every row the finger touches is 40px (the draft's ≤640
+ * .pm-item); a spacer opens the list and parts the pinned section from the
+ * groups, one group from the next and the groups from the footer.
  */
 export const SIDEBAR_ROW_HEIGHTS: Record<SidebarLayout, Record<SidebarRowKind, number>> = {
-  desktop: { "pinned-header": 28, session: 28, "pinned-more": 26, group: 28, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 28 },
-  mobile: { "pinned-header": 44, session: 44, "pinned-more": 36, group: 44, "group-more": 36, "group-empty": 44, spacer: 8, "footer-open": 44, "footer-archived": 44, "archive-group": 44 },
+  desktop: { "pinned-header": 28, session: 34, "pinned-more": 26, group: 34, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 34 },
+  mobile: { "pinned-header": 40, session: 40, "pinned-more": 36, group: 40, "group-more": 36, "group-empty": 40, spacer: 8, "footer-open": 40, "footer-archived": 40, "archive-group": 40 },
 };
+
+/**
+ * A family's children (a group's and the archive's sessions) sit a step
+ * under their row: the draft's .pm-item.is-child, 32px on a desktop. A
+ * phone keeps the one 40px row.
+ */
+export const CHILD_SESSION_ROW_HEIGHTS: Record<SidebarLayout, number> = { desktop: 32, mobile: 40 };
 export const GROUP_VISIBLE_LIMIT = 6;
 export const PINNED_VISIBLE_LIMIT = 8;
 /** How many more families each "show more" click reveals. */
@@ -688,10 +696,17 @@ export function familiesToDelete(
 /** Prefix sums of row heights: length rows.length + 1, offsets[0] = 0. */
 export function getRowOffsets(rows: readonly SidebarRow[], layout: SidebarLayout): number[] {
   const heights = SIDEBAR_ROW_HEIGHTS[layout];
+  const childHeight = CHILD_SESSION_ROW_HEIGHTS[layout];
   const offsets = new Array<number>(rows.length + 1);
   offsets[0] = 0;
   for (let index = 0; index < rows.length; index++) {
-    offsets[index + 1] = offsets[index] + heights[rows[index].kind];
+    const row = rows[index];
+    // A family's child (a group's or the archive's session) sits a step
+    // under a top-level (pinned) row.
+    const height = row.kind === "session" && (row.context === "group" || row.context === "archive")
+      ? childHeight
+      : heights[row.kind];
+    offsets[index + 1] = offsets[index] + height;
   }
   return offsets;
 }

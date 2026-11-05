@@ -1673,9 +1673,13 @@ a.session-tree-main {
 }
 
 /* The Sessions | Files track: a muted capsule with the chosen tab raised
-   onto the panel (the draft's segmented control), no accent top line. */
+   onto the panel (the draft's segmented control), no accent top line. It is
+   its own row under the brand row, in every layout, and its two tabs share
+   the width (.pm-tab's flex:1). */
 .sidebar-tabs-list {
+  flex: none;
   gap: 2px;
+  margin: 2px 0 4px;
   padding: 3px;
   border-radius: 999px;
   background: var(--bg-subtle);
@@ -1689,15 +1693,17 @@ a.session-tree-main {
 }
 
 .sidebar-tab {
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 28px;
-  padding: 0 14px;
+  padding: 0 8px;
 }
 
 .sidebar-tab.is-selected,
 .sidebar-search-toggle.is-active {
   border-top: 0;
   background: var(--bg-panel);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10);
 }
 
 /* New keeps its draft primary pill; the search toggle a quiet round ghost. */
@@ -1760,4 +1766,31 @@ a.session-tree-main {
   .session-tree-running::after {
     animation: none;
   }
+}
+
+/*
+ * R2-F1 draft fidelity: the draft item's metrics on the tree's rows. The
+ * heights come from SIDEBAR_ROW_HEIGHTS (lib/session-tree.ts); these rules
+ * carry the type and the child's depth (.pm-item / .pm-item.is-child).
+ */
+
+/* The item's 13px title; a family's child sits a step lower (its 32px row)
+   and deeper, at 12.5px. */
+.session-tree-title {
+  font-size: 13px;
+}
+
+.session-tree-session.is-child {
+  padding-left: 32px;
+}
+
+.session-tree-session.is-child .session-tree-title {
+  font-size: 12.5px;
+}
+
+/* A project header reads as the draft's item: its name at the item's size,
+   regular weight — the chevron marks it as a header. */
+.session-tree-group-toggle {
+  font-size: 13px;
+  font-weight: 400;
 }

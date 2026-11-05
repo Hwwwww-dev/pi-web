@@ -523,6 +523,9 @@ const SessionRowView = memo(function SessionRowView({
   const nowDate = new Date(now);
   const className = [
     "session-tree-row session-tree-session",
+    // A family's child (in its group, or the archive) sits a step lower and
+    // deeper than a pinned row: the draft's .pm-item.is-child.
+    context === "pinned" ? "" : "is-child",
     status.selected ? "is-selected" : "",
     status.running ? "is-running" : "",
     context === "archive" ? "is-archived" : "",

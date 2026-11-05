@@ -4,10 +4,10 @@ import { useSyncExternalStore } from "react";
 export type FilesPlacement = "below" | "tab";
 
 export const FILES_PLACEMENT_STORAGE_KEY = "pi-web:sidebar-files-placement";
-export const FILES_PLACEMENT_DEFAULT: FilesPlacement = "below";
+export const FILES_PLACEMENT_DEFAULT: FilesPlacement = "tab";
 
 export function parseFilesPlacement(raw: string | null): FilesPlacement {
-  return raw === "tab" ? "tab" : FILES_PLACEMENT_DEFAULT;
+  return raw === "below" ? "below" : FILES_PLACEMENT_DEFAULT;
 }
 
 function readStoredPlacement(): FilesPlacement {

@@ -120,7 +120,7 @@ import type { FileViewerState } from "@/lib/file-viewer-state";
 import { PRESET_READ_ONLY, type ToolEntry } from "@/lib/tool-presets";
 import { createSideChat, deleteSideChat } from "@/lib/side-chat-client";
 import { getAgentsBadge, getSessionFamily, isHiddenRelation, sideChatNameFrom, sideChatTitle } from "@/lib/session-family";
-import { getLastSettingsSection, settingsSectionRequiresProject, type SettingsSection } from "@/lib/settings-navigation";
+import { getLastSettingsSection, type SettingsSection } from "@/lib/settings-navigation";
 import { focusIfLost } from "@/lib/stacked-dialog";
 
 type SessionCopyField = "file" | "id" | "projectDir" | "gitBranch" | "gitWorktree";
@@ -135,8 +135,9 @@ type AutoNameStatus =
 // Agents pill, the toolbar segments and the debug/theme group.
 const HEADER_PILL = "flex h-7 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 text-xs font-medium whitespace-nowrap text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-45";
 const HEADER_PILL_OPEN = "border-border bg-background text-foreground shadow-sm";
-// The connected capsule (the draft's .pm-bgroup) around related segments.
-const HEADER_BGROUP = "flex h-7 shrink-0 items-center gap-0.5 rounded-full border border-border bg-background p-0.5 shadow-xs";
+// The connected capsule (the draft's .pm-bgroup) around related segments:
+// a 1px track with 30x26 round ghost segments in it.
+const HEADER_BGROUP = "flex h-7 shrink-0 items-center gap-px rounded-full border border-border bg-background p-px";
 const HEADER_BGROUP_SEGMENT = "flex h-full w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-45";
 
 /** Right-panel Git tab id; closing it removes the tab, the sidebar entry reopens it. It owns no FileViewer. */
@@ -1853,8 +1854,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         onSessionsChange={handleSessionsChange}
         onUnreadSessionIdsChange={handleUnreadSessionIdsChange}
       />
-      {/* Draft footer: one settings row, the models/skills shortcuts beside it,
-          the version at the end. */}
+      {/* The draft's footer: one settings row, the version at the row's end.
+          Models and skills live in Settings alone. */}
       <div className="flex shrink-0 items-center gap-1 border-t border-sidebar-border px-2.5 pb-2.5 pt-2">
         <button
           type="button"
@@ -1869,30 +1870,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           <SettingsSectionIcon section="general" size={14} strokeWidth={2} />
           <span className="truncate">{translate("common.settings")}</span>
         </button>
-        {([
-          ["models", translate("common.models")],
-          ["skills", translate("common.skills")],
-        ] as const).map(([section, label]) => {
-          const disabled = settingsSectionRequiresProject(section) && !projectTrustCwd;
-          return (
-            <button
-              key={section}
-              type="button"
-              onClick={() => openSettingsSection(section)}
-              disabled={disabled}
-              title={disabled ? translate("settings.projectRequired") : label}
-              aria-label={label}
-              className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-full bg-transparent p-0 text-muted-foreground transition-colors",
-                disabled
-                  ? "cursor-default opacity-35"
-                  : "hover:bg-accent hover:text-foreground",
-              )}
-            >
-              <SettingsSectionIcon section={section} size={14} strokeWidth={2} />
-            </button>
-          );
-        })}
         <span
           className="ml-auto shrink-0 font-mono text-[11px] leading-none tabular-nums text-muted-foreground opacity-70"
           title={`pi-web ${APP_VERSION} · pi ${PI_VERSION}`}
@@ -1925,13 +1902,15 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     );
   };
 
-  // Subagent count beside the Agents pill (the draft's green-tinted count).
+  // The Agents count badge (the draft's green-tinted mono count); a run
+  // lights the 5px breathing dot inside it.
   const renderAgentsBadge = (badge: { count: number; running: boolean }) => (
     <span
       aria-hidden="true"
-      className="grid h-4 min-w-4 shrink-0 place-items-center rounded-full bg-success/15 px-1 text-[10px] font-semibold leading-none tabular-nums text-success"
+      className="flex h-4 min-w-4 shrink-0 items-center justify-center gap-0.5 rounded-full bg-success/15 px-1 font-mono text-[10.5px] font-semibold leading-none tabular-nums text-success"
     >
       {badge.count}
+      {badge.running && <span className="size-[5px] shrink-0 rounded-full bg-success motion-safe:animate-pulse" />}
     </span>
   );
 
@@ -1950,13 +1929,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           title={agentsButtonLabel}
           aria-label={agentsButtonLabel}
           aria-pressed={activeTopPanel === "agents"}
-          className={cn(HEADER_PILL, activeTopPanel === "agents" && HEADER_PILL_OPEN)}
+          className={cn(HEADER_PILL, "pr-2", activeTopPanel === "agents" && HEADER_PILL_OPEN)}
           data-mobile-toolbar-action={mobile ? "agents" : undefined}
         >
           <BotIcon className="size-3.5" strokeWidth={1.9} />
-          {agentsBadge?.running && (
-            <span aria-hidden="true" className="size-[5px] shrink-0 rounded-full bg-success motion-safe:animate-pulse" />
-          )}
           {agentsBadge && agentsBadge.count > 0 && renderAgentsBadge(agentsBadge)}
           <span className="hidden min-[1240px]:inline">{translate("agentSwitcher.title")}</span>
         </button>
@@ -2524,7 +2500,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   {activeSessionTitle ?? "Pi Web"}
                 </span>
                 {selectedSession && (
-                  <span className="hidden min-[1240px]:inline min-w-0 truncate font-mono text-[11.5px] text-muted-foreground">
+                  <span className="hidden min-[1240px]:inline-flex shrink-0 items-center gap-1 font-mono text-[11.5px] text-muted-foreground">
+                    <GitBranchIcon className="size-[11px] shrink-0" strokeWidth={2} />
                     {[
                       getFileName(selectedSession.projectRoot ?? selectedSession.cwd),
                       selectedSession.branch,

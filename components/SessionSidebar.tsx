@@ -593,19 +593,26 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   const explorerRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileExplorerRef = useRef<FileExplorerHandle>(null);
 
-  // The files below the sessions (desktop, by default: both in view, a
-  // separator between them, the files section foldable to its header row),
-  // or Sessions | Files tabs (the setting, and always on phones), each panel
-  // shown alone. Both layouts render the same elements in the same order,
-  // only attributes and a few rows of their own differ, so a switch (the
-  // setting, the phone breakpoint) never remounts the explorer, the tree or
-  // the picker. The tab, the folded section, the group choices and the
-  // pinned section start as the server renders them and are restored from
-  // browser storage after hydration; the layout's choice is read the same
-  // way (useFilesPlacement's server snapshot).
+  // The files below the sessions (the desktop setting's one choice: both in
+  // view, a separator between them, the files section foldable to its header
+  // row), or each panel alone behind its tab (the setting's other choice,
+  // and always on phones). The Sessions | Files track is above the panes in
+  // every layout; the tab drives the panes, so in the files-below layout the
+  // files tab takes the files section's place as a full-height pane. Both
+  // layouts render the same elements in the same order, only attributes and
+  // a few rows of their own differ, so a switch (the setting, the phone
+  // breakpoint) never remounts the explorer, the tree or the picker. The
+  // tab, the folded section, the group choices and the pinned section start
+  // as the server renders them and are restored from browser storage after
+  // hydration; the layout's choice is read the same way (useFilesPlacement's
+  // server snapshot).
   const filesPlacement = useFilesPlacement();
   const stacked = !isMobile && filesPlacement === "below";
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("sessions");
+  // The files-below layout with the sessions pane in view: the tree with the
+  // foldable files section under it. On the files tab the section becomes
+  // the pane (the root loses is-files-below, the panel fills the column).
+  const filesBelow = stacked && sidebarTab === "sessions";
   const [filesCollapsed, setFilesCollapsed] = useState(false);
   const sessionsTabRef = useRef<HTMLButtonElement>(null);
   const filesTabRef = useRef<HTMLButtonElement>(null);
@@ -1699,14 +1706,13 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     setTreeReveal({ id: treeRevealIdRef.current, at: Date.now(), rowKey: `group:${projectKey}` });
   }, [applyUiState, model.unorderedKeysByBand, projectByKey]);
 
-  // With the files below the sessions there are no tabs: whatever would pick
-  // one (the archive view, the search's fallback) leaves the saved tab as it
-  // is, for the tabs layout and phones.
+  // The track is in every layout: the archive view and the search's
+  // fallback land on the sessions pane, the files' reveals on the files
+  // pane, whatever the placement.
   const switchTab = useCallback((tab: SidebarTab) => {
-    if (stacked) return;
     setSidebarTab(tab);
     saveSidebarTab(tab);
-  }, [stacked]);
+  }, []);
 
   // Every fold and unfold goes through here (the toggle, revealFiles, the
   // file search, changes and upload keys, a file manager error), and moves;
@@ -2387,15 +2393,15 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     if (next) setMoreShown((shown) => showLessFamilies(shown, PINNED_MORE_KEY));
   };
 
-  // Everything that goes to the files goes through here: the files tab, or
-  // the files section below the sessions, opened (and saved so) if folded.
-  // The focus follows once they show.
+  // Everything that goes to the files goes through here: the files tab, or —
+  // below the sessions, on the sessions pane — the section, opened (and
+  // saved so) if folded. The focus follows once they show.
   const revealFiles = useCallback((focusTarget: "project-button" | "project-list" | "file-search") => {
     filesFocusRef.current = focusTarget;
     setFilesFocusRequest((count) => count + 1);
-    if (stacked) setFilesSectionCollapsed(false);
+    if (filesBelow) setFilesSectionCollapsed(false);
     else switchTab("files");
-  }, [setFilesSectionCollapsed, stacked, switchTab]);
+  }, [filesBelow, setFilesSectionCollapsed, switchTab]);
 
   // "Open in Files" of another project is a deliberate project switch, the
   // same as choosing it in the files' project list.
@@ -2419,7 +2425,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   // the request counter runs it all the same. An unfolding section is not
   // shown yet: its button is still below the sidebar's edge, where the
   // project menu would be placed.
-  const filesShown = stacked ? filesFold.open : sidebarTab === "files";
+  const filesShown = filesBelow ? filesFold.open : sidebarTab === "files";
   useEffect(() => {
     const target = filesFocusRef.current;
     if (!target || !filesShown) return;
@@ -2810,26 +2816,23 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     if (!changesKeyDisabled || !key || sidebarFocusRef.current !== key) return;
     handOffDisabledKeyFocus(document, key, selectedTabButton());
   }, [changesKeyDisabled, selectedTabButton]);
-  // The toolbar row's search button searches the files on the files tab:
-  // the head has no search of its own. Below the sessions it is the
-  // sessions' search alone; the files section's header has the files'.
-  const sessionsShown = stacked || sidebarTab === "sessions";
-  const searchesFiles = !stacked && sidebarTab === "files" && explorerCwd !== null;
-  // What the toolbar row's widths depend on: New's label, and the tabs (the
-  // chosen tab's label is bolder, the files tab carries the count). The
-  // brand's text reports its own changes (fitHeader).
-  const fitHeader = useHeaderFit(headerRef, (stacked
-    ? ["below", t("sidebar.new")]
-    : ["tabs", t("sidebar.tabSessions"), t("sidebar.tabFiles"), t("sidebar.new"), explorerCwd && changesCount > 0 ? changesCount : "", sidebarTab]
-  ).join("\n"));
+  // The toolbar row's search button searches the files on the files pane:
+  // the head has no search of its own. The sessions pane's search is the
+  // sessions'; the files section's header row below the tree has the files'.
+  const sessionsShown = sidebarTab === "sessions";
+  const searchesFiles = sidebarTab === "files" && explorerCwd !== null;
+  // What the brand row's widths depend on: New's label (the track's tabs sit
+  // on their own row, each with room). The brand's text reports its own
+  // changes (fitHeader).
+  const fitHeader = useHeaderFit(headerRef, ["brand", t("sidebar.new")].join("\n"));
   const archivedCount = model.archivedCount;
 
   // The files' keys: below the sessions in the files section's header row,
-  // in the files tab in the row under the picker. Always the same ones in
+  // in the files pane in the row under the picker. Always the same ones in
   // the same places; without a folder they wait, disabled. Their icons are
   // 13px in the header row (smaller keys there, beside the label), 14px in the
-  // files tab's row.
-  const keyIconSize = stacked ? 13 : 14;
+  // files pane's row.
+  const keyIconSize = filesBelow ? 13 : 14;
   const terminalButton = (
     <ToolbarIconButton
       onClick={() => { if (explorerCwd) onOpenTerminal?.(explorerCwd); }}
@@ -2846,7 +2849,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           // Its failure shows in the files' body. Below the sessions this key
           // is in the header row, there while the section is folded too: a
           // folded section opens, else the message would wait unseen.
-          if (failed && stacked) setFilesSectionCollapsed(false);
+          if (failed && filesBelow) setFilesSectionCollapsed(false);
         });
       }}
       disabled={!explorerCwd || fileManagerUnavailable}
@@ -2861,7 +2864,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     <ToolbarIconButton
       onClick={() => {
         // The upload's progress and summary are the tree's: a folded section opens.
-        if (stacked && filesCollapsed) setFilesSectionCollapsed(false);
+        if (filesBelow && filesCollapsed) setFilesSectionCollapsed(false);
         fileExplorerRef.current?.openUploadPicker();
       }}
       disabled={!explorerCwd || explorerUploadBusy}
@@ -2909,7 +2912,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       onClick={() => {
         // Below the sessions this key is in the header row, there while the
         // section is folded too: a folded section opens on the changes.
-        if (stacked && filesCollapsed) {
+        if (filesBelow && filesCollapsed) {
           setFilesSectionCollapsed(false);
           setChangesCollapsed(false);
           return;
@@ -2927,7 +2930,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   return (
     <div
       ref={setSidebarRoot}
-      className={`session-sidebar${stacked ? " is-files-below" : ""}${stacked && filesCollapsed ? " is-files-collapsed" : ""}${stacked && filesFold.moving ? " is-files-folding" : ""}`}
+      className={`session-sidebar${filesBelow ? " is-files-below" : ""}${filesBelow && filesCollapsed ? " is-files-collapsed" : ""}${filesBelow && filesFold.moving ? " is-files-folding" : ""}`}
       style={{ "--sidebar-files-height": `${filesSizer.width}px` } as CSSProperties}
       onFocus={(event) => { sidebarFocusRef.current = event.target; }}
       onBlur={(event) => { if (event.relatedTarget === null && !document.hasFocus()) return; if (!event.currentTarget.contains(event.relatedTarget)) sidebarFocusRef.current = null; }}
@@ -2950,50 +2953,13 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           onSelect={(path) => void commitCustomPath(path)}
         />
       )}
-      {/* One toolbar row, in the cells of the chat's top bar beside it (its
-          line continues that bar's): Sessions | Files, then New and the
-          search of the tab in view. Only the two tabs are the tablist. With
-          the files below the sessions there is nothing to choose: the brand
-          stands there (the panel's anchor, the versions on a click), and
-          the search is the sessions'. */}
+      {/* The draft's head: the brand row (the panel's anchor; a click shows
+          the versions), then New and the search of the pane in view. Under it
+          the Sessions | Files track, in every layout — the panes switch in
+          the files-below layout too, where the files pane takes the files
+          section's place. Only the two tabs are the tablist. */}
       <div ref={headerRef} className="sidebar-header">
-        {stacked && <PiWebTitle onWidthChange={fitHeader} />}
-        {!stacked && (
-          <div className="sidebar-tabs-list" role="tablist" aria-label={t("sidebar.tabsLabel")}>
-            <button
-              ref={sessionsTabRef}
-              type="button"
-              role="tab"
-              id="session-sidebar-tab-sessions"
-              aria-selected={sidebarTab === "sessions"}
-              aria-controls="session-sidebar-panel-sessions"
-              tabIndex={sidebarTab === "sessions" ? 0 : -1}
-              className={`sidebar-tab${sidebarTab === "sessions" ? " is-selected" : ""}`}
-              onClick={() => switchTab("sessions")}
-              onKeyDown={handleTabKeyDown}
-            >
-              <MessageSquareIcon size={13} className="sidebar-tab-icon" />
-              <span className="sidebar-tab-label">{t("sidebar.tabSessions")}</span>
-            </button>
-            <button
-              ref={filesTabRef}
-              type="button"
-              role="tab"
-              id="session-sidebar-tab-files"
-              aria-selected={sidebarTab === "files"}
-              aria-controls="session-sidebar-panel-files"
-              tabIndex={sidebarTab === "files" ? 0 : -1}
-              title={changedFilesTitle}
-              className={`sidebar-tab${sidebarTab === "files" ? " is-selected" : ""}`}
-              onClick={() => switchTab("files")}
-              onKeyDown={handleTabKeyDown}
-            >
-              <FolderIcon size={13} className="sidebar-tab-icon" />
-              <span className="sidebar-tab-label">{t("sidebar.tabFiles")}</span>
-              {explorerCwd && changesCount > 0 && <span className="sidebar-tab-count" aria-hidden="true">{changesCount}</span>}
-            </button>
-          </div>
-        )}
+        <PiWebTitle onWidthChange={fitHeader} />
         <span className="sidebar-header-spacer" />
         <button
           type="button"
@@ -3009,8 +2975,8 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           ref={searchButtonRef}
           type="button"
           onClick={() => {
-            // The search of the tab in view: the files tab's searches its
-            // files; without a folder there, it opens the sessions tab's.
+            // The search of the pane in view: the files pane's searches its
+            // files; without a folder there, it opens the sessions pane's.
             if (searchesFiles) {
               setFileSearchOpen((open) => !open);
               return;
@@ -3031,16 +2997,50 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           <SearchIcon size={16} />
         </button>
       </div>
+      <div className="sidebar-tabs-list" role="tablist" aria-label={t("sidebar.tabsLabel")}>
+        <button
+          ref={sessionsTabRef}
+          type="button"
+          role="tab"
+          id="session-sidebar-tab-sessions"
+          aria-selected={sidebarTab === "sessions"}
+          aria-controls="session-sidebar-panel-sessions"
+          tabIndex={sidebarTab === "sessions" ? 0 : -1}
+          className={`sidebar-tab${sidebarTab === "sessions" ? " is-selected" : ""}`}
+          onClick={() => switchTab("sessions")}
+          onKeyDown={handleTabKeyDown}
+        >
+          <MessageSquareIcon size={15} className="sidebar-tab-icon" />
+          <span className="sidebar-tab-label">{t("sidebar.tabSessions")}</span>
+        </button>
+        <button
+          ref={filesTabRef}
+          type="button"
+          role="tab"
+          id="session-sidebar-tab-files"
+          aria-selected={sidebarTab === "files"}
+          aria-controls="session-sidebar-panel-files"
+          tabIndex={sidebarTab === "files" ? 0 : -1}
+          title={changedFilesTitle}
+          className={`sidebar-tab${sidebarTab === "files" ? " is-selected" : ""}`}
+          onClick={() => switchTab("files")}
+          onKeyDown={handleTabKeyDown}
+        >
+          <FolderIcon size={15} className="sidebar-tab-icon" />
+          <span className="sidebar-tab-label">{t("sidebar.tabFiles")}</span>
+          {explorerCwd && changesCount > 0 && <span className="sidebar-tab-count" aria-hidden="true">{changesCount}</span>}
+        </button>
+      </div>
 
-      {/* Sessions: every project's sessions, or the archive. A tab's panel,
-          or the top section, always shown, filling what the files leave. */}
+      {/* Sessions: every project's sessions, or the archive. The sessions
+          tab's panel; below the sessions it carries the files section under
+          the tree. */}
       <div
         ref={sessionsPanelRef}
         id="session-sidebar-panel-sessions"
-        role={stacked ? "region" : "tabpanel"}
-        aria-label={stacked ? t("sidebar.tabSessions") : undefined}
-        aria-labelledby={stacked ? undefined : "session-sidebar-tab-sessions"}
-        hidden={!stacked && sidebarTab !== "sessions"}
+        role="tabpanel"
+        aria-labelledby="session-sidebar-tab-sessions"
+        hidden={sidebarTab !== "sessions"}
         className="sidebar-panel sidebar-sessions-panel"
         onScrollCapture={rememberScroll}
       >
@@ -3137,7 +3137,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           or a double-click to reset (useResizablePanel). Only while the
           files section is open and still: a drag never meets the fold's
           height transition. */}
-      {stacked && filesFold.open && (
+      {filesBelow && filesFold.open && (
         <div
           {...filesSizer.separatorProps}
           aria-controls="session-sidebar-panel-files"
@@ -3147,25 +3147,25 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         />
       )}
 
-      {/* Files: the project and worktree in use, and its files. A tab's
-          panel, or the section below the sessions, under a header row of its
-          own that folds it (only that row then shows, at the bottom). */}
+      {/* Files: the project and worktree in use, and its files. The files
+          tab's pane, or — on the sessions pane below the tree — the section
+          under a header row of its own that folds it (only that row then
+          shows, at the bottom). */}
       <div
         ref={filesPanelRef}
         id="session-sidebar-panel-files"
-        role={stacked ? "region" : "tabpanel"}
-        aria-label={stacked ? t("sidebar.tabFiles") : undefined}
-        aria-labelledby={stacked ? undefined : "session-sidebar-tab-files"}
-        hidden={!stacked && sidebarTab !== "files"}
+        role="tabpanel"
+        aria-labelledby="session-sidebar-tab-files"
+        hidden={!filesBelow && sidebarTab !== "files"}
         className="sidebar-panel sidebar-files-panel"
         onScrollCapture={rememberScroll}
         onTransitionEnd={(event) => { if (event.target === event.currentTarget && event.propertyName === "height") endFilesFold(); }}
       >
         {/* Below the sessions, one row: the section's toggle (its label,
             then the count, give way first), then the files' keys at its
-            right end, in the files tab's order with the search last. They
+            right end, in the files pane's order with the search last. They
             stay in this row while the section is folded. */}
-        {stacked && (
+        {filesBelow && (
           <div className="sidebar-files-section">
             <button
               type="button"
@@ -3210,8 +3210,8 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         {/* Everything under that header row: hidden while the section is
             folded, never unmounted. Shown from the start of an unfold, and
             until the end of a fold, inert then. */}
-        <div id="session-sidebar-files-body" className="sidebar-files-body" hidden={stacked && filesFold.bodyHidden} inert={stacked && filesFold.bodyInert}>
-          {/* One head: the folder in use, then (in the files tab) what is
+        <div id="session-sidebar-files-body" className="sidebar-files-body" hidden={filesBelow && filesFold.bodyHidden} inert={filesBelow && filesFold.bodyInert}>
+          {/* One head: the folder in use, then (in the files pane) what is
               done with it; below the sessions the keys are the header row's.
               The buttons are the head's, not the picker's: its group names
               only the project and worktree. */}
@@ -3228,7 +3228,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 project keeps the box instead of flickering while it refetches. */}
             <ProjectWorktreePicker
               handleRef={filesPickerRef}
-              layout={stacked ? "row" : "stacked"}
+              layout={filesBelow ? "row" : "stacked"}
               context={newSessionContext ?? { project: null, worktrees: null, currentWorktreePath: null, projects: projectChoiceList }}
               mobile={isMobile}
               label={t("sidebar.projectAndWorktree")}
@@ -3244,13 +3244,13 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               onCreateWorktree={createWorktree}
               onRemoveWorktree={handleRemoveWorktree}
             />
-            {/* The files tab's keys, under the picker. Always the same
+            {/* The files pane's keys, under the picker. Always the same
                 buttons in the same places: the changes view stays (disabled)
                 while there is nothing changed, so nothing moves as an agent
                 edits files and commits. The folder's actions first, the
                 tree's two views last (what it lists, then its changes); its
                 search is the toolbar row's search button. */}
-            {!stacked && explorerCwd && (
+            {!filesBelow && explorerCwd && (
               <div className="sidebar-files-actions" role="group" aria-label={t("sidebar.fileActions")}>
                 {onOpenTerminal && terminalButton}
                 {onOpenGitPanel && (

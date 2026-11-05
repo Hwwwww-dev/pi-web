@@ -4,14 +4,14 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createJiti } from "jiti";
 
-// The tabs layout's markup (the desktop setting's other choice; phones),
-// rendered. useFilesPlacement's server snapshot is always "below", so the
-// hook is aliased to a fixture that answers "tab". The alias takes the
-// module's absolute path without its extension ("@/…" resolves first and is
-// never matched), in the form jiti compares it with: forward slashes and an
-// upper-case drive letter on Windows (#1211). It needs a process of its own:
-// SessionSidebar.test.mjs has already loaded the sidebar with the real hook,
-// and jiti shares Node's module cache.
+// The tabs layout's markup (the desktop setting's default; phones), rendered.
+// The hook is aliased to a fixture that answers "tab", so the test's meaning
+// does not move with the default. The alias takes the module's absolute path
+// without its extension ("@/…" resolves first and is never matched), in the
+// form jiti compares it with: forward slashes and an upper-case drive letter
+// on Windows (#1211). It needs a process of its own: SessionSidebar.test.mjs
+// has already loaded the sidebar with its own fixture, and jiti shares Node's
+// module cache.
 const placementHook = fileURLToPath(new URL("../hooks/useFilesPlacement", import.meta.url))
   .replaceAll("\\", "/")
   .replace(/^[a-z]:/, (drive) => drive.toUpperCase());
@@ -60,11 +60,14 @@ test("the fixture stands in for the whole hook module", async () => {
   assert.equal(fixture.useFilesPlacement(), "tab");
 });
 
-test("the tabs layout renders its tabs, no brand and no files section header", () => {
+test("the tabs layout renders the brand row, its track and no files section header", () => {
   const html = render({ selectedCwd: "/work/alpha", onOpenTerminal: noop });
-  assert.match(html, /^<div class="session-sidebar" style="--sidebar-files-height:320px"><div class="sidebar-header"><div class="sidebar-tabs-list" role="tablist" aria-label="Sidebar view">/);
+  // The brand row first (the track hangs below it, in every layout), then
+  // New and the search.
+  assert.match(html, /^<div class="session-sidebar" style="--sidebar-files-height:320px"><div class="sidebar-header"><button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button type="button" class="sidebar-new-button"/);
+  assert.match(html, /<div class="sidebar-tabs-list" role="tablist" aria-label="Sidebar view">/);
   assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
-  assert.doesNotMatch(html, /sidebar-brand|sidebar-files-section|sidebar-files-keys|sidebar-files-changes|is-files-below/);
+  assert.doesNotMatch(html, /sidebar-files-section|sidebar-files-keys|sidebar-files-changes|is-files-below/);
   // Both panels are tab panels; the files' is hidden behind its tab.
   assert.match(html, /<div id="session-sidebar-panel-files" role="tabpanel" aria-labelledby="session-sidebar-tab-files" hidden="" class="sidebar-panel sidebar-files-panel">/);
   // The picker's two boxes one under the other, then the keys.
