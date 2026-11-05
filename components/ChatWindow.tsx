@@ -112,10 +112,10 @@ interface Props {
 }
 
 // The message column's page gutter and width, from the visual draft (§4.2):
-// 28px around a 700px column on desktop, half the gutter on phones.
+// 28px around a 700px column on desktop, half the gutter on phones. The
+// column's 700px cap lives in the message content's max-w-[700px].
 const CHAT_COLUMN_PADDING = 28;
 const CHAT_COLUMN_PADDING_MOBILE = 14;
-const CHAT_COLUMN_MAX_WIDTH = 700;
 
 // One update check per page. Every fresh composer mounts the header again
 // (each move of the new-session bar does), and a link that turned up late
@@ -1502,7 +1502,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center text-red-400">
+      <div className="flex h-full items-center justify-center text-destructive">
         {error}
       </div>
     );
@@ -1586,8 +1586,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             <div
               ref={messageContentRef}
               onPointerUp={captureQuotedSelection}
-              className="mx-auto w-full min-w-0 text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] max-sm:text-[length:calc(14px+var(--chat-font-size-offset,0px))]"
-              style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH }}
+              className="mx-auto w-full min-w-0 max-w-[700px] text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] max-sm:text-[length:calc(14px+var(--chat-font-size-offset,0px))]"
             >
             {hasMoreRendered && (
               <div ref={setSentinel} className="py-3 text-center text-xs text-muted-foreground">
@@ -1728,10 +1727,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <div className="pointer-events-none absolute bottom-full right-4 z-20 max-sm:right-2.5">
             <button
               type="button"
-              className={`chat-scroll-to-bottom${showScrollToBottom && !pendingScrollRestore ? " is-visible" : ""}`}
+              className={cn("chat-scroll-to-bottom size-[34px]", showScrollToBottom && !pendingScrollRestore && "is-visible")}
               title={t("chat.scrollToLatest")}
               aria-label={t("chat.scrollToLatest")}
-              style={{ width: 34, height: 34, marginBottom: isMobile ? 10 : 14 }}
+              style={{ marginBottom: isMobile ? 10 : 14 }}
               onClick={() => scrollToBottom("smooth")}
             >
               <ArrowDownIcon size={16} strokeWidth={2} aria-hidden="true" />

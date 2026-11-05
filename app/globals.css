@@ -2653,8 +2653,7 @@ pre, code {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  /* size comes from the component's size-[34px] utility */
   padding: 0;
   box-sizing: border-box;
   border: 1px solid var(--border);

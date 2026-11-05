@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
 
 interface ImagePreviewProps {
@@ -50,16 +51,8 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
       <button
         ref={triggerRef}
         type="button"
-        className={className}
-        style={{
-          display: "block",
-          padding: 0,
-          border: "none",
-          background: "none",
-          color: "inherit",
-          cursor: "zoom-in",
-          ...style,
-        }}
+        className={cn("block cursor-zoom-in border-none bg-transparent p-0 text-inherit", className)}
+        style={style}
         onClick={() => setOpen(true)}
         aria-label={triggerLabel}
         aria-haspopup="dialog"

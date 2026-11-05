@@ -7,7 +7,7 @@ const hookSource = await readFile(new URL("../hooks/useAgentSession.ts", import.
 const cssSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
 function elementBlock() {
-  const start = source.indexOf("className={`chat-scroll-to-bottom");
+  const start = source.indexOf('className={cn("chat-scroll-to-bottom');
   assert.notEqual(start, -1, "scroll-to-latest button not found");
   const buttonStart = source.lastIndexOf("<button", start);
   const buttonEnd = source.indexOf("</button>", start);
@@ -19,14 +19,14 @@ function elementBlock() {
 test("shows the scroll-to-latest button only when the viewport is detached from the tail", () => {
   assert.match(
     source,
-    /className=\{`chat-scroll-to-bottom\$\{showScrollToBottom && !pendingScrollRestore \? " is-visible" : ""\}`\}/,
+    /className=\{cn\("chat-scroll-to-bottom size-\[34px\]", showScrollToBottom && !pendingScrollRestore && "is-visible"\)\}/,
     "visibility must be a class toggle so the exit transition can play",
   );
 });
 
 test("floats the scroll-to-latest button above the composer's right edge", () => {
   const gate = source.indexOf("{!isEmptyNew && (");
-  const marker = source.indexOf('className={`chat-scroll-to-bottom', gate);
+  const marker = source.indexOf('className={cn("chat-scroll-to-bottom', gate);
   assert.notEqual(gate, -1);
   assert.notEqual(marker, -1);
   const container = source.slice(gate, marker);

@@ -23,7 +23,8 @@ test("keeps the selection toolbar above the session sidebar", async () => {
   const shellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 
   const toolbar = chatSource.match(/role=\{quoteInputOpen \? "dialog" : "toolbar"\}[\s\S]*?z-\[(\d+)\]/);
-  const sidebar = shellSource.match(/id="session-sidebar"[\s\S]*?zIndex:\s*(\d+)/);
+  // The sidebar's own z-[200] utility, read out of its className.
+  const sidebar = shellSource.match(/id="session-sidebar"[\s\S]{0,400}?z-\[(\d+)\]/);
 
   assert.ok(toolbar, "expected quote toolbar z-index");
   assert.ok(sidebar, "expected session sidebar z-index");

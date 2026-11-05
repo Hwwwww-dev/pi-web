@@ -1370,7 +1370,7 @@ function ResultImages({ images }: { images: ImageContent[] }) {
           <ImagePreview
             key={`${src}-${index}`}
             src={src}
-            style={{ maxWidth: "100%" }}
+            className="max-w-full"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

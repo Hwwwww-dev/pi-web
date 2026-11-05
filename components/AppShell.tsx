@@ -2537,10 +2537,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             />
           )}
           {/* Top panels — anchored under the header (the draft's sheet); only
-              one open at a time. The inline zIndex stays below the quote
-              toolbar's 260 (ChatWindow). */}
+              one open at a time. z-[240] stays below the quote toolbar's 260
+              (ChatWindow). */}
           {activeTopPanel === "system" && (
-            <div className="absolute inset-x-0 top-full" style={{ zIndex: 240 }}>
+            <div className="absolute inset-x-0 top-full z-[240]">
               <SystemPromptPanel
                 loading={systemInfoLoading}
                 prompt={systemPrompt}
@@ -2549,7 +2549,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </div>
           )}
           {activeTopPanel === "tools" && (
-            <div className="absolute inset-x-0 top-full" style={{ zIndex: 240 }}>
+            <div className="absolute inset-x-0 top-full z-[240]">
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
                 tools={systemTools}
@@ -2559,8 +2559,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           )}
           {activeTopPanel === "session" && (
             <div
-              className="session-info-popover absolute top-full right-0 max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-xl border border-border bg-popover shadow-lg"
-              style={{ zIndex: 240 }}
+              className="session-info-popover absolute top-full right-0 z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-xl border border-border bg-popover shadow-lg"
             >
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
@@ -2670,7 +2669,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </div>
           )}
           {activeTopPanel === "debug" && (
-            <div className="absolute inset-x-0 top-full" style={{ zIndex: 240 }}>
+            <div className="absolute inset-x-0 top-full z-[240]">
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
                   readerRef={debugSnapshotReaderRef}

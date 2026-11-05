@@ -68,10 +68,13 @@ test("renders the permissive marker as a small uppercase chip", async () => {
   const source = await readFile(new URL("./ExtensionStatus.tsx", import.meta.url), "utf8");
 
   assert.match(html, />YOLO</);
-  // The pill is styled inline: a CSS rule here once lagged the component and the
-  // marker fell back to plain red text.
-  assert.match(source, /color: "#dc2626"/);
-  assert.match(source, /borderRadius: 4/);
+  // The pill is styled with Tailwind utilities that compile with the component:
+  // a stylesheet rule here once lagged the component and the marker fell back
+  // to plain red text. Utilities keep that failure mode impossible.
+  assert.match(source, /text-destructive/);
+  assert.match(source, /rounded-\[4px\]/);
+  assert.match(source, /border-destructive\/35/);
+  assert.match(source, /bg-destructive\/8/);
 });
 
 test("tones the status dot after the LSP state pi-lens reports", () => {
@@ -196,12 +199,13 @@ test("scrolls status text sideways instead of wrapping it", async () => {
   assert.match(textRule, /white-space:\s*pre-wrap/);
   assert.match(textRule, /overflow-x:\s*auto/);
   assert.doesNotMatch(textRule, /overflow-wrap:\s*anywhere/);
-  // YOLO is a marker, not a control: its own red pill, styled inline so a stale
-  // stylesheet cannot turn it back into plain text or a button.
-  assert.match(chipSource, /color: "#dc2626"/);
-  assert.match(chipSource, /fontFamily: "var\(--font-mono\)"/);
-  assert.match(chipSource, /border: "1px solid color-mix\(in srgb, #dc2626 35%, transparent\)"/);
-  assert.match(chipSource, /cursor: "default"/);
+  // YOLO is a marker, not a control: its own red pill, styled with utilities
+  // compiled with the component so a stale stylesheet cannot turn it back into
+  // plain text or a button.
+  assert.match(chipSource, /text-destructive/);
+  assert.match(chipSource, /font-mono/);
+  assert.match(chipSource, /border-destructive\/35/);
+  assert.match(chipSource, /cursor-default/);
 });
 
 test("keeps the status button a compact single-line chip", async () => {

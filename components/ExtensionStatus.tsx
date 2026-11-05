@@ -8,8 +8,9 @@ import { AnsiText } from "./AnsiText";
 
 /** Permissive-mode marker (`yolo`). It is a marker, not a control, so it keeps
  *  its own red pill instead of the toolbar's flat chip look. The styling is
- *  inline on purpose: a CSS class here has twice rendered as a plain red word
- *  when the dev stylesheet was a generation behind the component. */
+ *  Tailwind utilities (not a CSS class) on purpose: a stylesheet class here has
+ *  twice rendered as a plain red word when the dev stylesheet was a generation
+ *  behind the component; utilities compile with the component itself. */
 export function PermissiveModeChip({ text }: { text: string }) {
   const { t } = useI18n();
   const label = t("chat.permissiveMode");
@@ -18,19 +19,7 @@ export function PermissiveModeChip({ text }: { text: string }) {
     <span
       title={label}
       aria-label={label}
-      style={{
-        flex: "0 0 auto",
-        padding: "2px 6px",
-        border: "1px solid color-mix(in srgb, #dc2626 35%, transparent)",
-        borderRadius: 4,
-        background: "color-mix(in srgb, #dc2626 8%, transparent)",
-        color: "#dc2626",
-        fontFamily: "var(--font-mono)",
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: "0.6px",
-        cursor: "default",
-      }}
+      className="inline-flex shrink-0 cursor-default rounded-[4px] border border-destructive/35 bg-destructive/8 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.6px] text-destructive"
     >
       {text.toUpperCase()}
     </span>

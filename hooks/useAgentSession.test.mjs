@@ -812,7 +812,9 @@ test("keeps prompt anchor measurement outside the React update cycle", () => {
   assert.match(anchorLifecycleEffectSource, /promptAnchorMeasureFrameRef\.current = requestAnimationFrame\(\(\) => \{\s*promptAnchorMeasureFrameRef\.current = null;\s*updatePromptAnchorSpacer\(\)/);
   assert.match(anchorLifecycleEffectSource, /disposed = true;[\s\S]*?promptAnchorUpdateRef\.current === updatePromptAnchorSpacer[\s\S]*?cancelAnimationFrame\(promptAnchorMeasureFrameRef\.current\)/);
   assert.match(anchorSyncEffectSource, /const updatePromptAnchor = useCallback\(\(\) => \{\s*promptAnchorUpdateRef\.current\?\.\(\);\s*\}, \[\]\);\s*useLayoutEffect\(updatePromptAnchor, \[isStreaming, hasStreamingContent, updatePromptAnchor\]\)/);
-  assert.match(chatWindowSource, /<div\s+ref=\{messageContentRef\}[^>]*style=\{\{/);
+  // The measured element keeps a static width cap (a class, not a per-render
+  // style object) so the anchor measurement reads a stable layout.
+  assert.match(chatWindowSource, /<div\s+ref=\{messageContentRef\}[^>]*max-w-\[700px\]/);
 });
 
 test("uses the prompt anchor as the only trailing message spacer", () => {

@@ -3,6 +3,7 @@
 import { Children, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, type SyntheticEvent } from "react";
 import { CheckIcon } from "lucide-react";
 import { Dialog as DialogPrimitive, DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
+import { cn } from "@/lib/utils";
 
 /**
  * The session sidebar's popup menu: a row's ⋯ or right-click menu, a project
@@ -1075,8 +1076,7 @@ export function SidebarMenu({
           <DialogPrimitive.Content
             ref={surfaceRef}
             role="presentation"
-            className={SHEET_LAYER_CLASS}
-            style={{ height: "var(--app-viewport-height, 100dvh)" } as CSSProperties}
+            className={cn(SHEET_LAYER_CLASS, "h-[var(--app-viewport-height,100dvh)]")}
             onOpenAutoFocus={handleOpenAutoFocus}
             onCloseAutoFocus={handleCloseAutoFocus}
             onEscapeKeyDown={handleEscapeKeyDown}
