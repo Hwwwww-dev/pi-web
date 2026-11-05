@@ -839,7 +839,7 @@ export const enLocale: LocalePlugin = {
     "chat.moveQueuedUp": "Move up",
     "chat.moveQueuedDown": "Move down",
     "chat.queueBehaviorSteer": "Steer",
-    "chat.queueBehaviorFollowUp": "Queue",
+    "chat.queueBehaviorFollowUp": "Queued",
     "chat.sideChat": "Side chat",
     "chat.sideChatHint": "Ask this in a side chat. The run keeps going.",
     "chat.steer": "Steer",

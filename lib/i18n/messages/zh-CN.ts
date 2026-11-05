@@ -838,7 +838,7 @@ export const zhCNLocale: LocalePlugin = {
     "chat.queueBehaviorHint": "点击切换：引导在下一请求前注入，排队等运行结束",
     "chat.moveQueuedUp": "上移",
     "chat.moveQueuedDown": "下移",
-    "chat.queueBehaviorSteer": "引导",
+    "chat.queueBehaviorSteer": "插队",
     "chat.queueBehaviorFollowUp": "排队",
     "chat.sideChat": "侧聊",
     "chat.sideChatHint": "在侧聊里问，不影响正在运行的任务",

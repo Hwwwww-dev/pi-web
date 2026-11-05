@@ -308,7 +308,7 @@ test("a message waiting in the composer keeps the main button on send", () => {
   assert.match(source, /onClick=\{isStreaming \? \(\) => queueFollowUp\(\) : handleSend\}/);
 });
 
-test("scrolls a long queue inside its own box, under the count and Recall (#1428)", () => {
+test("scrolls a long queue inside its own box, pills labeled by behavior (#1428)", () => {
   const html = renderToStaticMarkup(
     React.createElement(I18nProvider, null, React.createElement(ChatInput, {
       onSend() {}, onAbort() {}, onSteer() {}, onFollowUp() {}, onQueuedAction() {}, isStreaming: true,
@@ -320,9 +320,11 @@ test("scrolls a long queue inside its own box, under the count and Recall (#1428
   );
   const rows = html.match(/<div class="[^"]*max-h-\[min\(180px[^"]*overflow-y-auto[^"]*">(.*)$/s);
   assert.ok(rows, "queued rows sit in a capped scroll box");
-  assert.match(html.slice(0, rows.index), /Queued · 20<\/span>/);
   assert.deepEqual([...rows[1].matchAll(/<div title="([^"]+)"/g)].map((match) => match[1]),
     [...Array.from({ length: 19 }, (_, i) => `steer-${i}`), "follow-up-0"]);
+  // steer pills: the primary tag on a ringed background; follow-up: the muted tag on secondary
+  assert.match(html, /border-primary\/45 bg-background/);
+  assert.match(html, /bg-secondary text-secondary-foreground/);
 });
 
 test("the composer stays editable while compacting and says messages queue", () => {

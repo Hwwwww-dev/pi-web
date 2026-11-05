@@ -657,7 +657,7 @@ function QueuedMessageRow({
     <div
       title={item.text}
       className={cn(
-        "flex min-w-0 max-w-full items-center gap-2 self-start rounded-full py-1 pl-1.5 pr-2.5 text-[12.5px]",
+        "flex min-w-0 max-w-full items-center gap-2 self-start rounded-full py-[5px] pl-1.5 pr-2 text-[12.5px]",
         isSteer
           ? "border border-primary/45 bg-background text-foreground"
           : "bg-secondary text-secondary-foreground",
@@ -2011,9 +2011,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             on the composer's axis, one inner step (13px) in from the card. */}
         {queuedSubmissions && queuedSubmissions.length > 0 && (
           <div className="flex flex-col gap-1.5 px-[13px] max-sm:px-[9px]">
-            <span className="w-fit rounded-full px-1 font-mono text-[10.5px] uppercase tracking-[0.4px] text-muted-foreground">
-              {t("chat.queued", { count: queuedSubmissions.length })}
-            </span>
             {/* Only the rows scroll: a long queue must not push the input and its buttons off screen (#1428). */}
             <div className="flex max-h-[min(180px,calc(var(--app-viewport-height,100dvh)*0.25))] flex-col items-stretch gap-1.5 overflow-y-auto overscroll-contain px-[3px] py-0.5">
               {queuedSubmissions.map((item, index) => (

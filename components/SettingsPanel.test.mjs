@@ -66,34 +66,58 @@ test("keeps language selection in General settings", () => {
   assert.match(panelSource, /setLocale\(plugin\.id/);
 });
 
-test("groups fonts, chat font size and width in one section, chat behavior in another, without row backgrounds", () => {
-  const appearanceSection = panelSource.slice(
-    panelSource.indexOf('{detail === "appearance"'),
-    panelSource.indexOf('{detail === "chat"'),
+test("groups fonts, chat font size and width with the chat switches, without row backgrounds", () => {
+  const chatOptions = panelSource.slice(
+    panelSource.indexOf("const chatOptions = ("),
+    panelSource.indexOf("// The keep-alive group"),
   );
-  const chatSection = panelSource.slice(
-    panelSource.indexOf('{detail === "chat"'),
-    panelSource.indexOf('{detail === "shell"'),
-  );
-
-  assert.doesNotMatch(appearanceSection, /settings-chat-content|<FontSettings/);
-  // Typography lives inside the chat section (main's layout): FontSettings and
-  // the two range rows render between the switches.
-  assert.match(chatSection, /className="settings-chat-options"[\s\S]*<FontSettings \/>/);
-  assert.equal((chatSection.match(/className="settings-chat-option settings-chat-range-option"/g) ?? []).length, 2);
+  assert.doesNotMatch(chatOptions, /settings-theme-options/);
+  // Typography lives with the chat switches: FontSettings and the two range rows
+  // render between them, in both the phone's detail and the desktop's card.
+  assert.match(chatOptions, /className="settings-chat-options"[\s\S]*<FontSettings \/>/);
+  assert.equal((chatOptions.match(/className="settings-chat-option settings-chat-range-option"/g) ?? []).length, 2);
   for (const key of ["chatContentWidth", "chatContentFontSize"]) {
-    assert.match(chatSection, new RegExp(`t\\("settings\\.${key}"\\)`));
+    assert.match(chatOptions, new RegExp(`t\\("settings\\.${key}"\\)`));
   }
-  assert.match(chatSection, /className="settings-chat-options"/);
-  assert.equal((chatSection.match(/className="settings-chat-option(?: |")/g) ?? []).length, 8);
-  assert.equal((chatSection.match(/<ConfigSwitch/g) ?? []).length, 4);
+  assert.match(chatOptions, /className="settings-chat-options"/);
+  assert.equal((chatOptions.match(/className="settings-chat-option(?: |")/g) ?? []).length, 7);
+  assert.equal((chatOptions.match(/<ConfigSwitch/g) ?? []).length, 4);
   for (const key of ["thinkingExpandedDefault", "chatContentWidth", "chatContentFontSize", "quoteSelection", "completionSound", "enterSendMode", "enterSendModeEnter", "enterSendModeCtrlEnter"]) {
-    assert.match(chatSection, new RegExp(`t\\("settings\\.${key}"\\)`));
+    assert.match(chatOptions, new RegExp(`t\\("settings\\.${key}"\\)`));
   }
   assert.doesNotMatch(panelSource, /ThinkingIcon|settings-thinking-/);
   const chatOptionStyles = cssSource.match(/\.settings-chat-option \{[\s\S]*?\}/)?.[0] ?? "";
   assert.match(chatOptionStyles, /font-size: 13px/);
   assert.doesNotMatch(chatOptionStyles, /background/);
+});
+
+test("the desktop dialog is two columns: a page title over General's stacked cards", () => {
+  // §4.4: no middle chips column on a desktop — General's sub-sections stack as
+  // Cards in the scrolling body, named by the dialog's page title; the phone
+  // keeps its split view with the sub-section list (the stack's detail level).
+  assert.match(panelSource, /className="settings-dialog-page"/);
+  assert.match(panelSource, /<h2 className="settings-dialog-page-title">\{t\("settings\.title"\)\}<\/h2>/);
+  assert.match(cssSource, /\.settings-dialog-page-title \{[\s\S]*?font-size: 15px;[\s\S]*?font-weight: 600;[\s\S]*?letter-spacing: -0\.01em;/);
+  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-dialog-page-title \{[\s\S]*?display: none/);
+  const desktopGeneral = panelSource.slice(
+    panelSource.indexOf("if (!isPhone) {"),
+    panelSource.indexOf("<ConfigSplitView>"),
+  );
+  for (const key of ["appearance", "chat", "sidebar"]) {
+    assert.match(desktopGeneral, new RegExp(`<ConfigCard title=\\{t\\("settings\\.${key}"\\)\\}>`), key);
+  }
+  assert.match(desktopGeneral, /\{pushCard\}/);
+  assert.match(panelSource, /title=\{t\("settings\.pushPermission"\)\}/);
+  assert.match(desktopGeneral, /\{keepAliveCard\}/);
+  assert.match(panelSource, /title=\{t\("settings\.keepAlive"\)\}\s*description=\{t\("settings\.keepAliveDescription"\)\}/);
+  assert.match(desktopGeneral, /<ConfigCard title=\{t\("common\.language"\)\}>/);
+  assert.match(desktopGeneral, /\{logOutBlock\}/);
+  // The phone keeps its own sub-section list behind the section level.
+  assert.match(panelSource, /<ConfigSplitView>/);
+  assert.match(panelSource, /<ConfigSidebar>/);
+  // Form rows read as the draft's frow2: a 32px row, its description muted below the label.
+  assert.match(cssSource, /\.settings-chat-switch-option \{[\s\S]*?min-height: 32px/);
+  assert.match(cssSource, /\.settings-row-desc \{[\s\S]*?font-size: 11\.5px/);
 });
 
 test("keeps General free of divider rows", () => {

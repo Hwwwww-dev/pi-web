@@ -1521,15 +1521,46 @@
   min-height: 0;
 }
 
+/* §4.4: the desktop body's own column — the dialog's page title (§3.5, the
+   draft's pm-set-title) over the scrolling section. The floating close sits
+   over the title row, so it carries the room the close button needs. */
+.settings-dialog-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.settings-dialog-page-title {
+  flex: none;
+  min-width: 0;
+  padding: 18px 20px 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The title row owns the top strip the floating close floats over, so the
+   section below it needs no extra room of its own. */
+.settings-dialog-page .settings-section-host {
+  height: auto;
+}
+
 /* The floating close button sits over the body's top-right corner: the detail
    headers' actions (Test connection, Remove, the update check) start below it,
    as does MCP's notices card above its split view. */
 .settings-dialog-main .config-detail {
-  padding-top: 26px;
+  padding-top: 14px;
 }
 
 .settings-dialog-main .mcp-config-notices {
-  padding-top: 26px;
+  padding-top: 14px;
 }
 
 /* §4.4: a theme chip grid — auto-fill cards, the name truncating, the chosen
@@ -1683,7 +1714,7 @@
 .settings-chat-options {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
 }
 
@@ -1698,7 +1729,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 28px;
+  min-height: 32px;
+}
+
+/* A row's explanatory line under its label (the draft's pm-fdesc). */
+.settings-row-desc {
+  display: block;
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: 11.5px;
 }
 
 .settings-chat-range-option {
@@ -1871,6 +1910,17 @@
      default, so pre-hydration phones see no flash of the desktop rail. */
   .settings-section-rail {
     display: none;
+  }
+
+  /* The desktop page title stays off a phone: its 50px header names the level. */
+  .settings-dialog-page-title {
+    display: none;
+  }
+
+  /* At the section level the chips own the row above the section: the body
+     stacks so the full-width rail no longer squeezes the main to zero. */
+  .settings-dialog-surface[data-phone-level="section"] .settings-dialog-body {
+    flex-direction: column;
   }
 
   .settings-dialog-surface[data-phone-level="section"] .settings-section-rail {

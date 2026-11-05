@@ -261,8 +261,310 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     { id: "language", label: t("common.language") },
   ];
   const activeDetailLabel = generalDetails.find((item) => item.id === detail)?.label ?? t("settings.appearance");
+  const isPhone = useIsMobile();
   // A label/value row inside a Card (§7.3): label 13px on the left, the control on the right.
   const optionRowClass = "flex min-h-9 w-full items-center justify-between gap-4 text-[13px] text-foreground";
+
+  // Sub-section content, shared by both shapes: a phone shows one at a time
+  // behind its own list (the three-level stack); the desktop stacks them as
+  // Cards in the scrolling body (§4.4).
+  const themeGroup = (
+    <div role="radiogroup" aria-label={t("settings.appearance")} className="settings-theme-options">
+      {THEME_OPTIONS.map((option) => {
+        const selected = preference === option.id;
+        return (
+          <label
+            key={option.id}
+            data-theme-option={option.id}
+            className="settings-theme-option"
+          >
+            <input
+              type="radio"
+              name="theme"
+              value={option.id}
+              checked={selected}
+              onChange={() => setThemePreference(option.id)}
+              className="sr-only"
+            />
+            <span className="settings-theme-swatch" aria-hidden="true" />
+            <span className="settings-theme-option-label">{t(option.label)}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+  const chatOptions = (
+    <div className="settings-chat-options">
+      <div className="settings-chat-option settings-chat-switch-option">
+        <span>{t("settings.thinkingExpandedDefault")}</span>
+        <ConfigSwitch
+          checked={thinkingExpanded}
+          label={t("settings.thinkingExpandedDefault")}
+          onChange={(enabled) => {
+            setThinkingExpandedByDefault(enabled);
+            setThinkingExpanded(enabled);
+          }}
+        />
+      </div>
+      <div className="settings-chat-option settings-chat-range-option">
+        <div className="settings-chat-range-header">
+          <label htmlFor="settings-chat-content-width">{t("settings.chatContentWidth")}</label>
+          <output htmlFor="settings-chat-content-width">{chatContentWidth}px</output>
+          <ConfigButton
+            variant="ghost"
+            size="small"
+            className="settings-chat-reset"
+            title={t("settings.resetChatContentWidth")}
+            aria-label={t("settings.resetChatContentWidth")}
+            disabled={chatContentWidth === CHAT_CONTENT_WIDTH_DEFAULT}
+            onClick={() => setChatContentWidth(CHAT_CONTENT_WIDTH_DEFAULT)}
+          >
+            <RotateCcwIcon size={14} strokeWidth={1.8} />
+          </ConfigButton>
+        </div>
+        <input
+          id="settings-chat-content-width"
+          type="range"
+          min={CHAT_CONTENT_WIDTH_MIN}
+          max={CHAT_CONTENT_WIDTH_MAX}
+          step={10}
+          value={chatContentWidth}
+          onChange={(event) => setChatContentWidth(Number(event.target.value))}
+        />
+      </div>
+      <FontSettings />
+      <div className="settings-chat-option settings-chat-range-option">
+        <div className="settings-chat-range-header">
+          <label htmlFor="settings-chat-content-font-size">{t("settings.chatContentFontSize")}</label>
+          <output htmlFor="settings-chat-content-font-size">{fontSize}px</output>
+          <ConfigButton
+            variant="ghost"
+            size="small"
+            className="settings-chat-reset"
+            title={t("settings.resetChatContentFontSize")}
+            aria-label={t("settings.resetChatContentFontSize")}
+            disabled={fontSize === CHAT_CONTENT_FONT_SIZE_DEFAULT}
+            onClick={() => setFontSize(CHAT_CONTENT_FONT_SIZE_DEFAULT)}
+          >
+            <RotateCcwIcon size={14} strokeWidth={1.8} />
+          </ConfigButton>
+        </div>
+        <input
+          id="settings-chat-content-font-size"
+          type="range"
+          min={CHAT_CONTENT_FONT_SIZE_MIN}
+          max={CHAT_CONTENT_FONT_SIZE_MAX}
+          step={1}
+          value={fontSize}
+          onChange={(event) => setFontSize(Number(event.target.value))}
+        />
+      </div>
+      <div className="settings-chat-option settings-chat-switch-option">
+        <span>{t("settings.quoteSelection")}</span>
+        <ConfigSwitch
+          checked={quoteSelectionEnabled}
+          label={t("settings.quoteSelection")}
+          onChange={onQuoteSelectionChange}
+        />
+      </div>
+      <div className="settings-chat-option settings-chat-switch-option">
+        <span>{t("settings.completionSound")}</span>
+        <ConfigSwitch
+          checked={soundEnabled}
+          label={t("settings.completionSound")}
+          onChange={() => onSoundToggle()}
+        />
+      </div>
+      <div className="settings-chat-option settings-chat-switch-option">
+        <span>{t("settings.enterSendMode")}</span>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={enterSendMode}
+          aria-label={t("settings.enterSendMode")}
+          onValueChange={(value) => {
+            if (value === "enter" || value === "ctrlEnter") setEnterSendMode(value);
+          }}
+        >
+          <ToggleGroupItem value="enter" className="px-2.5 text-xs">{t("settings.enterSendModeEnter")}</ToggleGroupItem>
+          <ToggleGroupItem value="ctrlEnter" className="px-2.5 text-xs">{t("settings.enterSendModeCtrlEnter")}</ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      <div className="settings-chat-option settings-chat-switch-option">
+        <span>{t("settings.cacheMissNotices")}</span>
+        <ConfigSwitch
+          checked={cacheMissNotices === true}
+          loading={(cacheMissNotices === null && !cacheMissNoticesError) || cacheMissNoticesSaving}
+          label={t("settings.cacheMissNotices")}
+          describedBy="settings-cache-miss-notices-description"
+          onChange={(enabled) => void toggleCacheMissNotices(enabled)}
+        />
+      </div>
+    </div>
+  );
+  // The keep-alive group is a card of its own (§7.3): description, two numeric rows.
+  const keepAliveCard = (
+    <ConfigCard title={t("settings.keepAlive")} description={t("settings.keepAliveDescription")}>
+      <div className="flex flex-col gap-2">
+        <div className={optionRowClass}>
+          <label htmlFor="settings-keepalive-max-sessions">{t("settings.keepAliveMaxSessions")}</label>
+          <Input
+            id="settings-keepalive-max-sessions"
+            type="number"
+            min={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.min}
+            max={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.max}
+            value={keepAliveConfig.maxSessions}
+            className="h-8 w-20 text-right text-[13px]"
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, maxSessions: value });
+            }}
+          />
+        </div>
+        <div className={optionRowClass}>
+          <label htmlFor="settings-keepalive-idle-timeout">{t("settings.keepAliveIdleTimeout")}</label>
+          <Input
+            id="settings-keepalive-idle-timeout"
+            type="number"
+            min={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.min}
+            max={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.max}
+            value={keepAliveConfig.idleTimeoutMinutes}
+            className="h-8 w-20 text-right text-[13px]"
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, idleTimeoutMinutes: value });
+            }}
+          />
+        </div>
+      </div>
+    </ConfigCard>
+  );
+  const sidebarContent = (
+    <div
+      className="settings-chat-option settings-chat-switch-option"
+      aria-describedby="settings-files-placement-description"
+    >
+      <span>
+        {t("settings.filesPlacement")}
+        <span id="settings-files-placement-description" className="settings-row-desc">
+          {t("settings.filesPlacementDescription")}
+        </span>
+      </span>
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        value={filesPlacement}
+        aria-label={t("settings.filesPlacement")}
+        onValueChange={(value) => {
+          if (value === "below" || value === "tab") setFilesPlacement(value);
+        }}
+      >
+        <ToggleGroupItem value="below" className="px-2.5 text-xs">{t("settings.filesPlacementBelow")}</ToggleGroupItem>
+        <ToggleGroupItem value="tab" className="px-2.5 text-xs">{t("settings.filesPlacementTab")}</ToggleGroupItem>
+      </ToggleGroup>
+    </div>
+  );
+  const shellCard = shellSettings ? (
+    <ConfigCard
+      title={t("settings.shellTool")}
+      description={t("settings.shellToolDescription")}
+      footer={shellError ? <p role="alert" className="m-0 text-xs text-destructive">{shellError}</p> : undefined}
+    >
+      <div className={optionRowClass}>
+        <span>{t("settings.usePowerShell")}</span>
+        <ConfigSwitch
+          checked={shellSettings.powerShellEnabled}
+          loading={shellSaving}
+          label={t("settings.usePowerShell")}
+          onChange={(enabled) => void togglePowerShell(enabled)}
+        />
+      </div>
+    </ConfigCard>
+  ) : null;
+  const pushCard = (
+    <ConfigCard
+      title={t("settings.pushPermission")}
+      description={t("settings.pushPermissionDescription")}
+      footer={pushStatus ? (
+        <p role="status" className={cn("m-0 text-xs", pushStatus.kind === "ok" ? "text-primary" : "text-destructive")}>
+          {pushStatus.message}
+        </p>
+      ) : undefined}
+    >
+      <div className={optionRowClass}>
+        <span>{t("settings.pushPermission")}</span>
+        <ConfigButton
+          variant="secondary"
+          size="small"
+          disabled={pushRegistering}
+          onClick={() => void registerPush()}
+        >
+          {pushRegistering ? t("settings.pushRegisterLoading") : t("settings.pushRegister")}
+        </ConfigButton>
+      </div>
+    </ConfigCard>
+  );
+  const languageGroup = (
+    <div role="radiogroup" aria-label={t("common.language")} className="settings-language-options">
+      {supportedLocales.map((plugin) => {
+        const selected = locale === plugin.id;
+        return (
+          <button
+            key={plugin.id}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => setLocale(plugin.id as typeof locale)}
+            className="settings-language-option"
+          >
+            <span className="settings-language-radio">
+              {selected && <span className="settings-language-radio-dot" />}
+            </span>
+            <span className="settings-language-label">{plugin.label}</span>
+            <span className="settings-language-code">{plugin.id}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+  // The desktop body has no sub-navigation to hold the logout, so it closes the stack.
+  const logOutBlock = webAuthEnabled ? (
+    <>
+      <div className="flex items-center justify-end">
+        <ConfigButton
+          variant="secondary"
+          size="small"
+          disabled={loggingOut}
+          onClick={() => void logOut()}
+        >
+          <LogOutIcon size={14} strokeWidth={1.8} />
+          {loggingOut ? t("auth.loggingOut") : t("auth.logOut")}
+        </ConfigButton>
+      </div>
+      {logoutError && <p role="alert" className="m-0 text-xs text-destructive">{logoutError}</p>}
+    </>
+  ) : null;
+
+  if (!isPhone) {
+    return (
+      <ConfigPanelShell embedded title={t("settings.general")} onClose={onClose}>
+        <ConfigDetail>
+          <ConfigDetailStack>
+            <ConfigCard title={t("settings.appearance")}>{themeGroup}</ConfigCard>
+            <ConfigCard title={t("settings.chat")}>{chatOptions}</ConfigCard>
+            {keepAliveCard}
+            <ConfigCard title={t("settings.sidebar")}>{sidebarContent}</ConfigCard>
+            {shellCard}
+            {pushCard}
+            <ConfigCard title={t("common.language")}>{languageGroup}</ConfigCard>
+            {logOutBlock}
+          </ConfigDetailStack>
+        </ConfigDetail>
+      </ConfigPanelShell>
+    );
+  }
 
   return (
     <ConfigPanelShell embedded title={t("settings.general")} onClose={onClose}>
@@ -294,265 +596,13 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             <ConfigDetailHeader>
               <ConfigDetailTitle>{activeDetailLabel}</ConfigDetailTitle>
             </ConfigDetailHeader>
-            {detail === "appearance" && (
-              <div role="radiogroup" aria-label={t("settings.appearance")} className="settings-theme-options">
-                {THEME_OPTIONS.map((option) => {
-                  const selected = preference === option.id;
-                  return (
-                    <label
-                      key={option.id}
-                      data-theme-option={option.id}
-                      className="settings-theme-option"
-                    >
-                      <input
-                        type="radio"
-                        name="theme"
-                        value={option.id}
-                        checked={selected}
-                        onChange={() => setThemePreference(option.id)}
-                        className="sr-only"
-                      />
-                      <span className="settings-theme-swatch" aria-hidden="true" />
-                      <span className="settings-theme-option-label">{t(option.label)}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-            {detail === "chat" && (
-              <div className="settings-chat-options">
-                <div className="settings-chat-option settings-chat-switch-option">
-                  <span>{t("settings.thinkingExpandedDefault")}</span>
-                  <ConfigSwitch
-                    checked={thinkingExpanded}
-                    label={t("settings.thinkingExpandedDefault")}
-                    onChange={(enabled) => {
-                      setThinkingExpandedByDefault(enabled);
-                      setThinkingExpanded(enabled);
-                    }}
-                  />
-                </div>
-                <div className="settings-chat-option settings-chat-range-option">
-                  <div className="settings-chat-range-header">
-                    <label htmlFor="settings-chat-content-width">{t("settings.chatContentWidth")}</label>
-                    <output htmlFor="settings-chat-content-width">{chatContentWidth}px</output>
-                    <ConfigButton
-                      variant="ghost"
-                      size="small"
-                      className="settings-chat-reset"
-                      title={t("settings.resetChatContentWidth")}
-                      aria-label={t("settings.resetChatContentWidth")}
-                      disabled={chatContentWidth === CHAT_CONTENT_WIDTH_DEFAULT}
-                      onClick={() => setChatContentWidth(CHAT_CONTENT_WIDTH_DEFAULT)}
-                    >
-                      <RotateCcwIcon size={14} strokeWidth={1.8} />
-                    </ConfigButton>
-                  </div>
-                  <input
-                    id="settings-chat-content-width"
-                    type="range"
-                    min={CHAT_CONTENT_WIDTH_MIN}
-                    max={CHAT_CONTENT_WIDTH_MAX}
-                    step={10}
-                    value={chatContentWidth}
-                    onChange={(event) => setChatContentWidth(Number(event.target.value))}
-                  />
-                </div>
-                <FontSettings />
-                <div className="settings-chat-option settings-chat-range-option">
-                  <div className="settings-chat-range-header">
-                    <label htmlFor="settings-chat-content-font-size">{t("settings.chatContentFontSize")}</label>
-                    <output htmlFor="settings-chat-content-font-size">{fontSize}px</output>
-                    <ConfigButton
-                      variant="ghost"
-                      size="small"
-                      className="settings-chat-reset"
-                      title={t("settings.resetChatContentFontSize")}
-                      aria-label={t("settings.resetChatContentFontSize")}
-                      disabled={fontSize === CHAT_CONTENT_FONT_SIZE_DEFAULT}
-                      onClick={() => setFontSize(CHAT_CONTENT_FONT_SIZE_DEFAULT)}
-                    >
-                      <RotateCcwIcon size={14} strokeWidth={1.8} />
-                    </ConfigButton>
-                  </div>
-                  <input
-                    id="settings-chat-content-font-size"
-                    type="range"
-                    min={CHAT_CONTENT_FONT_SIZE_MIN}
-                    max={CHAT_CONTENT_FONT_SIZE_MAX}
-                    step={1}
-                    value={fontSize}
-                    onChange={(event) => setFontSize(Number(event.target.value))}
-                  />
-                </div>
-                <div className="settings-chat-option settings-chat-switch-option">
-                  <span>{t("settings.quoteSelection")}</span>
-                  <ConfigSwitch
-                    checked={quoteSelectionEnabled}
-                    label={t("settings.quoteSelection")}
-                    onChange={onQuoteSelectionChange}
-                  />
-                </div>
-                <div className="settings-chat-option settings-chat-switch-option">
-                  <span>{t("settings.completionSound")}</span>
-                  <ConfigSwitch
-                    checked={soundEnabled}
-                    label={t("settings.completionSound")}
-                    onChange={() => onSoundToggle()}
-                  />
-                </div>
-                <div className="settings-chat-option settings-chat-switch-option">
-                  <span>{t("settings.enterSendMode")}</span>
-                  <ToggleGroup
-                    type="single"
-                    variant="outline"
-                    size="sm"
-                    value={enterSendMode}
-                    aria-label={t("settings.enterSendMode")}
-                    onValueChange={(value) => {
-                      if (value === "enter" || value === "ctrlEnter") setEnterSendMode(value);
-                    }}
-                  >
-                    <ToggleGroupItem value="enter" className="px-2.5 text-xs">{t("settings.enterSendModeEnter")}</ToggleGroupItem>
-                    <ToggleGroupItem value="ctrlEnter" className="px-2.5 text-xs">{t("settings.enterSendModeCtrlEnter")}</ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-                <div className="settings-chat-option settings-chat-switch-option">
-                  <span>{t("settings.cacheMissNotices")}</span>
-                  <ConfigSwitch
-                    checked={cacheMissNotices === true}
-                    loading={(cacheMissNotices === null && !cacheMissNoticesError) || cacheMissNoticesSaving}
-                    label={t("settings.cacheMissNotices")}
-                    describedBy="settings-cache-miss-notices-description"
-                    onChange={(enabled) => void toggleCacheMissNotices(enabled)}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* The keep-alive group is a section of its own (§7.3): description, two numeric rows. */}
-            {detail === "chat" && (
-              <ConfigCard description={t("settings.keepAliveDescription")}>
-                <div className="flex flex-col gap-2">
-                  <div className={optionRowClass}>
-                    <label htmlFor="settings-keepalive-max-sessions">{t("settings.keepAliveMaxSessions")}</label>
-                    <Input
-                      id="settings-keepalive-max-sessions"
-                      type="number"
-                      min={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.min}
-                      max={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.max}
-                      value={keepAliveConfig.maxSessions}
-                      className="h-8 w-20 text-right text-[13px]"
-                      onChange={(event) => {
-                        const value = Number(event.target.value);
-                        if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, maxSessions: value });
-                      }}
-                    />
-                  </div>
-                  <div className={optionRowClass}>
-                    <label htmlFor="settings-keepalive-idle-timeout">{t("settings.keepAliveIdleTimeout")}</label>
-                    <Input
-                      id="settings-keepalive-idle-timeout"
-                      type="number"
-                      min={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.min}
-                      max={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.max}
-                      value={keepAliveConfig.idleTimeoutMinutes}
-                      className="h-8 w-20 text-right text-[13px]"
-                      onChange={(event) => {
-                        const value = Number(event.target.value);
-                        if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, idleTimeoutMinutes: value });
-                      }}
-                    />
-                  </div>
-                </div>
-              </ConfigCard>
-            )}
-
-            {detail === "sidebar" && (
-              <div
-                className="settings-chat-option settings-chat-switch-option"
-                aria-describedby="settings-files-placement-description"
-              >
-                <span>{t("settings.filesPlacement")}</span>
-                <ToggleGroup
-                  type="single"
-                  variant="outline"
-                  size="sm"
-                  value={filesPlacement}
-                  aria-label={t("settings.filesPlacement")}
-                  onValueChange={(value) => {
-                    if (value === "below" || value === "tab") setFilesPlacement(value);
-                  }}
-                >
-                  <ToggleGroupItem value="below" className="px-2.5 text-xs">{t("settings.filesPlacementBelow")}</ToggleGroupItem>
-                  <ToggleGroupItem value="tab" className="px-2.5 text-xs">{t("settings.filesPlacementTab")}</ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-            )}
-
-            {detail === "shell" && shellSettings && (
-              <ConfigCard
-                description={t("settings.shellToolDescription")}
-                footer={shellError ? <p role="alert" className="m-0 text-xs text-destructive">{shellError}</p> : undefined}
-              >
-                <div className={optionRowClass}>
-                  <span>{t("settings.usePowerShell")}</span>
-                  <ConfigSwitch
-                    checked={shellSettings.powerShellEnabled}
-                    loading={shellSaving}
-                    label={t("settings.usePowerShell")}
-                    onChange={(enabled) => void togglePowerShell(enabled)}
-                  />
-                </div>
-              </ConfigCard>
-            )}
-
-            {detail === "push" && (
-              <ConfigCard
-                description={t("settings.pushPermissionDescription")}
-                footer={pushStatus ? (
-                  <p role="status" className={cn("m-0 text-xs", pushStatus.kind === "ok" ? "text-primary" : "text-destructive")}>
-                    {pushStatus.message}
-                  </p>
-                ) : undefined}
-              >
-                <div className={optionRowClass}>
-                  <span>{t("settings.pushPermission")}</span>
-                  <ConfigButton
-                    variant="secondary"
-                    size="small"
-                    disabled={pushRegistering}
-                    onClick={() => void registerPush()}
-                  >
-                    {pushRegistering ? t("settings.pushRegisterLoading") : t("settings.pushRegister")}
-                  </ConfigButton>
-                </div>
-              </ConfigCard>
-            )}
-
-            {detail === "language" && (
-              <div role="radiogroup" aria-label={t("common.language")} className="settings-language-options">
-                {supportedLocales.map((plugin) => {
-                  const selected = locale === plugin.id;
-                  return (
-                    <button
-                      key={plugin.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => setLocale(plugin.id as typeof locale)}
-                      className="settings-language-option"
-                    >
-                      <span className="settings-language-radio">
-                        {selected && <span className="settings-language-radio-dot" />}
-                      </span>
-                      <span className="settings-language-label">{plugin.label}</span>
-                      <span className="settings-language-code">{plugin.id}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {detail === "appearance" && themeGroup}
+            {detail === "chat" && chatOptions}
+            {detail === "chat" && keepAliveCard}
+            {detail === "sidebar" && sidebarContent}
+            {detail === "shell" && shellCard}
+            {detail === "push" && pushCard}
+            {detail === "language" && languageGroup}
           </ConfigDetailStack>
         </ConfigDetail>
       </ConfigSplitView>
@@ -752,6 +802,22 @@ export function SettingsPanel({
     </div>
   ) : null;
 
+  // Both shapes mount the same sections: the desktop stacks them under the
+  // dialog's page title (§3.5), the phone shows them one level at a time.
+  const hostedSections = (
+    <ConfigDetailNavigationContext.Provider value={detailNavigation}>
+      {sectionHost("general", <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} soundEnabled={soundEnabled} onSoundToggle={onSoundToggle} keepAliveConfig={keepAliveConfig} onKeepAliveConfigChange={onKeepAliveConfigChange} />)}
+      {sectionHost("models", <ModelsConfig embedded cwd={cwd} onClose={onClose} />)}
+      {/* Visited sections stay mounted, so the ones whose answer depends on trust take the page's
+          status and load again in place when trusting from Settings › MCP changes it. */}
+      {cwd && sectionHost("skills", <SkillsConfig embedded key={cwd} cwd={cwd} trust={projectTrust} onClose={onClose} />)}
+      {cwd && sectionHost("agents", <AgentsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
+      {cwd && sectionHost("plugins", <PluginsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
+      {/* No project needed: the global mcp.json is listed alone, and a project adds its group. */}
+      {sectionHost("mcp", <McpConfig embedded key={cwd ?? ""} cwd={cwd} trust={projectTrust} onTrustProject={onOpenTrustDialog} onProjectTrustChanged={onProjectTrustChanged} onClose={onClose} />)}
+    </ConfigDetailNavigationContext.Provider>
+  );
+
   return (
     <div
       ref={dialogRef}
@@ -863,17 +929,14 @@ export function SettingsPanel({
                 })}
               </nav>
             )}
-            <ConfigDetailNavigationContext.Provider value={detailNavigation}>
-            {sectionHost("general", <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} soundEnabled={soundEnabled} onSoundToggle={onSoundToggle} keepAliveConfig={keepAliveConfig} onKeepAliveConfigChange={onKeepAliveConfigChange} />)}
-            {sectionHost("models", <ModelsConfig embedded cwd={cwd} onClose={onClose} />)}
-            {/* Visited sections stay mounted, so the ones whose answer depends on trust take the page's
-                status and load again in place when trusting from Settings › MCP changes it. */}
-            {cwd && sectionHost("skills", <SkillsConfig embedded key={cwd} cwd={cwd} trust={projectTrust} onClose={onClose} />)}
-            {cwd && sectionHost("agents", <AgentsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
-            {cwd && sectionHost("plugins", <PluginsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
-            {/* No project needed: the global mcp.json is listed alone, and a project adds its group. */}
-            {sectionHost("mcp", <McpConfig embedded key={cwd ?? ""} cwd={cwd} trust={projectTrust} onTrustProject={onOpenTrustDialog} onProjectTrustChanged={onProjectTrustChanged} onClose={onClose} />)}
-            </ConfigDetailNavigationContext.Provider>
+            {/* The desktop body names the dialog (§3.5) above its scrolling section; a
+                phone names it in its 50px header instead. */}
+            {!isPhone ? (
+              <div className="settings-dialog-page">
+                <h2 className="settings-dialog-page-title">{t("settings.title")}</h2>
+                {hostedSections}
+              </div>
+            ) : hostedSections}
           </main>
         </div>
       </div>
