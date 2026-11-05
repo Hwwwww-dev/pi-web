@@ -7,6 +7,8 @@ import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
 import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { Maximize, Minus, Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/hooks/useTheme";
 import { useI18n } from "@/hooks/useI18n";
 import { usePrismLanguages } from "@/hooks/usePrismLanguages";
@@ -153,10 +155,7 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
 // What a previewed fence (mermaid here, svg in components/SvgBlock.tsx) shares:
 // the header with its toggle and download button, and the zoom viewer.
 
-/** Header tool buttons: ghost icon-button form (spec §4.5), active = accent. */
-const GHOST_TOOL_BUTTON =
-  "inline-flex h-6 cursor-pointer items-center justify-center rounded-md bg-transparent px-2 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
-
+/** Header tool buttons: the ghost xs Button, active = accent. */
 export function PreviewToggleButton({ isStreaming, previewVisible, onToggle, title }: {
   isStreaming?: boolean;
   previewVisible: boolean;
@@ -166,31 +165,34 @@ export function PreviewToggleButton({ isStreaming, previewVisible, onToggle, tit
 }) {
   const { t } = useI18n();
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="xs"
       onClick={onToggle}
       disabled={isStreaming}
       title={isStreaming ? t("i18n.previewAfterStreaming") : title}
       aria-pressed={previewVisible}
-      className={[GHOST_TOOL_BUTTON, previewVisible ? "bg-accent text-foreground" : ""].filter(Boolean).join(" ")}
+      className={previewVisible ? "bg-accent text-foreground" : undefined}
     >
       {previewVisible ? t("i18n.source") : t("i18n.preview")}
-    </button>
+    </Button>
   );
 }
 
 export function SvgDownloadButton({ onClick }: { onClick: () => void }) {
   const { t } = useI18n();
   return (
-    <button
+    <Button
       type="button"
-      className={GHOST_TOOL_BUTTON}
+      variant="ghost"
+      size="xs"
       title={`${t("i18n.downloadFile")} (SVG)`}
       aria-label={`${t("i18n.downloadFile")} (SVG)`}
       onClick={onClick}
     >
       SVG
-    </button>
+    </Button>
   );
 }
 
@@ -249,45 +251,55 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
         <div className="mermaid-zoom-toolbar">
           <span className="mermaid-zoom-title">{title}</span>
           <div className="mermaid-zoom-actions">
-            <div className="mermaid-zoom-stepper">
-              <button
+            <div className="flex h-6 items-center overflow-hidden rounded-md border border-border bg-background">
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="size-[22px] rounded-none"
                 onClick={() => setZoom((value) => Math.max(ZOOM_MIN, value - ZOOM_STEP))}
                 disabled={zoom <= ZOOM_MIN}
                 title={t("i18n.zoomOut")}
                 aria-label={t("i18n.zoomOut")}
               >
-                <Minus size={13} strokeWidth={1.8} />
-              </button>
-              <span className="mermaid-zoom-value">{Math.round(zoom * 100)}%</span>
-              <button
+                <Minus strokeWidth={1.8} />
+              </Button>
+              <Separator orientation="vertical" className="h-[22px]" />
+              <span className="min-w-12 text-center font-mono text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
+              <Separator orientation="vertical" className="h-[22px]" />
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="size-[22px] rounded-none"
                 onClick={() => setZoom((value) => Math.min(ZOOM_MAX, value + ZOOM_STEP))}
                 disabled={zoom >= ZOOM_MAX}
                 title={t("i18n.zoomIn")}
                 aria-label={t("i18n.zoomIn")}
               >
-                <Plus size={13} strokeWidth={1.8} />
-              </button>
+                <Plus strokeWidth={1.8} />
+              </Button>
             </div>
-            <button
+            <Button
               type="button"
-              className="mermaid-zoom-icon-button"
+              variant="outline"
+              size="icon-xs"
               onClick={() => setZoom(1)}
               title={t("i18n.fitToWidth")}
               aria-label={t("i18n.fitToWidth")}
             >
-              <Maximize size={13} strokeWidth={1.8} />
-            </button>
-            <button
+              <Maximize strokeWidth={1.8} />
+            </Button>
+            <Button
               type="button"
-              className="mermaid-zoom-icon-button"
+              variant="outline"
+              size="icon-xs"
               onClick={onClose}
               title={t("i18n.close")}
               aria-label={t("i18n.close")}
             >
-              <X size={13} strokeWidth={1.8} />
-            </button>
+              <X strokeWidth={1.8} />
+            </Button>
           </div>
         </div>
         <div
@@ -394,12 +406,9 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
         <span className="markdown-code-lang">{lang || "text"}</span>
         <div className="markdown-code-actions">
           {headerAction}
-          <button
-            onClick={copy}
-            className={GHOST_TOOL_BUTTON}
-          >
+          <Button type="button" variant="ghost" size="xs" onClick={copy}>
             {copied ? t("i18n.copied") : t("i18n.copy")}
-          </button>
+          </Button>
         </div>
       </div>
       {isStreaming ? (

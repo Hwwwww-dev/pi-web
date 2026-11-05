@@ -24,7 +24,12 @@ import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH, MINIMAP_RAIL_STRIP } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
@@ -1494,16 +1499,22 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-text-muted">
-         {t("chat.loadingSession")}
+      <div className="flex h-full flex-col justify-center gap-3 px-10">
+        <Skeleton className="h-4 w-2/5" />
+        <Skeleton className="h-4 w-3/5" />
+        <Skeleton className="h-4 w-1/2" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center text-destructive">
-        {error}
+      <div className="flex h-full items-center justify-center p-6">
+        <Alert variant="destructive" className="max-w-[560px]">
+          <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
+            {error}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -1686,7 +1697,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             onClick={quoteSelectionHere}
             className="h-[35px] gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
           >
-            <QuoteIcon className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+            <QuoteIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
             <span>{t("chat.quoteSelection")}</span>
           </Button>
           {onSideSession && !isHiddenRelation(session?.relation) && (
@@ -1699,7 +1710,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               onClick={() => { setQuoteAskTarget("side"); setQuoteInputOpen(true); window.getSelection()?.removeAllRanges(); }}
               className="h-[35px] gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
             >
-              <MessagesSquareIcon className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+              <MessagesSquareIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
               <span>{t("chat.askInSideChat")}</span>
             </Button>
           )}
@@ -1713,7 +1724,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               onClick={() => { setQuoteAskTarget("new"); setQuoteInputOpen(true); window.getSelection()?.removeAllRanges(); }}
               className="h-[35px] gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
             >
-              <GitForkIcon className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+              <GitForkIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
               <span>{t("chat.askInNewChat")}</span>
             </Button>
           )}
@@ -2035,16 +2046,16 @@ function ExtensionWaitingCount({ count }: { count: number }) {
   const { t } = useI18n();
   if (count <= 0) return null;
   return (
-    <span className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-primary">
+    <Badge variant="ghost" className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-primary">
       {t("chat.extensionMoreWaiting", { count })}
-    </span>
+    </Badge>
   );
 }
 
 /** Corner brackets pointing outward; when expanded they point inward (restore). */
 function ExtensionSizeIcon({ expanded }: { expanded: boolean }) {
   return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {expanded
         ? <path d="M3.5 1v2.5H1M6.5 1v2.5H9M6.5 9v-2.5H9M3.5 9v-2.5H1" />
         : <path d="M1 3.5V1h2.5M6.5 1H9v2.5M9 6.5V9H6.5M3.5 9H1V6.5" />}
@@ -2239,60 +2250,68 @@ function ExtensionDialog({
               <span>{t("chat.extensionRequest")}</span>
               {totalQuestions > 1 && (
                 <span className="inline-flex items-center gap-1">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="icon-xs"
                     onClick={stepToPrevious}
                     disabled={!answered?.length || reviewIndex === 0}
                     aria-label={t("chat.question.previous")}
                     title={t("chat.question.previous")}
-                    className="grid size-[18px] cursor-pointer place-items-center rounded-[4px] border border-border bg-card p-0 text-muted-foreground"
+                    className="size-[18px] rounded-[4px] p-0"
                   >
-                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <svg className="size-2 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polyline points="6.5 2 3 5 6.5 8" />
                     </svg>
-                  </button>
+                  </Button>
                   <span className={cn("tabular-nums", reviewIndex !== null ? "text-foreground" : "text-primary")}>
                     {t("chat.question.pager", { index: reviewIndex !== null ? reviewIndex + 1 : currentQuestionIndex, total: totalQuestions })}
                   </span>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="icon-xs"
                     onClick={stepToNext}
                     disabled={reviewIndex === null}
                     aria-label={t("chat.question.next")}
                     title={t("chat.question.next")}
-                    className="grid size-[18px] cursor-pointer place-items-center rounded-[4px] border border-border bg-card p-0 text-muted-foreground"
+                    className="size-[18px] rounded-[4px] p-0"
                   >
-                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <svg className="size-2 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polyline points="3.5 2 7 5 3.5 8" />
                     </svg>
-                  </button>
+                  </Button>
                 </span>
               )}
               <ExtensionWaitingCount count={waitingCount} />
               {countdown}
             </div>
           </div>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon-xs"
             onClick={toggleFull}
             title={full ? t("chat.extensionRestoreSize") : t("chat.extensionMaximize")}
             aria-label={full ? t("chat.extensionRestoreSize") : t("chat.extensionMaximize")}
-            className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-sm border border-border bg-card text-muted-foreground"
+            className="size-7 shrink-0 rounded-sm"
           >
             <ExtensionSizeIcon expanded={full} />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
+            size="icon-xs"
             onClick={() => setCollapsed(true)}
             aria-expanded={true}
             title={t("chat.extensionCollapse")}
             aria-label={t("chat.extensionCollapse")}
-            className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-sm border border-border bg-card text-muted-foreground"
+            className="size-7 shrink-0 rounded-sm"
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="2 3.5 5 6.5 8 3.5" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         <div
@@ -2424,18 +2443,18 @@ function ExtensionDialog({
                   </div>
                 );
               })}
-              <input
+              <Input
                 value={customAnswer}
                 placeholder={t("chat.extensionCustomAnswer")}
                 onChange={(e) => setCustomAnswer(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
                 }}
-                className="w-full rounded-sm border border-border bg-card px-2.5 py-[9px] text-[13px] text-foreground outline-none"
+                className="rounded-sm border-border bg-card px-2.5 text-[13px]"
               />
             </div>
           ) : (
-            <input
+            <Input
               autoFocus
               value={value}
               placeholder={request.placeholder}
@@ -2443,18 +2462,18 @@ function ExtensionDialog({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              className="w-full rounded-sm border border-border bg-card px-2.5 py-[9px] text-[13px] text-foreground outline-none"
+              className="rounded-sm border-border bg-card px-2.5 text-[13px]"
             />
           ))}
           {request.method === "editor" && (
-            <textarea
+            <Textarea
               autoFocus
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              className="w-full min-h-[220px] resize-y rounded-sm border border-border bg-card p-2.5 text-[13px] leading-[1.55] text-foreground font-mono outline-none"
+              className="min-h-[220px] rounded-sm border-border bg-card p-2.5 text-[13px] leading-[1.55] font-mono"
             />
           )}
           </>
@@ -2463,48 +2482,38 @@ function ExtensionDialog({
 
         {reviewed ? (
           <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-card px-3.5 py-2.5">
-            <button
-              onClick={() => setReviewIndex(null)}
-              className="cursor-pointer rounded-sm border border-primary bg-primary px-3.5 py-2 text-[13px] text-primary-foreground"
-            >
+            <Button type="button" onClick={() => setReviewIndex(null)}>
               {t("chat.question.backToCurrent")}
-            </button>
+            </Button>
           </div>
         ) : (
         <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-card px-3.5 py-2.5">
-          <button
+          <Button
+            type="button"
+            variant="outline"
             autoFocus={request.method === "confirm" || (request.method === "select" && request.options.length === 0)}
             onClick={() => onRespond(request, { cancelled: true })}
-            className="cursor-pointer rounded-sm border border-border bg-background px-3.5 py-2 text-[13px] text-muted-foreground"
+            className="text-muted-foreground"
           >
              {t("chat.cancel")}
-          </button>
+          </Button>
           {request.method === "confirm" ? (
-            <button
-              onClick={submitValue}
-              className="cursor-pointer rounded-sm border border-primary bg-primary px-3.5 py-2 text-[13px] text-primary-foreground"
-            >
+            <Button type="button" onClick={submitValue}>
                {t("chat.confirm")}
-            </button>
+            </Button>
           ) : request.method === "select" ? (
-            <button
+            <Button
+              type="button"
               onClick={submitValue}
               disabled={selectedOption === null}
               autoFocus={request.options.length === 0}
-              className={cn(
-                "rounded-sm border border-primary px-3.5 py-2 text-[13px]",
-                selectedOption === null ? "cursor-default bg-transparent text-dim" : "cursor-pointer bg-primary text-primary-foreground",
-              )}
             >
                {t("chat.confirm")}
-            </button>
+            </Button>
           ) : (
-            <button
-              onClick={submitValue}
-              className="cursor-pointer rounded-sm border border-primary bg-primary px-3.5 py-2 text-[13px] text-primary-foreground"
-            >
+            <Button type="button" onClick={submitValue}>
                {t("chat.submit")}
-            </button>
+            </Button>
           )}
         </div>
         )}
@@ -2626,24 +2635,29 @@ function ExtensionCustomPanel({
            <div className="text-[13px] font-[650] text-foreground">{t("chat.extensionPanel")}</div>
           <div className="flex items-center gap-2">
             <ExtensionWaitingCount count={waitingCount} />
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="icon-xs"
               onClick={() => setCollapsed(true)}
               aria-expanded={true}
               title={t("chat.extensionCollapse")}
               aria-label={t("chat.extensionCollapse")}
-              className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-sm border border-border bg-card text-muted-foreground"
+              className="size-7 shrink-0 rounded-sm"
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="2 3.5 5 6.5 8 3.5" />
               </svg>
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               onClick={() => onInput(request, "\x03")}
-              className="cursor-pointer rounded-sm border border-border bg-card px-[9px] py-[5px] text-xs text-muted-foreground"
+              className="text-muted-foreground"
             >
                {t("chat.close")}
-            </button>
+            </Button>
           </div>
         </div>
         <pre className="m-0 min-h-0 overflow-auto bg-card p-3.5 text-[13px] leading-[1.45] text-foreground font-mono whitespace-pre">

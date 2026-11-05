@@ -160,15 +160,17 @@ function getFileApiUrl(
 function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceSessionId?: string | null }) {
   const { t } = useI18n();
   return (
-    <a
-      href={getFileApiUrl(filePath, "download", sourceSessionId)}
-      download={getFileName(filePath)}
+    <Button
+      asChild
+      variant="ghost"
+      size="icon-xs"
       title={t("i18n.downloadFile")}
       aria-label={t("i18n.downloadFile")}
-      className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
     >
-      <DownloadIcon className="size-3.5" strokeWidth={1.8} />
-    </a>
+      <a href={getFileApiUrl(filePath, "download", sourceSessionId)} download={getFileName(filePath)}>
+        <DownloadIcon className="size-3.5" strokeWidth={1.8} />
+      </a>
+    </Button>
   );
 }
 
@@ -1496,12 +1498,13 @@ function TextFileViewer({
 
       {showLoadMore && data?.truncated && (
         <div
-          className="file-viewer-load-more mx-3 flex shrink-0 items-center justify-center gap-2.5 rounded-md border border-border px-2 py-[5px] text-xs text-muted-foreground"
+          className="absolute right-3 bottom-3 z-[2] mx-3 flex max-w-[calc(100%-24px)] shrink-0 items-center justify-center gap-2.5 rounded-md border border-border bg-card px-2 py-[5px] text-xs text-muted-foreground shadow-[0_3px_12px_color-mix(in_srgb,var(--text)_18%,transparent)] [pointer-events:auto]"
         >
           <span>{formatFileSize(data.nextOffset)} / {formatFileSize(data.size)}</span>
-          <button
+          <Button
             type="button"
-            className="file-viewer-mode-button"
+            variant="outline"
+            size="xs"
             disabled={loadingMore}
             onClick={() => {
               setLoadingMore(true);
@@ -1509,7 +1512,7 @@ function TextFileViewer({
             }}
           >
             {loadingMore ? t("i18n.loading") : t("i18n.loadMore")}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -1616,13 +1619,15 @@ function TextFileViewer({
           // Decoded bytes are noise; opening a file never downloads it on its own (#1401).
           <div className="flex h-full flex-col items-center justify-center gap-2.5 p-6 text-center text-[13px] text-muted-foreground">
             <span>{t("files.binaryNoPreview")}</span>
-            <a
-              href={getFileApiUrl(filePath, "download", sourceSessionId)}
-              download={getFileName(filePath)}
-              className="file-viewer-mode-button inline-flex items-center rounded-md border border-border text-foreground no-underline"
-            >
-              {t("files.download")}
-            </a>
+            <Button asChild variant="outline" size="xs">
+              <a
+                href={getFileApiUrl(filePath, "download", sourceSessionId)}
+                download={getFileName(filePath)}
+                className="no-underline"
+              >
+                {t("files.download")}
+              </a>
+            </Button>
           </div>
         ) : useLightweightSource ? (
           <div

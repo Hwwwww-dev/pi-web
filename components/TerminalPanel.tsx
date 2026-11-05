@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { LinkIcon, MoonIcon, RotateCwIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { terminalFontSize, useChatAppearance } from "@/hooks/useChatAppearance";
 import { useI18n } from "@/hooks/useI18n";
 import { setTerminalTheme, useTerminalTheme } from "@/hooks/useTerminalTheme";
@@ -279,6 +280,9 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
     return () => { cancelled = true; };
   }, [id, tab.closing]);
 
+  // The status dot reads the app theme's semantic tokens; only the xterm palette
+  // and the island chrome (buttons, error strip) stay on --terminal-*.
+  const statusDotClass = { connecting: "bg-warning", ready: "bg-success", exited: "bg-destructive", error: "bg-destructive" }[status];
   const nextTheme = theme === "dark" ? "light" : "dark";
   const themeLabel = nextTheme === "light" ? "terminal.lightTheme" : "terminal.darkTheme";
   // The CodeBlock title names the shell; the server picks the real binary.
@@ -294,7 +298,7 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
     >
       <header className="flex min-w-0 shrink-0 items-center gap-2 px-2.5 text-muted-foreground">
         <span
-          className={`terminal-status-dot is-${status}`}
+          className={`size-[7px] shrink-0 rounded-full ${statusDotClass}`}
           title={t(`terminal.${status}`)}
           aria-label={t(`terminal.${status}`)}
         />
@@ -306,25 +310,25 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
         </span>
         <div className="pointer-coarse:opacity-100 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-focus-within/code-block:opacity-100 group-hover/code-block:opacity-100">
           {status === "error" && (
-            <button type="button" onClick={() => setReconnectKey((key) => key + 1)} disabled={Boolean(tab.closing)} title={t("terminal.reconnect")} aria-label={t("terminal.reconnect")} className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
-              <LinkIcon size={14} strokeWidth={1.8} />
-            </button>
+            <Button type="button" variant="ghost" size="icon-xs" className="text-(--terminal-muted) hover:bg-(--terminal-hover-bg) hover:text-(--terminal-strong)" onClick={() => setReconnectKey((key) => key + 1)} disabled={Boolean(tab.closing)} title={t("terminal.reconnect")} aria-label={t("terminal.reconnect")}>
+              <LinkIcon strokeWidth={1.8} />
+            </Button>
           )}
-          <button type="button" onClick={() => setTerminalTheme(nextTheme)} title={t(themeLabel)} aria-label={t(themeLabel)} className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
+          <Button type="button" variant="ghost" size="icon-xs" className="text-(--terminal-muted) hover:bg-(--terminal-hover-bg) hover:text-(--terminal-strong)" onClick={() => setTerminalTheme(nextTheme)} title={t(themeLabel)} aria-label={t(themeLabel)}>
             {nextTheme === "light" ? (
-              <SunIcon size={14} strokeWidth={1.8} />
+              <SunIcon strokeWidth={1.8} />
             ) : (
-              <MoonIcon size={14} strokeWidth={1.8} />
+              <MoonIcon strokeWidth={1.8} />
             )}
-          </button>
-          <button type="button" onClick={onRestart} disabled={Boolean(tab.closing)} title={t("terminal.restart")} aria-label={t("terminal.restart")} className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
-            <RotateCwIcon size={14} strokeWidth={1.8} />
-          </button>
+          </Button>
+          <Button type="button" variant="ghost" size="icon-xs" className="text-(--terminal-muted) hover:bg-(--terminal-hover-bg) hover:text-(--terminal-strong)" onClick={onRestart} disabled={Boolean(tab.closing)} title={t("terminal.restart")} aria-label={t("terminal.restart")}>
+            <RotateCwIcon strokeWidth={1.8} />
+          </Button>
         </div>
       </header>
       <div>
-        {error && <div className="terminal-panel-error" role="alert">{error}</div>}
-        {status === "exited" && <div className="terminal-panel-exit" role="status">{exitCode === null ? t("terminal.exited") : t("terminal.exitCode", { code: exitCode })}</div>}
+        {error && <div role="alert" className="border-b bg-(--terminal-error-bg) px-3 py-[7px] font-mono text-xs text-(--terminal-error-text) border-(--terminal-error-border)">{error}</div>}
+        {status === "exited" && <div role="status" className="px-3 py-[7px] font-mono text-xs text-(--terminal-muted)">{exitCode === null ? t("terminal.exited") : t("terminal.exitCode", { code: exitCode })}</div>}
       </div>
       <div className="terminal-xterm"><div ref={containerRef} className="terminal-xterm-host" /></div>
       {showExtraKeys && <TerminalExtraKeys modifiers={modifiers} onKey={sendExtraKey} onToggleModifier={toggleModifier} />}

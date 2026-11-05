@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
+import { Button } from "@/components/ui/button";
 import {
   codemodeTotalCost,
   formatCodemodeCost,
@@ -85,13 +86,14 @@ export function CodemodeCallList({ calls, omitted, isError }: {
         <div className="text-muted-foreground/70">{t("codemode.omittedCalls", { count: omitted })}</div>
       )}
       {hidden > 0 && (
-        <button
+        <Button
           type="button"
+          variant="link"
           onClick={() => setShowAll(true)}
-          className="self-start cursor-pointer p-0 text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="h-auto self-start p-0"
         >
           {t("codemode.showEarlierCalls", { count: hidden })}
-        </button>
+        </Button>
       )}
       <ul className="flex min-w-0 flex-col gap-[3px]">
         {shown.map((call, index) => (

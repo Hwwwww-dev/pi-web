@@ -8,7 +8,14 @@ import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
 import { StatusIcon } from "./AgentSessionPanel";
 import { MCP_SESSION_STATE_KEYS } from "./mcp-config-helpers";
 import { sessionRowTitle } from "./SessionTree";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Empty, EmptyHeader, EmptyTitle } from "./ui/empty";
+import { Separator } from "./ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./ui/sheet";
+import { cn } from "@/lib/utils";
 import { CircleXIcon, FolderIcon, LoaderCircleIcon, ServerIcon, TriangleAlertIcon } from "lucide-react";
 import {
   DEBUG_CLOSE_REASON_KEYS,
@@ -348,9 +355,9 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
         <span className="debug-panel-heading shrink-0 cursor-help font-bold text-foreground" title={t("debug.readOnly")}>{t("debug.title")}</span>
         {/* Plain text, no live region: a screen reader would read out every change. */}
         <VerdictView verdict={verdict} t={t} />
-        <button type="button" className="debug-panel-copy ml-auto shrink-0 cursor-pointer rounded-sm border border-border bg-transparent px-2 py-0.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground" onClick={onCopy} title={t("debug.copyTitle")}>
+        <Button type="button" variant="outline" size="xs" className="debug-panel-copy ml-auto shrink-0" onClick={onCopy} title={t("debug.copyTitle")}>
           {copied ? t("debug.copied") : t("debug.copyJson")}
-        </button>
+        </Button>
       </div>
       {page !== null && (
         <div className="debug-panel-scroll">
@@ -361,13 +368,13 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
               above the other on a phone. */}
           <div className="debug-cols">
             <PageColumn page={page} samples={samples} reply={reply} ctx={ctx} />
-            <div className="debug-col debug-col-server">
+            <Card className="debug-col-server min-w-0 gap-2 px-3 py-3 shadow-none">
               <ServerHead reply={reply} ctx={ctx} />
               <PageList reply={reply} ctx={ctx} />
-            </div>
-            <div className="debug-col debug-col-sessions">
+            </Card>
+            <Card className="debug-col-sessions min-w-0 gap-2 px-3 py-3 shadow-none">
               <SessionList reply={reply} detail={detail} groups={groups} targetSessionId={targetSessionId} sources={page.sources} ctx={ctx} />
-            </div>
+            </Card>
           </div>
         </div>
       )}
@@ -401,11 +408,53 @@ interface BadgeItem {
   text?: string;
 }
 
-/** A badge's classes: the tone sets its color; filled, dashed and faint say whose it is and how it stands. */
-function badgeClass(item: Pick<BadgeItem, "tone" | "filled" | "dashed" | "faded">, extra?: string): string {
-  return ["debug-badge", extra, `is-${item.tone}`, item.filled && "is-filled", item.dashed && "is-dashed", item.faded && "is-faded"]
-    .filter(Boolean)
-    .join(" ");
+// The panel's tones as shadcn semantic tokens: Badge, Dot, Bar and the value texts read one map.
+const TONE_TEXT: Record<DebugTone, string> = {
+  ok: "text-success",
+  warning: "text-warning",
+  error: "text-destructive",
+  accent: "text-primary",
+  muted: "text-muted-foreground",
+  dim: "text-dim",
+};
+
+// A filled badge's box in its own tone: the border joins the fill (the accent one is the
+// Badge's default variant, so it is mapped separately).
+const TONE_FILLED: Partial<Record<DebugTone, string>> = {
+  ok: "border-success bg-success text-background",
+  warning: "border-warning bg-warning text-card",
+  error: "border-destructive bg-destructive text-background",
+  muted: "border-muted-foreground bg-muted-foreground text-background",
+  dim: "border-dim bg-dim text-background",
+};
+const FILLED_ACCENT = "border-primary";
+
+/**
+ * A Badge's tone classes: the tone sets its color; filled, dashed and faint say whose it is and
+ * how it stands. The dense telemetry box keeps the panel's own metrics (16px, mono 10px); the
+ * tone itself rides the theme's semantic tokens.
+ */
+function badgeClasses(item: Pick<BadgeItem, "tone" | "filled" | "dashed" | "faded">, extra?: string): string {
+  return cn(
+    "h-4 gap-0 rounded-[3px] px-1 py-0 font-mono text-[10px] font-semibold leading-[14px]",
+    item.filled ? cn(FILLED_ACCENT, TONE_FILLED[item.tone]) : cn("border-current", TONE_TEXT[item.tone]),
+    item.dashed && "border-dashed",
+    item.faded && "opacity-45",
+    extra,
+  );
+}
+
+/** A boxed word's Badge: this page's own filled (primary), the rest outlined in their tone. */
+function BadgeWord({ item, children }: { item: BadgeItem; children: ReactNode }) {
+  return (
+    <Badge
+      variant={item.filled ? "default" : "outline"}
+      className={badgeClasses(item, item.text !== undefined ? "block max-w-[calc(12ch+10px)] truncate" : undefined)}
+      title={item.title}
+    >
+      {item.text ?? children}
+    </Badge>
+  );
 }
 
 /**
@@ -424,9 +473,7 @@ function BadgeRun({ text, items, cap, label, plain = false }: {
   return (
     <span className="debug-run" title={label} {...(plain ? {} : { role: "img", "aria-label": label })}>
       {items.slice(0, cap).map((item, index) => (
-        <span key={index} className={badgeClass(item, item.text !== undefined ? "is-name" : undefined)} title={item.title}>
-          {item.text ?? text}
-        </span>
+        <BadgeWord key={index} item={item}>{text}</BadgeWord>
       ))}
       {items.length > cap && <span className="debug-run-more">{`+${items.length - cap}`}</span>}
     </span>
@@ -522,8 +569,13 @@ function Dot({ tone, ring = false }: { tone: DebugTone; ring?: boolean }) {
   return <span className={`debug-dot is-${tone}${ring ? " is-ring" : ""}`} aria-hidden="true" />;
 }
 
+/** A state word in its tone's outline (shadcn Badge): the box reads the tone's own color. */
 function Chip({ tone, children, title }: { tone: DebugTone; children: ReactNode; title?: string }) {
-  return <span className={`debug-chip is-${tone}`} title={title}>{children}</span>;
+  return (
+    <Badge variant="outline" className={cn("border-current/35 px-1.5 py-0 font-mono text-[11px] leading-4 font-normal", TONE_TEXT[tone])} title={title}>
+      {children}
+    </Badge>
+  );
 }
 
 /** A value against its scale; hidden from screen readers, whose text is the label and value beside it. */
@@ -606,6 +658,17 @@ function StatusSlot({ state, label }: { state: DebugStatusState; label: string }
 
 // ── A. Header and B. Issues ──
 
+/** A column's bare state ("waiting", "no chat"): the Empty composition, kept dense for the panel. */
+function DebugEmpty({ children }: { children: ReactNode }) {
+  return (
+    <Empty className="flex-none items-start gap-0 rounded-none border-0 p-0 text-left md:p-0">
+      <EmptyHeader className="items-start text-left">
+        <EmptyTitle className="text-xs font-normal text-dim">{children}</EmptyTitle>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
 function VerdictView({ verdict, t }: { verdict: DebugVerdict; t: Translate }) {
   const text = {
     reading: () => t("debug.reading"),
@@ -624,17 +687,23 @@ function VerdictView({ verdict, t }: { verdict: DebugVerdict; t: Translate }) {
   );
 }
 
-/** One line per fault: its tone's mark, then the sentence, which names what it is about. */
+/** One callout per fault (shadcn Alert): its tone's mark, then the sentence, which names what it is about. */
 function IssueList({ issues }: { issues: readonly DebugIssue[] }) {
   return (
-    <ul className="debug-issues">
+    <div className="flex flex-col gap-1">
       {issues.map((issue, index) => (
-        <li key={`${issue.id}:${index}`} className={`debug-issue is-${issue.tone}`}>
-          <Glyph kind={issue.tone} />
-          <span className="debug-issue-text">{issue.text}</span>
-        </li>
+        <Alert
+          key={`${issue.id}:${index}`}
+          variant={issue.tone === "error" ? "destructive" : "warning"}
+          className="gap-x-1.5 px-2.5 py-1.5"
+          // role={undefined}: Alert's implicit live region would read the panel's 2 s re-renders out.
+          role={undefined}
+        >
+          <Glyph kind={issue.tone === "error" ? "error" : "warning"} />
+          <AlertDescription className="text-xs text-current [overflow-wrap:anywhere]">{issue.text}</AlertDescription>
+        </Alert>
       ))}
-    </ul>
+    </div>
   );
 }
 
@@ -653,34 +722,38 @@ function SampleValue({ samples, t }: { samples: readonly DebugSample[]; t: Trans
 }
 
 /**
- * The page's connections and timings in one column: the meter under its count, then one table of
- * name, scale and value for the two polls, the chat's stream and its lease, each with its details
- * on a dim line below.
+ * The page's connections and timings in one column: the meter under its count, then one
+ * definition list of name, scale and value for the two polls, the chat's stream and its lease,
+ * each with its details on a dim line below.
  */
 function PageColumn({ page, samples, reply, ctx }: { page: DebugPageReading; samples: DebugSamples; reply: DebugSnapshotResponse | null; ctx: Ctx }) {
   const { t } = ctx;
   const pool = poolSlots(page.sources, page.protocol, page.client?.connection?.sessionId ?? null);
   const running = page.runningPoll;
   return (
-    <div className="debug-col debug-col-page">
-      <div className="debug-col-head">
-        <span className="debug-section-title">{t("debug.section.page")}</span>
-      </div>
-      <Meter pool={pool} ctx={ctx} />
-      <div className="debug-measures">
-        <span className="debug-measure-name"><span className="debug-label">{t("debug.page.debugPoll")}</span></span>
-        <Sparkline samples={samples.poll} label={sparkLabel(samples.poll, t)} />
-        <SampleValue samples={samples.poll} t={t} />
-        <span className="debug-measure-name"><span className="debug-label">{t("debug.page.runningPoll")}</span></span>
-        <Sparkline
-          samples={samples.running}
-          label={join([running && t("debug.page.pollCounts", { count: running.count, failures: running.failures }), sparkLabel(samples.running, t)])}
-        />
-        <SampleValue samples={samples.running} t={t} />
-        <StreamRows page={page} reply={reply} ctx={ctx} />
-        <LeaseRows page={page} ctx={ctx} />
-      </div>
-    </div>
+    <Card className="debug-col-page min-w-0 gap-2 px-3 py-3 shadow-none">
+      <CardHeader className="flex min-h-[18px] flex-row items-center gap-2 px-0">
+        <CardTitle className="debug-section-title">{t("debug.section.page")}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex min-w-0 flex-col gap-2 px-0">
+        <Meter pool={pool} ctx={ctx} />
+        <Separator />
+        <dl className="debug-measures">
+          <dt className="debug-measure-name"><span className="debug-label">{t("debug.page.debugPoll")}</span></dt>
+          <dd className="debug-measure-cell"><Sparkline samples={samples.poll} label={sparkLabel(samples.poll, t)} /><SampleValue samples={samples.poll} t={t} /></dd>
+          <dt className="debug-measure-name"><span className="debug-label">{t("debug.page.runningPoll")}</span></dt>
+          <dd className="debug-measure-cell">
+            <Sparkline
+              samples={samples.running}
+              label={join([running && t("debug.page.pollCounts", { count: running.count, failures: running.failures }), sparkLabel(samples.running, t)])}
+            />
+            <SampleValue samples={samples.running} t={t} />
+          </dd>
+          <StreamRows page={page} reply={reply} ctx={ctx} />
+          <LeaseRows page={page} ctx={ctx} />
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -701,13 +774,14 @@ function Meter({ pool, ctx }: { pool: DebugPool; ctx: Ctx }) {
         {cells.map((slot, index) => slot ? (
           // The chat's own stream filled, a stream kept through its grace and the rest outlined;
           // amber and dashed while connecting.
-          <span
+          <Badge
             key={slot.id}
-            className={badgeClass({ tone: slot.connecting ? "warning" : slot.chat ? "accent" : "muted", filled: slot.chat, dashed: slot.connecting }, "debug-slot")}
+            variant={slot.chat ? "default" : "outline"}
+            className={cn("debug-slot", badgeClasses({ tone: slot.connecting ? "warning" : slot.chat ? "accent" : "muted", filled: slot.chat, dashed: slot.connecting }))}
             title={debugSlotTitle(slot, now, t, titleOf)}
           >
             {slot.kind === "agent" ? "SSE" : t(SLOT_TEXT_KEYS[slot.kind])}
-          </span>
+          </Badge>
         ) : (
           <span key={`empty:${index}`} className="debug-slot is-empty" />
         ))}
@@ -780,15 +854,15 @@ function StreamRows({ page, reply, ctx }: { page: DebugPageReading; reply: Debug
   const client = page.client;
   const connection = client?.connection ?? null;
   const name = (
-    <span className="debug-measure-name" title={client && connection ? streamStateTitle(client, connection, page, t) : undefined}>
+    <dt className="debug-measure-name" title={client && connection ? streamStateTitle(client, connection, page, t) : undefined}>
       <span className="debug-label">{t("debug.section.stream")}</span>
-    </span>
+    </dt>
   );
   if (!client || !connection) {
     return (
       <>
         {name}
-        <span className="debug-measure-empty">{!client ? (page.clientFailed ? "—" : t("debug.stream.noChat")) : t("debug.stream.noConnection")}</span>
+        <dd className="debug-measure-empty">{!client ? (page.clientFailed ? "—" : t("debug.stream.noChat")) : t("debug.stream.noConnection")}</dd>
       </>
     );
   }
@@ -800,25 +874,22 @@ function StreamRows({ page, reply, ctx }: { page: DebugPageReading; reply: Debug
       {freshness ? (
         <FreshnessCells connection={connection} freshness={freshness} heartbeatMs={reply?.server.heartbeatMs ?? 0} ctx={ctx} />
       ) : (
-        <>
-          <span />
-          <span className="debug-value is-dim">—</span>
-        </>
+        <dd className="debug-measure-cell"><span className="debug-value is-dim">—</span></dd>
       )}
       {/* The state leads its line with its dot, so the names stay in one column. */}
-      <span className="debug-measure-sub" title={streamStateTitle(client, connection, page, t)}>
+      <dd className="debug-measure-sub" title={streamStateTitle(client, connection, page, t)}>
         <Dot tone={dot?.tone ?? "dim"} ring={dot?.ring ?? true} />
         {join([
           t(DEBUG_STREAM_STATE_KEYS[connection.state] ?? "debug.unknown"),
           `${t("debug.stream.events")} ${connection.events}`,
           connection.retries > 0 && `${t("debug.stream.opens")} ${t("debug.stream.opensRetries", { opens: connection.opens, retries: connection.retries })}`,
         ])}
-      </span>
+      </dd>
       {(client.released.active || client.graceDueAt !== null) && (
-        <span className="debug-measure-sub debug-chips">
+        <dd className="debug-measure-sub debug-chips">
           {client.released.active && <Chip tone="accent">{t("debug.stream.close.released")}</Chip>}
           {client.graceDueAt !== null && <Chip tone="accent">{`${t("debug.stream.grace")} ${formatSecondsCountdown(client.graceDueAt - now, t)}`}</Chip>}
-        </span>
+        </dd>
       )}
     </>
   );
@@ -844,10 +915,10 @@ function FreshnessCells({ connection, freshness, heartbeatMs, ctx }: {
     t("debug.stream.watchdogArmed", { time: formatDebugDuration(staleAfterMs, t) }),
   ]);
   return (
-    <>
+    <dd className="debug-measure-cell">
       <Bar fraction={barFraction(ageMs, staleAfterMs) ?? 0} tone={tone} width={BAR_WIDTH} notches={notches} title={title} />
       <span className={`debug-value is-${tone}`} title={title}>{t("debug.stream.dataAgo", { time: formatDebugSeconds(ageMs, t) })}</span>
-    </>
+    </dd>
   );
 }
 
@@ -856,12 +927,12 @@ function LeaseRows({ page, ctx }: { page: DebugPageReading; ctx: Ctx }) {
   const { t, now } = ctx;
   const lease = page.client?.lease ?? null;
   const pageId = page.client?.pageId ?? null;
-  const name = <span className="debug-measure-name"><span className="debug-label">{t("debug.section.lease")}</span></span>;
+  const name = <dt className="debug-measure-name"><span className="debug-label">{t("debug.section.lease")}</span></dt>;
   if (!lease || lease.requests === 0) {
     return (
       <>
         {name}
-        <span className="debug-measure-empty">{!lease ? (page.clientFailed ? "—" : t("debug.stream.noChat")) : t("debug.lease.noHolder")}</span>
+        <dd className="debug-measure-empty">{!lease ? (page.clientFailed ? "—" : t("debug.stream.noChat")) : t("debug.lease.noHolder")}</dd>
       </>
     );
   }
@@ -880,12 +951,9 @@ function LeaseRows({ page, ctx }: { page: DebugPageReading; ctx: Ctx }) {
     <>
       {name}
       {next === null ? (
-        <>
-          <span />
-          <span className="debug-value is-dim">—</span>
-        </>
+        <dd className="debug-measure-cell"><span className="debug-value is-dim">—</span></dd>
       ) : (
-        <>
+        <dd className="debug-measure-cell">
           {/* Fills toward the renewal, as the stream's bar fills toward its watchdog; waiting for an
               answer: full and amber until it comes. */}
           <Bar fraction={waiting ? 1 : 1 - (barFraction(next - now, lease.renewIntervalMs) ?? 1)} tone={tone} width={BAR_WIDTH} title={title} />
@@ -893,9 +961,9 @@ function LeaseRows({ page, ctx }: { page: DebugPageReading; ctx: Ctx }) {
           <span className="debug-value is-muted" title={title}>
             {next - now > 0 ? t("debug.lease.renewsIn", { time: formatDebugSeconds(next - now, t, "ceil") }) : t("debug.lease.renewing")}
           </span>
-        </>
+        </dd>
       )}
-      <span className="debug-measure-sub">
+      <dd className="debug-measure-sub">
         {`${t("debug.lease.last")} ${last
           ? join([
             t(DEBUG_LEASE_OUTCOME_KEYS[last.outcome] ?? "debug.unknown"),
@@ -904,8 +972,8 @@ function LeaseRows({ page, ctx }: { page: DebugPageReading; ctx: Ctx }) {
             t("debug.time.ago", { time: formatDebugSeconds(now - last.at, t) }),
           ])
           : t("debug.notYet")}`}
-      </span>
-      {(lease.unanswered > 0 || lease.errors > 0) && <span className="debug-measure-sub">{counts}</span>}
+      </dd>
+      {(lease.unanswered > 0 || lease.errors > 0) && <dd className="debug-measure-sub">{counts}</dd>}
     </>
   );
 }
@@ -915,13 +983,13 @@ function LeaseRows({ page, ctx }: { page: DebugPageReading; ctx: Ctx }) {
 
 function ServerHead({ reply, ctx }: { reply: DebugSnapshotResponse | null; ctx: Ctx }) {
   const { t, clock } = ctx;
-  const title = <span className="debug-section-title">{t("debug.section.server")}</span>;
+  const title = <CardTitle className="debug-section-title">{t("debug.section.server")}</CardTitle>;
   if (!reply || !clock) {
     return (
-      <div className="debug-col-head debug-server-head">
+      <CardHeader className="debug-server-head flex min-h-[18px] flex-row flex-wrap items-center gap-x-3.5 gap-y-1 px-0">
         {title}
         <span>{t("debug.poll.waiting")}</span>
-      </div>
+      </CardHeader>
     );
   }
   const global = reply.server;
@@ -949,7 +1017,7 @@ function ServerHead({ reply, ctx }: { reply: DebugSnapshotResponse | null; ctx: 
   const watchesLabel = `${t("debug.global.fileWatches")}: ${global.fileWatches}`;
   const starting = global.wrappers.starting;
   return (
-    <div className="debug-col-head debug-server-head">
+    <CardHeader className="debug-server-head flex min-h-[18px] flex-row flex-wrap items-center gap-x-3.5 gap-y-1 px-0">
       {title}
       <span className="debug-server-item" title={timers}>
         <Glyph kind="server" />
@@ -971,7 +1039,7 @@ function ServerHead({ reply, ctx }: { reply: DebugSnapshotResponse | null; ctx: 
         label={watchesLabel}
       />
       <BadgeRun text={t("debug.box.terminal")} items={terminalItems} cap={4} label={terminalsLabel} />
-    </div>
+    </CardHeader>
   );
 }
 
@@ -989,7 +1057,8 @@ function PageList({ reply, ctx }: { reply: DebugSnapshotResponse | null; ctx: Ct
   if (sseTotal === 0 && pages.length === 0) return null;
   const holders = thisPageFirst(pages, myHolder);
   return (
-    <div className="debug-pages">
+    <CardContent className="min-w-0 px-0">
+      <div className="debug-pages">
       <div className="debug-page-row debug-list-head">
         <span className="debug-pages-title">{`${t("debug.pages.title")} ${holders.length}`}</span>
         <span className="debug-page-count">{`SSE ${t("debug.global.streamTotal", { count: sseTotal })}`}</span>
@@ -1019,7 +1088,8 @@ function PageList({ reply, ctx }: { reply: DebugSnapshotResponse | null; ctx: Ct
           </div>
         );
       })}
-    </div>
+      </div>
+    </CardContent>
   );
 }
 
@@ -1035,18 +1105,19 @@ function SessionList({ reply, detail, groups, targetSessionId, sources, ctx }: {
   ctx: Ctx;
 }) {
   const { t, clock } = ctx;
-  if (!reply || !clock || !groups) return <div className="debug-empty">{t("debug.poll.waiting")}</div>;
+  if (!reply || !clock || !groups) return <DebugEmpty>{t("debug.poll.waiting")}</DebugEmpty>;
   const listed = detail !== null && groups.some((group) => group.rows.some((row) => row.current && row.id === detail.sessionId));
   // Above the groups: no chat, an answer still about another one, or a chat the server holds
   // nothing for, which has no row to sit under.
   let lead: ReactNode = null;
-  if (!targetSessionId) lead = <div className="debug-empty">{t("debug.server.noSession")}</div>;
-  else if (!detail) lead = <div className="debug-empty">{t("debug.poll.waiting")}</div>;
+  if (!targetSessionId) lead = <DebugEmpty>{t("debug.server.noSession")}</DebugEmpty>;
+  else if (!detail) lead = <DebugEmpty>{t("debug.poll.waiting")}</DebugEmpty>;
   else if (!listed) lead = <UnlistedCurrent detail={detail} clock={clock} ctx={ctx} />;
   return (
+    <CardContent className="min-w-0 px-0">
     <div className="debug-list">
       {lead}
-      {groups.length === 0 && !(detail && !listed) && <div className="debug-empty">{t("debug.none")}</div>}
+      {groups.length === 0 && !(detail && !listed) && <DebugEmpty>{t("debug.none")}</DebugEmpty>}
       {/* What the rows' columns are: the badges and the countdown say nothing on their own. */}
       {groups.length > 0 && (
         <div className="debug-row debug-list-head" aria-hidden="true">
@@ -1056,7 +1127,7 @@ function SessionList({ reply, detail, groups, targetSessionId, sources, ctx }: {
           <span className="debug-list-head-idle">{t("debug.server.idle")}</span>
         </div>
       )}
-      {groups.map((group) => (
+          {groups.map((group) => (
         <div key={group.key} className="debug-group">
           <div className="debug-group-head">
             {group.name !== null && <FolderIcon size={11} />}
@@ -1082,6 +1153,7 @@ function SessionList({ reply, detail, groups, targetSessionId, sources, ctx }: {
         </div>
       ))}
     </div>
+    </CardContent>
   );
 }
 
@@ -1164,7 +1236,7 @@ function SessionDetail({ detail, clock, ctx, unlisted = false }: { detail: Debug
     <div className="debug-detail">
       <div className="debug-detail-line">
         {titleOf(detail.sessionId) !== null && <span className="debug-detail-id">{shortDebugId(detail.sessionId)}</span>}
-        {!wrapper && <span className="debug-note">{t(detail.starting ? "debug.server.starting" : "debug.server.noWrapper")}</span>}
+        {!wrapper && <span className="text-xs text-dim">{t(detail.starting ? "debug.server.starting" : "debug.server.noWrapper")}</span>}
         {/* A listed row has its own ↻ count. */}
         {unlisted && lifecycle && lifecycle.starts > 1 && (
           <span className="debug-starts" title={startsTitle(lifecycle, ago, t)}>{`↻${lifecycle.starts}`}</span>
@@ -1470,7 +1542,9 @@ function SessionRowCells({ summary, mine, remaining, idleTimeoutMs, t, badges, i
 
 // The session info popover's look (AppShell): the panel's background, a border below. Tones are
 // classes setting `color`, and every mark is drawn in currentColor. No transitions: bars and rings
-// jump once a second. Narrow rules follow the panel's own width, not the window's.
+// jump once a second. Narrow rules follow the panel's own width, not the window's. Badges, chips,
+// issue callouts and the empty states are shadcn components; the columns are Card compositions —
+// what stays here is the data-viz chrome (bars, dots, rings, rows, the container queries).
 const DEBUG_PANEL_CSS = `
   /* Tones read the theme's state tokens; the container declaration stays here
      because the panel's own width, not the window's, drives the rules below. */
@@ -1503,11 +1577,6 @@ const DEBUG_PANEL_CSS = `
     font-size: 11px;
     font-weight: 700;
   }
-  .debug-empty,
-  .debug-note {
-    color: var(--text-dim);
-    font-size: 12px;
-  }
   .debug-label {
     color: var(--text-dim);
     font-size: 11px;
@@ -1530,51 +1599,14 @@ const DEBUG_PANEL_CSS = `
     color: var(--dbg-warn);
   }
 
-  .debug-issues {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .debug-issue {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 4px 8px;
-    border-left: 2px solid currentColor;
-    border-radius: 4px;
-    background: color-mix(in srgb, currentColor 8%, var(--bg-panel));
-  }
-  .debug-issue > svg {
-    margin-top: 3px;
-  }
-  .debug-issue-text {
-    min-width: 0;
-    color: var(--text);
-    font-size: 12px;
-    overflow-wrap: anywhere;
-  }
-
   /* Three columns when the panel is wide: the page's as wide as its table, the server's and the
      sessions' each capped, so names never stretch and push the badges to the far edge. Each
-     column reads as a card: a rounded panel block with its own border. */
+     column is a shadcn Card; only its place in the grid is this sheet's business. */
   .debug-cols {
     display: grid;
     grid-template-areas: "page server sessions";
     grid-template-columns: minmax(320px, max-content) minmax(340px, 480px) minmax(360px, 560px);
     gap: 12px;
-  }
-  .debug-col {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--bg-panel);
   }
   .debug-col-page {
     grid-area: page;
@@ -1595,25 +1627,23 @@ const DEBUG_PANEL_CSS = `
   .debug-block {
     gap: 4px;
   }
-  .debug-col-head {
-    display: flex;
-    min-height: 18px;
-    align-items: center;
-    gap: 8px;
-  }
   /* Name, scale, value; a measure's details span the row below it. */
   /* As wide as the column (the details get the room), never so wide a value drifts off its bar. */
   .debug-measures {
     display: grid;
     max-width: 400px;
-    grid-template-columns: max-content minmax(max-content, 1fr) max-content;
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
     gap: 4px 10px;
   }
-  /* Numbers line up on the right, as the count in the column's head does. */
-  .debug-measures > .debug-value {
-    justify-self: end;
-    text-align: right;
+  /* A measure's scale and value share the second column, the value on its right edge. */
+  .debug-measures > .debug-measure-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    grid-column: 2;
+    min-width: 0;
   }
   .debug-measure-name {
     display: inline-flex;
@@ -1652,56 +1682,7 @@ const DEBUG_PANEL_CSS = `
     flex-wrap: wrap;
     gap: 4px;
   }
-  .debug-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 0 6px;
-    border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-    border-radius: 9px;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    line-height: 16px;
-    white-space: nowrap;
-  }
 
-  /* A boxed word: "SSE", a provider's name, File, Term. Filled is this page's own. */
-  .debug-badge {
-    display: inline-flex;
-    height: 16px;
-    box-sizing: border-box;
-    flex-shrink: 0;
-    align-items: center;
-    padding: 0 4px;
-    border: 1px solid currentColor;
-    border-radius: 3px;
-    background-clip: padding-box;
-    font: 600 10px/14px var(--font-mono);
-    white-space: nowrap;
-  }
-  .debug-panel .debug-badge.is-filled {
-    border-color: var(--accent);
-    background-color: var(--accent);
-    color: var(--accent-contrast);
-  }
-  /* This page's, amber: a stream of its own still starting or dropping events. */
-  .debug-panel .debug-badge.is-filled.is-warning {
-    border-color: var(--dbg-warn);
-    background-color: var(--dbg-warn);
-    color: var(--bg-panel);
-  }
-  .debug-badge.is-dashed {
-    border-style: dashed;
-  }
-  .debug-badge.is-faded {
-    opacity: 0.45;
-  }
-  /* A provider's name: twelve characters, then an ellipsis (a block, so the ellipsis applies). */
-  .debug-badge.is-name {
-    display: inline-block;
-    max-width: calc(12ch + 10px);
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
   /* A page's browser and system marks. */
   .debug-client {
     display: inline-flex;

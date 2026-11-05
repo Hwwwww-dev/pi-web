@@ -3,7 +3,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BookOpenIcon, BotIcon, CheckIcon, CircleXIcon, CopyIcon, ExternalLinkIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareTerminalIcon, TriangleAlertIcon, WrenchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import { CodeBlock, CodeBlockContent } from "./ui/code-block";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import { Skeleton } from "./ui/skeleton";
 import { Spinner } from "./ui/spinner";
 import {
   Trace,
@@ -182,9 +186,9 @@ function ToolRowPreview({ block, result, cwd, onOpenFile }: {
 
   if (paths.length > 0 && onOpenFile) {
     return (
-      <span className="tool-row-chips">
+      <span>
         {paths.slice(0, 4).map((path) => <ToolFileChip key={path} path={path} cwd={cwd} onOpenFile={onOpenFile} />)}
-        {paths.length > 4 && <span className="tool-row-more">+{paths.length - 4}</span>}
+        {paths.length > 4 && <span>+{paths.length - 4}</span>}
       </span>
     );
   }
@@ -302,8 +306,8 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
               )}
               {diffStat && (
                 <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] font-medium" aria-hidden="true">
-                  <span className="rounded-full bg-success/15 px-1.5 text-success">+{diffStat.added}</span>
-                  <span className="rounded-full bg-destructive/10 px-1.5 text-destructive">−{diffStat.removed}</span>
+                  <Badge variant="ghost" className="bg-success/15 text-success">+{diffStat.added}</Badge>
+                  <Badge variant="ghost" className="bg-destructive/10 text-destructive">−{diffStat.removed}</Badge>
                 </span>
               )}
               {!active && duration !== undefined && (
@@ -364,15 +368,17 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
           </TraceCollapsibleContent>
         </TraceCollapsible>
         {subagent && onOpenSubagent && (
-          <button
+          <Button
             type="button"
-            className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0 text-muted-foreground"
             onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
             title={t("subagent.openTab")}
             aria-label={t("subagent.openTab")}
           >
-            <ExternalLinkIcon className="size-3.5" strokeWidth={2} />
-          </button>
+            <ExternalLinkIcon strokeWidth={2} />
+          </Button>
         )}
       </div>
 
@@ -616,7 +622,9 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
             )}
             onScroll={handleDetailScroll}
           >
-            {loading ? t("i18n.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
+            {loading ? (
+              <Skeleton className="h-3 w-1/2" />
+            ) : error ?? (block.deferred ? content : block.thinking)}
           </div>
         </TraceCollapsibleContent>
       </TraceCollapsible>
@@ -747,16 +755,17 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
                 : <span className="text-xs text-muted-foreground">{t("i18n.noMessage")}</span>}
               {hasDetails && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <button type="button" onClick={copyContent} className="cursor-pointer border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground">
+                  <Button type="button" variant="ghost" size="xs" onClick={copyContent}>
                     {copied ? t("i18n.copied") : t("i18n.copy")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={() => setDetailsExpanded((v) => !v)}
-                    className="cursor-pointer border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {detailsExpanded ? t("i18n.hideDetails") : t("i18n.showDetails")}
-                  </button>
+                  </Button>
                   {detailsExpanded && (
                     <CodeBlock size="sm" className="mt-1.5"><CodeBlockContent wrap>{detailsText}</CodeBlockContent></CodeBlock>
                   )}
@@ -764,24 +773,26 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
               )}
               {!hasDetails && text && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <button type="button" onClick={copyContent} className="cursor-pointer border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground">
+                  <Button type="button" variant="ghost" size="xs" onClick={copyContent}>
                     {copied ? t("i18n.copied") : t("i18n.copy")}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
           </TraceCollapsibleContent>
         </TraceCollapsible>
         {subagent && onOpenSubagent && (
-          <button
+          <Button
             type="button"
-            className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0 text-muted-foreground"
             onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
             title={t("subagent.openTab")}
             aria-label={t("subagent.openTab")}
           >
-            <ExternalLinkIcon className="size-3.5" strokeWidth={2} />
-          </button>
+            <ExternalLinkIcon strokeWidth={2} />
+          </Button>
         )}
       </div>
     </Trace>
@@ -869,11 +880,17 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
   if (modifiedFiles.length > 0) parts.push(`${modifiedFiles.length} modified`);
 
   return (
-    <details className="compaction-file-details">
-      <summary>{t("i18n.fileContext", { details: parts.join(", ") })}</summary>
-      {modifiedFiles.length > 0 && <CompactionFileList title={t("i18n.modifiedFiles")} files={modifiedFiles} />}
-      {readFiles.length > 0 && <CompactionFileList title={t("i18n.readFiles")} files={readFiles} />}
-    </details>
+    <Collapsible className="mt-2.5 border-t border-border pt-2 text-xs text-muted-foreground">
+      <CollapsibleTrigger className="flex w-full cursor-pointer justify-start text-left font-semibold leading-[1.4]">
+        {t("i18n.fileContext", { details: parts.join(", ") })}
+      </CollapsibleTrigger>
+      {/* forceMount: the native <details> this replaces kept its lists in the
+          DOM while closed; the lists are tiny, so stay mounted and hidden. */}
+      <CollapsibleContent forceMount>
+        {modifiedFiles.length > 0 && <CompactionFileList title={t("i18n.modifiedFiles")} files={modifiedFiles} />}
+        {readFiles.length > 0 && <CompactionFileList title={t("i18n.readFiles")} files={readFiles} />}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -928,7 +945,10 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
       )}
       {time && <span>{time}</span>}
       {copySource && (
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={() => {
             copyText(copySource).then(() => {
               setCopied(true);
@@ -938,12 +958,12 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
           title={t("i18n.copyMessage")}
           aria-label={t("i18n.copyMessage")}
           className={cn(
-            "ml-auto flex cursor-pointer items-center rounded-sm p-0.5 transition-colors",
-            copied ? "text-primary" : "text-muted-foreground hover:text-foreground",
+            "ml-auto size-4 rounded-sm p-0.5",
+            copied ? "text-primary" : "text-muted-foreground",
           )}
         >
-          {copied ? <CheckIcon className="size-3" strokeWidth={1.8} /> : <CopyIcon className="size-3" strokeWidth={1.8} />}
-        </button>
+          {copied ? <CheckIcon strokeWidth={1.8} /> : <CopyIcon strokeWidth={1.8} />}
+        </Button>
       )}
     </div>
   );
@@ -967,13 +987,15 @@ export function SafeMarkdownBody({ children, className, ...props }: React.Compon
   }
   if (!showRaw) {
     return (
-      <button
+      <Button
+        type="button"
+        variant="outline"
         onClick={() => setShowRaw(true)}
-        className="my-1 block w-full cursor-pointer rounded-sm border border-border bg-card px-2.5 py-[7px] text-left text-xs text-muted-foreground"
+        className="my-1 h-auto w-full justify-start px-2.5 py-[7px] text-left text-xs font-normal text-muted-foreground"
       >
-        <TriangleAlertIcon aria-hidden className="mr-1.5 inline size-3.5 align-[-0.15em]" />
+        <TriangleAlertIcon aria-hidden className="mr-1.5 size-3.5 shrink-0" />
         {t("i18n.largeMessageReveal", { size: children.length >= 1_000_000 ? `${(children.length / 1_000_000).toFixed(1)} MB` : children.length >= 1_000 ? `${Math.round(children.length / 1_000)} KB` : `${children.length} B` })}
-      </button>
+      </Button>
     );
   }
   return (

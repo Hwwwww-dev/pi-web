@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { AnsiText } from "@/components/AnsiText";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ExtensionWidgetItem } from "@/lib/types";
 
 export const DEFAULT_EXPANDED_WIDGET_LINES = 3;
@@ -183,28 +184,40 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
             );
 
             return expandable ? (
-              <button
-                key={widget.key}
-                id={triggerId}
-                type="button"
-                className={`extension-widget-trigger${expanded ? " is-expanded" : ""}${updating ? " is-updating" : ""}`}
-                aria-controls={panelId}
-                aria-expanded={expanded}
-                aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-                title={`${widget.key} - ${placementLabel} - ${expanded ? t("i18n.collapse") : t("i18n.expand")}`}
-                onClick={() => toggleWidget(widget)}
-              >
-                {content}
-              </button>
+              <Tooltip key={widget.key}>
+                <TooltipTrigger asChild>
+                  <button
+                    id={triggerId}
+                    type="button"
+                    className={`extension-widget-trigger${expanded ? " is-expanded" : ""}${updating ? " is-updating" : ""}`}
+                    aria-controls={panelId}
+                    aria-expanded={expanded}
+                    aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
+                    title={`${widget.key} - ${placementLabel} - ${expanded ? t("i18n.collapse") : t("i18n.expand")}`}
+                    onClick={() => toggleWidget(widget)}
+                  >
+                    {content}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {widget.key} - {placementLabel} - {expanded ? t("i18n.collapse") : t("i18n.expand")}
+                </TooltipContent>
+              </Tooltip>
             ) : (
-              <div
-                key={widget.key}
-                className={`extension-widget-trigger${updating ? " is-updating" : ""}`}
-                aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-                title={`${widget.key} - ${placementLabel}`}
-              >
-                {content}
-              </div>
+              <Tooltip key={widget.key}>
+                <TooltipTrigger asChild>
+                  <div
+                    className={`extension-widget-trigger${updating ? " is-updating" : ""}`}
+                    aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
+                    title={`${widget.key} - ${placementLabel}`}
+                  >
+                    {content}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {widget.key} - {placementLabel}
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </div>

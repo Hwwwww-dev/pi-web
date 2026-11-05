@@ -92,7 +92,7 @@ test("client code stays parseable by Safari 16.2 and its CSS flat", () => {
     assert.doesNotMatch(file, /\(\?<[=!]/, "no RegExp lookbehind");
   }
   const header = css.slice(css.indexOf(".new-session-hero-inner {"), css.indexOf("/* The project and worktree picker (ProjectWorktreePicker)"));
-  const rules = css.slice(css.indexOf(".new-session-hero-inner {"), css.indexOf(".file-viewer-icon-button {"));
+  const rules = css.slice(css.indexOf(".new-session-hero-inner {"), css.indexOf(".directory-picker-path:focus-visible"));
   assert.ok(header.length > 0 && rules.length > header.length);
   assert.doesNotMatch(rules.replace(/@media[^{]*\{/g, ""), /\{[^}]*\{|&/, "no nested rules");
   // The link's box: padding offset by equal negative margins, so hover and

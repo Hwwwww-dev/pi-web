@@ -4,9 +4,12 @@ import { Fragment, memo, useState, useRef, useEffect, useMemo } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, ClockIcon, CopyIcon, CornerDownRightIcon, GitBranchIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "./ui/alert";
+import { Badge } from "./ui/badge";
 import { Bubble, BubbleContent } from "./ui/bubble";
+import { Button } from "./ui/button";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
+import { Skeleton } from "./ui/skeleton";
 import {
   CompactionRow,
   CustomRow,
@@ -397,51 +400,56 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             ? "opacity-100"
             : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
         )}>
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
             onClick={copyContent}
             title={t("i18n.copyMessage")}
             aria-label={t("i18n.copyMessage")}
-            className={cn(
-              "inline-flex size-[26px] cursor-pointer items-center justify-center rounded-lg transition-colors",
-              copied ? "text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-            )}
+            className={cn("text-muted-foreground", copied && "text-primary")}
           >
-            {copied ? <CheckIcon className="size-[13px]" strokeWidth={1.8} /> : <CopyIcon className="size-[13px]" strokeWidth={1.8} />}
-          </button>
+            {copied ? <CheckIcon strokeWidth={1.8} /> : <CopyIcon strokeWidth={1.8} />}
+          </Button>
           {canEdit && !canCancelEdit && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
               onClick={() => onEditContent!(editTarget, entryId!)}
-               title={t("i18n.editFromHereTitle")}
+              title={t("i18n.editFromHereTitle")}
               aria-label={t("i18n.editFromHere")}
-              className="inline-flex size-[26px] cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="text-muted-foreground"
             >
-              <CornerDownRightIcon className="size-[13px]" strokeWidth={1.8} />
-            </button>
+              <CornerDownRightIcon strokeWidth={1.8} />
+            </Button>
           )}
           {canCancelEdit && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               onClick={onCancelEdit}
               title={t("i18n.cancel")}
               aria-label={t("i18n.cancel")}
-              className="inline-flex size-[26px] cursor-pointer items-center justify-center rounded-lg text-primary"
+              className="text-primary"
             >
-              <XIcon className="size-[13px]" strokeWidth={2} />
-            </button>
+              <XIcon strokeWidth={2} />
+            </Button>
           )}
           {canFork && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
               onClick={() => { onFork!(entryId!); }}
               disabled={forking}
-               title={forking ? t("i18n.creatingSession") : t("i18n.newSessionTitle")}
+              title={forking ? t("i18n.creatingSession") : t("i18n.newSessionTitle")}
               aria-label={t("i18n.newSession")}
-              className={cn(
-                "inline-flex size-[26px] cursor-pointer items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed",
-                forking ? "text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-              )}
+              className={cn("text-muted-foreground", forking && "text-primary")}
             >
-              <GitBranchIcon className="size-[13px]" strokeWidth={1.8} />
-            </button>
+              <GitBranchIcon strokeWidth={1.8} />
+            </Button>
           )}
           {time && <span className="text-[10px] text-muted-foreground">{time}</span>}
         </div>
@@ -663,9 +671,10 @@ function AssistantMessageView({
                       {est}
                     </span>
                     {tps !== null && (
-                      <span
+                      <Badge
+                        variant="ghost"
                         className={cn(
-                          "ml-1.5 rounded-full px-1.5 py-px text-[11px] font-normal",
+                          "ml-1.5",
                           tps >= 50 ? "bg-primary/15 text-primary"
                             : tps >= 30 ? "bg-success/15 text-success"
                             : tps >= 15 ? "bg-warning/15 text-warning"
@@ -673,7 +682,7 @@ function AssistantMessageView({
                         )}
                       >
                         {tps.toFixed(1)} t/s
-                      </span>
+                      </Badge>
                     )}
                   </span>
                 )}
@@ -704,14 +713,16 @@ function AssistantMessageView({
           <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
             {t(unansweredTruncation ? "chat.truncatedWithoutAnswer" : "chat.truncatedByOutputLimit")}
             {unansweredTruncation && onCompact && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 onClick={onCompact}
                 disabled={isCompacting}
-                className="mt-2 block cursor-pointer rounded-sm border border-current bg-transparent px-2 py-[3px] transition-colors hover:bg-warning/15 disabled:cursor-default"
+                className="mt-2 w-fit border-current bg-transparent text-current hover:bg-warning/15"
               >
                 {t(isCompacting ? "chat.compacting" : "chat.compactContext")}
-              </button>
+              </Button>
             )}
             {unansweredTruncation && compactError && (
               <div className="mt-2 whitespace-pre-wrap text-destructive">{compactError}</div>
@@ -736,18 +747,20 @@ function AssistantMessageView({
             </div>
           )}
           {textContent && !isStreaming && !hideCopy && (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
             onClick={copyContent}
             title={t("i18n.copyMessage")}
             aria-label={t("i18n.copyMessage")}
             className={cn(
-              "inline-flex size-[26px] shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors",
-              "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
-              copied ? "text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+              "pointer-events-none shrink-0 text-muted-foreground opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
+              copied && "text-primary",
             )}
           >
-            {copied ? <CheckIcon className="size-[13px]" strokeWidth={1.8} /> : <CopyIcon className="size-[13px]" strokeWidth={1.8} />}
-          </button>
+            {copied ? <CheckIcon strokeWidth={1.8} /> : <CopyIcon strokeWidth={1.8} />}
+          </Button>
           )}
           {time && !isStreaming && (
             <span className="ml-auto whitespace-nowrap text-[10px] text-muted-foreground">{time}</span>
@@ -882,7 +895,7 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
             error ? "text-destructive" : "text-muted-foreground",
           )}
         >
-           {loading ? t("i18n.loadingThinking") : error ?? <ThinkingText text={(block.deferred ? content : block.thinking) ?? ""} />}
+           {loading ? <Skeleton className="h-3 w-1/2" /> : error ?? <ThinkingText text={(block.deferred ? content : block.thinking) ?? ""} />}
         </div>
       )}
       {duration !== undefined && (
@@ -1027,13 +1040,15 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
       {message.truncated && fullOutputUrl && (
         <div className="-mt-px px-1 py-1 text-xs">
           {showFullButton && (
-            <button
+            <Button
+              type="button"
+              variant="link"
               onClick={loadFullOutput}
               disabled={loadingFull}
-              className="cursor-pointer border-none bg-transparent p-0 text-xs text-primary underline disabled:cursor-default"
+              className="h-auto p-0 text-xs underline"
             >
               {loadingFull ? t("chat.loadingFullOutput") : t("chat.viewFullOutput")}
-            </button>
+            </Button>
           )}
           <a
             href={`${fullOutputUrl}&download=1`}

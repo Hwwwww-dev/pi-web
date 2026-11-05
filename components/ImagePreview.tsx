@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
+import { Button } from "@/components/ui/button";
 
 interface ImagePreviewProps {
   src: string;
@@ -83,10 +84,12 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="image-preview-image" src={src} alt={alt} />
-          <button
+          <Button
             ref={closeButtonRef}
             type="button"
-            className="image-preview-close"
+            variant="outline"
+            size="icon-lg"
+            className="absolute top-[max(12px,env(safe-area-inset-top))] right-[max(12px,env(safe-area-inset-right))] z-[1] size-9 bg-card text-muted-foreground shadow-[0_2px_10px_rgba(0,0,0,0.28)] hover:bg-secondary hover:text-foreground pointer-coarse:size-11"
             onClick={closePreview}
             aria-label={t("chat.close")}
             title={t("chat.close")}
@@ -94,7 +97,7 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M6 6l12 12M18 6 6 18" />
             </svg>
-          </button>
+          </Button>
         </dialog>
       )}
     </>

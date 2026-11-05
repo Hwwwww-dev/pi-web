@@ -30,6 +30,12 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import {
   encodeFilePathForApi,
@@ -186,16 +192,17 @@ const GIT_STATUS_BADGE_CLASSES: Record<GitFileStatusKind, string> = {
 
 function GitStatusBadge({ status, t }: { status: GitFileStatus; t: Translate }) {
   return (
-    <span
+    <Badge
+      variant="outline"
       title={t(GIT_STATUS_KEYS[status.status])}
       aria-label={t(GIT_STATUS_KEYS[status.status])}
       className={cn(
-        "inline-flex h-4 shrink-0 items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold leading-none",
+        "h-4 border-transparent rounded-full px-1.5 text-[10.5px] font-semibold leading-none",
         GIT_STATUS_BADGE_CLASSES[status.status],
       )}
     >
       {status.code}
-    </span>
+    </Badge>
   );
 }
 
@@ -450,32 +457,39 @@ export function TreeNode({
           <LoaderIcon size={13} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
         )}
         {onAtMention && hovered && (
-          <button
+          <Button
+            variant="outline"
+            size="xs"
+            className={cn(
+              "absolute top-1/2 h-7 -translate-y-1/2 text-primary",
+              node.isDir ? "right-1" : "right-7",
+            )}
             onClick={(e) => {
               e.stopPropagation();
               onAtMention(getRelativeFilePath(node.fullPath, cwd), node.isDir);
             }}
             title={t("files.insertPath")}
-            className={cn(
-              "absolute top-1/2 flex h-7 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm",
-              "outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
-              node.isDir ? "right-1" : "right-7",
-            )}
           >
-            <AtSignIcon size={13} strokeWidth={1.8} />
+            <AtSignIcon strokeWidth={1.8} />
             {t("files.mention")}
-          </button>
+          </Button>
         )}
         {hovered && !node.isDir && (
-          <a
-            href={`/api/files/${encodeFilePathForApi(node.fullPath)}?type=download`}
-            download
-            onClick={(e) => e.stopPropagation()}
+          <Button
+            asChild
+            variant="outline"
+            size="icon-xs"
+            className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
             title={t("files.download")}
-            className="absolute right-1 top-1/2 flex h-7 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-[5px] py-0 text-xs font-medium text-muted-foreground shadow-sm no-underline outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
-            <DownloadIcon size={13} strokeWidth={1.8} />
-          </a>
+            <a
+              href={`/api/files/${encodeFilePathForApi(node.fullPath)}?type=download`}
+              download
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DownloadIcon strokeWidth={1.8} />
+            </a>
+          </Button>
         )}
       </div>
       {node.isDir && open && pendingLinkTarget && (
@@ -487,15 +501,17 @@ export function TreeNode({
           {node.outsideLinkEncloses && (
             <span className="text-warning">{t("files.outsideLinkEncloses")}</span>
           )}
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
+            className="h-7 text-primary"
             title={t("files.allowOutsideLinkTitle", { target: pendingLinkTarget })}
-            className="h-7 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-60"
             onClick={handleAllowLink}
             disabled={allowingLink}
           >
             {t("files.allowOutsideLink")}
-          </button>
+          </Button>
           {allowLinkError && (
             <span role="alert" className="break-words text-destructive">{allowLinkError}</span>
           )}
@@ -1184,35 +1200,33 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
               {uploadPhase === "uploading" && <span className="text-[10px]">{uploadProgress}%</span>}
             </div>
             {uploadPhase === "uploading" && (
-              <div className="mt-1 h-[3px] overflow-hidden rounded-[2px] bg-border">
-                <div className="h-full bg-muted-foreground transition-[width] duration-[120ms]" style={{ width: `${uploadProgress}%` }} /* 进度百分比为动态测量值 */ />
-              </div>
+              <Progress value={uploadProgress} className="mt-1 h-[3px] rounded-[2px] bg-border" />
             )}
           </div>
         )}
 
         {pendingConflict && (
-          <div role="alert" className="rounded-lg border border-warning/55 bg-warning/10 p-2">
-            <div className="text-xs leading-[1.35] text-foreground [overflow-wrap:anywhere]">
+          <Alert variant="warning" className="gap-y-0 p-2">
+            <AlertDescription className="text-xs leading-[1.35] text-foreground [overflow-wrap:anywhere]">
               {t("files.conflictSummary", { count: pendingConflict.conflicts.length, countSuffix: pendingConflict.conflicts.length === 1 ? "" : "s", files: pendingConflict.conflicts.join(", ") })}
-            </div>
+            </AlertDescription>
             {pendingConflict.nonReplaceable.length > 0 && (
               <div className="mt-[3px] text-[10px] leading-[1.35] text-warning [overflow-wrap:anywhere]">
                 {t("files.cannotReplace", { files: pendingConflict.nonReplaceable.join(", ") })}
               </div>
             )}
             <div className="mt-2 flex gap-1.5">
-              <button type="button" onClick={() => void performUpload(pendingConflict.files, "overwrite", pendingConflict.directory)} className="inline-flex h-7 cursor-pointer items-center justify-center gap-2 rounded-md border border-destructive/40 bg-transparent px-3 py-0 text-xs font-medium whitespace-nowrap text-destructive outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
+              <Button type="button" variant="outline" size="xs" className="h-7 border-destructive/40 text-destructive hover:bg-destructive/10" onClick={() => void performUpload(pendingConflict.files, "overwrite", pendingConflict.directory)}>
                 {t("files.replace")}
-              </button>
-              <button type="button" onClick={() => void performUpload(pendingConflict.files, "skip", pendingConflict.directory)} className="inline-flex h-7 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-0 text-xs font-medium whitespace-nowrap text-foreground shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-accent disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
+              </Button>
+              <Button type="button" variant="outline" size="xs" className="h-7" onClick={() => void performUpload(pendingConflict.files, "skip", pendingConflict.directory)}>
                 {t("files.skipExisting")}
-              </button>
-              <button type="button" onClick={() => setPendingConflict(null)} className="inline-flex h-7 cursor-pointer items-center justify-center gap-2 rounded-md bg-transparent px-3 py-0 text-xs font-medium whitespace-nowrap text-muted-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-accent enabled:hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0">
+              </Button>
+              <Button type="button" variant="ghost" size="xs" className="h-7 text-muted-foreground" onClick={() => setPendingConflict(null)}>
                 {t("files.cancel")}
-              </button>
+              </Button>
             </div>
-          </div>
+          </Alert>
         )}
 
         {uploadError && (
@@ -1358,16 +1372,18 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
             <span className="font-mono text-success">+{gitLineStats.additions}</span>
             <span className="font-mono text-destructive">-{gitLineStats.deletions}</span>
             <span className="flex-1" />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground"
               onClick={handleChangesViewModeToggle}
               title={changesViewMode === "list" ? t("files.viewAsTree") : t("files.viewAsList")}
               aria-label={changesViewMode === "list" ? t("files.viewAsTree") : t("files.viewAsList")}
               aria-pressed={changesViewMode === "tree"}
-              className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-transparent p-0 text-muted-foreground outline-none transition-colors enabled:hover:bg-accent enabled:hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
               <ChangesViewToggleIcon mode={changesViewMode} />
-            </button>
+            </Button>
           </div>
           {changesViewMode === "tree" ? (
             <ChangesTreeRows
@@ -1399,7 +1415,12 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
       {(changesCollapsed || gitFiles.length === 0) && (!fileSearchOpen || !hasSearchQuery) && (
         <div className="px-1 py-[2px]">
           {loading ? (
-            <div className="px-3 py-2 text-xs text-muted-foreground">{t("files.loading")}</div>
+            <div aria-busy="true" className="flex flex-col gap-1.5 px-3 py-2">
+              <span className="sr-only">{t("files.loading")}</span>
+              {[0, 1, 2].map((row) => (
+                <Skeleton key={row} className="h-4 rounded-sm" style={{ width: `${72 - row * 16}%` }} /* 三行递减宽度示意树形 */ />
+              ))}
+            </div>
           ) : error ? (
             <div className="px-3 py-2 text-xs text-destructive">{error}</div>
           ) : (
@@ -1426,9 +1447,11 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
             ))
           )}
           {!loading && !error && roots.length === 0 && (
-            <div className="px-3 py-2 text-xs text-muted-foreground">
-              {t("files.noFiles")}
-            </div>
+            <Empty className="flex-none items-start gap-0 rounded-none border-0 px-3 py-2 text-left md:px-3 md:py-2">
+              <EmptyHeader className="items-start text-left">
+                <EmptyTitle className="text-xs font-normal text-muted-foreground">{t("files.noFiles")}</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           )}
         </div>
       )}

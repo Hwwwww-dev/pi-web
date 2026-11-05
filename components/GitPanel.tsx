@@ -16,6 +16,7 @@ import { formatFileSize } from "@/lib/file-types";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import { getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { DiffView } from "./DiffView";
 import { PathLabel } from "./PathLabel";
 import { FileMentionButton, FileToolbar, FILE_MODE_LABELS } from "./FileToolbar";
@@ -576,14 +577,11 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
           wrapLines={wrapLines}
           onToggleWrapLines={() => setWrapLines((current) => !current)}
           download={deleted || !selectedRepo ? undefined : (
-            <a
-              href={commitFileUrl(selectedRepo, commit.hash, file.path, true)}
-              title={t("i18n.downloadFile")}
-              aria-label={t("i18n.downloadFile")}
-              className="file-viewer-icon-button"
-            >
-              <ArrowDownToLineIcon className="size-[14px]" strokeWidth={1.8} />
-            </a>
+            <Button asChild variant="outline" size="icon-xs" title={t("i18n.downloadFile")} aria-label={t("i18n.downloadFile")}>
+              <a href={commitFileUrl(selectedRepo, commit.hash, file.path, true)}>
+                <ArrowDownToLineIcon className="size-[14px]" strokeWidth={1.8} />
+              </a>
+            </Button>
           )}
         />
         <div className="min-h-0 flex-1 overflow-auto bg-background">

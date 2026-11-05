@@ -59,6 +59,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -621,15 +622,17 @@ function QueueActionButton({ title, onClick, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-xs"
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="inline-flex size-5 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+      className="size-5 rounded-full"
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -648,10 +651,8 @@ function QueuedMessageRow({
   const isSteer = item.behavior === "steer";
   const behaviorLabel = isSteer ? t("chat.queueBehaviorSteer") : t("chat.queueBehaviorFollowUp");
   const behaviorChipClass = cn(
-    "shrink-0 whitespace-nowrap rounded-full px-[7px] py-px text-[10.5px] font-semibold leading-[1.4]",
-    isSteer
-      ? "bg-primary text-primary-foreground"
-      : "bg-muted text-muted-foreground",
+    "shrink-0 whitespace-nowrap px-[7px] py-px text-[10.5px] font-semibold leading-[1.4]",
+    !isSteer && "bg-muted text-muted-foreground",
   );
   return (
     <div
@@ -681,32 +682,34 @@ function QueuedMessageRow({
         </span>
       )}
       {onAction ? (
-        <button
-          type="button"
-          title={t("chat.queueBehaviorHint")}
-          onClick={() => onAction(item.id, "toggle")}
-          className={cn(behaviorChipClass, "cursor-pointer transition-opacity hover:opacity-80")}
-        >
-          {behaviorLabel}
-        </button>
+        <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass} asChild>
+          <button
+            type="button"
+            title={t("chat.queueBehaviorHint")}
+            onClick={() => onAction(item.id, "toggle")}
+            className="cursor-pointer transition-opacity hover:opacity-80"
+          >
+            {behaviorLabel}
+          </button>
+        </Badge>
       ) : (
-        <span className={behaviorChipClass}>{behaviorLabel}</span>
+        <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass}>{behaviorLabel}</Badge>
       )}
       <span className="min-w-0 truncate">{item.text}</span>
       <span className="ml-auto flex shrink-0 items-center gap-0.5">
         {onAction && canMoveUp && (
           <QueueActionButton title={t("chat.moveQueuedUp")} onClick={() => onAction(item.id, "moveUp")}>
-            <ChevronUpIcon className="size-3" strokeWidth={2} aria-hidden="true" />
+            <ChevronUpIcon strokeWidth={2} aria-hidden="true" />
           </QueueActionButton>
         )}
         {onAction && canMoveDown && (
           <QueueActionButton title={t("chat.moveQueuedDown")} onClick={() => onAction(item.id, "moveDown")}>
-            <ChevronDownIcon className="size-3" strokeWidth={2} aria-hidden="true" />
+            <ChevronDownIcon strokeWidth={2} aria-hidden="true" />
           </QueueActionButton>
         )}
         {onAction && (
           <QueueActionButton title={t("chat.editQueuedTitle")} onClick={() => onAction(item.id, "edit")}>
-            <PencilIcon className="size-3" strokeWidth={2} aria-hidden="true" />
+            <PencilIcon strokeWidth={2} aria-hidden="true" />
           </QueueActionButton>
         )}
       </span>
@@ -1923,7 +1926,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         >
           {/* While the run streams the circle stops it, until the user types
               something to send. */}
-          <SquareIcon className="size-3 fill-current" aria-hidden="true" />
+          <SquareIcon data-icon className="size-3 fill-current" aria-hidden="true" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>{t("chat.stopAgent")}</TooltipContent>
@@ -1941,7 +1944,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               aria-label={t("chat.sideChat")}
               className="size-[30px] rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             >
-              <MessagesSquareIcon className="size-4" strokeWidth={1.8} aria-hidden="true" />
+              <MessagesSquareIcon data-icon strokeWidth={1.8} aria-hidden="true" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t("chat.sideChatHint")}</TooltipContent>
@@ -1960,7 +1963,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 : "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
             )}
           >
-            <ArrowUpIcon className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
+            <ArrowUpIcon data-icon strokeWidth={2.2} aria-hidden="true" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{t("chat.send")}</TooltipContent>
@@ -2265,28 +2268,32 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       className="block size-14 rounded-md border border-border object-cover"
                     />
                   </ImagePreview>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-xs"
                     onClick={() => removeImage(i)}
                     title={t("chat.dismiss")}
                     aria-label={t("chat.dismiss")}
-                    className="absolute -right-1 -top-1 flex size-4 cursor-pointer items-center justify-center rounded-full border border-border bg-card p-0 text-muted-foreground transition-colors hover:text-foreground"
+                    className="absolute -right-1 -top-1 size-4 rounded-full border border-border bg-card p-0 text-muted-foreground"
                   >
                     <XIcon className="size-2" strokeWidth={2.5} aria-hidden="true" />
-                  </button>
+                  </Button>
                 </div>
               ))}
               {!compact && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="xs"
                   onClick={() => fileInputRef.current?.click()}
                   title={t("chat.attachFiles")}
                   aria-label={t("chat.attachFiles")}
-                  className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-full border border-dashed border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  className="h-[26px] rounded-full border-dashed px-2.5 text-xs text-muted-foreground"
                 >
-                  <PlusIcon className="size-3" strokeWidth={2} aria-hidden="true" />
+                  <PlusIcon data-icon="inline-start" strokeWidth={2} aria-hidden="true" />
                   {t("chat.attachFiles")}
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -2352,7 +2359,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         attachedImages.length > 0 && "text-primary",
                       )}
                     >
-                      <ImageIcon className="size-4" strokeWidth={1.8} aria-hidden="true" />
+                      <ImageIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>{t("chat.attachFiles")}</TooltipContent>
@@ -2388,9 +2395,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     aria-label={t("chat.changeReasoningLabel")}
                     className="h-7 min-w-0 flex-[0_1_auto] gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
-                    <LightbulbIcon className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+                    <LightbulbIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
                     <span className="min-w-0 truncate">{thinkingDisplayLabel}</span>
-                    <ChevronDownIcon className="size-3 shrink-0 opacity-60" aria-hidden="true" />
+                    <ChevronDownIcon data-icon="inline-end" className="shrink-0 opacity-60" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="end" sideOffset={6} className="min-w-[180px]">
@@ -2464,9 +2471,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     aria-label={t("chat.changeToolPreset")}
                     className="h-7 min-w-0 flex-[0_1_auto] gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
-                    <WrenchIcon className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+                    <WrenchIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
                     <span className="min-w-0 truncate">{toolPresetLabel}</span>
-                    <ChevronDownIcon className="size-3 shrink-0 opacity-60" aria-hidden="true" />
+                    <ChevronDownIcon data-icon="inline-end" className="shrink-0 opacity-60" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="end" sideOffset={6} className="min-w-[120px]">
@@ -2511,9 +2518,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     )}
                   >
                     {isCompacting ? (
-                      <><SquareIcon className="size-2.5 fill-current" aria-hidden="true" /><span className="whitespace-nowrap">{t("chat.compacting")}</span></>
+                      <><SquareIcon data-icon="inline-start" className="size-2.5 fill-current" aria-hidden="true" /><span className="whitespace-nowrap">{t("chat.compacting")}</span></>
                     ) : (
-                      <ShrinkIcon className="size-4" aria-hidden="true" />
+                      <ShrinkIcon data-icon="inline-start" aria-hidden="true" />
                     )}
                   </Button>
                 </TooltipTrigger>
@@ -2535,8 +2542,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     )}
                   >
                     {soundEnabled
-                      ? <Volume2Icon className="size-4" strokeWidth={1.8} aria-hidden="true" />
-                      : <VolumeXIcon className="size-4" strokeWidth={1.8} aria-hidden="true" />}
+                      ? <Volume2Icon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
+                      : <VolumeXIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}</TooltipContent>
@@ -2553,7 +2560,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     className="h-7 gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
                     {t("chat.moreControls")}
-                    <ChevronUpIcon className="size-3 shrink-0 opacity-60" aria-hidden="true" />
+                    <ChevronUpIcon data-icon="inline-end" className="shrink-0 opacity-60" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="end" sideOffset={6} className="max-w-[calc(100vw-16px)]">
