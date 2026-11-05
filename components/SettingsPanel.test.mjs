@@ -72,23 +72,22 @@ test("groups fonts, chat font size and width with the chat switches, without row
     panelSource.indexOf("// The keep-alive group"),
   );
   assert.doesNotMatch(chatOptions, /settings-theme-options/);
-  // Typography lives with the chat switches: FontSettings and the two range rows
+  // Typography lives with the chat switches: FontSettings and the two slider rows
   // render between them, in both the phone's detail and the desktop's card.
-  assert.match(chatOptions, /className="settings-chat-options"[\s\S]*<FontSettings \/>/);
-  assert.equal((chatOptions.match(/className="settings-chat-option settings-chat-range-option"/g) ?? []).length, 2);
+  assert.match(chatOptions, /className="flex w-full flex-col gap-2\.5"[\s\S]*<FontSettings \/>/);
+  assert.equal((chatOptions.match(/<Slider/g) ?? []).length, 2);
   for (const key of ["chatContentWidth", "chatContentFontSize"]) {
     assert.match(chatOptions, new RegExp(`t\\("settings\\.${key}"\\)`));
   }
-  assert.match(chatOptions, /className="settings-chat-options"/);
-  assert.equal((chatOptions.match(/className="settings-chat-option(?: |")/g) ?? []).length, 7);
+  assert.equal((chatOptions.match(/<Field\b/g) ?? []).length, 7);
   assert.equal((chatOptions.match(/<ConfigSwitch/g) ?? []).length, 4);
   for (const key of ["thinkingExpandedDefault", "chatContentWidth", "chatContentFontSize", "quoteSelection", "completionSound", "enterSendMode", "enterSendModeEnter", "enterSendModeCtrlEnter"]) {
     assert.match(chatOptions, new RegExp(`t\\("settings\\.${key}"\\)`));
   }
   assert.doesNotMatch(panelSource, /ThinkingIcon|settings-thinking-/);
-  const chatOptionStyles = cssSource.match(/\.settings-chat-option \{[\s\S]*?\}/)?.[0] ?? "";
-  assert.match(chatOptionStyles, /font-size: 13px/);
-  assert.doesNotMatch(chatOptionStyles, /background/);
+  // The rows carry no background of their own: Field lays them out, the Card is the surface.
+  assert.doesNotMatch(chatOptions, /settings-chat-option/);
+  assert.doesNotMatch(cssSource, /\.settings-chat-option/);
 });
 
 test("the desktop dialog is two columns: a page title over General's stacked cards", () => {
@@ -115,9 +114,8 @@ test("the desktop dialog is two columns: a page title over General's stacked car
   // The phone keeps its own sub-section list behind the section level.
   assert.match(panelSource, /<ConfigSplitView>/);
   assert.match(panelSource, /<ConfigSidebar>/);
-  // Form rows read as the draft's frow2: a 32px row, its description muted below the label.
-  assert.match(cssSource, /\.settings-chat-switch-option \{[\s\S]*?min-height: 32px/);
-  assert.match(cssSource, /\.settings-row-desc \{[\s\S]*?font-size: 11\.5px/);
+  // Form rows read as the draft's frow2: a Field row, its description muted under the label.
+  assert.match(panelSource, /<FieldDescription id="settings-files-placement-description" className="text-xs">/);
 });
 
 test("keeps General free of divider rows", () => {

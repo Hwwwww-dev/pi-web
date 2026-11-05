@@ -1246,6 +1246,8 @@ export const zhTWLocale: LocalePlugin = {
     "mcp.actionFailed": "無法變更該伺服器：",
     "mcp.actionTimedOut": "Pi Web 沒有及時回應，變更可能未生效。",
     "mcp.removed": "已從 {path} 移除 {name}。",
+    "mcp.remove.title": "移除 {name}？",
+    "mcp.remove.description": "將從 {path} 移除 {name} 條目，短時間內可以復原。",
     "mcp.undo": "復原",
     "mcp.undoing": "正在復原…",
     "mcp.undoFailed": "無法復原：",

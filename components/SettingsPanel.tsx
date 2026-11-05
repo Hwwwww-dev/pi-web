@@ -20,7 +20,9 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useTheme } from "@/hooks/useTheme";
 import { THEME_OPTIONS } from "@/lib/theme";
 import { Button } from "./ui/button";
+import { Field, FieldContent, FieldDescription, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
+import { Slider } from "./ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import {
   CHAT_CONTENT_WIDTH_DEFAULT,
@@ -262,8 +264,8 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   ];
   const activeDetailLabel = generalDetails.find((item) => item.id === detail)?.label ?? t("settings.appearance");
   const isPhone = useIsMobile();
-  // A label/value row inside a Card (§7.3): label 13px on the left, the control on the right.
-  const optionRowClass = "flex min-h-9 w-full items-center justify-between gap-4 text-[13px] text-foreground";
+  // A form row's label: 13px, regular, per the draft's frow2 density.
+  const rowLabelClass = "text-[13px] font-normal";
 
   // Sub-section content, shared by both shapes: a phone shows one at a time
   // behind its own list (the three-level stack); the desktop stacks them as
@@ -294,9 +296,11 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     </div>
   );
   const chatOptions = (
-    <div className="settings-chat-options">
-      <div className="settings-chat-option settings-chat-switch-option">
-        <span>{t("settings.thinkingExpandedDefault")}</span>
+    <div className="flex w-full flex-col gap-2.5">
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel className={rowLabelClass}>{t("settings.thinkingExpandedDefault")}</FieldLabel>
+        </FieldContent>
         <ConfigSwitch
           checked={thinkingExpanded}
           label={t("settings.thinkingExpandedDefault")}
@@ -305,15 +309,15 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             setThinkingExpanded(enabled);
           }}
         />
-      </div>
-      <div className="settings-chat-option settings-chat-range-option">
-        <div className="settings-chat-range-header">
-          <label htmlFor="settings-chat-content-width">{t("settings.chatContentWidth")}</label>
-          <output htmlFor="settings-chat-content-width">{chatContentWidth}px</output>
+      </Field>
+      <Field>
+        <div className="flex items-center gap-2">
+          <FieldLabel className={rowLabelClass}>{t("settings.chatContentWidth")}</FieldLabel>
+          <span className="ml-auto font-mono text-xs text-muted-foreground">{chatContentWidth}px</span>
           <ConfigButton
             variant="ghost"
             size="small"
-            className="settings-chat-reset"
+            className="size-7 p-0"
             title={t("settings.resetChatContentWidth")}
             aria-label={t("settings.resetChatContentWidth")}
             disabled={chatContentWidth === CHAT_CONTENT_WIDTH_DEFAULT}
@@ -322,25 +326,24 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             <RotateCcwIcon size={14} strokeWidth={1.8} />
           </ConfigButton>
         </div>
-        <input
-          id="settings-chat-content-width"
-          type="range"
+        <Slider
           min={CHAT_CONTENT_WIDTH_MIN}
           max={CHAT_CONTENT_WIDTH_MAX}
           step={10}
-          value={chatContentWidth}
-          onChange={(event) => setChatContentWidth(Number(event.target.value))}
+          value={[chatContentWidth]}
+          aria-label={t("settings.chatContentWidth")}
+          onValueChange={(values) => setChatContentWidth(values[0])}
         />
-      </div>
+      </Field>
       <FontSettings />
-      <div className="settings-chat-option settings-chat-range-option">
-        <div className="settings-chat-range-header">
-          <label htmlFor="settings-chat-content-font-size">{t("settings.chatContentFontSize")}</label>
-          <output htmlFor="settings-chat-content-font-size">{fontSize}px</output>
+      <Field>
+        <div className="flex items-center gap-2">
+          <FieldLabel className={rowLabelClass}>{t("settings.chatContentFontSize")}</FieldLabel>
+          <span className="ml-auto font-mono text-xs text-muted-foreground">{fontSize}px</span>
           <ConfigButton
             variant="ghost"
             size="small"
-            className="settings-chat-reset"
+            className="size-7 p-0"
             title={t("settings.resetChatContentFontSize")}
             aria-label={t("settings.resetChatContentFontSize")}
             disabled={fontSize === CHAT_CONTENT_FONT_SIZE_DEFAULT}
@@ -349,34 +352,39 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             <RotateCcwIcon size={14} strokeWidth={1.8} />
           </ConfigButton>
         </div>
-        <input
-          id="settings-chat-content-font-size"
-          type="range"
+        <Slider
           min={CHAT_CONTENT_FONT_SIZE_MIN}
           max={CHAT_CONTENT_FONT_SIZE_MAX}
           step={1}
-          value={fontSize}
-          onChange={(event) => setFontSize(Number(event.target.value))}
+          value={[fontSize]}
+          aria-label={t("settings.chatContentFontSize")}
+          onValueChange={(values) => setFontSize(values[0])}
         />
-      </div>
-      <div className="settings-chat-option settings-chat-switch-option">
-        <span>{t("settings.quoteSelection")}</span>
+      </Field>
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel className={rowLabelClass}>{t("settings.quoteSelection")}</FieldLabel>
+        </FieldContent>
         <ConfigSwitch
           checked={quoteSelectionEnabled}
           label={t("settings.quoteSelection")}
           onChange={onQuoteSelectionChange}
         />
-      </div>
-      <div className="settings-chat-option settings-chat-switch-option">
-        <span>{t("settings.completionSound")}</span>
+      </Field>
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel className={rowLabelClass}>{t("settings.completionSound")}</FieldLabel>
+        </FieldContent>
         <ConfigSwitch
           checked={soundEnabled}
           label={t("settings.completionSound")}
           onChange={() => onSoundToggle()}
         />
-      </div>
-      <div className="settings-chat-option settings-chat-switch-option">
-        <span>{t("settings.enterSendMode")}</span>
+      </Field>
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel className={rowLabelClass}>{t("settings.enterSendMode")}</FieldLabel>
+        </FieldContent>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -390,9 +398,11 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           <ToggleGroupItem value="enter" className="px-2.5 text-xs">{t("settings.enterSendModeEnter")}</ToggleGroupItem>
           <ToggleGroupItem value="ctrlEnter" className="px-2.5 text-xs">{t("settings.enterSendModeCtrlEnter")}</ToggleGroupItem>
         </ToggleGroup>
-      </div>
-      <div className="settings-chat-option settings-chat-switch-option">
-        <span>{t("settings.cacheMissNotices")}</span>
+      </Field>
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel className={rowLabelClass}>{t("settings.cacheMissNotices")}</FieldLabel>
+        </FieldContent>
         <ConfigSwitch
           checked={cacheMissNotices === true}
           loading={(cacheMissNotices === null && !cacheMissNoticesError) || cacheMissNoticesSaving}
@@ -400,57 +410,52 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           describedBy="settings-cache-miss-notices-description"
           onChange={(enabled) => void toggleCacheMissNotices(enabled)}
         />
-      </div>
+      </Field>
     </div>
   );
   // The keep-alive group is a card of its own (§7.3): description, two numeric rows.
   const keepAliveCard = (
     <ConfigCard title={t("settings.keepAlive")} description={t("settings.keepAliveDescription")}>
-      <div className="flex flex-col gap-2">
-        <div className={optionRowClass}>
-          <label htmlFor="settings-keepalive-max-sessions">{t("settings.keepAliveMaxSessions")}</label>
-          <Input
-            id="settings-keepalive-max-sessions"
-            type="number"
-            min={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.min}
-            max={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.max}
-            value={keepAliveConfig.maxSessions}
-            className="h-8 w-20 text-right text-[13px]"
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, maxSessions: value });
-            }}
-          />
-        </div>
-        <div className={optionRowClass}>
-          <label htmlFor="settings-keepalive-idle-timeout">{t("settings.keepAliveIdleTimeout")}</label>
-          <Input
-            id="settings-keepalive-idle-timeout"
-            type="number"
-            min={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.min}
-            max={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.max}
-            value={keepAliveConfig.idleTimeoutMinutes}
-            className="h-8 w-20 text-right text-[13px]"
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, idleTimeoutMinutes: value });
-            }}
-          />
-        </div>
-      </div>
+      <Field orientation="horizontal">
+        <FieldLabel htmlFor="settings-keepalive-max-sessions" className={rowLabelClass}>{t("settings.keepAliveMaxSessions")}</FieldLabel>
+        <Input
+          id="settings-keepalive-max-sessions"
+          type="number"
+          min={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.min}
+          max={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.max}
+          value={keepAliveConfig.maxSessions}
+          className="h-8 w-20 text-right text-[13px]"
+          onChange={(event) => {
+            const value = Number(event.target.value);
+            if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, maxSessions: value });
+          }}
+        />
+      </Field>
+      <Field orientation="horizontal">
+        <FieldLabel htmlFor="settings-keepalive-idle-timeout" className={rowLabelClass}>{t("settings.keepAliveIdleTimeout")}</FieldLabel>
+        <Input
+          id="settings-keepalive-idle-timeout"
+          type="number"
+          min={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.min}
+          max={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.max}
+          value={keepAliveConfig.idleTimeoutMinutes}
+          className="h-8 w-20 text-right text-[13px]"
+          onChange={(event) => {
+            const value = Number(event.target.value);
+            if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, idleTimeoutMinutes: value });
+          }}
+        />
+      </Field>
     </ConfigCard>
   );
   const sidebarContent = (
-    <div
-      className="settings-chat-option settings-chat-switch-option"
-      aria-describedby="settings-files-placement-description"
-    >
-      <span>
-        {t("settings.filesPlacement")}
-        <span id="settings-files-placement-description" className="settings-row-desc">
+    <Field orientation="horizontal" aria-describedby="settings-files-placement-description">
+      <FieldContent>
+        <FieldLabel className={rowLabelClass}>{t("settings.filesPlacement")}</FieldLabel>
+        <FieldDescription id="settings-files-placement-description" className="text-xs">
           {t("settings.filesPlacementDescription")}
-        </span>
-      </span>
+        </FieldDescription>
+      </FieldContent>
       <ToggleGroup
         type="single"
         variant="outline"
@@ -464,7 +469,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
         <ToggleGroupItem value="below" className="px-2.5 text-xs">{t("settings.filesPlacementBelow")}</ToggleGroupItem>
         <ToggleGroupItem value="tab" className="px-2.5 text-xs">{t("settings.filesPlacementTab")}</ToggleGroupItem>
       </ToggleGroup>
-    </div>
+    </Field>
   );
   const shellCard = shellSettings ? (
     <ConfigCard
@@ -472,15 +477,15 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       description={t("settings.shellToolDescription")}
       footer={shellError ? <p role="alert" className="m-0 text-xs text-destructive">{shellError}</p> : undefined}
     >
-      <div className={optionRowClass}>
-        <span>{t("settings.usePowerShell")}</span>
+      <Field orientation="horizontal">
+        <FieldLabel className={rowLabelClass}>{t("settings.usePowerShell")}</FieldLabel>
         <ConfigSwitch
           checked={shellSettings.powerShellEnabled}
           loading={shellSaving}
           label={t("settings.usePowerShell")}
           onChange={(enabled) => void togglePowerShell(enabled)}
         />
-      </div>
+      </Field>
     </ConfigCard>
   ) : null;
   const pushCard = (
@@ -493,8 +498,8 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
         </p>
       ) : undefined}
     >
-      <div className={optionRowClass}>
-        <span>{t("settings.pushPermission")}</span>
+      <Field orientation="horizontal">
+        <FieldLabel className={rowLabelClass}>{t("settings.pushPermission")}</FieldLabel>
         <ConfigButton
           variant="secondary"
           size="small"
@@ -503,7 +508,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
         >
           {pushRegistering ? t("settings.pushRegisterLoading") : t("settings.pushRegister")}
         </ConfigButton>
-      </div>
+      </Field>
     </ConfigCard>
   );
   const languageGroup = (

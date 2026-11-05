@@ -1246,6 +1246,8 @@ export const enLocale: LocalePlugin = {
     "mcp.actionFailed": "Could not change the server:",
     "mcp.actionTimedOut": "Pi Web did not answer in time, so the change may not have been made.",
     "mcp.removed": "Removed {name} from {path}.",
+    "mcp.remove.title": "Remove {name}?",
+    "mcp.remove.description": "Removes the {name} entry from {path}. You can undo this for a short time.",
     "mcp.undo": "Undo",
     "mcp.undoing": "Undoing…",
     "mcp.undoFailed": "Could not undo:",

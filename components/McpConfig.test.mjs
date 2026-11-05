@@ -29,9 +29,9 @@ function decode(html) {
   return html.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 }
 
-/** The text of the markup, tags dropped, entities decoded. */
+/** The text of the markup, tags dropped, entities decoded. Tag matching keeps quoted `>` (the Button classes carry `has-[>svg]`). */
 function text(html) {
-  return decode(html.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+  return decode(html.replace(/<(?:[^>"']|"[^"]*"|'[^']*')+>/g, " ")).replace(/\s+/g, " ").trim();
 }
 
 function server(overrides = {}) {
@@ -135,10 +135,11 @@ test("with a project, its group comes first and every row names its state", () =
   const markup = decode(html);
   assert.ok(markup.indexOf(">project<") < markup.indexOf(">global<"));
   // Each heading holds its n/m count and the group switch, on only while every server is.
-  assert.match(markup, /<span class="config-sidebar-group-count">1\/2<\/span><button type="button" role="switch" aria-checked="false" aria-label="Turn on every global server"/);
+  assert.match(markup, /<span class="config-sidebar-group-count">1\/2<\/span><button type="button" role="switch" aria-checked="false"[^>]*aria-label="Turn on every global server"/);
   // The untrusted project's switch waits for trust, pointing at the notice that says so.
   const projectSwitch = markup.match(/<span class="config-sidebar-group-count">2\/2<\/span>(<button[^>]*>)/)?.[1];
-  assert.match(projectSwitch, /aria-checked="true" aria-label="Turn off every project server" aria-describedby="([^"]+)"[^>]*disabled=""/);
+  assert.match(projectSwitch, /aria-checked="true"[^>]*aria-label="Turn off every project server"/);
+  assert.match(projectSwitch, /\sdisabled="/);
   const noticeId = projectSwitch.match(/aria-describedby="([^"]+)"/)[1];
   assert.match(markup, new RegExp(`<div id="${noticeId}" role="status" class="config-notice">This project is not trusted`));
   // The project is not trusted, so its entry does not connect and the global one is not replaced.
@@ -148,7 +149,7 @@ test("with a project, its group comes first and every row names its state", () =
   assert.match(row(html, "legacy"), /aria-label="legacy: Refused by Pi"/);
   // The state is visible text on the row too, never only the dot's color.
   for (const badge of ["untrusted", "off", "refused"]) {
-    assert.match(markup, new RegExp(`class="shrink-0 max-w-\\[45%\\] truncate text-\\[10px\\] text-[a-z-]+">${badge}<`), badge);
+    assert.match(markup, new RegExp(`<span data-slot="badge" data-variant="[a-z]+" class="[^"]*">${badge}<`), badge);
   }
   // The untrusted project gets the trust notice, which also says its servers cannot be changed
   // here; without a Trust handler it has no button.
@@ -186,7 +187,7 @@ test("a stdio server's detail shows its masked command line, folder, env names a
   assert.doesNotMatch(shown, /Transport/);
   assert.match(markup, /<div class="config-detail-grid-label">Command<\/div><div class="config-detail-grid-value is-mono text-xs">npx -y @acme\/lint-mcp --api-key=••••<\/div>/);
   assert.match(shown, /Working directory tools/);
-  assert.match(markup, /<code class="mcp-config-chip">NODE_ENV<\/code><code class="mcp-config-chip">LINT_TOKEN<\/code>/);
+  assert.match(markup, /<code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">NODE_ENV<\/code><code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">LINT_TOKEN<\/code>/);
   // Names only: the values stay in the file.
   assert.doesNotMatch(shown, /Values are not shown here/);
   assert.match(shown, /Shell commands Runs a shell command on every connection: env LINT_TOKEN/);
@@ -330,7 +331,7 @@ test("a dangling project link needs no trust, so only the footer speaks of it", 
 });
 
 test("an untrusted project's notice offers Trust only where the trust dialog would", () => {
-  const trustButton = /<button type="button" class="config-button config-button-secondary config-button-small">Trust project…<\/button>/;
+  const trustButton = /<button data-slot="button" data-variant="outline" data-size="xs" class="[^"]*" type="button">Trust project…<\/button>/;
   const projectServer = server({ name: "p", scope: "project", sourcePath: projectFile.path, transport: "stdio", command: "node" });
   const withTrust = (project, files = [globalFile, projectFile], props = {}) => decode(view({
     cwd: "/Users/me/repo",
@@ -341,7 +342,7 @@ test("an untrusted project's notice offers Trust only where the trust dialog wou
 
   // The folder requires trust and is not trusted: the notice and its button share one line.
   const offered = withTrust({ trust: untrusted });
-  assert.match(offered, /<div id="[^"]+" role="status" class="config-notice has-action"><span class="config-notice-text">This project is not trusted, so the servers in its \.pi\/mcp\.json do not connect\. Pi Web does not change them until the project is trusted\.<\/span><button type="button"[^>]*>Trust project…<\/button><\/div>/);
+  assert.match(offered, /<div id="[^"]+" role="status" class="config-notice has-action"><span class="config-notice-text">This project is not trusted, so the servers in its \.pi\/mcp\.json do not connect\. Pi Web does not change them until the project is trusted\.<\/span><button data-slot="button" data-variant="outline" data-size="xs" class="[^"]*" type="button">Trust project…<\/button><\/div>/);
   // An ancestor marked untrusted: trusting records this folder's own decision, which wins.
   assert.match(withTrust({ trust: { ...untrusted, decision: false, decisionPath: "/Users/me", inherited: true } }), trustButton);
 
@@ -400,16 +401,16 @@ test("loading, a failed load and an empty listing each say so", () => {
   assert.match(empty, /global No servers/);
   assert.doesNotMatch(empty, /0 of 0/);
   assert.match(text(view({ selected: "global\0gone" })), /Select a server or Code mode\./);
-  assert.match(decode(view({ refreshing: true })), /<button type="button" disabled="" class="config-button config-button-secondary config-button-default">Refresh<\/button>/);
+  assert.match(decode(view({ refreshing: true })), /<button data-slot="button" data-variant="outline" data-size="sm" class="[^"]*" type="button" disabled="">Refresh<\/button>/);
 });
 
 /** The Code mode switch's buttons, by label, with whether each is pressed and disabled. */
 function codemodeOptions(html) {
-  const group = decode(html).match(/<div role="group" aria-label="Code mode"[^>]*>([\s\S]*?)<\/div>/)?.[1];
+  const group = decode(html).match(/<div dir="ltr" role="radiogroup" data-slot="toggle-group"[^>]*aria-label="Code mode"[^>]*>([\s\S]*?)<\/div>/)?.[1];
   assert.ok(group, "the Code mode switch is rendered");
   return [...group.matchAll(/<button([^>]*)>([^<]*)<\/button>/g)].map(([, attributes, label]) => ({
     label,
-    pressed: /aria-pressed="true"/.test(attributes),
+    pressed: /aria-checked="true"/.test(attributes),
     disabled: /disabled=""/.test(attributes),
     describedBy: attributes.match(/aria-describedby="([^"]+)"/)?.[1],
   }));
@@ -451,7 +452,7 @@ test("the Code mode pane offers Automatic and Always on, and says once when its 
     view: { codemodeSave: { saving: true, error: null } },
   });
   assert.deepEqual(codemodeOptions(saving).map(({ disabled }) => disabled), [true, true]);
-  assert.match(decode(saving), /<span role="status" class="mcp-config-line is-dim">Saving…<\/span>/);
+  assert.match(decode(saving), /<span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-dim">Saving…<\/span>/);
 });
 
 test("Always on is disabled with a visible reason while no session could offer Code mode", () => {
@@ -488,7 +489,7 @@ test("Always on is disabled with a visible reason while no session could offer C
   assert.match(down, /Turned off by -builtin:codemode in ~\/\.pi\/agent\/settings\.json\./);
   const html = view({ load: { state: "loaded", data: overview({ codemode: { sandbox: { state: "unavailable", error: "x" }, builtinDisabled: false, preference: "automatic" } }) } });
   assert.match(row(html, "Code mode"), /aria-label="Code mode: Unavailable"/);
-  assert.match(decode(html), /class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-destructive">Unavailable</);
+  assert.match(decode(html), /<span data-slot="badge" data-variant="destructive" class="[^"]*">Unavailable</);
 });
 
 test("a trusted project that turns Code mode off for itself leaves Always on, a global choice, available", () => {
@@ -512,7 +513,7 @@ test("a failed save is shown with its reason on every platform", () => {
   const info = { sandbox: { state: "available" }, builtinDisabled: false, preference: "automatic" };
   const failed = (error) => {
     const html = codemodeView(info, { view: { codemodeSave: { saving: false, error } } });
-    return decode(html).match(/<span role="alert" class="mcp-config-line is-error">([\s\S]*?)<\/span>(?=<span|<\/div>)/)?.[1];
+    return decode(html).match(/<span role="alert" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">([\s\S]*?)<\/span>(?=<span|<\/div>)/)?.[1];
   };
   assert.equal(text(failed({ error: "Untrusted API request", reason: "request-denied" })),
     "Could not save the choice: Pi Web refused the request because it did not come from this page.");
@@ -574,7 +575,7 @@ test("the Code mode pane's budget field saves a whole number, or empty for pi's 
   const info = (inlineBudget, extra = {}) => ({ sandbox: { state: "available" }, builtinDisabled: false, preference: "automatic", inlineBudget, ...extra });
   const field = (html) => decode(html).match(/<form class="flex min-w-0 flex-wrap items-center gap-1\.5">([\s\S]*?)<\/form>/)?.[1];
   const input = (html) => field(html).match(/<input[^>]*>/)[0];
-  const save = (html) => field(html).match(/<button type="submit"[^>]*>/)[0];
+  const save = (html) => field(html).match(/<button data-slot="button" data-variant="outline" data-size="xs" class="[^"]*" type="submit"[^>]*>/)[0];
 
   const unset = codemodeView(info(budget));
   assert.match(input(unset), /aria-label="Tool list budget"/);
@@ -586,16 +587,16 @@ test("the Code mode pane's budget field saves a whole number, or empty for pi's 
   assert.match(text(unset), /Turns on when an MCP server that uses code mode connects\. Tool list budget tokens Save Tokens the code mode description may spend listing tools; scripts find the rest with searchTools\(\)\. Leave empty for pi's default, 3000\. Sandbox/);
   // The hint describes the field.
   const hintId = input(unset).match(/aria-describedby="([^"]+)"/)[1];
-  assert.match(decode(unset), new RegExp(`<span id="${hintId}" class="mcp-config-line">Tokens the code mode description`));
+  assert.match(decode(unset), new RegExp(`<span id="${hintId}" class="min-w-0 text-xs leading-normal text-muted-foreground \\[overflow-wrap:anywhere\\]">Tokens the code mode description`));
   assert.match(input(codemodeView(info({ ...budget, value: 1000 }))), /value="1000"/);
 
   // While a budget save is on its way, the field keeps focus (read-only, not disabled), Save waits, and the
   // choice waits too; the Saving… line is the budget's, not the choice's.
   const saving = codemodeView(info({ ...budget, value: 1000 }), { view: { codemodeSave: { saving: true, error: null, target: "inlineBudget" } } });
   assert.match(input(saving), /readOnly=""/);
-  assert.doesNotMatch(input(saving), /disabled/);
+  assert.doesNotMatch(input(saving), /\sdisabled=/);
   assert.match(save(saving), /disabled=""/);
-  assert.match(field(saving), /<span role="status" class="mcp-config-line is-dim">Saving…<\/span>/);
+  assert.match(field(saving), /<span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-dim">Saving…<\/span>/);
   assert.deepEqual(codemodeOptions(saving).map(({ disabled }) => disabled), [true, true]);
   assert.equal(decode(saving).match(/role="status"/g).length, 1);
   // A server change on its way makes the field wait as well.
@@ -627,11 +628,11 @@ test("the Code mode pane's budget field saves a whole number, or empty for pi's 
 
 /** The Built-in tools switch's buttons, by label, with whether each is pressed and disabled. */
 function modeOptions(html) {
-  const group = decode(html).match(/<div role="group" aria-label="Built-in tools"[^>]*>([\s\S]*?)<\/div>/)?.[1];
+  const group = decode(html).match(/<div dir="ltr" role="radiogroup" data-slot="toggle-group"[^>]*aria-label="Built-in tools"[^>]*>([\s\S]*?)<\/div>/)?.[1];
   assert.ok(group, "the mode switch is rendered");
   return [...group.matchAll(/<button([^>]*)>([^<]*)<\/button>/g)].map(([, attributes, label]) => [
     label,
-    /aria-pressed="true"/.test(attributes),
+    /aria-checked="true"/.test(attributes),
     /disabled=""/.test(attributes),
   ]);
 }
@@ -718,7 +719,7 @@ test("every string the panel shows is translated", () => {
 /** The selected server's exposure dropdown: its opening tag, and each option with whether it is selected. */
 function exposureSelect(html) {
   const markup = decode(html);
-  const match = markup.match(/(<select[^>]*class="mcp-add-input w-auto max-w-full \[font-family:inherit\]"[^>]*>)([\s\S]*?)<\/select>/);
+  const match = markup.match(/(<select class="mcp-select-arrow h-8 max-w-full rounded-md border border-input bg-transparent py-1 pr-\[30px\] pl-2\.5 text-xs outline-none focus-visible:border-ring focus-visible:ring-\[3px\] focus-visible:ring-ring\/50"[^>]*>)([\s\S]*?)<\/select>/);
   assert.ok(match, "the Tools row holds the exposure dropdown");
   return {
     tag: match[1],
@@ -738,7 +739,7 @@ test("a server's Tools row chooses its exposure, saying in one line what each co
   ]);
   // The description of the chosen exposure describes the dropdown.
   const describedBy = select.tag.match(/aria-describedby="([^"]+)"/)[1];
-  assert.match(decode(view({ selected: "global\0github" })), new RegExp(`<span id="${describedBy}" class="mcp-config-line">Only the server's name and summary are listed`));
+  assert.match(decode(view({ selected: "global\0github" })), new RegExp(`<span id="${describedBy}" class="min-w-0 text-xs leading-normal text-muted-foreground \\[overflow-wrap:anywhere\\]">Only the server's name and summary are listed`));
   const shown = text(view({ selected: "global\0github" }));
   assert.match(shown, /Tools Code mode \(default\) .*? Only the server's name and summary are listed; Code mode scripts search for its tools\. File/);
   assert.doesNotMatch(shown, /toolExposure/);
@@ -762,7 +763,7 @@ test("a server's Tools row chooses its exposure, saying in one line what each co
 
   // A refused entry has no exposure to choose.
   const refused = view({ selected: "global\0bad", load: { state: "loaded", data: overview({ servers: [server({ name: "bad", invalidError: "x" })] }) } });
-  assert.doesNotMatch(refused, /mcp-add-input w-auto/);
+  assert.doesNotMatch(refused, /mcp-select-arrow/);
 });
 
 test("the exposure dropdown waits like a switch, and points at why it cannot be changed", () => {
@@ -774,7 +775,7 @@ test("the exposure dropdown waits like a switch, and points at why it cannot be 
   // While any change is on its way it waits; the one for this server says it is saving.
   const saving = validated({ view: { busy: "exposure:global\0docs" } });
   assert.match(exposureSelect(saving).tag, /disabled=""/);
-  assert.match(decode(saving), /<span class="flex min-w-0 flex-wrap items-center gap-1\.5"><select[^>]*>[\s\S]*?<\/select><span role="status" class="mcp-config-line is-dim">Saving…<\/span><\/span>/);
+  assert.match(decode(saving), /<span class="flex min-w-0 flex-wrap items-center gap-1\.5"><select[^>]*>[\s\S]*?<\/select><span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-dim">Saving…<\/span><\/span>/);
   assert.match(exposureSelect(validated({ view: { busy: "switch:global\0pw" } })).tag, /disabled=""/);
   assert.doesNotMatch(exposureSelect(validated()).tag, /disabled/);
   // Where no change may be written, it points at the note that says why.
@@ -793,7 +794,7 @@ function detailControls(html) {
   assert.ok(actions, "the detail header holds Remove and the switch");
   const [, buttons, noteId, note] = actions;
   return {
-    remove: buttons.match(/<button[^>]*class="config-button config-button-danger[^"]*"[^>]*>([^<]*)<\/button>/),
+    remove: buttons.match(/<button data-slot="alert-dialog-trigger" data-variant="destructive" data-size="xs" class="[^"]*"(?:[^>]*)>([^<]*)<\/button>/),
     toggle: buttons.match(/<button type="button" role="switch"[^>]*>/)?.[0],
     noteId,
     note,
@@ -818,13 +819,13 @@ function writeView(props = {}) {
 test("a server's detail switches it and removes it, with no note while both work", () => {
   const { remove, toggle, note } = detailControls(writeView());
   assert.equal(remove[1], "Remove");
-  assert.doesNotMatch(remove[0], /disabled/);
-  assert.match(toggle, /aria-checked="true" aria-label="Turn docs off"/);
-  assert.doesNotMatch(toggle, /disabled|aria-describedby/);
+  assert.doesNotMatch(remove[0], /\sdisabled=/);
+  assert.match(toggle, /aria-checked="true"[^>]*aria-label="Turn docs off"/);
+  assert.doesNotMatch(toggle, /\sdisabled=|aria-describedby/);
   assert.equal(note, undefined, "nothing to say while the controls simply work");
   // A server that is off offers to turn it on.
   const off = detailControls(writeView({ data: { servers: [server({ name: "docs", enabled: false, transport: "http", url: "https://docs/mcp" })] } }));
-  assert.match(off.toggle, /aria-checked="false" aria-label="Turn docs on"/);
+  assert.match(off.toggle, /aria-checked="false"[^>]*aria-label="Turn docs on"/);
 });
 
 test("why a server cannot be changed is the visible note its controls point at", () => {
@@ -837,7 +838,7 @@ test("why a server cannot be changed is the visible note its controls point at",
   assert.match(untrustedProject.toggle, /disabled=""/);
   assert.match(untrustedProject.remove[0], new RegExp(`disabled="" aria-describedby="${untrustedProject.noteId}"`));
   // ...while the global servers beside it can still be changed.
-  assert.doesNotMatch(detailControls(writeView({ data: { project: { cwd: "/Users/me/repo", trust: untrusted } } })).toggle, /disabled/);
+  assert.doesNotMatch(detailControls(writeView({ data: { project: { cwd: "/Users/me/repo", trust: untrusted } } })).toggle, /\sdisabled=/);
   // An unreadable trust store blocks the project the same way, with its own reason.
   assert.equal(
     detailControls(writeView({ data: { project: { cwd: "/Users/me/repo", trustError: "locked" } }, view: { selected: "project\0repo" } })).note,
@@ -856,14 +857,14 @@ test("why a server cannot be changed is the visible note its controls point at",
   assert.match(decode(offHtml), new RegExp(`<div id="${bannerId}" role="status" class="config-notice">MCP is off`));
   // -builtin:mcp leaves the files writable: a project can turn MCP back on.
   const builtin = writeView({ data: { mcp: { available: false, reason: "builtin-disabled", error: "x", settingsPath: "/s.json" } } });
-  assert.doesNotMatch(detailControls(builtin).toggle, /disabled/);
+  assert.doesNotMatch(detailControls(builtin).toggle, /\sdisabled=/);
   assert.doesNotMatch(text(builtin), /cannot be changed here/);
 
   // An entry that references PI_WEB_PASSWORD is never turned on, but can be removed.
   const password = detailControls(writeView({ view: { selected: "global\0pw" } }));
   assert.equal(password.note, "It references PI_WEB_PASSWORD, so Pi Web does not turn it on.");
   assert.match(password.toggle, /aria-checked="false"[^>]*disabled=""/);
-  assert.doesNotMatch(password.remove[0], /disabled/);
+  assert.doesNotMatch(password.remove[0], /\sdisabled=/);
 });
 
 test("while a change is on its way every control waits, and the one in use says so", () => {
@@ -872,7 +873,7 @@ test("while a change is on its way every control waits, and the one in use says 
   assert.equal(controls.remove[1], "Removing…");
   assert.match(controls.remove[0], /disabled=""/);
   assert.match(controls.toggle, /disabled=""/);
-  assert.match(decode(removing), /<button type="button" disabled="" class="config-button config-button-secondary config-button-default">Refresh<\/button>/);
+  assert.match(decode(removing), /<button data-slot="button" data-variant="outline" data-size="sm" class="[^"]*" type="button" disabled="">Refresh<\/button>/);
   for (const match of decode(removing).matchAll(/<button type="button" role="switch"[^>]*>/g)) assert.match(match[0], /disabled=""/);
 
   const switching = detailControls(writeView({ view: { busy: "switch:global\0docs" } }));
@@ -881,12 +882,12 @@ test("while a change is on its way every control waits, and the one in use says 
   // A load on its way holds the controls too, so a click acts on the listing shown.
   assert.match(detailControls(writeView({ view: { refreshing: true } })).toggle, /disabled=""/);
   // The group switch shows its own wait (on: the one server off references PI_WEB_PASSWORD).
-  assert.match(decode(writeView({ view: { busy: "group:global" } })), /<span class="config-sidebar-group-count">1\/2<\/span><button type="button" role="switch" aria-checked="true" aria-busy="true"/);
+  assert.match(decode(writeView({ view: { busy: "group:global" } })), /<span class="config-sidebar-group-count">1\/2<\/span><button type="button" role="switch" aria-checked="true"[^>]*aria-busy="true"/);
 });
 
 test("a failed change is said in the server's pane with its reason, and a timeout as possibly landed", () => {
   const failed = (failure, key = "global\0docs") => decode(writeView({ view: { actionError: { key, failure } } }))
-    .match(/<p role="alert" class="mcp-config-line is-error">([^<]*)<\/p>/)?.[1];
+    .match(/<p role="alert" class="text-xs leading-normal text-destructive \[overflow-wrap:anywhere\]">([^<]*)<\/p>/)?.[1];
   assert.equal(failed({ error: "/x: Unexpected token", reason: "unparsable", path: "/x" }), "Could not change the server: The file is not valid JSON, so Pi Web left it unchanged.");
   assert.equal(failed({ error: "EACCES: permission denied", reason: "internal" }), "Could not change the server: EACCES: permission denied");
   assert.equal(failed({ error: "POST /api/mcp did not answer within 15000 ms", timedOut: true }),
@@ -915,11 +916,11 @@ test("the group switch names what it left undone under the heading", () => {
 test("a removal offers Undo until the route lets it go, and says why an undo failed", () => {
   const notice = (undo) => decode(writeView({ view: { undo: { token: "t", scope: "global", name: "lint", path: "/Users/me/.pi/agent/mcp.json", expiresInMs: 60_000, undoing: false, ...undo } } }))
     .match(/<div role="status" class="config-notice[^"]*">([\s\S]*?)<\/div>/)?.[1];
-  assert.match(notice({}), /^<span class="config-notice-text">Removed lint from ~\/\.pi\/agent\/mcp\.json\.<\/span><button type="button" class="config-button config-button-secondary config-button-small">Undo<\/button>$/);
-  assert.match(notice({ undoing: true }), /<button type="button" disabled="" [^>]*>Undoing…<\/button>/);
+  assert.match(notice({}), /^<span class="config-notice-text">Removed lint from ~\/\.pi\/agent\/mcp\.json\.<\/span><button data-slot="button" data-variant="outline" data-size="xs" class="[^"]*" type="button">Undo<\/button>$/);
+  assert.match(notice({ undoing: true }), /<button data-slot="button" data-variant="outline" data-size="xs" class="[^"]*" type="button" disabled="">Undoing…<\/button>/);
   // A name added again since keeps Undo for when it is gone; an undo that is no longer possible drops it.
   assert.match(notice({ error: { error: "x", reason: "undo-name-taken", name: "lint" } }),
-    /Removed lint from ~\/\.pi\/agent\/mcp\.json\. Could not undo: The file defines a server of the same name again, so the removal was not undone\.<\/span><button[^>]*>Undo</);
+    /Removed lint from ~\/\.pi\/agent\/mcp\.json\. Could not undo: The file defines a server of the same name again, so the removal was not undone\.<\/span><button data-slot="button" data-variant="outline" data-size="xs" class="[^"]*" type="button">Undo</);
   const gone = notice({ error: { error: "x", reason: "undo-unavailable" } });
   assert.match(gone, /Could not undo: The removal can no longer be undone\.$/);
   assert.doesNotMatch(gone, /<button/);
@@ -934,19 +935,19 @@ test("a group holding a server the switch never turns on can still be switched o
   // docs is on and pw, the only server off, references PI_WEB_PASSWORD: the switch reads on and
   // offers to turn the group off. Reading "every row on" kept it off for good, and each click
   // asked to turn on again and sent nothing.
-  assert.match(groupSwitch(writeView(), "1/2"), /aria-checked="true" aria-label="Turn off every global server"/);
+  assert.match(groupSwitch(writeView(), "1/2"), /aria-checked="true"[^>]*aria-label="Turn off every global server"/);
   // The count still says what the file says.
   const pwOff = server({ name: "pw", transport: "http", url: "https://pw/mcp", enabled: false, webPasswordField: { kind: "header", name: "Authorization" } });
   assert.match(
     groupSwitch(writeView({ data: { servers: [server({ name: "docs", enabled: false, transport: "http", url: "https://docs/mcp" }), pwOff] } }), "0/2"),
-    /aria-checked="false" aria-label="Turn on every global server"/,
+    /aria-checked="false"[^>]*aria-label="Turn on every global server"/,
   );
   // The shared switch's click asks for the opposite of what it shows.
   const asked = [];
   const heading = ConfigSidebarGroupSwitch({ enabled: 1, total: 2, checked: true, label: "x", onChange: (next) => asked.push(next) });
   const toggle = heading.props.children[1];
   assert.equal(toggle.props.checked, true);
-  toggle.type(toggle.props).props.onClick();
+  toggle.type(toggle.props).props.onCheckedChange(false);
   assert.deepEqual(asked, [false]);
   // Without `checked` it keeps the Skills and Plugins rule.
   assert.equal(ConfigSidebarGroupSwitch({ enabled: 1, total: 2, label: "x", onChange() {} }).props.children[1].props.checked, false);
@@ -957,8 +958,8 @@ test("an entry that is not an object can be removed but not switched, and says s
   const html = writeView({ data: { servers: [junk, server({ name: "docs", transport: "http", url: "https://docs/mcp" })] }, view: { selected: "global\0junk" } });
   const controls = detailControls(html);
   assert.equal(controls.note, "This entry is not an object, so it cannot be turned on or off. Remove it, or fix it in the file.");
-  assert.match(controls.toggle, new RegExp(`aria-describedby="${controls.noteId}"[^>]*disabled=""`));
-  assert.doesNotMatch(controls.remove[0], /disabled/);
+  assert.match(controls.toggle, new RegExp(`disabled=""[^>]*aria-describedby="${controls.noteId}"`));
+  assert.doesNotMatch(controls.remove[0], /\sdisabled=/);
   // It reads as on in the count, but does not hold the group switch off.
   assert.match(groupSwitch(html, "2/2"), /aria-checked="true"/);
 });
@@ -971,7 +972,7 @@ test("a Code mode save and a server change never overlap", () => {
   assert.match(controls.toggle, /disabled=""/);
   assert.match(controls.remove[0], /disabled=""/);
   assert.match(groupSwitch(saving, "1/2"), /disabled=""/);
-  assert.match(decode(saving), /<button type="button" disabled="" class="config-button config-button-secondary config-button-default">Refresh<\/button>/);
+  assert.match(decode(saving), /<button data-slot="button" data-variant="outline" data-size="sm" class="[^"]*" type="button" disabled="">Refresh<\/button>/);
   // While a server change runs, neither Code mode option can be chosen.
   const info = { sandbox: { state: "available" }, builtinDisabled: false, preference: "automatic" };
   assert.deepEqual(codemodeOptions(codemodeView(info, { view: { busy: "switch:global\0docs" } })).map(({ disabled }) => disabled), [true, true]);
@@ -981,7 +982,7 @@ test("a Code mode save and a server change never overlap", () => {
 test("under -builtin:mcp a change is saved, and the note says no session connects it", () => {
   const builtin = detailControls(writeView({ data: { mcp: { available: false, reason: "builtin-disabled", error: "x", settingsPath: "/s.json" } } }));
   assert.equal(builtin.note, "Changes are saved to the file, but no session connects these servers while builtin:mcp is off.");
-  assert.doesNotMatch(builtin.toggle, /disabled/);
+  assert.doesNotMatch(builtin.toggle, /\sdisabled=/);
   // MCP on: no note.
   assert.equal(detailControls(writeView()).note, undefined);
 });
@@ -999,11 +1000,11 @@ function statusRow(html) {
   const markup = decode(html);
   const row = markup.match(/<div class="config-detail-grid-label">Status<\/div><div class="config-detail-grid-value">([\s\S]*?)<\/div>/)?.[1];
   assert.ok(row, "the detail pane has a Status row");
-  const head = row.match(/^<span class="mcp-config-lines"><span class="mcp-config-state is-[a-z]+">([^<]*)<\/span>/);
+  const head = row.match(/^<div class="flex min-w-0 flex-col gap-1"><span data-slot="badge" data-variant="[a-z]+" class="[^"]*">([^<]*)<\/span>/);
   assert.ok(head, "the Status row starts with the state label");
   const value = row.slice(head[0].length);
   const actions = markup.match(/<div class="config-detail-actions">([\s\S]*?)<\/div><\/div>/)?.[1] ?? "";
-  const button = actions.match(/<button([^>]*)>(Test connection|Testing…)<\/button>/);
+  const button = actions.match(/<button data-slot="button" data-variant="outline" data-size="xs" class="[^"]*"([^>]*)>(Test connection|Testing…)<\/button>/);
   assert.ok(button, "the detail header holds Test");
   return { label: head[1], value, text: text(value), button: { attributes: button[1], label: button[2] } };
 }
@@ -1048,8 +1049,8 @@ test("an untested server offers Test in its header, beside Remove", () => {
   const html = testView();
   const { text: shown, button } = statusRow(html);
   assert.equal(button.label, "Test connection");
-  assert.doesNotMatch(button.attributes, /disabled|aria-describedby/);
-  assert.match(decode(html), /<div class="config-detail-actions"><button type="button" class="config-button config-button-secondary config-button-small">Test connection<\/button><button[^>]*class="config-button config-button-danger/);
+  assert.doesNotMatch(button.attributes, /\sdisabled=|aria-describedby/);
+  assert.match(decode(html), /<div class="config-detail-actions"><button data-slot="button" data-variant="outline" data-size="xs" class="[^"]*" type="button">Test connection<\/button><button data-slot="alert-dialog-trigger" data-variant="destructive"/);
   assert.equal(shown, "Not tested yet.");
   assert.equal(statusRow(html).label, "On");
   // A server that runs a shell command on every connection is labelled: its tests run one at a time.
@@ -1081,7 +1082,7 @@ test("a connected test shows what it listed, and the row reads connected", () =>
   const { label, value, text: shown } = statusRow(html);
   // The state is said once: what the test found follows it without its own "Connected".
   assert.equal(label, "Connected when tested");
-  assert.match(value, /^<span class="mcp-config-line">3 tool\(s\) listed in 0\.4 s, tested at [^.]+\.<\/span>/);
+  assert.match(value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">3 tool\(s\) listed in 0\.4 s, tested at [^.]+\.<\/span>/);
   assert.match(shown, /Server: docs-server 2\.1\.0/);
   assert.match(shown, /Offers resources\./);
   assert.doesNotMatch(shown, /Ran in/, "an HTTP server runs in no folder");
@@ -1092,9 +1093,9 @@ test("a connected test shows what it listed, and the row reads connected", () =>
   const tools = markup.match(/<div class="config-detail-grid-label">Tools<\/div><div class="config-detail-grid-value">([\s\S]*?)<\/div>/)?.[1];
   assert.ok(tools, "a Tools row");
   assert.match(tools, /<select[\s\S]*<\/select>[\s\S]*<ul class="mt-1 flex min-w-0 flex-col gap-1\.5">/);
-  assert.match(tools, /<li class="flex min-w-0 flex-col gap-0\.5"><span class="mcp-config-chips"><code class="mcp-config-chip">search<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">read-only<\/span><\/span><span class="mcp-config-line is-dim">Search the docs\.<\/span><\/li>/);
+  assert.match(tools, /<li class="flex min-w-0 flex-col gap-0\.5"><span class="flex min-w-0 flex-wrap gap-1"><code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">search<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">read-only<\/span><\/span><span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-dim">Search the docs\.<\/span><\/li>/);
   // A tool whose exposure differs from its server's says so; one like its server's does not.
-  assert.match(tools, /<code class="mcp-config-chip">publish<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">direct<\/span>/);
+  assert.match(tools, /<code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">publish<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">direct<\/span>/);
   assert.doesNotMatch(tools, /<span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">Code mode<\/span>/);
   // A tool name is the server's text: hidden characters are shown as codes.
   assert.match(tools, /bidi\\u\{202E\}tool/);
@@ -1116,25 +1117,25 @@ test("a stdio server's test names the folder it ran in", () => {
 test("a failed test shows the error and stderr, a sign-in, and no answer, each with visible text", () => {
   const failed = testView({ status: testedStatus("failed", { error: "spawn lint-mcp ENOENT", stderr: "line one\nline\u0007two", durationMs: 1_250 }) });
   assert.match(row(failed, "docs"), /aria-label="docs: Did not connect when tested"/);
-  assert.match(decode(failed), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-destructive">failed<\/span>/);
+  assert.match(decode(failed), /<span data-slot="badge" data-variant="destructive" class="[^"]*">failed<\/span>/);
   const { label, value } = statusRow(failed);
   assert.equal(label, "Did not connect when tested");
-  assert.match(value, /^<span class="mcp-config-line">Gave up after 1\.3 s, tested at/);
-  assert.match(value, /<span class="mcp-config-line is-error">Error: <code class="mcp-config-chip">spawn lint-mcp ENOENT<\/code><\/span>/);
+  assert.match(value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">Gave up after 1\.3 s, tested at/);
+  assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Error: <code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">spawn lint-mcp ENOENT<\/code><\/span>/);
   // The stderr tail keeps its lines, and its control characters are shown as codes.
-  assert.match(value, /<span class="mcp-config-line is-dim">The last lines it wrote to stderr:<\/span><pre class="max-h-\[160px\][^"]*">line one\nline\\u\{0007\}two<\/pre>/);
+  assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-dim">The last lines it wrote to stderr:<\/span><pre class="max-h-\[160px\][^"]*">line one\nline\\u\{0007\}two<\/pre>/);
 
   const signIn = testView({ status: testedStatus("needs-auth") });
   assert.match(row(signIn, "docs"), /aria-label="docs: Needs sign-in"/);
-  assert.match(decode(signIn), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-warning">sign-in<\/span>/);
-  assert.match(statusRow(signIn).value, /^<span class="mcp-config-line">The server asked for an OAuth sign-in\. Tested at/);
+  assert.match(decode(signIn), /<span data-slot="badge" data-variant="warning" class="[^"]*">sign-in<\/span>/);
+  assert.match(statusRow(signIn).value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">The server asked for an OAuth sign-in\. Tested at/);
   // The panel's own Sign in, not a chat command, is where to sign in.
   assert.match(text(decode(signIn)), /Status Needs sign-in The server asked for an OAuth sign-in\./);
   assert.doesNotMatch(text(decode(signIn)), /for example with \/mcp/);
 
   const silent = statusRow(testView({ status: testedStatus("failed", { timedOut: true, durationMs: 20_000 }) }));
   assert.equal(silent.label, "Did not connect when tested");
-  assert.match(silent.value, /^<span class="mcp-config-line">It did not answer within 20\.0 s, so Pi Web stopped the test\. Tested at/);
+  assert.match(silent.value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">It did not answer within 20\.0 s, so Pi Web stopped the test\. Tested at/);
 
   // A test of a switched-off server is shown in its pane, but the row says what the file says.
   const off = testView({ enabled: false, status: testedStatus("connected") });
@@ -1173,7 +1174,7 @@ test("Test is disabled where the route would refuse it, and points at the visibl
   assert.doesNotMatch(text(decode(password)), /so Pi Web does not connect it/);
   // -builtin:mcp leaves it as an explicit action.
   const builtin = statusRow(testView({}, { data: { mcp: { available: false, reason: "builtin-disabled", error: "x", settingsPath: "/s.json" } } }));
-  assert.doesNotMatch(builtin.button.attributes, /disabled/);
+  assert.doesNotMatch(builtin.button.attributes, /\sdisabled=/);
 });
 
 test("while a test runs its button says so, and every other control keeps working", () => {
@@ -1184,18 +1185,18 @@ test("while a test runs its button says so, and every other control keeps workin
   assert.match(button.attributes, /disabled="" aria-busy="true"/);
   // A test writes no file: the switch, Remove and Refresh do not wait for it.
   const controls = detailControls(html);
-  assert.doesNotMatch(controls.toggle, /disabled/);
-  assert.doesNotMatch(controls.remove[0], /disabled/);
-  assert.match(decode(html), /<button type="button" class="config-button config-button-secondary config-button-default">Refresh<\/button>/);
+  assert.doesNotMatch(controls.toggle, /\sdisabled=/);
+  assert.doesNotMatch(controls.remove[0], /\sdisabled=/);
+  assert.match(decode(html), /<button data-slot="button" data-variant="outline" data-size="sm" class="[^"]*" type="button">Refresh<\/button>/);
   // ...and a change on its way does not hold Test either.
-  assert.doesNotMatch(statusRow(testView({}, { view: { busy: "switch:global\0docs" } })).button.attributes, /disabled/);
+  assert.doesNotMatch(statusRow(testView({}, { view: { busy: "switch:global\0docs" } })).button.attributes, /\sdisabled=/);
 });
 
 test("a test request that failed says why in a test's words, and keeps the last result", () => {
   const key = "global\0docs";
   const failure = (error, extra = {}) => statusRow(testView({ status: testedStatus("connected") }, { view: { tests: { [key]: { running: false, error, ...extra } } } }));
   const refused = failure({ error: "x", reason: "project-untrusted" });
-  assert.match(refused.value, /<span role="alert" class="mcp-config-line is-error">Could not test the server: This project is not trusted, so Pi Web does not start its servers\.<\/span>/);
+  assert.match(refused.value, /<span role="alert" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Could not test the server: This project is not trusted, so Pi Web does not start its servers\.<\/span>/);
   assert.equal(refused.label, "Connected when tested", "the last result stays");
   assert.match(refused.text, /^0 tool\(s\) listed in/);
   assert.match(failure({ error: "x", reason: "server-missing" }).text, /Could not test the server: The file no longer defines this server\./);
@@ -1208,7 +1209,7 @@ test("a test request that failed says why in a test's words, and keeps the last 
   assert.doesNotMatch(failure({ error: "x", reason: "server-invalid" }, { configKey: "old-key" }).text, /Could not test/);
   assert.match(failure({ error: "x", reason: "server-invalid" }, { configKey: "key" }).text, /Could not test the server: Pi refuses this entry/);
   const queued = statusRow(testView({}, { view: { tests: { [key]: { running: false, queueTimedOut: true, configKey: "key" } } } }));
-  assert.match(queued.value, /<span role="alert" class="mcp-config-line is-error">Another test of a server that runs a shell command did not finish in time, so this one did not start\. Try again\.<\/span>/);
+  assert.match(queued.value, /<span role="alert" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Another test of a server that runs a shell command did not finish in time, so this one did not start\. Try again\.<\/span>/);
   assert.doesNotMatch(statusRow(testView({}, { view: { tests: { [key]: { running: false, queueTimedOut: true, configKey: "old-key" } } } })).text, /did not start/);
 });
 
@@ -1237,7 +1238,7 @@ test("a session's report names the state in the row and says which session saw i
   assert.match(row(connected, "docs"), /aria-label="docs: Connected in a session"/);
   const { value, button } = statusRow(connected);
   // The session's folder, shortened as every path in the panel is.
-  assert.match(value, /^<span class="mcp-config-line">A session in ~\/repo connected it at [^.]+\.<\/span>/);
+  assert.match(value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">A session in ~\/repo connected it at [^.]+\.<\/span>/);
   assert.match(text(decode(connected)), /Status Connected in a session A session in ~\/repo connected it/);
   // A session lists no tools for the panel; only a test does.
   assert.doesNotMatch(decode(connected), /<ul class="mt-1 flex min-w-0 flex-col gap-1\.5">/);
@@ -1245,16 +1246,16 @@ test("a session's report names the state in the row and says which session saw i
 
   const failed = testView({ transport: "stdio", url: undefined, command: "node", status: sessionStatus("failed", { error: "spawn lint ENOENT", stderr: "no\nconfig" }) });
   assert.match(row(failed, "docs"), /aria-label="docs: Did not connect in a session"/);
-  assert.match(decode(failed), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-destructive">failed<\/span>/);
+  assert.match(decode(failed), /<span data-slot="badge" data-variant="destructive" class="[^"]*">failed<\/span>/);
   const failedRow = statusRow(failed).value;
-  assert.match(failedRow, /^<span class="mcp-config-line">A session in ~\/repo could not connect it at/);
-  assert.match(failedRow, /<span class="mcp-config-line is-error">Error: <code class="mcp-config-chip">spawn lint ENOENT<\/code><\/span>/);
+  assert.match(failedRow, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">A session in ~\/repo could not connect it at/);
+  assert.match(failedRow, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Error: <code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">spawn lint ENOENT<\/code><\/span>/);
   assert.match(failedRow, /<pre class="max-h-\[160px\][^"]*">no\nconfig<\/pre>/);
   assert.match(text(decode(failed)), /Status Did not connect in a session A session in ~\/repo could not connect it/);
 
   const signIn = testView({ status: sessionStatus("needs-auth") });
   assert.match(row(signIn, "docs"), /aria-label="docs: Needs sign-in"/);
-  assert.match(decode(signIn), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-warning">sign-in<\/span>/);
+  assert.match(decode(signIn), /<span data-slot="badge" data-variant="warning" class="[^"]*">sign-in<\/span>/);
   assert.match(statusRow(signIn).text, /^The server asked a session in ~\/repo for an OAuth sign-in at/);
   assert.match(text(decode(signIn)), /Status Needs sign-in The server asked a session in ~\/repo for an OAuth sign-in/);
 });
@@ -1269,7 +1270,7 @@ test("a connection the session closed since reads like an untested entry, and sa
   assert.equal(label, "On");
   // The sentence says it closed; no state word of its own repeats it.
   assert.equal(
-    value.match(/^<span class="mcp-config-line">([^<]*)<\/span>/)?.[1],
+    value.match(/^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">([^<]*)<\/span>/)?.[1],
     `A session in ~/repo connected it at ${time(TODAY_10_42)} and closed it at ${time(closedAt)}.`,
   );
 
@@ -1282,24 +1283,24 @@ test("a connection the session closed since reads like an untested entry, and sa
 test("connecting, a dropped connection and a name another extension holds each have visible words", () => {
   const connecting = testView({ status: sessionStatus("connecting") });
   assert.match(row(connecting, "docs"), /aria-label="docs: Connecting in a session"/);
-  assert.match(decode(connecting), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-dim">connecting<\/span>/);
+  assert.match(decode(connecting), /<span data-slot="badge" data-variant="secondary" class="[^"]*">connecting<\/span>/);
   assert.match(statusRow(connecting).text, /^A session in ~\/repo started connecting it at/);
 
   const dropped = testView({ transport: "stdio", url: undefined, command: "node", status: sessionStatus("disconnected", { stderr: "panic: out of memory" }) });
   assert.match(row(dropped, "docs"), /aria-label="docs: Connection dropped in a session"/);
-  assert.match(decode(dropped), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-warning">dropped<\/span>/);
-  assert.match(statusRow(dropped).value, /^<span class="mcp-config-line">The connection of a session in ~\/repo dropped at [^.]+\.<\/span>/);
+  assert.match(decode(dropped), /<span data-slot="badge" data-variant="warning" class="[^"]*">dropped<\/span>/);
+  assert.match(statusRow(dropped).value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">The connection of a session in ~\/repo dropped at [^.]+\.<\/span>/);
   assert.match(statusRow(dropped).value, /<pre class="max-h-\[160px\][^"]*">panic: out of memory<\/pre>/);
   // What happens next follows what the session saw, which it does not repeat.
   assert.match(statusRow(dropped).text, /panic: out of memory That session connects it again at the next call to one of its tools\.$/);
 
   const taken = testView({ status: sessionStatus("conflict", { conflict: "/Users/me/.pi/agent/extensions/jira.ts" }) });
   assert.match(row(taken, "docs"), /aria-label="docs: Name taken by another extension"/);
-  assert.match(decode(taken), /<span class="shrink-0 max-w-\[45%\] truncate text-\[10px\] text-destructive">conflict<\/span>/);
+  assert.match(decode(taken), /<span data-slot="badge" data-variant="destructive" class="[^"]*">conflict<\/span>/);
   const takenRow = statusRow(taken).value;
-  assert.match(takenRow, /^<span class="mcp-config-line">A session in ~\/repo found the name taken at [^,]+, so it did not connect this entry\.<\/span>/);
+  assert.match(takenRow, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">A session in ~\/repo found the name taken at [^,]+, so it did not connect this entry\.<\/span>/);
   // The owner is named, the home folder shortened as everywhere in the panel.
-  assert.match(takenRow, /<span class="mcp-config-line is-error">Registered first by: <code class="mcp-config-chip">~\/\.pi\/agent\/extensions\/jira\.ts<\/code><\/span>/);
+  assert.match(takenRow, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Registered first by: <code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">~\/\.pi\/agent\/extensions\/jira\.ts<\/code><\/span>/);
   assert.match(statusRow(taken).text, /jira\.ts Rename the entry in its file, or turn the other extension off\.$/);
 });
 
@@ -1313,7 +1314,7 @@ test("a session that found the project untrusted is said in the Status row, what
   const still = view({ load: { state: "loaded", data }, ...select });
   assert.match(row(still, "repo"), /aria-label="repo: Project not trusted"/);
   // The state comes from the files, not the report, so the report keeps its own word.
-  assert.match(statusRow(still).value, /^<span class="mcp-config-line"><span class="mcp-config-state is-warning">Not read<\/span> A session in ~\/repo did not read it at [^,]+, because no decision trusted the project then\./);
+  assert.match(statusRow(still).value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]"><span data-slot="badge" data-variant="warning" class="[^"]*">Not read<\/span> A session in ~\/repo did not read it at [^,]+, because no decision trusted the project then\./);
   assert.doesNotMatch(statusRow(still).text, /does not connect/, "the label says the project is not trusted");
   // Trusted since: the row reads on, since sessions read the file at their next message.
   const since = view({ load: { state: "loaded", data: { ...data, project: { cwd: "/Users/me/repo", trust: trusted } } }, ...select });
@@ -1348,7 +1349,7 @@ test("an OAuth server's pane signs in from its Sign-in row, under the Status row
   const html = testView({ usesOAuth: true, signedIn: false, status: testedStatus("needs-auth") });
   assert.match(text(decode(html)), /Status Needs sign-in The server asked for an OAuth sign-in\./);
   const { value, text: shown } = signInRow(html);
-  assert.match(value, /<button type="button" class="config-button config-button-primary config-button-small">Sign in<\/button>/);
+  assert.match(value, /<button data-slot="button" data-variant="default" data-size="sm" class="[^"]*" type="button">Sign in<\/button>/);
   assert.match(shown, /Not signed in\./);
 
   // The panel's sign-in for the selected server is the one the row shows.
@@ -1368,16 +1369,16 @@ test("an OAuth server's pane signs in from its Sign-in row, under the Status row
     }) },
     selected: mcpServerKey({ scope: "project", name: "docs" }),
   }));
-  const id = blocked.value.match(/<button type="button" disabled="" aria-describedby="([^"]+)" class="config-button config-button-primary config-button-small">Sign in<\/button>/)?.[1];
+  const id = blocked.value.match(/<button data-slot="button" data-variant="default" data-size="sm" class="[^"]*" type="button" disabled="" aria-describedby="([^"]+)">Sign in<\/button>/)?.[1];
   assert.ok(id, "Sign in is disabled and points at the reason");
-  assert.match(blocked.value, new RegExp(`<span id="${id}" class="mcp-config-line is-dim">This project is not trusted`));
+  assert.match(blocked.value, new RegExp(`<span id="${id}" class="min-w-0 text-xs leading-normal \\[overflow-wrap:anywhere\\] text-dim">This project is not trusted`));
   assert.match(blocked.text, /This project is not trusted, so Pi Web does not sign in to or out of its servers\./);
 });
 
 test("the connection a sign-in made is summed up as a sign-in's in the Status row", () => {
   const status = testedStatus("connected", { toolCount: 2, afterSignIn: true, tools: [{ name: "whoami", readOnly: true, exposure: "codemode" }] });
   const { value } = statusRow(testView({ usesOAuth: true, signedIn: true, status }));
-  assert.match(value, /^<span class="mcp-config-line">Signed in, then 2 tool\(s\) listed in 0\.4 s, at [^.]+\.<\/span>/);
+  assert.match(value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">Signed in, then 2 tool\(s\) listed in 0\.4 s, at [^.]+\.<\/span>/);
   const after = statusRow(testView({ usesOAuth: true, signedIn: true, status: testedStatus("needs-auth", { afterSignIn: true }) }));
   assert.equal(after.label, "Needs sign-in");
   assert.match(after.text, /^Signed in, but the server still asked for a sign-in at /);

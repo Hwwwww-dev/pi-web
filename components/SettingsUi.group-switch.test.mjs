@@ -32,8 +32,8 @@ test("a group switch is on only while every row of the group is", () => {
 test("the group switch shares the heading row and uses the regular switch", () => {
   const html = renderSwitch(1, 2);
   assert.match(html, /^<div class="config-sidebar-group-label"><span class="config-sidebar-group-label-text">global<\/span><span class="config-sidebar-group-switch">/);
-  assert.match(html, /class="config-switch"/);
-  assert.doesNotMatch(html, /class="config-switch is-small"/);
+  assert.match(html, /data-slot="switch" data-size="default"/);
+  assert.doesNotMatch(html, /data-size="sm"/);
   assert.match(html, /aria-label="Switch the group"/);
 });
 

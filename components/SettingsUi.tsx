@@ -4,10 +4,26 @@ import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect,
 import type { ButtonHTMLAttributes, ClipboardEvent, CSSProperties, HTMLAttributes, ReactNode, Ref } from "react";
 import { PlusIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
+import { Empty, EmptyDescription, EmptyHeader } from "./ui/empty";
+import { Field, FieldLabel } from "./ui/field";
+import { Input } from "./ui/input";
+import { Switch } from "./ui/switch";
+import { Textarea } from "./ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
 type ConfigButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 type ConfigButtonSize = "small" | "default";
+
+/** A settings button's variant on the stock Button: the names keep the panels' vocabulary. */
+const CONFIG_BUTTON_VARIANTS = {
+  primary: "default",
+  secondary: "outline",
+  danger: "destructive",
+  ghost: "ghost",
+} as const;
 
 interface ConfigPanelShellProps {
   embedded: boolean;
@@ -316,7 +332,7 @@ export function ConfigCard({
   return (
     <Card className={cn("gap-0 overflow-hidden py-0 shadow-none", className)}>
       {hasHeader && (
-        <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 pt-3.5 pb-1">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 px-[16px] pt-[14px] pb-[4px]">
           <div className="min-w-0">
             {title !== undefined && <CardTitle className="text-[13.5px] leading-snug font-semibold">{title}</CardTitle>}
             {description !== undefined && <CardDescription className="mt-0.5 text-xs">{description}</CardDescription>}
@@ -334,10 +350,10 @@ export function ConfigCard({
 
 export function ConfigField({ label, children, style, ref }: { label: ReactNode; children: ReactNode; style?: CSSProperties; ref?: Ref<HTMLDivElement> }) {
   return (
-    <div ref={ref} className="config-field" style={style}>
-      <span className="config-field-label">{label}</span>
+    <Field ref={ref} style={style} className="min-w-0 gap-1.5">
+      <FieldLabel className="text-[13px] font-medium text-muted-foreground">{label}</FieldLabel>
       {children}
-    </div>
+    </Field>
   );
 }
 
@@ -387,9 +403,16 @@ export function ConfigDetailGridRow({
 /** Where a row lives (`global`, `project`, …); a project scope is tinted. */
 export function ConfigScopeTag({ scope, children }: { scope: string; children: ReactNode }) {
   return (
-    <span className={`config-scope-tag${scope === "project" ? " is-project" : ""}`}>
+    <Badge
+      variant="secondary"
+      className={cn(
+        "shrink-0 rounded-[3px] px-1.5 py-px text-[10px] font-normal",
+        // The project tint has no pi token, kept literal (as .config-scope-tag was).
+        scope === "project" && "bg-[rgba(99,102,241,0.12)] text-[rgba(99,102,241,0.8)]",
+      )}
+    >
       {children}
-    </span>
+    </Badge>
   );
 }
 
@@ -430,23 +453,34 @@ export function ConfigScopeSwitch<S extends string>({
   return (
     <div className="config-scope-switch-field">
       <div className="config-scope-switch-row">
-        <div role="group" aria-label={label} className={`config-scope-switch${size === "small" ? " is-small" : ""}`}>
+        {/* Radix hands back "" when the active option is clicked again; keep the value. */}
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          spacing={0}
+          value={value}
+          aria-label={label}
+          className={size === "small" ? "text-xs" : undefined}
+          onValueChange={(next) => {
+            if (next) onChange(next as S);
+          }}
+        >
           {options.map((option) => (
-            <button
+            <ToggleGroupItem
               key={option.value}
-              type="button"
-              aria-pressed={option.value === value}
+              value={option.value}
               aria-describedby={option.disabled && reason ? reasonId : undefined}
               disabled={option.disabled}
-              className="config-scope-switch-option"
-              onClick={() => {
-                if (!option.disabled) onChange(option.value);
-              }}
+              className={cn(
+                size === "small"
+                  ? "h-auto px-2.5 py-0.5 font-normal text-dim data-[state=on]:font-semibold data-[state=on]:text-foreground"
+                  : "h-[30px] w-[76px] font-normal text-muted-foreground data-[state=on]:font-medium",
+              )}
             >
               {option.label}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
         {children}
       </div>
       {reason && (
@@ -654,12 +688,12 @@ export function ConfigAddSourcePanel({
 
       <ConfigField label={inputLabel}>
         {multiline ? (
-          <textarea
+          <Textarea
             id={inputId}
             ref={textareaRef}
             value={value}
             aria-label={inputLabel}
-            className="config-add-source-input is-multiline"
+            className="max-h-[40vh] min-h-24 resize-y whitespace-pre font-mono text-xs"
             placeholder={placeholder}
             rows={5}
             spellCheck={false}
@@ -677,12 +711,12 @@ export function ConfigAddSourcePanel({
             }}
           />
         ) : (
-          <input
+          <Input
             id={inputId}
             ref={inputRef}
             value={value}
             aria-label={inputLabel}
-            className="config-add-source-input"
+            className="font-mono text-xs"
             placeholder={placeholder}
             onChange={(event) => onValueChange(event.target.value)}
             onPaste={onPaste}
@@ -701,26 +735,28 @@ export function ConfigAddSourcePanel({
       {examples.length > 0 && (
         <div className="config-add-source-examples">
           <div className="config-add-source-examples-label">{examplesLabel}</div>
-          <div className="config-add-source-example-list">
+          <div className="flex flex-col gap-1.5">
             {examples.map((example) => typeof example === "string" ? (
-              <button
+              <Button
                 key={example}
                 type="button"
-                className="config-add-source-example"
+                variant="outline"
+                className="config-add-source-example h-auto min-h-[30px] w-full justify-start px-2.5 py-1.5 text-left font-mono text-xs font-normal whitespace-normal"
                 onClick={() => onValueChange(example)}
               >
                 {example}
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 key={example.value}
                 type="button"
-                className="config-add-source-example has-label"
+                variant="outline"
+                className="config-add-source-example has-label grid h-auto min-h-[30px] w-full grid-cols-[minmax(0,15em)_minmax(0,1fr)] items-baseline gap-x-3 gap-y-0.5 px-2.5 py-1.5 text-left font-normal max-[640px]:grid-cols-1"
                 onClick={() => onValueChange(example.value)}
               >
-                <span className="config-add-source-example-label">{example.label}</span>
-                <span className="config-add-source-example-value">{example.value}</span>
-              </button>
+                <span className="config-add-source-example-label text-xs text-muted-foreground">{example.label}</span>
+                <span className="config-add-source-example-value font-mono text-xs">{example.value}</span>
+              </Button>
             ))}
           </div>
         </div>
@@ -778,7 +814,13 @@ export function ConfigTrustNotice({
 }
 
 export function ConfigEmptyState({ children }: { children: ReactNode }) {
-  return <div className="config-empty-state">{children}</div>;
+  return (
+    <Empty className="min-h-40">
+      <EmptyHeader>
+        <EmptyDescription className="text-xs">{children}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
 }
 
 export function ConfigDetail({ children, style }: { children: ReactNode; style?: CSSProperties }) {
@@ -835,18 +877,16 @@ export function ConfigButton({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ConfigButtonVariant; size?: ConfigButtonSize; ref?: Ref<HTMLButtonElement> }) {
   return (
-    <button
+    <Button
       type="button"
+      variant={CONFIG_BUTTON_VARIANTS[variant]}
+      size={size === "small" ? "xs" : "sm"}
+      // The settings density: 28px for `small`, where the stock xs runs 24px.
+      className={cn(size === "small" && "h-7 px-2.5", className)}
       {...props}
-      className={[
-        "config-button",
-        `config-button-${variant}`,
-        `config-button-${size}`,
-        className,
-      ].filter(Boolean).join(" ")}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -868,22 +908,18 @@ export function ConfigSwitch({
   describedBy?: string;
   onChange: (checked: boolean) => void;
 }) {
-  const inactive = disabled || loading;
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
+    <Switch
+      checked={checked}
+      disabled={disabled || loading}
+      onCheckedChange={onChange}
+      size={size === "small" ? "sm" : "default"}
       aria-busy={loading || undefined}
       aria-label={label}
       aria-describedby={describedBy}
       title={label}
-      disabled={inactive}
-      className={`config-switch${size === "small" ? " is-small" : ""}${loading ? " is-loading" : ""}`}
-      onClick={() => onChange(!checked)}
-    >
-      <span className="config-switch-knob" aria-hidden="true" />
-    </button>
+      className="shrink-0"
+    />
   );
 }
 

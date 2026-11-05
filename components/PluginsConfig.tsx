@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ArrowUpIcon } from "lucide-react";
+import { Badge } from "./ui/badge";
+import { Separator } from "./ui/separator";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type {
   PluginPackageInfo,
@@ -192,26 +194,26 @@ function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
   return (
     <div className="flex flex-col gap-3">
       {groups.map((group, groupIndex) => (
-        <div
-          key={group.kind}
-          className={groupIndex === 0 ? "" : "border-t border-border pt-3"}
-        >
-          <div className="mb-1.5 text-[10px] font-bold uppercase text-dim">
-            {group.label}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {group.resources.map((resource) => (
-              <div key={`${resource.kind}:${resource.path}`} className="min-w-0">
-                <div className="truncate font-mono text-xs text-foreground" title={resource.path}>
-                  {resource.name}
+        <Fragment key={group.kind}>
+          {groupIndex > 0 && <Separator />}
+          <div>
+            <div className="mb-1.5 text-[10px] font-bold uppercase text-dim">
+              {group.label}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {group.resources.map((resource) => (
+                <div key={`${resource.kind}:${resource.path}`} className="min-w-0">
+                  <div className="truncate font-mono text-xs text-foreground" title={resource.path}>
+                    {resource.name}
+                  </div>
+                  <div className="mt-px truncate font-mono text-[10px] text-dim" title={resource.path}>
+                    {resource.relativePath}
+                  </div>
                 </div>
-                <div className="mt-px truncate font-mono text-[10px] text-dim" title={resource.path}>
-                  {resource.relativePath}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        </Fragment>
       ))}
     </div>
   );
@@ -340,13 +342,13 @@ function PackageDetail({
           <ConfigDetailHeaderInfo>
             <ConfigScopeTag scope={pkg.scope}>{scopeLabel(pkg.scope, t)}</ConfigScopeTag>
             {pkg.disabled ? (
-              <span className="rounded-[3px] bg-[rgba(120,120,120,0.12)] px-[5px] py-px text-[10px] text-dim">
+              <Badge variant="secondary" className="rounded-[3px] px-1.5 py-px text-[10px] font-normal text-dim">
                 {t("i18n.disabled")}
-              </span>
+              </Badge>
             ) : pkg.filtered && (
-              <span className="rounded-[3px] bg-warning/12 px-[5px] py-px text-[10px] text-warning">
+              <Badge variant="secondary" className="rounded-[3px] bg-warning/10 px-1.5 py-px text-[10px] font-normal text-warning">
                 {t("i18n.filtered")}
-              </span>
+              </Badge>
             )}
             <span className="truncate font-mono text-xs text-foreground">
               {pkg.source}

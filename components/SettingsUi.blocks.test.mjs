@@ -26,8 +26,13 @@ const render = (element) => renderToStaticMarkup(element);
 const noop = () => {};
 
 test("a scope tag shows the caller's label and tints only the project scope", () => {
-  assert.equal(render(h(ConfigScopeTag, { scope: "project" }, "项目")), '<span class="config-scope-tag is-project">项目</span>');
-  assert.equal(render(h(ConfigScopeTag, { scope: "global" }, "global")), '<span class="config-scope-tag">global</span>');
+  const project = render(h(ConfigScopeTag, { scope: "project" }, "项目"));
+  assert.match(project, /data-slot="badge" data-variant="secondary"/);
+  assert.match(project, /bg-\[rgba\(99,102,241,0\.12\)\] text-\[rgba\(99,102,241,0\.8\)\]/);
+  assert.match(project, />项目<\/span>$/);
+  const global = render(h(ConfigScopeTag, { scope: "global" }, "global"));
+  assert.doesNotMatch(global, /rgba\(99,102,241/);
+  assert.match(global, /bg-secondary text-secondary-foreground/);
 });
 
 test("a scope switch shows why an option is unavailable as visible text", () => {
@@ -42,12 +47,12 @@ test("a scope switch shows why an option is unavailable as visible text", () => 
     disabledReason: "Project installs are unavailable",
     onChange: noop,
   }));
-  assert.match(html, /role="group" aria-label="Scope" class="config-scope-switch"/);
-  assert.match(html, /<button type="button" aria-pressed="true" class="config-scope-switch-option">global<\/button>/);
+  assert.match(html, /role="radiogroup" data-slot="toggle-group"[^>]*aria-label="Scope"/);
+  assert.match(html, /<button[^>]*aria-checked="true"[^>]*>global<\/button>/);
   const reasonId = html.match(/<span id="([^"]+)" class="config-scope-switch-reason">Project installs are unavailable<\/span>/)?.[1];
   assert.ok(reasonId, "the reason is rendered as text");
   // The disabled option points at the visible reason instead of a tooltip.
-  assert.match(html, new RegExp(`aria-pressed="false" aria-describedby="${reasonId}" disabled="" class="config-scope-switch-option">project`));
+  assert.match(html, new RegExp(`<button[^>]*aria-checked="false"[^>]*aria-describedby="${reasonId}"[^>]*disabled=""[^>]*>project<\\/button>`));
   assert.doesNotMatch(html, /title=/);
 });
 
@@ -60,7 +65,7 @@ test("a scope switch says nothing while every option is available", () => {
     disabledReason: "Project installs are unavailable",
     onChange: noop,
   }));
-  assert.match(html, /class="config-scope-switch is-small"/);
+  assert.match(html, /class="group\/toggle-group[^"]* text-xs"/);
   assert.doesNotMatch(html, /config-scope-switch-reason|aria-describedby|disabled=/);
 });
 
@@ -76,7 +81,7 @@ test("a scope switch keeps the caller's controls on its line and the reason unde
   // against the switch plus its reason, out of line with the switch.
   assert.match(
     html,
-    /^<div class="config-scope-switch-field"><div class="config-scope-switch-row"><div role="group"[^>]*>.*?<\/div><button type="button">Install<\/button><\/div><span id="[^"]+" class="config-scope-switch-reason">Project installs are unavailable<\/span><\/div>$/,
+    /^<div class="config-scope-switch-field"><div class="config-scope-switch-row"><div dir="ltr" role="radiogroup"[^>]*>[\s\S]*?<\/div><button type="button">Install<\/button><\/div><span id="[^"]+" class="config-scope-switch-reason">Project installs are unavailable<\/span><\/div>$/,
   );
 });
 
@@ -91,7 +96,7 @@ test("a save target is the scope switch with the path it writes to, the reason a
   }, h("p", null, "Trust project…")));
   assert.match(
     html,
-    /^<div class="config-save-target"><div class="config-scope-switch-field"><div class="config-scope-switch-row"><div role="group" aria-label="Save to" class="config-scope-switch is-small">.*?<\/div><span class="config-save-target-path">~\/<wbr\/>\.pi\/<wbr\/>agent\/<wbr\/>mcp\.json<\/span><\/div><span id="[^"]+" class="config-scope-switch-reason">Project installs are unavailable<\/span><\/div><p>Trust project…<\/p><\/div>$/,
+    /^<div class="config-save-target"><div class="config-scope-switch-field"><div class="config-scope-switch-row"><div dir="ltr" role="radiogroup"[^>]*aria-label="Save to"[^>]*>[\s\S]*?<\/div><span class="config-save-target-path">~\/<wbr\/>\.pi\/<wbr\/>agent\/<wbr\/>mcp\.json<\/span><\/div><span id="[^"]+" class="config-scope-switch-reason">Project installs are unavailable<\/span><\/div><p>Trust project…<\/p><\/div>$/,
   );
   // The path is shown whole, never cut short behind a tooltip; a narrow pane breaks it between folders.
   assert.doesNotMatch(html, /title=/);
@@ -134,7 +139,7 @@ test("a trust notice offers its button only when the caller can trust the projec
   // A label without a handler would be a button that does nothing.
   assert.doesNotMatch(render(h(ConfigTrustNotice, { message: "x", trustLabel: "Trust project" })), /<button/);
   const html = render(h(ConfigTrustNotice, { message: "x", trustLabel: "Trust project", onTrust: noop }));
-  assert.match(html, /^<div role="status" class="config-notice has-action"><span class="config-notice-text">x<\/span><button type="button" class="config-button config-button-secondary config-button-small">Trust project<\/button><\/div>$/);
+  assert.match(html, /^<div role="status" class="config-notice has-action"><span class="config-notice-text">x<\/span><button data-slot="button" data-variant="outline" data-size="xs"[^>]*>Trust project<\/button><\/div>$/);
   assert.match(render(h(ConfigNotice, { action: h("a", { href: "#" }, "Open") }, "Off")), /class="config-notice has-action"/);
 });
 
@@ -156,12 +161,12 @@ test("the add panel lays out the catalog, save target, source box, caller contro
   }, h("div", { className: "caller-controls" }, "controls")));
   assert.match(html, /<div class="config-detail-title">Add plugin<\/div><span class="config-add-source-catalogs"><a href="https:\/\/pi\.dev\/packages" target="_blank" rel="noopener noreferrer" class="config-add-source-catalog">pi\.dev\/packages<\/a><\/span>/);
   // Where it saves comes first under the title, before the source box.
-  assert.match(html, /<\/a><\/span><\/div><div class="save-target">~\/\.pi\/agent\/\{npm,git\}<\/div><\/div><div class="config-field">/);
-  assert.match(html, /<span class="config-field-label">Source<\/span><input id="plugin-source" aria-label="Source" class="config-add-source-input" placeholder="npm:@scope\/package" value=""\/>/);
+  assert.match(html, /<\/a><\/span><\/div><div class="save-target">~\/\.pi\/agent\/\{npm,git\}<\/div><\/div><div role="group" data-slot="field"/);
+  assert.match(html, /<label data-slot="field-label"[^>]*>Source<\/label><input data-slot="input"[^>]*id="plugin-source" aria-label="Source" placeholder="npm:@scope\/package" value=""\/>/);
   // The caller's controls sit between the box and the examples.
   assert.match(html, /<\/div><div class="caller-controls">controls<\/div><div class="config-add-source-examples">/);
   assert.match(html, /<div class="config-add-source-examples-label">Examples<\/div>/);
-  assert.match(html, /<button type="button" class="config-add-source-example">npm:a<\/button><button type="button" class="config-add-source-example">git:b<\/button>/);
+  assert.match(html, /<button data-slot="button" data-variant="outline" data-size="default" class="[^"]*config-add-source-example[^"]*" type="button">npm:a<\/button><button data-slot="button" data-variant="outline" data-size="default" class="[^"]*config-add-source-example[^"]*" type="button">git:b<\/button>/);
   assert.match(html, /<div role="alert" class="config-add-source-error">boom<\/div>/);
 });
 
@@ -179,8 +184,8 @@ test("a labeled example shows what it is beside its text", () => {
     examplesLabel: "Supported formats",
     examples: [{ label: "Zed settings", value: '{ "context_servers": {} }' }, "plain"],
   }));
-  assert.match(html, /<button type="button" class="config-add-source-example has-label"><span class="config-add-source-example-label">Zed settings<\/span><span class="config-add-source-example-value">\{ &quot;context_servers&quot;: \{\} \}<\/span><\/button>/);
-  assert.match(html, /<button type="button" class="config-add-source-example">plain<\/button>/);
+  assert.match(html, /<button data-slot="button" data-variant="outline" data-size="default" class="[^"]*config-add-source-example has-label[^"]*" type="button"><span class="config-add-source-example-label text-xs text-muted-foreground">Zed settings<\/span><span class="config-add-source-example-value font-mono text-xs">\{ &quot;context_servers&quot;: \{\} \}<\/span><\/button>/);
+  assert.match(html, /<button data-slot="button" data-variant="outline" data-size="default" class="[^"]*config-add-source-example[^"]*" type="button">plain<\/button>/);
 });
 
 test("the multiline add box is a textarea where Enter adds a line and Cmd/Ctrl+Enter submits", () => {
@@ -199,7 +204,7 @@ test("the multiline add box is a textarea where Enter adds a line and Cmd/Ctrl+E
     examples: [],
     multiline: true,
   }));
-  assert.match(html, /<textarea id="mcp-add-source" aria-label="Server to add" class="config-add-source-input is-multiline" placeholder="https:\/\/…" rows="5" spellCheck="false" autoCapitalize="off" autoCorrect="off">npx x<\/textarea>/);
+  assert.match(html, /<textarea data-slot="textarea"[^>]*id="mcp-add-source" aria-label="Server to add" placeholder="https:\/\/…" rows="5" spellCheck="false" autoCapitalize="off" autoCorrect="off">npx x<\/textarea>/);
   assert.doesNotMatch(html, /<input/, "no single-line box beside it");
 
   const key = (overrides) => ({ key: "Enter", metaKey: false, ctrlKey: false, nativeEvent: { isComposing: false }, keyCode: 13, ...overrides });
