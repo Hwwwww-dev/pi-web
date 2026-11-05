@@ -976,5 +976,5 @@ test("keeps the compaction control reachable while a turn is auto-compacting", (
   // The control is a shadcn Button now: the pointer affordance and the
   // compacting danger tint live in its variant/className.
   assert.match(controlBlock, /<Button/);
-  assert.match(chatInputSource, /isCompacting && "h-7 w-auto gap-1 rounded-full px-2 text-destructive/);
+  assert.match(chatInputSource, /isCompacting && "h-8 w-auto gap-1 rounded-full px-2 text-destructive/);
 });

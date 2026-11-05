@@ -2355,7 +2355,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       onClick={() => fileInputRef.current?.click()}
                       aria-label={t("chat.attachFiles")}
                       className={cn(
-                        "size-7 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        "rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                         attachedImages.length > 0 && "text-primary",
                       )}
                     >
@@ -2393,7 +2393,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       ? t("chat.currentReasoning", { level: thinkingDisplayLabel })
                       : t("chat.changeReasoning", { level: thinkingDisplayLabel })}
                     aria-label={t("chat.changeReasoningLabel")}
-                    className="h-7 min-w-0 flex-[0_1_auto] gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    className="min-w-0 flex-[0_1_auto] gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
                     <LightbulbIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
                     <span className="min-w-0 truncate">{thinkingDisplayLabel}</span>
@@ -2469,7 +2469,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     size="sm"
                     title={t("chat.changeToolPreset") + `: ${toolPresetLabel}`}
                     aria-label={t("chat.changeToolPreset")}
-                    className="h-7 min-w-0 flex-[0_1_auto] gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    className="min-w-0 flex-[0_1_auto] gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
                     <WrenchIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
                     <span className="min-w-0 truncate">{toolPresetLabel}</span>
@@ -2513,8 +2513,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     title={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
                     aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
                     className={cn(
-                      "size-7 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                      isCompacting && "h-7 w-auto gap-1 rounded-full px-2 text-destructive hover:bg-destructive/10 hover:text-destructive",
+                      "rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      isCompacting && "h-8 w-auto gap-1 rounded-full px-2 text-destructive hover:bg-destructive/10 hover:text-destructive",
                     )}
                   >
                     {isCompacting ? (
@@ -2537,7 +2537,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     onClick={onSoundToggle}
                     aria-label={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}
                     className={cn(
-                      "size-7 rounded-full hover:bg-accent",
+                      "rounded-full hover:bg-accent",
                       soundEnabled ? "text-muted-foreground hover:text-accent-foreground" : "text-muted-foreground/55 hover:text-accent-foreground",
                     )}
                   >
@@ -2557,7 +2557,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     variant="ghost"
                     size="sm"
                     aria-label={t("chat.moreControls")}
-                    className="h-7 gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    className="gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   >
                     {t("chat.moreControls")}
                     <ChevronUpIcon data-icon="inline-end" className="shrink-0 opacity-60" aria-hidden="true" />
