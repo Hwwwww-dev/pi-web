@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useImperativeHandle, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref, type RefObject, type UIEvent as ReactUIEvent } from "react";
+import { memo, useEffect, useImperativeHandle, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref, type RefObject, type UIEvent as ReactUIEvent } from "react";
 import type { SessionInfo } from "@/lib/types";
 import { listSessionFamilies, type SessionFamily, isHiddenRelation } from "@/lib/session-family";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
@@ -93,6 +93,9 @@ import { PiWebTitle } from "./PiWebTitle";
 import { ProjectWorktreePicker, type ProjectWorktreePickerHandle, type WorktreeRemoval } from "./ProjectWorktreePicker";
 import { SessionSearch } from "./SessionSearch";
 import { SessionTree, sessionRowTitle, type SessionTreeReveal } from "./SessionTree";
+import { Badge } from "@/components/ui/badge";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SidebarMenu, SIDEBAR_MENU_FOCUS_RING as FOCUS_RING, type SidebarMenuAnchor, type SidebarMenuItem } from "./SidebarMenu";
 import { toast } from "sonner";
 import {
@@ -1801,16 +1804,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     if (last && (!last.isConnected || last.getClientRects().length === 0)) focusIfHidden(selectedTabButton());
   }, [stacked, selectedTabButton]);
 
-  const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") return;
-    event.preventDefault();
-    const next: SidebarTab = event.key === "Home" ? "sessions"
-      : event.key === "End" ? "files"
-      : sidebarTab === "sessions" ? "files" : "sessions";
-    switchTab(next);
-    (next === "sessions" ? sessionsTabRef : filesTabRef).current?.focus();
-  };
-
   // A session family's pin and archive flags live on its root session.
   const setFamilyPinned = useCallback((family: SessionFamily, pinned: boolean) => {
     void applyUiState({ action: "set", ids: [family.root.id], pinned });
@@ -2997,40 +2990,38 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           <SearchIcon size={16} />
         </button>
       </div>
-      <div className="sidebar-tabs-list" role="tablist" aria-label={t("sidebar.tabsLabel")}>
-        <button
-          ref={sessionsTabRef}
-          type="button"
-          role="tab"
-          id="session-sidebar-tab-sessions"
-          aria-selected={sidebarTab === "sessions"}
-          aria-controls="session-sidebar-panel-sessions"
-          tabIndex={sidebarTab === "sessions" ? 0 : -1}
-          className={`sidebar-tab${sidebarTab === "sessions" ? " is-selected" : ""}`}
-          onClick={() => switchTab("sessions")}
-          onKeyDown={handleTabKeyDown}
-        >
-          <MessageSquareIcon size={15} className="sidebar-tab-icon" />
-          <span className="sidebar-tab-label">{t("sidebar.tabSessions")}</span>
-        </button>
-        <button
-          ref={filesTabRef}
-          type="button"
-          role="tab"
-          id="session-sidebar-tab-files"
-          aria-selected={sidebarTab === "files"}
-          aria-controls="session-sidebar-panel-files"
-          tabIndex={sidebarTab === "files" ? 0 : -1}
-          title={changedFilesTitle}
-          className={`sidebar-tab${sidebarTab === "files" ? " is-selected" : ""}`}
-          onClick={() => switchTab("files")}
-          onKeyDown={handleTabKeyDown}
-        >
-          <FolderIcon size={15} className="sidebar-tab-icon" />
-          <span className="sidebar-tab-label">{t("sidebar.tabFiles")}</span>
-          {explorerCwd && changesCount > 0 && <span className="sidebar-tab-count" aria-hidden="true">{changesCount}</span>}
-        </button>
-      </div>
+      {/* The segmented control: Radix's roving focus owns the arrows and
+          Home/End, activating the tab it lands on. */}
+      <Tabs value={sidebarTab} onValueChange={(value) => switchTab(value as SidebarTab)} className="flex-none">
+        <TabsList aria-label={t("sidebar.tabsLabel")} className="sidebar-tabs-list w-full rounded-full p-[3px]">
+          <TabsTrigger
+            ref={sessionsTabRef}
+            id="session-sidebar-tab-sessions"
+            value="sessions"
+            aria-controls="session-sidebar-panel-sessions"
+            className="min-h-8 min-w-0 px-[8px] rounded-full cursor-pointer hover:bg-(--bg-hover) data-[state=active]:bg-(--bg-panel) dark:data-[state=active]:bg-(--bg-panel)"
+          >
+            <MessageSquareIcon className="size-[15px]" />
+            <span>{t("sidebar.tabSessions")}</span>
+          </TabsTrigger>
+          <TabsTrigger
+            ref={filesTabRef}
+            id="session-sidebar-tab-files"
+            value="files"
+            aria-controls="session-sidebar-panel-files"
+            title={changedFilesTitle}
+            className="min-h-8 min-w-0 px-[8px] rounded-full cursor-pointer hover:bg-(--bg-hover) data-[state=active]:bg-(--bg-panel) dark:data-[state=active]:bg-(--bg-panel)"
+          >
+            <FolderIcon className="size-[15px]" />
+            <span>{t("sidebar.tabFiles")}</span>
+            {explorerCwd && changesCount > 0 && (
+              <Badge variant="secondary" className="h-4 min-w-4 px-1 py-0 border-0 font-normal tabular-nums" aria-hidden="true">
+                {changesCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Sessions: every project's sessions, or the archive. The sessions
           tab's panel; below the sessions it carries the files section under
@@ -3046,23 +3037,28 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       >
         {sessionSearchOpen && (
           <div className="sidebar-search">
-            <input
-              id="session-search-input"
-              type="search"
-              autoFocus
-              value={sessionSearchQuery}
-              maxLength={200}
-              aria-label={t("sidebar.searchSessions")}
-              placeholder={t("sidebar.searchSessions")}
-              onChange={(event) => setSessionSearchQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape" && !event.nativeEvent.isComposing && event.keyCode !== 229) {
-                  event.stopPropagation();
-                  setSessionSearchQuery("");
-                }
-              }}
-              className="sidebar-search-input"
-            />
+            {/* The files' search field (FileExplorer), mirrored. */}
+            <InputGroup className="h-8 rounded-full bg-muted">
+              <InputGroupInput
+                id="session-search-input"
+                type="search"
+                autoFocus
+                value={sessionSearchQuery}
+                maxLength={200}
+                aria-label={t("sidebar.searchSessions")}
+                placeholder={t("sidebar.searchSessions")}
+                onChange={(event) => setSessionSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && !event.nativeEvent.isComposing && event.keyCode !== 229) {
+                    event.stopPropagation();
+                    setSessionSearchQuery("");
+                  }
+                }}
+              />
+              <InputGroupAddon>
+                <SearchIcon size={13} strokeWidth={1.8} className="text-muted-foreground" />
+              </InputGroupAddon>
+            </InputGroup>
           </div>
         )}
         <SessionSearch
@@ -3178,7 +3174,11 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${filesCollapsed ? "" : " is-open"}`} />
               <span className="sidebar-files-section-label">{t("sidebar.tabFiles")}</span>
               {/* As the pinned section's count; the changes key says it to a screen reader. */}
-              {changedFilesTitle && <span className="sidebar-files-section-count" aria-hidden="true">· {changesCount}</span>}
+              {changedFilesTitle && (
+                <Badge variant="secondary" className="h-4 min-w-4 px-1 py-0 font-normal tabular-nums" aria-hidden="true">
+                  {changesCount}
+                </Badge>
+              )}
             </button>
             <div className="sidebar-files-keys" role="group" aria-label={t("sidebar.fileActions")}>
               {terminalButton}

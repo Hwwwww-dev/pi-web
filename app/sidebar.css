@@ -17,18 +17,6 @@
   min-height: 0;
 }
 
-.session-tree-message {
-  flex: none;
-  padding: 16px 14px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.session-tree-message.is-error {
-  padding: 12px 14px;
-  color: var(--danger);
-}
-
 .session-tree-scroll {
   /* Rows sit 6px in from the left edge in every browser: the grid the brand,
      the files section's header, the picker and the file tree keep too
@@ -944,16 +932,18 @@ a.session-tree-main {
   border-bottom: 1px solid var(--border);
 }
 
-/* The tablist itself holds only the two tabs (ARIA allows nothing else in it). */
+/* The Sessions | Files track (the TabsList component): sized by its
+   triggers — the utility track's fixed height would stretch the pills —
+   with the draft's margins and 2px gutter (absolute, like the sidebar's
+   other measures). The colors are the component's. */
 .sidebar-tabs-list {
-  display: flex;
-  flex: none;
-  align-items: stretch;
+  height: auto;
+  gap: 2px;
+  margin: 2px 0 4px;
 }
 
-/* The chat bar's cells: a 2px line on top that takes the accent when the
-   cell is the one chosen (a tab, the open search). */
-.sidebar-tab,
+/* The chat bar's cells: New and the search toggle (the tabs are the
+   TabsTrigger components). */
 .sidebar-new-button,
 .sidebar-search-toggle {
   display: flex;
@@ -973,7 +963,6 @@ a.session-tree-main {
   transition: background 0.12s, color 0.12s;
 }
 
-.sidebar-tab,
 .sidebar-new-button {
   border-right: 1px solid var(--border);
 }
@@ -989,38 +978,14 @@ a.session-tree-main {
   border-left: 1px solid var(--border);
 }
 
-.sidebar-tab-icon {
-  flex: none;
-  color: var(--text-dim);
-}
-
-.sidebar-tab:hover,
 .sidebar-new-button:not(:disabled):hover,
 .sidebar-search-toggle:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.sidebar-tab.is-selected,
 .sidebar-search-toggle.is-active {
-  border-top-color: var(--accent);
-  background: var(--bg-selected);
   color: var(--text);
-}
-
-.sidebar-tab.is-selected {
-  font-weight: 500;
-}
-
-.sidebar-tab.is-selected .sidebar-tab-icon {
-  color: var(--accent);
-}
-
-.sidebar-tab-count {
-  color: var(--text-dim);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 400;
 }
 
 /* With the files below the sessions there is no tab to choose: the brand
@@ -1096,17 +1061,12 @@ a.session-tree-main {
   padding: 0;
 }
 
-.sidebar-header[data-fit="2"] .sidebar-tab {
-  padding: 0 11px;
-}
-
 .sidebar-header[data-fit="2"] .sidebar-brand {
   font-size: 11px;
 }
 
 .sidebar-header[data-fit="1"] .sidebar-new-label,
-.sidebar-header[data-fit="2"] .sidebar-new-label,
-.sidebar-header[data-fit="2"] .sidebar-tab-label {
+.sidebar-header[data-fit="2"] .sidebar-new-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1117,7 +1077,6 @@ a.session-tree-main {
 
 .sidebar-new-button:focus-visible,
 .sidebar-search-toggle:focus-visible,
-.sidebar-tab:focus-visible,
 .sidebar-archive-back:focus-visible,
 .sidebar-archive-menu-button:focus-visible,
 .sidebar-tool-button:focus-visible,
@@ -1273,13 +1232,6 @@ a.session-tree-main {
   text-transform: uppercase;
 }
 
-/* The changed files' count, as the pinned section's (.session-tree-pinned-count). */
-.sidebar-files-section-count {
-  flex: none;
-  color: var(--text-dim);
-  font-weight: 400;
-}
-
 /* The keys' group, right-aligned by the toggle before it: never under its
    seven keys' minimum (no shrink from 7 x 18px), never over their maximum
    (7 x 26px). Its grow factor, far above the toggle's, gives it the room
@@ -1315,26 +1267,6 @@ a.session-tree-main {
 .sidebar-search {
   flex: none;
   padding: 8px 8px 4px;
-}
-
-.sidebar-search-input {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  height: 29px;
-  padding: 0 10px;
-  box-sizing: border-box;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-}
-
-.sidebar-search-input:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 /* The tree and the archive view under the search, in one cell: the archive
@@ -1622,7 +1554,6 @@ a.session-tree-main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar-tab,
   .sidebar-new-button,
   .sidebar-search-toggle,
   .sidebar-tool-button {
@@ -1662,44 +1593,21 @@ a.session-tree-main {
   border-bottom: 0;
 }
 
-.sidebar-tab,
 .sidebar-new-button {
   border-right: 0;
-}
-
-.sidebar-new-button {
   margin-left: 0;
   border-left: 0;
 }
 
-/* The Sessions | Files track: a muted capsule with the chosen tab raised
-   onto the panel (the draft's segmented control), no accent top line. It is
-   its own row under the brand row, in every layout, and its two tabs share
-   the width (.pm-tab's flex:1). */
-.sidebar-tabs-list {
-  flex: none;
-  gap: 2px;
-  margin: 2px 0 4px;
-  padding: 3px;
-  border-radius: 999px;
-  background: var(--bg-subtle);
-}
-
-.sidebar-tab,
+/* The Sessions | Files track: the Tabs track's colors are the component's
+   (bg-muted, the raised active pill); New keeps its draft primary pill and
+   the search toggle a quiet round ghost. */
 .sidebar-new-button,
 .sidebar-search-toggle {
   border-top: 0;
   border-radius: 999px;
 }
 
-.sidebar-tab {
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 28px;
-  padding: 0 8px;
-}
-
-.sidebar-tab.is-selected,
 .sidebar-search-toggle.is-active {
   border-top: 0;
   background: var(--bg-panel);
@@ -1724,15 +1632,6 @@ a.session-tree-main {
 .sidebar-new-button:disabled {
   background: var(--accent);
   color: var(--accent-contrast);
-}
-
-.sidebar-tab.is-selected .sidebar-tab-icon,
-.sidebar-new-button .sidebar-tab-icon {
-  color: inherit;
-}
-
-.sidebar-search-toggle {
-  border-radius: 999px;
 }
 
 /* Session rows take the item radius (the draft's 8px); their padding and

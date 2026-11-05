@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
-import { SIDEBAR_MENU_FOCUS_RING as FOCUS_RING } from "./SidebarMenu";
+import { Button } from "@/components/ui/button";
+import { Field, FieldError } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 /**
  * A worktree menu's "New worktree…" body (components/ProjectWorktreePicker.tsx,
@@ -28,6 +30,7 @@ export function WorktreeCreateForm({
   const { t } = useI18n();
   const [branch, setBranch] = useState("");
   const trimmed = branch.trim();
+  const invalid = error !== null;
   const submit = () => {
     if (trimmed && !busy) onCreate(trimmed);
   };
@@ -38,31 +41,48 @@ export function WorktreeCreateForm({
     // pick them.
     <div className="sidebar-worktree-form px-1 pt-0.5 pb-1 [.is-classic_&]:px-2 [.is-classic_&]:py-1.5 [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2.5 [.sidebar-sheet_&]:pb-1">
       {heading && <div className="sidebar-menu-header overflow-hidden text-(--text-dim) text-ellipsis whitespace-nowrap px-2 pt-1.5 pb-1 text-[11px] [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs">{heading}</div>}
-      <input
-        className="sidebar-worktree-input block w-full h-7 px-2 box-border border border-(--accent) rounded-(--radius-sm) outline-none bg-(--bg) text-(--text) font-mono text-[11.5px] [user-select:text] [-webkit-user-select:text] [.is-classic_&]:h-auto [.is-classic_&]:py-[5px] [.is-classic_&]:text-[11px] [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"
-        data-sidebar-menu-autofocus=""
-        value={branch}
-        readOnly={busy}
-        placeholder={t("sidebar.branchName")}
-        aria-label={t("sidebar.branchName")}
-        onChange={(event) => setBranch(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" || event.nativeEvent.isComposing || event.keyCode === 229) return;
-          event.preventDefault();
-          submit();
-        }}
-      />
+      <Field className="gap-0">
+        <Input
+          className="sidebar-worktree-input h-7 px-2 rounded-(--radius-sm) bg-(--bg) dark:bg-(--bg) border-(--accent) font-mono text-(--text) text-[11.5px] md:text-[11.5px] shadow-none [user-select:text] [-webkit-user-select:text] [.is-classic_&]:h-auto [.is-classic_&]:py-[5px] [.is-classic_&]:text-[11px] [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"
+          data-sidebar-menu-autofocus=""
+          aria-invalid={invalid || undefined}
+          value={branch}
+          readOnly={busy}
+          placeholder={t("sidebar.branchName")}
+          aria-label={t("sidebar.branchName")}
+          onChange={(event) => setBranch(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || event.nativeEvent.isComposing || event.keyCode === 229) return;
+            event.preventDefault();
+            submit();
+          }}
+        />
+      </Field>
       <div className="sidebar-worktree-form-buttons flex gap-1.5 mt-1.5 [.is-classic_&]:gap-[5px] [.is-classic_&]:mt-[5px]">
-        <button type="button" className={["sidebar-worktree-create", "flex-1 h-[26px] border border-(--accent) rounded-(--radius-sm) bg-(--accent) text-(--accent-contrast) text-xs font-semibold cursor-pointer", "disabled:cursor-not-allowed disabled:opacity-50", FOCUS_RING, "[.is-classic_&]:h-auto [.is-classic_&]:py-1 [.is-classic_&]:text-[11px] [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"].join(" ")} disabled={busy || !trimmed} onClick={submit}>
+        <Button
+          type="button"
+          className="sidebar-worktree-create flex-1 h-[26px] rounded-(--radius-sm) text-xs font-semibold [.is-classic_&]:h-auto [.is-classic_&]:py-1 [.is-classic_&]:text-[11px] [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"
+          disabled={busy || !trimmed}
+          onClick={submit}
+        >
           {busy ? t("sidebar.creating") : t("sidebar.create")}
-        </button>
+        </Button>
         {showCancel && (
-          <button type="button" className={["sidebar-worktree-cancel", "flex-1 h-[26px] border border-(--border) rounded-(--radius-sm) bg-(--bg) text-(--text-muted) text-xs cursor-pointer hover:bg-(--bg-hover)", FOCUS_RING, "[.is-classic_&]:h-auto [.is-classic_&]:py-1 [.is-classic_&]:bg-(--bg-hover) [.is-classic_&]:text-[11px] [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"].join(" ")} onClick={onCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            className="sidebar-worktree-cancel flex-1 h-[26px] rounded-(--radius-sm) text-xs text-(--text-muted) hover:text-(--text-muted) bg-(--bg) dark:bg-(--bg) hover:bg-(--bg-hover) dark:hover:bg-(--bg-hover) [.is-classic_&]:h-auto [.is-classic_&]:py-1 [.is-classic_&]:bg-(--bg-hover) [.is-classic_&]:text-[11px] [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"
+            onClick={onCancel}
+          >
             {t("sidebar.cancel")}
-          </button>
+          </Button>
         )}
       </div>
-      {error && <div className="sidebar-worktree-error mt-1.5 text-(--danger) text-[11px] leading-[1.35] [overflow-wrap:anywhere] [.is-classic_&]:mt-[5px]">{error}</div>}
+      {error && (
+        <FieldError className="sidebar-worktree-error mt-1.5 text-[11px] leading-[1.35] [overflow-wrap:anywhere] [.is-classic_&]:mt-[5px]">
+          {error}
+        </FieldError>
+      )}
     </div>
   );
 }

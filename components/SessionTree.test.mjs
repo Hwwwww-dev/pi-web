@@ -420,12 +420,13 @@ test("show more, empty groups, footer links and archive groups", () => {
 
 test("loading replaces the rows; the empty label shows only without session, group or archive-group rows", () => {
   const loading = render({ loading: true, rows: [groupRow(), ...footer], emptyLabel: "No sessions found" });
-  assert.match(loading, /<div class="session-tree-message">Loading...<\/div>/);
+  assert.match(loading, /<div role="status" aria-label="Loading..." class="[^"]*"><div data-slot="skeleton"/);
+  assert.equal((loading.match(/data-slot="skeleton"/g) ?? []).length, 3);
   assert.deepEqual(renderedKeys(loading), []);
   assert.doesNotMatch(loading, /No sessions found/);
 
   const empty = render({ rows: footer, emptyLabel: "No sessions found" });
-  assert.match(empty, /<div class="session-tree-message">No sessions found<\/div><div class="session-tree-scroll scrollbar-subtle">/);
+  assert.match(empty, /<div data-slot="empty-description" class="[^"]*">No sessions found<\/div><\/div><\/div><div class="session-tree-scroll scrollbar-subtle">/);
   assert.deepEqual(renderedKeys(empty), ["footer-open"]);
 
   assert.doesNotMatch(render({ rows: [groupRow(), ...footer], emptyLabel: "No sessions found" }), /No sessions found/);
@@ -445,10 +446,11 @@ test("loading replaces the rows; the empty label shows only without session, gro
   });
   assert.doesNotMatch(foldedArchive, /No archived sessions/);
   assert.deepEqual(renderedKeys(foldedArchive), ["archive:/work/app", "archive:/work/old"]);
-  assert.doesNotMatch(render({ rows: footer, emptyLabel: null }), /session-tree-message/);
+  assert.doesNotMatch(render({ rows: footer, emptyLabel: null }), /data-slot="empty"/);
 
   const failed = render({ rows: footer, emptyLabel: "No sessions found", error: "HTTP 500" });
-  assert.match(failed, /<div class="session-tree-message is-error">HTTP 500<\/div>/);
+  assert.match(failed, /<div data-slot="alert" role="alert" class="[^"]*session-tree-error[^"]*">/);
+  assert.match(failed, /<div data-slot="alert-description" class="[^"]*">HTTP 500<\/div>/);
   assert.doesNotMatch(failed, /No sessions found/);
 });
 

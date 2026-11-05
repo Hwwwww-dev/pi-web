@@ -146,8 +146,11 @@ test("with the files below the sessions, both are in view under the track", () =
   // The brand row (its name says the versions a click shows), then New and
   // the search; under it the track, in every layout. No view options.
   assert.match(html, /<div class="sidebar-header"><button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button type="button" class="sidebar-new-button"/);
-  assert.match(html, /<div class="sidebar-tabs-list" role="tablist" aria-label="Sidebar view">/);
+  assert.match(html, /<div dir="ltr" data-orientation="horizontal" data-slot="tabs" class="[^"]*"><div role="tablist" aria-orientation="horizontal" data-slot="tabs-list" data-variant="default" class="[^"]*sidebar-tabs-list[^"]*" aria-label="Sidebar view"/);
   assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
+  // The chosen tab is active and owns its panel; the other is inactive.
+  assert.match(html, /<button type="button" role="tab" aria-selected="true" aria-controls="session-sidebar-panel-sessions" data-state="active" id="session-sidebar-tab-sessions"/);
+  assert.match(html, /<button type="button" role="tab" aria-selected="false" aria-controls="session-sidebar-panel-files" data-state="inactive" id="session-sidebar-tab-files"/);
   assert.doesNotMatch(html, /View options|sidebar-title/);
   assert.match(html, /<span class="sidebar-new-label">New<\/span><\/button><button type="button" title="Search conversations" aria-label="Search conversations" aria-expanded="false" aria-controls="session-search-input" class="sidebar-search-toggle">/);
   // Both tab panels shown: the sessions (its tab selected), the separator,
@@ -170,7 +173,7 @@ test("with the files below the sessions, both are in view under the track", () =
   assert.doesNotMatch(filesPanel, /sidebar-files-toolbar|sidebar-files-title|sidebar-files-actions|sidebar-files-section-search|sidebar-files-changes/);
   assert.doesNotMatch(filesPanel, /sidebar-files-section-count/);
   // Pins and archive not loaded yet: the tree waits instead of flashing archived rows.
-  assert.match(html, /<div class="session-tree-message">Loading\.\.\.<\/div>/);
+  assert.match(html, /<div role="status" aria-label="Loading..." class="[^"]*"><div data-slot="skeleton"/);
   // Without a folder the files' search has nothing to search.
   assert.match(render(), /<button type="button" disabled="" title="Search files" aria-label="Search files" aria-expanded="false" aria-controls="file-search-input" class="sidebar-tool-button">/);
 });
@@ -445,9 +448,11 @@ test("the files tab keeps FileExplorer mounted under an always-present scroll co
 });
 
 test("arrow keys move between the tabs and the search toggle opens the sessions tab", () => {
-  const keys = source.slice(source.indexOf("const handleTabKeyDown"), source.indexOf("// A session family's pin"));
-  assert.match(keys, /event\.key !== "ArrowLeft" && event\.key !== "ArrowRight" && event\.key !== "Home" && event\.key !== "End"/);
-  assert.match(keys, /switchTab\(next\);\s*\(next === "sessions" \? sessionsTabRef : filesTabRef\)\.current\?\.focus\(\);/);
+  // The track is Radix's Tabs: its roving focus moves between the two
+  // triggers on the arrows and Home/End and activates the one it lands on,
+  // reaching switchTab through onValueChange; the hand-written handler is gone.
+  assert.doesNotMatch(source, /handleTabKeyDown/);
+  assert.match(source, /<Tabs value=\{sidebarTab\} onValueChange=\{\(value\) => switchTab\(value as SidebarTab\)\}/);
   assert.match(source, /if \(!sessionsShown\) \{\s*switchTab\("sessions"\);\s*setSessionSearchOpen\(true\);\s*return;\s*\}/);
 });
 

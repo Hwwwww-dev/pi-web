@@ -47,6 +47,9 @@ import {
   ArchiveRestoreIcon,
   Trash2Icon,
 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * The sessions tab's tree: the pinned section, every project as a group of
@@ -407,9 +410,25 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
 
   return (
     <div ref={treeRef} className={`session-tree${layout === "mobile" ? " is-mobile" : ""}${ghostProject ? " is-group-dragging" : ""}`}>
-      {loading && <div className="session-tree-message">{t("sidebar.loading")}</div>}
-      {error && <div className="session-tree-message is-error">{error}</div>}
-      {showEmpty && <div className="session-tree-message">{emptyLabel}</div>}
+      {loading && (
+        <div role="status" aria-label={t("sidebar.loading")} className="flex-none flex flex-col gap-2.5 p-4 px-3.5">
+          <Skeleton className="h-4 w-3/5" />
+          <Skeleton className="h-4 w-4/5" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
+      )}
+      {error && (
+        <Alert variant="destructive" className="session-tree-error flex-none border-0 bg-transparent px-3.5 py-3 text-xs">
+          <AlertDescription className="text-xs leading-normal text-(--danger)">{error}</AlertDescription>
+        </Alert>
+      )}
+      {showEmpty && (
+        <Empty className="session-tree-empty flex-none items-start gap-1 border-0 p-4 px-3.5 text-left md:p-4 md:px-3.5">
+          <EmptyHeader className="items-start text-left">
+            <EmptyDescription className="text-xs">{emptyLabel}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
       <div
         ref={scrollRef}
         className="session-tree-scroll scrollbar-subtle"

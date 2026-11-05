@@ -65,7 +65,7 @@ test("the tabs layout renders the brand row, its track and no files section head
   // The brand row first (the track hangs below it, in every layout), then
   // New and the search.
   assert.match(html, /^<div class="session-sidebar" style="--sidebar-files-height:320px"><div class="sidebar-header"><button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button type="button" class="sidebar-new-button"/);
-  assert.match(html, /<div class="sidebar-tabs-list" role="tablist" aria-label="Sidebar view">/);
+  assert.match(html, /<div dir="ltr" data-orientation="horizontal" data-slot="tabs" class="[^"]*"><div role="tablist" aria-orientation="horizontal" data-slot="tabs-list" data-variant="default" class="[^"]*sidebar-tabs-list[^"]*" aria-label="Sidebar view"/);
   assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
   assert.doesNotMatch(html, /sidebar-files-section|sidebar-files-keys|sidebar-files-changes|is-files-below/);
   // Both panels are tab panels; the files' is hidden behind its tab.
