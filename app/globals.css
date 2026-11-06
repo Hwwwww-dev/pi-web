@@ -26,29 +26,38 @@
   --color-bg-subtle: var(--bg-subtle);
 }
 
-/* shadcn 语义变量 → pi 主题变量映射（13 套主题自动生效，见
-   dev-docs/progress/20261103_shadcn_ui_refactor_PROGRESS.md §5.1）。
-   只在 utility 层桥接，不定义 :root 变量：pi 的 --accent 是品牌色，
-   shadcn 的 accent 是激活底，同名不同义，全部经 --color-* 分流。 */
+/* shadcn 官方 theming：语义 token 是唯一真值源（:root/.dark 下方定义），
+   组件一律消费 --color-* 映射出的 utilities；旧变量名保留为官方 token 的
+   别名，存量 CSS/组件无需感知替换。 */
 @theme inline {
   --font-sans: var(--font-ui);
   --font-mono: var(--font-mono);
-  --color-background: var(--bg);
-  --color-foreground: var(--text);
-  --color-card: var(--bg-panel);
-  --color-card-foreground: var(--text);
-  --color-popover: var(--bg);
-  --color-popover-foreground: var(--text);
-  --color-primary: var(--accent);
-  --color-primary-foreground: var(--accent-contrast);
-  --color-secondary: var(--bg-hover);
-  --color-secondary-foreground: var(--text);
-  --color-muted: var(--bg-subtle);
-  --color-muted-foreground: var(--text-muted);
-  --color-accent: var(--bg-selected);
-  --color-accent-foreground: var(--text);
-  --color-destructive: var(--danger);
-  --color-ring: var(--accent);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
   --color-dim: var(--text-dim);
   --color-warning: var(--warning);
   --color-success: var(--ok);
@@ -57,15 +66,6 @@
   --color-diff-add: var(--diff-add);
   --color-diff-del: var(--diff-del);
   --color-diff-hunk-bg: var(--diff-hunk-bg);
-  --color-input: var(--border);
-  --color-sidebar-ring: var(--accent);
-  --color-sidebar-border: var(--border);
-  --color-sidebar-accent-foreground: var(--text);
-  --color-sidebar-accent: var(--bg-hover);
-  --color-sidebar-primary-foreground: var(--accent-contrast);
-  --color-sidebar-primary: var(--accent);
-  --color-sidebar-foreground: var(--text);
-  --color-sidebar: var(--bg-panel);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -180,325 +180,123 @@ html.dark {
   scrollbar-width: thin;
 }
 
-:root,
-[data-theme="light"] {
+:root {
   color-scheme: light;
-  --bg: #ffffff;
-  --bg-panel: #f5f5f5;
-  --bg-hover: #eeeeee;
-  --bg-selected: #e8e8e8;
-  --border: #e0e0e0;
-  --text: #1a1a1a;
-  --text-muted: #515c6b;
-  --text-dim: #8a94a3;
-  --accent: oklch(0.205 0 0);
-  --accent-hover: oklch(0.145 0 0);
-  --accent-contrast: oklch(0.985 0 0);
-  --user-bg: #eff6ff;
-  --assistant-bg: #ffffff;
-  --tool-bg: #f9fafb;
-  --user-border: rgba(59,130,246,0.2);
-  --diff-add: #1a7f37;
-  --diff-del: #cf222e;
-  --diff-add-bg: rgba(34,197,94,0.12);
-  --diff-del-bg: rgba(248,113,113,0.13);
-  --diff-hunk-bg: rgba(96,165,250,0.12);
-  --danger: #ef4444;
-  --danger-border: rgba(239,68,68,0.3);
-  --danger-bg: rgba(239,68,68,0.07);
-  --warning: #ca8a04;
-  --warning-border: rgba(234,179,8,0.3);
-  --warning-bg: rgba(234,179,8,0.07);
-  --ok: #16a34a;
-  --bg-subtle: rgba(0,0,0,0.03);
+  /* shadcn 官方 neutral 基色（ui.shadcn.com/docs/theming 原值）。 */
+  --radius: 10px;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  /* 旧变量名 → 官方 token 别名（存量 CSS 与组件继续可用）。 */
+  --bg: var(--background);
+  --bg-panel: var(--sidebar);
+  --bg-hover: var(--secondary);
+  --bg-selected: var(--accent);
+  --text: var(--foreground);
+  --text-muted: var(--muted-foreground);
+  --text-dim: var(--muted-foreground);
+  --accent-hover: var(--accent);
+  --accent-contrast: var(--accent-foreground);
+  --user-bg: var(--secondary);
+  --user-border: transparent;
+  --assistant-bg: var(--card);
+  --tool-bg: var(--muted);
+  --bg-subtle: color-mix(in srgb, var(--foreground) 4%, transparent);
+  --danger: var(--destructive);
+  --danger-border: color-mix(in srgb, var(--destructive) 30%, transparent);
+  --danger-bg: color-mix(in srgb, var(--destructive) 7%, transparent);
+  --warning: oklch(0.769 0.15 70.08);
+  --warning-border: color-mix(in srgb, var(--warning) 30%, transparent);
+  --warning-bg: color-mix(in srgb, var(--warning) 12%, transparent);
+  --ok: oklch(0.627 0.17 149.2);
+  --diff-add: oklch(0.45 0.13 150);
+  --diff-del: oklch(0.55 0.2 25);
+  --diff-add-bg: color-mix(in srgb, var(--ok) 12%, transparent);
+  --diff-del-bg: color-mix(in srgb, var(--destructive) 12%, transparent);
+  --diff-hunk-bg: color-mix(in srgb, oklch(0.6 0.12 250) 12%, transparent);
   --chat-content-max-width: 820px;
   --chat-content-font-size: 14px;
 }
 
-html.dark,
-[data-theme="dark"] {
+.dark {
   color-scheme: dark;
-  --bg: #1a1a1a;
-  --bg-panel: #242424;
-  --bg-hover: #2e2e2e;
-  --bg-selected: #383838;
-  --border: #454545;
-  --text: #e8e8e8;
-  --text-muted: #b7b7b7;
-  --text-dim: #7a7a7a;
-  --accent: oklch(0.922 0 0);
-  --accent-hover: oklch(0.87 0 0);
-  --accent-contrast: oklch(0.205 0 0);
-  --user-bg: #292929;
-  --assistant-bg: #1a1a1a;
-  --tool-bg: #222222;
-  --user-border: rgba(59,130,246,0.2);
-  --diff-add: #3fb950;
-  --diff-del: #f85149;
-  --diff-add-bg: rgba(34,197,94,0.12);
-  --diff-del-bg: rgba(248,113,113,0.13);
-  --diff-hunk-bg: rgba(96,165,250,0.12);
-  --danger: #f87171;
-  --danger-border: rgba(239,68,68,0.3);
-  --danger-bg: rgba(239,68,68,0.07);
-  --warning: #e3b341;
-  --warning-border: rgba(234,179,8,0.3);
-  --warning-bg: rgba(234,179,8,0.07);
-  --ok: #4ade80;
-  --bg-subtle: rgba(255,255,255,0.04);
-}
-
-[data-theme="mist"] {
-  color-scheme: light;
-  --bg: #f4f8f7;
-  --bg-panel: #e9f0ee;
-  --bg-hover: #e0eae7;
-  --bg-selected: #d7e4df;
-  --border: #afc4ba;
-  --text: #202e2b;
-  --text-muted: #455f56;
-  --text-dim: #7e9389;
-  --accent: #1e6559;
-  --accent-hover: #174f46;
-  --accent-contrast: #ffffff;
-  --user-bg: #e0efeb;
-  --assistant-bg: #f4f8f7;
-  --tool-bg: #ecf3f0;
-  --user-border: rgba(59,130,246,0.2);
-  --diff-add: #1a7f37;
-  --diff-del: #cf222e;
-  --diff-add-bg: rgba(34,197,94,0.12);
-  --diff-del-bg: rgba(248,113,113,0.13);
-  --diff-hunk-bg: rgba(96,165,250,0.12);
-  --danger: #ef4444;
-  --danger-border: rgba(239,68,68,0.3);
-  --danger-bg: rgba(239,68,68,0.07);
-  --warning: #ca8a04;
-  --warning-border: rgba(234,179,8,0.3);
-  --warning-bg: rgba(234,179,8,0.07);
-  --bg-subtle: rgba(24,65,50,0.04);
-}
-
-[data-theme="rose"] {
-  color-scheme: light;
-  --bg: #fcf7f8;
-  --bg-panel: #f3edef;
-  --bg-hover: #eee3e7;
-  --bg-selected: #e8dce1;
-  --border: #cdb5bf;
-  --text: #34282e;
-  --text-muted: #65505a;
-  --text-dim: #a28b96;
-  --accent: #914360;
-  --accent-hover: #76324d;
-  --accent-contrast: #ffffff;
-  --user-bg: #f3e4eb;
-  --assistant-bg: #fcf7f8;
-  --tool-bg: #f7eef2;
-  --user-border: rgba(59,130,246,0.2);
-  --diff-add: #1a7f37;
-  --diff-del: #cf222e;
-  --diff-add-bg: rgba(34,197,94,0.12);
-  --diff-del-bg: rgba(248,113,113,0.13);
-  --diff-hunk-bg: rgba(96,165,250,0.12);
-  --danger: #ef4444;
-  --danger-border: rgba(239,68,68,0.3);
-  --danger-bg: rgba(239,68,68,0.07);
-  --warning: #ca8a04;
-  --warning-border: rgba(234,179,8,0.3);
-  --warning-bg: rgba(234,179,8,0.07);
-  --bg-subtle: rgba(89,39,62,0.04);
-}
-
-html[data-theme="pine"],
-[data-theme="pine"] {
-  color-scheme: dark;
-  --bg: #19201f;
-  --bg-panel: #212b28;
-  --bg-hover: #2b3632;
-  --bg-selected: #35433c;
-  --border: #4a5f52;
-  --text: #e6ede8;
-  --text-muted: #c3d0c6;
-  --text-dim: #82988c;
-  --accent: #acccb7;
-  --accent-hover: #d0e2d3;
-  --accent-contrast: #182b20;
-  --user-bg: #25382f;
-  --assistant-bg: #19201f;
-  --tool-bg: #222d29;
-  --user-border: rgba(59,130,246,0.2);
-  --diff-add: #3fb950;
-  --diff-del: #f85149;
-  --diff-add-bg: rgba(34,197,94,0.12);
-  --diff-del-bg: rgba(248,113,113,0.13);
-  --diff-hunk-bg: rgba(96,165,250,0.12);
-  --danger: #f87171;
-  --danger-border: rgba(239,68,68,0.3);
-  --danger-bg: rgba(239,68,68,0.07);
-  --warning: #e3b341;
-  --warning-border: rgba(234,179,8,0.3);
-  --warning-bg: rgba(234,179,8,0.07);
-  --bg-subtle: rgba(210,236,219,0.04);
-}
-
-[data-theme="sand"] {
-  color-scheme: light;
-  --bg: #faf6ee;
-  --bg-panel: #f1ebdf;
-  --bg-hover: #ebe3d4;
-  --bg-selected: #e4dac8;
-  --border: #cdbfa6;
-  --text: #2e2a22;
-  --text-muted: #5c5243;
-  --text-dim: #665b4b;
-  --accent: #7a4f10;
-  --accent-hover: #613f0b;
-  --accent-contrast: #ffffff;
-  --user-bg: #f2e8d5;
-  --assistant-bg: #faf6ee;
-  --tool-bg: #f5efe4;
-  --bg-subtle: rgba(92,70,30,0.04);
-}
-
-html[data-theme="slate"],
-[data-theme="slate"] {
-  color-scheme: dark;
-  --bg: #161b26;
-  --bg-panel: #1d2331;
-  --bg-hover: #262d3d;
-  --bg-selected: #2f3749;
-  --border: #435069;
-  --text: #e3e8f2;
-  --text-muted: #bcc5d6;
-  --text-dim: #a7b1c5;
-  --accent: #8ccfe0;
-  --accent-hover: #b3e2ec;
-  --accent-contrast: #0f2229;
-  --user-bg: #232c3f;
-  --assistant-bg: #161b26;
-  --tool-bg: #1b2130;
-  --bg-subtle: rgba(200,215,245,0.04);
-}
-
-html[data-theme="dusk"],
-[data-theme="dusk"] {
-  color-scheme: dark;
-  --bg: #1e1a24;
-  --bg-panel: #26212e;
-  --bg-hover: #302a39;
-  --bg-selected: #3a3345;
-  --border: #54496a;
-  --text: #ebe6f0;
-  --text-muted: #c9c0d4;
-  --text-dim: #b5abc3;
-  --accent: #cdb4f0;
-  --accent-hover: #e0d0f7;
-  --accent-contrast: #261a38;
-  --user-bg: #2e2638;
-  --assistant-bg: #1e1a24;
-  --tool-bg: #241f2b;
-  --bg-subtle: rgba(225,210,245,0.04);
-}
-
-[data-theme="lilac"] {
-  color-scheme: light;
-  --bg: #f8f6fc;
-  --bg-panel: #efebf6;
-  --bg-hover: #e8e2f2;
-  --bg-selected: #e0d8ed;
-  --border: #c4b8d8;
-  --text: #2b2635;
-  --text-muted: #574d68;
-  --text-dim: #625873;
-  --accent: #6a43a8;
-  --accent-hover: #56348c;
-  --accent-contrast: #ffffff;
-  --user-bg: #ece4f7;
-  --assistant-bg: #f8f6fc;
-  --tool-bg: #f3eff9;
-  --bg-subtle: rgba(60,30,110,0.04);
-}
-
-html[data-theme="ember"],
-[data-theme="ember"] {
-  color-scheme: dark;
-  --bg: #1f1a16;
-  --bg-panel: #28211c;
-  --bg-hover: #322a23;
-  --bg-selected: #3d332b;
-  --border: #5a4a3d;
-  --text: #ede4da;
-  --text-muted: #cfc0b0;
-  --text-dim: #bba996;
-  --accent: #e8b27a;
-  --accent-hover: #f2cba0;
-  --accent-contrast: #2b1a0c;
-  --user-bg: #33291f;
-  --assistant-bg: #1f1a16;
-  --tool-bg: #251f1a;
-  --bg-subtle: rgba(245,220,190,0.04);
-}
-
-/* High contrast: every text token reaches WCAG AAA (7:1) on every surface. */
-[data-theme="contrast-light"] {
-  color-scheme: light;
-  --bg: #ffffff;
-  --bg-panel: #f3f3f3;
-  --bg-hover: #e6e6e6;
-  --bg-selected: #d9d9d9;
-  --border: #5c5c5c;
-  --text: #000000;
-  --text-muted: #1f1f1f;
-  --text-dim: #2e2e2e;
-  --accent: #0034a0;
-  --accent-hover: #002678;
-  --accent-contrast: #ffffff;
-  --user-bg: #eaf0ff;
-  --assistant-bg: #ffffff;
-  --tool-bg: #f7f7f7;
-  --bg-subtle: rgba(0,0,0,0.05);
-}
-
-html[data-theme="contrast-dark"],
-[data-theme="contrast-dark"] {
-  color-scheme: dark;
-  --bg: #000000;
-  --bg-panel: #0f0f0f;
-  --bg-hover: #1f1f1f;
-  --bg-selected: #2e2e2e;
-  --border: #a3a3a3;
-  --text: #ffffff;
-  --text-muted: #ebebeb;
-  --text-dim: #d6d6d6;
-  --accent: #ffd60a;
-  --accent-hover: #ffe566;
-  --accent-contrast: #000000;
-  --user-bg: #1a1a1a;
-  --assistant-bg: #000000;
-  --tool-bg: #0d0d0d;
-  --bg-subtle: rgba(255,255,255,0.06);
-}
-
-/* Zenburn's own colors (Jani Nurminen's low-contrast scheme); dim text lifted for WCAG AA. */
-html[data-theme="zenburn"],
-[data-theme="zenburn"] {
-  color-scheme: dark;
-  --bg: #3f3f3f;
-  --bg-panel: #383838;
-  --bg-hover: #474747;
-  --bg-selected: #4f4f4f;
-  --border: #6f6f6f;
-  --text: #dcdccc;
-  --text-muted: #cfcfbf;
-  --text-dim: #c6c6b6;
-  --accent: #f0dfaf;
-  --accent-hover: #f8eccb;
-  --accent-contrast: #3f3f3f;
-  --user-bg: #4a4a42;
-  --assistant-bg: #3f3f3f;
-  --tool-bg: #3a3a3a;
-  --bg-subtle: rgba(220,220,204,0.04);
+  /* shadcn 官方 neutral 暗色（ui.shadcn.com/docs/theming 原值）。 */
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.269 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.922 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  /* 别名与功能色（暗色）。 */
+  --bg: var(--background);
+  --bg-panel: var(--sidebar);
+  --bg-hover: var(--secondary);
+  --bg-selected: var(--accent);
+  --text: var(--foreground);
+  --text-muted: var(--muted-foreground);
+  --text-dim: var(--muted-foreground);
+  --accent-hover: var(--accent);
+  --accent-contrast: var(--accent-foreground);
+  --user-bg: var(--secondary);
+  --user-border: transparent;
+  --assistant-bg: var(--card);
+  --tool-bg: var(--muted);
+  --bg-subtle: color-mix(in srgb, var(--foreground) 4%, transparent);
+  --danger: var(--destructive);
+  --danger-border: color-mix(in srgb, var(--destructive) 30%, transparent);
+  --danger-bg: color-mix(in srgb, var(--destructive) 10%, transparent);
+  --warning: oklch(0.8 0.15 75);
+  --warning-border: color-mix(in srgb, var(--warning) 30%, transparent);
+  --warning-bg: color-mix(in srgb, var(--warning) 12%, transparent);
+  --ok: oklch(0.72 0.17 150);
+  --diff-add: oklch(0.7 0.15 150);
+  --diff-del: oklch(0.7 0.17 20);
+  --diff-add-bg: color-mix(in srgb, var(--ok) 14%, transparent);
+  --diff-del-bg: color-mix(in srgb, var(--destructive) 14%, transparent);
+  --diff-hunk-bg: color-mix(in srgb, oklch(0.6 0.12 250) 16%, transparent);
 }
 
 /* WebKit reports dvh/innerHeight without the status-bar strip for installed
@@ -554,6 +352,18 @@ html.dark .catppuccin-file-icon {
 
 * {
   box-sizing: border-box;
+}
+
+/* shadcn v4 base（官方安装的必备一步）：Tailwind v4 preflight 把默认
+   border-color 设为 currentColor（≈文字色，浅色主题近黑），不在这里钉住，
+   任何裸 border utility 都会渲染成黑边框；outline 同理走 ring 灰。 */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
 html, body {

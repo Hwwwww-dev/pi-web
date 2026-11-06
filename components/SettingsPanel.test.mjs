@@ -50,8 +50,8 @@ test("trusting from Settings › MCP reloads, in place, the other mounted sectio
   assert.match(panelSource, /sectionHost\("models", <ModelsConfig embedded cwd=\{cwd\} onClose=\{onClose\} \/>\)/);
 });
 
-test("offers every palette and system theme selection with native radios", () => {
-  for (const preference of ["auto", "light", "mist", "lilac", "sand", "rose", "dark", "pine", "dusk", "ember"]) {
+test("offers system, light and dark selection with native radios (shadcn theme only)", () => {
+  for (const preference of ["auto", "light", "dark"]) {
     assert.match(themeOptionsSource, new RegExp(`id: "${preference}"`));
   }
   assert.match(panelSource, /THEME_OPTIONS\.map/);

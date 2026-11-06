@@ -24,7 +24,7 @@ import {
   WrenchIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "./ui/badge";
+import { ButtonGroup, ButtonGroupText } from "./ui/button-group";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
@@ -1968,9 +1968,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     </Popover>
   );
 
-  // Branch / history / ⋯: plain ghost controls (the connected capsule base is
-  // gone). The BranchNavigator dropdown hangs under the whole bar
-  // (containerRef), so the branch control only toggles it.
+  // Branch / history / ⋯: plain ghost controls. The BranchNavigator dropdown
+  // hangs under the whole bar (containerRef), so the branch control only
+  // toggles it.
   const renderToolbarBGroup = (mobile: boolean) => (
     <div className="flex shrink-0 items-center gap-0.5" role="group">
       {/* A narrow phone keeps only the ⋯ control: branch and history live in
@@ -2211,7 +2211,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       tooltipParts.push(`${translate("session.context")}: ${percent !== null ? `${percent.toFixed(1)}%` : "?"} / ${contextUsage.contextWindow.toLocaleString(locale)}`);
     }
     const tooltip = tooltipParts.join("  |  ");
-    const badgeClass = "h-7 gap-1 rounded-lg px-2.5 font-mono text-[11.5px] font-normal tabular-nums text-muted-foreground";
 
     if (mobile) {
       return (
@@ -2250,18 +2249,21 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     const meterPercent = contextUsage?.contextWindow && contextUsage.percent !== null
       ? Math.max(2, Math.min(100, contextUsage.percent))
       : 0;
+    const segmentClass = "h-8 border-0 bg-secondary px-2.5 font-mono text-[11.5px] font-normal tabular-nums text-muted-foreground shadow-none";
     return (
-      <div className="hidden min-[1240px]:flex shrink-0 items-center gap-1.5">
+      // One segmented capsule (the ButtonGroup flattens the middle segments'
+      // rounding): tokens | cost | the clickable ctx meter.
+      <ButtonGroup className="hidden min-[1240px]:flex shrink-0">
         {tokens && (
-          <Badge variant="secondary" className={badgeClass}>
+          <ButtonGroupText className={segmentClass}>
             <ArrowUpIcon className="size-3" strokeWidth={2} />
             {formatCompactCount(tokens.total)}
-          </Badge>
+          </ButtonGroupText>
         )}
         {cost > 0 && (
-          <Badge variant="secondary" className={badgeClass}>
+          <ButtonGroupText className={segmentClass}>
             {`$${cost >= 0.01 ? cost.toFixed(2) : cost.toFixed(4)}`}
-          </Badge>
+          </ButtonGroupText>
         )}
         {contextUsage?.contextWindow && (
           <Button
@@ -2272,7 +2274,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             aria-label={translate("session.title")}
             aria-pressed={activeTopPanel === "session"}
             className={cn(
-              "gap-1 overflow-hidden rounded-lg bg-secondary px-2.5 font-mono text-[11.5px] font-normal tabular-nums text-muted-foreground",
+              segmentClass,
+              "gap-1 overflow-hidden hover:bg-secondary/80 hover:text-foreground",
               activeTopPanel === "session" && HEADER_CONTROL_OPEN,
             )}
           >
@@ -2292,13 +2295,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </span>
           </Button>
         )}
-      </div>
+      </ButtonGroup>
     );
   };
 
-  // Debug / theme: plain ghost controls (the connected capsule base is gone).
-  // Debug only opens or closes its panel: nothing is loaded here. The theme
-  // control flips light/dark through the same preference Settings writes.
+  // Debug / theme: plain ghost controls. Debug only opens or closes its panel:
+  // nothing is loaded here. The theme control flips light/dark through the
+  // same preference Settings writes.
   const renderDebugThemeGroup = () => {
     const open = activeTopPanel === "debug";
     return (
@@ -2398,7 +2401,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         inert={rightPanelFullWidth}
         className={cn(
           `sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${mobileSidebarReady ? "" : " sidebar-mobile-pending"}${sidebarResizer.isResizing ? " sidebar-resizing" : ""}`,
-          "z-[200] flex shrink-0 flex-col border-r border-border bg-card pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
+          "z-[200] flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
         )}
         // 可拖拽宽度经 CSS 变量注入（useResizablePanel 写 --sidebar-width），保留 inline。
         style={{ "--sidebar-width": `${sidebarResizer.width}px` } as React.CSSProperties}
@@ -2425,7 +2428,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             treats a sticky/fixed top bar as "the app has its own top bar" and
             skips the blur entirely. Visually a no-op: the bar is already the
             first element. */}
-        <div ref={topBarRef} className="sticky top-0 z-[5] shrink-0 bg-card">
+        <div ref={topBarRef} className="sticky top-0 z-[5] shrink-0 bg-background">
         {/* The draft's header: 52px, title + crumb left, the pills right. On a
             phone it folds into two rows — the title row, then the controls. */}
         <div className="relative flex min-h-[52px] flex-wrap items-center border-b border-border px-3 pt-[env(safe-area-inset-top)]">
@@ -2862,7 +2865,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         style={{ "--right-panel-width": `${rightPanelResizer.width}px` } as React.CSSProperties}
       >
         {/* Right panel tab bar — the draft's 46px bar with pill tabs. */}
-        <div className="flex h-[calc(46px_+_env(safe-area-inset-top))] shrink-0 items-center border-b border-border bg-card pt-[env(safe-area-inset-top)]">
+        <div className="flex h-[calc(46px_+_env(safe-area-inset-top))] shrink-0 items-center border-b border-border bg-background pt-[env(safe-area-inset-top)]">
           <div className="min-w-0 flex-1 overflow-hidden">
             <TabBar
               tabs={panelTabs}
