@@ -732,14 +732,16 @@ function ModelNoticeBanner({ tone, title, body, onClose }: { tone: "error" | "wa
       <AlertTitle className="min-h-0 font-semibold">{title}</AlertTitle>
       <AlertDescription className="whitespace-pre-wrap text-xs wrap-anywhere">{body}</AlertDescription>
       {onClose && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={onClose}
           aria-label={t("sidebar.dismiss")}
-          className="absolute right-1 top-1 flex cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 text-current opacity-70 transition-opacity hover:opacity-100"
+          className="absolute top-1 right-1 size-5 text-current opacity-70 hover:opacity-100 hover:bg-transparent"
         >
           <XIcon className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
-        </button>
+        </Button>
       )}
     </Alert>
   );
