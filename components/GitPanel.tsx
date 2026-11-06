@@ -137,14 +137,19 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
   const selected = options.find((option) => option.value === value) ?? null;
   return (
     <div ref={rootRef} className={cn("relative min-w-0 flex-1", className)}>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="default"
         onClick={() => setOpen((current) => !current)}
         disabled={disabled}
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex min-h-9 w-full cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-left text-xs text-foreground shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+        className={cn(
+          "h-auto py-0 justify-start has-[>svg]:px-2.5",
+          "flex min-h-9 w-full cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-left text-xs text-foreground shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-accent disabled:pointer-events-none disabled:opacity-50",
+        )}
       >
         <span className="flex shrink-0 items-center text-muted-foreground" aria-hidden="true">{icon}</span>
         <span className="min-w-0 flex-1 truncate">
@@ -157,7 +162,7 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
           className={cn("size-[13px] shrink-0 transition-transform", open && "rotate-180")}
           strokeWidth={1.8}
         />
-      </button>
+      </Button>
       {open && (
         <div
           role="listbox"
@@ -169,13 +174,16 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
             {options.map((option) => {
               const isSelected = option.value === value;
               return (
-                <button
+                <Button
                   key={option.value}
                   type="button"
                   role="option"
+                  variant="ghost"
+                  size="default"
                   aria-selected={isSelected}
                   onClick={() => { setOpen(false); onSelect(option.value); }}
                   className={cn(
+                    "h-auto justify-start focus-visible:ring-0 focus-visible:border-transparent has-[>svg]:px-2",
                     "flex min-h-9 w-full cursor-pointer items-center gap-[7px] rounded-sm px-2 py-1.5 text-left text-xs outline-none focus-visible:bg-accent hover:bg-accent",
                     isSelected ? "text-foreground" : "text-muted-foreground",
                   )}
@@ -189,7 +197,7 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
                   {option.secondary && (
                     <span className="min-w-0 flex-1 truncate text-right font-mono text-xs text-muted-foreground">{option.secondary}</span>
                   )}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -471,7 +479,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
       <div className="break-words text-xs text-muted-foreground">
         {t("gitPanel.error", { message })}
       </div>
-      <button type="button" onClick={retry} className={buttonClass}>{t("gitPanel.retry")}</button>
+      <Button type="button" variant="outline" size="default" onClick={retry} className={cn("h-auto py-0", buttonClass)}>{t("gitPanel.retry")}</Button>
     </div>
   );
 
@@ -518,11 +526,16 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
           <div className="p-3 text-xs text-muted-foreground">{t("gitPanel.emptyFiles")}</div>
         )}
         {files.map((file) => (
-          <button
+          <Button
             key={`${file.status}:${file.path}`}
             type="button"
+            variant="ghost"
+            size="default"
             onClick={() => openCommitFile(commit, file)}
-            className="flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50"
+            className={cn(
+              "h-auto justify-start focus-visible:ring-0 focus-visible:border-transparent",
+              "flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50",
+            )}
           >
             <span className={cn(
               "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-mono text-[10.5px] font-semibold leading-none",
@@ -537,7 +550,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
                 <span className="text-diff-del">−{file.deletions}</span>
               </span>
             )}
-          </button>
+          </Button>
         ))}
       </div>
     </div>
@@ -617,15 +630,17 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
         className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border p-2"
       >
         {view.type !== "log" && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={goBack}
             title={t("gitPanel.back")}
             aria-label={t("gitPanel.back")}
             className={cn(buttonClass, "w-9 p-0")}
           >
             <ChevronLeftIcon className="size-[14px]" strokeWidth={1.8} />
-          </button>
+          </Button>
         )}
         <GitDropdown
           className={NARROW_FULL_ROW}
@@ -651,8 +666,10 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
             options={branches.map((branch) => ({ value: branch, primary: branch }))}
             onSelect={selectBranch}
           />
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={refresh}
             disabled={reposLoading}
             title={t("gitPanel.refresh")}
@@ -660,7 +677,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
             className={cn(buttonClass, "w-9 p-0")}
           >
             <RotateCwIcon className="size-[14px]" strokeWidth={1.8} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -677,11 +694,16 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
             <div className="p-3 text-xs text-muted-foreground">{t("gitPanel.emptyLog")}</div>
           )}
           {commits.map((commit, index) => (
-            <button
+            <Button
               key={commit.hash}
               type="button"
+              variant="ghost"
+              size="default"
               onClick={() => setView({ type: "detail", commit })}
-              className="block min-h-9 w-full cursor-pointer rounded-lg px-2.5 py-[7px] text-left text-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50"
+              className={cn(
+                "h-auto focus-visible:ring-0 focus-visible:border-transparent",
+                "block min-h-9 w-full cursor-pointer rounded-lg px-2.5 py-[7px] text-left text-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50",
+              )}
             >
               <div className="flex min-w-0 items-center gap-2 text-xs font-semibold">
                 <span className="min-w-0 flex-1 truncate">
@@ -701,18 +723,20 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
                 <span className="min-w-0 flex-1 truncate">{commit.author}</span>
                 <span className="shrink-0">{formatRelativeTime(new Date(commit.timestamp * 1000), locale)}</span>
               </div>
-            </button>
+            </Button>
           ))}
           {hasMore && (
             <div className="p-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="default"
                 onClick={() => { void loadCommits(selectedRepo, selectedBranch ?? "", commits.length); }}
                 disabled={commitsLoading}
-                className={cn(buttonClass, "w-full")}
+                className={cn("h-auto py-0", buttonClass, "w-full")}
               >
                 {commitsLoading ? t("gitPanel.loading") : t("gitPanel.loadMore")}
-              </button>
+              </Button>
             </div>
           )}
         </div>

@@ -145,14 +145,14 @@ test("with the files below the sessions, both are in view under the track", () =
   assert.match(html, /^<div class="session-sidebar is-files-below" style="--sidebar-files-height:320px">/);
   // The brand row (its name says the versions a click shows), then New and
   // the search; under it the track, in every layout. No view options.
-  assert.match(html, /<div class="sidebar-header"><button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button type="button" class="sidebar-new-button"/);
+  assert.match(html, /<div class="sidebar-header"><button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button [^>]*class="[^"]*sidebar-new-button[^"]*"/);
   assert.match(html, /<div dir="ltr" data-orientation="horizontal" data-slot="tabs" class="[^"]*"><div role="tablist" aria-orientation="horizontal" data-slot="tabs-list" data-variant="default" class="[^"]*sidebar-tabs-list[^"]*" aria-label="Sidebar view"/);
   assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
   // The chosen tab is active and owns its panel; the other is inactive.
   assert.match(html, /<button type="button" role="tab" aria-selected="true" aria-controls="session-sidebar-panel-sessions" data-state="active" id="session-sidebar-tab-sessions"/);
   assert.match(html, /<button type="button" role="tab" aria-selected="false" aria-controls="session-sidebar-panel-files" data-state="inactive" id="session-sidebar-tab-files"/);
   assert.doesNotMatch(html, /View options|sidebar-title/);
-  assert.match(html, /<span class="sidebar-new-label">New<\/span><\/button><button type="button" title="Search conversations" aria-label="Search conversations" aria-expanded="false" aria-controls="session-search-input" class="sidebar-search-toggle">/);
+  assert.match(html, /<span class="sidebar-new-label">New<\/span><\/button><button [^>]*class="[^"]*sidebar-search-toggle[^"]*" type="button" title="Search conversations" aria-label="Search conversations" aria-expanded="false" aria-controls="session-search-input">/);
   // Both tab panels shown: the sessions (its tab selected), the separator,
   // the files section under the tree.
   const sessions = openingTag(html, "session-sidebar-panel-sessions");
@@ -167,7 +167,7 @@ test("with the files below the sessions, both are in view under the track", () =
   // picker's one row and the tree. No row of keys under the picker; nothing
   // changed, so no count after the label.
   const filesPanel = html.slice(html.indexOf(files) + files.length);
-  assert.match(filesPanel, /^<div class="sidebar-files-section"><button type="button" class="sidebar-files-section-toggle" aria-expanded="true" aria-controls="session-sidebar-files-body"><svg[^>]*width="12"[^>]*stroke-width="3"[^>]*class="lucide[^"]*session-tree-chevron is-open"[^>]*>[\s\S]*?<\/svg><span class="sidebar-files-section-label">Files<\/span><\/button><div class="sidebar-files-keys" role="group" aria-label="File actions"><button type="button" title="Open workspace terminal" aria-label="Open workspace terminal" class="sidebar-tool-button">/);
+  assert.match(filesPanel, /^<div class="sidebar-files-section"><button [^>]*class="[^"]*sidebar-files-section-toggle[^"]*" type="button" aria-expanded="true" aria-controls="session-sidebar-files-body"><svg[^>]*width="12"[^>]*stroke-width="3"[^>]*class="lucide[^"]*session-tree-chevron is-open"[^>]*>[\s\S]*?<\/svg><span class="sidebar-files-section-label">Files<\/span><\/button><div class="sidebar-files-keys" role="group" aria-label="File actions"><button [^>]*class="[^"]*sidebar-tool-button[^"]*" type="button" title="Open workspace terminal" aria-label="Open workspace terminal">/);
   assert.match(filesPanel, /<div id="session-sidebar-files-body" class="sidebar-files-body"><div class="sidebar-files-head"><div class="project-picker is-row" role="group"/);
   assert.match(filesPanel, /<div class="sidebar-files-scroll scrollbar-subtle">/);
   assert.doesNotMatch(filesPanel, /sidebar-files-toolbar|sidebar-files-title|sidebar-files-actions|sidebar-files-section-search|sidebar-files-changes/);
@@ -175,7 +175,7 @@ test("with the files below the sessions, both are in view under the track", () =
   // Pins and archive not loaded yet: the tree waits instead of flashing archived rows.
   assert.match(html, /<div role="status" aria-label="Loading..." class="[^"]*"><div data-slot="skeleton"/);
   // Without a folder the files' search has nothing to search.
-  assert.match(render(), /<button type="button" disabled="" title="Search files" aria-label="Search files" aria-expanded="false" aria-controls="file-search-input" class="sidebar-tool-button">/);
+  assert.match(render(), /<button [^>]*class="[^"]*sidebar-tool-button[^"]*" type="button" disabled="" title="Search files" aria-label="Search files" aria-expanded="false" aria-controls="file-search-input">/);
 });
 
 test("the fold's and the archive view's motions in the CSS last as long as the hook's phase", async () => {
@@ -208,7 +208,7 @@ function sectionKeys(html) {
 
 /** Each key's name and state, in order. */
 function keyLabels(markup) {
-  return [...markup.matchAll(/<button type="button"( disabled="")? title="([^"]+)" aria-label="\2"( aria-pressed="(true|false)")?( aria-expanded="(true|false)" aria-controls="[^"]+")? class="[^"]+"/g)]
+  return [...markup.matchAll(/<button [^>]*class="[^"]+" type="button"( disabled="")? title="([^"]+)" aria-label="\2"( aria-pressed="(true|false)")?( aria-expanded="(true|false)" aria-controls="[^"]+")?/g)]
     .map((match) => `${match[2]}${match[1] ? " (disabled)" : ""}${match[4] ? ` pressed=${match[4]}` : ""}${match[6] ? ` expanded=${match[6]}` : ""}`);
 }
 

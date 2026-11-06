@@ -47,7 +47,7 @@ function actionsRow(html) {
 
 /** Each key's name and state, in order (as SessionSidebar.test.mjs reads the stacked row's). */
 function keyLabels(markup) {
-  return [...markup.matchAll(/<button type="button"( disabled="")? title="([^"]+)" aria-label="\2"( aria-pressed="(true|false)")?( aria-expanded="(true|false)" aria-controls="[^"]+")? class="[^"]+"/g)]
+  return [...markup.matchAll(/<button [^>]*class="[^"]+" type="button"( disabled="")? title="([^"]+)" aria-label="\2"( aria-pressed="(true|false)")?( aria-expanded="(true|false)" aria-controls="[^"]+")?/g)]
     .map((match) => `${match[2]}${match[1] ? " (disabled)" : ""}${match[4] ? ` pressed=${match[4]}` : ""}${match[6] ? ` expanded=${match[6]}` : ""}`);
 }
 
@@ -64,7 +64,7 @@ test("the tabs layout renders the brand row, its track and no files section head
   const html = render({ selectedCwd: "/work/alpha", onOpenTerminal: noop });
   // The brand row first (the track hangs below it, in every layout), then
   // New and the search.
-  assert.match(html, /^<div class="session-sidebar" style="--sidebar-files-height:320px"><div class="sidebar-header"><button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button type="button" class="sidebar-new-button"/);
+  assert.match(html, /^<div class="session-sidebar" style="--sidebar-files-height:320px"><div class="sidebar-header"><button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button [^>]*class="[^"]*sidebar-new-button[^"]*"/);
   assert.match(html, /<div dir="ltr" data-orientation="horizontal" data-slot="tabs" class="[^"]*"><div role="tablist" aria-orientation="horizontal" data-slot="tabs-list" data-variant="default" class="[^"]*sidebar-tabs-list[^"]*" aria-label="Sidebar view"/);
   assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
   assert.doesNotMatch(html, /sidebar-files-section|sidebar-files-keys|sidebar-files-changes|is-files-below/);
@@ -90,7 +90,7 @@ test("the files tab's keys: the folder's four, then the tree's two views, always
     "0 changed files (disabled) pressed=false",
   ]);
   // The tree's views start at the right end.
-  assert.match(row, /title="Show ignored files" aria-label="Show ignored files" aria-pressed="false" class="sidebar-tool-button sidebar-files-views-start"/);
+  assert.match(row, /class="[^"]*sidebar-tool-button sidebar-files-views-start[^"]*" type="button" title="Show ignored files" aria-label="Show ignored files" aria-pressed="false"/);
   assert.equal((row.match(/sidebar-files-views-start/g) ?? []).length, 1);
   // Their icons stay 14px here (the section header row's are 13px).
   assert.deepEqual([...row.matchAll(/<svg[^>]*width="(\d+)" height="(\d+)"/g)].map((match) => `${match[1]}x${match[2]}`), Array(6).fill("14x14"));

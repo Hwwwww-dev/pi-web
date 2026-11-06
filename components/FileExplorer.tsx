@@ -640,17 +640,22 @@ function ChangeRow({
         </span>
       </span>
       {onAtMention && hovered && (
-        <button
+        <Button
+          variant="outline"
+          size="xs"
           onClick={(e) => {
             e.stopPropagation();
             onAtMention(rel, false);
           }}
           title={t("files.insertPath")}
-          className="absolute right-1 top-1/2 flex h-7 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className={cn(
+            "has-[>svg]:px-2",
+            "absolute right-1 top-1/2 flex h-7 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+          )}
         >
-          <AtSignIcon size={13} strokeWidth={1.8} />
+          <AtSignIcon size={13} strokeWidth={1.8} className="size-[13px]" />
           {t("files.mention")}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -1260,16 +1265,21 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
                 )}
               </div>
               {uploadSummary.uploaded.length > 0 && onAtMentions && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="xs"
                   onClick={addUploadedFilesToChat}
                   title={uploadSummary.uploaded.length === 1 ? t("files.addUploadedFile") : t("files.addAllUploadedFiles")}
                   aria-label={uploadSummary.uploaded.length === 1 ? t("files.addUploadedFile") : t("files.addAllUploadedFiles")}
-                  className="flex h-7 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className={cn(
+                    "has-[>svg]:px-2",
+                    "flex h-7 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  )}
                 >
-                  <AtSignIcon size={13} strokeWidth={1.8} />
+                  <AtSignIcon size={13} strokeWidth={1.8} className="size-[13px]" />
                   {t("files.mention")}
-                </button>
+                </Button>
               )}
               <DismissButton onClick={() => setUploadSummary(null)} title={t("files.dismissUploadResults")} />
             </div>

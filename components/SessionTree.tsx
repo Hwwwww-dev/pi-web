@@ -48,6 +48,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -667,9 +668,15 @@ const SessionRowView = memo(function SessionRowView({
     >
       {status.transient ? (
         // No file yet: a link would open a session no other tab can load.
-        <button type="button" className="session-tree-main" title={tooltip} aria-current={status.selected ? "true" : undefined}>
+        <Button
+          type="button"
+          variant="ghost"
+          className="session-tree-main justify-start rounded-none font-normal hover:bg-transparent hover:text-inherit dark:hover:bg-transparent"
+          title={tooltip}
+          aria-current={status.selected ? "true" : undefined}
+        >
           {mainContent}
-        </button>
+        </Button>
       ) : (
         // A real link, so middle-click, Ctrl/Cmd-click and the browser's own
         // gestures open the session in another tab. A plain click (or Enter)
@@ -694,8 +701,10 @@ const SessionRowView = memo(function SessionRowView({
       {!status.transient && (
         <span className="session-tree-actions">
           {quickAction && (context === "archive" ? (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               className="session-tree-action session-tree-quick-action"
               aria-label={t("sidebar.restore")}
               title={t("sidebar.restore")}
@@ -704,11 +713,13 @@ const SessionRowView = memo(function SessionRowView({
                 handlers.current.onRestoreFamily(family);
               }}
             >
-              <ArchiveRestoreIcon size={13} />
-            </button>
+              <ArchiveRestoreIcon size={13} className="size-[13px]" />
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               className="session-tree-action session-tree-quick-action"
               aria-label={t("sidebar.archive")}
               title={t("sidebar.archive")}
@@ -717,11 +728,13 @@ const SessionRowView = memo(function SessionRowView({
                 handlers.current.onArchiveFamily(family);
               }}
             >
-              <ArchiveIcon size={13} />
-            </button>
+              <ArchiveIcon size={13} className="size-[13px]" />
+            </Button>
           ))}
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-xs"
             className={`session-tree-action session-tree-more-action${menuOpen ? " is-active" : ""}`}
             aria-label={t("sidebar.moreActions")}
             title={t("sidebar.moreActions")}
@@ -733,8 +746,8 @@ const SessionRowView = memo(function SessionRowView({
               handlers.current.onOpenRowMenu(row, anchorOf(button), button);
             }}
           >
-            <MoreHorizontalIcon size={14} />
-          </button>
+            <MoreHorizontalIcon size={14} className="size-3.5" />
+          </Button>
         </span>
       )}
     </div>
@@ -825,13 +838,13 @@ export function DeleteConfirm({
   return (
     <>
       <span className="session-tree-confirm-text">{label}</span>
-      <button type="button" className="session-tree-confirm-delete" onClick={onConfirm}>
-        <Trash2Icon size={12} />
+      <Button type="button" variant="destructive" size="xs" className="session-tree-confirm-delete hover:bg-destructive" onClick={onConfirm}>
+        <Trash2Icon size={12} className="size-3" />
         {deleteLabel}
-      </button>
-      <button ref={cancelRef} type="button" className="session-tree-confirm-cancel" onClick={onCancel}>
+      </Button>
+      <Button ref={cancelRef} type="button" variant="outline" size="xs" className="session-tree-confirm-cancel shadow-none hover:text-inherit" onClick={onCancel}>
         {cancelLabel}
-      </button>
+      </Button>
     </>
   );
 }
@@ -954,9 +967,10 @@ const GroupRowView = memo(function GroupRowView({
       data-row-key={row.key}
       onPointerDown={canDrag ? (event) => drag.onPointerDown(event, project.key) : undefined}
     >
-      <button
+      <Button
         type="button"
-        className="session-tree-group-toggle"
+        variant="ghost"
+        className="session-tree-group-toggle justify-start rounded-none hover:bg-transparent dark:hover:bg-transparent"
         aria-expanded={expanded}
         title={project.root}
         onClick={(event) => handlers.current.onToggleGroup(project.key, event.altKey)}
@@ -964,15 +978,17 @@ const GroupRowView = memo(function GroupRowView({
         {/* A section header, not one more row: the chevron leads in a
             column of its own, so the name starts where the session titles
             below it do and every header's chevron lines up. */}
-        <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
+        <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""} size-3`} />
         <span className="session-tree-group-name">{project.name}</span>
-        {project.pinned && <PinIcon size={10} className="session-tree-group-pin" role="img" aria-label={t("sidebar.pinnedProject")} aria-hidden={false} />}
+        {project.pinned && <PinIcon size={10} className="session-tree-group-pin size-2.5" role="img" aria-label={t("sidebar.pinnedProject")} aria-hidden={false} />}
         {!expanded && <ActivitySummary running={row.running} awaiting={row.awaiting} unread={row.unread} t={t} />}
-      </button>
+      </Button>
       <span className="session-tree-group-actions">
-        <button
+        <Button
           type="button"
-          className="session-tree-group-action"
+          variant="ghost"
+          size="icon-xs"
+          className="session-tree-group-action size-[22px]"
           aria-label={t("sidebar.newSessionInProject", { name: project.name })}
           title={t("sidebar.newSessionInProject", { name: project.name })}
           onClick={(event) => {
@@ -980,11 +996,13 @@ const GroupRowView = memo(function GroupRowView({
             handlers.current.onGroupNew(project);
           }}
         >
-          <PlusIcon size={13} />
-        </button>
-        <button
+          <PlusIcon size={13} className="size-[13px]" />
+        </Button>
+        <Button
           type="button"
-          className={`session-tree-group-action${menuOpen ? " is-active" : ""}`}
+          variant="ghost"
+          size="icon-xs"
+          className={`session-tree-group-action size-[22px]${menuOpen ? " is-active" : ""}`}
           aria-label={t("sidebar.projectActions", { name: project.name })}
           title={t("sidebar.projectActions", { name: project.name })}
           aria-haspopup="menu"
@@ -994,8 +1012,8 @@ const GroupRowView = memo(function GroupRowView({
             handlers.current.onGroupMenu(project, event.currentTarget);
           }}
         >
-          <MoreHorizontalIcon size={13} />
-        </button>
+          <MoreHorizontalIcon size={13} className="size-[13px]" />
+        </Button>
       </span>
     </div>
   );
@@ -1022,13 +1040,14 @@ const PlainRowView = memo(function PlainRowView({
     case "pinned-header":
       return (
         <div className="session-tree-row session-tree-pinned-header" style={style} data-row-key={row.key}>
-          <button
+          <Button
             type="button"
-            className="session-tree-pinned-toggle"
+            variant="ghost"
+            className="session-tree-pinned-toggle h-auto justify-start rounded-none hover:bg-transparent dark:hover:bg-transparent"
             aria-expanded={!row.collapsed}
             onClick={() => handlers.current.onTogglePinned()}
           >
-            <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${row.collapsed ? "" : " is-open"}`} />
+            <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${row.collapsed ? "" : " is-open"} size-3`} />
             <span className="session-tree-pinned-label">{t("sidebar.pinned")}</span>
             <span className="session-tree-pinned-count">· {row.count}</span>
             {row.collapsed && row.running > 0 && (
@@ -1055,7 +1074,7 @@ const PlainRowView = memo(function PlainRowView({
                 aria-label={`${t("sidebar.newSessionActivity")} (${row.unread})`}
               />
             )}
-          </button>
+          </Button>
         </div>
       );
     case "pinned-more":
@@ -1064,24 +1083,26 @@ const PlainRowView = memo(function PlainRowView({
       return (
         <div className="session-tree-row session-tree-more" style={style} data-row-key={row.key}>
           {row.hidden > 0 && (
-            <button
+            <Button
               type="button"
-              className="session-tree-more-toggle"
+              variant="ghost"
+              className="session-tree-more-toggle justify-start rounded-none font-normal hover:bg-transparent dark:hover:bg-transparent"
               data-more-action="more"
               onClick={(event) => onMoreAction(row.key, moreKey, "more", event.currentTarget)}
             >
               {t("sidebar.showMore", { count: row.hidden })}
-            </button>
+            </Button>
           )}
           {row.canShowLess && (
-            <button
+            <Button
               type="button"
-              className="session-tree-more-toggle"
+              variant="ghost"
+              className="session-tree-more-toggle justify-start rounded-none font-normal hover:bg-transparent dark:hover:bg-transparent"
               data-more-action="less"
               onClick={(event) => onMoreAction(row.key, moreKey, "less", event.currentTarget)}
             >
               {t("sidebar.showLess")}
-            </button>
+            </Button>
           )}
         </div>
       );
@@ -1091,37 +1112,44 @@ const PlainRowView = memo(function PlainRowView({
         <div className="session-tree-row session-tree-group-empty" style={style} data-row-key={row.key}>
           <span className="session-tree-group-empty-label">{t("sidebar.noLiveSessions")}</span>
           {!row.project.pinned && (
-            <button
+            <Button
               type="button"
-              className="session-tree-more-toggle"
+              variant="ghost"
+              className="session-tree-more-toggle justify-start rounded-none font-normal hover:bg-transparent dark:hover:bg-transparent"
               onClick={() => handlers.current.onPinEmptyGroup(row.project)}
             >
               {t("sidebar.pinToKeep")}
-            </button>
+            </Button>
           )}
         </div>
       );
     case "footer-open":
       return (
         <div className="session-tree-row session-tree-footer" style={style} data-row-key={row.key}>
-          <button
+          <Button
             type="button"
-            className="session-tree-footer-button"
+            variant="ghost"
+            className="session-tree-footer-button h-auto justify-start font-normal"
             onClick={(event) => handlers.current.onOpenOtherProject(event.currentTarget)}
           >
-            <FolderPlusIcon size={12} />
+            <FolderPlusIcon size={12} className="size-3" />
             <span className="session-tree-footer-label">{t("sidebar.openOtherProject")}</span>
-          </button>
+          </Button>
         </div>
       );
     case "footer-archived":
       return (
         <div className="session-tree-row session-tree-footer" style={style} data-row-key={row.key}>
-          <button type="button" className="session-tree-footer-button" onClick={() => handlers.current.onOpenArchive()}>
-            <ArchiveIcon size={12} />
+          <Button
+            type="button"
+            variant="ghost"
+            className="session-tree-footer-button h-auto justify-start font-normal"
+            onClick={() => handlers.current.onOpenArchive()}
+          >
+            <ArchiveIcon size={12} className="size-3" />
             <span className="session-tree-footer-label">{t("sidebar.archivedCount", { count: row.count })}</span>
-            <ChevronRightIcon size={10} className="session-tree-footer-chevron" />
-          </button>
+            <ChevronRightIcon size={10} className="session-tree-footer-chevron size-2.5" />
+          </Button>
         </div>
       );
   }
@@ -1154,21 +1182,24 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
   ].filter(Boolean).join(" ");
   return (
     <div className={className} style={rowStyle(top, height)} data-row-key={row.key}>
-      <button
+      <Button
         type="button"
-        className="session-tree-group-toggle"
+        variant="ghost"
+        className="session-tree-group-toggle justify-start rounded-none hover:bg-transparent dark:hover:bg-transparent"
         aria-expanded={expanded}
         title={project.root}
         onClick={(event) => handlers.current.onToggleArchiveGroup?.(project.key, event.altKey)}
       >
-        <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
+        <ChevronRightIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""} size-3`} />
         <span className="session-tree-group-name">{project.name}</span>
         <span className="session-tree-archive-group-count">· {row.count}</span>
-      </button>
+      </Button>
       <span className="session-tree-group-actions">
-        <button
+        <Button
           type="button"
-          className={`session-tree-group-action${menuOpen ? " is-active" : ""}`}
+          variant="ghost"
+          size="icon-xs"
+          className={`session-tree-group-action size-[22px]${menuOpen ? " is-active" : ""}`}
           aria-label={t("sidebar.archivedProjectActions", { name: project.name })}
           title={t("sidebar.archivedProjectActions", { name: project.name })}
           aria-haspopup="menu"
@@ -1178,8 +1209,8 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
             handlers.current.onArchiveGroupMenu?.(project, event.currentTarget);
           }}
         >
-          <MoreHorizontalIcon size={13} />
-        </button>
+          <MoreHorizontalIcon size={13} className="size-[13px]" />
+        </Button>
       </span>
     </div>
   );

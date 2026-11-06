@@ -30,7 +30,7 @@ test("back navigation pops one layer and repository switch resets to the log lay
   assert.ok(goBack);
   assert.match(goBack, /if \(view\.type === "diff"\) setView\(\{ type: "detail", commit: view\.commit \}\)/);
   assert.match(goBack, /else if \(view\.type === "detail"\) setView\(\{ type: "log" \}\)/);
-  assert.match(source, /\{view\.type !== "log" && \(\s*<button[\s\S]{0,80}?onClick=\{goBack\}/);
+  assert.match(source, /\{view\.type !== "log" && \(\s*<Button[\s\S]{0,160}?onClick=\{goBack\}/);
   assert.doesNotMatch(source, /‹ \{t\("gitPanel\.back"\)\}/);
   const selectHandler = source.match(/const selectRepository = \(repositoryRoot: string\) => \{[\s\S]*?\n  \};/)?.[0];
   assert.ok(selectHandler);

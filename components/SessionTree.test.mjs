@@ -117,9 +117,9 @@ test("the pinned header toggles the section and shows activity dots only while c
   }), "pinned-header");
   // A group header's height: both are section headers.
   assert.match(collapsed, /^<div class="session-tree-row session-tree-pinned-header" style="top:0;height:28px" data-row-key="pinned-header">/);
-  assert.match(collapsed, /<button type="button" class="session-tree-pinned-toggle" aria-expanded="false">/);
+  assert.match(collapsed, /<button [^>]*class="[^"]*session-tree-pinned-toggle[^"]*"[^>]*aria-expanded="false">/);
   // Its chevron leads, in the chevron column, decoration only; no pin icon.
-  assert.match(collapsed, /aria-expanded="false"><svg[^>]*width="12" height="12"[^>]*stroke-width="3"[^>]*class="lucide[^"]*session-tree-chevron" aria-hidden="true">[\s\S]*?<\/svg><span class="session-tree-pinned-label">Pinned<\/span><span class="session-tree-pinned-count">· 3<\/span><span class="session-tree-pinned-dot is-running"/);
+  assert.match(collapsed, /aria-expanded="false"><svg[^>]*width="12" height="12"[^>]*stroke-width="3"[^>]*class="lucide[^"]*session-tree-chevron[^"]*" aria-hidden="true">[\s\S]*?<\/svg><span class="session-tree-pinned-label">Pinned<\/span><span class="session-tree-pinned-count">· 3<\/span><span class="session-tree-pinned-dot is-running"/);
   assert.doesNotMatch(collapsed, /session-tree-group-icon/);
   assert.match(collapsed, /class="session-tree-pinned-dot is-running" role="img" title="Agent running…" aria-label="Agent running… \(1\)"/);
   assert.match(collapsed, /class="session-tree-pinned-dot is-unread" role="img" title="New session activity" aria-label="New session activity \(2\)"/);
@@ -159,14 +159,14 @@ test("a collapsed group shows its running and unread counts and labelled actions
     rows: [groupRow({ expanded: false, running: 2, unread: 1 }, { pinned: true, current: false })],
   }), "group:/work/app");
   assert.match(html, /^<div class="session-tree-row session-tree-group" style="top:0;height:34px"/);
-  assert.match(html, /<button type="button" class="session-tree-group-toggle" aria-expanded="false" title="\/work\/app">/);
+  assert.match(html, /<button [^>]*class="[^"]*session-tree-group-toggle[^"]*"[^>]*aria-expanded="false" title="\/work\/app">/);
   // The chevron leads, inside the toggle (the whole header still toggles)
   // and hidden from its accessible name; then the name, its pin, the summary.
-  assert.match(html, /title="\/work\/app"><svg[^>]*width="12" height="12"[^>]*stroke-width="3"[^>]*class="lucide[^"]*session-tree-chevron" aria-hidden="true"><path[^>]*><\/path><\/svg><span class="session-tree-group-name">app<\/span>/, "the chevron precedes the name");
-  assert.match(html, /<span class="session-tree-group-name">app<\/span><svg[^>]*class="lucide[^"]*session-tree-group-pin"[\s\S]*?<\/svg><span class="session-tree-summary">/);
+  assert.match(html, /title="\/work\/app"><svg[^>]*width="12" height="12"[^>]*stroke-width="3"[^>]*class="lucide[^"]*session-tree-chevron[^"]*" aria-hidden="true"><path[^>]*><\/path><\/svg><span class="session-tree-group-name">app<\/span>/, "the chevron precedes the name");
+  assert.match(html, /<span class="session-tree-group-name">app<\/span><svg[^>]*class="lucide[^"]*session-tree-group-pin[^"]*"[\s\S]*?<\/svg><span class="session-tree-summary">/);
   // No folder: a project group is no second file tree.
   assert.doesNotMatch(html, /session-tree-group-icon/);
-  assert.match(html, /<svg[^>]*class="lucide[^"]*session-tree-group-pin" role="img" aria-label="Pinned"/);
+  assert.match(html, /<svg[^>]*class="lucide[^"]*session-tree-group-pin[^"]*" role="img" aria-label="Pinned"/);
   assert.match(html, /aria-label="Agent running… \(2\)"/);
   assert.match(html, /aria-label="New session activity \(1\)"/);
   assert.match(html, /aria-label="New session in app" title="New session in app"/);
@@ -182,11 +182,11 @@ test("a collapsed group shows its running and unread counts and labelled actions
 test("a group's ⋯ shows its open menu; its + starts a session at once", () => {
   const more = rowMarkup(render({ rows: [groupRow()], activeMenuRowKey: "group:/work/app" }), "group:/work/app");
   assert.match(more, /session-tree-group is-current is-active/);
-  assert.match(more, /class="session-tree-group-action is-active" aria-label="app actions"[^>]*aria-expanded="true"/);
+  assert.match(more, /class="[^"]*session-tree-group-action[^"]*is-active"[^>]*aria-label="app actions"[^>]*aria-expanded="true"/);
 
   // The + opens nothing and never waits: no popup, busy or disabled state.
   const plus = rowMarkup(render({ rows: [groupRow()] }), "group:/work/app").match(/<button[^>]*aria-label="New session in app"[^>]*>/)[0];
-  assert.equal(plus, '<button type="button" class="session-tree-group-action" aria-label="New session in app" title="New session in app">');
+  assert.match(plus, /class="[^"]*session-tree-group-action[^"]*"[^>]*aria-label="New session in app" title="New session in app">$/);
 });
 
 test("an idle session row shows its short time, branch and both actions", () => {
@@ -198,8 +198,8 @@ test("an idle session row shows its short time, branch and both actions", () => 
   // The branch keeps the upstream icon and type; the tooltip keeps the ⑂ glyph.
   assert.match(html, /<a class="session-tree-main" href="\?session=idle" title="[^"]*"><span class="session-tree-title">first idle<\/span><span class="session-tree-branch"><svg[^>]*width="10" height="10"[^>]*class="lucide[^"]*session-tree-branch-icon" aria-hidden="true">[\s\S]*?<\/svg>feat\/rows<\/span><span class="session-tree-meta">5m<\/span><\/a>/);
   assert.match(html, /title="first idle\n3 msgs · 5 minutes ago · ⑂ feat\/rows"/);
-  assert.match(html, /class="session-tree-action session-tree-quick-action" aria-label="Archive" title="Archive"/);
-  assert.match(html, /class="session-tree-action session-tree-more-action" aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded="false"/);
+  assert.match(html, /class="[^"]*session-tree-action session-tree-quick-action"[^>]*aria-label="Archive" title="Archive"/);
+  assert.match(html, /class="[^"]*session-tree-action session-tree-more-action"[^>]*aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded="false"/);
   assert.doesNotMatch(html, /aria-current/);
 });
 
@@ -261,7 +261,7 @@ test("the selected row is marked and its menu button reports an open menu", () =
   const html = rowMarkup(render({ rows: [row], activeMenuRowKey: row.key }), row.key);
   assert.match(html, /class="session-tree-row session-tree-session is-child is-selected is-menu-open"/);
   assert.match(html, /<a class="session-tree-main" href="\?session=sel" title="[^"]*" aria-current="true">/);
-  assert.match(html, /class="session-tree-action session-tree-more-action is-active"[^>]*aria-expanded="true"/);
+  assert.match(html, /class="[^"]*session-tree-action session-tree-more-action is-active"[^>]*aria-expanded="true"/);
 });
 
 test("a transient row offers no actions at all", () => {
@@ -271,10 +271,10 @@ test("a transient row offers no actions at all", () => {
   assert.doesNotMatch(html, /aria-label="Archive"/);
   assert.match(html, /session-tree-title">first tmp</);
   // No file yet, so no link another tab could not load: still a button.
-  assert.match(html, /<button type="button" class="session-tree-main" title="[^"]*"><span class="session-tree-title">first tmp<\/span>/);
+  assert.match(html, /<button [^>]*class="[^"]*session-tree-main[^"]*"[^>]*title="[^"]*"><span class="session-tree-title">first tmp<\/span>/);
   assert.doesNotMatch(html, /<a |href=/);
   const selected = rowMarkup(render({ rows: [sessionRow(session("tmp"), { status: { transient: true, selected: true } })] }), "session:group:tmp");
-  assert.match(selected, /<button type="button" class="session-tree-main" title="[^"]*" aria-current="true">/);
+  assert.match(selected, /<button [^>]*class="[^"]*session-tree-main[^"]*"[^>]*title="[^"]*" aria-current="true">/);
 });
 
 test("every saved row's title links to its session, encoded, in every context and state", () => {
@@ -348,7 +348,7 @@ test("rename mode swaps the row for a field seeded with the title", () => {
 test("a named project shows its name as plain text in its header, the path as the tooltip", () => {
   const named = { name: "Thermal <b>Models</b>", customName: "Thermal <b>Models</b>" };
   const raw = renderToStaticMarkup(h(I18nProvider, null, h(SessionTree, { ...defaults, rows: [groupRow({}, named)] })));
-  assert.match(raw, /title="\/work\/app"><svg[^>]*class="lucide[^"]*session-tree-chevron is-open"[\s\S]*?<\/svg><span class="session-tree-group-name">Thermal &lt;b&gt;Models&lt;\/b&gt;<\/span>/);
+  assert.match(raw, /title="\/work\/app"><svg[^>]*class="lucide[^"]*session-tree-chevron is-open[^"]*"[\s\S]*?<\/svg><span class="session-tree-group-name">Thermal &lt;b&gt;Models&lt;\/b&gt;<\/span>/);
   assert.doesNotMatch(raw, /<b>/, "never markup");
   const html = render({ rows: [groupRow({}, named)] });
   assert.match(html, /aria-label="New session in Thermal <b>Models<\/b>"/);
@@ -371,8 +371,8 @@ test("delete confirmation shows a shortened title and both answers", () => {
   }), "session:group:d");
   assert.match(html, /class="session-tree-row session-tree-session is-child is-confirming"/);
   assert.match(html, /<span class="session-tree-confirm-text">Delete A very long session ti…\?<\/span>/);
-  assert.match(html, /<button type="button" class="session-tree-confirm-delete"><svg[^>]*><path[\s\S]*?<\/svg>Delete<\/button>/);
-  assert.match(html, /<button type="button" class="session-tree-confirm-cancel">Cancel<\/button>/);
+  assert.match(html, /<button [^>]*class="[^"]*session-tree-confirm-delete[^"]*"[^>]*><svg[^>]*><path[\s\S]*?<\/svg>Delete<\/button>/);
+  assert.match(html, /<button [^>]*class="[^"]*session-tree-confirm-cancel[^"]*"[^>]*>Cancel<\/button>/);
   assert.doesNotMatch(html, /More actions/);
 });
 
@@ -390,18 +390,18 @@ test("show more, empty groups, footer links and archive groups", () => {
       { kind: "footer-archived", key: "footer-archived", count: 4 },
     ],
   });
-  assert.match(rowMarkup(html, "pinned-more"), /<button type="button" class="session-tree-more-toggle" data-more-action="less">Show less<\/button><\/div>/);
+  assert.match(rowMarkup(html, "pinned-more"), /<button [^>]*class="[^"]*session-tree-more-toggle[^"]*"[^>]*data-more-action="less">Show less<\/button><\/div>/);
   assert.doesNotMatch(rowMarkup(html, "pinned-more"), /data-more-action="more"/);
-  assert.match(rowMarkup(html, "more:/work/app"), /<button type="button" class="session-tree-more-toggle" data-more-action="more">Show more · 3<\/button><\/div>/);
+  assert.match(rowMarkup(html, "more:/work/app"), /<button [^>]*class="[^"]*session-tree-more-toggle[^"]*"[^>]*data-more-action="more">Show more · 3<\/button><\/div>/);
   assert.doesNotMatch(rowMarkup(html, "more:/work/app"), /data-more-action="less"/);
   assert.match(
     rowMarkup(html, "more:/work/big"),
-    /data-more-action="more">Show more · 24<\/button><button type="button" class="session-tree-more-toggle" data-more-action="less">Show less<\/button>/,
+    /data-more-action="more">Show more · 24<\/button><button [^>]*class="[^"]*session-tree-more-toggle[^"]*"[^>]*data-more-action="less">Show less<\/button>/,
   );
   // Without sessions only a pin keeps a project listed once another one is current (#1476).
   assert.match(
     rowMarkup(html, "empty:/work/app"),
-    /style="top:78px;height:28px" data-row-key="empty:\/work\/app"><span class="session-tree-group-empty-label">No sessions yet<\/span><button type="button" class="session-tree-more-toggle">Pin to keep<\/button><\/div>/,
+    /style="top:78px;height:28px" data-row-key="empty:\/work\/app"><span class="session-tree-group-empty-label">No sessions yet<\/span><button [^>]*class="[^"]*session-tree-more-toggle[^"]*"[^>]*>Pin to keep<\/button><\/div>/,
   );
   const pinnedEmpty = render({ rows: [{ kind: "group-empty", key: "empty:/work/app", project: { ...project, pinned: true } }] });
   assert.match(rowMarkup(pinnedEmpty, "empty:/work/app"), /No sessions yet<\/span><\/div>/);
@@ -410,12 +410,12 @@ test("show more, empty groups, footer links and archive groups", () => {
   // chevron, the name, the count; ⋯ for its archived sessions, no "+".
   const archiveHeader = rowMarkup(html, "archive:/work/app");
   assert.match(archiveHeader, /class="session-tree-row session-tree-group session-tree-archive-group is-current"/);
-  assert.match(archiveHeader, /<button type="button" class="session-tree-group-toggle" aria-expanded="true" title="\/work\/app"><svg[^>]*class="lucide[^"]*session-tree-chevron is-open"[\s\S]*?<span class="session-tree-group-name">app<\/span><span class="session-tree-archive-group-count">· 2<\/span><\/button>/);
+  assert.match(archiveHeader, /<button [^>]*class="[^"]*session-tree-group-toggle[^"]*"[^>]*aria-expanded="true" title="\/work\/app"><svg[^>]*class="lucide[^"]*session-tree-chevron is-open[^"]*"[\s\S]*?<span class="session-tree-group-name">app<\/span><span class="session-tree-archive-group-count">· 2<\/span><\/button>/);
   assert.match(archiveHeader, /aria-label="Archived sessions of app"[^>]*aria-haspopup="menu" aria-expanded="false"/);
   assert.doesNotMatch(archiveHeader, /New session/);
-  assert.match(rowMarkup(html, "archive:/work/old"), /aria-expanded="false" title="\/work\/old"><svg[^>]*class="lucide[^"]*session-tree-chevron"/);
-  assert.match(rowMarkup(html, "footer-open"), /<button type="button" class="session-tree-footer-button"><svg[^>]*>[\s\S]*?<\/svg><span class="session-tree-footer-label">Open another project…<\/span><\/button>/);
-  assert.match(rowMarkup(html, "footer-archived"), /<span class="session-tree-footer-label">Archived · 4<\/span><svg[^>]*class="lucide[^"]*session-tree-footer-chevron"/);
+  assert.match(rowMarkup(html, "archive:/work/old"), /aria-expanded="false" title="\/work\/old"><svg[^>]*class="lucide[^"]*session-tree-chevron[^"]*"/);
+  assert.match(rowMarkup(html, "footer-open"), /<button [^>]*class="[^"]*session-tree-footer-button[^"]*"[^>]*><svg[^>]*>[\s\S]*?<\/svg><span class="session-tree-footer-label">Open another project…<\/span><\/button>/);
+  assert.match(rowMarkup(html, "footer-archived"), /<span class="session-tree-footer-label">Archived · 4<\/span><svg[^>]*class="lucide[^"]*session-tree-footer-chevron[^"]*"/);
 });
 
 test("loading replaces the rows; the empty label shows only without session, group or archive-group rows", () => {
@@ -576,7 +576,7 @@ test("headers lead with their chevron, and every row's text starts in one column
   // A group header's toggle starts at the row's own left edge.
   assert.match(cssRule(".session-tree-group"), /padding: 0 4px 0 0;/);
   assert.equal(lastPx(".session-tree-footer-button", "padding") + 12 + lastPx(".session-tree-footer-button", "gap"), textStart);
-  assert.deepEqual([...source.matchAll(/<(?:FolderPlus|Archive)Icon size=\{(\d+)\} \/>\s*<span className="session-tree-footer-label">/g)].map((match) => Number(match[1])), [12, 12]);
+  assert.deepEqual([...source.matchAll(/<(?:FolderPlus|Archive)Icon size=\{(\d+)\}(?: className="[^"]*")? \/>\s*<span className="session-tree-footer-label">/g)].map((match) => Number(match[1])), [12, 12]);
   // These rows span the whole width, so their padding adds the rows' inset.
   assert.match(css, /\.session-tree-group-empty,\s*\.session-tree-more \{\s*padding-left: calc\(var\(--session-tree-inset-left\) \+ 20px\);/);
   // The pinned section's chevron in the same column (its row spans the
