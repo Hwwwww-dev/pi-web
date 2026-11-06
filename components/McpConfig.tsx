@@ -1137,18 +1137,18 @@ export function McpConfigView({
           <ConfigSidebarList>
             {load.state === "loading" ? (
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="config-sidebar-message">{t("i18n.loading")}</div>
+                <div className="px-2 py-2.5 text-xs text-muted-foreground">{t("i18n.loading")}</div>
                 <Skeleton className="mx-2 h-[30px] w-auto" />
                 <Skeleton className="mx-2 h-[30px] w-auto" />
               </div>
             ) : load.state === "failed" ? (
-              <div role="alert" className="config-sidebar-message is-error">
+              <div role="alert" className="px-2 py-2.5 text-xs text-destructive">
                 {t("mcp.loadFailed")} {failureText(load.error, t)}
               </div>
             ) : data && context ? (
               <>
                 {/* First, so the 190px phone sidebar always shows it, however many servers follow. */}
-                <div className="config-sidebar-group">
+                <div className="flex flex-col gap-1 pb-1.5">
                   <McpCodemodeRow
                     codemode={data.codemode}
                     active={!adding && selected === MCP_CODEMODE_SELECTION}
@@ -1362,7 +1362,7 @@ function McpCodemodeRow({
       onClick={() => onSelect(MCP_CODEMODE_SELECTION)}
     >
       <ConfigStatusDot {...mcpStatusDot(mcpCodemodeTone(state))} />
-      <ConfigSidebarText className="is-grow">{t("mcp.codemode.title")}</ConfigSidebarText>
+      <ConfigSidebarText className="flex-1">{t("mcp.codemode.title")}</ConfigSidebarText>
       <McpRowBadge tone={mcpCodemodeTone(state)}>{stateText}</McpRowBadge>
     </ConfigSidebarItem>
   );
@@ -1418,7 +1418,7 @@ function McpServerGroupList({
   const emptyKey = mcpGroupEmptyKey(group);
   const statusText = status ? groupStatusText(status, t) : undefined;
   return (
-    <div className="config-sidebar-group">
+    <div className="flex flex-col gap-1 pb-1.5">
       <ConfigSidebarGroupLabel
         aside={total > 0 ? (
           <ConfigSidebarGroupSwitch
@@ -1453,7 +1453,7 @@ function McpServerGroupList({
             onClick={() => onSelect(key)}
           >
             <ConfigStatusDot {...mcpStatusDot(tone)} />
-            <ConfigSidebarText className={`is-grow${tone === "on" ? "" : " is-muted"}`}>{name}</ConfigSidebarText>
+            <ConfigSidebarText className={`flex-1${tone === "on" ? "" : " text-muted-foreground"}`}>{name}</ConfigSidebarText>
             {badgeKey && <McpRowBadge tone={tone}>{t(badgeKey)}</McpRowBadge>}
           </ConfigSidebarItem>
         );

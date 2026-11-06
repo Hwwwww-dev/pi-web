@@ -325,7 +325,7 @@ test("Settings › MCP opens the add pane from the sidebar, keeps the draft, and
     onCodemodeChange: noop,
     onClose: noop,
   })));
-  assert.match(decode(html), /<button type="button" aria-current="page" class="config-list-action-button">[\s\S]*?Add MCP<\/button>/);
+  assert.match(decode(html), /<button type="button" aria-current="page" class="config-list-action-button[^"]*">[\s\S]*?Add MCP<\/button>/);
   // The name first, under the paste box, with the note on where it came from; then the preview, which
   // leaves out what is not set: no working directory and no env names, rather than "None".
   assert.match(text(html), /Server to add npx -y @acme\/lint-mcp Name Named lint after its address or command\. Preview Read as a command line Transport stdio Command npx -y @acme\/lint-mcp Add /);

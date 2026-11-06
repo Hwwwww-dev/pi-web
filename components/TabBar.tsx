@@ -58,14 +58,15 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
     else if (right > strip.right) list.scrollLeft += right - strip.right;
   }, [activeTabId, tabs.length]);
 
-  // One tab, one pill: inactive pills sit muted, the active one raises onto the
-  // bar with a border. The scrollbar is hidden (globals.css .tabbar-scroll):
-  // it would squeeze the pills or clip their tops (#1225).
+  // The shadcn Tabs shape: one muted track, the active tab is a raised
+  // background segment — no floating per-tab pills. The scrollbar is hidden
+  // (globals.css .tabbar-scroll): it would squeeze the tabs or clip their
+  // tops (#1225).
   return (
     <div
       ref={listRef}
       role="tablist"
-      className="tabbar-scroll flex h-[46px] shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden"
+      className="tabbar-scroll flex h-[46px] shrink-0 items-center gap-0.5 overflow-x-auto overflow-y-hidden px-2"
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
@@ -101,10 +102,10 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               if (!tab.closing) onCloseTab(tab.id);
             }}
             className={cn(
-              "flex h-[30px] min-w-20 max-w-[180px] shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-full border pl-[11px] pr-1 whitespace-nowrap text-xs transition-colors",
+              "flex h-7 min-w-20 max-w-[180px] shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md py-0 pr-1 pl-2.5 whitespace-nowrap text-xs transition-colors",
               isActive
-                ? "border-border bg-card font-medium text-foreground shadow-sm"
-                : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
+                ? "bg-background font-medium text-foreground shadow-xs"
+                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
             )}
           >
             <span className={cn("flex shrink-0 items-center", isActive ? "opacity-100" : "opacity-70")}>
@@ -127,7 +128,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
             <button
               disabled={tab.closing}
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
-              className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent p-0 text-dim transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+              className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent p-0 text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
               title={t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")}
               aria-label={`${t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")} ${tab.kind === "git" ? t("gitPanel.title") : tab.label}`}
             >

@@ -839,15 +839,15 @@ export function SkillsConfig({
           <ConfigSidebar>
             <ConfigSidebarList>
               {loading ? (
-                <div className="config-sidebar-message">
+                <div className="px-2 py-2.5 text-xs text-muted-foreground">
                    {t("i18n.loading")}
                 </div>
               ) : error ? (
-                <div className="config-sidebar-message is-error">
+                <div className="px-2 py-2.5 text-xs text-destructive">
                   {error}
                 </div>
               ) : skills.length === 0 ? (
-                <div className="config-sidebar-message is-empty">
+                <div className="px-2 py-2.5 text-xs text-muted-foreground/60">
                    {t("i18n.noSkills")}
                 </div>
               ) : (
@@ -907,7 +907,7 @@ export function SkillsConfig({
                         }}
                       >
                         <ConfigStatusDot active={!disabled} />
-                        <ConfigSidebarText className={`is-grow${disabled ? " is-muted" : ""}`}>
+                        <ConfigSidebarText className={`flex-1${disabled ? " text-muted-foreground" : ""}`}>
                           {skill.name}
                         </ConfigSidebarText>
                         {(() => {
@@ -928,7 +928,7 @@ export function SkillsConfig({
                       const visible = grpSkills.filter((skill) => !skill.disableModelInvocation).length;
                       const allVisible = visible === grpSkills.length;
                       return (
-                        <div key={grpLabel} className="config-sidebar-group">
+                        <div key={grpLabel} className="flex flex-col gap-1 pb-1.5">
                           <ConfigSidebarGroupLabel
                             aside={
                               <ConfigSidebarGroupSwitch

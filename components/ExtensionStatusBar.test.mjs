@@ -57,7 +57,7 @@ test("renders each status as its own cell without identifier keys", () => {
 
   assert.match(html, /aria-label="ponytail memory"/);
   assert.match(html, /role="status"/);
-  assert.equal(html.match(/whitespace-pre px-1\.5/g)?.length, 2);
+  assert.equal(html.match(/whitespace-pre rounded-md bg-muted\/60 px-2/g)?.length, 2);
   assert.match(html, /text-muted-foreground"><span>ponytail<\/span><\/span>/);
   assert.match(html, /<span style="[^"]*">memory<\/span>/);
   assert.doesNotMatch(html, /05-ponytail|20-memory/);
@@ -73,7 +73,7 @@ test("a status with nothing visible to show gets no cell", () => {
     ],
   });
 
-  assert.equal(html.match(/whitespace-pre px-1\.5/g)?.length, 1);
+  assert.equal(html.match(/whitespace-pre rounded-md bg-muted\/60 px-2/g)?.length, 1);
   assert.match(html, /aria-label="shown"/);
   assert.equal(renderStatusBar({ statuses: [{ key: "a", text: "" }] }), "");
 });
@@ -207,14 +207,14 @@ test("with widgets, the triggers and the status line share one scrolling row bel
     widgets: [{ key: "usage", lines: ["a", "b"], placement: "aboveEditor" }],
   });
   const panel = html.indexOf("<section");
-  const row = html.indexOf('class="flex min-w-0 flex-1 items-center gap-1"');
+  const row = html.indexOf('class="flex min-w-0 flex-1 items-center gap-1 px-1.5 py-1"');
   const triggers = html.indexOf('aria-label="Extension widgets"');
   const line = html.indexOf('role="status"');
 
   // The expanded panel stays outside the row, so it does not scroll sideways with it.
   assert.ok(panel !== -1 && panel < row, "panel comes before the row");
   assert.ok(row < triggers && triggers < line, "row holds the triggers, then the status line");
-  assert.equal(html.match(/class="flex min-w-0 flex-1 items-center gap-1"/g)?.length, 1);
+  assert.equal(html.match(/class="flex min-w-0 flex-1 items-center gap-1 px-1.5 py-1"/g)?.length, 1);
 });
 
 test("without widgets there is no shared row, and without status the row holds only the triggers", () => {

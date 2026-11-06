@@ -148,7 +148,7 @@ test("keeps empty widgets non-interactive", () => {
     widgets: [{ key: "empty-widget", lines: [], placement: "aboveEditor" }],
   });
 
-  assert.match(html, /<span[^>]*inline-flex h-7[^>]*>/);
+  assert.match(html, /<span[^>]*inline-flex h-6[^>]*>/);
   assert.doesNotMatch(html, /<button/);
   assert.doesNotMatch(html, /aria-expanded/);
   assert.match(html, /title="empty-widget - Above editor widget"/);

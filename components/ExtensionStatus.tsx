@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
+import { Badge } from "@/components/ui/badge";
 import { extensionStatusEntryTone, extensionStatusTone, splitExtensionStatuses } from "@/lib/extension-status";
 import type { ExtensionStatusItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
@@ -16,13 +17,14 @@ export function PermissiveModeChip({ text }: { text: string }) {
   const label = t("chat.permissiveMode");
 
   return (
-    <span
+    <Badge
+      variant="outline"
       title={label}
       aria-label={label}
-      className="inline-flex shrink-0 cursor-default rounded-[4px] border border-destructive/35 bg-destructive/8 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.6px] text-destructive"
+      className="shrink-0 cursor-default border-destructive/35 bg-destructive/[0.06] px-1.5 py-0 font-mono text-[10px] font-semibold tracking-[0.6px] text-destructive"
     >
       {text.toUpperCase()}
-    </span>
+    </Badge>
   );
 }
 

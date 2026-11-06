@@ -151,18 +151,20 @@ export function ConfigSplitView({ children }: { children: ReactNode }) {
 }
 
 export function ConfigSidebar({ children }: { children: ReactNode }) {
-  return <aside className="config-sidebar">{children}</aside>;
+  // `config-sidebar` stays as the phone pane layout hook (settings.css media).
+  return <aside className="config-sidebar flex w-full min-h-0 shrink-0 flex-col border-sidebar-border bg-sidebar md:w-[240px] md:border-r">{children}</aside>;
 }
 
 export function ConfigSidebarList({ children }: { children: ReactNode }) {
-  return <div className="config-sidebar-list">{children}</div>;
+  return <div className="min-h-0 flex-1 overflow-y-auto p-2">{children}</div>;
 }
 
 /** A sidebar group heading; `aside` sits at its right edge. */
 export function ConfigSidebarGroupLabel({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
+  // `config-sidebar-group-label` stays as the phone sizing hook (settings.css).
   return (
-    <div className="config-sidebar-group-label">
-      <span className="config-sidebar-group-label-text">{children}</span>
+    <div className="config-sidebar-group-label flex items-center gap-1.5 px-2 pt-1 pb-1 text-[11px] font-medium text-muted-foreground">
+      <span className="min-w-0 truncate">{children}</span>
       {aside}
     </div>
   );
@@ -198,8 +200,8 @@ export function ConfigSidebarGroupSwitch({
   onChange: (enabled: boolean) => void;
 }) {
   return (
-    <span className="config-sidebar-group-switch">
-      <span className="config-sidebar-group-count">{enabled}/{total}</span>
+    <span className="inline-flex shrink-0 items-center gap-1.5">
+      <span className="font-mono text-[11px] text-muted-foreground">{enabled}/{total}</span>
       <ConfigSwitch
         checked={checked ?? (total > 0 && enabled === total)}
         disabled={disabled}
@@ -216,9 +218,9 @@ export function ConfigSidebarGroupSwitch({
 export function ConfigSidebarGroupStatus({ error, note }: { error?: string | null; note?: string | null }) {
   if (!error && !note) return null;
   return (
-    <div className="config-sidebar-group-status">
-      {note && <div role="status" className="config-sidebar-group-note">{note}</div>}
-      {error && <div role="alert" className="config-sidebar-group-error">{error}</div>}
+    <div className="flex max-h-16 flex-col gap-0.5 overflow-y-auto px-2 pb-1 text-xs leading-snug whitespace-pre-wrap [overflow-wrap:anywhere]">
+      {note && <div role="status" className="text-muted-foreground">{note}</div>}
+      {error && <div role="alert" className="text-destructive">{error}</div>}
     </div>
   );
 }
@@ -245,7 +247,11 @@ export function ConfigSidebarItem({
         if (!event.defaultPrevented) openDetail();
       }}
       aria-current={active ? "page" : undefined}
-      className={["config-sidebar-item", className].filter(Boolean).join(" ")}
+      className={cn(
+        // `config-sidebar-item` stays as the phone row-height hook (settings.css).
+        "config-sidebar-item flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:bg-sidebar-accent focus-visible:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-50 [&[aria-current='page']]:bg-sidebar-accent [&[aria-current='page']]:font-medium [&[aria-current='page']]:text-sidebar-accent-foreground",
+        className,
+      )}
     >
       {children}
     </button>
@@ -256,7 +262,7 @@ export function ConfigSidebarText({ className, ...props }: HTMLAttributes<HTMLSp
   return (
     <span
       {...props}
-      className={["config-sidebar-text", className].filter(Boolean).join(" ")}
+      className={cn("block min-w-0 truncate text-[12px] leading-[1.35]", className)}
     />
   );
 }
@@ -928,7 +934,7 @@ export function ConfigListAction({ active = false, children, className, onClick,
   const { openDetail } = useConfigDetailNavigation();
   const buttonRef = useReportDetailTitle(active, ref);
   return (
-    <div className="config-list-action">
+    <div className="shrink-0 px-2 pb-2">
       <button
         type="button"
         {...props}
@@ -938,7 +944,11 @@ export function ConfigListAction({ active = false, children, className, onClick,
           if (!event.defaultPrevented) openDetail();
         }}
         aria-current={active ? "page" : undefined}
-        className={["config-list-action-button", className].filter(Boolean).join(" ")}
+        className={cn(
+          // `config-list-action-button` stays as the phone row-height hook.
+          "config-list-action-button flex h-8 w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-left text-[12.5px] text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:bg-sidebar-accent focus-visible:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50",
+          className,
+        )}
       >
         <PlusIcon size={13} strokeWidth={2} className="shrink-0" />
         {children}

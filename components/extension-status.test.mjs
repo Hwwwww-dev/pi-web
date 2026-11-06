@@ -72,9 +72,9 @@ test("renders the permissive marker as a small uppercase chip", async () => {
   // a stylesheet rule here once lagged the component and the marker fell back
   // to plain red text. Utilities keep that failure mode impossible.
   assert.match(source, /text-destructive/);
-  assert.match(source, /rounded-\[4px\]/);
+  assert.match(source, /variant="outline"/);
   assert.match(source, /border-destructive\/35/);
-  assert.match(source, /bg-destructive\/8/);
+  assert.match(source, /bg-destructive\/\[0\.06\]/);
 });
 
 test("tones the status dot after the LSP state pi-lens reports", () => {

@@ -2159,7 +2159,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                     onClick={() => setSelection({ type: "oauth", providerId: p.id })}
                   >
                     <ProviderIcon id={p.id} size={16} />
-                    <ConfigSidebarText className="is-grow">{p.name}</ConfigSidebarText>
+                    <ConfigSidebarText className="flex-1">{p.name}</ConfigSidebarText>
                     {scopeBadge(p.id)}
                   </ConfigSidebarItem>
                 );
@@ -2175,7 +2175,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                     onClick={() => setSelection({ type: "apikey", providerId: p.id })}
                   >
                     <ProviderIcon id={p.id} size={16} />
-                    <ConfigSidebarText className="is-grow">{p.displayName}</ConfigSidebarText>
+                    <ConfigSidebarText className="flex-1">{p.displayName}</ConfigSidebarText>
                     {scopeBadge(p.id)}
                   </ConfigSidebarItem>
                 );
@@ -2203,7 +2203,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                       active={isProviderSelected}
                     >
                       <Cpu size={11} strokeWidth={1.8} className="shrink-0 text-dim" />
-                      <ConfigSidebarText className="is-grow">
+                      <ConfigSidebarText className="flex-1">
                         {pName}
                       </ConfigSidebarText>
                       {scopeBadge(pName)}
@@ -2219,7 +2219,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                           className="models-sidebar-indented-item"
                           onClick={() => setSelection({ type: "model", providerName: pName, index: i })}
                         >
-                          <ConfigSidebarText className={cn("is-grow", m.id ? "text-muted-foreground" : "text-dim")}>
+                          <ConfigSidebarText className={cn("flex-1", m.id ? "text-muted-foreground" : "text-dim")}>
                              {modelSidebarLabel(m) || t("i18n.newModel")}
                           </ConfigSidebarText>
                           {/* Reasoning pin: no pi token for the indigo tint, kept literal. */}

@@ -852,21 +852,21 @@ export function PluginsConfig({
           <ConfigSidebar>
             <ConfigSidebarList>
               {loading ? (
-                <div className="config-sidebar-message">
+                <div className="px-2 py-2.5 text-xs text-muted-foreground">
                   {t("i18n.loading")}
                 </div>
               ) : error ? (
-                <div className="config-sidebar-message is-error">
+                <div className="px-2 py-2.5 text-xs text-destructive">
                   {error}
                 </div>
               ) : packages.length === 0 && standaloneExtensions.length === 0 ? (
-                <div className="config-sidebar-message is-empty">
+                <div className="px-2 py-2.5 text-xs text-muted-foreground/60">
                   {t("i18n.noPlugins")}
                 </div>
               ) : (
                 <>
                   {standaloneExtensions.length > 0 && (
-                    <div className="config-sidebar-group">
+                    <div className="flex flex-col gap-1 pb-1.5">
                       <ConfigSidebarGroupLabel>{t("i18n.extensions")}</ConfigSidebarGroupLabel>
                       {standaloneExtensions.map((extension) => {
                         const key = extensionKey(extension);
@@ -883,7 +883,7 @@ export function PluginsConfig({
                             }}
                           >
                             <ConfigStatusDot active={extension.enabled} />
-                            <ConfigSidebarText className={`is-grow${extension.enabled ? "" : " is-muted"}`}>
+                            <ConfigSidebarText className={`flex-1${extension.enabled ? "" : " text-muted-foreground"}`}>
                               {extension.name}
                             </ConfigSidebarText>
                           </ConfigSidebarItem>
@@ -895,7 +895,7 @@ export function PluginsConfig({
                     const enabledCount = group.packages.filter((pkg) => !pkg.disabled).length;
                     const allEnabled = enabledCount === group.packages.length;
                     return (
-                      <div key={group.scope} className="config-sidebar-group">
+                      <div key={group.scope} className="flex flex-col gap-1 pb-1.5">
                         <ConfigSidebarGroupLabel
                           aside={
                             <ConfigSidebarGroupSwitch
@@ -929,7 +929,7 @@ export function PluginsConfig({
                               }}
                             >
                               <ConfigStatusDot active={!pkg.disabled} color={statusColor(pkg.status)} />
-                              <ConfigSidebarText className={`is-grow${pkg.disabled ? " is-muted" : ""}`}>
+                              <ConfigSidebarText className={`flex-1${pkg.disabled ? " text-muted-foreground" : ""}`}>
                                 {pkg.source}
                               </ConfigSidebarText>
                               {updateStatuses[packageKey(pkg)]?.state === "update-available" && (

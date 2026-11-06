@@ -1444,30 +1444,23 @@ function PairedResult({ text, isEmpty, isError }: {
 }
 
 const TOOL_FIELD_LABEL =
-  "pr-3 py-1 align-top whitespace-nowrap text-muted-foreground text-[length:calc(11px+var(--chat-font-size-offset,0px))]";
-
-const TOOL_FIELD_VALUE =
-  "py-1 font-mono wrap-anywhere text-muted-foreground text-[length:calc(12px+var(--chat-font-size-offset,0px))]";
+  "shrink-0 text-muted-foreground/70 text-[length:calc(11px+var(--chat-font-size-offset,0px))] leading-[1.6]";
 
 // A value with newlines of its own keeps them, scrolled in place.
 const TOOL_FIELD_BLOCK =
-  "m-0 max-h-[260px] overflow-auto rounded-lg border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
+  "m-0 mt-0.5 max-h-[260px] overflow-auto rounded-lg border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
 
-// A tool call's argument labels stack above their values instead of a
-// two-column table (the label column squeezed long values).
+// One row per argument: `key: value` on a single line — the key muted, the
+// value in the row's mono face; multiline values keep their own block.
 function ToolFieldRows({ fields }: { fields: ToolField[] }) {
   return (
-    <table className="border-collapse [&_tr]:block [&_td]:block [&_td+td]:pt-0">
-      <tbody>
-        {fields.map((field) => (
-          <tr key={field.key}>
-            <td className={TOOL_FIELD_LABEL}>{field.key}</td>
-            <td className={TOOL_FIELD_VALUE}>
-              {field.multiline ? <pre className={TOOL_FIELD_BLOCK}>{field.value}</pre> : field.value}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+      {fields.map((field) => (
+        <div key={field.key} className="min-w-0">
+          <span className={TOOL_FIELD_LABEL}>{field.key}:</span>{" "}
+          {field.multiline ? <pre className={TOOL_FIELD_BLOCK}>{field.value}</pre> : field.value}
+        </div>
+      ))}
+    </div>
   );
 }

@@ -37,9 +37,10 @@ test("overflowing tabs keep the whole bar: the strip has no scrollbar", () => {
   const tabs = classes(html, "tab");
   assert.equal(tabs.length, 12);
   for (const tab of tabs) {
-    // One tab, one pill: a fixed pill height on every row.
-    assert.match(tab, /h-\[30px\]/);
+    // One segment per tab: a fixed segment height on every row (the shadcn
+    // Tabs shape — the raised background segment, not a floating pill).
+    assert.match(tab, /h-7/);
     assert.match(tab, /items-center/);
-    assert.match(tab, /rounded-full/);
+    assert.match(tab, /rounded-md/);
   }
 });

@@ -543,7 +543,7 @@ export function AgentsConfig({
                 const scopedProfiles = profiles.filter((profile) => profile.scope === scope);
                 if (scopedProfiles.length === 0) return null;
                 return (
-                  <div key={scope} className="config-sidebar-group">
+                  <div key={scope} className="flex flex-col gap-1 pb-1.5">
                     <ConfigSidebarGroupLabel>{t(`agents.scope.${scope}`)}</ConfigSidebarGroupLabel>
                     {scopedProfiles.map((profile) => {
                       const overridden = isSubagentProfileOverridden(profile, profiles);
@@ -554,7 +554,7 @@ export function AgentsConfig({
                           onClick={() => selectProfile(profile)}
                         >
                           <ConfigStatusDot active={profile.enabled} />
-                          <ConfigSidebarText className={`is-grow${profile.enabled ? "" : " is-muted"}`}>{profile.displayName}</ConfigSidebarText>
+                          <ConfigSidebarText className={`flex-1${profile.enabled ? "" : " text-muted-foreground"}`}>{profile.displayName}</ConfigSidebarText>
                           {overridden && <span className="agents-overridden-label">{t("agents.overridden")}</span>}
                         </ConfigSidebarItem>
                       );

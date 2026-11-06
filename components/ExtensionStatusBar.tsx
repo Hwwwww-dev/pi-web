@@ -82,14 +82,14 @@ export function ExtensionStatusBar({
   const statusLine = cells.length > 0 ? (
     <div
       role="status"
-      className="flex min-w-0 flex-1 items-start gap-0.5 overflow-auto py-1 pl-1 [scrollbar-width:thin]"
+      className="flex min-w-0 flex-1 items-center gap-1 overflow-auto px-1.5 py-1.5 [scrollbar-width:thin]"
       aria-label={plainStatusLine}
       title={plainStatusLine}
     >
       {cells.map((cell, index) => cell.kind === "text" ? (
         <span
           key={index}
-          className="max-w-full whitespace-pre px-1.5 py-1 font-mono text-xs/relaxed text-muted-foreground"
+          className="inline-flex max-w-full items-center whitespace-pre rounded-md bg-muted/60 px-2 py-1 font-mono text-[11.5px] leading-4 text-muted-foreground"
         >
           <AnsiText text={cell.text} />
         </span>
@@ -98,12 +98,12 @@ export function ExtensionStatusBar({
           key={index}
           type="button"
           variant="ghost"
-          size="sm"
+          size="xs"
           disabled={!onCommand || commandsDisabled}
           title={`${cell.label} · ${cell.command}`}
           aria-label={`${cell.label} (${cell.command})`}
           onClick={() => onCommand?.(cell.command)}
-          className="h-7 shrink-0 rounded-md px-2 font-mono text-xs text-muted-foreground"
+          className="shrink-0 bg-muted/60 px-2 font-mono text-[11.5px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
         >
           {cell.label}
         </Button>
@@ -113,8 +113,9 @@ export function ExtensionStatusBar({
 
   return (
     // `extension-status-bar` is a layout hook (keyboard-open collapse below); the
-    // styling itself is shadcn utilities on the row's buttons and text.
-    <div className="extension-status-bar flex shrink-0 items-stretch border-t">
+    // styling itself is shadcn utilities on the row's pills. `relative` anchors
+    // an expanded widget's floating panel above the row.
+    <div className="extension-status-bar relative mx-auto flex w-full min-w-0 max-w-[700px] shrink-0 items-stretch pt-1.5 pb-2">
       {widgets.length > 0 ? <ExtensionWidgets widgets={widgets}>{statusLine}</ExtensionWidgets> : statusLine}
     </div>
   );

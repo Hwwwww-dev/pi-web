@@ -103,126 +103,6 @@
   overflow: hidden;
 }
 
-.config-sidebar {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  width: 240px;
-  min-height: 0;
-  border-right: 1px solid var(--border);
-  background: var(--bg-panel);
-}
-
-.config-sidebar-list {
-  flex: 1;
-  min-height: 0;
-  padding: 10px 8px;
-  overflow-y: auto;
-}
-
-.config-sidebar-group {
-  margin-bottom: 6px;
-}
-
-.config-sidebar-group-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px 3px;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.config-sidebar-group-label-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Sits in the heading row, so the sidebar gains no height for it. */
-.config-sidebar-group-switch {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-}
-
-.config-sidebar-group-count {
-  font-family: var(--font-mono);
-  font-weight: 400;
-}
-
-/* Three lines, then scroll: the phone layout gives the whole sidebar 190px. */
-.config-sidebar-group-status {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 4.2em;
-  padding: 0 8px 4px;
-  overflow-y: auto;
-  font-size: 12px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.config-sidebar-group-note {
-  color: var(--text-muted);
-}
-
-.config-sidebar-group-error {
-  color: var(--danger);
-}
-
-.config-sidebar-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  height: 30px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: var(--radius-md);
-  outline: none;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 400;
-  text-align: left;
-  transition: background-color 0.12s ease, color 0.12s ease;
-}
-
-.config-sidebar-item:not(:disabled):hover,
-.config-sidebar-item:not(:disabled):focus-visible {
-  background: var(--accent);
-}
-
-.config-sidebar-item:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
-}
-
-.config-sidebar-item[aria-current="page"] {
-  background: var(--accent);
-  color: var(--accent-foreground, var(--text));
-  font-weight: 500;
-}
-
-.config-sidebar-item:disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
 .models-sidebar-indented-item {
   padding-left: 26px;
 }
@@ -292,10 +172,10 @@
 .oauth-paste-submit {
   flex-shrink: 0;
   padding: 0 12px;
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--bg-hover);
+  color: var(--text);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
@@ -494,25 +374,6 @@
   font-size: 10px;
 }
 
-.config-sidebar-text {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  font-family: inherit;
-  font-size: 12px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.config-sidebar-text.is-grow {
-  flex: 1;
-}
-
-.config-sidebar-text.is-muted {
-  color: var(--text-dim);
-}
-
 .agents-overridden-label {
   flex: 0 0 auto;
   color: var(--text-dim);
@@ -547,20 +408,6 @@
   color: var(--text);
   font: inherit;
   text-align: center;
-}
-
-.config-sidebar-message {
-  padding: 10px 8px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.config-sidebar-message.is-error {
-  color: var(--danger);
-}
-
-.config-sidebar-message.is-empty {
-  color: var(--text-dim);
 }
 
 .config-detail {
@@ -1012,47 +859,6 @@
 }
 
 
-.config-list-action {
-  flex-shrink: 0;
-  padding: 8px 6px;
-  border-top: 1px solid var(--border);
-}
-
-.config-list-action-button {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
-  width: 100%;
-  height: 30px;
-  min-height: 30px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.config-list-action-button:not(:disabled):hover,
-.config-list-action-button:not(:disabled):focus-visible {
-  background: var(--accent);
-  color: var(--text-muted);
-  outline: none;
-}
-
-.config-list-action-button[aria-current="page"] {
-  background: var(--accent);
-  color: var(--accent-foreground, var(--text));
-  font-weight: 500;
-}
-
-.config-list-action-button:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
 .config-status-dot {
   flex-shrink: 0;
   width: 5px;
@@ -1310,18 +1116,7 @@
 }
 
 .settings-theme-option[data-theme-option="light"] .settings-theme-swatch { background: #ffffff; }
-.settings-theme-option[data-theme-option="mist"] .settings-theme-swatch { background: #f4f8f7; }
-.settings-theme-option[data-theme-option="lilac"] .settings-theme-swatch { background: #f8f6fc; }
-.settings-theme-option[data-theme-option="sand"] .settings-theme-swatch { background: #faf6ee; }
-.settings-theme-option[data-theme-option="rose"] .settings-theme-swatch { background: #fcf7f8; }
 .settings-theme-option[data-theme-option="dark"] .settings-theme-swatch { background: #1a1a1a; }
-.settings-theme-option[data-theme-option="pine"] .settings-theme-swatch { background: #19201f; }
-.settings-theme-option[data-theme-option="dusk"] .settings-theme-swatch { background: #1e1a24; }
-.settings-theme-option[data-theme-option="ember"] .settings-theme-swatch { background: #1f1a16; }
-.settings-theme-option[data-theme-option="slate"] .settings-theme-swatch { background: #161b26; }
-.settings-theme-option[data-theme-option="contrast-light"] .settings-theme-swatch { background: #ffffff; box-shadow: inset 0 0 0 1px #999999; }
-.settings-theme-option[data-theme-option="contrast-dark"] .settings-theme-swatch { background: #000000; }
-.settings-theme-option[data-theme-option="zenburn"] .settings-theme-swatch { background: #3f3f3f; }
 
 /* The font name field is drawn in the font it names: the live preview. The
    Input component carries the box; only the dynamic faces stay here. */
@@ -1523,8 +1318,8 @@
   }
 
   .settings-section-rail-item.is-selected {
-    background: var(--accent);
-    color: var(--accent-contrast);
+    background: var(--bg-selected);
+    color: var(--text);
   }
 
   /* Back, title, close: equal side columns keep the title in the middle

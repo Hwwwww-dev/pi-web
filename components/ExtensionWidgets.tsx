@@ -137,7 +137,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
           panelId={`${idPrefix}-panel-${widgets.indexOf(expandedWidget)}`}
         />
       )}
-      <div className="flex min-w-0 flex-1 items-center gap-1">
+      <div className="flex min-w-0 flex-1 items-center gap-1 px-1.5 py-1">
       <div className="flex shrink-0 items-center gap-0.5" aria-label={t("chat.extensionWidgets")}>
         {widgets.map((widget, index) => {
           const expandable = widget.lines.length > 0;
@@ -155,7 +155,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
           const triggerId = `${idPrefix}-trigger-${index}`;
           const panelId = `${idPrefix}-panel-${index}`;
           const triggerClass = cn(
-            "h-7 shrink-0 gap-1.5 rounded-md px-2 font-mono text-xs text-muted-foreground",
+            "shrink-0 gap-1.5 rounded-md px-2 font-mono text-[11.5px] text-muted-foreground",
             "data-[expanded=true]:bg-accent data-[expanded=true]:text-accent-foreground",
           );
           const content = (
@@ -178,7 +178,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
                   id={triggerId}
                   type="button"
                   variant="ghost"
-                  size="sm"
+                  size="xs"
                   data-expanded={expanded || undefined}
                   className={triggerClass}
                   aria-controls={panelId}
@@ -198,7 +198,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
             <Tooltip key={widget.key}>
               <TooltipTrigger asChild>
                 <span
-                  className="inline-flex h-7 shrink-0 items-center rounded-md px-2 font-mono text-xs text-muted-foreground"
+                  className="inline-flex h-6 shrink-0 items-center rounded-md px-2 font-mono text-[11.5px] text-muted-foreground"
                   aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
                   title={`${widget.key} - ${placementLabel}`}
                 >
@@ -228,16 +228,19 @@ export function ExtensionWidgetPanel({ widget, triggerId, panelId }: {
   panelId: string;
 }) {
   return (
+    // Floats above the shelf bar (the bar root is its positioned ancestor): the
+    // official popover look — bg-popover, its own border, shadow — detached from
+    // the pill row, never nested inside it.
     <section
       id={panelId}
       aria-labelledby={triggerId}
-      className="mx-2 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-sm"
+      className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md"
     >
-      <div className="border-b px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground">{widget.key}</div>
+      <div className="border-b px-3 py-1.5 font-mono text-[11px] text-muted-foreground">{widget.key}</div>
       {/* Extension widgets render TUI output: tables, progress bars and box drawing
           only line up while the monospace grid survives, so the panel scrolls
           sideways rather than wrapping a line into a broken row. */}
-      <pre className="max-h-40 overflow-auto px-2.5 py-2 font-mono text-xs/relaxed [font-size:calc(12px+var(--chat-font-size-offset,0px))] [scrollbar-width:thin] [overflow-wrap:normal] whitespace-pre">
+      <pre className="max-h-40 overflow-auto px-3 py-2 font-mono text-xs/relaxed [font-size:calc(12px+var(--chat-font-size-offset,0px))] [scrollbar-width:thin] [overflow-wrap:normal] whitespace-pre">
         <AnsiText text={formatExtensionWidgetContent(widget.lines)} />
       </pre>
     </section>

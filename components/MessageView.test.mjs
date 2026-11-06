@@ -200,7 +200,7 @@ test("renders write tool content as readable file text", () => {
 
     assert.ok(html.includes("src/example.ts"));
     assert.match(html, /first line\nsecond line\n/);
-    assert.ok(!html.includes("<table"));
+    assert.ok(!html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
     assert.doesNotMatch(textOf(html), /"content":/);
   } finally {
     clearExpandedToolCalls();
@@ -242,10 +242,10 @@ test("streaming input shows the rows pi's partial parse has so far, else its raw
     try {
       const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
       if (rows) {
-        assert.ok(html.includes("<table"), id);
+        assert.ok(html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'), id);
         for (const text of rows) assert.ok(textOf(html).includes(text), id);
       } else {
-        assert.ok(!html.includes("<table"), id);
+        assert.ok(!html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'), id);
         assert.ok(textOf(html).includes(getToolCallInputText(block)), id);
       }
     } finally {
@@ -265,7 +265,7 @@ test("a nested argument keeps the JSON body: a row cannot hold a subtree", () =>
   setToolCallExpanded(block.toolCallId, true);
   try {
     const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
-    assert.ok(!html.includes("<table"));
+    assert.ok(!html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
     assert.ok(textOf(html).includes('"filter"'));
     assert.ok(textOf(html).includes('"labels"'));
   } finally {
@@ -283,7 +283,7 @@ test("an edit call shows no table: its arguments are a list of patches", () => {
   setToolCallExpanded(block.toolCallId, true);
   try {
     const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
-    assert.ok(!html.includes("<table"));
+    assert.ok(!html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
   } finally {
     clearExpandedToolCalls();
   }
@@ -291,16 +291,16 @@ test("an edit call shows no table: its arguments are a list of patches", () => {
 
 test("a read, a subagent and a flat MCP call show one row per argument", (t) => {
   const cases = [
-    { id: "call-read-rows", toolName: "read", input: { path: "lib/tool-fields.ts", offset: 120, limit: 80 }, expect: [">path</td>", "lib/tool-fields.ts", ">120</td>"] },
-    { id: "call-agent-rows", toolName: "Agent", input: { subagent_type: "Explore", prompt: "Find the parser" }, expect: [">subagent_type</td>", "Find the parser"] },
-    { id: "call-mcp-flat-rows", toolName: "mcp__issues__search", input: { query: "open bugs", limit: 10 }, expect: [">query</td>", "open bugs", ">10</td>"] },
+    { id: "call-read-rows", toolName: "read", input: { path: "lib/tool-fields.ts", offset: 120, limit: 80 }, expect: [">path:</span>", "lib/tool-fields.ts", "120"] },
+    { id: "call-agent-rows", toolName: "Agent", input: { subagent_type: "Explore", prompt: "Find the parser" }, expect: [">subagent_type:</span>", "Find the parser"] },
+    { id: "call-mcp-flat-rows", toolName: "mcp__issues__search", input: { query: "open bugs", limit: 10 }, expect: [">query:</span>", "open bugs", "10"] },
   ];
   for (const { id, toolName, input, expect } of cases) {
     const block = { type: "toolCall", toolCallId: id, toolName, input };
     setToolCallExpanded(id, true);
     t.after(() => setToolCallExpanded(id, false));
     const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
-    assert.ok(html.includes("<table"), id);
+    assert.ok(html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'), id);
     for (const needle of expect) assert.ok(html.includes(needle), `${id}: ${needle}`);
   }
 });
@@ -317,7 +317,7 @@ test("a long or multi-line value stays inside the card", (t) => {
   t.after(() => setToolCallExpanded(block.toolCallId, false));
   const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
   // A single-line value wraps in its cell; a value with lines of its own scrolls in a block.
-  assert.ok(html.includes("<table"));
+  assert.ok(html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
   assert.match(html, /wrap-anywhere/);
   assert.match(html, /calc\(12px\+var\(--chat-font-size-offset,0px\)\)/);
   assert.match(html, /max-h-\[260px\]/);
@@ -832,7 +832,7 @@ test("a codemode call with no script or streaming input falls back to a plain bo
   const streamingText = textOf(renderCodemode(streaming));
   assert.match(streamingText, /Generating parameters/);
   // The script so far, through the partial parse, rather than its JSON.
-  assert.match(streamingText, /codeconst secret/);
+  assert.match(streamingText, /code:?\s*const secret/);
   assert.doesNotMatch(streamingText, /\{"code"/);
   assert.doesNotMatch(streamingText, /Tool calls/);
 
@@ -842,8 +842,8 @@ test("a codemode call with no script or streaming input falls back to a plain bo
   // An argument this view does not understand is still an argument: no script box,
   // but the flat row shows it.
   const otherHtml = renderCodemode(other);
-  assert.match(otherHtml, /<table/);
-  assert.match(otherHtml, />x<\/td>/);
+  assert.match(otherHtml, /flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere/);
+  assert.match(otherHtml, />x<\/span>/);
   assert.doesNotMatch(textOf(otherHtml), /"script": "x"/);
 });
 

@@ -111,9 +111,9 @@ test("without a project only the global file is listed, under the Code mode row"
   const html = view();
   const shown = text(html);
   assert.ok(!shown.includes(messages["skills.scope.project"]), "no Project group without a project");
-  assert.match(decode(html), /class="config-sidebar-group-label-text">global</);
+  assert.match(decode(html), />global</);
   // Code mode comes first, so the 190px phone sidebar always shows it.
-  const sidebar = decode(html).slice(decode(html).indexOf('class="config-sidebar-list"'));
+  const sidebar = decode(html).slice(decode(html).indexOf('class="min-h-0 flex-1 overflow-y-auto p-2"'));
   assert.ok(sidebar.indexOf("Code mode: Automatic") < sidebar.indexOf("github: On"));
   assert.match(row(html, "Code mode"), /aria-label="Code mode: Automatic"/);
   assert.match(row(html, "github"), /aria-label="github: On"/);
@@ -135,9 +135,9 @@ test("with a project, its group comes first and every row names its state", () =
   const markup = decode(html);
   assert.ok(markup.indexOf(">project<") < markup.indexOf(">global<"));
   // Each heading holds its n/m count and the group switch, on only while every server is.
-  assert.match(markup, /<span class="config-sidebar-group-count">1\/2<\/span><button type="button" role="switch" aria-checked="false"[^>]*aria-label="Turn on every global server"/);
+  assert.match(markup, /<span class="font-mono text-\[11px\] text-muted-foreground">1\/2<\/span><button type="button" role="switch" aria-checked="false"[^>]*aria-label="Turn on every global server"/);
   // The untrusted project's switch waits for trust, pointing at the notice that says so.
-  const projectSwitch = markup.match(/<span class="config-sidebar-group-count">2\/2<\/span>(<button[^>]*>)/)?.[1];
+  const projectSwitch = markup.match(/<span class="font-mono text-\[11px\] text-muted-foreground">2\/2<\/span>(<button[^>]*>)/)?.[1];
   assert.match(projectSwitch, /aria-checked="true"[^>]*aria-label="Turn off every project server"/);
   assert.match(projectSwitch, /\sdisabled="/);
   const noticeId = projectSwitch.match(/aria-describedby="([^"]+)"/)[1];
@@ -382,13 +382,16 @@ test("the notices above the list sit together in their own box, right before the
 });
 
 test("a selected row renders with the ref attached as a plain button: the ref is not an attribute", () => {
-  assert.match(view({ selected: "codemode" }), /<button type="button" aria-label="Code mode: [^"]+" aria-current="page" class="config-sidebar-item">/);
+  const row = decode(view({ selected: "codemode" })).match(/<button type="button" aria-label="Code mode: [^"]+"[^>]*aria-current="page"[^>]*>/)?.[0] ?? "";
+  assert.match(row, /aria-current="page"/);
+  assert.match(row, /config-sidebar-item/);
+  assert.match(row, /bg-sidebar-accent/);
 });
 
 test("loading, a failed load and an empty listing each say so", () => {
   assert.match(text(view({ load: { state: "loading" } })), /Loading\.\.\./);
   const denied = decode(view({ load: { state: "failed", error: { error: "Access denied", reason: "cwd-denied" } } }));
-  assert.match(denied, /<div role="alert" class="config-sidebar-message is-error">Could not read the MCP settings\. Pi Web may not read this folder\.<\/div>/);
+  assert.match(denied, /<div role="alert" class="px-2 py-2\.5 text-xs text-destructive">Could not read the MCP settings\. Pi Web may not read this folder\.<\/div>/);
   // Nothing to translate for an internal failure: its diagnostic is the reason.
   assert.match(text(view({ load: { state: "failed", error: { error: "EACCES: permission denied", reason: "internal" } } })), /Could not read the MCP settings\. EACCES: permission denied/);
   // A load that never answered ends with a way out, never "Loading..." for good.
@@ -851,7 +854,7 @@ test("why a server cannot be changed is the visible note its controls point at",
   assert.equal(mcpOff.note, "MCP is off on this Pi Web server, so it changes no server.");
   assert.match(mcpOff.toggle, /disabled=""/);
   assert.match(text(offHtml), /MCP is off: PI_WEB_DISABLE_MCP is set where Pi Web runs\. The servers are listed, but no session connects them\. Servers cannot be changed here while MCP is off\./);
-  const offSwitch = decode(offHtml).match(/<span class="config-sidebar-group-count">1\/2<\/span>(<button[^>]*>)/)[1];
+  const offSwitch = decode(offHtml).match(/<span class="font-mono text-\[11px\] text-muted-foreground">1\/2<\/span>(<button[^>]*>)/)[1];
   const bannerId = offSwitch.match(/aria-describedby="([^"]+)"/)?.[1];
   assert.ok(bannerId, "the disabled group switch points at the banner");
   assert.match(decode(offHtml), new RegExp(`<div id="${bannerId}" role="status" class="config-notice">MCP is off`));
@@ -882,7 +885,7 @@ test("while a change is on its way every control waits, and the one in use says 
   // A load on its way holds the controls too, so a click acts on the listing shown.
   assert.match(detailControls(writeView({ view: { refreshing: true } })).toggle, /disabled=""/);
   // The group switch shows its own wait (on: the one server off references PI_WEB_PASSWORD).
-  assert.match(decode(writeView({ view: { busy: "group:global" } })), /<span class="config-sidebar-group-count">1\/2<\/span><button type="button" role="switch" aria-checked="true"[^>]*aria-busy="true"/);
+  assert.match(decode(writeView({ view: { busy: "group:global" } })), /<span class="font-mono text-\[11px\] text-muted-foreground">1\/2<\/span><button type="button" role="switch" aria-checked="true"[^>]*aria-busy="true"/);
 });
 
 test("a failed change is said in the server's pane with its reason, and a timeout as possibly landed", () => {
@@ -903,14 +906,14 @@ test("the group switch names what it left undone under the heading", () => {
     failures: [{ name: "gone", failure: { error: "x", reason: "server-missing" } }, { name: "odd", failure: { error: "EIO", reason: "internal" } }],
     total: 3,
   } } }));
-  const status = html.match(/<div class="config-sidebar-group-status">([\s\S]*?)<\/div><\/div>/)?.[1];
+  const status = html.match(/<div role="status" class="text-muted-foreground">([\s\S]*?)<\/div><\/div>/)?.[1];
   assert.ok(status, "the status sits under the Global heading");
-  assert.ok(html.indexOf("config-sidebar-group-status") > html.indexOf(">global<"));
-  assert.match(status, /<div role="status" class="config-sidebar-group-note">1 server\(s\) that reference PI_WEB_PASSWORD stayed off\.<\/div>/);
-  assert.match(status, /<div role="alert" class="config-sidebar-group-error">Could not change 2 of 3 servers:\ngone: The file no longer defines this server\.\nodd: EIO/);
+  assert.ok(html.indexOf('role="status"') > html.indexOf(">global<"));
+  assert.match(status, /^1 server\(s\) that reference PI_WEB_PASSWORD stayed off\./);
+  assert.match(status, /<div role="alert" class="text-destructive">Could not change 2 of 3 servers:\ngone: The file no longer defines this server\.\nodd: EIO/);
   const whole = decode(writeView({ view: { groupStatus: { scope: "project", keptOff: 0, failures: [], total: 1, error: { error: "x", reason: "project-untrusted" } } } }));
-  assert.match(whole, /<div role="alert" class="config-sidebar-group-error">Could not change the server: This project is not trusted, so Pi Web does not change its \.pi\/mcp\.json\.<\/div>/);
-  assert.ok(whole.indexOf("config-sidebar-group-error") < whole.indexOf(">global<"), "under the Project heading");
+  assert.match(whole, /<div role="alert" class="text-destructive">Could not change the server: This project is not trusted, so Pi Web does not change its \.pi\/mcp\.json\.<\/div>/);
+  assert.ok(whole.indexOf('role="alert"') < whole.indexOf(">global<"), "under the Project heading");
 });
 
 test("a removal offers Undo until the route lets it go, and says why an undo failed", () => {
@@ -928,7 +931,7 @@ test("a removal offers Undo until the route lets it go, and says why an undo fai
 
 /** The opening tag of a group's switch, found by the n/m count in front of it. */
 function groupSwitch(html, count) {
-  return decode(html).match(new RegExp(`<span class="config-sidebar-group-count">${count.replace("/", "\\/")}</span>(<button[^>]*>)`))?.[1];
+  return decode(html).match(new RegExp(`<span class="font-mono text-\\[11px\\] text-muted-foreground">${count.replace("/", "\\/")}</span>(<button[^>]*>)`))?.[1];
 }
 
 test("a group holding a server the switch never turns on can still be switched off from its heading", () => {
@@ -1078,7 +1081,7 @@ test("a connected test shows what it listed, and the row reads connected", () =>
   const markup = decode(html);
   // The dot and the accessible name follow the test; connected needs no badge, as on needs none.
   assert.match(row(html, "docs"), /aria-label="docs: Connected when tested"/);
-  assert.match(markup, /<button type="button" aria-label="docs: Connected when tested"[^>]*><span aria-hidden="true" class="config-status-dot is-active"><\/span><span class="config-sidebar-text is-grow">docs<\/span><\/button>/);
+  assert.match(markup, /<button type="button" aria-label="docs: Connected when tested"[^>]*><span aria-hidden="true" class="config-status-dot is-active"><\/span><span class="block min-w-0 truncate text-\[12px\] leading-\[1\.35\] flex-1">docs<\/span><\/button>/);
   const { label, value, text: shown } = statusRow(html);
   // The state is said once: what the test found follows it without its own "Connected".
   assert.equal(label, "Connected when tested");
