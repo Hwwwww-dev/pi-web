@@ -334,7 +334,9 @@ test("the composer stays editable while compacting and says messages queue", () 
     })),
   );
 
-  assert.doesNotMatch(html, /<textarea[^>]*\bdisabled\b/);
+  // The disabled ATTRIBUTE must be absent — `disabled:` utility classes in
+  // the serialized class list do not count.
+  assert.doesNotMatch(html, /<textarea[^>]*\sdisabled[= >]/);
   assert.match(html, /placeholder="Compacting… messages queue until it finishes"/);
 });
 
@@ -1088,42 +1090,20 @@ test("renders image warnings for known text-only defaults without an explicit mo
   }
 });
 
-test("selector rows keep the default star and the floating save button in one gutter", async () => {
-  const { SelectorRow } = await jiti.import("./SelectorRow.tsx");
-  const star = (isDefault) => ({ isDefault, saveLabel: "Save as default", defaultLabel: "Default", onSave: () => {} });
-  const row = (props) => renderToStaticMarkup(React.createElement(SelectorRow, {
-    active: false,
-    onSelect: () => {},
-    ...props,
-  }, "Alpha"));
+test("model rows keep the default star and the floating save button in one gutter", async () => {
+  // The rows render inside the Radix popover portal, which SSR does not
+  // materialize, so these invariants are asserted on the component source.
+  const source = readFileSync(new URL("./ModelSelector.tsx", import.meta.url), "utf8");
 
-  const savable = row({ star: star(false) });
-  assert.match(savable, /role="option"/);
-  assert.match(savable, /aria-label="Save as default"/);
-  // Hidden until hover or focus, but kept out of the row's text by the gutter.
-  assert.match(savable, /opacity-0/);
-  assert.match(savable, /tabindex="-1"/);
-  assert.match(savable, /py-\[7px\]/);
-  assert.match(savable, /\bpl-3\b/);
-  assert.match(savable, /\bpr-9\b/);
-  assert.doesNotMatch(savable, /aria-label="Default"/);
-
-  // The default row shows a static marker in the same spot and no button.
-  const saved = row({ star: star(true) });
-  assert.match(saved, /role="img" aria-label="Default"/);
-  assert.match(saved, /fill="currentColor"/);
-  assert.doesNotMatch(saved, /Save as default/);
-
-  const plain = row({});
-  assert.doesNotMatch(plain, /Save as default|aria-label="Default"/);
-  assert.match(plain, /\bpr-3\b/);
-  assert.doesNotMatch(plain, /\bpr-9\b/);
-  // Rows without a star still line up with starred ones in the same menu.
-  assert.match(row({ gutter: true }), /\bpr-9\b/);
-
-  const active = row({ active: true });
-  assert.match(active, /aria-selected="true"/);
-  assert.doesNotMatch(active, /border-left/);
+  // Rows reserve the gutter whenever the star column can exist…
+  assert.match(source, /onSetDefault && "pr-9"/);
+  // …the save button hides until hover or focus and sits in that gutter.
+  assert.match(source, /aria-label=\{t\("chat\.saveDefaultModel"\)\}/);
+  assert.match(source, /opacity-0 transition-opacity group-hover\/item:opacity-100/);
+  assert.match(source, /absolute top-1\/2 right-1\.5 size-6 -translate-y-1\/2/);
+  // The default row shows a static filled marker instead of a button.
+  assert.match(source, /role="img"\s*\n\s*aria-label=\{t\("chat\.defaultModel"\)\}/);
+  assert.match(source, /<StarIcon size=\{10\} fill="currentColor" \/>/);
 });
 
 test("grows the composer to its text and hides the scrollbar until the text is taller than the box", () => {

@@ -2772,15 +2772,16 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         />
       )}
 
-      {/* Right panel: file viewer — a top-level column beside the chat page
-          (sibling of SidebarInset, full height), not an inset card inside it.
-          Always mounted; width animated via CSS. */}
+      {/* Right panel: file viewer — a floating card like the chat page (same
+          inset + radius + shadow come from the .right-panel-container rules),
+          a sibling of SidebarInset at full height. Always mounted; width
+          animated via CSS. */}
       <div
         ref={rightPanelResizer.panelRef}
         id="file-panel"
         className={cn(
           `right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelFullWidth ? " right-panel-full-width" : ""}${rightPanelResizer.isResizing ? " right-panel-resizing" : ""}`,
-          "flex h-[var(--app-viewport-height,100dvh)] flex-col border-l border-border bg-background",
+          "flex h-[var(--app-viewport-height,100dvh)] flex-col bg-background",
         )}
         // 可拖拽宽度经 CSS 变量注入（useResizablePanel 写 --right-panel-width），保留 inline。
         style={{ "--right-panel-width": `${rightPanelResizer.width}px` } as React.CSSProperties}

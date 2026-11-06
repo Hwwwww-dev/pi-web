@@ -1990,11 +1990,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           size="icon"
           onClick={onAbort}
           aria-label={t("chat.stopAgent")}
-          className="size-[30px] shrink-0 rounded-full"
+          className="size-9 shrink-0 rounded-full"
         >
           {/* While the run streams the circle stops it, until the user types
               something to send. */}
-          <SquareIcon data-icon className="size-3 fill-current" aria-hidden="true" />
+          <SquareIcon data-icon className="size-3.5 fill-current" aria-hidden="true" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>{t("chat.stopAgent")}</TooltipContent>
@@ -2010,7 +2010,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               onClick={sendToSideChat}
               disabled={!value.trim() || attachedImages.length > 0}
               aria-label={t("chat.sideChat")}
-              className="size-[30px] rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="size-9 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             >
               <MessagesSquareIcon data-icon strokeWidth={1.8} aria-hidden="true" />
             </Button>
@@ -2025,9 +2025,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             disabled={!canSubmit}
             aria-label={t("chat.send")}
             className={cn(
-              "size-[30px] shrink-0 rounded-full",
+              "size-9 shrink-0 rounded-full",
               canSubmit || isStreaming
-                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
                 : "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
             )}
           >
@@ -2315,15 +2315,17 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             );
           })()}
           {/* The drafted composer card: attachments, then the input, then one
-              pill row with the send button physically pinned to its right. */}
+              pill row with the send button physically pinned to its right.
+              AI-element composer language: one large-radius card, borderless
+              textarea with headroom, tools bottom-left, circular submit
+              bottom-right, and a soft tinted focus ring (the border itself
+              stays put while typing). */}
           <InputGroup
             className={cn(
-              // No focus-within border darkening: the card border stays put
-              // while typing (the user flagged the darkening as heavy-handed).
-              "chat-composer-row min-w-0 rounded-[18px] border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] has-[[data-slot=input-group-control]:focus-visible]:border-border has-[[data-slot=input-group-control]:focus-visible]:ring-0",
+              "chat-composer-row min-w-0 rounded-[24px] border-border bg-card shadow-sm has-[[data-slot=input-group-control]:focus-visible]:border-ring/40 has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot=input-group-control]:focus-visible]:ring-ring/15",
               compact
-                ? "flex-row items-center gap-1 rounded-xl p-1"
-                : "flex-col items-stretch gap-2 p-2.5 px-3",
+                ? "flex-row items-center gap-1 rounded-[18px] p-1.5"
+                : "flex-col items-stretch gap-0 p-2",
             )}
           >
           {attachedImages.length > 0 && (
@@ -2370,9 +2372,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           <InputGroupTextarea
             ref={textareaRef}
             className={cn(
-              "chat-input-textarea w-full min-w-0 px-0 py-0 text-foreground max-h-[120px] overflow-auto placeholder:text-muted-foreground",
+              "chat-input-textarea w-full min-w-0 px-2.5 py-2 text-foreground max-h-44 overflow-auto placeholder:text-muted-foreground",
               "text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.55]",
-              compact ? "min-h-24" : "min-h-6",
+              compact ? "min-h-24" : "min-h-11",
             )}
             data-chat-composer=""
             aria-label={compact ? t("chat.askInSideChat") : undefined}
@@ -2411,7 +2413,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           />
 
           {compact ? sendCluster : (
-            <InputGroupAddon align="block-end" className="min-w-0 items-center gap-2 px-0 pb-0">
+            <InputGroupAddon align="block-end" className="min-w-0 items-center gap-2 px-1 pb-0.5">
               {/* One pill row: the pills scroll horizontally instead of wrapping,
                   and the send button is a sibling so it can never be squeezed
                   out. chat-input-controls keeps the keyboard-open collapse. */}
