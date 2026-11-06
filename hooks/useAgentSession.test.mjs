@@ -962,19 +962,21 @@ test("empty queued texts never render, and expired records feed the image memory
 test("keeps the compaction control reachable while a turn is auto-compacting", () => {
   // Auto-compaction starts mid-turn, so `isStreaming` (sessionBusy) is already true. Hiding
   // the control behind `!isStreaming` left only the generic stop button, which aborts the
-  // whole prompt instead of the compaction.
+  // whole prompt instead of the compaction. Compact now lives in the tools
+  // icon menu as a trailing entry; the trigger stays visible while compacting.
   const controlBlock = chatInputSource.slice(
-    chatInputSource.indexOf("onClick={isCompacting ? onAbortCompaction : (e) => { if (!isStrayClick(e)) onCompact(); }}") - 420,
-    chatInputSource.indexOf('aria-label={isCompacting ? t("chat.stopCompaction")'),
+    chatInputSource.indexOf("{/* Tools + compact share one icon menu"),
+    chatInputSource.indexOf("</DropdownMenu>", chatInputSource.indexOf("chat.compactContext")),
   );
 
-  assert.match(controlBlock, /\{\(!isStreaming \|\| isCompacting\) && onCompact && \(/);
+  assert.match(controlBlock, /\(onCompact && \(!isStreaming \|\| isCompacting\)\)/);
   assert.doesNotMatch(controlBlock, /\{!isStreaming && onCompact && \(/);
   // The "streaming but not compacting" state is now unreachable, so its disabled styling
   // must be gone rather than left as dead branches.
   assert.doesNotMatch(controlBlock, /isStreaming && !isCompacting/);
-  // The control is a shadcn Button now: the pointer affordance and the
-  // compacting danger tint live in its variant/className.
-  assert.match(controlBlock, /<Button/);
-  assert.match(chatInputSource, /isCompacting && "h-8 w-auto gap-1 rounded-full px-2 text-destructive/);
+  // The compaction entry is a menu item whose onSelect flips between starting
+  // and aborting; the trigger turns into a destructive stop while compacting.
+  assert.match(controlBlock, /onSelect=\{isCompacting \? onAbortCompaction : \(\) => onCompact\(\)\}/);
+  assert.match(controlBlock, /<DropdownMenuTrigger asChild>/);
+  assert.match(controlBlock, /isCompacting\s*\?\s*"text-destructive hover:bg-destructive\/10 hover:text-destructive"/);
 });

@@ -429,8 +429,11 @@ test("renders the read-only tool preset as the active selection", () => {
     ),
   );
 
+  // The row keeps no text pill: the preset name lives on the wrench button's
+  // tooltip, and the icon carries a tint instead.
   assert.match(html, /title="Change tool preset: Read Only"/);
-  assert.match(html, />Read Only<\/span>/);
+  assert.match(html, /aria-label="Change tool preset"/);
+  assert.doesNotMatch(html, />Read Only<\/span>/);
 });
 
 test("renders the empty tool preset as Chat only", () => {
@@ -449,7 +452,8 @@ test("renders the empty tool preset as Chat only", () => {
   );
 
   assert.match(html, /title="Change tool preset: Chat only"/);
-  assert.match(html, />Chat only<\/span>/);
+  assert.match(html, /aria-label="Change tool preset"/);
+  assert.doesNotMatch(html, />Chat only<\/span>/);
 });
 
 test("renders the compact composer with the standard Send button and no session controls", () => {

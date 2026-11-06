@@ -1754,8 +1754,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             .new-session-context in app/globals.css; the side padding and
             width are inline here). */}
         {isEmptyNew && (
-          <div className="new-session-hero max-md:px-4 md:pr-[52px] md:pl-4">
-            <div className="new-session-hero-inner max-w-[min(var(--chat-content-max-width,820px),700px)]">
+          <div className="new-session-hero max-md:px-4 md:px-4">
+            <div className="new-session-hero-inner flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-center">
               <div className="new-session-brand">
                 <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo" />
                 <div className="new-session-brand-text">
@@ -1768,7 +1768,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                   </span>
                 </div>
               </div>
-              {newSessionContextBar}
+              <div className="flex w-full justify-center">{newSessionContextBar}</div>
             </div>
           </div>
         )}

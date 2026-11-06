@@ -100,13 +100,11 @@ test("client code stays parseable by Safari 16.2 and its CSS flat", () => {
   const update = header.match(/\.new-session-update \{[^}]*\smargin: -(\d+)px -(\d+)px;\s*padding: (\d+)px (\d+)px;/);
   assert.ok(update);
   assert.deepEqual([update[1], update[2]], [update[3], update[4]]);
-  // The bar is pulled left by the project button's own padding, so its
-  // folder icon stands on the logo's and the composer card's edge.
-  const row = header.match(/\.new-session-context \{[^}]*\smargin: 0 0 \d+px -(\d+)px;/);
+  // The hero centres the row under the brand lockup now (ChatWindow wraps it
+  // in a justify-center flex), so the old left-edge pull is gone: the row's
+  // margin carries no horizontal component.
+  const row = header.match(/\.new-session-context \{[^}]*\smargin: 0 0 \d+px;/);
   assert.ok(row);
-  const button = rules.match(/\.project-picker\.is-inline \.project-picker-button \{[^}]*\spadding: 0 (\d+)px;/);
-  assert.ok(button);
-  assert.equal(row[1], button[1]);
   // The inline boxes never take a share of the row (60% of a lone project
   // button, in a repo subdirectory, once left it 0px wide).
   assert.doesNotMatch(rules.slice(0, rules.indexOf(".project-picker.is-stacked {")), /max-width: [1-9]\d?%/);

@@ -44,7 +44,6 @@ import {
   ChevronUpIcon,
   HistoryIcon,
   ImageIcon,
-  LightbulbIcon,
   MessagesSquareIcon,
   PencilIcon,
   PlusIcon,
@@ -67,6 +66,7 @@ import {
   DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -1884,6 +1884,78 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const rawToolPresetLabel = Object.entries(TOOL_PRESET_MAP).find(([, v]) => v === (toolPreset ?? "configured"))?.[0] ?? "configured";
   const toolPresetLabel = rawToolPresetLabel === "chat-only" ? t("chat.chatOnly") : titleCaseLabel(rawToolPresetLabel);
 
+  // Thinking selects inside the model popover now (pi's /model keeps reasoning
+  // beside the model); the row shows no text pill. The model pill's CPU icon
+  // carries the state instead — a pinned level lights up in primary, off dims,
+  // auto stays muted — and the popover section below does the selecting.
+  const thinkingPinned = !isAutoThinkingSelection && resolvedThinkingLevel != null;
+  const thinkingIconTone = thinkingPinned ? "text-primary" : thinkingLevel === "off" ? "opacity-45" : undefined;
+  const thinkingSection = onThinkingLevelChange && (
+    <div role="radiogroup" aria-label={t("chat.changeReasoningLabel")} className="flex flex-col">
+      <div className="px-2 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-dim">{t("chat.thinkingSection")}</div>
+      {THINKING_LEVELS.filter((lvl) => {
+        if (!availableThinkingLevels) return true;
+        if (lvl === "auto") return true;
+        return availableThinkingLevels.includes(lvl);
+      }).map((lvl) => {
+        const desc = t(THINKING_LEVEL_DESC_KEYS[lvl]);
+        const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
+        const displayLabel = titleCaseLabel((mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl);
+        const showOriginal = mappedVal != null && mappedVal !== lvl;
+        const selected = lvl === "auto" ? isAutoThinkingSelection : (!isAutoThinkingSelection && resolvedThinkingLevel === lvl);
+        return (
+          <button
+            key={lvl}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => {
+              if (lvl === "auto") {
+                if (!isAutoThinkingSelection) onThinkingLevelChange("auto");
+                return;
+              }
+              // Re-selecting the pinned level keeps the popover open, like the
+              // old menu's no-op onSelect guard.
+              if (!isAutoThinkingSelection && resolvedThinkingLevel === lvl) return;
+              onThinkingLevelChange(lvl as typeof THINKING_LEVELS[number]);
+            }}
+            className={cn(
+              "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-left text-xs transition-colors hover:bg-accent",
+              selected ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
+            <CheckIcon className={cn("size-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")} strokeWidth={2.2} aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">
+              {displayLabel}
+              {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-dim">({lvl})</span>}
+            </span>
+            <span className="whitespace-nowrap text-[11px] text-dim">{desc}</span>
+            {onSetDefaultThinkingLevel && lvl !== "auto" && (
+              <span
+                role={savedDefaultThinkingLevel === lvl ? "img" : "button"}
+                aria-label={savedDefaultThinkingLevel === lvl ? t("chat.defaultThinking") : t("chat.saveDefaultThinking")}
+                title={savedDefaultThinkingLevel === lvl ? t("chat.defaultThinking") : t("chat.saveDefaultThinking")}
+                aria-hidden={savedDefaultThinkingLevel === lvl ? undefined : "true"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSetDefaultThinkingLevel(lvl);
+                }}
+                className={cn(
+                  "pointer-events-auto flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-dim",
+                  savedDefaultThinkingLevel === lvl && "opacity-100",
+                )}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill={savedDefaultThinkingLevel === lvl ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+                  <polygon points="12 2.5 14.9 8.6 21.5 9.4 16.6 13.9 17.9 20.5 12 17.2 6.1 20.5 7.4 13.9 2.5 9.4 9.1 8.6" />
+                </svg>
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   // The history menu keeps its own anchor positioning (it is a typing-driven
   // overlay, not a trigger menu), so it closes on outside click like the
   // Radix popovers above do.
@@ -2250,7 +2322,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               pill row with the send button physically pinned to its right. */}
           <div
             className={cn(
-              "chat-composer-row min-w-0 rounded-[18px] border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-colors focus-within:border-[color-mix(in_oklch,var(--foreground)_30%,var(--border))]",
+              // No focus-within border darkening: the card border stays put
+              // while typing (the user flagged the darkening as heavy-handed).
+              "chat-composer-row min-w-0 rounded-[18px] border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)]",
               compact
                 ? "flex flex-row items-center gap-1 rounded-xl p-1"
                 : "flex flex-col gap-2 p-2.5 px-3",
@@ -2380,152 +2454,90 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       onSetDefault={onSetDefaultModel}
                       allOptions={allModelList?.map((m) => ({ provider: m.provider, modelId: m.id, name: m.name }))}
                       onShowAll={onLoadAllModels}
+                      headerSlot={!isMobile && onThinkingLevelChange ? thinkingSection : undefined}
+                      iconClassName={!isMobile && onThinkingLevelChange ? thinkingIconTone : undefined}
+                      titleHint={!isMobile && onThinkingLevelChange ? thinkingDisplayLabel : undefined}
                     />
                   </div>
                 )}
-            {!isMobile && onThinkingLevelChange && (
+            {/* Tools + compact share one icon menu: the row keeps no text
+                pills. The wrench tint says which preset is active (full
+                bright, chat-only dim, others muted), and compacting flips the
+                icon to a destructive stop. The menu's onSelect fires on a
+                deliberate click, so the run-end stray-click guard the old
+                direct button needed does not apply here. */}
+            {!isMobile && ((onToolPresetChange && !isStreaming) || (onCompact && (!isStreaming || isCompacting))) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    title={isStreaming
-                      ? t("chat.currentReasoning", { level: thinkingDisplayLabel })
-                      : t("chat.changeReasoning", { level: thinkingDisplayLabel })}
-                    aria-label={t("chat.changeReasoningLabel")}
-                    className="min-w-0 flex-[0_1_auto] gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    size="icon-sm"
+                    title={isCompacting
+                      ? t("chat.stopCompaction")
+                      : onToolPresetChange && !isStreaming
+                        ? t("chat.changeToolPreset") + `: ${toolPresetLabel}`
+                        : t("chat.compactContext")}
+                    aria-label={isCompacting
+                      ? t("chat.stopCompaction")
+                      : onToolPresetChange && !isStreaming
+                        ? t("chat.changeToolPreset")
+                        : t("chat.compactContext")}
+                    className={cn(
+                      "rounded-full",
+                      isCompacting
+                        ? "text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        : onToolPresetChange && !isStreaming && rawToolPresetLabel === "full"
+                          ? "text-primary hover:bg-accent hover:text-accent-foreground"
+                          : onToolPresetChange && !isStreaming && rawToolPresetLabel === "chat-only"
+                            ? "text-dim hover:bg-accent hover:text-accent-foreground"
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    )}
                   >
-                    <LightbulbIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
-                    <span className="min-w-0 truncate">{thinkingDisplayLabel}</span>
-                    <ChevronDownIcon data-icon="inline-end" className="shrink-0 opacity-60" aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="end" sideOffset={6} className="min-w-[180px]">
-                  <DropdownMenuRadioGroup
-                    value={isAutoThinkingSelection ? "auto" : (resolvedThinkingLevel ?? "")}
-                    onValueChange={(next) => {
-                      if (next === "auto") {
-                        if (!isAutoThinkingSelection) onThinkingLevelChange("auto");
-                        return;
-                      }
-                      onThinkingLevelChange(next as typeof THINKING_LEVELS[number]);
-                    }}
-                  >
-                    {THINKING_LEVELS.filter((lvl) => {
-                      if (!availableThinkingLevels) return true;
-                      if (lvl === "auto") return true;
-                      return availableThinkingLevels.includes(lvl);
-                    }).map((lvl) => {
-                      const desc = t(THINKING_LEVEL_DESC_KEYS[lvl]);
-                      const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
-                      const displayLabel = titleCaseLabel((mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl);
-                      const showOriginal = mappedVal != null && mappedVal !== lvl;
-                      return (
-                        <DropdownMenuRadioItem
-                          key={lvl}
-                          value={lvl}
-                          onSelect={() => {
-                            if (lvl === "auto" && isAutoThinkingSelection) return;
-                            if (lvl !== "auto" && !isAutoThinkingSelection && resolvedThinkingLevel === lvl) return;
-                          }}
-                        >
-                          <span className="min-w-0 flex-1">
-                            {displayLabel}
-                            {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-dim">({lvl})</span>}
-                          </span>
-                          <span className="text-xs text-dim">{desc}</span>
-                          {onSetDefaultThinkingLevel && lvl !== "auto" && (
-                            <span
-                              role={savedDefaultThinkingLevel === lvl ? "img" : "button"}
-                              aria-label={savedDefaultThinkingLevel === lvl ? t("chat.defaultThinking") : t("chat.saveDefaultThinking")}
-                              title={savedDefaultThinkingLevel === lvl ? t("chat.defaultThinking") : t("chat.saveDefaultThinking")}
-                              aria-hidden={savedDefaultThinkingLevel === lvl ? undefined : "true"}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSetDefaultThinkingLevel(lvl);
-                              }}
-                              className={cn(
-                                "pointer-events-auto flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-dim",
-                                savedDefaultThinkingLevel === lvl && "opacity-100",
-                              )}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill={savedDefaultThinkingLevel === lvl ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
-                                <polygon points="12 2.5 14.9 8.6 21.5 9.4 16.6 13.9 17.9 20.5 12 17.2 6.1 20.5 7.4 13.9 2.5 9.4 9.1 8.6" />
-                              </svg>
-                            </span>
-                          )}
-                        </DropdownMenuRadioItem>
-                      );
-                    })}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            {!isMobile && !isStreaming && onToolPresetChange && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title={t("chat.changeToolPreset") + `: ${toolPresetLabel}`}
-                    aria-label={t("chat.changeToolPreset")}
-                    className="min-w-0 flex-[0_1_auto] gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <WrenchIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
-                    <span className="min-w-0 truncate">{toolPresetLabel}</span>
-                    <ChevronDownIcon data-icon="inline-end" className="shrink-0 opacity-60" aria-hidden="true" />
+                    {isCompacting
+                      ? <SquareIcon className="size-4 fill-current" aria-hidden="true" />
+                      : <WrenchIcon strokeWidth={1.8} aria-hidden="true" />}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="end" sideOffset={6} className="min-w-[120px]">
-                  <DropdownMenuRadioGroup
-                    value={toolPreset ?? "configured"}
-                    onValueChange={(next) => {
-                      const preset = TOOL_PRESET_MAP[next as ToolPresetLabel];
-                      if ((toolPreset ?? "configured") !== preset) onToolPresetChange(preset);
-                    }}
-                  >
-                    {TOOL_PRESETS.map((lvl) => {
-                      let desc: string | null;
-                      if (lvl === "configured") desc = t("chat.configuredTools");
-                      else if (lvl === "chat-only") desc = null;
-                      else if (lvl === "read-only") desc = t("chat.readOnlyTools", { count: 4 });
-                      else if (lvl === "default") desc = t("chat.builtInTools", { count: 4 });
-                      else desc = t("chat.allBuiltInTools");
-                      return (
-                        <DropdownMenuRadioItem key={lvl} value={lvl}>
-                          <span className="flex-1 whitespace-nowrap">{lvl === "chat-only" ? t("chat.chatOnly") : titleCaseLabel(lvl)}</span>
-                          {desc && <span className="whitespace-nowrap text-xs text-dim">{desc}</span>}
-                        </DropdownMenuRadioItem>
-                      );
-                    })}
-                  </DropdownMenuRadioGroup>
+                  {onToolPresetChange && !isStreaming && (
+                    <DropdownMenuRadioGroup
+                      value={toolPreset ?? "configured"}
+                      onValueChange={(next) => {
+                        const preset = TOOL_PRESET_MAP[next as ToolPresetLabel];
+                        if ((toolPreset ?? "configured") !== preset) onToolPresetChange(preset);
+                      }}
+                    >
+                      {TOOL_PRESETS.map((lvl) => {
+                        let desc: string | null;
+                        if (lvl === "configured") desc = t("chat.configuredTools");
+                        else if (lvl === "chat-only") desc = null;
+                        else if (lvl === "read-only") desc = t("chat.readOnlyTools", { count: 4 });
+                        else if (lvl === "default") desc = t("chat.builtInTools", { count: 4 });
+                        else desc = t("chat.allBuiltInTools");
+                        return (
+                          <DropdownMenuRadioItem key={lvl} value={lvl}>
+                            <span className="flex-1 whitespace-nowrap">{lvl === "chat-only" ? t("chat.chatOnly") : titleCaseLabel(lvl)}</span>
+                            {desc && <span className="whitespace-nowrap text-xs text-dim">{desc}</span>}
+                          </DropdownMenuRadioItem>
+                        );
+                      })}
+                    </DropdownMenuRadioGroup>
+                  )}
+                  {onCompact && (!isStreaming || isCompacting) && (
+                    <>
+                      {onToolPresetChange && !isStreaming && <DropdownMenuSeparator />}
+                      <DropdownMenuItem
+                        onSelect={isCompacting ? onAbortCompaction : () => onCompact()}
+                        className={cn("text-muted-foreground", isCompacting && "text-destructive")}
+                      >
+                        {isCompacting
+                          ? <><SquareIcon className="size-4 fill-current" aria-hidden="true" />{t("chat.stopCompaction")}</>
+                          : <><ShrinkIcon className="size-4" aria-hidden="true" />{t("chat.compactContext")}</>}
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-
-            {(!isStreaming || isCompacting) && onCompact && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size={isCompacting ? "sm" : "icon-sm"}
-                    onClick={isCompacting ? onAbortCompaction : (e) => { if (!isStrayClick(e)) onCompact(); }}
-                    title={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
-                    aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
-                    className={cn(
-                      "rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                      isCompacting && "h-8 w-auto gap-1 rounded-full px-2 text-destructive hover:bg-destructive/10 hover:text-destructive",
-                    )}
-                  >
-                    {isCompacting ? (
-                      <><SquareIcon data-icon="inline-start" className="size-2.5 fill-current" aria-hidden="true" /><span className="whitespace-nowrap">{t("chat.compacting")}</span></>
-                    ) : (
-                      <ShrinkIcon data-icon="inline-start" aria-hidden="true" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}</TooltipContent>
-              </Tooltip>
             )}
 
             {onSoundToggle !== undefined && (
