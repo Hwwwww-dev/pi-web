@@ -50,7 +50,7 @@ test("trusting from Settings › MCP reloads, in place, the other mounted sectio
   // Agents: only the model list (GET /api/models leaves out an untrusted project's extensions).
   assert.match(agents, /const response = await fetch\(`\/api\/models\?cwd=\$\{encodeURIComponent\(cwd\)\}`[\s\S]*?\}, \[cwd, trustKey\]\);/);
   // Models reads models.json, auth and enabledModels, none of which follows trust.
-  assert.match(panelSource, /models: <ModelsConfig embedded cwd=\{cwd\} onClose=\{onClose\} \/>,/);
+  assert.match(panelSource, /sectionHost\("models", <ModelsConfig embedded cwd=\{cwd\} onClose=\{onClose\} \/>\)/);
 });
 
 test("offers system, light and dark selection with native radios (shadcn theme only)", () => {
@@ -72,7 +72,7 @@ test("keeps language selection in General settings", () => {
 test("groups fonts, chat font size and width with the chat switches, without row backgrounds", () => {
   const chatOptions = panelSource.slice(
     panelSource.indexOf("const chatOptions = ("),
-    panelSource.indexOf("// The keep-alive group"),
+    panelSource.indexOf("const keepAliveBlock = ("),
   );
   assert.doesNotMatch(chatOptions, /settings-theme-options/);
   // Typography lives with the chat switches: FontSettings and the two slider rows
@@ -93,28 +93,31 @@ test("groups fonts, chat font size and width with the chat switches, without row
   assert.doesNotMatch(cssSource, /\.settings-chat-option/);
 });
 
-test("the desktop dialog is a section rail beside the scrolling sections", () => {
-  // Desktop: the vertical Tabs rail (a muted 200px column) beside the sections;
-  // the active trigger reads as a raised item on the muted rail.
-  assert.match(panelSource, /<Tabs[\s\n]*orientation="vertical"/);
-  assert.match(panelSource, /w-\[200px\] shrink-0 flex-col border-r bg-muted\/40/);
-  assert.match(panelSource, /data-\[state=active\]:bg-background data-\[state=active\]:font-medium data-\[state=active\]:shadow-sm/);
-  const desktopGeneral = panelSource.slice(
-    panelSource.indexOf("if (!isPhone) {"),
-    panelSource.indexOf("<ConfigSplitView>"),
+test("the desktop dialog is a horizontal section tab bar over the sections", () => {
+  // Desktop: the original top bar — title, then the horizontal line Tabs whose
+  // active trigger is underlined; the phone's Back rides in the same bar.
+  assert.doesNotMatch(panelSource, /orientation="vertical"/);
+  assert.match(panelSource, /<TabsList\s*\n\s*variant="line"/);
+  assert.match(panelSource, /w-24 flex-none gap-1\.5 rounded-none px-1 py-0 text-\[12\.5px\] font-normal data-\[state=active\]:font-semibold/);
+  // General keeps one shape on every size: the sub-section list beside its
+  // detail (a phone shows one pane at a time through the navigation context).
+  const generalReturn = panelSource.slice(
+    panelSource.indexOf("// One shape on every size"),
+    panelSource.indexOf("// A phone shows Settings one level at a time"),
   );
-  for (const key of ["appearance", "chat", "sidebar"]) {
-    assert.match(desktopGeneral, new RegExp(`<ConfigCard title=\\{t\\("settings\\.${key}"\\)\\}>`), key);
+  assert.match(generalReturn, /<ConfigSplitView>/);
+  assert.match(generalReturn, /<ConfigSidebar>/);
+  assert.match(generalReturn, /<ConfigDetailHeader>/);
+  for (const key of ["appearance", "chat", "sidebar", "shell", "push", "language"]) {
+    assert.match(generalReturn, new RegExp(`\\{detail === "${key}" && `), key);
   }
-  assert.match(desktopGeneral, /\{pushCard\}/);
-  assert.match(panelSource, /title=\{t\("settings\.pushPermission"\)\}/);
-  assert.match(desktopGeneral, /\{keepAliveCard\}/);
-  assert.match(panelSource, /title=\{t\("settings\.keepAlive"\)\}\s*description=\{t\("settings\.keepAliveDescription"\)\}/);
-  assert.match(desktopGeneral, /<ConfigCard title=\{t\("common\.language"\)\}>/);
-  assert.match(desktopGeneral, /\{logOutBlock\}/);
-  // The phone keeps its split view with the sub-section list.
-  assert.match(panelSource, /<ConfigSplitView>/);
-  assert.match(panelSource, /<ConfigSidebar>/);
+  // Detail groups render flat, under the detail header's own title: no
+  // re-titled Cards inside a detail pane, and the logout lives in the list.
+  assert.doesNotMatch(generalReturn, /<ConfigCard/);
+  for (const [key, block] of [["appearance", "themeGroup"], ["chat", "chatOptions"], ["sidebar", "sidebarContent"], ["shell", "shellBlock"], ["push", "pushBlock"], ["language", "languageGroup"]]) {
+    assert.ok(generalReturn.includes(`{detail === "${key}" && ${block}}`), key);
+  }
+  assert.match(generalReturn, /<ConfigListAction disabled=\{loggingOut\}/);
   // Form rows read as the draft's frow2: a Field row, its description muted under the label.
   assert.match(panelSource, /<FieldDescription id="settings-files-placement-description" className="text-xs">/);
 });
@@ -130,17 +133,22 @@ test("keeps General free of divider rows", () => {
   assert.doesNotMatch(cssSource, /\.settings-phone-back/);
 });
 
-test("uses a fixed section rail on desktop and a phone home list of sections", () => {
-  // Desktop: the TabsList rail; phone home: a list of sections opened by
-  // openSectionFromHome; the section level turns them into chips.
-  assert.match(panelSource, /<TabsList variant="line" className="h-auto min-h-0 w-full flex-1 flex-col items-stretch gap-0\.5 overflow-y-auto bg-transparent p-3">/);
+test("hosts the sections in one full-size layer, listed on a phone's home level", () => {
+  // Desktop: the horizontal TabsList in the top bar; phone home: a list of
+  // sections opened by openSectionFromHome. The sections themselves mount once
+  // in full-size hosts, `hidden` unless active (a phone's level rides along).
+  assert.match(panelSource, /<TabsList\s*\n\s*variant="line"/);
   assert.match(panelSource, /openSectionFromHome/);
-  assert.match(panelSource, /aria-current=\{selected \? "page" : undefined\}/);
-  assert.match(panelSource, /variant=\{selected \? "secondary" : "ghost"\}/);
-  // The pre-Tabs self-drawn rail classes are gone from panel and stylesheet
-  // (the aria-describedby id prefix `settings-phone-home-*` is not a class).
+  assert.match(panelSource, /hidden=\{section !== id \|\| phone\.level === "home"\}/);
+  assert.match(panelSource, /data-phone-level=\{isPhone \? phone\.level : undefined\}/);
+  assert.match(panelSource, /className="settings-section-host"/);
+  assert.match(cssSource, /\.settings-section-host \{/);
+  // The v2 rail and the chip row are gone; the pre-Tabs self-drawn classes are
+  // gone from panel and stylesheet (the aria-describedby id prefix
+  // `settings-phone-home-*` is not a class).
   assert.doesNotMatch(panelSource, /className="[^"]*settings-(section-rail|phone-home)/);
   assert.doesNotMatch(cssSource, /\.settings-(section-rail|phone-home)/);
+  assert.doesNotMatch(panelSource, /variant=\{selected \? "secondary" : "ghost"\}/);
   assert.doesNotMatch(panelSource, /<style>/);
   assert.doesNotMatch(panelSource, /style=\{\{/);
 });

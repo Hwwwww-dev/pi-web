@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
 import { Slider } from "./ui/slider";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import {
   CHAT_CONTENT_WIDTH_DEFAULT,
@@ -56,7 +56,6 @@ import { PluginsConfig } from "./PluginsConfig";
 import { McpConfig } from "./McpConfig";
 import {
   ConfigButton,
-  ConfigCard,
   ConfigDetail,
   ConfigDetailHeader,
   ConfigDetailStack,
@@ -263,7 +262,6 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     { id: "language", label: t("common.language") },
   ];
   const activeDetailLabel = generalDetails.find((item) => item.id === detail)?.label ?? t("settings.appearance");
-  const isPhone = useIsMobile();
   // A form row's label: 13px, regular, per the draft's frow2 density.
   const rowLabelClass = "text-[13px] font-normal";
 
@@ -413,9 +411,10 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       </Field>
     </div>
   );
-  // The keep-alive group is a card of its own (§7.3): description, two numeric rows.
-  const keepAliveCard = (
-    <ConfigCard title={t("settings.keepAlive")} description={t("settings.keepAliveDescription")}>
+  // The keep-alive rows sit flat in the chat detail (its own sub-section).
+  const keepAliveBlock = (
+    <div className="flex flex-col gap-2.5">
+      <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{t("settings.keepAliveDescription")}</p>
       <Field orientation="horizontal">
         <FieldLabel htmlFor="settings-keepalive-max-sessions" className={rowLabelClass}>{t("settings.keepAliveMaxSessions")}</FieldLabel>
         <Input
@@ -446,7 +445,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           }}
         />
       </Field>
-    </ConfigCard>
+    </div>
   );
   const sidebarContent = (
     <Field orientation="horizontal" aria-describedby="settings-files-placement-description">
@@ -471,12 +470,9 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       </ToggleGroup>
     </Field>
   );
-  const shellCard = shellSettings ? (
-    <ConfigCard
-      title={t("settings.shellTool")}
-      description={t("settings.shellToolDescription")}
-      footer={shellError ? <p role="alert" className="m-0 text-xs text-destructive">{shellError}</p> : undefined}
-    >
+  const shellBlock = shellSettings ? (
+    <>
+      <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{t("settings.shellToolDescription")}</p>
       <Field orientation="horizontal">
         <FieldLabel className={rowLabelClass}>{t("settings.usePowerShell")}</FieldLabel>
         <ConfigSwitch
@@ -486,18 +482,12 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           onChange={(enabled) => void togglePowerShell(enabled)}
         />
       </Field>
-    </ConfigCard>
+      {shellError && <p role="alert" className="m-0 text-xs text-destructive">{shellError}</p>}
+    </>
   ) : null;
-  const pushCard = (
-    <ConfigCard
-      title={t("settings.pushPermission")}
-      description={t("settings.pushPermissionDescription")}
-      footer={pushStatus ? (
-        <p role="status" className={cn("m-0 text-xs", pushStatus.kind === "ok" ? "text-primary" : "text-destructive")}>
-          {pushStatus.message}
-        </p>
-      ) : undefined}
-    >
+  const pushBlock = (
+    <>
+      <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{t("settings.pushPermissionDescription")}</p>
       <Field orientation="horizontal">
         <FieldLabel className={rowLabelClass}>{t("settings.pushPermission")}</FieldLabel>
         <ConfigButton
@@ -509,7 +499,12 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           {pushRegistering ? t("settings.pushRegisterLoading") : t("settings.pushRegister")}
         </ConfigButton>
       </Field>
-    </ConfigCard>
+      {pushStatus && (
+        <p role="status" className={cn("m-0 text-xs", pushStatus.kind === "ok" ? "text-primary" : "text-destructive")}>
+          {pushStatus.message}
+        </p>
+      )}
+    </>
   );
   const languageGroup = (
     <div role="radiogroup" aria-label={t("common.language")} className="settings-language-options">
@@ -534,43 +529,8 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       })}
     </div>
   );
-  // The desktop body has no sub-navigation to hold the logout, so it closes the stack.
-  const logOutBlock = webAuthEnabled ? (
-    <>
-      <div className="flex items-center justify-end">
-        <ConfigButton
-          variant="secondary"
-          size="small"
-          disabled={loggingOut}
-          onClick={() => void logOut()}
-        >
-          <LogOutIcon size={14} strokeWidth={1.8} />
-          {loggingOut ? t("auth.loggingOut") : t("auth.logOut")}
-        </ConfigButton>
-      </div>
-      {logoutError && <p role="alert" className="m-0 text-xs text-destructive">{logoutError}</p>}
-    </>
-  ) : null;
-
-  if (!isPhone) {
-    return (
-      <ConfigPanelShell embedded title={t("settings.general")} onClose={onClose}>
-        <ConfigDetail>
-          <ConfigDetailStack>
-            <ConfigCard title={t("settings.appearance")}>{themeGroup}</ConfigCard>
-            <ConfigCard title={t("settings.chat")}>{chatOptions}</ConfigCard>
-            {keepAliveCard}
-            <ConfigCard title={t("settings.sidebar")}>{sidebarContent}</ConfigCard>
-            {shellCard}
-            {pushCard}
-            <ConfigCard title={t("common.language")}>{languageGroup}</ConfigCard>
-            {logOutBlock}
-          </ConfigDetailStack>
-        </ConfigDetail>
-      </ConfigPanelShell>
-    );
-  }
-
+  // One shape on every size: a list beside the detail. A phone shows one pane
+  // at a time (ConfigSplitView's data-pane) behind the header's Back button.
   return (
     <ConfigPanelShell embedded title={t("settings.general")} onClose={onClose}>
       <ConfigSplitView>
@@ -603,10 +563,10 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             </ConfigDetailHeader>
             {detail === "appearance" && themeGroup}
             {detail === "chat" && chatOptions}
-            {detail === "chat" && keepAliveCard}
+            {detail === "chat" && keepAliveBlock}
             {detail === "sidebar" && sidebarContent}
-            {detail === "shell" && shellCard}
-            {detail === "push" && pushCard}
+            {detail === "shell" && shellBlock}
+            {detail === "push" && pushBlock}
             {detail === "language" && languageGroup}
           </ConfigDetailStack>
         </ConfigDetail>
@@ -782,32 +742,31 @@ export function SettingsPanel({
     enterPhoneLevel("section");
   };
 
-  const sectionContent: Partial<Record<SettingsSection, ReactNode>> = {
-    general: <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} soundEnabled={soundEnabled} onSoundToggle={onSoundToggle} keepAliveConfig={keepAliveConfig} onKeepAliveConfigChange={onKeepAliveConfigChange} />,
-    models: <ModelsConfig embedded cwd={cwd} onClose={onClose} />,
-    // Visited sections stay mounted, so the ones whose answer depends on trust take the page's
-    // status and load again in place when trusting from Settings › MCP changes it.
-    skills: cwd ? <SkillsConfig embedded key={cwd} cwd={cwd} trust={projectTrust} onClose={onClose} /> : null,
-    agents: cwd ? <AgentsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} /> : null,
-    plugins: cwd ? <PluginsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} /> : null,
-    // No project needed: the global mcp.json is listed alone, and a project adds its group.
-    mcp: <McpConfig embedded key={cwd ?? ""} cwd={cwd} trust={projectTrust} onTrustProject={onOpenTrustDialog} onProjectTrustChanged={onProjectTrustChanged} onClose={onClose} />,
-  };
-
   // The phone shows sections one level at a time; only a mounted one renders.
-  const sectionHost = (id: SettingsSection) => mountedSections.has(id) && sectionContent[id] ? (
+  const sectionHost = (id: SettingsSection, content: ReactNode) => mountedSections.has(id) ? (
     <div
       key={id}
       hidden={section !== id || phone.level === "home"}
+      data-phone-level={isPhone ? phone.level : undefined}
       className="settings-section-host"
     >
-      {sectionContent[id]}
+      {content}
     </div>
   ) : null;
 
+  // Both shapes mount the same sections: the desktop shows the active tab's,
+  // a phone shows them one level at a time (its list, then a row's detail).
   const hostedSections = (
     <ConfigDetailNavigationContext.Provider value={detailNavigation}>
-      {(["general", "models", "skills", "agents", "plugins", "mcp"] as const).map((id) => sectionHost(id))}
+      {sectionHost("general", <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} soundEnabled={soundEnabled} onSoundToggle={onSoundToggle} keepAliveConfig={keepAliveConfig} onKeepAliveConfigChange={onKeepAliveConfigChange} />)}
+      {sectionHost("models", <ModelsConfig embedded cwd={cwd} onClose={onClose} />)}
+      {/* Visited sections stay mounted, so the ones whose answer depends on trust take the page's
+          status and load again in place when trusting from Settings › MCP changes it. */}
+      {cwd && sectionHost("skills", <SkillsConfig embedded key={cwd} cwd={cwd} trust={projectTrust} onClose={onClose} />)}
+      {cwd && sectionHost("agents", <AgentsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
+      {cwd && sectionHost("plugins", <PluginsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
+      {/* No project needed: the global mcp.json is listed alone, and a project adds its group. */}
+      {sectionHost("mcp", <McpConfig embedded key={cwd ?? ""} cwd={cwd} trust={projectTrust} onTrustProject={onOpenTrustDialog} onProjectTrustChanged={onProjectTrustChanged} onClose={onClose} />)}
     </ConfigDetailNavigationContext.Provider>
   );
 
@@ -818,17 +777,22 @@ export function SettingsPanel({
           // The overlay and surface sit above every in-page overlay (file panel,
           // minimap, widgets); the trust dialog mounts after and stacks above.
           "settings-phone-safe z-[1000] flex flex-col gap-0 overflow-hidden p-0",
-          "h-[min(640px,100dvh)] w-[min(920px,calc(100vw-2rem))] max-w-none sm:max-w-none rounded-2xl",
+          "h-[84vh] max-h-[calc(100dvh-16px)] w-[min(1080px,calc(100vw-16px))] max-w-none sm:max-w-none rounded-xl",
           "max-sm:inset-0 max-sm:h-full max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
         )}
       >
         <DialogTitle className="sr-only">{t("settings.title")}</DialogTitle>
 
-        {/* A phone's 50px header area: Back names where it returns, the title names
-            the level shown; a desktop has no header (the rail carries the sections). */}
-        {isPhone && (
-          <div ref={headerRef} className="relative flex min-h-[50px] shrink-0 items-center border-b pr-[52px] pl-2">
-            {phone.level !== "home" && (() => {
+        <Tabs
+          value={section}
+          onValueChange={(value) => activateSection(value as SettingsSection)}
+          className="flex min-h-0 flex-1 flex-col gap-0"
+        >
+          {/* §3.5: one top bar on every size — the title, a phone's Back, the
+              desktop's horizontal section tabs; the built-in close sits at its
+              right edge. */}
+          <div ref={headerRef} className="flex min-h-[50px] shrink-0 items-center gap-1 border-b pr-[52px] pl-[18px] max-sm:pl-2">
+            {isPhone && phone.level !== "home" && (() => {
               const backName = phone.level === "detail" ? sectionLabel : t("settings.title");
               return (
                 <Button
@@ -844,26 +808,16 @@ export function SettingsPanel({
               );
             })()}
             {/* A phone names the level it shows: Settings, the section, the detail's row. */}
-            <strong className="settings-dialog-title shrink-0 whitespace-nowrap text-[15px] text-foreground">
-              {phone.level === "home"
+            <strong className="settings-dialog-title shrink-0 text-[15px] font-semibold whitespace-nowrap">
+              {!isPhone || phone.level === "home"
                 ? t("settings.title")
                 : phone.level === "section" ? sectionLabel : detailTitle}
             </strong>
-          </div>
-        )}
-
-        {/* Desktop: a vertical section rail (shadcn Tabs) beside the scrolling
-            sections; a visited section stays mounted but hidden. */}
-        {!isPhone && (
-          <Tabs
-            orientation="vertical"
-            value={section}
-            onValueChange={(value) => activateSection(value as SettingsSection)}
-            className="flex min-h-0 flex-1 gap-0"
-          >
-            <div className="flex w-[200px] shrink-0 flex-col border-r bg-muted/40">
-              <div className="px-4 pt-4 pb-2 text-[15px] font-semibold">{t("settings.title")}</div>
-              <TabsList variant="line" className="h-auto min-h-0 w-full flex-1 flex-col items-stretch gap-0.5 overflow-y-auto bg-transparent p-3">
+            {!isPhone && (
+              <TabsList
+                variant="line"
+                className="ml-4 h-auto min-h-0 w-full min-w-0 flex-1 items-stretch justify-start gap-0.5 self-stretch overflow-x-auto rounded-none border-0 bg-transparent p-0 pb-[5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
                 {sections.map((item) => {
                   const disabled = item.requiresProject && !cwd;
                   return (
@@ -872,7 +826,7 @@ export function SettingsPanel({
                       value={item.id}
                       disabled={disabled}
                       title={disabled ? t("settings.projectRequired") : item.label}
-                      className="h-9 w-full min-w-0 justify-start gap-2.5 rounded-md px-2.5 text-[13px] font-normal after:hidden data-[state=active]:bg-background data-[state=active]:font-medium data-[state=active]:shadow-sm"
+                      className="h-auto w-24 flex-none gap-1.5 rounded-none px-1 py-0 text-[12.5px] font-normal data-[state=active]:font-semibold"
                     >
                       <SettingsSectionIcon section={item.id} size={15} />
                       <span className="truncate">{item.label}</span>
@@ -880,22 +834,13 @@ export function SettingsPanel({
                   );
                 })}
               </TabsList>
-            </div>
-            <div className="settings-section-body min-h-0 min-w-0 flex-1 overflow-y-auto">
-              {sections.map((item) => mountedSections.has(item.id) && sectionContent[item.id] ? (
-                <TabsContent key={item.id} value={item.id} forceMount className="flex-1 data-[state=inactive]:hidden">
-                  {sectionContent[item.id]}
-                </TabsContent>
-              ) : null)}
-            </div>
-          </Tabs>
-        )}
+            )}
+          </div>
 
-        {/* Phone: one level at a time — home list, a section with its chip row,
-            a row's detail (the Back button above). */}
-        {isPhone && (
-          <main ref={mainRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-            {phone.level === "home" && (
+          <main ref={mainRef} className="relative flex min-h-0 flex-1 overflow-hidden max-sm:flex-col">
+            {/* A phone's home level lists the sections; its section and detail
+                levels show the section itself. */}
+            {isPhone && phone.level === "home" && (
               <nav aria-label={t("settings.title")} className="flex flex-1 flex-col overflow-y-auto pb-2">
                 {sections.map((item) => {
                   const disabled = item.requiresProject && !cwd;
@@ -924,33 +869,9 @@ export function SettingsPanel({
                 })}
               </nav>
             )}
-            {phone.level === "section" && (
-              <nav aria-label={t("settings.title")} className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {sections.map((item) => {
-                  const selected = section === item.id;
-                  const disabled = item.requiresProject && !cwd;
-                  return (
-                    <Button
-                      key={item.id}
-                      type="button"
-                      variant={selected ? "secondary" : "ghost"}
-                      size="sm"
-                      disabled={disabled}
-                      title={disabled ? t("settings.projectRequired") : item.label}
-                      aria-current={selected ? "page" : undefined}
-                      onClick={() => activateSection(item.id)}
-                      className="h-8 shrink-0 gap-2 rounded-full px-3 text-[12.5px] font-normal"
-                    >
-                      <SettingsSectionIcon section={item.id} size={15} />
-                      <span className="truncate">{item.label}</span>
-                    </Button>
-                  );
-                })}
-              </nav>
-            )}
             {hostedSections}
           </main>
-        )}
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

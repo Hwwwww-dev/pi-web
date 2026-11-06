@@ -877,10 +877,16 @@
   opacity: 0.45;
 }
 
-/* §7.3/§4.4: a desktop picks the section from a fixed rail on the left (its
-   items carry their states as utilities in SettingsPanel); a phone turns the
-   rail into a horizontal chip row at its section level and lists the sections
-   on its home level instead. */
+/* One mounted section fills the dialog's body (SettingsPanel); `hidden` keeps
+   the visited ones mounted but unseen, and a phone's level rides along as
+   `data-phone-level` for the pane rules at the end of this file. */
+.settings-section-host {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
 /* §4.4: a theme chip grid — auto-fill cards, the name truncating, the chosen
    chip ringed in the foreground color, each chip led by a 14px swatch dot. */
 .settings-theme-options {
