@@ -355,11 +355,12 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             <div className="flex min-w-0 flex-col gap-1.5">
               {imageBlocksNode}
               <div className="flex flex-wrap items-start gap-2">
-                <button
+                <Button
+                  variant="ghost"
                   onClick={() => setExpanded((prev) => !prev)}
                   title={expanded ? t("i18n.collapse") : t("i18n.expand")}
                   aria-expanded={expanded}
-                  className="flex shrink-0 cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-left font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-primary"
+                  className="flex h-auto shrink-0 cursor-pointer items-center gap-1.5 rounded-none border-none bg-transparent p-0 text-left font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] font-normal text-primary hover:bg-transparent hover:text-primary"
                 >
                   <span className="truncate">
                     {commandName}
@@ -367,9 +368,9 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   <ChevronDownIcon
                     aria-hidden="true"
                     strokeWidth={2}
-                    className={cn("h-[11px] w-[11px] shrink-0 opacity-75 transition-transform", expanded && "rotate-180")}
+                    className={cn("size-[11px] shrink-0 opacity-75 transition-transform", expanded && "rotate-180")}
                   />
-                </button>
+                </Button>
                 {commandArgs && (
                   <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground">
                     {commandArgs}

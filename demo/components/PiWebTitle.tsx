@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 
 /**
@@ -116,13 +117,15 @@ export function PiWebTitle({ onWidthChange }: {
   // The name says what the click shows, so the versions need no click (and
   // no scrambled text is ever read out: the name stays the same).
   return (
-    <button
+    <Button
       type="button"
-      className={`sidebar-brand${versionShown ? " is-version" : ""}`}
+      variant="ghost"
+      size="default"
+      className={`h-auto justify-start focus-visible:ring-0 focus-visible:border-transparent sidebar-brand${versionShown ? " is-version" : ""}`}
       aria-label={t("sidebar.brandLabel", { app: appVersion ?? "0.0.0", pi: piVersion ?? "0.0.0" })}
       onClick={handleClick}
     >
       {text}
-    </button>
+    </Button>
   );
 }

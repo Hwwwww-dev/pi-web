@@ -21,7 +21,9 @@ type ConfigButtonSize = "small" | "default";
 const CONFIG_BUTTON_VARIANTS = {
   primary: "default",
   secondary: "outline",
-  danger: "destructive",
+  // A settings destructive action is row-level: ghost red, not a solid wall
+  // of red — the shadcn idiom for inline destructive actions.
+  danger: "ghost",
   ghost: "ghost",
 } as const;
 
@@ -72,15 +74,17 @@ export function ConfigPanelShell({
                 {subtitle}
               </code>
             )}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               className="config-close-button"
               onClick={onClose}
               title={closeLabel}
               aria-label={closeLabel}
             >
               ×
-            </button>
+            </Button>
           </div>
         )}
         {children}
@@ -238,8 +242,9 @@ export function ConfigSidebarItem({
   const { openDetail } = useConfigDetailNavigation();
   const buttonRef = useReportDetailTitle(active, ref);
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       {...props}
       ref={buttonRef}
       onClick={(event) => {
@@ -249,12 +254,12 @@ export function ConfigSidebarItem({
       aria-current={active ? "page" : undefined}
       className={cn(
         // `config-sidebar-item` stays as the phone row-height hook (settings.css).
-        "config-sidebar-item flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:bg-sidebar-accent focus-visible:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-50 [&[aria-current='page']]:bg-sidebar-accent [&[aria-current='page']]:font-medium [&[aria-current='page']]:text-sidebar-accent-foreground",
+        "config-sidebar-item h-9 w-full min-w-0 justify-start gap-2 px-2 text-left text-[13px] font-normal text-sidebar-foreground [&[aria-current='page']]:bg-sidebar-accent [&[aria-current='page']]:font-medium [&[aria-current='page']]:text-sidebar-accent-foreground",
         className,
       )}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -262,7 +267,7 @@ export function ConfigSidebarText({ className, ...props }: HTMLAttributes<HTMLSp
   return (
     <span
       {...props}
-      className={cn("block min-w-0 truncate text-[12px] leading-[1.35]", className)}
+      className={cn("block min-w-0 truncate text-[13px] leading-[1.35]", className)}
     />
   );
 }
@@ -303,8 +308,8 @@ export function ConfigDetailActions({ className, ...props }: HTMLAttributes<HTML
   );
 }
 
-export function ConfigDetailTitle({ children }: { children: ReactNode }) {
-  return <div className="config-detail-title">{children}</div>;
+export function ConfigDetailTitle({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("config-detail-title", className)}>{children}</div>;
 }
 
 export function ConfigSectionTitle({ children }: { children: ReactNode }) {
@@ -888,7 +893,12 @@ export function ConfigButton({
       variant={CONFIG_BUTTON_VARIANTS[variant]}
       size={size === "small" ? "xs" : "sm"}
       // The settings density: 28px for `small`, where the stock xs runs 24px.
-      className={cn(size === "small" && "h-7 px-2.5", className)}
+      className={cn(
+        size === "small" && "h-7 px-2.5",
+        variant === "danger" &&
+          "text-destructive hover:bg-destructive/10 hover:text-destructive focus-visible:ring-destructive/20",
+        className,
+      )}
       {...props}
     >
       {children}
@@ -935,8 +945,9 @@ export function ConfigListAction({ active = false, children, className, onClick,
   const buttonRef = useReportDetailTitle(active, ref);
   return (
     <div className="shrink-0 px-2 pb-2">
-      <button
+      <Button
         type="button"
+        variant="ghost"
         {...props}
         ref={buttonRef}
         onClick={(event) => {
@@ -946,13 +957,13 @@ export function ConfigListAction({ active = false, children, className, onClick,
         aria-current={active ? "page" : undefined}
         className={cn(
           // `config-list-action-button` stays as the phone row-height hook.
-          "config-list-action-button flex h-8 w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-left text-[12.5px] text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:bg-sidebar-accent focus-visible:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50",
+          "config-list-action-button h-9 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-[13px] font-normal text-muted-foreground",
           className,
         )}
       >
         <PlusIcon size={13} strokeWidth={2} className="shrink-0" />
         {children}
-      </button>
+      </Button>
     </div>
   );
 }

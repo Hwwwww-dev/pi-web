@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ToolEntry } from "@/lib/tool-presets";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -151,16 +152,18 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
             return (
               // A pressed list row, not a command Button: its hover is the dim bg-secondary,
               // which Button's variants do not carry (ghost hovers on the selected bg-accent).
-              <button
+              <Button
                 key={tool.name}
                 type="button"
+                variant="ghost"
+                size="default"
                 data-selected={selected}
                 aria-pressed={selected}
                 onClick={() => setSelectedToolName(tool.name)}
-                className="flex min-h-[38px] w-full cursor-pointer items-center border-b border-border bg-transparent px-3 py-2 text-left text-muted-foreground hover:bg-secondary hover:text-foreground data-[selected=true]:bg-accent data-[selected=true]:text-foreground data-[selected=true]:shadow-[inset_2px_0_0_var(--accent)] max-[640px]:px-2.5"
+                className="flex h-auto min-h-[38px] w-full cursor-pointer justify-start items-center rounded-none border-b border-border bg-transparent px-3 py-2 text-left font-normal text-muted-foreground hover:bg-secondary hover:text-foreground dark:hover:bg-secondary data-[selected=true]:bg-accent data-[selected=true]:text-foreground data-[selected=true]:shadow-[inset_2px_0_0_var(--accent)] max-[640px]:px-2.5"
               >
                 <code className="max-w-full text-[11px] font-semibold [overflow-wrap:anywhere]">{tool.name}</code>
-              </button>
+              </Button>
             );
           }) : declaredTools ? (
             <EmptyState>{translate("tools.noTools")}</EmptyState>
@@ -239,7 +242,7 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
         ) : declaredTools ? (
           <EmptyState>{translate("tools.noTools")}</EmptyState>
         ) : loading ? (
-          <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3.5 pb-5 max-[640px]:p-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3.5 pb-5 max-[640px]:p-3">
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-3 w-full max-w-md" />
             <Skeleton className="h-3 w-full max-w-sm" />

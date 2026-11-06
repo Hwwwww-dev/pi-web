@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo, memo, type RefObject } from "react";
 import { isMessageGroupAnchor } from "@/lib/message-display";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { AgentMessage, AssistantMessage, CustomMessage, MinimapTurnDescriptor, TextContent, UserMessage } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
 import styles from "./ChatMinimap.module.css";
@@ -668,9 +670,10 @@ export const ChatMinimap = memo(function ChatMinimap({
                   {String(node.index + 1 + (turnIndex.length > 0 ? 0 : turnsBefore)).padStart(2, "0")}
                 </span>
                 <div className={styles.content}>
-                  <button
+                  <Button
                     type="button"
-                    className={styles.user}
+                    variant="ghost"
+                    className={cn(styles.user, "h-auto focus-visible:ring-0 focus-visible:border-transparent")}
                     data-minimap-preview-user={node.index}
                     onClick={() => {
                       scrollToNode(node, "smooth");
@@ -679,7 +682,7 @@ export const ChatMinimap = memo(function ChatMinimap({
                       <span className={styles.userText}>
                       {getUserPreview(node.targetTurn.userMessage)}
                     </span>
-                  </button>
+                  </Button>
 
                   {metaParts.length > 0 && (
                     <div className={styles.meta}>{metaParts.join(" · ")}</div>

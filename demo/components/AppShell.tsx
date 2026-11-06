@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger } from "./ui/sidebar";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "./ui/empty";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
   DropdownMenu,
@@ -1632,10 +1633,6 @@ export function AppShell() {
 
   const handleViewFullHistory = useCallback(() => {
     if (!selectedSession) return;
-    // selectedSession.id is a server-generated uuid; enforce the internal
-    // export route so the redirect target can never leave this origin.
-    const id = encodeURIComponent(selectedSession.id);
-    if (!/^[A-Za-z0-9-]+$/.test(id)) return;
     // Demo: no server export route — the mock renders the history in a new tab.
     openDemoHistory(selectedSession.id);
   }, [selectedSession]);
@@ -2374,9 +2371,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             skips the blur entirely. Visually a no-op: the bar is already the
             first element. */}
         {/* 全屏文件面板时页头 inert：面板盖住全屏，页头不该接收焦点；
-            注意 inert 只落在页头与聊天列——文件面板在 SidebarInset 内部，
-            落在容器上会连面板自己的还原/关闭按钮一起禁用（旧壳层是兄弟
-            节点才没踩到）。 */}
+            注意 inert 只落在页头与聊天列——文件面板是 SidebarInset 的兄弟
+            顶级列，落在 SidebarInset 上会连面板自己的还原/关闭按钮一起禁用。 */}
         <div ref={topBarRef} inert={rightPanelFullWidth} className="sticky top-0 z-[5] shrink-0 bg-background">
         {/* The draft's header: 52px, title + crumb left, the pills right. On a
             phone it folds into two rows — the title row, then the controls. */}
@@ -2609,9 +2605,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         {isMobile && renderProjectTrustWarning(true)}
         </div>
 
-        {/* 聊天列与右侧文件面板的 flex 行：SidebarInset 是 flex-col，两者必须
-            同处一行，文件面板才能并排占宽、关闭时也不再以死条高度挤压聊天
-            底部（dashboard-01 壳层改动曾丢失这层行容器）。 */}
+        {/* 聊天列行：SidebarInset 是 flex-col，聊天列占满头部以下剩余高度。
+            右侧文件面板已升为 SidebarInset 的兄弟顶级列（见下方），不再嵌在
+            聊天页内部。 */}
         <div className="flex min-h-0 w-full flex-1">
         {/* Chat content */}
         {/* 全宽文件面板时聊天列同样 visibility 隐藏：minimap 浮层 z-260 高于
@@ -2778,6 +2774,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           ) : null}
         </div>
 
+    </div>
+    </SidebarInset>
       <div
         aria-hidden="true"
         className={`right-panel-overlay-backdrop${rightPanelOpen ? " is-open" : ""}`}
@@ -2788,19 +2786,22 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           {...rightPanelResizer.separatorProps}
           inert={rightPanelFullWidth}
           aria-controls="file-panel"
-          className={`panel-resize-handle right-panel-resize-handle${rightPanelResizer.isResizing ? " is-resizing" : ""}`}
+          className={`panel-resize-handle right-panel-resize-handle hidden min-[961px]:block${rightPanelResizer.isResizing ? " is-resizing" : ""}`}
           data-resize-handle="right-panel"
           title={`${translate("layout.resizeFilePanel")}: ${translate("layout.resizeHint")}`}
         />
       )}
 
-      {/* Right panel: file viewer — always mounted, width animated via CSS */}
+      {/* Right panel: file viewer — a floating card like the chat page (same
+          inset + radius + shadow come from the .right-panel-container rules),
+          a sibling of SidebarInset at full height. Always mounted; width
+          animated via CSS. */}
       <div
         ref={rightPanelResizer.panelRef}
         id="file-panel"
         className={cn(
           `right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelFullWidth ? " right-panel-full-width" : ""}${rightPanelResizer.isResizing ? " right-panel-resizing" : ""}`,
-          "flex flex-col border-l border-border bg-background",
+          "flex h-[var(--app-viewport-height,100dvh)] flex-col bg-background",
         )}
         // 可拖拽宽度经 CSS 变量注入（useResizablePanel 写 --right-panel-width），保留 inline。
         style={{ "--right-panel-width": `${rightPanelResizer.width}px` } as React.CSSProperties}
@@ -2898,9 +2899,14 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               )}
             />
           ) : !terminalTabs.some((tab) => tab.id === activeFileTabId) && !activeAgentTab ? (
-            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-               {translate("files.noneOpen")}
-            </div>
+            <Empty className="h-full border-none">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <PanelRightIcon />
+                </EmptyMedia>
+                <EmptyTitle>{translate("files.noneOpen")}</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           ) : null}
           {terminalTabs.map((tab) => (
             <div key={tab.id} hidden={tab.id !== activeFileTabId} className="h-full w-full">
@@ -2945,8 +2951,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           )}
         </div>
       </div>
-    </div>
-    </SidebarInset>
     </SidebarProvider>
     {settingsSection && (
       <SettingsPanel

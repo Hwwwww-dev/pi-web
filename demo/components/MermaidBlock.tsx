@@ -119,10 +119,11 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
     ) : (
       <>
         {!zoomOpen && (
-          <button
+          <Button
             ref={previewRef}
             type="button"
-            className="mermaid-block mermaid-preview-button"
+            variant="ghost"
+            className="mermaid-block mermaid-preview-button block h-auto rounded-none font-normal focus-visible:ring-0 focus-visible:border-transparent"
             title={t("i18n.openMermaidViewer")}
             aria-label={t("i18n.openMermaidViewer")}
             onClick={() => setZoomOpen(true)}

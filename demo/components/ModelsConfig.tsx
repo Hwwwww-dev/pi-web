@@ -9,6 +9,7 @@ import { ButtonGroup } from "./ui/button-group";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import type { ModelCatalogPreset, ModelCatalogRecommendation } from "@/lib/model-catalog";
 import type { DiscoveredModel } from "@/lib/model-discovery";
 import { ContextWindowError, normalizeContextWindowOverrides, withContextWindowOverride } from "@/lib/model-context";
@@ -281,14 +282,21 @@ function NumInput({ value, onChange, placeholder, invalid }: { value: string; on
     aria-invalid={invalid || undefined} className={inputClass} />;
 }
 
+/** Radix SelectItem values cannot be empty, so the empty pick travels as this sentinel. */
+const SELECT_NONE = "__none__";
+
 function Select({ value, onChange, options, required }: { value: string; onChange: (v: string) => void; options: readonly string[]; required?: boolean }) {
   const { t } = useI18n();
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)}
-      className={cn(inputClass, "h-8 w-full rounded-md border border-input bg-transparent py-1 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive", value ? "text-foreground" : "text-muted-foreground")}>
-       {!required && <option value="">— {t("i18n.default")} / none —</option>}
-      {options.map((o) => <option key={o} value={o}>{o}</option>)}
-    </select>
+    <UiSelect value={value === "" ? SELECT_NONE : value} onValueChange={(v) => onChange(v === SELECT_NONE ? "" : v)}>
+      <SelectTrigger size="sm" className={cn(inputClass, "w-full shadow-none dark:bg-transparent dark:hover:bg-transparent", value === "" ? "text-muted-foreground" : "text-foreground")}>
+        <SelectValue>{value === "" ? `— ${t("i18n.default")} / none —` : value}</SelectValue>
+      </SelectTrigger>
+      <SelectContent position="popper" align="start" className="z-[1100]">
+        {!required && <SelectItem value={SELECT_NONE}>— {t("i18n.default")} / none —</SelectItem>}
+        {options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+      </SelectContent>
+    </UiSelect>
   );
 }
 
@@ -1189,12 +1197,13 @@ function ModelDetail({
 
       <ConfigCard>
         <div className="flex flex-col">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => setAdvancedOpen((open) => !open)}
             aria-expanded={advancedOpen}
             aria-controls="model-advanced-settings"
-            className="grid min-h-12 w-full grid-cols-[minmax(0,1fr)_18px] items-center gap-2.5 rounded-md px-1 py-2 text-left text-foreground hover:bg-accent hover:text-accent-foreground"
+            className="grid h-auto min-h-12 w-full grid-cols-[minmax(0,1fr)_18px] items-center gap-2.5 rounded-md px-1 py-2 text-left font-normal text-foreground"
           >
             <span className="min-w-0">
               <span className="block text-xs font-semibold">{t("models.advancedSettings")}</span>
@@ -1205,9 +1214,9 @@ function ModelDetail({
             <ChevronDown
               size={16}
               strokeWidth={1.8}
-              className={cn("text-muted-foreground transition-transform", advancedOpen && "rotate-180")}
+              className={cn("size-4 text-muted-foreground transition-transform", advancedOpen && "rotate-180")}
             />
-          </button>
+          </Button>
 
           {advancedOpen && (
             <div id="model-advanced-settings" className="flex flex-col gap-3.5 pb-4 pt-1">
@@ -1745,13 +1754,13 @@ function AddProviderPicker({
         {/* Search */}
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3.5 py-2.5">
           <Search size={13} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
-          <input
+          <Input
             ref={inputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
              placeholder={t("i18n.searchProviders")}
             aria-label={t("i18n.searchProviders")}
-            className="min-w-0 flex-1 border-0 bg-transparent text-[13px] text-foreground outline-none"
+            className="min-w-0 flex-1 border-0 bg-transparent p-0 h-auto text-[13px] text-foreground shadow-none focus-visible:ring-0 focus-visible:border-transparent"
           />
         </div>
 

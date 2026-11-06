@@ -24,9 +24,14 @@ import {
   mcpVariableReferencesKey,
   revealHiddenCharacters,
 } from "@/lib/mcp-server-display";
-import { openStackedDialog } from "@/lib/stacked-dialog";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "./ui/alert";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
@@ -211,8 +216,47 @@ export function ProjectTrustDialog({
   );
 }
 
-/** The dialog for a listing in any state, without the fetch; exported for tests. */
-export function ProjectTrustDialogView({
+/** The dialog for a listing in any state, without the fetch. */
+function ProjectTrustDialogView({
+  cwd,
+  busy,
+  error,
+  listing,
+  onCancel,
+  onConfirm,
+}: {
+  cwd: string;
+  busy: boolean;
+  error: ProjectTrustFailure | null;
+  listing: ProjectTrustMcpListing;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  // The dialog can open above Settings › MCP: both are Radix layers, so
+  // Escape closes the topmost one only, focus moves into it as it opens and
+  // back to what had it once it closes. Escape is ignored while trusting,
+  // like the Cancel button, but still never reaches Settings.
+  return (
+    <AlertDialog
+      open
+      onOpenChange={(next) => {
+        if (!next && !busy) onCancel();
+      }}
+    >
+      <AlertDialogContent
+        className="settings-phone-safe z-[1100] flex max-h-[100dvh] w-[480px] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden rounded-xl p-0"
+        onEscapeKeyDown={(event) => {
+          if (busy) event.preventDefault();
+        }}
+      >
+        <ProjectTrustDialogBody cwd={cwd} busy={busy} error={error} listing={listing} onCancel={onCancel} onConfirm={onConfirm} />
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/** The dialog's content: Radix's portal does not render server-side, so tests render this inside an open root. */
+export function ProjectTrustDialogBody({
   cwd,
   busy,
   error,
@@ -230,92 +274,64 @@ export function ProjectTrustDialogView({
   const { t } = useI18n();
   const loading = listing.state === "loading";
   const notice = listing.state === "loaded" ? settledTrustNotice(listing.status) : undefined;
-  const dialogRef = useRef<HTMLDivElement>(null);
-  // Read through refs, so the Escape listener registered once sees the current props.
-  const busyRef = useRef(busy);
-  const onCancelRef = useRef(onCancel);
-  useEffect(() => {
-    busyRef.current = busy;
-    onCancelRef.current = onCancel;
-  }, [busy, onCancel]);
-
-  // The dialog can open above Settings › MCP: Escape closes it alone (taken in
-  // the capture phase, before Settings' own handler), focus moves into it, and
-  // goes back to what had it once it closes. Escape is ignored while trusting,
-  // like Cancel and the backdrop, but still never reaches Settings.
-  useEffect(() => openStackedDialog(document, dialogRef.current, () => {
-    if (!busyRef.current) onCancelRef.current();
-  }), []);
 
   return (
-    <div
-      role="presentation"
-      className="project-trust-backdrop"
-      onClick={(event) => {
-        if (!busy && event.target === event.currentTarget) onCancel();
-      }}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="project-trust-title"
-        aria-describedby="project-trust-description"
-        tabIndex={-1}
-        className="project-trust-dialog"
-      >
-        <div className="flex min-h-0 flex-1 gap-3 overflow-auto px-[18px] pt-[18px] pb-3.5 [overscroll-behavior:contain]">
-          <ShieldCheck aria-hidden="true" strokeWidth={2} className="mt-px size-5 shrink-0 text-warning" />
-          <div className="min-w-0 flex-1">
-            <div id="project-trust-title" className="text-[15px] font-bold text-foreground">
-              {t("trust.dialogTitle")}
+    <>
+      <div className="flex min-h-0 gap-3 overflow-auto px-[18px] pt-[18px] pb-3.5 [overscroll-behavior:contain]">
+        <ShieldCheck aria-hidden="true" strokeWidth={2} className="mt-px size-5 shrink-0 text-warning" />
+        <div className="min-w-0 flex-1">
+          <AlertDialogTitle id="project-trust-title" className="text-[15px] font-bold text-foreground">
+            {t("trust.dialogTitle")}
+          </AlertDialogTitle>
+          <AlertDialogDescription id="project-trust-description" className="mt-[7px] text-xs leading-[1.6] text-muted-foreground">
+            {t("trust.dialogBody")}
+          </AlertDialogDescription>
+          <code className="mt-2.5 block rounded-sm border border-border bg-background px-2.5 py-2 font-mono text-xs text-foreground [overflow-wrap:anywhere]">
+            {revealHiddenCharacters(cwd)}
+          </code>
+          {notice && <p id={NOTICE_ID} role="status" className="mt-2.5 text-xs leading-normal text-foreground">{t(notice)}</p>}
+          {listing.state === "loaded" && listing.statusError !== undefined && (
+            <div className="mt-3">
+              <Line tone="warning">{t("mcp.reason.trust-unreadable")}</Line>
+              <McpCode dim block className="[overflow-wrap:anywhere]">{revealHiddenCharacters(listing.statusError)}</McpCode>
             </div>
-            <div id="project-trust-description" className="mt-[7px] text-xs leading-[1.6] text-muted-foreground">
-              {t("trust.dialogBody")}
-            </div>
-            <code className="mt-2.5 block rounded-sm border border-border bg-background px-2.5 py-2 font-mono text-xs text-foreground [overflow-wrap:anywhere]">
-              {revealHiddenCharacters(cwd)}
-            </code>
-            {notice && <p id={NOTICE_ID} role="status" className="mt-2.5 text-xs leading-normal text-foreground">{t(notice)}</p>}
-            {listing.state === "loaded" && listing.statusError !== undefined && (
-              <div className="mt-3">
-                <Line tone="warning">{t("mcp.reason.trust-unreadable")}</Line>
-                <McpCode dim block className="[overflow-wrap:anywhere]">{revealHiddenCharacters(listing.statusError)}</McpCode>
-              </div>
-            )}
-            <ProjectTrustMcpSection listing={listing} />
-          </div>
-        </div>
-        {/* Outside the scrolling body, so a long server list cannot hide it. */}
-        {error && <ProjectTrustError error={error} />}
-        <Separator />
-        <div className="flex shrink-0 justify-end gap-2 px-[18px] py-2.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="text-xs"
-            onClick={onCancel}
-            disabled={busy}
-          >
-            {notice ? t("trust.close") : t("trust.cancel")}
-          </Button>
-          {!notice && (
-            <Button
-              type="button"
-              size="sm"
-              className="text-xs aria-busy:cursor-wait"
-              onClick={onConfirm}
-              disabled={busy || loading}
-              aria-busy={busy || undefined}
-              aria-describedby={loading ? STATUS_ID : undefined}
-            >
-              {busy ? t("trust.trusting") : t("trust.trustProject")}
-            </Button>
           )}
+          <ProjectTrustMcpSection listing={listing} />
         </div>
       </div>
-    </div>
+      {/* Outside the scrolling body, so a long server list cannot hide it. */}
+      {error && <ProjectTrustError error={error} />}
+      <Separator />
+      <div className="flex shrink-0 justify-end gap-2 px-[18px] py-2.5">
+        {/* A plain button rather than AlertDialogCancel: the page unmounts the
+            dialog on cancel, so no Radix close bookkeeping is needed. */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="text-xs"
+          disabled={busy}
+          onClick={onCancel}
+        >
+          {notice ? t("trust.close") : t("trust.cancel")}
+        </Button>
+        {/* A plain button: confirming keeps the dialog open while it trusts;
+            the page closes it when the run settles. */}
+        {!notice && (
+          <Button
+            type="button"
+            size="sm"
+            className="text-xs aria-busy:cursor-wait"
+            onClick={onConfirm}
+            disabled={busy || loading}
+            aria-busy={busy || undefined}
+            aria-describedby={loading ? STATUS_ID : undefined}
+          >
+            {busy ? t("trust.trusting") : t("trust.trustProject")}
+          </Button>
+        )}
+      </div>
+    </>
   );
 }
 

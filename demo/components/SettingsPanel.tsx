@@ -12,7 +12,6 @@ import {
   RotateCcwIcon,
   ServerIcon,
   SlidersHorizontalIcon,
-  XIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
@@ -20,9 +19,11 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useTheme } from "@/hooks/useTheme";
 import { THEME_OPTIONS } from "@/lib/theme";
 import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
 import { Slider } from "./ui/slider";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import {
   CHAT_CONTENT_WIDTH_DEFAULT,
@@ -43,7 +44,6 @@ import {
   settingsSectionRequiresProject,
   type SettingsSection,
 } from "@/lib/settings-navigation";
-import { focusModalPanel, listenForPanelEscape } from "@/lib/stacked-dialog";
 import {
   isThinkingExpandedByDefault,
   setThinkingExpandedByDefault,
@@ -56,7 +56,6 @@ import { PluginsConfig } from "./PluginsConfig";
 import { McpConfig } from "./McpConfig";
 import {
   ConfigButton,
-  ConfigCard,
   ConfigDetail,
   ConfigDetailHeader,
   ConfigDetailStack,
@@ -263,7 +262,6 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     { id: "language", label: t("common.language") },
   ];
   const activeDetailLabel = generalDetails.find((item) => item.id === detail)?.label ?? t("settings.appearance");
-  const isPhone = useIsMobile();
   // A form row's label: 13px, regular, per the draft's frow2 density.
   const rowLabelClass = "text-[13px] font-normal";
 
@@ -413,9 +411,10 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       </Field>
     </div>
   );
-  // The keep-alive group is a card of its own (§7.3): description, two numeric rows.
-  const keepAliveCard = (
-    <ConfigCard title={t("settings.keepAlive")} description={t("settings.keepAliveDescription")}>
+  // The keep-alive rows sit flat in the chat detail (its own sub-section).
+  const keepAliveBlock = (
+    <div className="flex flex-col gap-2.5">
+      <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{t("settings.keepAliveDescription")}</p>
       <Field orientation="horizontal">
         <FieldLabel htmlFor="settings-keepalive-max-sessions" className={rowLabelClass}>{t("settings.keepAliveMaxSessions")}</FieldLabel>
         <Input
@@ -446,7 +445,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           }}
         />
       </Field>
-    </ConfigCard>
+    </div>
   );
   const sidebarContent = (
     <Field orientation="horizontal" aria-describedby="settings-files-placement-description">
@@ -471,12 +470,9 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       </ToggleGroup>
     </Field>
   );
-  const shellCard = shellSettings ? (
-    <ConfigCard
-      title={t("settings.shellTool")}
-      description={t("settings.shellToolDescription")}
-      footer={shellError ? <p role="alert" className="m-0 text-xs text-destructive">{shellError}</p> : undefined}
-    >
+  const shellBlock = shellSettings ? (
+    <>
+      <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{t("settings.shellToolDescription")}</p>
       <Field orientation="horizontal">
         <FieldLabel className={rowLabelClass}>{t("settings.usePowerShell")}</FieldLabel>
         <ConfigSwitch
@@ -486,18 +482,12 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           onChange={(enabled) => void togglePowerShell(enabled)}
         />
       </Field>
-    </ConfigCard>
+      {shellError && <p role="alert" className="m-0 text-xs text-destructive">{shellError}</p>}
+    </>
   ) : null;
-  const pushCard = (
-    <ConfigCard
-      title={t("settings.pushPermission")}
-      description={t("settings.pushPermissionDescription")}
-      footer={pushStatus ? (
-        <p role="status" className={cn("m-0 text-xs", pushStatus.kind === "ok" ? "text-primary" : "text-destructive")}>
-          {pushStatus.message}
-        </p>
-      ) : undefined}
-    >
+  const pushBlock = (
+    <>
+      <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{t("settings.pushPermissionDescription")}</p>
       <Field orientation="horizontal">
         <FieldLabel className={rowLabelClass}>{t("settings.pushPermission")}</FieldLabel>
         <ConfigButton
@@ -509,7 +499,12 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           {pushRegistering ? t("settings.pushRegisterLoading") : t("settings.pushRegister")}
         </ConfigButton>
       </Field>
-    </ConfigCard>
+      {pushStatus && (
+        <p role="status" className={cn("m-0 text-xs", pushStatus.kind === "ok" ? "text-primary" : "text-destructive")}>
+          {pushStatus.message}
+        </p>
+      )}
+    </>
   );
   const languageGroup = (
     <div role="radiogroup" aria-label={t("common.language")} className="settings-language-options">
@@ -534,43 +529,8 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       })}
     </div>
   );
-  // The desktop body has no sub-navigation to hold the logout, so it closes the stack.
-  const logOutBlock = webAuthEnabled ? (
-    <>
-      <div className="flex items-center justify-end">
-        <ConfigButton
-          variant="secondary"
-          size="small"
-          disabled={loggingOut}
-          onClick={() => void logOut()}
-        >
-          <LogOutIcon size={14} strokeWidth={1.8} />
-          {loggingOut ? t("auth.loggingOut") : t("auth.logOut")}
-        </ConfigButton>
-      </div>
-      {logoutError && <p role="alert" className="m-0 text-xs text-destructive">{logoutError}</p>}
-    </>
-  ) : null;
-
-  if (!isPhone) {
-    return (
-      <ConfigPanelShell embedded title={t("settings.general")} onClose={onClose}>
-        <ConfigDetail>
-          <ConfigDetailStack>
-            <ConfigCard title={t("settings.appearance")}>{themeGroup}</ConfigCard>
-            <ConfigCard title={t("settings.chat")}>{chatOptions}</ConfigCard>
-            {keepAliveCard}
-            <ConfigCard title={t("settings.sidebar")}>{sidebarContent}</ConfigCard>
-            {shellCard}
-            {pushCard}
-            <ConfigCard title={t("common.language")}>{languageGroup}</ConfigCard>
-            {logOutBlock}
-          </ConfigDetailStack>
-        </ConfigDetail>
-      </ConfigPanelShell>
-    );
-  }
-
+  // One shape on every size: a list beside the detail. A phone shows one pane
+  // at a time (ConfigSplitView's data-pane) behind the header's Back button.
   return (
     <ConfigPanelShell embedded title={t("settings.general")} onClose={onClose}>
       <ConfigSplitView>
@@ -603,10 +563,10 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             </ConfigDetailHeader>
             {detail === "appearance" && themeGroup}
             {detail === "chat" && chatOptions}
-            {detail === "chat" && keepAliveCard}
+            {detail === "chat" && keepAliveBlock}
             {detail === "sidebar" && sidebarContent}
-            {detail === "shell" && shellCard}
-            {detail === "push" && pushCard}
+            {detail === "shell" && shellBlock}
+            {detail === "push" && pushBlock}
             {detail === "language" && languageGroup}
           </ConfigDetailStack>
         </ConfigDetail>
@@ -764,20 +724,6 @@ export function SettingsPanel({
 
   useEffect(() => setLastSettingsSection(initialSection), [initialSection]);
 
-  // Bubble phase, unless something nearer handled the key. The trust dialog,
-  // which opens above Settings, takes Escape in the capture phase and stops it,
-  // so one Escape closes that dialog and leaves Settings open.
-  useEffect(() => listenForPanelEscape(document, onClose), [onClose]);
-
-  // Focus moves into Settings as it opens and back to what had it once it closes. Left
-  // on the chat composer (a bare /mcp opens Settings from there), Escape would reach the
-  // composer first and stop a running agent, which also kept Settings open. A layout
-  // effect, so the opener is read before a section focuses its own search box.
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => focusModalPanel(document, dialogRef.current, {
-    restoreTextEntry: !window.matchMedia?.("(pointer: coarse)").matches,
-  }), []);
-
   useEffect(() => {
     if (cwd || !sectionRequiresProject) return;
     setSection("general");
@@ -796,6 +742,7 @@ export function SettingsPanel({
     enterPhoneLevel("section");
   };
 
+  // The phone shows sections one level at a time; only a mounted one renders.
   const sectionHost = (id: SettingsSection, content: ReactNode) => mountedSections.has(id) ? (
     <div
       key={id}
@@ -807,8 +754,8 @@ export function SettingsPanel({
     </div>
   ) : null;
 
-  // Both shapes mount the same sections: the desktop stacks them under the
-  // dialog's page title (§3.5), the phone shows them one level at a time.
+  // Both shapes mount the same sections: the desktop shows the active tab's,
+  // a phone shows them one level at a time (its list, then a row's detail).
   const hostedSections = (
     <ConfigDetailNavigationContext.Provider value={detailNavigation}>
       {sectionHost("general", <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} soundEnabled={soundEnabled} onSoundToggle={onSoundToggle} keepAliveConfig={keepAliveConfig} onKeepAliveConfigChange={onKeepAliveConfigChange} />)}
@@ -824,127 +771,108 @@ export function SettingsPanel({
   );
 
   return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("settings.title")}
-      tabIndex={-1}
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-      className="settings-dialog-backdrop"
-    >
-      <div className="settings-dialog-surface" data-phone-level={isPhone ? phone.level : undefined}>
-        {/* The close floats alone in the surface's top-right corner (§4.4): over the
-            scrolling body on a desktop, alone in the phone's 50px header area. */}
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={onClose}
-          title={t("i18n.close")}
-          aria-label={t("i18n.close")}
-          className="settings-dialog-close"
-        >
-          <XIcon aria-hidden="true" />
-        </Button>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent
+        className={cn(
+          // The overlay and surface sit above every in-page overlay (file panel,
+          // minimap, widgets); the trust dialog mounts after and stacks above.
+          "settings-phone-safe z-[1000] flex flex-col gap-0 overflow-hidden p-0",
+          "h-[84vh] max-h-[calc(100dvh-16px)] w-[min(1080px,calc(100vw-16px))] max-w-none sm:max-w-none rounded-xl",
+          "max-sm:inset-0 max-sm:h-full max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
+        )}
+      >
+        <DialogTitle className="sr-only">{t("settings.title")}</DialogTitle>
 
-        {/* A phone's 50px header area: Back names where it returns, the title names
-            the level shown; a desktop has no header (the rail carries the sections). */}
-        {isPhone && (
-          <div ref={headerRef} className="settings-dialog-header">
-            {phone.level !== "home" && (() => {
+        <Tabs
+          value={section}
+          onValueChange={(value) => activateSection(value as SettingsSection)}
+          className="flex min-h-0 flex-1 flex-col gap-0"
+        >
+          {/* §3.5: one top bar on every size — the title, a phone's Back, the
+              desktop's horizontal section tabs; the built-in close sits at its
+              right edge. */}
+          <div ref={headerRef} className="flex min-h-[50px] shrink-0 items-center gap-1 border-b pr-[52px] pl-[18px] max-sm:pl-2">
+            {isPhone && phone.level !== "home" && (() => {
               const backName = phone.level === "detail" ? sectionLabel : t("settings.title");
               return (
-                <button
+                <Button
                   type="button"
-                  className="settings-phone-back flex h-11 max-w-full shrink-0 items-center gap-0.5 bg-transparent pr-1.5 pl-0.5 text-[15px] text-primary"
+                  variant="ghost"
+                  className="settings-phone-back h-11 max-w-full shrink-0 justify-start gap-0.5 px-1.5 text-[15px] text-primary"
                   onClick={goUpPhoneLevel}
                   aria-label={t("settings.backTo", { name: backName })}
                 >
                   <ChevronLeftIcon size={20} />
                   <span className="truncate">{backName}</span>
-                </button>
+                </Button>
               );
             })()}
             {/* A phone names the level it shows: Settings, the section, the detail's row. */}
-            <strong className="settings-dialog-title">
-              {phone.level === "home"
+            <strong className="settings-dialog-title shrink-0 text-[15px] font-semibold whitespace-nowrap">
+              {!isPhone || phone.level === "home"
                 ? t("settings.title")
                 : phone.level === "section" ? sectionLabel : detailTitle}
             </strong>
-          </div>
-        )}
-
-        <div className="settings-dialog-body">
-          {/* §7.3: a desktop picks the section from a fixed rail on the left; a phone
-              shows it as a horizontal chip row at the section level (its home level
-              lists the sections, its detail level keeps the Back button). */}
-          <nav aria-label={t("settings.title")} className="settings-section-rail">
-            {sections.map((item) => {
-              const selected = section === item.id;
-              const disabled = item.requiresProject && !cwd;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={cn(
-                    "settings-section-rail-item inline-flex min-w-0 items-center gap-2 text-left transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                    "disabled:cursor-default disabled:opacity-40",
-                    selected
-                      ? "is-selected bg-accent font-medium text-accent-foreground"
-                      : "bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  )}
-                  disabled={disabled}
-                  title={disabled ? t("settings.projectRequired") : item.label}
-                  aria-current={selected ? "page" : undefined}
-                  onClick={() => activateSection(item.id)}
-                >
-                  <SettingsSectionIcon section={item.id} size={15} />
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-          <main ref={mainRef} className="settings-dialog-main">
-            {isPhone && phone.level === "home" && (
-              <nav aria-label={t("settings.title")} className="settings-phone-home flex flex-1 flex-col overflow-y-auto pb-2">
+            {!isPhone && (
+              <TabsList
+                variant="line"
+                className="ml-4 h-auto min-h-0 w-full min-w-0 flex-1 items-stretch justify-start gap-0.5 self-stretch overflow-x-auto rounded-none border-0 bg-transparent p-0 pb-[5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
                 {sections.map((item) => {
                   const disabled = item.requiresProject && !cwd;
                   return (
-                    <button
+                    <TabsTrigger
+                      key={item.id}
+                      value={item.id}
+                      disabled={disabled}
+                      title={disabled ? t("settings.projectRequired") : item.label}
+                      className="h-auto w-24 flex-none gap-1.5 rounded-none px-1 py-0 text-[12.5px] font-normal data-[state=active]:font-semibold"
+                    >
+                      <SettingsSectionIcon section={item.id} size={15} />
+                      <span className="truncate">{item.label}</span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            )}
+          </div>
+
+          <main ref={mainRef} className="relative flex min-h-0 flex-1 overflow-hidden max-sm:flex-col">
+            {/* A phone's home level lists the sections; its section and detail
+                levels show the section itself. */}
+            {isPhone && phone.level === "home" && (
+              <nav aria-label={t("settings.title")} className="flex flex-1 flex-col overflow-y-auto pb-2">
+                {sections.map((item) => {
+                  const disabled = item.requiresProject && !cwd;
+                  return (
+                    <Button
                       key={item.id}
                       type="button"
-                      className="settings-phone-home-item flex min-h-[52px] w-full items-center gap-3.5 border-b border-border bg-transparent pl-4.5 pr-4 text-left text-[15px] text-foreground active:bg-secondary disabled:cursor-default disabled:text-muted-foreground"
+                      variant="ghost"
+                      className="flex min-h-[52px] w-full items-center justify-start gap-3.5 rounded-none border-b px-4 text-left text-[15px] font-normal text-foreground disabled:text-muted-foreground"
                       disabled={disabled}
                       aria-describedby={disabled ? `settings-phone-home-${item.id}-note` : undefined}
                       onClick={() => openSectionFromHome(item.id)}
                     >
-                      <SettingsSectionIcon section={item.id} size={20} />
-                      <span className="settings-phone-home-label flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-muted-foreground"><SettingsSectionIcon section={item.id} size={20} /></span>
+                      <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
                         <span>{item.label}</span>
                         {disabled && (
-                          <span id={`settings-phone-home-${item.id}-note`} className="settings-phone-home-note text-xs text-muted-foreground">
+                          <span id={`settings-phone-home-${item.id}-note`} className="text-xs font-normal text-muted-foreground">
                             {t("settings.projectRequired")}
                           </span>
                         )}
                       </span>
-                      <ChevronRightIcon size={16} className="settings-phone-home-chevron shrink-0 text-muted-foreground" />
-                    </button>
+                      <ChevronRightIcon size={16} className="shrink-0 text-muted-foreground" />
+                    </Button>
                   );
                 })}
               </nav>
             )}
-            {/* The desktop body names the dialog (§3.5) above its scrolling section; a
-                phone names it in its 50px header instead. */}
-            {!isPhone ? (
-              <div className="settings-dialog-page">
-                <h2 className="settings-dialog-page-title">{t("settings.title")}</h2>
-                {hostedSections}
-              </div>
-            ) : hostedSections}
+            {hostedSections}
           </main>
-        </div>
-      </div>
-    </div>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 }

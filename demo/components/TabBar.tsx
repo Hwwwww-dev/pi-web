@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { getFileIcon } from "./FileIcons";
 import { BotIcon, GitBranchIcon, MessagesSquareIcon, TerminalIcon, XIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
 import type { FileViewerDisplayMode, FileViewerState } from "@/lib/file-viewer-state";
@@ -125,7 +126,10 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
             >
               {tab.kind === "git" ? t("gitPanel.title") : tab.label}
             </span>
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
               disabled={tab.closing}
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
               className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent p-0 text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
@@ -133,7 +137,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               aria-label={`${t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")} ${tab.kind === "git" ? t("gitPanel.title") : tab.label}`}
             >
               <XIcon className="size-[11px]" strokeWidth={1.8} />
-            </button>
+            </Button>
           </div>
         );
       })}

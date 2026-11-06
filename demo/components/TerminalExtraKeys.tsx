@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useSyncExternalStore, type PointerEvent } from "react";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import {
   TERMINAL_EXTRA_KEY_ROWS,
@@ -88,11 +89,13 @@ export function TerminalExtraKeys({ modifiers, onKey, onToggleModifier }: Props)
       {TERMINAL_EXTRA_KEY_ROWS.flat().map((key) => {
         const modifier = key === "ctrl" || key === "alt";
         return (
-          <button
+          <Button
             key={key}
             type="button"
+            variant="ghost"
+            size="default"
             tabIndex={-1}
-            className={modifier && modifiers[key] ? "is-active" : undefined}
+            className={`rounded-none px-0 font-normal hover:bg-transparent dark:hover:bg-transparent${modifier && modifiers[key] ? " is-active" : ""}`}
             aria-pressed={modifier ? modifiers[key] : undefined}
             aria-label={modifier ? undefined : KEY_NAMES[key]}
             onPointerDown={(event) => press(event, key)}
@@ -103,7 +106,7 @@ export function TerminalExtraKeys({ modifiers, onKey, onToggleModifier }: Props)
             onContextMenu={(event) => event.preventDefault()}
           >
             {key === "ArrowLeft" || key === "ArrowRight" ? <span className="is-rotated">{KEY_LABELS[key]}</span> : KEY_LABELS[key]}
-          </button>
+          </Button>
         );
       })}
     </div>

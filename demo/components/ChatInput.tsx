@@ -25,7 +25,6 @@ import {
 import { getMarkdownListContinuation } from "@/lib/markdown-list-continuation";
 import { quoteSeparator } from "@/lib/quoted-selection";
 import { isBareMcpCommand, isBuiltinMcpCommand } from "@/lib/mcp-command";
-import { FolderIcon, getFileIcon } from "./FileIcons";
 import { ImagePreview } from "./ImagePreview";
 import { DismissButton } from "./DismissButton";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -42,6 +41,8 @@ import {
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  FileIcon,
+  FolderClosedIcon,
   HistoryIcon,
   ImageIcon,
   MessagesSquareIcon,
@@ -60,6 +61,7 @@ import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -683,14 +685,18 @@ function QueuedMessageRow({
       )}
       {onAction ? (
         <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass} asChild>
-          <button
+          <Button
             type="button"
+            variant="ghost"
             title={t("chat.queueBehaviorHint")}
             onClick={() => onAction(item.id, "toggle")}
-            className="cursor-pointer transition-opacity hover:opacity-80"
+            className={cn(
+              "h-auto cursor-pointer rounded-full transition-opacity hover:opacity-80",
+              isSteer ? "hover:bg-primary hover:text-primary-foreground" : "hover:bg-muted hover:text-muted-foreground",
+            )}
           >
             {behaviorLabel}
-          </button>
+          </Button>
         </Badge>
       ) : (
         <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass}>{behaviorLabel}</Badge>
@@ -1906,9 +1912,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         const showOriginal = mappedVal != null && mappedVal !== lvl;
         const selected = lvl === "auto" ? isAutoThinkingSelection : (!isAutoThinkingSelection && resolvedThinkingLevel === lvl);
         return (
-          <button
+          <Button
             key={lvl}
             type="button"
+            variant="ghost"
             role="radio"
             aria-checked={selected}
             onClick={() => {
@@ -1922,7 +1929,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               onThinkingLevelChange(lvl as typeof THINKING_LEVELS[number]);
             }}
             className={cn(
-              "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-left text-xs transition-colors hover:bg-accent",
+              "flex h-auto w-full cursor-pointer justify-start rounded-sm px-2 py-1 text-left text-xs font-normal",
               selected ? "text-foreground" : "text-muted-foreground",
             )}
           >
@@ -1947,12 +1954,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   savedDefaultThinkingLevel === lvl && "opacity-100",
                 )}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill={savedDefaultThinkingLevel === lvl ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill={savedDefaultThinkingLevel === lvl ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true" className="size-3 shrink-0">
                   <polygon points="12 2.5 14.9 8.6 21.5 9.4 16.6 13.9 17.9 20.5 12 17.2 6.1 20.5 7.4 13.9 2.5 9.4 9.1 8.6" />
                 </svg>
               </span>
             )}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -1989,11 +1996,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           size="icon"
           onClick={onAbort}
           aria-label={t("chat.stopAgent")}
-          className="size-[30px] shrink-0 rounded-full"
+          className="size-9 shrink-0 rounded-full"
         >
           {/* While the run streams the circle stops it, until the user types
               something to send. */}
-          <SquareIcon data-icon className="size-3 fill-current" aria-hidden="true" />
+          <SquareIcon data-icon className="size-3.5 fill-current" aria-hidden="true" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>{t("chat.stopAgent")}</TooltipContent>
@@ -2009,7 +2016,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               onClick={sendToSideChat}
               disabled={!value.trim() || attachedImages.length > 0}
               aria-label={t("chat.sideChat")}
-              className="size-[30px] rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="size-9 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             >
               <MessagesSquareIcon data-icon strokeWidth={1.8} aria-hidden="true" />
             </Button>
@@ -2024,9 +2031,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             disabled={!canSubmit}
             aria-label={t("chat.send")}
             className={cn(
-              "size-[30px] shrink-0 rounded-full",
+              "size-9 shrink-0 rounded-full",
               canSubmit || isStreaming
-                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
                 : "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
             )}
           >
@@ -2142,19 +2149,20 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 {inputHistory.map((item, index) => {
                   const active = index === historyActiveIndex;
                   return (
-                    <button
+                    <Button
                       key={`${index}:${item}`}
                       ref={(node) => {
                         historyItemRefs.current[index] = node;
                       }}
                       type="button"
+                      variant="ghost"
                       onMouseDown={(e) => {
                         e.preventDefault();
                         applyHistoryInput(item);
                       }}
                       onMouseEnter={() => setHistoryActiveIndex(index)}
                       className={cn(
-                        "flex w-full items-start gap-2 rounded-sm px-2 py-[7px] text-left text-[12.5px] leading-[1.45] text-foreground transition-colors",
+                        "flex h-auto w-full items-start justify-start rounded-sm px-2 py-[7px] text-left text-[12.5px] leading-[1.45] font-normal whitespace-normal text-foreground transition-colors",
                         active && "bg-accent",
                       )}
                     >
@@ -2164,7 +2172,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       <span className="line-clamp-2 min-w-0 wrap-anywhere">
                         {item}
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -2202,19 +2210,20 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                           const active = index === slashActiveIndex;
                           const dormant = isDormantSkillCommand(command, skillDormancy);
                           return (
-                            <button
+                            <Button
                               key={`${command.source}:${command.name}`}
                               ref={(node) => {
                                 slashItemRefs.current[index] = node;
                               }}
                               type="button"
+                              variant="ghost"
                               onMouseDown={(e) => {
                                 e.preventDefault();
                                 applySlashCommand(command);
                               }}
                               onMouseEnter={() => setSlashActiveIndex(index)}
                               className={cn(
-                                "flex min-h-[58px] w-full min-w-0 flex-col justify-center gap-1 rounded-md border px-2.5 py-[9px] text-left transition-colors",
+                                "flex h-auto min-h-[58px] w-full min-w-0 flex-col items-stretch justify-center gap-1 rounded-md border px-2.5 py-[9px] text-left font-normal whitespace-normal transition-colors",
                                 active
                                   ? "border-ring bg-accent"
                                   : "border-border bg-card",
@@ -2233,7 +2242,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                                    {getSlashDescription(command, t)}
                                 </span>
                               )}
-                            </button>
+                            </Button>
                           );
                         })}
                       </div>
@@ -2281,31 +2290,34 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       const name = entry.path.split("/").pop() ?? entry.path;
                       const dirPrefix = entry.path.slice(0, entry.path.length - name.length);
                       return (
-                        <button
+                        <Button
                           key={`${entry.isDir ? "d" : "f"}:${entry.path}`}
                           ref={(node) => {
                             atItemRefs.current[index] = node;
                           }}
                           type="button"
+                          variant="ghost"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             applyAtCompletion(entry);
                           }}
                           onMouseEnter={() => setAtActiveIndex(index)}
                           className={cn(
-                            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left font-mono text-[12.5px] text-foreground transition-colors",
+                            "flex h-auto w-full justify-start rounded-sm px-2 py-1.5 text-left font-mono text-[12.5px] font-normal text-foreground transition-colors",
                             active && "bg-accent",
                           )}
                         >
                           <span className="flex shrink-0 items-center">
-                            {entry.isDir ? <FolderIcon size={14} /> : getFileIcon(name, 14)}
+                            {entry.isDir
+                              ? <FolderClosedIcon size={14} strokeWidth={1.8} className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                              : <FileIcon size={14} strokeWidth={1.8} className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
                           </span>
                           <span className="min-w-0 truncate">
                             {dirPrefix && <span className="text-muted-foreground">{dirPrefix}</span>}
                             {name}
                             {entry.isDir && <span className="text-muted-foreground">/</span>}
                           </span>
-                        </button>
+                        </Button>
                       );
                     })
                   )}
@@ -2314,19 +2326,21 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             );
           })()}
           {/* The drafted composer card: attachments, then the input, then one
-              pill row with the send button physically pinned to its right. */}
-          <div
+              pill row with the send button physically pinned to its right.
+              AI-element composer language: one large-radius card, borderless
+              textarea with headroom, tools bottom-left, circular submit
+              bottom-right, and a soft tinted focus ring (the border itself
+              stays put while typing). */}
+          <InputGroup
             className={cn(
-              // No focus-within border darkening: the card border stays put
-              // while typing (the user flagged the darkening as heavy-handed).
-              "chat-composer-row min-w-0 rounded-[18px] border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)]",
+              "chat-composer-row min-w-0 rounded-[24px] border-border bg-card shadow-sm has-[[data-slot=input-group-control]:focus-visible]:border-ring/40 has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot=input-group-control]:focus-visible]:ring-ring/15",
               compact
-                ? "flex flex-row items-center gap-1 rounded-xl p-1"
-                : "flex flex-col gap-2 p-2.5 px-3",
+                ? "flex-row items-center gap-1 rounded-[18px] p-1.5"
+                : "flex-col items-stretch gap-0 p-2",
             )}
           >
           {attachedImages.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
+            <InputGroupAddon align="block-start" className="flex-wrap px-0 pt-0">
               {attachedImages.map((img, i) => (
                 <div key={i} className="relative shrink-0">
                   <ImagePreview key={img.previewUrl} src={img.previewUrl}>
@@ -2364,14 +2378,14 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   {t("chat.attachFiles")}
                 </Button>
               )}
-            </div>
+            </InputGroupAddon>
           )}
-          <textarea
+          <InputGroupTextarea
             ref={textareaRef}
             className={cn(
-              "chat-input-textarea w-full min-w-0 border-none bg-transparent outline-none resize-none text-foreground max-h-[120px] overflow-auto placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0",
+              "chat-input-textarea w-full min-w-0 px-2.5 py-2 text-foreground max-h-44 overflow-auto placeholder:text-muted-foreground",
               "text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.55]",
-              compact ? "min-h-24" : "min-h-6",
+              compact ? "min-h-24" : "min-h-11",
             )}
             data-chat-composer=""
             aria-label={compact ? t("chat.askInSideChat") : undefined}
@@ -2410,7 +2424,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           />
 
           {compact ? sendCluster : (
-            <div className="flex min-w-0 items-center gap-2">
+            <InputGroupAddon align="block-end" className="min-w-0 items-center gap-2 px-1 pb-0.5">
               {/* One pill row: the pills scroll horizontally instead of wrapping,
                   and the send button is a sibling so it can never be squeezed
                   out. chat-input-controls keeps the keyboard-open collapse. */}
@@ -2676,9 +2690,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </div>
 
               {sendCluster}
-            </div>
+            </InputGroupAddon>
           )}
-          </div>
+          </InputGroup>
         </div>
 
         {/* Bash mode status label */}

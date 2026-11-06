@@ -149,9 +149,10 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
               const isUnread = !isRunning && unreadSessionIds.has(info.id);
               return (
                 <div key={info.id} className={`keepalive-dock-row${isSelected ? " is-active" : ""}`}>
-                  <button
+                  <Button
                     type="button"
-                    className="keepalive-dock-open"
+                    variant="ghost"
+                    className="keepalive-dock-open h-auto items-stretch justify-start font-normal"
                     onClick={() => {
                       if (!isSelected) onSelect(info);
                       setOpen(false);
@@ -171,7 +172,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                       text={info.cwd}
                       className="text-[10px] font-mono text-muted-foreground"
                     />
-                  </button>
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"

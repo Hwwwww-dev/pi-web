@@ -19,6 +19,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { Checkbox } from "./ui/checkbox";
+import { Input } from "./ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Textarea } from "./ui/textarea";
 import type { SubagentProfile, SubagentScope, SubagentWritableScope } from "@/lib/subagents";
 import {
   getLastSettingsSelection,
@@ -52,6 +62,8 @@ import { projectTrustReloadKey } from "./settings-ui-helpers";
 
 const TOOL_OPTIONS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 const THINKING_OPTIONS = ["", "off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+// Radix Select 的 Item 不接受空字符串，「未设置」以 sentinel 承载。
+const THINKING_NONE = "__none__";
 
 type EditableProfile = Omit<SubagentProfile, "scope" | "filePath">;
 type EditorMode = "view" | "edit" | "create";
@@ -73,12 +85,12 @@ const EMPTY_PROFILE: EditableProfile = {
 };
 
 /**
- * The shared control look as utilities; a disabled control falls to its
- * panel background and dim text. Height stays per control (34px fields, the
- * taller prompt textarea), so the base carries none.
+ * 各控件共享的观感：禁用时退到面板底色并弱化文字；高度由每个控件自带
+ * （字段 34px，提示词 textarea 更高）。边框、焦点环、禁用手势交给 ui/
+ * 原语，这里只留需要与现状对齐的项（含 dark 与 md 断点压过原语的默认值）。
  */
 const controlClassName =
-  "min-w-0 rounded-md border border-border bg-background px-[9px] text-xs text-foreground outline-none disabled:bg-card disabled:text-muted-foreground disabled:cursor-default";
+  "min-w-0 rounded-md border border-border bg-background dark:bg-background px-[9px] text-xs md:text-xs text-foreground disabled:bg-card disabled:text-muted-foreground disabled:cursor-default";
 
 function editableProfile(profile: SubagentProfile): EditableProfile {
   return {
@@ -158,11 +170,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Toggle({ checked, disabled, label, onChange }: { checked: boolean; disabled: boolean; label: string; onChange: (checked: boolean) => void }) {
   return (
+    // label 包裹 Checkbox：点击文字仍转发为一次切换。
     <label className={disabled
       ? "flex cursor-default items-center gap-[7px] text-xs text-muted-foreground"
       : "flex cursor-pointer items-center gap-[7px] text-xs text-muted-foreground"}
     >
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
+      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(next) => onChange(next === true)} />
       {label}
     </label>
   );
@@ -510,7 +523,7 @@ export function AgentsConfig({
             )}
             <label className="agents-concurrency-control" title={t("agents.maxConcurrentDescription")}>
               <span>{t("agents.maxConcurrent")}</span>
-              <input
+              <Input
                 aria-label={t("agents.maxConcurrent")}
                 type="number"
                 min={1}
@@ -555,7 +568,7 @@ export function AgentsConfig({
                         >
                           <ConfigSidebarText className={`flex-1${profile.enabled ? "" : " text-muted-foreground"}`}>{profile.displayName}</ConfigSidebarText>
                           {!profile.enabled && (
-                            <Badge variant="secondary" className="shrink-0 rounded-full px-1.5 py-0 text-[10px] font-normal text-muted-foreground">
+                            <Badge variant="secondary" className="shrink-0 px-1.5 text-[10px] font-normal text-muted-foreground">
                               {t("agents.codemode.off")}
                             </Badge>
                           )}
@@ -615,7 +628,7 @@ export function AgentsConfig({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <Field label={t("agents.name")}>
                       {creating ? (
-                        <input aria-label={t("agents.name")} value={draft.name} disabled={disabled} onChange={(event) => update("name", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
+                        <Input aria-label={t("agents.name")} value={draft.name} disabled={disabled} onChange={(event) => update("name", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
                       ) : (
                         <code className="flex min-h-[34px] items-center overflow-hidden text-ellipsis whitespace-nowrap text-xs text-foreground">
                           {draft.name}
@@ -623,14 +636,14 @@ export function AgentsConfig({
                       )}
                     </Field>
                     <Field label={t("agents.displayName")}>
-                      <input aria-label={t("agents.displayName")} value={draft.displayName} disabled={disabled} onChange={(event) => update("displayName", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
+                      <Input aria-label={t("agents.displayName")} value={draft.displayName} disabled={disabled} onChange={(event) => update("displayName", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
                     </Field>
                   </div>
                   <Field label={t("agents.description")}>
-                    <input aria-label={t("agents.description")} value={draft.description} disabled={disabled} onChange={(event) => update("description", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
+                    <Input aria-label={t("agents.description")} value={draft.description} disabled={disabled} onChange={(event) => update("description", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
                   </Field>
                   <Field label={t("agents.prompt")}>
-                    <textarea className={`${controlClassName} agents-system-prompt h-[195px] min-h-[195px] max-h-[60vh] w-full py-[9px] overflow-auto leading-normal resize-y disabled:resize-none`} aria-label={t("agents.prompt")} value={draft.systemPrompt} disabled={disabled} onChange={(event) => update("systemPrompt", event.target.value)} />
+                    <Textarea className={`${controlClassName} agents-system-prompt h-[195px] min-h-[195px] max-h-[60vh] w-full py-[9px] overflow-auto leading-normal resize-y disabled:resize-none`} aria-label={t("agents.prompt")} value={draft.systemPrompt} disabled={disabled} onChange={(event) => update("systemPrompt", event.target.value)} />
                   </Field>
 
                   <Field label={t("agents.tools")}>
@@ -676,17 +689,24 @@ export function AgentsConfig({
 
                   <Field label={t("agents.codemode")}>
                     <div className="flex flex-col gap-1.5">
-                      <select
-                        aria-label={t("agents.codemode")}
+                      {/* 弹层挂 body，z 必须压过设置对话框的 z-[1000]。 */}
+                      <Select
                         value={draft.codemode ?? "off"}
+                        onValueChange={(value) => update("codemode", value as EditableProfile["codemode"])}
                         disabled={disabled}
-                        onChange={(event) => update("codemode", event.target.value as EditableProfile["codemode"])}
-                        className={`${controlClassName} h-[34px] w-auto min-w-[180px] self-start`}
                       >
-                        <option value="inherit">{t("agents.codemode.inherit")}</option>
-                        <option value="on">{t("agents.codemode.on")}</option>
-                        <option value="off">{t("agents.codemode.off")}</option>
-                      </select>
+                        <SelectTrigger
+                          aria-label={t("agents.codemode")}
+                          className={`${controlClassName} h-[34px] w-auto min-w-[180px] self-start data-[size=default]:h-[34px]`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent position="popper" align="start" className="z-[1100]">
+                          <SelectItem value="inherit">{t("agents.codemode.inherit")}</SelectItem>
+                          <SelectItem value="on">{t("agents.codemode.on")}</SelectItem>
+                          <SelectItem value="off">{t("agents.codemode.off")}</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <span className="text-xs leading-[1.4] text-muted-foreground">
                         {t("agents.codemodeHint")}
                       </span>
@@ -714,12 +734,25 @@ export function AgentsConfig({
                       </div>
                     </Field>
                     <Field label={t("agents.thinking")}>
-                      <select aria-label={t("agents.thinking")} value={draft.thinking ?? ""} disabled={disabled} onChange={(event) => update("thinking", (event.target.value || undefined) as EditableProfile["thinking"])} className={`${controlClassName} h-[34px] w-full`}>
-                        {THINKING_OPTIONS.map((value) => <option key={value || "default"} value={value}>{value || t("agents.inherit")}</option>)}
-                      </select>
+                      <Select
+                        value={draft.thinking ?? THINKING_NONE}
+                        onValueChange={(value) => update("thinking", (value === THINKING_NONE ? undefined : value) as EditableProfile["thinking"])}
+                        disabled={disabled}
+                      >
+                        <SelectTrigger aria-label={t("agents.thinking")} className={`${controlClassName} h-[34px] w-full data-[size=default]:h-[34px]`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent position="popper" align="start" className="z-[1100]">
+                          {THINKING_OPTIONS.map((value) => (
+                            <SelectItem key={value || "default"} value={value || THINKING_NONE}>
+                              {value || t("agents.inherit")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </Field>
                     <Field label={t("agents.maxTurns")}>
-                      <input aria-label={t("agents.maxTurns")} type="number" min={1} value={draft.maxTurns ?? ""} disabled={disabled} onChange={(event) => update("maxTurns", event.target.value ? Number(event.target.value) : undefined)} className={`${controlClassName} h-[34px] w-full`} />
+                      <Input aria-label={t("agents.maxTurns")} type="number" min={1} value={draft.maxTurns ?? ""} disabled={disabled} onChange={(event) => update("maxTurns", event.target.value ? Number(event.target.value) : undefined)} className={`${controlClassName} h-[34px] w-full`} />
                     </Field>
                   </div>
 

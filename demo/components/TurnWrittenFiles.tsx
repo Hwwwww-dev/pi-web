@@ -1,9 +1,10 @@
 "use client";
 
+import { FileIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import { getFileName } from "@/lib/file-paths";
 import type { WrittenFile } from "@/lib/turn-written-files";
-import { getFileIcon } from "./FileIcons";
 
 /**
  * Lists the files a turn actually wrote, as buttons that open each one in the
@@ -22,17 +23,19 @@ export function TurnWrittenFiles({ files, onOpenFile }: {
       {files.map(({ filePath }) => {
         const name = getFileName(filePath);
         return (
-          <button
+          <Button
             key={filePath}
             type="button"
+            variant="outline"
+            size="default"
             title={filePath}
             aria-label={t("chat.openWrittenFile", { name })}
             onClick={() => onOpenFile?.(filePath)}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-sm border border-border bg-muted px-2 py-0.5 font-mono text-xs text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+            className="inline-flex h-auto cursor-pointer items-center gap-1 rounded-sm border border-border bg-muted px-2 py-0.5 font-mono text-xs font-normal text-foreground shadow-none hover:bg-muted hover:text-foreground dark:border-border dark:bg-muted dark:hover:bg-muted focus-visible:border-border focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           >
-            {getFileIcon(name, 12)}
+            <FileIcon size={12} strokeWidth={1.8} className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span>{name}</span>
-          </button>
+          </Button>
         );
       })}
     </div>

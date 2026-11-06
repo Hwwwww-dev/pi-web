@@ -1738,16 +1738,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
         {!isEmptyNew && (
           <div className="pointer-events-none absolute bottom-full right-4 z-20 max-sm:right-2.5">
-            <button
+            <Button
               type="button"
-              className={cn("chat-scroll-to-bottom size-[34px]", showScrollToBottom && !pendingScrollRestore && "is-visible")}
+              variant="ghost"
+              className={cn("chat-scroll-to-bottom size-[34px] h-[34px]", showScrollToBottom && !pendingScrollRestore && "is-visible")}
               title={t("chat.scrollToLatest")}
               aria-label={t("chat.scrollToLatest")}
               style={{ marginBottom: isMobile ? 10 : 14 }}
               onClick={() => scrollToBottom("smooth")}
             >
-              <ArrowDownIcon size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
+              <ArrowDownIcon size={16} strokeWidth={2} className="size-4" aria-hidden="true" />
+            </Button>
           </div>
         )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
@@ -1875,15 +1876,16 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
               </span>
             )}
             {onDismiss && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 className="notice-shelf-close mt-3.5 shrink-0"
                 aria-label="Dismiss notification"
                 title="Dismiss notification"
                 onClick={() => onDismiss(notice.id)}
               >
-                <XIcon size={12} strokeWidth={2} aria-hidden="true" />
-              </button>
+                <XIcon size={12} strokeWidth={2} className="size-3" aria-hidden="true" />
+              </Button>
             )}
           </div>
         );
@@ -2205,11 +2207,12 @@ function ExtensionDialog({
       className={cn("absolute inset-0 z-[90] flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-end")}
     >
       {collapsed ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          className="pointer-events-auto flex w-full max-w-[min(560px,100%)] cursor-pointer items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left text-foreground shadow-lg"
+          className="pointer-events-auto flex h-auto w-full max-w-[min(560px,100%)] cursor-pointer items-center justify-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left font-normal text-foreground shadow-lg hover:bg-background hover:text-foreground"
         >
           <span className="shrink-0 text-xs font-[650] text-primary">
             {t("chat.extensionPending")}
@@ -2227,7 +2230,7 @@ function ExtensionDialog({
           <span className="shrink-0 text-xs text-muted-foreground">
             {t("chat.extensionExpand")}
           </span>
-        </button>
+        </Button>
       ) : (
       <div
         ref={dialogRef}
@@ -2556,11 +2559,12 @@ function ExtensionCustomPanel({
       className={cn("absolute inset-0 z-[95] flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-center")}
     >
       {collapsed ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          className="pointer-events-auto flex w-full max-w-[min(920px,100%)] cursor-pointer items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left text-foreground shadow-lg"
+          className="pointer-events-auto flex h-auto w-full max-w-[min(920px,100%)] cursor-pointer items-center justify-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left font-normal text-foreground shadow-lg hover:bg-background hover:text-foreground"
         >
           <span className="shrink-0 text-xs font-[650] text-primary">
             {t("chat.extensionPending")}
@@ -2577,7 +2581,7 @@ function ExtensionCustomPanel({
           <span className="shrink-0 text-xs text-muted-foreground">
             {t("chat.extensionExpand")}
           </span>
-        </button>
+        </Button>
       ) : (
       <div
         role="dialog"
@@ -2593,7 +2597,7 @@ function ExtensionCustomPanel({
           maxHeight: dialogMaxHeight,
         }}
       >
-        <textarea
+        <Textarea
           ref={inputRef}
            aria-label={t("chat.extensionInput")}
           autoCapitalize="off"
@@ -2631,7 +2635,7 @@ function ExtensionCustomPanel({
             const text = event.clipboardData.getData("text");
             if (text) onInput(request, asBracketedPaste(text));
           }}
-          className="absolute h-px w-px border-0 p-0 opacity-0 pointer-events-none"
+          className="absolute h-px min-h-0 w-px border-0 p-0 opacity-0 shadow-none pointer-events-none"
         />
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2.5">
            <div className="text-[13px] font-[650] text-foreground">{t("chat.extensionPanel")}</div>
