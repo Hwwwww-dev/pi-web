@@ -414,17 +414,17 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 18px 20px;
+  padding: 24px;
   overflow-y: auto;
   font-family: inherit;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .config-detail-stack {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
   width: 100%;
   min-width: 0;
 }
@@ -441,9 +441,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   min-width: 0;
-  min-height: 28px;
+  min-height: 32px;
 }
 
 .config-detail-header.is-top-aligned {
@@ -471,7 +471,7 @@
 
 .config-detail-title {
   color: var(--foreground);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.35;
 }
@@ -564,10 +564,10 @@
 
 .config-detail-grid {
   display: grid;
-  grid-template-columns: minmax(96px, 130px) minmax(0, 1fr);
-  gap: 9px 14px;
-  font-size: 12px;
-  line-height: 1.45;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px 16px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .config-detail-grid-label {
@@ -1089,25 +1089,8 @@
   }
 
 
-  /* Back, title, close: equal side columns keep the title in the middle
-     whatever Back says; a long title is cut short in its own column. The
-     close floats alone at the surface's top-right corner. */
-  .settings-dialog-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr) minmax(0, 1fr);
-    align-items: center;
-    padding: 0 4px;
-  }
-
-  .settings-phone-back {
-    grid-column: 1;
-    justify-self: start;
-  }
-
   .settings-dialog-title {
-    grid-column: 2;
     overflow: hidden;
-    font-size: 16px;
     text-align: center;
     text-overflow: ellipsis;
   }

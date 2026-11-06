@@ -5,6 +5,7 @@ import test from "node:test";
 const cssSource = await readFile(new URL("../app/settings.css", import.meta.url), "utf8");
 const loginSource = await readFile(new URL("../app/login/page.tsx", import.meta.url), "utf8");
 const panelSource = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
+const trustSource = await readFile(new URL("./ProjectTrustDialog.tsx", import.meta.url), "utf8");
 const shellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 const themeOptionsSource = await readFile(new URL("../lib/theme.ts", import.meta.url), "utf8");
 const enSource = await readFile(new URL("../lib/i18n/messages/en.ts", import.meta.url), "utf8");
@@ -12,8 +13,10 @@ const zhSource = await readFile(new URL("../lib/i18n/messages/zh-CN.ts", import.
 const themeSource = await readFile(new URL("../hooks/useTheme.ts", import.meta.url), "utf8");
 
 test("the trust dialog Settings › MCP opens stacks above Settings", () => {
-  const zIndex = (selector) => Number(cssSource.match(new RegExp(`\\${selector} \\{[^}]*z-index: (\\d+);`))?.[1]);
-  assert.ok(zIndex(".project-trust-backdrop") > zIndex(".settings-dialog-backdrop"));
+  // Both surfaces sit above every in-page overlay; the trust dialog mounts
+  // after and stacks one level higher (z-[1100] vs the panel's z-[1000]).
+  assert.match(panelSource, /"settings-phone-safe z-\[1000\] /);
+  assert.match(trustSource, /"settings-phone-safe z-\[1100\] /);
 });
 
 test("an Add in Settings › MCP hands the folder's new trust to the page, which every section reloads on", () => {
@@ -47,7 +50,7 @@ test("trusting from Settings › MCP reloads, in place, the other mounted sectio
   // Agents: only the model list (GET /api/models leaves out an untrusted project's extensions).
   assert.match(agents, /const response = await fetch\(`\/api\/models\?cwd=\$\{encodeURIComponent\(cwd\)\}`[\s\S]*?\}, \[cwd, trustKey\]\);/);
   // Models reads models.json, auth and enabledModels, none of which follows trust.
-  assert.match(panelSource, /sectionHost\("models", <ModelsConfig embedded cwd=\{cwd\} onClose=\{onClose\} \/>\)/);
+  assert.match(panelSource, /models: <ModelsConfig embedded cwd=\{cwd\} onClose=\{onClose\} \/>,/);
 });
 
 test("offers system, light and dark selection with native radios (shadcn theme only)", () => {
@@ -90,14 +93,12 @@ test("groups fonts, chat font size and width with the chat switches, without row
   assert.doesNotMatch(cssSource, /\.settings-chat-option/);
 });
 
-test("the desktop dialog is two columns: a page title over General's stacked cards", () => {
-  // §4.4: no middle chips column on a desktop — General's sub-sections stack as
-  // Cards in the scrolling body, named by the dialog's page title; the phone
-  // keeps its split view with the sub-section list (the stack's detail level).
-  assert.match(panelSource, /className="settings-dialog-page"/);
-  assert.match(panelSource, /<h2 className="settings-dialog-page-title">\{t\("settings\.title"\)\}<\/h2>/);
-  assert.match(cssSource, /\.settings-dialog-page-title \{[\s\S]*?font-size: 15px;[\s\S]*?font-weight: 600;[\s\S]*?letter-spacing: -0\.01em;/);
-  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-dialog-page-title \{[\s\S]*?display: none/);
+test("the desktop dialog is a section rail beside the scrolling sections", () => {
+  // Desktop: the vertical Tabs rail (a muted 200px column) beside the sections;
+  // the active trigger reads as a raised item on the muted rail.
+  assert.match(panelSource, /<Tabs[\s\n]*orientation="vertical"/);
+  assert.match(panelSource, /w-\[200px\] shrink-0 flex-col border-r bg-muted\/40/);
+  assert.match(panelSource, /data-\[state=active\]:bg-background data-\[state=active\]:font-medium data-\[state=active\]:shadow-sm/);
   const desktopGeneral = panelSource.slice(
     panelSource.indexOf("if (!isPhone) {"),
     panelSource.indexOf("<ConfigSplitView>"),
@@ -111,7 +112,7 @@ test("the desktop dialog is two columns: a page title over General's stacked car
   assert.match(panelSource, /title=\{t\("settings\.keepAlive"\)\}\s*description=\{t\("settings\.keepAliveDescription"\)\}/);
   assert.match(desktopGeneral, /<ConfigCard title=\{t\("common\.language"\)\}>/);
   assert.match(desktopGeneral, /\{logOutBlock\}/);
-  // The phone keeps its own sub-section list behind the section level.
+  // The phone keeps its split view with the sub-section list.
   assert.match(panelSource, /<ConfigSplitView>/);
   assert.match(panelSource, /<ConfigSidebar>/);
   // Form rows read as the draft's frow2: a Field row, its description muted under the label.
@@ -119,31 +120,27 @@ test("the desktop dialog is two columns: a page title over General's stacked car
 });
 
 test("keeps General free of divider rows", () => {
-  assert.match(panelSource, /className="settings-dialog-header"/);
-  assert.match(cssSource, /\.settings-dialog-header \{[\s\S]*?display: flex[\s\S]*?align-items: center[\s\S]*?min-height: 50px/);
-  // sections.find survives upstream's navigation rework as the phone's section-level
-  // title lookup — a label read, not a per-section divider header.
+  // The only chrome above a level is the phone's 50px header; sections render
+  // as Cards, never as divider-topped sections.
+  assert.match(panelSource, /min-h-\[50px\]/);
   assert.doesNotMatch(panelSource, /<section style=\{\{[^}]*borderBottom/);
   assert.doesNotMatch(panelSource, /borderLeft: index > 0/);
+  // The old grid header rules are gone; the phone title keeps only its cut.
+  assert.doesNotMatch(cssSource, /\.settings-dialog-header/);
+  assert.doesNotMatch(cssSource, /\.settings-phone-back/);
 });
 
 test("uses a fixed section rail on desktop and a phone home list of sections", () => {
-  assert.match(panelSource, /className="settings-phone-home[ "]/);
-  assert.match(panelSource, /className="settings-phone-home-item[ "]/);
-  assert.match(panelSource, /className="settings-section-rail"/);
-  assert.match(panelSource, /className=\{cn\(\s*"settings-section-rail-item /);
-  // The active section reads as the current page (bg-accent + font-medium);
-  // hover and the focus ring are the shared recipes.
-  assert.match(panelSource, /selected\s*\?\s*"is-selected bg-accent font-medium text-accent-foreground"\s*:\s*"bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"/);
+  // Desktop: the TabsList rail; phone home: a list of sections opened by
+  // openSectionFromHome; the section level turns them into chips.
+  assert.match(panelSource, /<TabsList variant="line" className="h-auto min-h-0 w-full flex-1 flex-col items-stretch gap-0\.5 overflow-y-auto bg-transparent p-3">/);
+  assert.match(panelSource, /openSectionFromHome/);
   assert.match(panelSource, /aria-current=\{selected \? "page" : undefined\}/);
-  // §4.4: the desktop rail is a 176px column; a phone turns it into horizontal
-  // chips at the section level (hidden at home/detail via data-phone-level).
-  assert.match(cssSource, /\.settings-section-rail \{[\s\S]*?width: 176px/);
-  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-section-rail \{[\s\S]*?display: none/);
-  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-dialog-surface\[data-phone-level="section"\] \.settings-section-rail \{[\s\S]*?flex-direction: row/);
-  assert.match(panelSource, /data-phone-level=\{isPhone \? phone\.level : undefined\}/);
-  assert.doesNotMatch(panelSource, /width: isMobile \? "100%" : 188/);
-  assert.match(panelSource, /<main[^>]*className="settings-dialog-main"/);
+  assert.match(panelSource, /variant=\{selected \? "secondary" : "ghost"\}/);
+  // The pre-Tabs self-drawn rail classes are gone from panel and stylesheet
+  // (the aria-describedby id prefix `settings-phone-home-*` is not a class).
+  assert.doesNotMatch(panelSource, /className="[^"]*settings-(section-rail|phone-home)/);
+  assert.doesNotMatch(cssSource, /\.settings-(section-rail|phone-home)/);
   assert.doesNotMatch(panelSource, /<style>/);
   assert.doesNotMatch(panelSource, /style=\{\{/);
 });

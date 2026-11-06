@@ -340,19 +340,21 @@ function PackageDetail({
       <div className="config-detail-heading">
         <ConfigDetailHeader className="is-top-aligned">
           <ConfigDetailHeaderInfo>
-            <ConfigScopeTag scope={pkg.scope}>{scopeLabel(pkg.scope, t)}</ConfigScopeTag>
-            {pkg.disabled ? (
-              <Badge variant="secondary" className="rounded-[3px] px-1.5 py-px text-[10px] font-normal text-muted-foreground">
-                {t("i18n.disabled")}
-              </Badge>
-            ) : pkg.filtered && (
-              <Badge variant="secondary" className="rounded-[3px] bg-warning/10 px-1.5 py-px text-[10px] font-normal text-warning">
-                {t("i18n.filtered")}
-              </Badge>
-            )}
-            <span className="truncate font-mono text-xs text-foreground">
-              {pkg.source}
-            </span>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <ConfigDetailTitle className="truncate">{pkg.source}</ConfigDetailTitle>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <ConfigScopeTag scope={pkg.scope}>{scopeLabel(pkg.scope, t)}</ConfigScopeTag>
+                {pkg.disabled ? (
+                  <Badge variant="secondary" className="rounded-[3px] px-1.5 py-px text-[10px] font-normal text-muted-foreground">
+                    {t("i18n.disabled")}
+                  </Badge>
+                ) : pkg.filtered && (
+                  <Badge variant="secondary" className="rounded-[3px] bg-warning/10 px-1.5 py-px text-[10px] font-normal text-warning">
+                    {t("i18n.filtered")}
+                  </Badge>
+                )}
+              </div>
+            </div>
           </ConfigDetailHeaderInfo>
 
           <ConfigDetailActions>
@@ -404,14 +406,18 @@ function PackageDetail({
         )}
       </div>
 
+      {/* The description reads as prose under the header, not as a grid value:
+          a wall of text wrapped into a narrow label column is what made the
+          old detail pane feel broken. */}
+      {description && (
+        <p className="max-w-prose text-[13px] leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+      )}
+
       {/* The package's properties as one card (§7.3). */}
       <ConfigCard>
         <ConfigDetailGrid>
-          {description && (
-            <ConfigDetailGridRow label={t("i18n.description")}>
-              {description}
-            </ConfigDetailGridRow>
-          )}
         <ConfigDetailGridRow
           label={t("i18n.status")}
           tone="plain"

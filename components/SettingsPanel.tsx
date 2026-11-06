@@ -818,7 +818,7 @@ export function SettingsPanel({
           // The overlay and surface sit above every in-page overlay (file panel,
           // minimap, widgets); the trust dialog mounts after and stacks above.
           "settings-phone-safe z-[1000] flex flex-col gap-0 overflow-hidden p-0",
-          "h-[min(560px,100dvh)] w-[min(780px,calc(100vw-2rem))] max-w-none sm:max-w-none rounded-xl",
+          "h-[min(640px,100dvh)] w-[min(920px,calc(100vw-2rem))] max-w-none sm:max-w-none rounded-2xl",
           "max-sm:inset-0 max-sm:h-full max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
         )}
       >
@@ -861,9 +861,9 @@ export function SettingsPanel({
             onValueChange={(value) => activateSection(value as SettingsSection)}
             className="flex min-h-0 flex-1 gap-0"
           >
-            <div className="flex w-[188px] shrink-0 flex-col border-r">
-              <div className="px-4 pt-4 pb-2 text-sm font-semibold">{t("settings.title")}</div>
-              <TabsList variant="line" className="h-auto min-h-0 w-full flex-1 flex-col items-stretch gap-0.5 overflow-y-auto bg-transparent p-2">
+            <div className="flex w-[200px] shrink-0 flex-col border-r bg-muted/40">
+              <div className="px-4 pt-4 pb-2 text-[15px] font-semibold">{t("settings.title")}</div>
+              <TabsList variant="line" className="h-auto min-h-0 w-full flex-1 flex-col items-stretch gap-0.5 overflow-y-auto bg-transparent p-3">
                 {sections.map((item) => {
                   const disabled = item.requiresProject && !cwd;
                   return (
@@ -872,7 +872,7 @@ export function SettingsPanel({
                       value={item.id}
                       disabled={disabled}
                       title={disabled ? t("settings.projectRequired") : item.label}
-                      className="h-9 w-full min-w-0 justify-start gap-2 px-2.5 text-[13px] font-normal data-[state=active]:bg-accent data-[state=active]:font-medium"
+                      className="h-9 w-full min-w-0 justify-start gap-2.5 rounded-md px-2.5 text-[13px] font-normal data-[state=active]:bg-background data-[state=active]:font-medium data-[state=active]:shadow-sm"
                     >
                       <SettingsSectionIcon section={item.id} size={15} />
                       <span className="truncate">{item.label}</span>

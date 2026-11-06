@@ -26,14 +26,14 @@ export function FontSettings() {
   const fonts = useFontPreferences();
 
   return (
-    <div className="grid w-full grid-cols-[max-content_minmax(0,1fr)_auto_auto] gap-x-2">
+    <div className="grid w-full grid-cols-[max-content_minmax(0,1fr)_auto_auto] gap-x-2 gap-y-4">
       {FONT_FIELDS.map(({ kind, label, placeholder, reset, weightLabel }) => {
         const weight = fonts[`${kind}Weight`];
         const weightIndex = FONT_WEIGHT_OPTIONS.findIndex((option) => option.value === weight);
         return (
           <Field
             key={kind}
-            className="col-span-full grid grid-cols-subgrid items-center gap-y-1"
+            className="col-span-full grid grid-cols-subgrid items-center gap-y-1.5"
           >
             <FieldLabel htmlFor={`settings-font-${kind}`} className="pr-1 text-[13px] font-normal">
               {t(label)}
