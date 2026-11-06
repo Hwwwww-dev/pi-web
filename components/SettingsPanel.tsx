@@ -872,7 +872,7 @@ export function SettingsPanel({
                       value={item.id}
                       disabled={disabled}
                       title={disabled ? t("settings.projectRequired") : item.label}
-                      className="h-9 w-full min-w-0 justify-start gap-2.5 rounded-md px-2.5 text-[13px] font-normal data-[state=active]:bg-background data-[state=active]:font-medium data-[state=active]:shadow-sm"
+                      className="h-9 w-full min-w-0 justify-start gap-2.5 rounded-md px-2.5 text-[13px] font-normal after:hidden data-[state=active]:bg-background data-[state=active]:font-medium data-[state=active]:shadow-sm"
                     >
                       <SettingsSectionIcon section={item.id} size={15} />
                       <span className="truncate">{item.label}</span>
