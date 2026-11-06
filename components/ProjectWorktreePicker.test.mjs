@@ -194,7 +194,7 @@ test("the force question starts on a Cancel on a desktop and in a sheet, never o
   const sheet = removalSurface({ sheet: true });
   assert.equal((sheet.match(/data-sidebar-menu-autofocus=""/g) ?? []).length, 1);
   assert.match(sheet, /<button type="button" class="sidebar-worktree-force[^"]*">Force<\/button>/);
-  assert.match(sheet, /<button type="button" class="sidebar-sheet-cancel[^"]*" data-sidebar-menu-autofocus="">Cancel<\/button><\/div><\/div>$/);
+  assert.match(sheet, /<button [^>]*class="[^"]*sidebar-sheet-cancel[^"]*"[^>]*data-sidebar-menu-autofocus="">Cancel<\/button><\/div><\/div>$/);
   assert.doesNotMatch(sheet, /sidebar-worktree-cancel/, "one Cancel in the sheet");
   // A failure without the question: the error, and still Cancel first.
   const failed = removalSurface({ sheet: true, dirty: false, error: "locked" });

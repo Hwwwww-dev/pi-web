@@ -3,6 +3,8 @@
 import { Children, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, type SyntheticEvent } from "react";
 import { CheckIcon } from "lucide-react";
 import { Dialog as DialogPrimitive, DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /**
@@ -461,8 +463,9 @@ function filterClassName(mode: SurfaceMode): string {
 function filterInputClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-filter-input",
-    "block w-full px-2 box-border border border-(--border) rounded-(--radius-sm) outline-none bg-background text-foreground [user-select:text] [-webkit-user-select:text] focus:border-(--accent)",
-    mode.classic ? "h-auto py-[5px] font-mono text-[11px]" : mode.sheet ? "h-10 text-sm" : "h-7 text-xs",
+    "block w-full px-2 box-border border border-(--border) rounded-(--radius-sm) outline-none bg-background text-foreground [user-select:text] [-webkit-user-select:text] focus:border-(--accent) focus-visible:border-(--accent) focus-visible:ring-0",
+    // Input 的响应式字号随模式收口，避免 md:text-sm 抬高 classic/sheet 之外的字号。
+    mode.classic ? "h-auto py-[5px] font-mono text-[11px] md:text-[11px]" : mode.sheet ? "h-10 text-sm" : "h-7 text-xs md:text-xs",
   ].filter(Boolean).join(" ");
 }
 
@@ -495,7 +498,7 @@ const SHEET_BACKDROP_CLASS = "sidebar-sheet-backdrop fixed inset-0 z-[410] bg-bl
 const SHEET_CLASS = "sidebar-sheet relative z-[1] box-border max-h-[calc(var(--app-viewport-height,100dvh)-48px)] overflow-y-auto [overscroll-behavior:contain] pt-1 pb-[max(8px,env(safe-area-inset-bottom))] border-t border-(--border) rounded-t-(--radius-lg) bg-background text-foreground text-[15px] shadow-[0_-6px_20px_rgba(0,0,0,0.12)] animate-in fade-in slide-in-from-bottom-[16px] duration-[120ms] ease-out pointer-events-auto focus:outline-none motion-reduce:animate-none [html[data-keyboard-open]_&]:pb-2";
 const SHEET_TITLE_CLASS = "sidebar-sheet-title px-4 pt-[10px] pb-[9px] overflow-hidden border-b border-(--border) text-muted-foreground text-xs text-ellipsis whitespace-nowrap";
 const SHEET_BODY_CLASS = "sidebar-sheet-body py-1";
-const SHEET_CANCEL_CLASS = ["sidebar-sheet-cancel", "flex items-center justify-center w-full h-12 px-4 border-0 border-t border-(--border) bg-transparent text-muted-foreground text-[15px] [font:inherit] cursor-pointer hover:bg-accent", FOCUS_RING].filter(Boolean).join(" ");
+const SHEET_CANCEL_CLASS = ["sidebar-sheet-cancel", "flex items-center justify-center w-full h-12 px-4 border-0 border-t border-(--border) bg-transparent text-muted-foreground text-[15px] [font:inherit] cursor-pointer hover:bg-accent", "rounded-none font-normal focus-visible:ring-0 focus-visible:border-(--border)", FOCUS_RING].filter(Boolean).join(" ");
 
 /** Enter is taken on the button rather than left to its click, which would not say whether Shift was held. */
 function activateOnEnter(action: MenuAction, onActivate: (action: MenuAction, shiftKey: boolean) => void) {
@@ -616,7 +619,7 @@ function MenuSurfaceBody({ mode, ariaLabel, items, filter, filterQuery = "", onF
     <>
       {filtered && (
         <div className={filterClassName(mode)}>
-          <input
+          <Input
             className={filterInputClassName(mode)}
             value={filterQuery}
             placeholder={filter.placeholder}
@@ -707,14 +710,15 @@ function SheetInner({
           {children}
         </MenuSurfaceBody>
       </div>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         className={SHEET_CANCEL_CLASS}
         data-sidebar-menu-autofocus={focusCancel ? "" : undefined}
         onClick={onCancel}
       >
         {cancelLabel}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -132,7 +132,7 @@ test("the mobile sheet has its own backdrop, a title, the items and a Cancel but
   assert.match(html, /<div class="sidebar-sheet[^"]*" role="dialog" aria-modal="true" aria-label="Session actions">/);
   assert.match(html, /<div class="sidebar-sheet-title[^"]*">A very long session title<\/div>/);
   assert.match(html, /<div class="sidebar-sheet-body[^"]*" role="menu" aria-label="Session actions">/);
-  assert.match(html, /<button type="button" class="sidebar-sheet-cancel[^"]*">Cancel<\/button><\/div><\/div>$/);
+  assert.match(html, /<button data-slot="button"[^>]*class="[^"]*sidebar-sheet-cancel[^"]*"[^>]*>Cancel<\/button><\/div><\/div>$/);
   assert.doesNotMatch(html, /style="width/, "the sheet is full width");
 
   const form = surface({ sheet: true, children: h("input", { "aria-label": "Branch" }) });
@@ -140,7 +140,7 @@ test("the mobile sheet has its own backdrop, a title, the items and a Cancel but
   assert.doesNotMatch(form, /data-sidebar-menu-autofocus/, "the body's first control takes focus");
   // A question whose other answer discards something starts on the sheet's Cancel.
   const question = surface({ sheet: true, focusCancel: true, children: h("button", { type: "button" }, "Force") });
-  assert.match(question, /<div class="sidebar-sheet-body[^"]*"><button type="button">Force<\/button><\/div><button type="button" class="sidebar-sheet-cancel[^"]*" data-sidebar-menu-autofocus="">Cancel<\/button>/);
+  assert.match(question, /<div class="sidebar-sheet-body[^"]*"><button type="button">Force<\/button><\/div><button [^>]*class="[^"]*sidebar-sheet-cancel[^"]*"[^>]*data-sidebar-menu-autofocus="">Cancel<\/button>/);
 });
 
 test("conditional bodies that are all off are no body: the items show", () => {
@@ -296,7 +296,10 @@ test("a classic menu: main's dropdown look, paths cut at their left, a footer an
 test("filter markup: a field above the list, the empty label, focus only on a desktop", () => {
   // A menu holds only items: the field and the empty label stand before it, in a dialog.
   const html = surface({ items: projectMenu, filter, filterQuery: "" });
-  assert.match(html, /^<div class="sidebar-menu[^"]*" role="dialog" aria-label="Session actions" style="width:208px"><div class="sidebar-menu-filter[^"]*"><input class="sidebar-menu-filter-input[^"]*" placeholder="Filter projects…" aria-label="Filter projects…" [^>]*data-sidebar-menu-filter="" data-sidebar-menu-autofocus="" value=""\/><\/div><div role="status"><\/div><div role="menu" aria-label="Session actions"><button/);
+  assert.match(html, /^<div class="sidebar-menu[^"]*" role="dialog" aria-label="Session actions" style="width:208px"><div class="sidebar-menu-filter[^"]*"><input data-slot="input" class="[^"]*sidebar-menu-filter-input[^"]*"/);
+  assert.match(html, /placeholder="Filter projects…" aria-label="Filter projects…" autoComplete="off"/);
+  assert.match(html, /data-sidebar-menu-filter=""[^>]*data-sidebar-menu-autofocus=""[^>]*value=""/);
+  assert.match(html, /<\/div><div role="status"><\/div><div role="menu" aria-label="Session actions"><button/);
   assert.equal((html.match(/role="menu"/g) ?? []).length, 1);
   assert.equal((html.match(/role="menuitemradio"/g) ?? []).length, 8);
   const narrowed = surface({ items: projectMenu, filter, filterQuery: "pi-web" });
