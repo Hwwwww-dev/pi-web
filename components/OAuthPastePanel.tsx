@@ -2,6 +2,7 @@
 
 import type { ReactNode, Ref } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 /** The parts of a keydown the paste box decides on. */
 export interface OAuthPasteKey {
@@ -65,7 +66,7 @@ export function OAuthPastePanel({
       <p className="oauth-paste-message">{message}</p>
       {hint && <p className="oauth-paste-hint">{hint}</p>}
       <div className="oauth-paste-row">
-        <input
+        <Input
           ref={inputRef}
           value={value}
           className="oauth-paste-input"

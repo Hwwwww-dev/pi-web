@@ -2596,7 +2596,7 @@ function ExtensionCustomPanel({
           maxHeight: dialogMaxHeight,
         }}
       >
-        <textarea
+        <Textarea
           ref={inputRef}
            aria-label={t("chat.extensionInput")}
           autoCapitalize="off"
@@ -2634,7 +2634,7 @@ function ExtensionCustomPanel({
             const text = event.clipboardData.getData("text");
             if (text) onInput(request, asBracketedPaste(text));
           }}
-          className="absolute h-px w-px border-0 p-0 opacity-0 pointer-events-none"
+          className="absolute h-px min-h-0 w-px border-0 p-0 opacity-0 shadow-none pointer-events-none"
         />
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2.5">
            <div className="text-[13px] font-[650] text-foreground">{t("chat.extensionPanel")}</div>

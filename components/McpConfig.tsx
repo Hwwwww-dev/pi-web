@@ -158,6 +158,7 @@ import { McpSignInRow } from "./McpSignIn";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
+import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Skeleton } from "./ui/skeleton";
 import {
   MCP_SIGN_IN_POLL_MS,
@@ -1569,6 +1570,11 @@ function McpServerDetail({
   const stdio = !http && (server.transport === "stdio" || server.command !== undefined);
   const reachNotice = server.exposure ? mcpExposureReachNotice(server.exposure, { codemode, toolSearchDisabled }, autoEnable) : undefined;
   const exposureId = useId();
+  // The dropdown's trigger shows the chosen exposure, its menu repeats the same labels.
+  const exposureOptionLabel = (exposure: McpExposure) =>
+    exposure === "codemode"
+      ? t("mcp.exposure.optionDefault", { label: t(MCP_EXPOSURE_SHORT_KEYS[exposure]) })
+      : t(MCP_EXPOSURE_SHORT_KEYS[exposure]);
   const inProjectNoteId = useId();
   const key = mcpServerKey(server);
   const name = revealHiddenCharacters(server.name);
@@ -1744,25 +1750,27 @@ function McpServerDetail({
                 {server.exposure && (
                   <>
                     <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                      <select
-                        className="mcp-select-arrow h-8 max-w-full rounded-md border border-input bg-transparent py-1 pr-[30px] pl-2.5 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                        aria-label={t("mcp.exposure.label", { name })}
-                        aria-describedby={[exposureId, block ? noteId : null].filter(Boolean).join(" ")}
+                      <UiSelect
                         value={server.exposure}
                         disabled={controlsBusy || block !== undefined}
-                        onChange={(event) => {
-                          const exposure = event.target.value as McpExposure;
+                        onValueChange={(value) => {
+                          const exposure = value as McpExposure;
                           if (exposure !== server.exposure) onExposureChange(server, exposure);
                         }}
                       >
-                        {MCP_EXPOSURE_OPTIONS.map((exposure) => (
-                          <option key={exposure} value={exposure}>
-                            {exposure === "codemode"
-                              ? t("mcp.exposure.optionDefault", { label: t(MCP_EXPOSURE_SHORT_KEYS[exposure]) })
-                              : t(MCP_EXPOSURE_SHORT_KEYS[exposure])}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger
+                          className="h-8 max-w-full rounded-md border-input px-2.5 text-xs shadow-none dark:bg-transparent dark:hover:bg-transparent"
+                          aria-label={t("mcp.exposure.label", { name })}
+                          aria-describedby={[exposureId, block ? noteId : null].filter(Boolean).join(" ")}
+                        >
+                          <SelectValue>{exposureOptionLabel(server.exposure)}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent position="popper" align="start" className="z-[1100]">
+                          {MCP_EXPOSURE_OPTIONS.map((exposure) => (
+                            <SelectItem key={exposure} value={exposure}>{exposureOptionLabel(exposure)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </UiSelect>
                       {busy === `exposure:${key}` && <Line role="status" tone="dim">{t("i18n.saving")}</Line>}
                     </span>
                     <Line id={exposureId}>{t(MCP_EXPOSURE_KEYS[server.exposure])}</Line>

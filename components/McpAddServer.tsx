@@ -23,6 +23,7 @@ import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
+import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import {
   MCP_ADD_BREADTH_KEYS,
   MCP_ADD_EXAMPLES,
@@ -84,9 +85,12 @@ function McpCode({ children }: { children: ReactNode }) {
 /** The add pane's boxes: the settings density (32px) in mono 12px, as the paste box above them. */
 const ADD_INPUT_CLASS = "h-8 px-2.5 font-mono text-xs";
 
-/** The pane's native selects (a portaled dropdown would not stack over the Settings dialog). */
+/** The add pane's selects: the settings density (32px) in mono 12px, as the paste box above them. */
 const ADD_SELECT_CLASS =
-  "mcp-select-arrow h-8 w-full min-w-0 rounded-md border border-input bg-transparent py-1 pr-[30px] pl-2.5 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  "h-8 w-full min-w-0 rounded-md border-input px-2.5 font-mono text-xs shadow-none dark:bg-transparent dark:hover:bg-transparent";
+
+/** Radix SelectItem values cannot be empty, so the "choose one" state travels as this sentinel. */
+const ADD_SELECT_NONE = "__none__";
 
 function displayPath(path: string): string {
   return revealHiddenCharacters(shortenPath(path));
@@ -305,16 +309,19 @@ export function McpAddServer({
 
       {parsed.ok && parsed.servers.length > 1 && (
         <ConfigField label={t("mcp.add.serverLabel")}>
-          <select
-            className={ADD_SELECT_CLASS}
-            aria-label={t("mcp.add.serverLabel")}
+          <UiSelect
             value={String(parsed.servers.indexOf(server ?? parsed.servers[0]))}
-            onChange={(event) => change({ server: Number(event.target.value), name: undefined, values: {}, references: {}, secretReferences: {} })}
+            onValueChange={(value) => change({ server: Number(value), name: undefined, values: {}, references: {}, secretReferences: {} })}
           >
-            {parsed.servers.map((item, index) => (
-              <option key={`${index}\0${item.name}`} value={index}>{revealHiddenCharacters(item.name)}</option>
-            ))}
-          </select>
+            <SelectTrigger className={ADD_SELECT_CLASS} aria-label={t("mcp.add.serverLabel")}>
+              <SelectValue>{revealHiddenCharacters((server ?? parsed.servers[0]).name)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent position="popper" align="start" className="z-[1100]">
+              {parsed.servers.map((item, index) => (
+                <SelectItem key={`${index}\0${item.name}`} value={String(index)}>{revealHiddenCharacters(item.name)}</SelectItem>
+              ))}
+            </SelectContent>
+          </UiSelect>
           <Line tone="dim">{t("mcp.add.serverCount", { count: parsed.servers.length })}</Line>
         </ConfigField>
       )}
@@ -576,10 +583,18 @@ function McpAddFieldInput({
           onChange={(event) => setReference(event.target.value)}
         />
       ) : field.kind === "select" ? (
-        <select className={ADD_SELECT_CLASS} aria-label={label} value={value} {...invalid} onChange={(event) => setValue(event.target.value)}>
-          {!field.options?.includes(value) && <option value="">{t("mcp.add.field.choose")}</option>}
-          {(field.options ?? []).map((option) => <option key={option} value={option}>{revealHiddenCharacters(option)}</option>)}
-        </select>
+        <UiSelect
+          value={value === "" ? ADD_SELECT_NONE : value}
+          onValueChange={(next) => setValue(next === ADD_SELECT_NONE ? "" : next)}
+        >
+          <SelectTrigger className={ADD_SELECT_CLASS} aria-label={label} {...invalid}>
+            <SelectValue>{value === "" ? t("mcp.add.field.choose") : revealHiddenCharacters(value)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent position="popper" align="start" className="z-[1100]">
+            {!field.options?.includes(value) && <SelectItem value={ADD_SELECT_NONE}>{t("mcp.add.field.choose")}</SelectItem>}
+            {(field.options ?? []).map((option) => <SelectItem key={option} value={option}>{revealHiddenCharacters(option)}</SelectItem>)}
+          </SelectContent>
+        </UiSelect>
       ) : (
         <Input
           className={ADD_INPUT_CLASS}

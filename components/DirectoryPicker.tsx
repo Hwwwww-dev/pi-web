@@ -4,6 +4,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import { ChevronUpIcon, FolderIcon, HardDriveIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +31,7 @@ const panelSurfaceClass = "overflow-hidden rounded-lg border border-border bg-ba
 
 // 焦点环由未分层 CSS 的 .directory-picker-path:focus-visible 提供（border + box-shadow），
 // 这里不叠加 focus-visible:ring，避免双环与被压制的死 utility。
-const textInputClass = "h-9 rounded-md border border-border bg-card px-2.5 font-mono text-xs text-foreground outline-none";
+const textInputClass = "h-9 rounded-md border border-border bg-card px-2.5 font-mono text-xs text-foreground outline-none shadow-none";
 
 const actionButtonClass = "rounded-md px-4 py-1.5 text-[13px]";
 
@@ -220,7 +221,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
           <label htmlFor="directory-path" className="sr-only">
             {t("directoryPicker.directoryPath")}
           </label>
-          <input
+          <Input
             className={cn("directory-picker-path min-w-0 flex-1", textInputClass)}
             id="directory-path"
             type="text"
@@ -355,7 +356,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
                 <label htmlFor="new-directory-name" className="mb-1.5 block text-xs text-muted-foreground">
                   {t("directoryPicker.directoryName")}
                 </label>
-                <input
+                <Input
                   id="new-directory-name"
                   value={directoryName}
                   autoFocus

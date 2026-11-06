@@ -242,7 +242,7 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
         ) : declaredTools ? (
           <EmptyState>{translate("tools.noTools")}</EmptyState>
         ) : loading ? (
-          <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3.5 pb-5 max-[640px]:p-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3.5 pb-5 max-[640px]:p-3">
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-3 w-full max-w-md" />
             <Skeleton className="h-3 w-full max-w-sm" />

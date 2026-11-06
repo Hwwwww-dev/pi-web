@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useLayoutEffect, useRef } from "react";
 import { ArrowUpIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { Input } from "@/components/ui/input";
 import { PathLabel } from "./PathLabel";
 import type {
   SkillContentResponse,
@@ -476,7 +477,7 @@ function AddSkillPanel({
 
         {/* Search row */}
         <div className="flex gap-2">
-          <input
+          <Input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -484,7 +485,7 @@ function AddSkillPanel({
               if (e.key === "Enter") search(query);
             }}
              placeholder={t("i18n.skillSearchPlaceholder")}
-            className="min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 py-[7px] text-xs text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="min-w-0 flex-1 h-auto rounded-md border-border bg-background px-2.5 py-[7px] text-xs text-foreground shadow-none focus-visible:border-border focus-visible:ring-[3px] focus-visible:ring-ring/50"
           />
           <ConfigButton
             variant="primary"

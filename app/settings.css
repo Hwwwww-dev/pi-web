@@ -159,6 +159,9 @@
   flex: 1;
   /* An input's intrinsic width would otherwise push the button out of a narrow pane. */
   min-width: 0;
+  /* The box is an Input primitive now: keep this rule above its utilities, and
+     keep the height padding-driven with no primitive shadow or disabled fade. */
+  height: auto;
   padding: 6px 9px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -167,6 +170,11 @@
   font-family: var(--font-mono);
   font-size: 12px;
   outline: none;
+  box-shadow: none;
+}
+
+.oauth-paste-input:disabled {
+  opacity: 1;
 }
 
 .oauth-paste-submit {
@@ -290,6 +298,9 @@
   color: var(--foreground);
   font-family: inherit;
   font-size: 12px;
+  /* The box is an Input primitive now: this unlayered rule wins over its
+     utilities, and no primitive shadow may show in place of outline: none. */
+  box-shadow: none;
 }
 
 .enabled-models-list {
@@ -397,7 +408,7 @@
   white-space: nowrap;
 }
 
-.agents-concurrency-control input {
+.agents-concurrency-control [data-slot="input"] {
   width: 52px;
   height: 28px;
   padding: 0 6px;
@@ -1195,16 +1206,8 @@
    Settings dialog): macOS draws the native arrow against the border, ignoring
    the padding, so a chevron of our own, in the theme's dim text color, as far
    from the right edge as the text is from the left. */
-.mcp-select-arrow {
-  appearance: none;
-  padding-right: 30px;
-  background-image:
-    linear-gradient(45deg, transparent 40%, var(--muted-foreground) 40%, var(--muted-foreground) 60%, transparent 60%),
-    linear-gradient(-45deg, transparent 40%, var(--muted-foreground) 40%, var(--muted-foreground) 60%, transparent 60%);
-  background-size: 5px 5px;
-  background-position: right 15px center, right 10px center;
-  background-repeat: no-repeat;
-}
+/* The panel's selects are Radix dropdowns now (SelectContent sits at z-[1100],
+   above the Settings dialog); the native arrow hack is gone with them. */
 
 /* Remove's confirmation (McpConfig's AlertDialog) portals to the body, which
    would put it under the Settings dialog (z-index 1000): raise the overlay and

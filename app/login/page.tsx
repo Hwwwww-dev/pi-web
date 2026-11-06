@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { I18nProvider, useI18n } from "@/hooks/useI18n";
 import { safeLoginDestination } from "@/lib/login-destination";
 
@@ -59,7 +60,7 @@ function LoginForm() {
         <form className="web-login-form" onSubmit={submit}>
           <div className="web-login-composer">
             <label className="web-login-label" htmlFor="web-login-password">{t("auth.password")}</label>
-            <input
+            <Input
               id="web-login-password"
               type="password"
               value={password}
@@ -69,6 +70,7 @@ function LoginForm() {
               autoFocus
               required
               disabled={busy}
+              className="w-auto min-w-0 h-auto flex-1 border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0 focus-visible:border-transparent"
             />
             <Button type="submit" variant="default" size="default" className="h-auto justify-start focus-visible:ring-0 focus-visible:border-transparent" disabled={busy || !password}>
               <svg className="size-3.5" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

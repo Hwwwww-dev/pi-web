@@ -11,6 +11,7 @@ import {
   isLastEnabledModel,
 } from "./enabled-models-helpers";
 import { ConfigButton, ConfigSwitch } from "./SettingsUi";
+import { Input } from "@/components/ui/input";
 import { ModelContextWindow, type ModelContextSettings } from "./ModelContextWindow";
 
 /**
@@ -449,7 +450,7 @@ export function EnabledModelsSection({
       )}
 
       {provider.models.length > 8 && (
-        <input
+        <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t("models.enabledFilterPlaceholder", { count: provider.models.length })}

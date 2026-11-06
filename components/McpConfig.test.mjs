@@ -13,6 +13,7 @@ const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 const { McpConfig, McpConfigView } = await jiti.import("./McpConfig.tsx");
 const { ConfigSidebarGroupSwitch } = await jiti.import("./SettingsUi.tsx");
 const { enLocale } = await jiti.import("@/lib/i18n/messages/en.ts");
+const { MCP_EXPOSURE_OPTIONS, MCP_EXPOSURE_SHORT_KEYS } = await jiti.import("./mcp-config-helpers.ts");
 const source = await readFile(new URL("./McpConfig.tsx", import.meta.url), "utf8");
 const helperSource = await readFile(new URL("./mcp-config-helpers.ts", import.meta.url), "utf8");
 const displaySource = await readFile(new URL("../lib/mcp-server-display.ts", import.meta.url), "utf8");
@@ -104,7 +105,8 @@ function view(props = {}) {
 
 /** The opening tag of the sidebar row whose accessible name starts with `name`. */
 function row(html, name) {
-  return decode(html).match(new RegExp(`<button[^>]*aria-label="${name}[^"]*"[^>]*>`))?.[0];
+  // The Button classes carry quoted `>` (has-[>svg]); scan attributes without leaving the tag.
+  return decode(html).match(new RegExp(`<button(?:[^>"']|"[^"]*"|'[^']*')*aria-label="${name}[^"]*"(?:[^>"']|"[^"]*"|'[^']*')*>`))?.[0];
 }
 
 test("without a project only the global file is listed, under the Code mode row", () => {
@@ -191,7 +193,7 @@ test("a stdio server's detail shows its masked command line, folder, env names a
   // Names only: the values stay in the file.
   assert.doesNotMatch(shown, /Values are not shown here/);
   assert.match(shown, /Shell commands Runs a shell command on every connection: env LINT_TOKEN/);
-  assert.match(markup, /<option value="direct" selected="">direct<\/option>/);
+  assert.match(markup, /<span data-slot="select-value" style="pointer-events:none">direct<\/span>/);
   assert.match(shown, /Every tool's full declaration goes with every request: the most tokens\./);
   assert.match(shown, /File ~\/\.pi\/agent\/mcp\.json/);
   assert.match(shown, /Parts that look like secrets are hidden\./);
@@ -382,7 +384,7 @@ test("the notices above the list sit together in their own box, right before the
 });
 
 test("a selected row renders with the ref attached as a plain button: the ref is not an attribute", () => {
-  const row = decode(view({ selected: "codemode" })).match(/<button type="button" aria-label="Code mode: [^"]+"[^>]*aria-current="page"[^>]*>/)?.[0] ?? "";
+  const row = decode(view({ selected: "codemode" })).match(/<button(?:[^>"']|"[^"]*"|'[^']*')*aria-label="Code mode: [^"]+"(?:[^>"']|"[^"]*"|'[^']*')*aria-current="page"(?:[^>"']|"[^"]*"|'[^']*')*>/)?.[0] ?? "";
   assert.match(row, /aria-current="page"/);
   assert.match(row, /config-sidebar-item/);
   assert.match(row, /bg-sidebar-accent/);
@@ -719,32 +721,37 @@ test("every string the panel shows is translated", () => {
   assert.doesNotMatch(source, />\s*[A-Z][a-z]+(?: [a-z]+){2,}[.:]?\s*</);
 });
 
-/** The selected server's exposure dropdown: its opening tag, and each option with whether it is selected. */
+/** The selected server's exposure dropdown: its trigger's opening tag and the chosen label it
+    shows. A closed Radix select renders no option list, so the choices are asserted against
+    the helpers' option list and the source that maps each one to its label. */
 function exposureSelect(html) {
   const markup = decode(html);
-  const match = markup.match(/(<select class="mcp-select-arrow h-8 max-w-full rounded-md border border-input bg-transparent py-1 pr-\[30px\] pl-2\.5 text-xs outline-none focus-visible:border-ring focus-visible:ring-\[3px\] focus-visible:ring-ring\/50"[^>]*>)([\s\S]*?)<\/select>/);
+  const match = markup.match(/<button[^>]*role="combobox"[^>]*>/);
   assert.ok(match, "the Tools row holds the exposure dropdown");
+  const shown = markup.match(/<span data-slot="select-value" style="pointer-events:none">([^<]*)<\/span>/);
   return {
-    tag: match[1],
-    options: [...match[2].matchAll(/<option value="([^"]+)"( selected="")?>([^<]*)<\/option>/g)].map(([, value, selected, label]) => ({ value, selected: Boolean(selected), label })),
+    tag: match[0],
+    shownLabel: shown?.[1] ?? null,
   };
 }
 
 test("a server's Tools row chooses its exposure, saying in one line what each costs", () => {
   const select = exposureSelect(view({ selected: "global\0github" }));
   assert.match(select.tag, /aria-label="How github's tools reach the model"/);
-  assert.doesNotMatch(select.tag, /disabled/);
-  assert.deepEqual(select.options, [
-    { value: "codemode", selected: true, label: "Code mode (default)" },
-    { value: "deferred", selected: false, label: "tool search" },
-    { value: "direct", selected: false, label: "direct" },
-    { value: "hidden", selected: false, label: "hidden" },
-  ]);
+  assert.doesNotMatch(select.tag, /disabled=""/);
+  // The trigger names the chosen exposure; the menu offers the helpers' exposures in order,
+  // each labelled by the source's mapping (Code mode carries the "(default)" suffix).
+  assert.equal(select.shownLabel, "Code mode (default)");
+  assert.deepEqual(MCP_EXPOSURE_OPTIONS, ["codemode", "deferred", "direct", "hidden"]);
+  assert.match(source, /exposure === "codemode"\s*\?\s*t\("mcp\.exposure\.optionDefault", \{ label: t\(MCP_EXPOSURE_SHORT_KEYS\[exposure\]\) \}\)\s*:\s*t\(MCP_EXPOSURE_SHORT_KEYS\[exposure\]\)/);
+  assert.equal(messages["mcp.exposure.optionDefault"], "{label} (default)");
+  assert.deepEqual(Object.values(MCP_EXPOSURE_SHORT_KEYS).map((key) => messages[key]), ["Code mode", "tool search", "direct", "hidden"]);
   // The description of the chosen exposure describes the dropdown.
   const describedBy = select.tag.match(/aria-describedby="([^"]+)"/)[1];
   assert.match(decode(view({ selected: "global\0github" })), new RegExp(`<span id="${describedBy}" class="min-w-0 text-xs leading-normal text-muted-foreground \\[overflow-wrap:anywhere\\]">Only the server's name and summary are listed`));
   const shown = text(view({ selected: "global\0github" }));
-  assert.match(shown, /Tools Code mode \(default\) .*? Only the server's name and summary are listed; Code mode scripts search for its tools\. File/);
+  // The closed dropdown only shows the chosen label between the row title and its description.
+  assert.match(shown, /Tools Code mode \(default\).*?Only the server's name and summary are listed; Code mode scripts search for its tools\. File/);
   assert.doesNotMatch(shown, /toolExposure/);
 
   // toolExposure rules are named and kept.
@@ -766,7 +773,7 @@ test("a server's Tools row chooses its exposure, saying in one line what each co
 
   // A refused entry has no exposure to choose.
   const refused = view({ selected: "global\0bad", load: { state: "loaded", data: overview({ servers: [server({ name: "bad", invalidError: "x" })] }) } });
-  assert.doesNotMatch(refused, /mcp-select-arrow/);
+  assert.doesNotMatch(refused, /data-slot="select-trigger"/);
 });
 
 test("the exposure dropdown waits like a switch, and points at why it cannot be changed", () => {
@@ -778,9 +785,9 @@ test("the exposure dropdown waits like a switch, and points at why it cannot be 
   // While any change is on its way it waits; the one for this server says it is saving.
   const saving = validated({ view: { busy: "exposure:global\0docs" } });
   assert.match(exposureSelect(saving).tag, /disabled=""/);
-  assert.match(decode(saving), /<span class="flex min-w-0 flex-wrap items-center gap-1\.5"><select[^>]*>[\s\S]*?<\/select><span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">Saving…<\/span><\/span>/);
+  assert.match(decode(saving), /<span class="flex min-w-0 flex-wrap items-center gap-1\.5"><button[^>]*role="combobox"[^>]*>[\s\S]*?<\/button>(?:<select[^>]*><\/select>)?<span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">Saving…<\/span><\/span>/);
   assert.match(exposureSelect(validated({ view: { busy: "switch:global\0pw" } })).tag, /disabled=""/);
-  assert.doesNotMatch(exposureSelect(validated()).tag, /disabled/);
+  assert.doesNotMatch(exposureSelect(validated()).tag, /disabled=""/);
   // Where no change may be written, it points at the note that says why.
   const html = validated({ data: { mcp: { available: false, reason: "operator-disabled", error: "x" } } });
   const select = exposureSelect(html);
@@ -797,7 +804,7 @@ function detailControls(html) {
   assert.ok(actions, "the detail header holds Remove and the switch");
   const [, buttons, noteId, note] = actions;
   return {
-    remove: buttons.match(/<button data-slot="alert-dialog-trigger" data-variant="destructive" data-size="xs" class="[^"]*"(?:[^>]*)>([^<]*)<\/button>/),
+    remove: buttons.match(/<button data-slot="alert-dialog-trigger" data-variant="ghost" data-size="xs" class="[^"]*"(?:[^>"']|"[^"]*"|'[^']*')*>([^<]*)<\/button>/),
     toggle: buttons.match(/<button type="button" role="switch"[^>]*>/)?.[0],
     noteId,
     note,
@@ -1053,7 +1060,7 @@ test("an untested server offers Test in its header, beside Remove", () => {
   const { text: shown, button } = statusRow(html);
   assert.equal(button.label, "Test connection");
   assert.doesNotMatch(button.attributes, /\sdisabled=|aria-describedby/);
-  assert.match(decode(html), /<div class="config-detail-actions"><button data-slot="button" data-variant="outline" data-size="xs" class="[^"]*" type="button">Test connection<\/button><button data-slot="alert-dialog-trigger" data-variant="destructive"/);
+  assert.match(decode(html), /<div class="config-detail-actions"><button data-slot="button" data-variant="outline" data-size="xs" class="[^"]*" type="button">Test connection<\/button><button data-slot="alert-dialog-trigger" data-variant="ghost"/);
   assert.equal(shown, "Not tested yet.");
   assert.equal(statusRow(html).label, "On");
   // A server that runs a shell command on every connection is labelled: its tests run one at a time.
@@ -1081,7 +1088,7 @@ test("a connected test shows what it listed, and the row reads connected", () =>
   const markup = decode(html);
   // The dot and the accessible name follow the test; connected needs no badge, as on needs none.
   assert.match(row(html, "docs"), /aria-label="docs: Connected when tested"/);
-  assert.match(markup, /<button type="button" aria-label="docs: Connected when tested"[^>]*><span aria-hidden="true" class="config-status-dot is-active"><\/span><span class="block min-w-0 truncate text-\[12px\] leading-\[1\.35\] flex-1">docs<\/span><\/button>/);
+  assert.match(markup, /<button(?:[^>"']|"[^"]*"|'[^']*')*aria-label="docs: Connected when tested"(?:[^>"']|"[^"]*"|'[^']*')*><span aria-hidden="true" class="config-status-dot is-active"><\/span><span class="block min-w-0 truncate text-\[13px\] leading-\[1\.35\] flex-1">docs<\/span><\/button>/);
   const { label, value, text: shown } = statusRow(html);
   // The state is said once: what the test found follows it without its own "Connected".
   assert.equal(label, "Connected when tested");
@@ -1095,7 +1102,7 @@ test("a connected test shows what it listed, and the row reads connected", () =>
   // The tools it listed go under the Tools row's choice, in the same row.
   const tools = markup.match(/<div class="config-detail-grid-label">Tools<\/div><div class="config-detail-grid-value">([\s\S]*?)<\/div>/)?.[1];
   assert.ok(tools, "a Tools row");
-  assert.match(tools, /<select[\s\S]*<\/select>[\s\S]*<ul class="mt-1 flex min-w-0 flex-col gap-1\.5">/);
+  assert.match(tools, /<button[^>]*role="combobox"[^>]*>[\s\S]*?<\/button>[\s\S]*<ul class="mt-1 flex min-w-0 flex-col gap-1\.5">/);
   assert.match(tools, /<li class="flex min-w-0 flex-col gap-0\.5"><span class="flex min-w-0 flex-wrap gap-1"><code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">search<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-muted-foreground">read-only<\/span><\/span><span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">Search the docs\.<\/span><\/li>/);
   // A tool whose exposure differs from its server's says so; one like its server's does not.
   assert.match(tools, /<code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">publish<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-muted-foreground">direct<\/span>/);
@@ -1360,7 +1367,7 @@ test("an OAuth server's pane signs in from its Sign-in row, under the Status row
   const flow = { flowId: "f1", scope: "global", name: "docs", configKey: "key", phase: "authorize", expiresInMs: 100_000, authorizationUrl: "https://auth.example/authorize?state=s" };
   const waiting = signInRow(testView({ usesOAuth: true, signedIn: false }, { view: { signIns: { [key]: { flow } } } }));
   assert.match(waiting.value, /<a href="https:\/\/auth\.example\/authorize\?state=s" target="_blank" rel="noopener noreferrer">/);
-  assert.match(waiting.value, /class="oauth-paste-input"/);
+  assert.match(waiting.value, /class="[^"]*oauth-paste-input"/);
 
   // A project nobody trusted: no sign-in, and the reason is visible.
   const blocked = signInRow(view({
