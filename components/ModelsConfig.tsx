@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback, useId, useRef } from "react";
 import { Check as CheckIcon, ChevronDown, Cpu, Eye, EyeOff, Plus, Search, X as XIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
+import { Button } from "./ui/button";
+import { ButtonGroup } from "./ui/button-group";
+import { Checkbox } from "./ui/checkbox";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 import type { ModelCatalogPreset, ModelCatalogRecommendation } from "@/lib/model-catalog";
 import type { DiscoveredModel } from "@/lib/model-discovery";
 import { ContextWindowError, normalizeContextWindowOverrides, withContextWindowOverride } from "@/lib/model-context";
@@ -209,11 +214,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <ConfigField label={label}>{children}</ConfigField>;
 }
 
-const inputClass =
-  "h-8 w-full rounded-md border border-border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+// Input/Select 的尺寸覆盖：其余边框、焦点环、placeholder、aria-invalid
+// 样式都来自 ui/ 原语自身。
+const inputClass = "h-8 px-2.5 text-xs md:text-xs";
 
 function TextInput({ value, onChange, placeholder, mono }: { value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean }) {
-  return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+  return <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
     className={cn(inputClass, mono && "font-mono")} />;
 }
 
@@ -245,7 +251,7 @@ function SecretTextInput({
 
   return (
     <div className={cn("relative w-full", className)}>
-      <input
+      <Input
         type={visible ? "text" : "password"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -255,29 +261,31 @@ function SecretTextInput({
         autoComplete={autoComplete}
         spellCheck={spellCheck}
       />
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-xs"
         onClick={() => setVisible((v) => !v)}
-         aria-label={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
-         title={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
-        className="absolute right-[5px] top-1/2 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted-foreground"
+        aria-label={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
+        title={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
+        className="absolute top-1/2 right-[5px] -translate-y-1/2 text-muted-foreground"
       >
         {visible ? <Eye size={15} strokeWidth={1.8} /> : <EyeOff size={15} strokeWidth={1.8} />}
-      </button>
+      </Button>
     </div>
   );
 }
 
 function NumInput({ value, onChange, placeholder, invalid }: { value: string; onChange: (v: string) => void; placeholder?: string; invalid?: boolean }) {
-  return <input type="number" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-    aria-invalid={invalid || undefined} className={cn(inputClass, invalid && "border-destructive")} />;
+  return <Input type="number" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+    aria-invalid={invalid || undefined} className={inputClass} />;
 }
 
 function Select({ value, onChange, options, required }: { value: string; onChange: (v: string) => void; options: readonly string[]; required?: boolean }) {
   const { t } = useI18n();
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}
-      className={cn(inputClass, value ? "text-foreground" : "text-muted-foreground")}>
+      className={cn(inputClass, "h-8 w-full rounded-md border border-input bg-transparent py-1 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive", value ? "text-foreground" : "text-muted-foreground")}>
        {!required && <option value="">— {t("i18n.default")} / none —</option>}
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -285,12 +293,12 @@ function Select({ value, onChange, options, required }: { value: string; onChang
 }
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  const id = useId();
   return (
-    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)}
-        className="size-[13px] cursor-pointer accent-primary" />
-      {label}
-    </label>
+    <div className="flex items-center gap-1.5">
+      <Checkbox id={id} checked={checked} onCheckedChange={(v) => onChange(v === true)} />
+      <Label htmlFor={id} className="cursor-pointer text-xs font-normal text-muted-foreground">{label}</Label>
+    </div>
   );
 }
 
@@ -323,8 +331,8 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
   const [discoveryQuery, setDiscoveryQuery] = useState("");
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const discoveryRequestIdRef = useRef(0);
-  const selectShownRef = useRef<HTMLInputElement>(null);
   const switchNoteId = useId();
+  const selectShownId = useId();
   const set = <K extends keyof ProviderEntry>(k: K, v: ProviderEntry[K]) => onChange({ ...provider, [k]: v });
 
   useEffect(() => {
@@ -371,12 +379,12 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
   const selectedCount = selectedModelIds.filter((id) => !existingModelIds.has(id)).length;
   const allShownSelected = selectableShownIds.length > 0
     && selectableShownIds.every((id) => selectedModelIds.includes(id));
-  const someShownSelected = !allShownSelected
-    && selectableShownIds.some((id) => selectedModelIds.includes(id));
-
-  useEffect(() => {
-    if (selectShownRef.current) selectShownRef.current.indeterminate = someShownSelected;
-  }, [someShownSelected]);
+  // Radix Checkbox 的三态：部分选中以 indeterminate 呈现，不再手写 DOM 属性。
+  const selectShownState: boolean | "indeterminate" = allShownSelected
+    ? true
+    : selectableShownIds.some((id) => selectedModelIds.includes(id))
+      ? "indeterminate"
+      : false;
 
   const toggleDiscoveredModel = (id: string) => {
     setSelectedModelIds((current) => current.includes(id)
@@ -425,10 +433,10 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
               </span>
             )}
             {editingName !== name && trimmedName && !renameConflict && (
-              <button onClick={() => onRename(trimmedName)}
-                className="mt-1 self-start rounded-sm border-0 bg-primary px-2.5 py-[3px] text-xs text-primary-foreground">
+              <Button size="xs" onClick={() => onRename(trimmedName)}
+                className="mt-1 self-start">
                  {t("i18n.rename")}
-              </button>
+              </Button>
             )}
           </Field>
 
@@ -469,7 +477,7 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
       >
         {discoveryState.phase === "success" && (
           <div className="flex flex-col gap-2.5">
-            <input
+            <Input
               value={discoveryQuery}
               onChange={(event) => setDiscoveryQuery(event.target.value)}
               placeholder={t("models.discoveryFilterPlaceholder", { count: discoveryState.models.length })}
@@ -478,49 +486,56 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
             />
 
             <div className="max-h-[220px] overflow-y-auto rounded-sm border border-border bg-card">
-              <label
-                className={cn(
-                  "sticky top-0 z-[1] flex min-h-8 items-center gap-2 border-b border-border bg-background px-2.5 py-[5px] text-[10px] font-semibold text-muted-foreground",
-                  selectableShownIds.length ? "cursor-pointer" : "cursor-default",
-                )}
+              <div
+                className="sticky top-0 z-[1] flex min-h-8 items-center gap-2 border-b border-border bg-background px-2.5 py-[5px] text-[10px] font-semibold text-muted-foreground"
               >
-                <input
-                  ref={selectShownRef}
-                  type="checkbox"
-                  checked={allShownSelected}
+                <Checkbox
+                  id={selectShownId}
+                  checked={selectShownState}
                   disabled={selectableShownIds.length === 0}
-                  onChange={toggleShownModels}
-                  className="size-[13px] shrink-0 accent-primary"
+                  onCheckedChange={() => toggleShownModels()}
+                  className="shrink-0"
                 />
-                {t("models.discoverySelectShown")}
-              </label>
+                <Label
+                  htmlFor={selectShownId}
+                  className={cn(
+                    "min-w-0 flex-1 truncate text-[10px] font-semibold text-muted-foreground",
+                    selectableShownIds.length ? "cursor-pointer" : "cursor-default",
+                  )}
+                >
+                  {t("models.discoverySelectShown")}
+                </Label>
+              </div>
               {shownDiscoveredModels.length === 0 ? (
                 <div className="p-3 text-xs text-muted-foreground">{t("models.discoveryNoMatches")}</div>
               ) : shownDiscoveredModels.map((model, index) => {
                 const alreadyAdded = existingModelIds.has(model.id);
                 const checked = selectedModelIds.includes(model.id);
                 return (
-                  <label
+                  <div
                     key={model.id}
                     className={cn(
                       "flex min-h-9 items-center gap-2 px-2.5 py-1.5",
                       index > 0 && "border-t border-border",
-                      alreadyAdded ? "cursor-default opacity-65" : "cursor-pointer",
+                      alreadyAdded && "opacity-65",
                     )}
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked || alreadyAdded}
+                    <Checkbox
+                      id={`${selectShownId}:${model.id}`}
+                      checked={alreadyAdded ? true : checked}
                       disabled={alreadyAdded}
-                      onChange={() => toggleDiscoveredModel(model.id)}
-                      className="size-[13px] shrink-0 accent-primary"
+                      onCheckedChange={() => toggleDiscoveredModel(model.id)}
+                      className="shrink-0"
                     />
-                    <span className="min-w-0 flex-1">
+                    <Label
+                      htmlFor={`${selectShownId}:${model.id}`}
+                      className="min-w-0 flex-1 cursor-pointer font-normal"
+                    >
                       <span className="block truncate text-xs text-foreground">{model.name ?? model.id}</span>
-                      {model.name && <code className="block truncate font-mono text-[10px] text-muted-foreground">{model.id}</code>}
-                    </span>
+                      {model.name && <code className="block truncate font-mono text-[10px] font-normal text-muted-foreground">{model.id}</code>}
+                    </Label>
                     {alreadyAdded && <span className="text-[10px] text-muted-foreground">{t("models.discoveryAdded")}</span>}
-                  </label>
+                  </div>
                 );
               })}
             </div>
@@ -587,16 +602,6 @@ function ThinkingLevelMapEditor({
     onChange(Object.keys(next).length ? next : undefined);
   };
 
-  const btnClass = (state: "plain" | "active" | "off") =>
-    cn(
-      "cursor-pointer whitespace-nowrap border-0 px-2.5 py-1 text-[10px] transition-colors",
-      state === "active"
-        ? "bg-primary font-semibold text-primary-foreground"
-        : state === "off"
-          ? "bg-destructive font-semibold text-white"
-          : "bg-card font-normal text-muted-foreground",
-    );
-
   return (
     <div className="flex flex-col gap-0.5">
       {THINKING_LEVELS.map((level) => {
@@ -626,43 +631,43 @@ function ThinkingLevelMapEditor({
               </span>
             </div>
 
-            <div className="flex shrink-0 overflow-hidden rounded-sm border border-border">
-              <button
+            <ButtonGroup className="shrink-0">
+              <Button
+                size="xs"
+                variant={state === "omit" ? "default" : "outline"}
+                className="whitespace-nowrap font-normal"
                 onClick={() => setLevel(level, "omit")}
-                className={btnClass(state === "omit" ? "active" : "plain")}
               >
                 {t("i18n.default")}
-              </button>
-              <button
+              </Button>
+              <Button
+                size="xs"
+                variant={state === "null" ? "destructive" : "outline"}
+                className="whitespace-nowrap font-normal"
                 onClick={() => setLevel(level, null)}
-                className={cn(btnClass(state === "null" ? "off" : "plain"), "border-l border-border")}
               >
                 {t("i18n.disabled")}
-              </button>
-            </div>
+              </Button>
+            </ButtonGroup>
 
-            <div className={cn(
-              "flex overflow-hidden rounded-sm border transition-colors",
-              state === "string" ? "border-primary" : "border-border",
-            )}>
-              <button
+            <ButtonGroup className="shrink-0">
+              <Button
+                size="xs"
+                variant={state === "string" ? "default" : "outline"}
+                className="shrink-0 whitespace-nowrap font-normal"
                 onClick={() => setLevel(level, strVal || level)}
-                className={cn(btnClass(state === "string" ? "active" : "plain"), "shrink-0 border-r border-border")}
               >
                 {t("i18n.custom")}
-              </button>
-              <input
+              </Button>
+              <Input
                 value={strVal}
                 onChange={(e) => setLevel(level, e.target.value)}
                 onFocus={() => { if (state !== "string") setLevel(level, strVal || level); }}
                 placeholder={level}
                 maxLength={10}
-                className={cn(
-                  "w-[12ch] border-0 py-1 pl-[7px] pr-1.5 font-mono text-xs outline-none transition-colors",
-                  state === "string" ? "bg-background text-foreground" : "bg-card text-muted-foreground",
-                )}
+                className="h-6 w-[12ch] rounded-none border-l-0 px-2 font-mono text-xs shadow-none md:text-xs"
               />
-            </div>
+            </ButtonGroup>
           </div>
         );
       })}
@@ -726,24 +731,26 @@ function HeaderListEditor({ headers, onChange }: {
     <div className="flex flex-col gap-1.5">
       {rows.map((row) => (
         <div key={row.id} className="flex gap-1.5">
-          <input value={row.name} onChange={(e) => setEntry(row.id, { name: e.target.value })}
+          <Input value={row.name} onChange={(e) => setEntry(row.id, { name: e.target.value })}
             placeholder="Header-Name" className={cn(inputClass, "flex-1 font-mono")} />
-          <input value={row.value} onChange={(e) => setEntry(row.id, { value: e.target.value })}
+          <Input value={row.value} onChange={(e) => setEntry(row.id, { value: e.target.value })}
             placeholder="value" className={cn(inputClass, "flex-1 font-mono")} />
-          <button onClick={() => removeEntry(row.id)}
-            className="cursor-pointer rounded-sm border border-destructive/30 bg-transparent px-2.5 py-1 leading-none text-destructive">
+          <Button variant="ghost" size="icon-xs"
+            onClick={() => removeEntry(row.id)}
+            className="text-destructive hover:text-destructive">
             <XIcon size={12} strokeWidth={1.8} />
-          </button>
+          </Button>
         </div>
       ))}
-      <button onClick={() => setRows((current) => [
-        ...current,
-        { id: nextRowIdRef.current++, name: "", value: "" },
-      ])}
-        className="inline-flex cursor-pointer items-center justify-center gap-1 self-start rounded-sm border border-border bg-transparent px-2.5 py-[5px] text-xs text-muted-foreground">
+      <Button variant="outline" size="xs"
+        onClick={() => setRows((current) => [
+          ...current,
+          { id: nextRowIdRef.current++, name: "", value: "" },
+        ])}
+        className="self-start text-muted-foreground">
         <Plus size={12} strokeWidth={1.8} />
         {t("models.addHeader")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -1091,12 +1098,14 @@ function ModelDetail({
               {catalogStatusText}
             </span>
             {catalogUndoRef.current && (
-              <button
+              <Button
+                variant="ghost"
+                size="xs"
                 onClick={undoCatalogFill}
-                className="shrink-0 cursor-pointer border-0 bg-transparent px-0.5 text-[10px] text-primary"
+                className="shrink-0 px-0.5 text-primary hover:text-primary"
               >
                 {t("models.catalogUndo")}
-              </button>
+              </Button>
             )}
           </div>
         ) : undefined}
@@ -1118,14 +1127,16 @@ function ModelDetail({
       <ConfigCard
         title={t("models.modelSpecs")}
         actions={(
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={toggleCostEditing}
             aria-expanded={costEditing}
-            className="cursor-pointer border-0 bg-transparent px-1 py-0.5 text-[10px] text-primary"
+            className="px-1 text-primary hover:text-primary"
           >
             {costEditing ? t("models.finishEditingCosts") : t("models.editCosts")}
-          </button>
+          </Button>
         )}
       >
         <div className="flex flex-col gap-4">
@@ -1183,7 +1194,7 @@ function ModelDetail({
             onClick={() => setAdvancedOpen((open) => !open)}
             aria-expanded={advancedOpen}
             aria-controls="model-advanced-settings"
-            className="grid min-h-12 w-full cursor-pointer grid-cols-[minmax(0,1fr)_18px] items-center gap-2.5 border-0 bg-transparent py-2 text-left text-foreground"
+            className="grid min-h-12 w-full grid-cols-[minmax(0,1fr)_18px] items-center gap-2.5 rounded-md px-1 py-2 text-left text-foreground hover:bg-accent hover:text-accent-foreground"
           >
             <span className="min-w-0">
               <span className="block text-xs font-semibold">{t("models.advancedSettings")}</span>
@@ -1266,13 +1277,15 @@ function ModelDetail({
                     <div className="mb-2 flex items-center justify-between gap-2.5">
                       <div className="text-xs font-semibold uppercase text-muted-foreground">{t("models.thinkingLevelMap")}</div>
                       {model.thinkingLevelMap && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="xs"
                           onClick={() => set("thinkingLevelMap", undefined)}
-                          className="cursor-pointer border-0 bg-transparent px-[5px] py-0.5 text-[10px] text-muted-foreground"
+                          className="px-[5px] text-muted-foreground"
                         >
                           {t("models.clearAll")}
-                        </button>
+                        </Button>
                       )}
                     </div>
                     <ThinkingLevelMapEditor
@@ -1483,13 +1496,14 @@ function OAuthDetail({ provider, onRefresh, enabledModels, contextSettings }: {
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {loginState.options.map((option) => (
-                    <button
+                    <Button
                       key={option.id}
+                      variant="outline"
                       onClick={() => submitSelection(loginState.token, option.id)}
-                      className="cursor-pointer rounded-sm border border-border bg-background px-2.5 py-1.5 text-left text-xs text-foreground"
+                      className="justify-start px-2.5 py-1.5 text-left text-xs font-normal md:text-xs"
                     >
                       {option.label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -1660,23 +1674,20 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
             spellCheck={false}
             mono
           />
-          <button
+          <Button
             onClick={handleSave}
             disabled={saving || !apiKey.trim() || savedOk}
+            variant={apiKey.trim() || savedOk ? "default" : "outline"}
             className={cn(
-              "flex shrink-0 cursor-pointer items-center gap-1 rounded-sm border-0 px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50",
-              savedOk
-                ? "bg-success text-white"
-                : apiKey.trim()
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground",
+              "shrink-0 text-xs font-semibold",
+              savedOk && "bg-success text-white hover:bg-success/90",
             )}
           >
             {savedOk && (
               <CheckIcon size={12} strokeWidth={2.5} />
             )}
              {savedOk ? t("i18n.saved") : saving ? t("i18n.saving") : t("i18n.save")}
-          </button>
+          </Button>
         </div>
       </ConfigCard>
 
@@ -1717,7 +1728,7 @@ function AddProviderPicker({
   const totalCount = availableOAuth.length + availableApiKey.length + (showCustom ? 1 : 0);
 
   const cardClass =
-    "flex w-full min-w-0 flex-row items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-primary hover:bg-accent/50";
+    "h-auto w-full min-w-0 justify-start gap-2 rounded-lg px-3 py-2.5 text-left font-normal text-foreground shadow-none border-border bg-card hover:border-primary hover:bg-accent/50";
 
   return (
     <div
@@ -1739,6 +1750,7 @@ function AddProviderPicker({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
              placeholder={t("i18n.searchProviders")}
+            aria-label={t("i18n.searchProviders")}
             className="min-w-0 flex-1 border-0 bg-transparent text-[13px] text-foreground outline-none"
           />
         </div>
@@ -1753,7 +1765,8 @@ function AddProviderPicker({
                  <div className="col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">{t("i18n.custom")}</div>
               )}
               {showCustom && (
-                <button
+                <Button
+                  variant="outline"
                   onClick={() => { onAddCustom(); onClose(); }}
                   className={cardClass}
                 >
@@ -1764,14 +1777,14 @@ function AddProviderPicker({
                   <span className="flex size-[26px] shrink-0 items-center justify-center rounded-sm border border-dashed border-border bg-secondary">
                     <Plus size={13} strokeWidth={1.8} className="text-muted-foreground" />
                   </span>
-                </button>
+                </Button>
               )}
 
               {availableOAuth.length > 0 && (
                  <div className={cn("col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground", showCustom && "pt-1.5")}>{t("i18n.subscriptions")}</div>
               )}
               {availableOAuth.map((p) => (
-                <button key={p.id} onClick={() => { onSelectOAuth(p.id); onClose(); }}
+                <Button key={p.id} variant="outline" onClick={() => { onSelectOAuth(p.id); onClose(); }}
                   className={cardClass}
                 >
                   <div className="min-w-0 flex-1">
@@ -1779,14 +1792,14 @@ function AddProviderPicker({
                     <div className="mt-0.5 text-[10px] text-muted-foreground">OAuth</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
-                </button>
+                </Button>
               ))}
 
               {availableApiKey.length > 0 && (
                 <div className={cn("col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground", availableOAuth.length > 0 && "pt-1.5")}>API Key</div>
               )}
               {availableApiKey.map((p) => (
-                <button key={p.id} onClick={() => { onSelectApiKey(p.id); onClose(); }}
+                <Button key={p.id} variant="outline" onClick={() => { onSelectApiKey(p.id); onClose(); }}
                   className={cardClass}
                 >
                   <div className="min-w-0 flex-1">
@@ -1794,7 +1807,7 @@ function AddProviderPicker({
                     <div className="mt-0.5 text-[10px] text-muted-foreground">{p.modelCount === 1 ? t("models.modelCountOne") : t("models.modelCount", { count: p.modelCount })}</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
-                </button>
+                </Button>
               ))}
 
             </div>
