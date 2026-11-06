@@ -6,7 +6,7 @@ const jiti = createJiti(import.meta.url, {
   jsx: { runtime: "automatic" },
   tsconfigPaths: true,
 });
-const { BranchNavigator, buildActivePath, compressChain, hasSessionBranches, selectTopLevelBranches } = await jiti.import("./BranchNavigator.tsx");
+const { BranchPanel, buildActivePath, compressChain, hasSessionBranches, selectTopLevelBranches } = await jiti.import("./BranchNavigator.tsx");
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
@@ -178,20 +178,20 @@ test("compressChain never labels a branch with a transcript system message", () 
   assert.equal(skipped, 2);
 });
 
-test("a locked navigator keeps the tree readable but offers no branch to switch to", () => {
+test("a locked branch panel keeps the tree readable but offers no branch to switch to", () => {
   const tree = [node(msg("u1", "user", "question"), [
     node(msg("a1", "assistant", "first answer")),
     node(msg("a2", "assistant", "second answer")),
   ])];
+  // Radix portals render nothing under renderToStaticMarkup, so the panel is
+  // exercised directly; selectBranch is what the navigator passes while locked.
   const render = (locked) => renderToStaticMarkup(React.createElement(
     I18nProvider,
     null,
-    React.createElement(BranchNavigator, {
-      tree,
-      activeLeafId: "a1",
-      onLeafChange() {},
-      open: true,
-      hasSession: true,
+    React.createElement(BranchPanel, {
+      topLevel: selectTopLevelBranches(tree),
+      activePathIds: buildActivePath(tree, "a1"),
+      selectBranch: locked ? undefined : () => {},
       locked,
     }),
   ));
@@ -199,13 +199,13 @@ test("a locked navigator keeps the tree readable but offers no branch to switch 
 
   const unlocked = render(false);
   assert.match(unlocked, /second answer/);
-  assert.equal((unlocked.match(/cursor-pointer/g) ?? []).length, 3);
+  assert.equal((unlocked.match(/cursor-pointer/g) ?? []).length, 2);
   assert.doesNotMatch(unlocked, new RegExp(lockedNotice));
 
   const locked = render(true);
   assert.match(locked, /second answer/);
   assert.match(locked, new RegExp(lockedNotice));
-  // Only the panel header stays clickable; branch rows are not.
-  assert.equal((locked.match(/cursor-pointer/g) ?? []).length, 1);
+  // Branch rows are not clickable while locked.
+  assert.equal((locked.match(/cursor-pointer/g) ?? []).length, 0);
   assert.equal((locked.match(/cursor-default/g) ?? []).length, 2);
 });

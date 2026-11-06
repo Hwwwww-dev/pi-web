@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { ChevronDownIcon, GitBranchIcon } from "lucide-react";
 import type { BranchPreview, SessionEntry, SessionTreeNode } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
-import { useOutsideDismiss } from "@/hooks/useOutsideDismiss";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -13,17 +14,17 @@ interface Props {
   onLeafChange: (leafId: string | null) => void;
   /** When true, renders as a compact inline button for embedding in a top bar */
   inline?: boolean;
-  /** When inline, use this ref's bounding rect to size/position the dropdown */
+  /** Anchor for the popover when the trigger button is hidden (e.g. the top bar) */
   containerRef?: React.RefObject<HTMLElement | null>;
-  /** Controlled open state for inline mode */
+  /** Controlled open state */
   open?: boolean;
-  /** Called when the button is clicked in inline mode */
+  /** Called when the open state should flip (trigger click or dismiss) */
   onToggle?: () => void;
   /** Whether a session is currently active (used to show appropriate empty reason) */
   hasSession?: boolean;
   /** When inline, render icon-only (no text label) to save horizontal space */
   compact?: boolean;
-  /** Keep the inline dropdown mounted while another control supplies its trigger */
+  /** Hide the inline button while another control supplies the trigger */
   hideInlineButton?: boolean;
   /** The session is running: the tree stays readable but branches cannot be switched */
   locked?: boolean;
@@ -222,34 +223,58 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
   );
 }
 
+// The branch tree panel: the tree when there is something to switch to, the
+// reason there is not otherwise. Exported for tests (Radix portals render
+// nothing under renderToStaticMarkup).
+export function BranchPanel({ topLevel, activePathIds, selectBranch, locked = false, noBranchReason }: {
+  topLevel: SessionTreeNode[];
+  activePathIds: Set<string>;
+  /** Absent while switching is locked */
+  selectBranch?: (id: string) => void;
+  locked?: boolean;
+  noBranchReason?: string | null;
+}) {
+  const { t } = useI18n();
+  if (topLevel.length === 0 && !locked) {
+    return (
+      <div className="px-3 py-2.5 text-xs italic text-muted-foreground">
+        {noBranchReason ?? t("i18n.noBranches")}
+      </div>
+    );
+  }
+  return (
+    <div className="max-h-[260px] min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-2">
+      {locked && (
+        <div className="pt-0.5 pb-1 text-xs italic text-muted-foreground">
+          {t("i18n.branchesLockedWhileRunning")}
+        </div>
+      )}
+      {topLevel.map((child, idx) => (
+        <TreeNodeView
+          key={child.entry.id}
+          node={child}
+          activePathIds={activePathIds}
+          depth={0}
+          isLast={idx === topLevel.length - 1}
+          parentLines={[]}
+          onSelect={selectBranch}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, containerRef, open: openProp, onToggle, hasSession, compact, hideInlineButton, locked = false }: Props) {
   const { t } = useI18n();
   const [openInternal, setOpenInternal] = useState(false);
   const open = openProp !== undefined ? openProp : openInternal;
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  // 点空白关闭：浮层与触发钮（data-outside-dismiss-ignore）之外的一次
-  // pointerdown 都算关闭请求，交给 onToggle 收起。
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
-  const setDropdownEl = useCallback((el: HTMLDivElement | null) => { dropdownRef.current = el; }, []);
-  useOutsideDismiss(open, dropdownRef, useCallback(() => {
-    if (openProp !== undefined) onToggle?.();
-    else setOpenInternal(false);
-  }, [openProp, onToggle]));
 
-  useEffect(() => {
-    if (!open || !inline) return;
-    const anchor = containerRef?.current ?? btnRef.current;
-    if (!anchor) return;
-    const update = () => {
-      const rect = anchor.getBoundingClientRect();
-      setDropdownPos({ top: rect.bottom, left: rect.left, width: rect.width });
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(anchor);
-    return () => ro.disconnect();
-  }, [open, inline, containerRef]);
+  // 受控（AppShell 的面板状态机）时开合都是对当前面板的一次 toggle；
+  // 非受控时直接落到新值。
+  const handleOpenChange = useCallback((next: boolean) => {
+    if (openProp !== undefined) onToggle?.();
+    else setOpenInternal(next);
+  }, [openProp, onToggle]);
 
   const activePathIds = useMemo(
     () => buildActivePath(tree, activeLeafId),
@@ -260,12 +285,6 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
     onLeafChange(id);
   }, [onLeafChange]);
   const selectBranch = locked ? undefined : handleSelect;
-
-  const lockedNotice = locked && (
-    <div className="pt-0.5 pb-1 text-xs italic text-muted-foreground">
-      {t("i18n.branchesLockedWhileRunning")}
-    </div>
-  );
 
   const noBranchReason = !hasSession
     ? t("i18n.noActiveSession")
@@ -284,98 +303,90 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
     <ChevronDownIcon
       size={10}
       strokeWidth={1.8}
-      className={cn("ml-0.5 text-muted-foreground transition-transform duration-150", open && "rotate-180")}
+      className={cn("ml-auto text-muted-foreground transition-transform duration-150", open && "rotate-180")}
     />
   );
 
-  const treeScrollClass = "max-h-[260px] overflow-y-auto px-3 pt-1 pb-2";
-  const emptyNoticeClass = "px-4 py-2.5 text-xs italic text-muted-foreground";
+  const panel = (
+    <BranchPanel
+      topLevel={topLevel}
+      activePathIds={activePathIds}
+      selectBranch={selectBranch}
+      locked={locked}
+      noBranchReason={noBranchReason}
+    />
+  );
 
-  const renderTreeRows = () =>
-    topLevel.map((child, idx) => (
-      <TreeNodeView
-        key={child.entry.id}
-        node={child}
-        activePathIds={activePathIds}
-        depth={0}
-        isLast={idx === topLevel.length - 1}
-        parentLines={[]}
-        onSelect={selectBranch}
-      />
-    ));
+  const contentClassName = cn(
+    "flex max-h-(--radix-popover-content-available-height) flex-col overflow-hidden p-0",
+    inline
+      ? "w-max min-w-56 max-w-(--radix-popover-content-available-width)"
+      : "w-(--radix-popover-trigger-width)",
+  );
 
   if (inline) {
     return (
-      <div className="flex h-full items-stretch">
-        <button
-          ref={btnRef}
-          onClick={() => onToggle ? onToggle() : setOpenInternal((v) => !v)}
-          data-outside-dismiss-ignore="true"
-          className={cn(
-            "h-full cursor-pointer items-center gap-1.5 border-0 border-r border-r-border border-t-2 px-3 text-xs whitespace-nowrap transition-colors duration-100",
-            "outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
-            open
-              ? "flex border-t-primary bg-accent text-foreground"
-              : "flex border-t-transparent bg-transparent text-muted-foreground",
-            hideInlineButton && "hidden",
-          )}
-          title={t("i18n.branches")}
-          aria-label={t("i18n.branches")}
-          aria-pressed={open}
-        >
-          {branchIcon}
-           {!compact && <span>{t("i18n.branches")}</span>}
-        </button>
-        {open && dropdownPos && (
-          // top/left/width 锚定自触发器的 getBoundingClientRect（测量值），保留 inline style。
-          <div
-            ref={setDropdownEl}
-            className="fixed z-[500] border-b border-border bg-card"
-            style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
-          >
-            {hasContent ? (
-              <div className={treeScrollClass}>
-                {lockedNotice}
-                {renderTreeRows()}
-              </div>
-            ) : (
-              <div className={emptyNoticeClass}>
-                {noBranchReason}
-              </div>
-            )}
-          </div>
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        {hideInlineButton ? (
+          // 触发钮在别处（顶栏 ⋯ 菜单），弹层锚定 AppShell 给的容器。
+          <PopoverAnchor virtualRef={containerRef} />
+        ) : (
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              title={t("i18n.branches")}
+              aria-label={t("i18n.branches")}
+              aria-pressed={open}
+              className={cn(
+                "h-full rounded-none border-y-0 border-l-0 border-r border-r-border border-t-2 px-3 py-0 text-xs font-normal",
+                open ? "border-t-primary bg-accent text-foreground" : "border-t-transparent text-muted-foreground",
+              )}
+            >
+              {branchIcon}
+              {!compact && <span>{t("i18n.branches")}</span>}
+            </Button>
+          </PopoverTrigger>
         )}
-      </div>
+        <PopoverContent
+          side="bottom"
+          align="end"
+          sideOffset={6}
+          collisionPadding={8}
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          // 从 ⋯ 菜单打开时，菜单关闭的焦点归还会落在弹层之外；
+          // 面板沿用旧语义：只有外部 pointerdown 或 Escape 才关闭。
+          onFocusOutside={(event) => event.preventDefault()}
+          className={contentClassName}
+        >
+          {panel}
+        </PopoverContent>
+      </Popover>
     );
   }
 
   return (
-    <div className="relative shrink-0 border-b border-border bg-background">
-      {/* Header toggle */}
-      <button
-        onClick={() => setOpenInternal((v) => !v)}
-        className="flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent px-3 py-[5px] text-left text-xs text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          className="h-8 w-full justify-start rounded-none px-3 text-xs font-normal text-muted-foreground"
+        >
+          {branchIcon}
+          <span>{t("i18n.branches")}</span>
+          {chevron}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="end"
+        sideOffset={6}
+        collisionPadding={8}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onFocusOutside={(event) => event.preventDefault()}
+        className={contentClassName}
       >
-        {branchIcon}
-         <span className="text-muted-foreground">{t("i18n.branches")}</span>
-        {chevron}
-      </button>
-
-      {/* Tree panel - overlay */}
-      {open && (
-        <div className="absolute top-full right-0 left-0 z-[100] border-b border-border bg-background shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
-          {hasContent ? (
-            <div className={treeScrollClass}>
-              {lockedNotice}
-              {renderTreeRows()}
-            </div>
-          ) : (
-            <div className={emptyNoticeClass}>
-              {noBranchReason ?? t("i18n.noBranches")}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        {panel}
+      </PopoverContent>
+    </Popover>
   );
 }
