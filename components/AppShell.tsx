@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -130,15 +132,9 @@ type AutoNameStatus =
   | { kind: "success" }
   | { kind: "error"; message: string };
 
-// R2-1 header pills (the draft's .pm-pill): a quiet capsule that raises onto
-// the bar (border + surface + shadow) while its panel is open. Shared by the
-// Agents pill, the toolbar segments and the debug/theme group.
-const HEADER_PILL = "flex h-7 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 text-xs font-medium whitespace-nowrap text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-45";
-const HEADER_PILL_OPEN = "border-border bg-background text-foreground shadow-sm";
-// The connected capsule (the draft's .pm-bgroup) around related segments:
-// a 1px track with 30x26 round ghost segments in it.
-const HEADER_BGROUP = "flex h-7 shrink-0 items-center gap-px rounded-full border border-border bg-background p-px";
-const HEADER_BGROUP_SEGMENT = "flex h-full w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-45";
+// 顶栏控件统一为 shadcn ghost Button：面板开着时以 bg-accent 文字色浮起，
+// 不再有描边胶囊/联排底座。
+const HEADER_CONTROL_OPEN = "bg-accent text-foreground";
 
 /** Right-panel Git tab id; closing it removes the tab, the sidebar entry reopens it. It owns no FileViewer. */
 const GIT_TAB_ID = "git";
@@ -1857,19 +1853,20 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       {/* The draft's footer: one settings row, the version at the row's end.
           Models and skills live in Settings alone. */}
       <div className="flex shrink-0 items-center gap-1 border-t border-sidebar-border px-2.5 pb-2.5 pt-2">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => {
             setSettingsOpenAtHome(true);
             setSettingsSection(getLastSettingsSection(projectTrustCwd));
           }}
           title={translate("common.settings")}
           aria-label={translate("common.settings")}
-          className="flex h-8 min-w-0 shrink cursor-pointer items-center gap-1.5 rounded-full bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="min-w-0 shrink justify-start gap-1.5 rounded-full px-2.5 font-medium text-muted-foreground"
         >
           <SettingsSectionIcon section="general" size={14} strokeWidth={2} />
           <span className="truncate">{translate("common.settings")}</span>
-        </button>
+        </Button>
         <span
           className="ml-auto shrink-0 font-mono text-[11px] leading-none tabular-nums text-muted-foreground opacity-70"
           title={`pi-web ${APP_VERSION} · pi ${PI_VERSION}`}
@@ -1883,22 +1880,22 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
   const renderProjectTrustWarning = (mobileBanner: boolean) => {
     if (!showChat || !projectTrust?.requiresTrust || projectTrust.trusted) return null;
     return (
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={openProjectTrustDialog}
-        title={translate("trust.resourcesNotLoaded")}
         aria-label={translate("trust.resourcesNotLoaded")}
         className={cn(
-          "flex shrink-0 cursor-pointer items-center gap-1.5 text-left text-[11px] leading-[1.35] text-warning",
+          "shrink-0 gap-1.5 text-left text-[11px] font-normal leading-[1.35] text-warning hover:bg-warning/10 hover:text-warning",
           mobileBanner
-            ? "min-h-8 w-full justify-start border-b border-border bg-warning/10 px-3 py-1.5"
-            : "h-8 self-center justify-center rounded-full border border-warning/40 bg-warning/10 px-3",
+            ? "h-auto min-h-8 w-full justify-start rounded-none border-b border-border bg-warning/10 px-3 py-1.5"
+            : "self-center justify-center rounded-full bg-warning/10 px-3",
         )}
         data-mobile-trust-banner={mobileBanner ? "true" : undefined}
       >
         <ShieldAlertIcon className="size-3.5 shrink-0" strokeWidth={2} />
-        <span>{translate("trust.resourcesNotLoaded")}</span>
-      </button>
+        <span className="min-w-0">{translate("trust.resourcesNotLoaded")}</span>
+      </Button>
     );
   };
 
@@ -1914,7 +1911,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     </span>
   );
 
-  // The Agents switcher's pill (Popover). A narrow phone shows it beside the
+  // The Agents switcher (Popover): a ghost control that raises onto the bar
+  // (bg-accent) while its panel is open. A narrow phone shows it beside the
   // More menu instead of folding it into that menu: the bar has the room, and
   // the badge stays in sight. A run lights the 5px breathing dot.
   const renderAgentsButton = (mobile: boolean) => (
@@ -1922,99 +1920,125 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       open={activeTopPanel === "agents" && Boolean(activeSessionFamily)}
       onOpenChange={() => toggleTopPanel("agents", mobile && !isNarrowMobile)}
     >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={!activeSessionFamily}
-          title={agentsButtonLabel}
-          aria-label={agentsButtonLabel}
-          aria-pressed={activeTopPanel === "agents"}
-          className={cn(HEADER_PILL, "pr-2", activeTopPanel === "agents" && HEADER_PILL_OPEN)}
-          data-mobile-toolbar-action={mobile ? "agents" : undefined}
-        >
-          <BotIcon className="size-3.5" strokeWidth={1.9} />
-          {agentsBadge && agentsBadge.count > 0 && renderAgentsBadge(agentsBadge)}
-          <span className="hidden min-[1240px]:inline">{translate("agentSwitcher.title")}</span>
-        </button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!activeSessionFamily}
+              aria-label={agentsButtonLabel}
+              aria-pressed={activeTopPanel === "agents"}
+              className={cn(
+                "gap-1.5 rounded-full font-medium text-muted-foreground",
+                activeTopPanel === "agents" && HEADER_CONTROL_OPEN,
+              )}
+              data-mobile-toolbar-action={mobile ? "agents" : undefined}
+            >
+              <BotIcon data-icon className="size-3.5" strokeWidth={1.9} />
+              {agentsBadge && agentsBadge.count > 0 && renderAgentsBadge(agentsBadge)}
+              <span className="hidden min-[1240px]:inline">{translate("agentSwitcher.title")}</span>
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{agentsButtonLabel}</TooltipContent>
+      </Tooltip>
       <PopoverContent
-        // 承载容器透明：视觉仍由 AgentSessionPanel 自己的卡片给出，这里只负责
-        // 定位（贴触发钮右缘）与宽度（AGENT_PANEL_WIDTH）；z-500 维持旧面板
-        // 高于引用工具栏的层序。
+        // 标准弹层本体（bg-popover + border + shadow-md）；清单由 AgentSessionPanel
+        // 给出，这里只负责定位（贴触发钮右缘）、宽度（AGENT_PANEL_WIDTH）与
+        // z-500（高于引用工具栏的层序）。
         align="end"
-        className="z-[500] w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] rounded-lg border-none bg-transparent p-0 shadow-none"
+        className="z-[500] w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden p-1"
         style={{ "--agent-panel-width": `${AGENT_PANEL_WIDTH}px` } as React.CSSProperties}
       >
-        {/* The panel hangs off the bar (no top border/rounding); the wrapper
-            turns it into a free-floating card. */}
-        <div className="[&>*]:rounded-lg [&>*]:border [&>*]:shadow-lg">
-          {activeSessionFamily && selectedSession && (
-            <AgentSessionPanel
-              rootSession={activeSessionFamily.root}
-              subagents={activeSessionFamily.subagents}
-              selectedSessionId={selectedSession.id}
-              runningSessionIds={runningSessionIds}
-              onSelectSession={handleSelectSession}
-              openSubagentTabIds={openSubagentTabIds}
-              onToggleSubagentTab={handleToggleSubagentTab}
-              onNewSideChat={() => handleNewSideChat(activeSessionFamily.root.id)}
-              onDeleteSideChat={(sessionId) => handleDeleteSideChat(sessionId, activeSessionFamily.root)}
-            />
-          )}
-        </div>
+        {activeSessionFamily && selectedSession && (
+          <AgentSessionPanel
+            rootSession={activeSessionFamily.root}
+            subagents={activeSessionFamily.subagents}
+            selectedSessionId={selectedSession.id}
+            runningSessionIds={runningSessionIds}
+            onSelectSession={handleSelectSession}
+            openSubagentTabIds={openSubagentTabIds}
+            onToggleSubagentTab={handleToggleSubagentTab}
+            onNewSideChat={() => handleNewSideChat(activeSessionFamily.root.id)}
+            onDeleteSideChat={(sessionId) => handleDeleteSideChat(sessionId, activeSessionFamily.root)}
+          />
+        )}
       </PopoverContent>
     </Popover>
   );
 
-  // The connected branch/history/⋯ capsule (the draft's .pm-bgroup). The
-  // BranchNavigator dropdown hangs under the whole bar (containerRef), so the
-  // branch segment only toggles it.
+  // Branch / history / ⋯: plain ghost controls (the connected capsule base is
+  // gone). The BranchNavigator dropdown hangs under the whole bar
+  // (containerRef), so the branch control only toggles it.
   const renderToolbarBGroup = (mobile: boolean) => (
-    <div className={HEADER_BGROUP} role="group">
-      {/* A narrow phone keeps only the ⋯ segment: branch and history live in
+    <div className="flex shrink-0 items-center gap-0.5" role="group">
+      {/* A narrow phone keeps only the ⋯ control: branch and history live in
           its menu there. */}
       {(!mobile || !isNarrowMobile) && sessionHasBranches && (
-        <button
-          type="button"
-          onClick={() => toggleTopPanel("branches", mobile)}
-          title={translate("i18n.branches")}
-          aria-label={translate("i18n.branches")}
-          aria-pressed={activeTopPanel === "branches"}
-          className={cn(HEADER_BGROUP_SEGMENT, activeTopPanel === "branches" && "bg-accent text-foreground")}
-          data-mobile-toolbar-action={mobile ? "branches" : undefined}
-        >
-          <GitBranchIcon
-            className={cn("size-3.5", branchTree.length > 0 ? "text-primary" : "text-dim")}
-            strokeWidth={2}
-          />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => toggleTopPanel("branches", mobile)}
+              aria-label={translate("i18n.branches")}
+              aria-pressed={activeTopPanel === "branches"}
+              className={cn(
+                "rounded-full text-muted-foreground",
+                activeTopPanel === "branches" && HEADER_CONTROL_OPEN,
+              )}
+              data-mobile-toolbar-action={mobile ? "branches" : undefined}
+            >
+              <GitBranchIcon
+                data-icon
+                className={cn(branchTree.length > 0 ? "text-primary" : "text-dim")}
+                strokeWidth={2}
+              />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{translate("i18n.branches")}</TooltipContent>
+        </Tooltip>
       )}
       {(!mobile || !isNarrowMobile) && (
-        <button
-          type="button"
-          onClick={handleViewFullHistory}
-          disabled={!selectedSession}
-          title={selectedSession ? translate("history.full") : translate("history.unsaved")}
-          aria-label={translate("history.full")}
-          className={HEADER_BGROUP_SEGMENT}
-          data-mobile-toolbar-action={mobile ? "history" : undefined}
-        >
-          <HistoryIcon className="size-3.5" strokeWidth={2} />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleViewFullHistory}
+              disabled={!selectedSession}
+              aria-label={translate("history.full")}
+              className="rounded-full text-muted-foreground"
+              data-mobile-toolbar-action={mobile ? "history" : undefined}
+            >
+              <HistoryIcon data-icon strokeWidth={2} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{selectedSession ? translate("history.full") : translate("history.unsaved")}</TooltipContent>
+        </Tooltip>
       )}
       <DropdownMenu open={mobileToolbarMoreOpen} onOpenChange={handleMobileToolbarMoreOpenChange}>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            title={moreControlsLabel}
-            aria-label={moreControlsLabel}
-            aria-expanded={mobileToolbarMoreOpen}
-            data-mobile-toolbar-more="true"
-            className={cn(HEADER_BGROUP_SEGMENT, mobileToolbarMoreOpen && "bg-accent text-foreground")}
-          >
-            <EllipsisIcon className="size-4" strokeWidth={2} />
-          </button>
-        </DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={moreControlsLabel}
+                aria-expanded={mobileToolbarMoreOpen}
+                data-mobile-toolbar-more="true"
+                className={cn(
+                  "rounded-full text-muted-foreground",
+                  mobileToolbarMoreOpen && HEADER_CONTROL_OPEN,
+                )}
+              >
+                <EllipsisIcon data-icon strokeWidth={2} />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>{moreControlsLabel}</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent
           align="end"
           id="mobile-toolbar-actions"
@@ -2191,17 +2215,19 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
 
     if (mobile) {
       return (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => toggleTopPanel("session")}
           disabled={!showChat}
           title={tooltip || translate("session.title")}
           aria-label={translate("session.title")}
           aria-pressed={activeTopPanel === "session"}
           className={cn(
-            "flex h-7 min-w-0 flex-1 items-center justify-end overflow-hidden whitespace-nowrap rounded-full border border-transparent bg-transparent px-2 text-xs text-muted-foreground transition-colors",
-            showChat ? "cursor-pointer enabled:hover:bg-accent enabled:hover:text-foreground" : "cursor-default",
-            activeTopPanel === "session" && HEADER_PILL_OPEN,
+            "min-w-0 flex-1 justify-end overflow-hidden whitespace-nowrap rounded-full px-2 text-xs font-normal text-muted-foreground",
+            !showChat && "cursor-default",
+            activeTopPanel === "session" && HEADER_CONTROL_OPEN,
+            "enabled:hover:bg-accent enabled:hover:text-foreground",
             "mobile-session-stats",
           )}
           data-mobile-toolbar-stats="true"
@@ -2217,7 +2243,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               <span className="font-mono text-[11.5px] font-medium text-foreground">{cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`}</span>
             )}
           </span>
-        </button>
+        </Button>
       );
     }
 
@@ -2238,15 +2264,16 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           </Badge>
         )}
         {contextUsage?.contextWindow && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => toggleTopPanel("session")}
             title={tooltip || translate("session.title")}
             aria-label={translate("session.title")}
             aria-pressed={activeTopPanel === "session"}
             className={cn(
-              "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border border-transparent bg-secondary px-2.5 font-mono text-[11.5px] tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-              activeTopPanel === "session" && "border-border bg-background text-foreground shadow-sm",
+              "gap-1 overflow-hidden rounded-lg bg-secondary px-2.5 font-mono text-[11.5px] font-normal tabular-nums text-muted-foreground",
+              activeTopPanel === "session" && HEADER_CONTROL_OPEN,
             )}
           >
             <span className={contextTone}>{contextUsage.percent !== null ? `${contextUsage.percent.toFixed(1)}%` : "?"}</span>
@@ -2263,144 +2290,92 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 )}
               />
             </span>
-          </button>
+          </Button>
         )}
       </div>
     );
   };
 
-  // The debug/theme capsule (the draft's right-end .pm-bgroup). Debug only
-  // opens or closes its panel: nothing is loaded here. The theme pill flips
-  // light/dark through the same preference Settings writes.
+  // Debug / theme: plain ghost controls (the connected capsule base is gone).
+  // Debug only opens or closes its panel: nothing is loaded here. The theme
+  // control flips light/dark through the same preference Settings writes.
   const renderDebugThemeGroup = () => {
     const open = activeTopPanel === "debug";
     return (
-      <div className={HEADER_BGROUP} role="group">
+      <div className="flex shrink-0 items-center gap-0.5" role="group">
         {showChat && (
-          <button
-            ref={debugButtonRef}
-            type="button"
-            onClick={() => toggleTopPanel("debug")}
-            title={translate("debug.title")}
-            aria-label={translate("debug.title")}
-            aria-pressed={open}
-            className={cn(HEADER_BGROUP_SEGMENT, open && "bg-accent text-foreground")}
-          >
-            <BugIcon
-              className={cn("size-3.5 shrink-0", open ? "text-primary" : "text-dim")}
-              strokeWidth={2}
-            />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                ref={debugButtonRef}
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => toggleTopPanel("debug")}
+                aria-label={translate("debug.title")}
+                aria-pressed={open}
+                className={cn(
+                  "rounded-full text-muted-foreground",
+                  open && HEADER_CONTROL_OPEN,
+                )}
+              >
+                <BugIcon
+                  data-icon
+                  className={cn(open ? "text-primary" : "text-dim")}
+                  strokeWidth={2}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{translate("debug.title")}</TooltipContent>
+          </Tooltip>
         )}
-        <button
-          type="button"
-          onClick={() => setThemePreference(theme === "dark" ? "light" : "dark")}
-          title={translate("settings.appearance")}
-          aria-label={translate("settings.appearance")}
-          className={HEADER_BGROUP_SEGMENT}
-        >
-          {theme === "dark" ? (
-            <SunIcon className="size-3.5 shrink-0" strokeWidth={2} />
-          ) : (
-            <MoonIcon className="size-3.5 shrink-0" strokeWidth={2} />
-          )}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setThemePreference(theme === "dark" ? "light" : "dark")}
+              aria-label={translate("settings.appearance")}
+              className="rounded-full text-muted-foreground"
+            >
+              {theme === "dark" ? (
+                <SunIcon data-icon strokeWidth={2} />
+              ) : (
+                <MoonIcon data-icon strokeWidth={2} />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{translate("settings.appearance")}</TooltipContent>
+        </Tooltip>
       </div>
     );
   };
 
   const renderMainFileToggle = (mobile: boolean) => (
-    <button
-      type="button"
-      onClick={handleRightPanelToggle}
-      aria-controls="file-panel"
-      aria-expanded={rightPanelOpen}
-      title={rightPanelOpen ? translate("files.hidePanel") : translate("files.showPanel")}
-      aria-label={rightPanelOpen ? translate("files.hidePanel") : translate("files.showPanel")}
-      data-mobile-toolbar-file={mobile ? "true" : undefined}
-      className={cn(
-        HEADER_PILL,
-        !mobile && !showChat && "ml-auto",
-        rightPanelOpen && HEADER_PILL_OPEN,
-      )}
-    >
-      <PanelRightIcon className="size-3.5" strokeWidth={2} />
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={handleRightPanelToggle}
+          aria-controls="file-panel"
+          aria-expanded={rightPanelOpen}
+          aria-label={rightPanelOpen ? translate("files.hidePanel") : translate("files.showPanel")}
+          data-mobile-toolbar-file={mobile ? "true" : undefined}
+          className={cn(
+            "shrink-0 rounded-full text-muted-foreground",
+            !mobile && !showChat && "ml-auto",
+            rightPanelOpen && HEADER_CONTROL_OPEN,
+          )}
+        >
+          <PanelRightIcon data-icon strokeWidth={2} />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{rightPanelOpen ? translate("files.hidePanel") : translate("files.showPanel")}</TooltipContent>
+    </Tooltip>
   );
 
   return (
     <>
-    <style>{`
-      @keyframes session-info-pop {
-        0% {
-          opacity: 0;
-          transform: translateY(-24px);
-          filter: blur(6px);
-          box-shadow: 0 2px 8px rgba(0,0,0,0);
-        }
-        55% {
-          opacity: 1;
-          transform: translateY(0);
-          filter: blur(0);
-          background: color-mix(in srgb, var(--accent) 8%, var(--bg-panel));
-          box-shadow: 0 18px 44px rgba(37,99,235,0.16);
-        }
-        100% {
-          opacity: 1;
-          transform: translateY(0);
-          filter: blur(0);
-          background: var(--bg-panel);
-          box-shadow: 0 10px 28px rgba(0,0,0,0.10);
-        }
-      }
-      @keyframes session-info-light-wash {
-        0% {
-          opacity: 0;
-          transform: translateX(-110%) skewX(-16deg);
-        }
-        24% {
-          opacity: 0.42;
-        }
-        100% {
-          opacity: 0;
-          transform: translateX(115%) skewX(-16deg);
-        }
-      }
-      .session-info-popover {
-        position: relative;
-        overflow: hidden;
-        transform-origin: top right;
-        animation: session-info-pop 360ms ease-out both;
-        will-change: transform, opacity, filter, background, box-shadow;
-      }
-      .session-info-popover::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        width: 44%;
-        pointer-events: none;
-        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 24%, transparent), transparent);
-        animation: session-info-light-wash 620ms ease-out both;
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .session-info-popover,
-        .session-info-popover::after {
-          animation: none;
-        }
-      }
-      @media (max-width: 640px) {
-        .sidebar-overlay-backdrop.sidebar-mobile-pending {
-          opacity: 0 !important;
-          pointer-events: none !important;
-        }
-        .sidebar-container.sidebar-mobile-pending.sidebar-open {
-          transform: translateX(calc(-100% - env(safe-area-inset-left)));
-          box-shadow: none;
-        }
-      }
-    `}</style>
     {/* The sidebar's toast (SessionSidebar's showToast): sonner portals it to
         the body, at the viewport's bottom-right, outside the drawer's
         transform below. */}
@@ -2459,14 +2434,16 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             // 不依赖 flex-wrap 断行（basis-full / 断行元素都会被算序挤变形）。
             <div className="flex min-w-0 flex-1 flex-col items-stretch">
               <div className="flex h-10 min-w-0 items-center gap-2">
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
                   onClick={handleSidebarToggle}
                   title={translate("sidebar.show")}
                   aria-label={translate("sidebar.show")}
-                  className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="shrink-0 rounded-full text-muted-foreground"
                 >
                   <MenuIcon className="size-4.5" strokeWidth={2} />
-                </button>
+                </Button>
                 <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">
                   {activeSessionTitle ?? "Pi Web"}
                 </span>
@@ -2483,18 +2460,24 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </div>
           ) : (
             <>
-              <button
-                onClick={handleSidebarToggle}
-                title={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
-                aria-label={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
-                className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                {sidebarOpen ? (
-                  <PanelLeftIcon className="size-4" strokeWidth={2} />
-                ) : (
-                  <MenuIcon className="size-4.5" strokeWidth={2} />
-                )}
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    onClick={handleSidebarToggle}
+                    aria-label={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
+                    className="shrink-0 rounded-full text-muted-foreground"
+                  >
+                    {sidebarOpen ? (
+                      <PanelLeftIcon className="size-4" strokeWidth={2} />
+                    ) : (
+                      <MenuIcon className="size-4.5" strokeWidth={2} />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}</TooltipContent>
+              </Tooltip>
               <div className="flex h-10 min-w-0 flex-1 items-center gap-2">
                 <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">
                   {activeSessionTitle ?? "Pi Web"}
@@ -2558,8 +2541,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </div>
           )}
           {activeTopPanel === "session" && (
+            // 会话信息浮层：标准弹层观感（bg-popover + border + shadow-md）。
+            // 开关仍由 toggleTopPanel 驱动，非 Radix Popover；类名保留作 e2e 定位锚。
             <div
-              className="session-info-popover absolute top-full right-0 z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-xl border border-border bg-popover shadow-lg"
+              className="session-info-popover absolute top-full right-0 z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md"
             >
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
@@ -2608,14 +2593,14 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 const copyButton = (field: SessionCopyField, value: string) => {
                   const copied = copiedSessionField === field;
                   return (
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
                       title={copied ? translate("session.copied") : translate(copyTitleKey[field])}
                       onClick={() => handleCopySessionField(field, value)}
                       className={cn(
-                        "-mt-0.5 inline-flex h-[22px] w-[22px] flex-none cursor-pointer items-center justify-center self-start rounded-[4px] border bg-transparent transition-colors",
-                        "hover:border-primary hover:bg-secondary hover:text-primary",
-                        copied ? "border-primary text-primary" : "border-border text-dim",
+                        "-mt-0.5 self-start",
+                        copied ? "text-primary" : "text-muted-foreground",
                       )}
                     >
                       {copied ? (
@@ -2623,7 +2608,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       ) : (
                         <CopyIcon className="size-3" strokeWidth={2} />
                       )}
-                    </button>
+                    </Button>
                   );
                 };
                 // The draft's pop rows: label left, mono value right, the copy
@@ -2886,36 +2871,46 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               onCloseTab={handleCloseFileTab}
             />
           </div>
-          <button
-            type="button"
-            onClick={handleRightPanelExpandToggle}
-            aria-controls="file-panel"
-            aria-pressed={rightPanelFullWidth}
-            title={translate(rightPanelFullWidth ? "files.restorePanelWidth" : "files.expandPanel")}
-            aria-label={translate(rightPanelFullWidth ? "files.restorePanelWidth" : "files.expandPanel")}
-            className={cn(
-              "mr-1 hidden h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:flex",
-              rightPanelFullWidth && "text-primary",
-            )}
-          >
-            {/* 动态 path（随 rightPanelFullWidth 切换展开/收起箭头）无 lucide 等价四角图形，按例外保留。 */}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d={rightPanelFullWidth
-                ? "M9 3v6H3m12-6v6h6M9 21v-6H3m12 6v-6h6M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"
-                : "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"} />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={() => setRightPanelOpen(false)}
-            aria-controls="file-panel"
-            aria-expanded={rightPanelOpen}
-            title={translate("files.hidePanel")}
-            aria-label={translate("files.hidePanel")}
-            className="mr-1.5 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <PanelRightIcon className="size-4" strokeWidth={2} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRightPanelExpandToggle}
+                aria-controls="file-panel"
+                aria-pressed={rightPanelFullWidth}
+                aria-label={translate(rightPanelFullWidth ? "files.restorePanelWidth" : "files.expandPanel")}
+                className={cn(
+                  "mr-1 hidden shrink-0 rounded-full text-muted-foreground sm:flex",
+                  rightPanelFullWidth && "text-primary",
+                )}
+              >
+                {/* 动态 path（随 rightPanelFullWidth 切换展开/收起箭头）无 lucide 等价四角图形，按例外保留。 */}
+                <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d={rightPanelFullWidth
+                    ? "M9 3v6H3m12-6v6h6M9 21v-6H3m12 6v-6h6M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"
+                    : "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"} />
+                </svg>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{translate(rightPanelFullWidth ? "files.restorePanelWidth" : "files.expandPanel")}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setRightPanelOpen(false)}
+                aria-controls="file-panel"
+                aria-expanded={rightPanelOpen}
+                aria-label={translate("files.hidePanel")}
+                className="mr-1.5 shrink-0 rounded-full text-muted-foreground"
+              >
+                <PanelRightIcon data-icon strokeWidth={2} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{translate("files.hidePanel")}</TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Only the active viewer is mounted. Lightweight per-tab state is restored on activation. */}

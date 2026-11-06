@@ -190,7 +190,7 @@
   height: 30px;
   padding: 0 8px;
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   outline: none;
   background: transparent;
   color: var(--text);
@@ -204,7 +204,7 @@
 
 .config-sidebar-item:not(:disabled):hover,
 .config-sidebar-item:not(:disabled):focus-visible {
-  background: color-mix(in srgb, var(--bg-selected) 50%, transparent);
+  background: var(--accent);
 }
 
 .config-sidebar-item:focus-visible {
@@ -213,8 +213,8 @@
 }
 
 .config-sidebar-item[aria-current="page"] {
-  background: var(--bg-selected);
-  color: var(--text);
+  background: var(--accent);
+  color: var(--accent-foreground, var(--text));
   font-weight: 500;
 }
 
@@ -1028,7 +1028,7 @@
   min-height: 30px;
   padding: 0 8px;
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
@@ -1037,14 +1037,14 @@
 
 .config-list-action-button:not(:disabled):hover,
 .config-list-action-button:not(:disabled):focus-visible {
-  background: color-mix(in srgb, var(--bg-selected) 50%, transparent);
+  background: var(--accent);
   color: var(--text-muted);
   outline: none;
 }
 
 .config-list-action-button[aria-current="page"] {
-  background: var(--bg-selected);
-  color: var(--text);
+  background: var(--accent);
+  color: var(--accent-foreground, var(--text));
   font-weight: 500;
 }
 
@@ -1055,18 +1055,20 @@
 
 .config-status-dot {
   flex-shrink: 0;
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--text-dim);
 }
 
+/* A quiet fill instead of the old bullet-black dot: state reads from the
+   dot's presence and tone, not from a heavy ink circle. */
 .config-status-dot.is-active {
-  background: var(--accent);
+  background: var(--text-muted);
 }
 
 .config-status-dot.is-inactive {
-  opacity: 0.7;
+  opacity: 0.45;
 }
 
 .settings-dialog-backdrop {

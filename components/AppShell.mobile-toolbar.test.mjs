@@ -8,12 +8,12 @@ const mobileHookSource = await readFile(new URL("../hooks/useIsMobile.ts", impor
 test("keeps action pills inline in medium mobile toolbars", () => {
   assert.match(mobileHookSource, /NARROW_MOBILE_QUERY = "\(max-width: 480px\)"/);
   assert.match(source, /const isNarrowMobile = useIsNarrowMobile\(\);/);
-  // The toolbar row renders the same pills on every width; a narrow phone's
-  // branch/history segments live in its ⋯ menu instead of the capsule.
+  // The toolbar row renders the same controls on every width; a narrow phone's
+  // branch/history controls live in its ⋯ menu instead of the row.
   assert.match(source, /\{renderAgentsButton\(true\)\}/);
   assert.match(source, /\{renderToolbarBGroup\(true\)\}/);
   assert.match(source, /\{\(!mobile \|\| !isNarrowMobile\) && sessionHasBranches && \(/);
-  assert.match(source, /\{\(!mobile \|\| !isNarrowMobile\) && \(\n        <button/);
+  assert.match(source, /\{\(!mobile \|\| !isNarrowMobile\) && \(\n        <Tooltip>/);
   assert.match(source, /data-mobile-toolbar-more="true"/);
 });
 
@@ -36,14 +36,14 @@ test("uses a compact mobile toolbar row with a Radix overflow menu", () => {
 
 test("only renders the Agents switcher when the active session family has subagents", () => {
   assert.match(source, /const agentsBadge = activeSessionFamily \? getAgentsBadge\(activeSessionFamily\.subagents, runningSessionIds\) : null;/);
-  // Upstream v0.14.2: on a narrow phone the Agents pill leaves the More menu, so it
+  // Upstream v0.14.2: on a narrow phone the Agents control leaves the More menu, so it
   // passes mobile && !isNarrowMobile and keeps that menu's state untouched.
   assert.match(
     source,
-    /onOpenChange=\{\(\) => toggleTopPanel\("agents", mobile && !isNarrowMobile\)\}\s*>\s*<PopoverTrigger asChild>\s*<button\s+type="button"\s+disabled=\{!activeSessionFamily\}/,
+    /onOpenChange=\{\(\) => toggleTopPanel\("agents", mobile && !isNarrowMobile\)\}\s*>\s*<Tooltip>\s*<TooltipTrigger asChild>\s*<PopoverTrigger asChild>\s*<Button\s+variant="ghost"\s+size="sm"\s+disabled=\{!activeSessionFamily\}/,
   );
   // The panel itself renders only while the family and the selected session exist.
-  assert.match(source, /\{activeSessionFamily && selectedSession && \(\n            <AgentSessionPanel/);
+  assert.match(source, /\{activeSessionFamily && selectedSession && \(\n          <AgentSessionPanel/);
 });
 
 test("keeps the Agents panel open while switching sessions and bounds it to the bar's width budget", () => {
@@ -87,13 +87,13 @@ test("keeps the naming menu open while the title generates", () => {
   assert.match(source, /onClick=\{\(\) => toggleTopPanel\("session"\)\}/);
 });
 
-test("keeps language out of the chat toolbar; the theme pill writes the shared preference", () => {
+test("keeps language out of the chat toolbar; the theme control writes the shared preference", () => {
   assert.doesNotMatch(source, /renderLanguageButton/);
   assert.doesNotMatch(source, /toggleTopPanel\("language"/);
   assert.doesNotMatch(source, /data-mobile-toolbar-action=\{mobile \? "language"/);
   assert.match(source, /import \{ useTheme \} from "@\/hooks\/useTheme"/);
   assert.match(source, /setThemePreference\(theme === "dark" \? "light" : "dark"\)/);
-  assert.match(source, /title=\{translate\("settings\.appearance"\)\}/);
+  assert.match(source, /aria-label=\{translate\("settings\.appearance"\)\}/);
 });
 
 test("mobile statistics collapse to a context+cost chip with the rest in the popover", () => {

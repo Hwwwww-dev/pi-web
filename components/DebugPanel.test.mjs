@@ -763,7 +763,7 @@ test("Escape with focus in the panel gives it back to the Debug button, after th
   assert.match(panelSource, /<section\s+ref=\{sectionRef\}\s+className="debug-panel/);
   assert.match(panelSource, /createDebugPanelEscapeListener\(\s*document,\s*\(\) => sectionRef\.current,\s*\(restoreFocus\) => onCloseRef\.current\(restoreFocus\),\s*\)/);
   const button = between(shellSource, "const renderDebugThemeGroup = () => {", "const renderMainFileToggle");
-  assert.match(button, /<button\s+ref=\{debugButtonRef\}/);
+  assert.match(button, /<Button\s+ref=\{debugButtonRef\}/);
   const close = between(shellSource, "const closeDebugPanel = useCallback(", "}, []);");
   assert.match(close, /\(restoreFocus: boolean\) => \{\s*setActiveTopPanel\(\(panel\) => panel === "debug" \? null : panel\);\s*if \(restoreFocus\) requestAnimationFrame\(\(\) => focusIfLost\(document, debugButtonRef\.current\)\);/);
   assert.match(shellSource, /import \{ focusIfLost \} from "@\/lib\/stacked-dialog";/);

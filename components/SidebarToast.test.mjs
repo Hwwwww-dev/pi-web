@@ -92,11 +92,9 @@ test("the Toaster hangs off the app root, not inside the transformed sidebar dra
   assert.notEqual(mount, -1, "the Toaster is mounted");
   // The AppShell root renders the sidebar's drawer (the .sidebar-container
   // div) after the shared head; the Toaster sits beside it, at the root's
-  // level, so a phone's drawer transform never moves it. Between </style> and
-  // the Toaster there is only its JSX comment.
+  // level, so a phone's drawer transform never moves it. Between the root's
+  // opening fragment and the Toaster there is only its JSX comment.
   const root = appShellSource.slice(appShellSource.indexOf("return (\n    <>"), mount);
-  const headEnd = root.lastIndexOf("</style>");
-  assert.notEqual(headEnd, -1, "the shared head comes before the Toaster");
-  assert.doesNotMatch(root.slice(headEnd), /<[a-zA-Z][^>]*>/, "no element is mounted before the Toaster at the root");
+  assert.doesNotMatch(root, /<[a-zA-Z][^>]*>/, "no element is mounted before the Toaster at the root");
   assert.ok(mount < appShellSource.indexOf('id="session-sidebar"'), "the drawer comes after the Toaster");
 });

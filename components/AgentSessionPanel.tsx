@@ -20,6 +20,11 @@ import type { SessionUsageSummary } from "@/lib/session-stats";
 import { formatActiveDuration, formatCompactCount, formatCostShort } from "@/lib/session-stats-format";
 import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Separator } from "./ui/separator";
 import { DeleteConfirm } from "./SessionTree";
 
 interface Props {
@@ -106,18 +111,18 @@ function UsageLine({ usage, className }: { usage: SessionUsageSummary; className
   return (
     <span
       title={usageTooltip(usage, t, locale)}
-      className={cn("flex min-w-0 items-center gap-2.5 whitespace-nowrap text-xs text-dim tabular-nums", className)}
+      className={cn("flex min-w-0 items-center gap-2.5 whitespace-nowrap font-mono text-xs text-muted-foreground tabular-nums", className)}
     >
       {usage.totalActiveMs > 0 && (
         <span className="flex items-center gap-[3px]">
-          <ClockIcon size={13} strokeWidth={1.8} />
+          <ClockIcon className="size-3" strokeWidth={1.8} />
           {formatActiveDuration(usage.totalActiveMs)}
         </span>
       )}
       {usage.tokens.total > 0 && (
         <span>{t("agentSwitcher.tokens", { count: formatCompactCount(usage.tokens.total) })}</span>
       )}
-      {cost && <span className="text-muted-foreground">{cost}</span>}
+      {cost && <span>{cost}</span>}
     </span>
   );
 }
@@ -149,7 +154,7 @@ function statusTextClass(status: SubagentSessionStatus): string {
   if (status === "completed") return "text-success";
   if (status === "failed") return "text-destructive";
   if (status === "aborted") return "text-warning";
-  return "text-dim";
+  return "text-muted-foreground";
 }
 
 export function StatusIcon({ status }: { status: SubagentSessionStatus }) {
@@ -221,7 +226,7 @@ function AgentRow({
     return (
       // The sidebar's confirmation, in a row as tall as the one it replaces.
       <div
-        className="flex min-h-14 items-center gap-[5px] border-b border-border bg-destructive/[0.06] px-3 py-[7px] shadow-[inset_0_0_0_1px_var(--danger-border)]"
+        className="flex min-h-14 items-center gap-[5px] rounded-md bg-destructive/10 px-3 py-[7px]"
         style={{ height: confirmHeight /* 测量值：Delete 时记录的行高，确认框与被替换行等高，列表不跳动 */ }}
         onKeyDown={(event) => {
           if (event.key !== "Escape") return;
@@ -244,35 +249,32 @@ function AgentRow({
   return (
     <div
       ref={rowRef}
-      className={cn(
-        "flex border-b border-l-2 border-border",
-        selected ? "border-l-primary bg-accent" : "border-l-transparent",
-      )}
+      className={cn("flex items-center gap-0.5 rounded-md pr-0.5", selected && "bg-accent")}
     >
-      <button
+      <Button
         type="button"
         role="option"
         aria-selected={selected}
         onClick={onSelect}
-        className={cn(
-          "grid min-h-14 min-w-0 flex-1 cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-[9px] px-3 py-[7px] text-left text-foreground",
-          !selected && "hover:bg-secondary",
-        )}
+        variant="ghost"
+        className="h-auto min-h-14 min-w-0 flex-1 justify-start gap-2.5 rounded-md px-2 py-2 text-left text-foreground"
       >
-        <span className={cn("grid size-7 place-items-center", main ? "text-muted-foreground" : "text-primary")}>
-          {main ? (
-            <UserIcon size={17} strokeWidth={1.8} />
-          ) : side ? (
-            <MessagesSquareIcon size={17} strokeWidth={1.8} />
-          ) : (
-            <BotIcon size={17} strokeWidth={1.8} />
-          )}
-        </span>
-        <span className="min-w-0">
-          <span className={cn("block truncate text-xs", selected ? "font-semibold" : "font-medium")} title={primary}>
+        <Avatar size="sm" className="shrink-0">
+          <AvatarFallback className={cn(main ? "text-muted-foreground" : "text-primary")}>
+            {main ? (
+              <UserIcon className="size-3.5" strokeWidth={1.8} />
+            ) : side ? (
+              <MessagesSquareIcon className="size-3.5" strokeWidth={1.8} />
+            ) : (
+              <BotIcon className="size-3.5" strokeWidth={1.8} />
+            )}
+          </AvatarFallback>
+        </Avatar>
+        <span className="min-w-0 flex-1">
+          <span className={cn("block truncate text-xs text-foreground", selected ? "font-semibold" : "font-medium")} title={primary}>
             {primary}
           </span>
-          <span className="mt-0.5 flex min-w-0 items-baseline gap-1 whitespace-nowrap text-xs text-dim" title={secondaryTitle}>
+          <span className="mt-0.5 flex min-w-0 items-baseline gap-1 whitespace-nowrap text-xs text-muted-foreground" title={secondaryTitle}>
             <span className={cn("truncate", modelId && !main && "max-w-[40%] shrink-0")}>{secondary}</span>
             {!main && modelId && <>
               <span aria-hidden="true">·</span>
@@ -282,20 +284,20 @@ function AgentRow({
           </span>
           {hasUsage(usage) && <UsageLine usage={usage} className="mt-[3px]" />}
         </span>
-        <span className={cn("flex items-center gap-1.5 whitespace-nowrap text-xs", (main || side) && !running ? "text-dim" : statusTextClass(status))}>
+        <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs">
           {(main || side) && !running ? (
-            selected ? t("agentSwitcher.current") : null
+            selected ? <Badge variant="secondary">{t("agentSwitcher.current")}</Badge> : null
           ) : (
-            <>
+            <span className={cn("flex items-center gap-1.5", statusTextClass(status))}>
               <StatusIcon status={status} />
               <span>{t(`agentSwitcher.status.${status}`)}</span>
-            </>
+            </span>
           )}
         </span>
-      </button>
+      </Button>
       {onNewSideChat && (
         <RowSideButton title={t("sideChat.new")} disabled={newSideChatPending} onClick={onNewSideChat}>
-          <MessageSquarePlusIcon size={17} strokeWidth={1.8} />
+          <MessageSquarePlusIcon data-icon strokeWidth={1.8} />
         </RowSideButton>
       )}
       {onToggleTab && (
@@ -308,7 +310,7 @@ function AgentRow({
           onClick={onToggleTab}
         >
           {/* Filled right pane while the panel shows this row (side-sessions.md). */}
-          <PanelRightIcon size={14} strokeWidth={1.8} aria-hidden="true">
+          <PanelRightIcon className="size-3.5" strokeWidth={1.8} aria-hidden="true">
             {tabShown ? <rect x="15" y="4" width="5.5" height="16" rx="1.5" fill="currentColor" stroke="none" /> : null}
           </PanelRightIcon>
         </RowSideButton>
@@ -322,7 +324,7 @@ function AgentRow({
             onDelete();
           }}
         >
-          <Trash2Icon size={14} />
+          <Trash2Icon className="size-3.5" />
         </RowSideButton>
       )}
     </div>
@@ -337,25 +339,27 @@ function RowSideButton({ title, pressed, danger, disabled, onClick, children }: 
   onClick: () => void;
   children: ReactNode;
 }) {
-  const state = disabled
-    ? "cursor-not-allowed text-dim opacity-40"
-    : danger
-      ? "cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive"
-      : pressed
-        ? "cursor-pointer text-primary hover:bg-secondary"
-        : "cursor-pointer text-muted-foreground hover:bg-secondary hover:text-foreground";
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-xs"
       onClick={onClick}
       title={title}
       aria-label={title}
       aria-pressed={pressed}
       disabled={disabled}
-      className={cn("grid w-9 shrink-0 place-items-center border-l border-border bg-transparent", state)}
+      className={cn(
+        "shrink-0",
+        danger
+          ? "text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive"
+          : pressed
+            ? "text-primary"
+            : "text-muted-foreground",
+      )}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -431,92 +435,91 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
   }, [familyIds, usage]);
 
   return (
+    // 本体不再自带卡片描边/投影：外壳由标准 PopoverContent 给出，这里只是清单。
     <div
       role="listbox"
       aria-label={t("agentSwitcher.title")}
-      className="overflow-hidden rounded-b-sm border-x border-b border-border bg-card shadow-md"
+      className="flex min-w-0 flex-col"
     >
-      <div>
-        <div className="flex min-h-11 items-center gap-2 border-b border-border px-3 py-[7px]">
-          <strong className="text-xs font-semibold">{t("agentSwitcher.title")}</strong>
-          {subagents.length > 0 && (
-            <span className="text-xs text-dim">
-              {subagents.length === 1
-                ? t("agentSwitcher.countOne", { count: subagents.length })
-                : t("agentSwitcher.count", { count: subagents.length })}
+      <div className="flex min-h-11 items-center gap-2 px-3 py-1.5">
+        <strong className="text-xs font-semibold text-foreground">{t("agentSwitcher.title")}</strong>
+        {subagents.length > 0 && (
+          <span className="text-xs text-muted-foreground">
+            {subagents.length === 1
+              ? t("agentSwitcher.countOne", { count: subagents.length })
+              : t("agentSwitcher.count", { count: subagents.length })}
+          </span>
+        )}
+        <span className="ms-auto flex min-w-0 items-center gap-2.5">
+          {familyUsage && (
+            <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+              <span className="whitespace-nowrap text-xs text-muted-foreground" title={t("agentSwitcher.totalUsageHint")}>{t("agentSwitcher.totalUsage")}</span>
+              <UsageLine usage={familyUsage} />
             </span>
           )}
-          <span className="ms-auto flex min-w-0 items-center gap-2.5">
-            {familyUsage && (
-              <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-                <span className="whitespace-nowrap text-xs text-dim" title={t("agentSwitcher.totalUsageHint")}>{t("agentSwitcher.totalUsage")}</span>
-                <UsageLine usage={familyUsage} />
-              </span>
-            )}
-            {runningCount > 0 && (
-              <span className="whitespace-nowrap text-xs text-primary">
-                {t("agentSwitcher.runningCount", { count: runningCount })}
-              </span>
-            )}
-          </span>
+          {runningCount > 0 && (
+            <span className="whitespace-nowrap text-xs text-primary">
+              {t("agentSwitcher.runningCount", { count: runningCount })}
+            </span>
+          )}
+        </span>
+      </div>
+      <Separator />
+      {subagents.length > 8 && (
+        <div className="p-2">
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("agentSwitcher.search")}
+            aria-label={t("agentSwitcher.search")}
+          />
         </div>
-        {subagents.length > 8 && (
-          <div className="border-b border-border p-2">
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("agentSwitcher.search")}
-              aria-label={t("agentSwitcher.search")}
-              className="h-8 w-full rounded-sm border border-border bg-background px-2.5 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            />
+      )}
+      <div className="max-h-[min(58dvh,480px)] overflow-y-auto p-1">
+        <AgentRow
+          session={rootSession}
+          main
+          selected={rootSession.id === selectedSessionId}
+          running={runningSessionIds.has(rootSession.id)}
+          usage={usage[rootSession.id]}
+          onSelect={() => onSelectSession(rootSession)}
+          onNewSideChat={handleNewSideChat}
+          newSideChatPending={newSideChatPending}
+        />
+        {(newSideChatError || deleteSideChatError) && (
+          <div role="alert" className="px-3 py-1.5 text-xs text-destructive [overflow-wrap:anywhere]">
+            {newSideChatError ?? deleteSideChatError}
           </div>
         )}
-        <div className="max-h-[min(58dvh,480px)] overflow-y-auto">
+        {visibleSubagents.map((session) => (
           <AgentRow
-            session={rootSession}
-            main
-            selected={rootSession.id === selectedSessionId}
-            running={runningSessionIds.has(rootSession.id)}
-            usage={usage[rootSession.id]}
-            onSelect={() => onSelectSession(rootSession)}
-            onNewSideChat={handleNewSideChat}
-            newSideChatPending={newSideChatPending}
+            key={session.id}
+            session={session}
+            selected={session.id === selectedSessionId}
+            running={runningSessionIds.has(session.id)}
+            usage={usage[session.id]}
+            onSelect={() => onSelectSession(session)}
+            tabShown={openSubagentTabIds.has(session.id)}
+            onToggleTab={() => {
+              const relation = session.relation?.kind === "subagent" ? session.relation : null;
+              if (session.relation?.kind === "side") {
+                onToggleSubagentTab(session.id, t("sideChat.title"), true);
+                return;
+              }
+              onToggleSubagentTab(session.id, relation?.description || relation?.profile || sessionTitle(session));
+            }}
+            onDelete={session.relation?.kind === "side" ? () => setConfirmDeleteSideChatId(session.id) : undefined}
+            confirming={confirmDeleteSideChatId === session.id}
+            onDeleteConfirm={() => { void handleDeleteSideChat(session.id); }}
+            onDeleteCancel={() => setConfirmDeleteSideChatId(null)}
           />
-          {(newSideChatError || deleteSideChatError) && (
-            <div role="alert" className="border-b border-border px-3 py-1.5 text-xs text-destructive [overflow-wrap:anywhere]">
-              {newSideChatError ?? deleteSideChatError}
-            </div>
-          )}
-          {visibleSubagents.map((session) => (
-            <AgentRow
-              key={session.id}
-              session={session}
-              selected={session.id === selectedSessionId}
-              running={runningSessionIds.has(session.id)}
-              usage={usage[session.id]}
-              onSelect={() => onSelectSession(session)}
-              tabShown={openSubagentTabIds.has(session.id)}
-              onToggleTab={() => {
-                const relation = session.relation?.kind === "subagent" ? session.relation : null;
-                if (session.relation?.kind === "side") {
-                  onToggleSubagentTab(session.id, t("sideChat.title"), true);
-                  return;
-                }
-                onToggleSubagentTab(session.id, relation?.description || relation?.profile || sessionTitle(session));
-              }}
-              onDelete={session.relation?.kind === "side" ? () => setConfirmDeleteSideChatId(session.id) : undefined}
-              confirming={confirmDeleteSideChatId === session.id}
-              onDeleteConfirm={() => { void handleDeleteSideChat(session.id); }}
-              onDeleteCancel={() => setConfirmDeleteSideChatId(null)}
-            />
-          ))}
-          {subagents.length > 0 && visibleSubagents.length === 0 && (
-            <div className="px-3 py-[22px] text-center text-xs text-dim">
-              {t("agentSwitcher.noMatches")}
-            </div>
-          )}
-        </div>
+        ))}
+        {subagents.length > 0 && visibleSubagents.length === 0 && (
+          <div className="px-3 py-[18px] text-center text-xs text-muted-foreground">
+            {t("agentSwitcher.noMatches")}
+          </div>
+        )}
       </div>
     </div>
   );
