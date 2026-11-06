@@ -42,6 +42,12 @@ interface ModelSelectorProps {
   allOptions?: ModelSelectorOption[] | null;
   /** Set only while `enabledModels` narrows `options`: shows pi's `/model` "scoped | all" row and loads `allOptions`. */
   onShowAll?: () => void;
+  /** Extra settings section rendered above the scope row (e.g. thinking level). */
+  headerSlot?: React.ReactNode;
+  /** Extra class for the trigger's leading icon (e.g. a thinking-state tint). */
+  iconClassName?: string;
+  /** Appended to the trigger tooltip after the default text. */
+  titleHint?: string;
 }
 
 const MODEL_FILTER_THRESHOLD = 8;
@@ -75,6 +81,9 @@ export function ModelSelector({
   onSetDefault,
   allOptions,
   onShowAll,
+  headerSlot,
+  iconClassName,
+  titleHint,
 }: ModelSelectorProps) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
@@ -109,6 +118,13 @@ export function ModelSelector({
   const currentName = selectedLabel ?? (value
     ? (isListed(options, value) ?? isListed(allOptions, value))?.name ?? value.modelId
     : emptyLabel ?? (options.length > 0 ? t("chat.selectModel") : t("chat.noModels")));
+  const triggerTitle = (busy
+    ? t("chat.switchingModel")
+    : locked
+      ? currentName
+      : options.length > 0 || onClear
+        ? t("chat.changeModel")
+        : t("chat.noAvailableModels")) + (titleHint ? ` · ${titleHint}` : "");
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -240,7 +256,7 @@ export function ModelSelector({
           aria-expanded={open}
           aria-busy={busy || undefined}
           disabled={locked}
-          title={busy ? t("chat.switchingModel") : locked ? currentName : options.length > 0 || onClear ? t("chat.changeModel") : t("chat.noAvailableModels")}
+          title={triggerTitle}
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect();
             setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
@@ -254,7 +270,7 @@ export function ModelSelector({
         >
           {busy
             ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
-            : <CpuIcon className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />}
+            : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
           <span className="min-w-0 flex-1 truncate">{currentName}</span>
         </Button>
       ) : (
@@ -269,7 +285,7 @@ export function ModelSelector({
           aria-expanded={open}
           aria-busy={busy || undefined}
           disabled={locked}
-          title={busy ? t("chat.switchingModel") : locked ? currentName : options.length > 0 || onClear ? t("chat.changeModel") : t("chat.noAvailableModels")}
+          title={triggerTitle}
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect();
             setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
@@ -282,7 +298,7 @@ export function ModelSelector({
         >
           {busy
             ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
-            : <CpuIcon className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />}
+            : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
           <span className="min-w-0 flex-1 truncate">{currentName}</span>
           <ChevronDownIcon className="size-3 shrink-0 text-dim" strokeWidth={2} aria-hidden="true" />
         </button>
@@ -321,6 +337,9 @@ export function ModelSelector({
               maxHeight,
             }}
           >
+            {headerSlot && (
+              <div className="shrink-0 border-b px-1.5 pb-1.5 pt-1">{headerSlot}</div>
+            )}
             {onShowAll && (
               <div className="flex items-center gap-1 px-2 pb-0 pt-1.5 text-xs">
                 {[false, true].map((all) => (

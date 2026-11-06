@@ -174,16 +174,13 @@ test("keeps the status label and the permissive chip in the composer's controls 
 });
 
 test("shelf carries widget triggers and the status line side by side", async () => {
-  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  const shelfRule = css.match(/^\.extension-status-shelf\s*\{([^}]*)\}/m)?.[1] ?? "";
-  const triggersRule = css.match(/^\.extension-widget-triggers\s*\{([^}]*)\}/m)?.[1] ?? "";
+  const widgetsSource = await readFile(new URL("./ExtensionWidgets.tsx", import.meta.url), "utf8");
+  const barSource = await readFile(new URL("./ExtensionStatusBar.tsx", import.meta.url), "utf8");
 
-  // The shelf carries both halves now: widget triggers keep their own compact
-  // row and the status cells sit beside them, split by a hairline border.
-  assert.match(shelfRule, /flex-wrap:\s*wrap/);
-  assert.match(triggersRule, /flex:\s*0 0 auto/);
-  assert.match(css, /\.extension-status-shelf\.has-widgets\.has-status \.extension-widget-triggers/);
-  assert.match(css, /^\.extension-status-line\s*\{/m);
+  // The shelf carries both halves now: the widgets row embeds the status line
+  // as its children, split by a vertical Separator.
+  assert.match(barSource, /<ExtensionWidgets widgets=\{widgets\}>\{statusLine\}<\/ExtensionWidgets>/);
+  assert.match(widgetsSource, /<Separator orientation="vertical"/);
 });
 
 test("scrolls status text sideways instead of wrapping it", async () => {

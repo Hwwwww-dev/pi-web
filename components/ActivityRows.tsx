@@ -115,7 +115,10 @@ function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; o
   const activate = () => onOpenFile!(resolved!);
   return (
     <span
-      className={cn("tool-file-chip", !clickable && "cursor-default")}
+      className={cn(
+        "inline-flex max-w-full items-center gap-1 overflow-hidden rounded-sm px-1.5 py-px font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))] whitespace-nowrap",
+        clickable && "cursor-pointer hover:bg-accent hover:text-accent-foreground",
+      )}
       title={resolved ?? path}
       aria-label={name}
       role={clickable ? "button" : undefined}
@@ -129,8 +132,8 @@ function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; o
       } : undefined}
     >
       {getFileIcon(name, 12)}
-      <span className="tool-file-chip-name">{name}</span>
-      {dir && <span className="tool-file-chip-dir">{dir}/</span>}
+      <span className="overflow-hidden text-ellipsis">{name}</span>
+      {dir && <span className="overflow-hidden text-ellipsis text-muted-foreground/60">{dir}/</span>}
     </span>
   );
 }
@@ -896,9 +899,9 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
 
 function CompactionFileList({ title, files }: { title: string; files: string[] }) {
   return (
-    <div className="compaction-file-section">
-      <div className="compaction-file-title">{title}</div>
-      <ul className="compaction-file-list">
+    <div className="mt-2">
+      <div className="mb-1 text-xs font-semibold text-foreground">{title}</div>
+      <ul className="m-0 max-h-[180px] list-none overflow-auto p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[3px] [&_li+li]:border-t [&_li+li]:border-border">
         {files.map((file) => (
           <li key={file}>{file}</li>
         ))}
@@ -935,7 +938,13 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
   const hasCtx = Boolean(ctx && (ctx.tokens !== undefined || ctx.percent !== undefined || ctx.contextWindow));
   if (!hasUsage && !hasCtx && !model && !time && !copySource) return null;
   return (
-    <div className="turn-meta-line" title={usage ? formatUsage(usage) : undefined}>
+    // Room above the next turn's user message: the meta line is the visual
+    // boundary between turns, so it needs the same breathing room as the
+    // messages themselves (the assistant above contributes its own 12px).
+    <div
+      className="mt-1 mb-3 flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground/60 [font-variant-numeric:tabular-nums]"
+      title={usage ? formatUsage(usage) : undefined}
+    >
       {model && <span>{model}</span>}
       {(hasUsage || hasCtx) && (
         <UsageBar
@@ -1122,7 +1131,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
     );
     index += 1;
   }
-  return <div className="activity-body">{nodes}</div>;
+  return <div className="flex min-w-0 flex-col gap-0.5 [&>[data-message-text]]:my-1">{nodes}</div>;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1418,17 +1427,19 @@ function PairedResult({ text, isEmpty, isError }: {
   // must not reflow to the container width.
   const tui = isTuiText(text);
   return (
-    <pre
-      className={cn(
-        "max-h-[420px] min-w-0 overflow-auto rounded-lg border px-2.5 py-2 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]",
-        isError
-          ? "border-destructive/30 text-destructive"
-          : isEmpty ? "border-border/60 italic text-muted-foreground/60" : "border-border/60 text-muted-foreground",
-        tui ? "whitespace-pre" : "whitespace-pre-wrap break-all",
-      )}
-    >
-      {isEmpty ? t("i18n.noOutput") : text}
-    </pre>
+    <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-w-full">
+      <CodeBlockContent
+        wrap={!tui}
+        className={cn(
+          "max-h-[420px] px-2.5 py-2 text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]",
+          isError ? "text-destructive" : "text-muted-foreground",
+          isEmpty && "italic opacity-60",
+          !tui && "[overflow-wrap:anywhere]",
+        )}
+      >
+        {isEmpty ? t("i18n.noOutput") : text}
+      </CodeBlockContent>
+    </CodeBlock>
   );
 }
 
@@ -1442,9 +1453,11 @@ const TOOL_FIELD_VALUE =
 const TOOL_FIELD_BLOCK =
   "m-0 max-h-[260px] overflow-auto rounded-lg border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
 
+// A tool call's argument labels stack above their values instead of a
+// two-column table (the label column squeezed long values).
 function ToolFieldRows({ fields }: { fields: ToolField[] }) {
   return (
-    <table className="tool-field-table border-collapse">
+    <table className="border-collapse [&_tr]:block [&_td]:block [&_td+td]:pt-0">
       <tbody>
         {fields.map((field) => (
           <tr key={field.key}>

@@ -413,7 +413,7 @@ test("keeps a custom message's text layout as pi's TUI does", () => {
 
   // Markdown still renders, and each paragraph counts its own lines.
   assert.match(layout("# Title\n\ntext\n\n\n  more\n    lines"), /<h1>Title<\/h1>\n<p>text<\/p>\n<p> {2}more<br\/> {4}lines<\/p>/);
-  assert.match(layout("    code\n      block"), /markdown-code-block[\s\S]*> {2}block</);
+  assert.match(layout("    code\n      block"), /data-slot="code-block"[\s\S]*> {2}block</);
   assert.match(layout("<b>hi</b>\nnext"), /&lt;b&gt;hi&lt;\/b&gt;<br\/>next/);
   // A list's or a quote's own prefix is not an indent.
   assert.match(layout("- a\n  b\n- c"), /<li>a<br\/>b<\/li>/);

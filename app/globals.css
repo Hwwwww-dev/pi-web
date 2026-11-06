@@ -970,228 +970,14 @@ html[data-keyboard-open] .terminal-extra-keys {
   background-color: rgb(var(--terminal-scrollbar));
 }
 
-.extension-status-shelf {
-  display: flex;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  align-items: stretch;
-  min-width: 0;
-  border-top: 1px solid var(--border);
-  background: transparent;
-}
-
-.extension-widget-panels {
-  display: flex;
-  flex: 0 0 100%;
-  flex-direction: column;
-  max-height: min(144px, 18dvh);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  background: var(--bg-panel);
-}
-
-.extension-widget-panel {
-  flex-shrink: 0;
-  min-width: 0;
-  overflow: hidden;
-  background: transparent;
-}
-
-.extension-widget-panel-heading {
-  height: 26px;
-  padding: 5px 12px 0;
-  overflow: hidden;
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The widget triggers and the status line are one row that scrolls sideways as a
-   whole. The expanded panel sits above it and stays put. */
-.extension-status-row {
-  display: flex;
-  flex: 1 1 100%;
-  align-items: stretch;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-}
-
-.extension-widget-triggers {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: stretch;
-  height: 35px;
-}
-
-/* A widget panel opens above the shelf instead of pushing the chat up, so an
-  expanded TUI box cannot eat the message list. */
+/* Extension widgets (shadcn rebuild): triggers are ghost buttons in one row with
+   the status line; the expanded panel is a popover-style card above them. On
+   phones the card opens upward so an expanded TUI box cannot eat the list. */
 @media (max-width: 640px) {
   /* Touch targets get a little taller; every control grows together. */
   .composer-chip {
     height: 34px;
   }
-
-  .extension-status-shelf {
-    position: relative;
-  }
-
-  .extension-widget-panels {
-    position: absolute;
-    inset: auto 0 100% 0;
-    z-index: 5;
-    max-height: min(144px, 26dvh);
-    border: 1px solid var(--border);
-    border-bottom: 0;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
-    background: var(--bg-panel);
-    box-shadow: 0 -6px 18px rgb(0 0 0 / 14%);
-  }
-}
-
-.extension-status-shelf.has-widgets.has-status .extension-widget-triggers {
-  border-right: 1px solid var(--border);
-}
-
-.extension-status-row > .extension-status-line {
-  flex: 0 0 auto;
-}
-
-.extension-widget-trigger {
-  position: relative;
-  display: flex;
-  flex: 0 0 108px;
-  align-items: center;
-  width: 108px;
-  height: 35px;
-  gap: 5px;
-  padding: 0 7px;
-  overflow: hidden;
-  border: 0;
-  border-right: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  background: transparent;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  text-align: left;
-}
-
-.extension-widget-trigger:last-child {
-  /* The trailing divider would sit at the end of the row with nothing after it. */
-  border-right: 0;
-}
-
-.extension-widget-update-pulse {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 180ms ease-out;
-}
-
-.extension-widget-update-pulse::before {
-  position: absolute;
-  inset: 0;
-  background: var(--accent);
-  content: "";
-  opacity: 0.12;
-}
-
-.extension-widget-trigger.is-updating .extension-widget-update-pulse {
-  opacity: 1;
-}
-
-.extension-widget-trigger.is-updating .extension-widget-update-pulse::before {
-  animation: extension-widget-update-pulse 900ms ease-in-out infinite alternate;
-}
-
-@keyframes extension-widget-update-pulse {
-  from { opacity: 0.18; }
-  to { opacity: 0.06; }
-}
-
-button.extension-widget-trigger {
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-
-button.extension-widget-trigger:hover,
-.extension-widget-trigger.is-expanded {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-button.extension-widget-trigger:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
-}
-
-.extension-widget-placement {
-  display: flex;
-  position: relative;
-  z-index: 1;
-  width: 10px;
-  flex: 0 0 10px;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dim);
-}
-
-.extension-widget-placement-icon {
-  display: block;
-  width: 8px;
-  height: 6px;
-  flex: 0 0 8px;
-  fill: currentColor;
-}
-
-.extension-widget-key {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .extension-widget-update-pulse {
-    transition: none;
-  }
-
-  .extension-widget-trigger.is-updating .extension-widget-update-pulse::before {
-    animation: none;
-    opacity: 0.12;
-  }
-}
-
-/* Extension widgets render TUI output: tables, progress bars and box drawing
-  only line up while the monospace grid survives, so the panel scrolls
-  sideways rather than wrapping a line into a broken row. */
-.extension-widget-content {
-  margin: 0;
-  padding: 3px 12px 8px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: calc(14px + var(--chat-font-size-offset, 0px));
-  line-height: 1.45;
-  overflow-wrap: normal;
-  white-space: pre;
-  scrollbar-width: thin;
 }
 
 /* One chip recipe for every control in the composer toolbar — thinking level,
@@ -1301,91 +1087,9 @@ button.extension-widget-trigger:focus-visible {
   white-space: pre-wrap;
 }
 
-.extension-status-line {
-  display: flex;
-  flex: 1 1 0;
-  align-items: flex-start;
-  min-width: 0;
-  min-height: 35px;
-  max-height: min(144px, 18dvh);
-  padding: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-}
-
-.extension-status-text {
-  display: flex;
-  flex: 1;
-  align-items: stretch;
-  min-width: 0;
-  min-height: 35px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.45;
-  overflow-wrap: normal;
-  white-space: pre;
-}
-
 /* pi-permission-system's permissive-mode pill (`yolo`) is styled inline in
   components/ExtensionStatus.tsx: it is a marker with no responsive variants, and
   inline keeps it from flickering when the stylesheet reloads behind the app. */
-/* Every status is a cell of the status line, told apart from its neighbours by a
-   vertical rule like the widget triggers. A `command:` status is a button cell, as
-   tall as the line, so the whole cell can be clicked. */
-.extension-status-item {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  padding: 8px 12px;
-  border-right: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-}
-
-.extension-status-item:last-child {
-  border-right: 0;
-}
-
-.extension-status-command {
-  border-top: 0;
-  border-bottom: 0;
-  border-left: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  line-height: 1.45;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-
-.extension-status-command:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.extension-status-command:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
-}
-
-.extension-status-command:disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-/* Touch screens get taller cells when there is something to tap, widget triggers
-   included, so the row stays level. */
-@media (pointer: coarse) {
-  .extension-status-shelf.has-commands .extension-status-text {
-    min-height: 44px;
-  }
-
-  .extension-status-shelf.has-commands .extension-widget-triggers,
-  .extension-status-shelf.has-commands .extension-widget-trigger {
-    height: 44px;
-  }
-}
 
 /* The chat's top bar, the sidebar's toolbar row and the file panel's tab bar
    share one height, so they read as one bar. A phone or touch screen gets a
@@ -1654,71 +1358,7 @@ pre, code {
 }
 
 /* ── Activity rows: compact one-line rendering of a turn's process ── */
-.activity-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.activity-body > [data-message-text] {
-  margin: 4px 0;
-}
-.tool-file-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  padding: 1px 6px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: calc(11px + var(--chat-font-size-offset, 0px));
-  cursor: pointer;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.tool-file-chip:hover {
-  background: var(--bg-hover);
-  color: var(--accent);
-}
-.tool-file-chip:disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-.tool-file-chip-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tool-file-chip-dir {
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.turn-meta-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  /* Room above the next turn's user message: the meta line is the visual
-    boundary between turns, so it needs the same breathing room as the
-    messages themselves (the assistant above contributes its own 12px). */
-  margin: 4px 0 12px;
-  font-size: 12px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
 
-/* A tool call's argument labels stack above their values instead of a
-   two-column table (the label column squeezed long values). */
-.tool-field-table tr,
-.tool-field-table td {
-  display: block;
-}
-.tool-field-table td + td {
-  padding-top: 0;
-}
 /* Inline code that holds a filesystem path opens the file viewer. */
 .markdown-inline-file {
   cursor: pointer;
@@ -1778,7 +1418,7 @@ pre, code {
   padding: 4px 8px;
 }
 .markdown-custom-message .markdown-table-frame,
-.markdown-custom-message .markdown-code-block {
+.markdown-custom-message [data-slot="code-block"] {
   margin: 4px 0;
 }
 
@@ -1801,50 +1441,10 @@ pre, code {
 }
 .markdown-compaction-message li { margin: 2px 0; }
 .markdown-compaction-message .markdown-table-frame,
-.markdown-compaction-message .markdown-code-block {
+.markdown-compaction-message [data-slot="code-block"] {
   margin: 6px 0;
 }
 
-.compaction-file-section {
-  margin-top: 8px;
-}
-.compaction-file-title {
-  margin-bottom: 4px;
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 650;
-}
-.compaction-file-list {
-  max-height: 180px;
-  margin: 0;
-  padding: 0;
-  overflow: auto;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.45;
-  list-style: none;
-}
-.compaction-file-list li {
-  overflow-wrap: anywhere;
-  padding: 3px 0;
-}
-.compaction-file-list li + li {
-  border-top: 1px solid var(--border);
-}
-
-.markdown-code-block {
-  position: relative;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  margin: 6px 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--bg);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 42%, transparent);
-}
 /* Code fences wrap long lines, as pi's TUI does: a line is a row of its number
    and its text (CodeBlock's renderer), so a wrapped line goes on under its
    text, and `anywhere` breaks a URL or path that has no space to break at. */
@@ -1863,50 +1463,6 @@ pre, code {
    grows to show them whole where the screen allows. */
 .extension-dialog-measuring .markdown-code-line-text {
   white-space: pre;
-}
-.markdown-code-header {
-  padding: 5px 10px;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
-  color: var(--text-dim);
-  font-size: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-.markdown-code-lang {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-weight: 650;
-}
-.markdown-code-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.markdown-code-action {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 2px 7px;
-  background: var(--bg);
-  color: var(--text-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.25;
-}
-.markdown-code-action:hover:not(:disabled) {
-  color: var(--text);
-  border-color: color-mix(in srgb, var(--border) 70%, var(--text-muted));
-}
-.markdown-code-action:disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-.markdown-code-action.is-active {
-  background: var(--bg-selected);
-  color: var(--text);
 }
 
 /* Terminal output is laid out for a fixed width: reflowing box art, tables and
@@ -2312,14 +1868,15 @@ pre, code {
 
 /* The project and worktree: a row of their own, under the brand. The
    project button's own padding is pulled out on the left, so its folder
-   icon stands on the logo's and the composer card's edge. */
+   icon stands on the logo's and the composer card's edge. The whole row is
+   centred under the brand lockup now, so the old left-edge pull is gone. */
 .new-session-context {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   min-width: 0;
   min-height: 28px;
-  margin: 0 0 6px -6px;
+  margin: 0 0 6px;
 }
 
 @media (max-width: 640px) {
@@ -2968,28 +2525,6 @@ span.token.table {
     min-width: 0;
   }
 }
-.file-panel-expand-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: var(--top-bar-height);
-  height: var(--top-bar-height);
-  padding: 0;
-  background: var(--bg-selected);
-  border: none;
-  border-left: 1px solid var(--border);
-  color: var(--text);
-  cursor: pointer;
-}
-.file-panel-expand-button:hover,
-.file-panel-expand-button[aria-pressed="true"] {
-  color: var(--accent);
-}
-.file-panel-expand-button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
-}
 
 /* Mobile sidebar: slide in/out as overlay */
 @media (max-width: 640px) {
@@ -3008,6 +2543,15 @@ span.token.table {
     box-shadow: 4px 0 20px rgba(0,0,0,0.15);
   }
   .sidebar-container.sidebar-closed {
+    transform: translateX(calc(-100% - env(safe-area-inset-left)));
+    box-shadow: none;
+  }
+  /* 挂载完成前（sidebar-mobile-pending）：抽屉与遮罩不闪现。 */
+  .sidebar-overlay-backdrop.sidebar-mobile-pending {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  .sidebar-container.sidebar-mobile-pending.sidebar-open {
     transform: translateX(calc(-100% - env(safe-area-inset-left)));
     box-shadow: none;
   }
@@ -3034,7 +2578,6 @@ span.token.table {
     width: 100%;
     min-width: 0;
   }
-  .file-panel-expand-button,
   .panel-resize-handle,
   .right-panel-overlay-backdrop {
     display: none;
@@ -3279,7 +2822,7 @@ span.token.table {
    touch screens opt in too; tablets keep their controls because the keyboard
    leaves them enough height. */
 @media (max-width: 640px), (pointer: coarse) and (max-height: 500px) {
-  html[data-keyboard-open] .extension-status-shelf {
+  html[data-keyboard-open] .extension-status-bar {
     display: none !important;
   }
   /* Except while its model picker is open: the picker's filter is the field

@@ -8,6 +8,7 @@ const chatWindowSource = await readFile(new URL("./ChatWindow.tsx", import.meta.
 const chatInputSource = await readFile(new URL("./ChatInput.tsx", import.meta.url), "utf8");
 const viewportHookSource = await readFile(new URL("../hooks/useViewportHeight.ts", import.meta.url), "utf8");
 const extensionStatusBarSource = await readFile(new URL("./ExtensionStatusBar.tsx", import.meta.url), "utf8");
+const mermaidBlockSource = await readFile(new URL("./MermaidBlock.tsx", import.meta.url), "utf8");
 const mcpConfigSource = await readFile(new URL("./McpConfig.tsx", import.meta.url), "utf8");
 const mcpSignInSource = await readFile(new URL("./McpSignIn.tsx", import.meta.url), "utf8");
 const mcpAddSource = await readFile(new URL("./McpAddServer.tsx", import.meta.url), "utf8");
@@ -53,7 +54,8 @@ test("tracks the visual viewport while the software keyboard is open", () => {
 
 test("contains chat content and inputs within the mobile viewport", () => {
   assert.match(cssSource, /\.markdown-body \{[\s\S]*?min-width: 0;[\s\S]*?max-width: 100%;[\s\S]*?overflow-x: hidden;/);
-  assert.match(cssSource, /\.markdown-code-block \{[\s\S]*?min-width: 0;[\s\S]*?max-width: 100%;/);
+  // Code fences keep their bounds through the ui CodeBlock's own utilities.
+  assert.match(mermaidBlockSource, /<CodeBlockFrame className="w-full min-w-0 max-w-full">/);
   assert.match(chatWindowSource, /overflow-x-hidden overflow-y-auto/);
   // The extension overlays are bounded by the panel that anchors them, not the
   // visual viewport, which is far taller than the chat panel on mobile.
@@ -87,10 +89,10 @@ test("every class the keyboard-open rules target exists on its component", () =>
   // means; a renamed class would otherwise leave the rule silently dead.
   assert.match(chatInputSource, /className="chat-input-controls[^"]*"/);
   assert.match(chatInputSource, /compact\s*\?\s*"shrink-0"[\s\S]*?:\s*"chat-input-shell /);
-  assert.match(extensionStatusBarSource, /className=\{`extension-status-shelf/);
+  assert.match(extensionStatusBarSource, /className="extension-status-bar /);
   assert.match(chatWindowSource, /className="chat-content /);
   // Phone landscape exceeds the 640px breakpoint but has the least height.
-  assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{\s*html\[data-keyboard-open\] \.extension-status-shelf \{\s*display: none !important;/);
+  assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{\s*html\[data-keyboard-open\] \.extension-status-bar \{\s*display: none !important;/);
   // Except while its model picker is open: the picker's filter is the field
   // the keyboard is for, and hiding its row would hide the picker (#1271).
   assert.match(cssSource, /html\[data-keyboard-open\] \.chat-input-controls:not\(:has\(\.model-selector \[role="listbox"\]\)\) \{\s*display: none !important;/);

@@ -148,10 +148,12 @@ test("CodeBlock renders plain text without tokenization while streaming", () => 
 
   assert.doesNotMatch(html, /class="token/);
   assert.match(html, /const x = 1;/);
-  // A streamed block wraps its long lines too, instead of scrolling sideways.
+  // A streamed block wraps its long lines too, instead of scrolling sideways
+  // (the ui CodeBlockContent's data-wrap variant).
   const pre = html.match(/<pre\b[^>]*>/)?.[0];
-  assert.match(pre, /whitespace-pre-wrap/);
-  assert.match(pre, /\[overflow-wrap:anywhere\]/);
+  assert.match(pre, /data-wrap="true"/);
+  assert.match(pre, /data-wrap:whitespace-pre-wrap/);
+  assert.match(pre, /data-wrap:wrap-break-word/);
   assert.doesNotMatch(pre, /overflow-x/);
 });
 

@@ -7,25 +7,21 @@ import { Alert, AlertDescription } from "./ui/alert";
 import { Badge } from "./ui/badge";
 import { Bubble, BubbleContent } from "./ui/bubble";
 import { Button } from "./ui/button";
+import { Message, MessageContent } from "./ui/message";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
-import { Skeleton } from "./ui/skeleton";
 import {
   CompactionRow,
   CustomRow,
   SafeMarkdownBody,
   ThinkingRow,
   ToolRow,
-  loadThinkingContent,
 } from "./ActivityRows";
 import { formatNoticeTokens } from "@/lib/transcript-notices";
-import { ThinkingIcon } from "./ThinkingIcon";
-import ReactMarkdown from "react-markdown";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
-import { getAssistantErrorMessage, getThinkingPreview, hasAssistantAnswer, isAssistantTruncated, isEmptyThinkingBlock, splitThinkingPieces } from "@/lib/message-display";
+import { getAssistantErrorMessage, hasAssistantAnswer, isAssistantTruncated, isEmptyThinkingBlock } from "@/lib/message-display";
 import { formatTurnDuration } from "@/lib/turn-duration";
-import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
 import { skillExpansionContent, skillExpansionToCommand } from "@/lib/slash-display";
@@ -344,14 +340,14 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   };
 
   return (
-    <div className="group mb-5 flex flex-col items-end gap-1">
+    <Message align="end" className="group mb-5 flex flex-col items-end gap-1">
       <Bubble variant="secondary" align="end" className="max-w-[82%] max-sm:max-w-[86%]">
         {/* Cap the height so an abnormally long message does not push the
             conversation off screen; overflow scrolls inside the bubble. */}
         <BubbleContent
           className={cn(
-            "max-h-[300px] overflow-y-auto rounded-[18px] px-4 py-[9px] text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
-            isEditing && "bg-[color-mix(in_srgb,var(--accent)_14%,var(--secondary))] ring-2 ring-[color-mix(in_srgb,var(--accent)_16%,transparent)]",
+            "max-h-[300px] overflow-y-auto text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
+            isEditing && "ring-2 ring-[color-mix(in_srgb,var(--accent)_16%,transparent)]",
           )}
         >
           {commandText ? (
@@ -454,7 +450,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
           {time && <span className="text-[10px] text-muted-foreground">{time}</span>}
         </div>
       )}
-    </div>
+    </Message>
   );
 }
 
@@ -639,11 +635,12 @@ function AssistantMessageView({
   if (blocks.length === 0 && !isStreaming && !providerError && !truncated) return null;
 
   return (
-    <div
+    <Message
       data-message-role="assistant"
       data-entry-id={entryId}
       className="group mb-5"
     >
+      <MessageContent>
       {/* Streaming status (estimated tokens + throughput); the model name lives
           in the turn meta line / the per-message label for standalone messages. */}
       {(showModelLabel || isStreaming) && (
@@ -692,13 +689,11 @@ function AssistantMessageView({
         </div>
       )}
 
-      <div className="flex flex-col gap-2.5">
-        {/* Not keyed by the entry id: a message of this run gets one when the file is
-            read again, and its blocks keep their state across that read (#1184). */}
-        {blockItems.map(({ block, originalIndex }) => (
-          <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
-        ))}
-      </div>
+      {/* Not keyed by the entry id: a message of this run gets one when the file is
+          read again, and its blocks keep their state across that read (#1184). */}
+      {blockItems.map(({ block, originalIndex }) => (
+        <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
+      ))}
 
       {providerError && (
         <Alert variant="destructive" className={cn("font-mono text-xs leading-normal", blocks.length > 0 ? "mt-2" : "mt-0")}>
@@ -767,7 +762,8 @@ function AssistantMessageView({
           )}
         </div>
       )}
-    </div>
+      </MessageContent>
+    </Message>
   );
 }
 
@@ -789,120 +785,6 @@ function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDur
 
 function TextBlock({ block, isStreaming, cwd, onOpenFile }: { block: TextContent; isStreaming?: boolean; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void }) {
   return <SafeMarkdownBody isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile}>{block.text}</SafeMarkdownBody>;
-}
-
-// A model looping in its thinking can write megabytes. As one text node, every
-// streamed chunk laid all of it out again (the prompt anchor reads layout after
-// each commit). As pieces, only the last one changes. Thinking that fits one
-// piece stays one text node.
-function ThinkingText({ text }: { text: string }) {
-  const pieces = useMemo(() => splitThinkingPieces(text), [text]);
-  if (pieces.length === 1) return text;
-  // No memo: React already skips a div whose text is unchanged, and a memo
-  // bailout keeps the old props, each a slice pinning the whole thinking of
-  // its chunk (995 MB retained streaming 2M Chinese characters).
-  return pieces.map((piece, index) => <div key={index}>{piece.text}</div>);
-}
-
-export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
-  block: ThinkingContent;
-  duration?: number;
-  sessionId?: string;
-  entryId?: string;
-  blockIndex: number;
-}) {
-  const { t } = useI18n();
-  const [expanded, setExpanded] = useState(isThinkingExpandedByDefault);
-  const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // The block outlives a change of entry id (a message of this run gets its id
-  // when the file is read again, #1184): what was loaded for another entry goes.
-  const loadKey = `${sessionId}:${entryId}:${blockIndex}`;
-  const [loadedKey, setLoadedKey] = useState(loadKey);
-  if (loadedKey !== loadKey) {
-    setLoadedKey(loadKey);
-    setContent(null);
-    setLoading(false);
-    setError(null);
-  }
-  const tRef = useRef(t);
-  tRef.current = t;
-  const preview = getThinkingPreview(block.thinking);
-
-  // Keep already-mounted blocks in sync when the preference changes.
-  useEffect(() => {
-    const onChange = () => setExpanded(isThinkingExpandedByDefault());
-    window.addEventListener(THINKING_EXPANDED_EVENT, onChange);
-    return () => window.removeEventListener(THINKING_EXPANDED_EVENT, onChange);
-  }, []);
-
-  // Load deferred history content whenever the block is expanded.
-  // loadThinkingContent() memoizes in-flight promises and drops failed ones
-  // from its cache, so re-running this effect is cheap and a failed load can
-  // be retried by collapsing and expanding the block again.
-  useEffect(() => {
-    if (!expanded || !block.deferred || content !== null) return;
-    if (!sessionId || !entryId) {
-      setError(tRef.current("i18n.thinkingUnavailable"));
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    loadThinkingContent(sessionId, entryId, blockIndex)
-      .then((value) => {
-        if (!cancelled) {
-          setContent(value);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [expanded, block.deferred, content, sessionId, entryId, blockIndex]);
-
-  return (
-    <div className="flex min-w-0 items-start gap-1.5 rounded-sm border border-border bg-background px-2.5 py-1.5 font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))] leading-[1.5]">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
-        title={t("i18n.thinking")}
-        onClick={() => setExpanded((v) => !v)}
-        className={cn(
-          "inline-flex min-h-[1.5em] min-w-0 cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-left text-muted-foreground",
-          expanded ? "w-3.5 shrink-0" : "w-full",
-        )}
-      >
-        <ThinkingIcon active={expanded} />
-        {!expanded && (
-          <span className="min-w-0 truncate">
-            {preview ? <ReactMarkdown allowedElements={[]} unwrapDisallowed skipHtml>{preview}</ReactMarkdown> : "..."}
-          </span>
-        )}
-      </button>
-      {expanded && (
-        <div
-          className={cn(
-            "min-w-0 flex-1 whitespace-pre-wrap wrap-anywhere",
-            error ? "text-destructive" : "text-muted-foreground",
-          )}
-        >
-           {loading ? <Skeleton className="h-3 w-1/2" /> : error ?? <ThinkingText text={(block.deferred ? content : block.thinking) ?? ""} />}
-        </div>
-      )}
-      {duration !== undefined && (
-        <span className="shrink-0 text-dim tabular-nums">{duration}s</span>
-      )}
-    </div>
-  );
 }
 
 

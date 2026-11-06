@@ -6,8 +6,15 @@ import renderSyntaxNode from "react-syntax-highlighter/dist/esm/create-element";
 import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
 import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { Maximize, Minus, Plus, X } from "lucide-react";
+import { CheckIcon, CopyIcon, Maximize, Minus, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  CodeBlock as CodeBlockFrame,
+  CodeBlockActions,
+  CodeBlockContent,
+  CodeBlockHeader,
+  CodeBlockTitle,
+} from "@/components/ui/code-block";
 import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/hooks/useTheme";
 import { useI18n } from "@/hooks/useI18n";
@@ -198,13 +205,13 @@ export function SvgDownloadButton({ onClick }: { onClick: () => void }) {
 
 export function PreviewFrame({ lang, actions, children }: { lang: string; actions: ReactNode; children: ReactNode }) {
   return (
-    <div className="markdown-code-block rounded-xl!">
-      <div className="markdown-code-header">
-        <span className="markdown-code-lang">{lang}</span>
-        <div className="markdown-code-actions">{actions}</div>
-      </div>
+    <CodeBlockFrame className="w-full min-w-0 max-w-full">
+      <CodeBlockHeader className="border-b px-2.5 py-1">
+        <CodeBlockTitle className="font-mono text-xs font-medium text-muted-foreground">{lang}</CodeBlockTitle>
+        <CodeBlockActions className="gap-1">{actions}</CodeBlockActions>
+      </CodeBlockHeader>
       {children}
-    </div>
+    </CodeBlockFrame>
   );
 }
 
@@ -401,20 +408,31 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
   };
 
   return (
-    <div className="markdown-code-block rounded-xl!">
-      <div className="markdown-code-header">
-        <span className="markdown-code-lang">{lang || "text"}</span>
-        <div className="markdown-code-actions">
+    <CodeBlockFrame className="w-full min-w-0 max-w-full">
+      <CodeBlockHeader className="border-b px-2.5 py-1">
+        <CodeBlockTitle className="font-mono text-xs font-medium text-muted-foreground">{lang || "text"}</CodeBlockTitle>
+        <CodeBlockActions className="gap-1">
           {headerAction}
-          <Button type="button" variant="ghost" size="xs" onClick={copy}>
-            {copied ? t("i18n.copied") : t("i18n.copy")}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={copy}
+            title={copied ? t("i18n.copied") : t("i18n.copy")}
+            aria-label={copied ? t("i18n.copied") : t("i18n.copy")}
+            className={copied ? "text-primary" : "text-muted-foreground"}
+          >
+            {copied ? <CheckIcon strokeWidth={1.8} /> : <CopyIcon strokeWidth={1.8} />}
           </Button>
-        </div>
-      </div>
+        </CodeBlockActions>
+      </CodeBlockHeader>
       {isStreaming ? (
-        <pre className="m-0 whitespace-pre-wrap [overflow-wrap:anywhere] bg-[color-mix(in_srgb,var(--bg)_92%,var(--bg-panel))] px-[13px] py-[11px] text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] leading-[1.62]">
-          <code className="font-mono">{code}</code>
-        </pre>
+        <CodeBlockContent
+          wrap
+          className="bg-[color-mix(in_srgb,var(--bg)_92%,var(--bg-panel))] px-[13px] py-[11px] text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] leading-[1.62]"
+        >
+          {code}
+        </CodeBlockContent>
       ) : (
         <SyntaxHighlighter
           language={highlighted ? lang || "text" : "text"}
@@ -432,7 +450,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
             lineHeight: 1.62,
             fontWeight: "var(--font-mono-weight)",
             // The light `vs` theme puts its own 1px #ddd border on <pre>; the
-            // block's wrapper already draws the frame.
+            // ui CodeBlock frame is the only border.
             border: "none",
             borderRadius: 0,
             backgroundColor: "color-mix(in srgb, var(--bg) 92%, var(--bg-panel))",
@@ -442,6 +460,6 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
           {code}
         </SyntaxHighlighter>
       )}
-    </div>
+    </CodeBlockFrame>
   );
 });

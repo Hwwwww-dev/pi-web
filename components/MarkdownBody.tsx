@@ -2,6 +2,7 @@
 
 import { createContext, memo, useContext, useMemo, useState, type ComponentProps, type MouseEvent, type ReactNode } from "react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import { copyText } from "@/lib/clipboard";
 import { parseFileOpenOptions, resolveLocalFileHref, resolveLocalFilePath, shouldOpenLocalFileInApp } from "@/lib/file-links";
@@ -80,13 +81,16 @@ function MathDisplay({ source, children }: { source: string; children: ReactNode
   return (
     <div className="markdown-math-display">
       {children}
-      <button
+      {/* `markdown-math-copy` is the hover-reveal positioning hook (app/globals.css). */}
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
         onClick={copy}
-        className="markdown-code-action markdown-math-copy focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="markdown-math-copy"
       >
         {copied ? t("i18n.copied") : t("i18n.copy")}
-      </button>
+      </Button>
     </div>
   );
 }
