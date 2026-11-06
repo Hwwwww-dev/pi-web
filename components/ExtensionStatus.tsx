@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { extensionStatusEntryTone, extensionStatusTone, splitExtensionStatuses } from "@/lib/extension-status";
 import type { ExtensionStatusItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
@@ -32,74 +34,48 @@ export function PermissiveModeChip({ text }: { text: string }) {
  * Extension status texts (LSP state, goal mode, subagents, …) live behind this
  * umbrella chip: the shelf above the composer only carries widget triggers, and
  * one compact button is what lets the toolbar row fit every control. The dot
- * carries the worst tone, the popover lists every line in full.
+ * carries the worst tone, the popover lists every line in full. Radix owns the
+ * upward placement (right-aligned), the viewport collision and the dismissal.
  */
 export function ExtensionStatusButton({ statuses }: { statuses: ExtensionStatusItem[] }) {
   const { t } = useI18n();
-  const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  // The popover is right-anchored to the button, but the button often sits mid-row
-  // (更多/YOLO to its right): a width capped only by 100vw still hangs past the
-  // viewport's LEFT edge on phones. Clamp the width to the space left of the
-  // button's right edge (240px floor beats an unusably narrow panel).
-  const [popoverMaxWidth, setPopoverMaxWidth] = useState(420);
   const { statuses: entries } = splitExtensionStatuses(statuses);
   const label = t("chat.extensionStatus");
 
-  useEffect(() => {
-    if (!open) return;
-    const clampToViewport = () => {
-      const rect = rootRef.current?.getBoundingClientRect();
-      if (rect) setPopoverMaxWidth(Math.max(240, Math.min(420, Math.round(rect.right) - 12)));
-    };
-    clampToViewport();
-    window.addEventListener("resize", clampToViewport);
-    return () => window.removeEventListener("resize", clampToViewport);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [open]);
-
   const tone = extensionStatusTone(entries);
   if (!tone) return null;
-  const expanded = open && entries.length > 0;
   const summary = entries.length > 1 ? `${label} · ${entries.length}` : label;
 
   return (
-    <div ref={rootRef} className="extension-status-button-root">
-      <button
-        type="button"
-        className="composer-chip"
-        title={label}
-        aria-label={summary}
-        aria-expanded={expanded}
-        onClick={() => setOpen((current) => !current)}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="ghost" className="composer-chip" title={label} aria-label={summary}>
+          <span className="extension-status-dot" data-tone={tone} aria-hidden="true" />
+          {summary}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={6}
+        collisionPadding={12}
+        aria-label={label}
+        className="flex max-h-[min(320px,40dvh)] w-max max-w-(--radix-popover-content-available-width) flex-col gap-[7px] overflow-auto overscroll-contain p-2 px-2.5"
       >
-        <span className="extension-status-dot" data-tone={tone} aria-hidden="true" />
-        {summary}
-      </button>
-      {expanded && (
-        <div className="extension-status-popover" role="dialog" aria-label={label} style={{ maxWidth: popoverMaxWidth }}>
-          {entries.map((status) => (
-            <div key={status.key} className="extension-status-entry">
-              <span
-                className="extension-status-dot"
-                data-tone={extensionStatusEntryTone(status.text)}
-                aria-hidden="true"
-              />
-              <pre className="extension-status-entry-text">
-                <AnsiText text={status.text} />
-              </pre>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+        {entries.map((status) => (
+          <div key={status.key} className="extension-status-entry">
+            <span
+              className="extension-status-dot"
+              data-tone={extensionStatusEntryTone(status.text)}
+              aria-hidden="true"
+            />
+            <pre className="extension-status-entry-text">
+              <AnsiText text={status.text} />
+            </pre>
+          </div>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -118,12 +118,12 @@ test("hides the status button while every extension status is empty", () => {
 test("renders one umbrella label with the tone dot, popover closed", () => {
   const html = renderStatusButton("LSP Active: typescript");
 
-  assert.match(html, /class="extension-status-button-root"/);
-  assert.match(html, /class="composer-chip"/);
+  assert.match(html, /data-slot="popover-trigger"/);
+  assert.match(html, /class="[^"]*composer-chip/);
   assert.match(html, /<span class="extension-status-dot" data-tone="ok" aria-hidden="true"><\/span>/);
   assert.match(html, /aria-expanded="false"/);
   assert.doesNotMatch(html, /extension-status-popover/);
-  assert.doesNotMatch(html, /<svg/);
+  assert.doesNotMatch(html, /data-state="open"/);
   // The label is one generic word, never the extension's own status text.
   assert.doesNotMatch(html, /LSP Active/);
 });
@@ -144,7 +144,8 @@ test("counts the reporting extensions on the label", () => {
 test("lists every status text in the popover without extension names", async () => {
   const source = await readFile(new URL("./ExtensionStatus.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /className="extension-status-popover"/);
+  // The panel is a Radix popover now; the entries keep their own classes.
+  assert.match(source, /<PopoverContent/);
   assert.match(source, /className="extension-status-entry"/);
   assert.match(source, /<pre className="extension-status-entry-text">/);
   assert.match(source, /<AnsiText text=\{status\.text\} \/>/);
@@ -185,13 +186,14 @@ test("shelf carries widget triggers and the status line side by side", async () 
 
 test("scrolls status text sideways instead of wrapping it", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  const popoverRule = css.match(/^\.extension-status-popover\s*\{([^}]*)\}/m)?.[1] ?? "";
   const textRule = css.match(/^\.extension-status-entry-text\s*\{([^}]*)\}/m)?.[1] ?? "";
   const chipSource = await readFile(new URL("./ExtensionStatus.tsx", import.meta.url), "utf8");
 
-  assert.match(popoverRule, /max-height:/);
-  assert.match(popoverRule, /overflow:\s*auto/);
-  assert.match(popoverRule, /bottom:\s*calc\(100% \+ 6px\)/);
+  // The panel's scroll budget lives on the Radix popover content now.
+  assert.match(chipSource, /max-h-\[min\(320px,40dvh\)\]/);
+  assert.match(chipSource, /overflow-auto overscroll-contain/);
+  assert.match(chipSource, /side="top"/);
+  assert.match(chipSource, /align="end"/);
   // The shelf's status text wraps (pre-wrap); only a popover entry scrolls sideways.
   assert.match(textRule, /white-space:\s*pre-wrap/);
   assert.match(textRule, /overflow-x:\s*auto/);

@@ -777,14 +777,8 @@ html[data-keyboard-open] .terminal-extra-keys {
 }
 
 /* Extension status texts (LSP state, goal mode, …) moved off the shelf behind
-  this chip, so the shelf only ever carries widget triggers. The popover opens
-  upward, right-aligned, and lists one line per reporting extension. */
-.extension-status-button-root {
-  position: relative;
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-}
+   this chip, so the shelf only ever carries widget triggers. The popover opens
+   upward, right-aligned, and lists one line per reporting extension. */
 
 /* pi-lens reports green/red itself; the dot carries those two signals. */
 .extension-status-dot {
@@ -804,27 +798,6 @@ html[data-keyboard-open] .terminal-extra-keys {
 
 .extension-status-dot[data-tone="error"] {
   background: var(--destructive);
-}
-
-.extension-status-popover {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 6px);
-  z-index: 400;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  width: max-content;
-  max-width: min(420px, calc(100vw - 24px));
-  max-height: min(320px, 40dvh);
-  padding: 8px 10px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--background);
-  box-shadow: 0 -4px 16px rgb(0 0 0 / 10%);
 }
 
 .extension-status-entry {
