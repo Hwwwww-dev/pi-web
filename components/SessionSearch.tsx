@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import type { SessionInfo } from "@/lib/types";
@@ -56,12 +57,14 @@ export function SessionSearch({ open, query, children, selectedSessionId, onSele
         <div role="status" className="px-3 pb-2 text-xs text-muted-foreground">{t("sidebar.sessionSearchPartial")}</div>
       )}
       {response?.results.map(({ session, entryId, blockIndex, titleMatch, before, match, after }) => (
-        <button
+        <Button
           key={session.id}
           type="button"
+          variant="ghost"
+          size="default"
           onClick={() => onSelectSession(session, entryId, blockIndex)}
           aria-current={session.id === selectedSessionId ? "true" : undefined}
-          className={`block w-full cursor-pointer border-b border-border px-3 py-2 text-left hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring ${session.id === selectedSessionId ? "bg-accent" : ""}`}
+          className={`h-auto justify-start rounded-none font-normal whitespace-normal block w-full cursor-pointer border-b border-border px-3 py-2 text-left hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring focus-visible:ring-0 focus-visible:border-transparent ${session.id === selectedSessionId ? "bg-accent" : ""}`}
         >
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="min-w-0 truncate text-xs font-medium text-foreground">
@@ -80,7 +83,7 @@ export function SessionSearch({ open, query, children, selectedSessionId, onSele
               {before}<mark className="rounded-sm bg-primary/20 text-foreground">{match}</mark>{after}
             </span>
           )}
-        </button>
+        </Button>
       ))}
     </div>
   );

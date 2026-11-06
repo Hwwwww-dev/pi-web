@@ -145,7 +145,7 @@ test("with the files below the sessions, both are in view under the track", () =
   assert.match(html, /^<div class="session-sidebar is-files-below" style="--sidebar-files-height:320px">/);
   // The brand row (its name says the versions a click shows), then New and
   // the search; under it the track, in every layout. No view options.
-  assert.match(html, /<div class="sidebar-header"><button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button [^>]*class="[^"]*sidebar-new-button[^"]*"/);
+  assert.match(html, /<div class="sidebar-header"><button [^>]*class="[^"]*sidebar-brand[^"]*"[^>]*aria-label="Pi Web, versions: web [^",]+, pi [^",]+"[^>]*>Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button [^>]*class="[^"]*sidebar-new-button[^"]*"/);
   assert.match(html, /<div dir="ltr" data-orientation="horizontal" data-slot="tabs" class="[^"]*"><div role="tablist" aria-orientation="horizontal" data-slot="tabs-list" data-variant="default" class="[^"]*sidebar-tabs-list[^"]*" aria-label="Sidebar view"/);
   assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
   // The chosen tab is active and owns its panel; the other is inactive.

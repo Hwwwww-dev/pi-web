@@ -3,6 +3,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronUpIcon, FolderIcon, HardDriveIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
 
@@ -189,29 +190,33 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-bold text-foreground">{t("directoryPicker.selectDirectory")}</div>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="default"
             onClick={onCancel}
             disabled={busy}
             title={t("i18n.close")}
             aria-label={t("i18n.close")}
-            className="rounded-sm border-0 bg-transparent px-1.5 py-0.5 text-xl leading-none text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-50"
+            className="h-auto font-normal rounded-sm border-0 bg-transparent px-1.5 py-0.5 text-xl leading-none text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-50"
           >
             ×
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handlePathSubmit} className="flex shrink-0 items-center gap-2 border-b border-border px-3.5 py-2.5">
-          <button
-            className="directory-picker-back flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-secondary p-0 text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-50"
+          <Button
+            className="dark:bg-secondary directory-picker-back flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-secondary p-0 text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-50"
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => void navigateTo(parentDirectory ?? undefined)}
             disabled={loading || !canNavigateUp}
             title={t("directoryPicker.goToParent")}
             aria-label={t("directoryPicker.goToParent")}
           >
-            <ChevronUpIcon size={16} strokeWidth={1.8} />
-          </button>
+            <ChevronUpIcon size={16} strokeWidth={1.8} className="size-4" />
+          </Button>
           <label htmlFor="directory-path" className="sr-only">
             {t("directoryPicker.directoryPath")}
           </label>
@@ -229,14 +234,16 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
               setLoadError(null);
             }}
           />
-          <button
-            className="directory-picker-action h-9 min-w-[58px] rounded-md border border-border bg-secondary px-3 text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-50"
+          <Button
+            className="font-normal dark:bg-secondary directory-picker-action h-9 min-w-[58px] rounded-md border border-border bg-secondary px-3 text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-50"
             type="submit"
+            variant="outline"
+            size="default"
             disabled={loading || !pathInput.trim()}
             title={t("directoryPicker.goToDirectory")}
           >
             {t("directoryPicker.go")}
-          </button>
+          </Button>
         </form>
 
         <div className="directory-picker-list min-h-0 flex-1 overflow-auto px-2.5 py-2">
@@ -246,16 +253,18 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
             <>
               {drives.length > 0 ? (
                 drives.map((drive) => (
-                  <button
+                  <Button
                     key={drive.path}
-                    className={cn("directory-picker-entry min-h-[34px] py-1.5", entryButtonClass)}
+                    className={cn("h-auto justify-start font-normal", "directory-picker-entry min-h-[34px] py-1.5", entryButtonClass)}
                     type="button"
+                    variant="ghost"
+                    size="default"
                     onClick={() => void navigateTo(drive.path)}
                     title={drive.path}
                   >
-                    <HardDriveIcon size={14} strokeWidth={1.8} />
+                    <HardDriveIcon size={14} strokeWidth={1.8} className="size-3.5" />
                     <span>{drive.name}</span>
-                  </button>
+                  </Button>
                 ))
               ) : (
                 <div className={emptyNoticeClass}>{t("directoryPicker.noDrives")}</div>
@@ -263,16 +272,18 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
             </>
           ) : directories.length > 0 ? (
             directories.map((entry) => (
-              <button
+              <Button
                 key={entry.path}
-                className={cn("directory-picker-entry min-h-[30px] py-[5px]", entryButtonClass)}
+                className={cn("h-auto justify-start font-normal", "directory-picker-entry min-h-[30px] py-[5px]", entryButtonClass)}
                 type="button"
+                variant="ghost"
+                size="default"
                 onClick={() => void navigateTo(entry.path)}
                 title={entry.path}
               >
-                <FolderIcon size={14} strokeWidth={1.8} />
+                <FolderIcon size={14} strokeWidth={1.8} className="size-3.5" />
                 <span className="overflow-hidden text-ellipsis whitespace-nowrap">{entry.name}</span>
-              </button>
+              </Button>
             ))
           ) : (
             <div className={emptyNoticeClass}>{t("directoryPicker.noSubdirectories")}</div>
@@ -281,9 +292,11 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
         </div>
 
         <div className="directory-picker-footer flex shrink-0 items-center justify-end gap-2.5 border-t border-border px-[18px] py-2.5">
-          <button
-            className={cn("directory-picker-action mr-auto", secondaryActionClass)}
+          <Button
+            className={cn("h-auto font-normal dark:bg-transparent", "directory-picker-action mr-auto", secondaryActionClass)}
             type="button"
+            variant="outline"
+            size="default"
             onClick={() => {
               setCreateOpen(true);
               setCreateError(null);
@@ -291,17 +304,19 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
             disabled={!canSelect}
           >
             {t("directoryPicker.newDirectory")}
-          </button>
-          <button className={cn("directory-picker-action", secondaryActionClass)} type="button" onClick={onCancel} disabled={busy}>{t("i18n.cancel")}</button>
-          <button
-            className={cn("directory-picker-action", primaryActionClass)}
+          </Button>
+          <Button className={cn("h-auto font-normal dark:bg-transparent", "directory-picker-action", secondaryActionClass)} type="button" variant="outline" size="default" onClick={onCancel} disabled={busy}>{t("i18n.cancel")}</Button>
+          <Button
+            className={cn("h-auto", "directory-picker-action", primaryActionClass)}
             type="button"
+            variant="default"
+            size="default"
             onClick={() => onSelect(currentPath)}
             disabled={!canSelect}
             title={hasUncommittedPath ? t("directoryPicker.openBeforeSelecting") : t("directoryPicker.selectCurrentDirectory")}
           >
             {busy ? t("i18n.checking") : t("directoryPicker.selectThisFolder")}
-          </button>
+          </Button>
         </div>
 
         {createOpen && (
@@ -356,21 +371,25 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
                 />
                 {createError && <div className="mt-[7px] text-xs leading-[1.35] text-destructive">{createError}</div>}
                 <div className="mt-2.5 flex gap-1.5">
-                  <button
-                    className={cn("directory-picker-action flex-1", primaryActionClass)}
+                  <Button
+                    className={cn("h-auto", "directory-picker-action flex-1", primaryActionClass)}
                     type="submit"
+                    variant="default"
+                    size="default"
                     disabled={creating || !directoryName.trim()}
                   >
                     {creating ? t("directoryPicker.creating") : t("directoryPicker.create")}
-                  </button>
-                  <button
-                    className={cn("directory-picker-action flex-1", secondaryActionClass)}
+                  </Button>
+                  <Button
+                    className={cn("h-auto font-normal dark:bg-transparent", "directory-picker-action flex-1", secondaryActionClass)}
                     type="button"
+                    variant="outline"
+                    size="default"
                     onClick={closeCreateDialog}
                     disabled={creating}
                   >
                     {t("i18n.cancel")}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>

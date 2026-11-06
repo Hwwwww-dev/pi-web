@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState, type FormEvent } from "react";
+import { Button } from "@/components/ui/button";
 import { I18nProvider, useI18n } from "@/hooks/useI18n";
 import { safeLoginDestination } from "@/lib/login-destination";
 
@@ -69,13 +70,13 @@ function LoginForm() {
               required
               disabled={busy}
             />
-            <button type="submit" disabled={busy || !password}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <Button type="submit" variant="default" size="default" className="h-auto justify-start focus-visible:ring-0 focus-visible:border-transparent" disabled={busy || !password}>
+              <svg className="size-3.5" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="2" y1="7" x2="11" y2="7" />
                 <polyline points="7.5 3 12 7 7.5 11" />
               </svg>
               {busy ? t("auth.loggingIn") : t("auth.logIn")}
-            </button>
+            </Button>
           </div>
           <p className="web-login-error" role="alert" aria-live="polite">{error}</p>
         </form>
