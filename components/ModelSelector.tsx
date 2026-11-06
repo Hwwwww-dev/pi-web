@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { ChevronDownIcon, CpuIcon, LoaderCircleIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { CheckIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, StarIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { SelectorRow } from "./SelectorRow";
 import { Button } from "@/components/ui/button";
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { isProviderUsageId } from "@/lib/provider-usage-ids";
 import { primaryUsagePercent, readProviderUsageSnapshot, writeProviderUsageSnapshot, type ProviderUsageSnapshot } from "./ProviderUsageSummary";
@@ -87,10 +89,7 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [anchorRect, setAnchorRect] = useState<{ top: number; right: number; bottom: number; left: number; width: number } | null>(null);
   const [filter, setFilter] = useState("");
   // pi's /model starts on the scope; Tab on the filter or a tap switches.
   const [showAll, setShowAll] = useState(false);
@@ -126,44 +125,11 @@ export function ModelSelector({
         ? t("chat.changeModel")
         : t("chat.noAvailableModels")) + (titleHint ? ` · ${titleHint}` : "");
 
-  useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (
-        rootRef.current && !rootRef.current.contains(event.target as Node)
-        && panelRef.current && !panelRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-        setFilter("");
-      }
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, []);
-
-  // While the picker is open, a phone keyboard shrinks the app height
-  // (useViewportHeight writes the root's style, sometimes with no viewport
-  // event) and moves the trigger; follow it instead of the rect from the tap.
-  useEffect(() => {
-    if (!open) return;
-    const remeasure = () => {
-      const rect = rootRef.current?.querySelector("button")?.getBoundingClientRect();
-      // A new object even for an unmoved trigger: the panel also reads the
-      // visual viewport, which may have changed alone.
-      if (rect?.height) setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
-    };
-    const viewport = window.visualViewport;
-    const rootObserver = new MutationObserver(remeasure);
-    rootObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "data-keyboard-open"] });
-    window.addEventListener("resize", remeasure);
-    viewport?.addEventListener("resize", remeasure);
-    viewport?.addEventListener("scroll", remeasure);
-    return () => {
-      rootObserver.disconnect();
-      window.removeEventListener("resize", remeasure);
-      viewport?.removeEventListener("resize", remeasure);
-      viewport?.removeEventListener("scroll", remeasure);
-    };
-  }, [open]);
+  const handleOpenChange = (next: boolean) => {
+    if (next) setShowAll(false);
+    else setFilter("");
+    setOpen(next);
+  };
 
   useEffect(() => {
     if (!locked) return;
@@ -231,182 +197,135 @@ export function ModelSelector({
     onSetDefault?.(option.provider, option.modelId);
   };
 
-  return (
-    <div
-      ref={rootRef}
-      className={cn(
-        "model-selector relative min-w-0",
-        variant === "field" ? "w-full" : "max-md:flex-[1_1_auto]",
-      )}
-      onKeyDown={(event) => {
-        if (event.key !== "Escape" || !open) return;
-        event.preventDefault();
-        event.stopPropagation();
-        setFilter("");
-        setOpen(false);
-      }}
+  const trigger = variant === "toolbar" ? (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      aria-label={ariaLabel}
+      aria-busy={busy || undefined}
+      disabled={locked}
+      title={triggerTitle}
+      className="max-w-[260px] gap-1.5 overflow-hidden px-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground max-md:max-w-full disabled:pointer-events-auto disabled:cursor-not-allowed"
     >
-      {variant === "toolbar" ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-label={ariaLabel}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          aria-busy={busy || undefined}
-          disabled={locked}
-          title={triggerTitle}
-          onClick={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect();
-            setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
-            setOpen((current) => {
-              if (current) setFilter("");
-              else setShowAll(false);
-              return !current;
-            });
-          }}
-          className="max-w-[260px] gap-1.5 overflow-hidden px-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground max-md:max-w-full disabled:pointer-events-auto disabled:cursor-not-allowed"
-        >
-          {busy
-            ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
-            : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
-          <span className="min-w-0 flex-1 truncate">{currentName}</span>
-        </Button>
-      ) : (
-        <button
-          type="button"
-          className={cn(
-            "flex h-[34px] w-full min-w-0 items-center gap-[7px] overflow-hidden rounded-md border border-border px-[9px] text-left text-xs transition-colors",
-            locked ? "cursor-default bg-card text-muted-foreground" : "cursor-pointer bg-background text-foreground hover:bg-secondary",
-          )}
-          aria-label={ariaLabel}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          aria-busy={busy || undefined}
-          disabled={locked}
-          title={triggerTitle}
-          onClick={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect();
-            setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
-            setOpen((current) => {
-              if (current) setFilter("");
-              else setShowAll(false);
-              return !current;
-            });
-          }}
-        >
-          {busy
-            ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
-            : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
-          <span className="min-w-0 flex-1 truncate">{currentName}</span>
-          <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden="true" />
-        </button>
+      {busy
+        ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
+        : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
+      <span className="min-w-0 flex-1 truncate">{currentName}</span>
+    </Button>
+  ) : (
+    <Button
+      type="button"
+      variant="outline"
+      aria-label={ariaLabel}
+      aria-busy={busy || undefined}
+      disabled={locked}
+      title={triggerTitle}
+      className={cn(
+        "h-[34px] w-full min-w-0 justify-between gap-[7px] overflow-hidden px-[9px] text-left text-xs font-normal",
+        locked ? "bg-card text-muted-foreground" : "text-foreground hover:bg-secondary",
       )}
+    >
+      {busy
+        ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
+        : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
+      <span className="min-w-0 flex-1 truncate">{currentName}</span>
+      <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden="true" />
+    </Button>
+  );
 
-      {open && anchorRect && (() => {
-        // Fixed coordinates belong to the layout viewport, which a phone
-        // keyboard does not shrink: measure from the visible part's top and
-        // hang an upward panel from `top` rather than from `bottom`.
-        const viewportTop = window.visualViewport?.offsetTop ?? 0;
-        const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-        const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
-        // A trigger the keyboard covers (a Settings field) still gets a
-        // panel ending above the keyboard.
-        const aboveEnd = Math.min(anchorRect.top - 6, viewportTop + viewportHeight - 8);
-        const spaceAbove = aboveEnd - viewportTop - 8;
-        const spaceBelow = viewportTop + viewportHeight - anchorRect.bottom - 6 - 8;
-        const openAbove = placement === "up" || spaceAbove > spaceBelow;
-        const maxHeight = Math.max(120, Math.min(openAbove ? spaceAbove : spaceBelow, viewportHeight * 0.6));
-        const verticalPosition: CSSProperties = openAbove
-          ? { top: aboveEnd, transform: "translateY(-100%)" }
-          : { top: anchorRect.bottom + 6 };
-        const horizontalPosition: CSSProperties = isMobile
-          ? { left: 8, right: 8, maxWidth: "calc(100vw - 16px)" }
-          : { left: anchorRect.left, width: "max-content", minWidth: anchorRect.width, maxWidth: Math.max(anchorRect.width, viewportWidth - anchorRect.left - 8) };
-
-        return (
-          <div
-            ref={panelRef}
-            role="listbox"
-            aria-label={ariaLabel}
-            className="fixed z-[500] flex flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
-            style={{
-              ...verticalPosition,
-              ...horizontalPosition,
-              maxHeight,
-            }}
-          >
-            {headerSlot && (
-              <div className="shrink-0 border-b px-1.5 pb-1.5 pt-1">{headerSlot}</div>
-            )}
-            {onShowAll && (
-              <div className="flex items-center gap-1 px-2 pb-0 pt-1.5 text-xs">
-                {[false, true].map((all) => (
-                  <button
-                    key={String(all)}
-                    type="button"
-                    aria-pressed={showAll === all}
-                    onClick={() => { if (showAll !== all) switchScope(); }}
-                    className={cn(
-                      "cursor-pointer rounded-sm border px-[7px] py-0.5 text-xs transition-colors",
-                      showAll === all
-                        ? "border-border bg-secondary text-foreground"
-                        : "border-transparent bg-transparent text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {t(all ? "chat.modelScopeAll" : "chat.modelScopeScoped")}
-                  </button>
-                ))}
-                {!isMobile && <span className="ml-auto font-mono text-[10px] text-muted-foreground">Tab</span>}
-              </div>
-            )}
+  return (
+    <div className={cn(
+      "model-selector min-w-0",
+      variant === "field" ? "w-full" : "max-md:flex-[1_1_auto]",
+    )}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent
+          side={placement === "up" ? "top" : "bottom"}
+          sideOffset={6}
+          align="start"
+          collisionPadding={8}
+          aria-label={ariaLabel}
+          className="flex max-h-(--radix-popover-content-available-height) w-max min-w-(--radix-popover-trigger-width) max-w-(--radix-popover-content-available-width) flex-col overflow-hidden p-0 max-md:w-(--radix-popover-content-available-width)"
+        >
+          {headerSlot && (
+            <div className="shrink-0 border-b px-1.5 pb-1.5 pt-1">{headerSlot}</div>
+          )}
+          {onShowAll && (
+            <div className="flex items-center gap-1 px-2 pb-0 pt-1.5 text-xs">
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                spacing={0}
+                value={showAll ? "all" : "scoped"}
+                onValueChange={(next) => { if (next && next !== (showAll ? "all" : "scoped")) switchScope(); }}
+              >
+                <ToggleGroupItem value="scoped" className="h-6 px-[7px] py-0.5 text-xs">
+                  {t("chat.modelScopeScoped")}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="all" className="h-6 px-[7px] py-0.5 text-xs">
+                  {t("chat.modelScopeAll")}
+                </ToggleGroupItem>
+              </ToggleGroup>
+              {!isMobile && <span className="ml-auto font-mono text-[10px] text-muted-foreground">Tab</span>}
+            </div>
+          )}
+          <Command shouldFilter={false} className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {showFilter && (
-              <div className="shrink-0 border-b p-2">
-                <input
-                  value={filter}
-                  onChange={(event) => setFilter(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (!onShowAll || event.key !== "Tab") return;
-                    event.preventDefault();
-                    switchScope();
-                  }}
-                  placeholder={t("chat.filterModels")}
-                  aria-label={t("chat.filterModels")}
-                  // On phones, focusing the filter opens the on-screen keyboard,
-                  // which shrinks the viewport and pushes the list off-screen
-                  // before the user has decided to filter. Tap to filter instead.
-                  autoFocus={!isMobile}
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="box-border w-full min-w-0 rounded-sm border border-border bg-background px-2 py-[5px] font-mono text-xs text-foreground outline-none max-md:min-w-0"
-                />
-              </div>
+              <CommandInput
+                value={filter}
+                onValueChange={setFilter}
+                onKeyDown={(event) => {
+                  if (!onShowAll || event.key !== "Tab") return;
+                  event.preventDefault();
+                  switchScope();
+                }}
+                placeholder={t("chat.filterModels")}
+                aria-label={t("chat.filterModels")}
+                // On phones, focusing the filter opens the on-screen keyboard,
+                // which shrinks the viewport and pushes the list off-screen
+                // before the user has decided to filter. Tap to filter instead.
+                autoFocus={!isMobile}
+                spellCheck={false}
+              />
             )}
-            <div className="min-h-0 overflow-y-auto">
+            <CommandList className="min-h-0 flex-1">
               {onClear && !filter.trim() && (
-                <SelectorRow active={!value} gutter={Boolean(onSetDefault)} onSelect={() => {
-                  setOpen(false);
-                  setFilter("");
-                  onClear();
-                }}>
-                  <OptionLabel label={emptyLabel ?? t("i18n.default")} />
-                </SelectorRow>
+                <CommandItem
+                  value="default"
+                  onSelect={() => {
+                    setOpen(false);
+                    setFilter("");
+                    onClear();
+                  }}
+                  className={cn(
+                    "gap-2 whitespace-nowrap py-[7px] text-xs",
+                    onSetDefault && "pr-9",
+                    !value ? "font-semibold text-foreground" : "font-normal text-muted-foreground",
+                  )}
+                >
+                  {!value ? <CheckIcon className="size-2.5 shrink-0 text-primary" /> : <span className="size-2.5 shrink-0" />}
+                  <span title={emptyLabel ?? t("i18n.default")} className="min-w-0 truncate">{emptyLabel ?? t("i18n.default")}</span>
+                </CommandItem>
               )}
-              {modelsByProvider.length === 0 ? (
+              {modelsByProvider.length === 0 && (
                 <div className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
                   {!listed ? t("agents.modelsLoading") : filter.trim() ? t("chat.noMatchingModels") : t("chat.noAvailableModels")}
                 </div>
-              ) : modelsByProvider.map((group, index) => (
-                <div key={group.provider}>
-                  {(modelsByProvider.length > 1 || usagePercent[group.provider] !== undefined) && (
-                    <div className={cn("flex items-baseline justify-between gap-2 px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase text-muted-foreground", (index > 0 || onClear) && "border-t border-border")}>
+              )}
+              {modelsByProvider.map((group) => (
+                <CommandGroup
+                  key={group.provider}
+                  heading={
+                    <div className="flex w-full items-baseline justify-between gap-2">
                       {modelsByProvider.length > 1 && <span className="min-w-0 truncate">{group.provider}</span>}
                       {usagePercent[group.provider] !== undefined && (
                         <span
                           title={t("providerUsage.usage")}
                           className={cn(
-                            "shrink-0 font-medium normal-case tracking-normal",
+                            "shrink-0 font-medium tracking-normal",
                             usagePercent[group.provider] > 90 ? "text-destructive" : usagePercent[group.provider] > 70 ? "text-warning" : "text-muted-foreground",
                           )}
                         >
@@ -414,35 +333,62 @@ export function ModelSelector({
                         </span>
                       )}
                     </div>
-                  )}
+                  }
+                >
                   {group.options.map((option) => {
+                    const active = option.modelId === value?.modelId && option.provider === value?.provider;
+                    // The default is saved only from the scope: PUT /api/models/default refuses others.
+                    const star = onSetDefault && (!showAll || isListed(options, option)) ? {
+                      isDefault: option.modelId === defaultValue?.modelId && option.provider === defaultValue?.provider,
+                    } : null;
                     return (
-                      <SelectorRow
+                      <CommandItem
                         key={`${option.provider}:${option.modelId}`}
-                        active={option.modelId === value?.modelId && option.provider === value?.provider}
+                        value={`${option.provider}:${option.modelId}`}
                         onSelect={() => choose(option)}
-                        // The default is saved only from the scope: PUT /api/models/default refuses others.
-                        star={onSetDefault && (!showAll || isListed(options, option)) ? {
-                          isDefault: option.modelId === defaultValue?.modelId && option.provider === defaultValue?.provider,
-                          saveLabel: t("chat.saveDefaultModel"),
-                          defaultLabel: t("chat.defaultModel"),
-                          onSave: () => saveDefault(option),
-                        } : undefined}
+                        className={cn(
+                          "group/item gap-2 whitespace-nowrap py-[7px] text-xs",
+                          onSetDefault && "pr-9",
+                          active ? "font-semibold text-foreground" : "font-normal text-muted-foreground",
+                        )}
                       >
-                        <OptionLabel label={option.name} />
-                      </SelectorRow>
+                        {active ? <CheckIcon className="size-2.5 shrink-0 text-primary" /> : <span className="size-2.5 shrink-0" />}
+                        <span title={option.name} className="min-w-0 truncate">{option.name}</span>
+                        {star?.isDefault && (
+                          <span
+                            role="img"
+                            aria-label={t("chat.defaultModel")}
+                            title={t("chat.defaultModel")}
+                            className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center text-muted-foreground"
+                          >
+                            <StarIcon size={10} fill="currentColor" />
+                          </span>
+                        )}
+                        {star && !star.isDefault && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-xs"
+                            title={t("chat.saveDefaultModel")}
+                            aria-label={t("chat.saveDefaultModel")}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              saveDefault(option);
+                            }}
+                            className="absolute top-1/2 right-1.5 size-6 -translate-y-1/2 p-0 text-muted-foreground opacity-0 transition-opacity group-hover/item:opacity-100 group-focus-within/item:opacity-100 focus-visible:opacity-100 hover:border-primary/35 hover:bg-accent hover:text-primary max-md:opacity-100"
+                          >
+                            <StarIcon className="size-3" />
+                          </Button>
+                        )}
+                      </CommandItem>
                     );
                   })}
-                </div>
+                </CommandGroup>
               ))}
-            </div>
-          </div>
-        );
-      })()}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   );
-}
-
-function OptionLabel({ label }: { label: string }) {
-  return <span title={label} className="min-w-0 truncate">{label}</span>;
 }

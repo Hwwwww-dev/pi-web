@@ -60,6 +60,7 @@ import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -2315,18 +2316,18 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           })()}
           {/* The drafted composer card: attachments, then the input, then one
               pill row with the send button physically pinned to its right. */}
-          <div
+          <InputGroup
             className={cn(
               // No focus-within border darkening: the card border stays put
               // while typing (the user flagged the darkening as heavy-handed).
-              "chat-composer-row min-w-0 rounded-[18px] border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)]",
+              "chat-composer-row min-w-0 rounded-[18px] border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] has-[[data-slot=input-group-control]:focus-visible]:border-border has-[[data-slot=input-group-control]:focus-visible]:ring-0",
               compact
-                ? "flex flex-row items-center gap-1 rounded-xl p-1"
-                : "flex flex-col gap-2 p-2.5 px-3",
+                ? "flex-row items-center gap-1 rounded-xl p-1"
+                : "flex-col items-stretch gap-2 p-2.5 px-3",
             )}
           >
           {attachedImages.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
+            <InputGroupAddon align="block-start" className="flex-wrap px-0 pt-0">
               {attachedImages.map((img, i) => (
                 <div key={i} className="relative shrink-0">
                   <ImagePreview key={img.previewUrl} src={img.previewUrl}>
@@ -2364,12 +2365,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   {t("chat.attachFiles")}
                 </Button>
               )}
-            </div>
+            </InputGroupAddon>
           )}
-          <textarea
+          <InputGroupTextarea
             ref={textareaRef}
             className={cn(
-              "chat-input-textarea w-full min-w-0 border-none bg-transparent outline-none resize-none text-foreground max-h-[120px] overflow-auto placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0",
+              "chat-input-textarea w-full min-w-0 px-0 py-0 text-foreground max-h-[120px] overflow-auto placeholder:text-muted-foreground",
               "text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.55]",
               compact ? "min-h-24" : "min-h-6",
             )}
@@ -2410,7 +2411,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           />
 
           {compact ? sendCluster : (
-            <div className="flex min-w-0 items-center gap-2">
+            <InputGroupAddon align="block-end" className="min-w-0 items-center gap-2 px-0 pb-0">
               {/* One pill row: the pills scroll horizontally instead of wrapping,
                   and the send button is a sibling so it can never be squeezed
                   out. chat-input-controls keeps the keyboard-open collapse. */}
@@ -2676,9 +2677,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </div>
 
               {sendCluster}
-            </div>
+            </InputGroupAddon>
           )}
-          </div>
+          </InputGroup>
         </div>
 
         {/* Bash mode status label */}
