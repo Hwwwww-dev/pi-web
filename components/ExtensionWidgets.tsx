@@ -184,14 +184,16 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
                   aria-controls={panelId}
                   aria-expanded={expanded}
                   aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-                  title={`${widget.key} - ${placementLabel} - ${expanded ? t("i18n.collapse") : t("i18n.expand")}`}
                   onClick={() => toggleWidget(widget)}
                 >
                   {content}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>
-                {widget.key} - {placementLabel} - {expanded ? t("i18n.collapse") : t("i18n.expand")}
+              <TooltipContent className="flex flex-col gap-0.5">
+                <span>{widget.key}</span>
+                <span className="text-xs text-muted-foreground">
+                  {placementLabel} · {expanded ? t("i18n.collapse") : t("i18n.expand")}
+                </span>
               </TooltipContent>
             </Tooltip>
           ) : (
@@ -200,13 +202,13 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
                 <span
                   className="inline-flex h-6 shrink-0 items-center rounded-md px-2 font-mono text-[11.5px] text-muted-foreground"
                   aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-                  title={`${widget.key} - ${placementLabel}`}
                 >
                   {content}
                 </span>
               </TooltipTrigger>
-              <TooltipContent>
-                {widget.key} - {placementLabel}
+              <TooltipContent className="flex flex-col gap-0.5">
+                <span>{widget.key}</span>
+                <span className="text-xs text-muted-foreground">{placementLabel}</span>
               </TooltipContent>
             </Tooltip>
           );

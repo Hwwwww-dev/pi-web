@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { Badge } from "@/components/ui/badge";
 import type { ProjectTrustStatus, SubagentProfilesResponse, SubagentSettingsResponse } from "@/lib/api-types";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { displayPathWithin, shortenPath } from "@/lib/display-path";
@@ -44,7 +45,6 @@ import {
   ConfigSidebarList,
   ConfigSidebarText,
   ConfigSplitView,
-  ConfigStatusDot,
   ConfigSwitch,
 } from "./SettingsUi";
 import { ModelSelector } from "./ModelSelector";
@@ -553,8 +553,12 @@ export function AgentsConfig({
                           active={selectedKey === profileKey(profile) && !creating}
                           onClick={() => selectProfile(profile)}
                         >
-                          <ConfigStatusDot active={profile.enabled} />
                           <ConfigSidebarText className={`flex-1${profile.enabled ? "" : " text-muted-foreground"}`}>{profile.displayName}</ConfigSidebarText>
+                          {!profile.enabled && (
+                            <Badge variant="secondary" className="shrink-0 rounded-full px-1.5 py-0 text-[10px] font-normal text-muted-foreground">
+                              {t("agents.codemode.off")}
+                            </Badge>
+                          )}
                           {overridden && <span className="agents-overridden-label">{t("agents.overridden")}</span>}
                         </ConfigSidebarItem>
                       );

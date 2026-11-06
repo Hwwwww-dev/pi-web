@@ -750,7 +750,7 @@ test("the Debug button only toggles its panel, beside the theme pill and the sta
 
   // Desktop: after the Agents pill and the toolbar capsule, then the stats,
   // then this group, then the file toggle.
-  assert.match(shellSource, /\{renderAgentsButton\(false\)\}\s*\{renderToolbarBGroup\(false\)\}\s*\{renderSessionStats\(false\)\}\s*\{renderDebugThemeGroup\(\)\}\s*\{renderMainFileToggle\(false\)\}/);
+  assert.match(shellSource, /\{renderAgentsButton\(false\)\}\s*\{renderToolbarBGroup\(false\)\}\s*\{renderSessionStats\(false\)\}\s*<Separator orientation="vertical"[^>]* \/>\s*\{renderDebugThemeGroup\(\)\}\s*\{renderMainFileToggle\(false\)\}/);
   const stats = between(shellSource, "const renderSessionStats = (mobile: boolean) => {", "const renderDebugThemeGroup");
   // The stats group follows the Debug group's place; it never pushes itself right.
   assert.doesNotMatch(stats, /ml-auto/);

@@ -136,7 +136,11 @@ test("keeps one-line widgets compact but expandable", () => {
   assert.doesNotMatch(html, /[\u2191\u2193]/);
   assert.match(html, /Below editor widget/);
   assert.match(html, /<button[^>]*aria-expanded="false"/);
-  assert.match(html, /title="single-line-widget - Below editor widget - Expand"/);
+  // The native title that rendered as a black browser blob is gone; the
+  // placement lives in the accessible name (the styled tooltip is portal
+  // content, absent from static markup).
+  assert.doesNotMatch(html, /title="[^"]*"/);
+  assert.match(html, /aria-label="Below editor widget: single-line-widget/);
   assert.doesNotMatch(html, /extension-widget-preview/);
   assert.doesNotMatch(html, /extension-widget-line-count/);
   assert.doesNotMatch(html, />ready</);
@@ -151,5 +155,6 @@ test("keeps empty widgets non-interactive", () => {
   assert.match(html, /<span[^>]*inline-flex h-6[^>]*>/);
   assert.doesNotMatch(html, /<button/);
   assert.doesNotMatch(html, /aria-expanded/);
-  assert.match(html, /title="empty-widget - Above editor widget"/);
+  assert.doesNotMatch(html, /title="[^"]*"/);
+  assert.match(html, /aria-label="Above editor widget: empty-widget/);
 });

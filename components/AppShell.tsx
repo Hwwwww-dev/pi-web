@@ -24,8 +24,8 @@ import {
   WrenchIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ButtonGroup, ButtonGroupText } from "./ui/button-group";
 import { Button } from "./ui/button";
+import { Separator } from "./ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
   DropdownMenu,
@@ -1862,7 +1862,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           }}
           title={translate("common.settings")}
           aria-label={translate("common.settings")}
-          className="min-w-0 shrink justify-start gap-1.5 rounded-full px-2.5 font-medium text-muted-foreground"
+          className="min-w-0 shrink justify-start gap-1.5 rounded-md px-2.5 font-medium text-muted-foreground"
         >
           <SettingsSectionIcon section="general" size={14} strokeWidth={2} />
           <span className="truncate">{translate("common.settings")}</span>
@@ -1930,7 +1930,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               aria-label={agentsButtonLabel}
               aria-pressed={activeTopPanel === "agents"}
               className={cn(
-                "gap-1.5 rounded-full font-medium text-muted-foreground",
+                "gap-1.5 rounded-md font-medium text-muted-foreground",
                 activeTopPanel === "agents" && HEADER_CONTROL_OPEN,
               )}
               data-mobile-toolbar-action={mobile ? "agents" : undefined}
@@ -1985,7 +1985,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               aria-label={translate("i18n.branches")}
               aria-pressed={activeTopPanel === "branches"}
               className={cn(
-                "rounded-full text-muted-foreground",
+                "rounded-md text-muted-foreground",
                 activeTopPanel === "branches" && HEADER_CONTROL_OPEN,
               )}
               data-mobile-toolbar-action={mobile ? "branches" : undefined}
@@ -2009,7 +2009,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               onClick={handleViewFullHistory}
               disabled={!selectedSession}
               aria-label={translate("history.full")}
-              className="rounded-full text-muted-foreground"
+              className="rounded-md text-muted-foreground"
               data-mobile-toolbar-action={mobile ? "history" : undefined}
             >
               <HistoryIcon data-icon strokeWidth={2} />
@@ -2029,7 +2029,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 aria-expanded={mobileToolbarMoreOpen}
                 data-mobile-toolbar-more="true"
                 className={cn(
-                  "rounded-full text-muted-foreground",
+                  "rounded-md text-muted-foreground",
                   mobileToolbarMoreOpen && HEADER_CONTROL_OPEN,
                 )}
               >
@@ -2223,7 +2223,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           aria-label={translate("session.title")}
           aria-pressed={activeTopPanel === "session"}
           className={cn(
-            "min-w-0 flex-1 justify-end overflow-hidden whitespace-nowrap rounded-full px-2 text-xs font-normal text-muted-foreground",
+            "min-w-0 flex-1 justify-end overflow-hidden whitespace-nowrap rounded-md px-2 text-xs font-normal text-muted-foreground",
             !showChat && "cursor-default",
             activeTopPanel === "session" && HEADER_CONTROL_OPEN,
             "enabled:hover:bg-accent enabled:hover:text-foreground",
@@ -2249,40 +2249,34 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     const meterPercent = contextUsage?.contextWindow && contextUsage.percent !== null
       ? Math.max(2, Math.min(100, contextUsage.percent))
       : 0;
-    const segmentClass = "h-8 border-0 bg-secondary px-2.5 font-mono text-[11.5px] font-normal tabular-nums text-muted-foreground shadow-none";
     return (
-      // One segmented capsule (the ButtonGroup flattens the middle segments'
-      // rounding): tokens | cost | the clickable ctx meter.
-      <ButtonGroup className="hidden min-[1240px]:flex shrink-0">
+      // Plain mono text, the dashboard-header form: no chips, one quiet click
+      // target for the per-turn details.
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => toggleTopPanel("session")}
+        title={tooltip || translate("session.title")}
+        aria-label={translate("session.title")}
+        aria-pressed={activeTopPanel === "session"}
+        className={cn(
+          "hidden h-8 shrink-0 items-center gap-1.5 rounded-md px-2 font-mono text-xs font-normal tabular-nums text-muted-foreground min-[1240px]:inline-flex",
+          activeTopPanel === "session" && HEADER_CONTROL_OPEN,
+        )}
+      >
         {tokens && (
-          <ButtonGroupText className={segmentClass}>
+          <span className="inline-flex items-center gap-1">
             <ArrowUpIcon className="size-3" strokeWidth={2} />
             {formatCompactCount(tokens.total)}
-          </ButtonGroupText>
+          </span>
         )}
-        {cost > 0 && (
-          <ButtonGroupText className={segmentClass}>
-            {`$${cost >= 0.01 ? cost.toFixed(2) : cost.toFixed(4)}`}
-          </ButtonGroupText>
-        )}
+        {cost > 0 && <span>{`$${cost >= 0.01 ? cost.toFixed(2) : cost.toFixed(4)}`}</span>}
         {contextUsage?.contextWindow && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => toggleTopPanel("session")}
-            title={tooltip || translate("session.title")}
-            aria-label={translate("session.title")}
-            aria-pressed={activeTopPanel === "session"}
-            className={cn(
-              segmentClass,
-              "gap-1 overflow-hidden hover:bg-secondary/80 hover:text-foreground",
-              activeTopPanel === "session" && HEADER_CONTROL_OPEN,
-            )}
-          >
+          <span className="inline-flex items-center gap-1">
             <span className={contextTone}>{contextUsage.percent !== null ? `${contextUsage.percent.toFixed(1)}%` : "?"}</span>
-            <span aria-hidden="true" className="text-dim">·</span>
+            <span aria-hidden="true" className="text-dim">/</span>
             <span>{formatCompactCount(contextUsage.contextWindow)}</span>
-            <span aria-hidden="true" className="h-1 w-11 overflow-hidden rounded-full bg-foreground/15">
+            <span aria-hidden="true" className="h-1 w-10 overflow-hidden rounded-full bg-foreground/15">
               <span
                 style={{ width: `${meterPercent}%` }}
                 className={cn(
@@ -2293,9 +2287,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 )}
               />
             </span>
-          </Button>
+          </span>
         )}
-      </ButtonGroup>
+      </Button>
     );
   };
 
@@ -2317,7 +2311,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 aria-label={translate("debug.title")}
                 aria-pressed={open}
                 className={cn(
-                  "rounded-full text-muted-foreground",
+                  "rounded-md text-muted-foreground",
                   open && HEADER_CONTROL_OPEN,
                 )}
               >
@@ -2338,7 +2332,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               size="icon-sm"
               onClick={() => setThemePreference(theme === "dark" ? "light" : "dark")}
               aria-label={translate("settings.appearance")}
-              className="rounded-full text-muted-foreground"
+              className="rounded-md text-muted-foreground"
             >
               {theme === "dark" ? (
                 <SunIcon data-icon strokeWidth={2} />
@@ -2439,11 +2433,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               <div className="flex h-10 min-w-0 items-center gap-2">
                 <Button
                   variant="ghost"
-                  size="icon-lg"
+                  size="icon-sm"
                   onClick={handleSidebarToggle}
                   title={translate("sidebar.show")}
                   aria-label={translate("sidebar.show")}
-                  className="shrink-0 rounded-full text-muted-foreground"
+                  className="shrink-0 rounded-md text-muted-foreground"
                 >
                   <MenuIcon className="size-4.5" strokeWidth={2} />
                 </Button>
@@ -2467,10 +2461,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="icon-lg"
+                    size="icon-sm"
                     onClick={handleSidebarToggle}
                     aria-label={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
-                    className="shrink-0 rounded-full text-muted-foreground"
+                    className="shrink-0 rounded-md text-muted-foreground"
                   >
                     {sidebarOpen ? (
                       <PanelLeftIcon className="size-4" strokeWidth={2} />
@@ -2481,12 +2475,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 </TooltipTrigger>
                 <TooltipContent>{sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}</TooltipContent>
               </Tooltip>
-              <div className="flex h-10 min-w-0 flex-1 items-center gap-2">
-                <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">
+              <Separator orientation="vertical" className="h-5 self-center" />
+              <div className="flex h-10 min-w-0 flex-1 items-center gap-2.5">
+                <h1 className="min-w-0 truncate text-base font-semibold text-foreground">
                   {activeSessionTitle ?? "Pi Web"}
-                </span>
+                </h1>
                 {selectedSession && (
-                  <span className="hidden min-[1240px]:inline-flex shrink-0 items-center gap-1 font-mono text-[11.5px] text-muted-foreground">
+                  <span className="hidden min-[1240px]:inline-flex shrink-0 items-center gap-1 rounded-md border bg-muted/50 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
                     <GitBranchIcon className="size-[11px] shrink-0" strokeWidth={2} />
                     {[
                       getFileName(selectedSession.projectRoot ?? selectedSession.cwd),
@@ -2503,6 +2498,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               {renderAgentsButton(false)}
               {renderToolbarBGroup(false)}
               {renderSessionStats(false)}
+              <Separator orientation="vertical" className="mx-0.5 h-5 self-center" />
               {renderDebugThemeGroup()}
               {renderMainFileToggle(false)}
             </>
