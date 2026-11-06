@@ -194,7 +194,7 @@ test("a file problem is explained, and one that hides servers the SDK still load
     }),
   }));
   assert.match(text(outside), /so its servers are not listed here\. Pi still loads them once the project is trusted\. \/elsewhere\/mcp\.json$/);
-  assert.match(outside, /<code class="font-mono text-xs mt-1 block text-dim \[overflow-wrap:anywhere\]">\/elsewhere\/mcp\.json<\/code>/);
+  assert.match(outside, /<code class="font-mono text-xs mt-1 block text-muted-foreground \[overflow-wrap:anywhere\]">\/elsewhere\/mcp\.json<\/code>/);
 
   const tooLarge = text(render(h(ProjectTrustMcpSection, {
     listing: loaded({ file: { problems: [{ reason: "too-large", error: "larger than 1048576 bytes" }] } }),
@@ -218,7 +218,7 @@ test("an empty file, a missing one, and an unchecked listing", () => {
 test("while the listing loads it says so, and Trust waits for it", () => {
   const html = render(h(ProjectTrustDialog, { cwd: "/repo", busy: false, error: null, onCancel() {}, onConfirm() {} }));
   assert.match(html, /role="dialog" aria-modal="true" aria-labelledby="project-trust-title" aria-describedby="project-trust-description" tabindex="-1" class="project-trust-dialog"/);
-  assert.match(html, /<p id="project-trust-mcp-status" role="status" class="mt-3 text-xs leading-normal text-dim">Reading \.pi\/mcp\.json…<\/p>/);
+  assert.match(html, /<p id="project-trust-mcp-status" role="status" class="mt-3 text-xs leading-normal text-muted-foreground">Reading \.pi\/mcp\.json…<\/p>/);
   assert.match(html, /<button data-slot="button" data-variant="default" data-size="sm" class="[^"]*" type="button" disabled="" aria-describedby="project-trust-mcp-status">Trust project<\/button>/);
   assert.match(html, /<button data-slot="button" data-variant="outline" data-size="sm" class="[^"]*" type="button">Cancel<\/button>/);
   assert.match(html, /<code class="mt-2\.5 block rounded-sm border border-border bg-background px-2\.5 py-2 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">\/repo<\/code>/);

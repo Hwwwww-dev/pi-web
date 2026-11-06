@@ -11,7 +11,7 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
-  background: var(--bg);
+  background: var(--background);
   border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
   border-radius: 16px;
   box-shadow:
@@ -58,7 +58,7 @@
 
 .number {
   padding-top: 6px;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
@@ -81,7 +81,7 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--text);
+  color: var(--foreground);
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -104,7 +104,7 @@
 }
 
 .user:hover {
-  background: color-mix(in srgb, var(--text) 6%, transparent);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 
 .turn[data-located="true"] .user {
@@ -123,7 +123,7 @@
 /* Tool count, tokens and cost of the turn, in one monospaced line. */
 .meta {
   margin: 1px 0 3px 8px;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
@@ -134,11 +134,11 @@
 }
 
 .turn[data-located="true"] .meta {
-  color: color-mix(in srgb, var(--accent) 65%, var(--text-dim));
+  color: color-mix(in srgb, var(--accent) 65%, var(--muted-foreground));
 }
 
 .user:focus-visible {
   outline: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
   outline-offset: -1px;
-  background: color-mix(in srgb, var(--text) 6%, transparent);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
 }

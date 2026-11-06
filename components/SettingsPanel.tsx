@@ -914,7 +914,7 @@ export function SettingsPanel({
                     <button
                       key={item.id}
                       type="button"
-                      className="settings-phone-home-item flex min-h-[52px] w-full items-center gap-3.5 border-b border-border bg-transparent pl-4.5 pr-4 text-left text-[15px] text-foreground active:bg-secondary disabled:cursor-default disabled:text-dim"
+                      className="settings-phone-home-item flex min-h-[52px] w-full items-center gap-3.5 border-b border-border bg-transparent pl-4.5 pr-4 text-left text-[15px] text-foreground active:bg-secondary disabled:cursor-default disabled:text-muted-foreground"
                       disabled={disabled}
                       aria-describedby={disabled ? `settings-phone-home-${item.id}-note` : undefined}
                       onClick={() => openSectionFromHome(item.id)}
@@ -923,12 +923,12 @@ export function SettingsPanel({
                       <span className="settings-phone-home-label flex min-w-0 flex-1 flex-col gap-0.5">
                         <span>{item.label}</span>
                         {disabled && (
-                          <span id={`settings-phone-home-${item.id}-note`} className="settings-phone-home-note text-xs text-dim">
+                          <span id={`settings-phone-home-${item.id}-note`} className="settings-phone-home-note text-xs text-muted-foreground">
                             {t("settings.projectRequired")}
                           </span>
                         )}
                       </span>
-                      <ChevronRightIcon size={16} className="settings-phone-home-chevron shrink-0 text-dim" />
+                      <ChevronRightIcon size={16} className="settings-phone-home-chevron shrink-0 text-muted-foreground" />
                     </button>
                   );
                 })}

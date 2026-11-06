@@ -362,7 +362,7 @@ function menuBoxClassName(classic: boolean): string {
     classic ? "is-classic" : "",
     "z-[400] box-border max-w-[calc(100vw-16px)]",
     "max-h-[min(calc(var(--app-viewport-height,100dvh)-16px),480px,var(--radix-popper-available-height,480px))] overflow-y-auto [overscroll-behavior:contain]",
-    "border border-(--border) rounded-(--radius-md) bg-(--bg) text-(--text) text-xs shadow-(--shadow-md)",
+    "border border-(--border) rounded-(--radius-md) bg-background text-foreground text-xs shadow-(--shadow-md)",
     classic ? "p-0" : "p-1",
     "animate-in fade-in slide-in-from-top-[3px] duration-[120ms] ease-out motion-reduce:animate-none",
     "focus:outline-none",
@@ -371,12 +371,12 @@ function menuBoxClassName(classic: boolean): string {
 
 function itemClassName(item: ActionItem, mode: SurfaceMode, inRow: boolean): string {
   const choice = item.checked !== undefined;
-  const color = item.danger ? "text-(--danger)"
-    : mode.classic ? (item.checked ? "text-(--text)" : "text-(--text-muted)")
-    : "text-(--text)";
+  const color = item.danger ? "text-destructive"
+    : mode.classic ? (item.checked ? "text-foreground" : "text-muted-foreground")
+    : "text-foreground";
   const highlight = item.danger
-    ? "not-aria-disabled:hover:bg-(--danger-bg) not-aria-disabled:focus-visible:bg-(--danger-bg)"
-    : "not-aria-disabled:hover:bg-(--bg-hover) not-aria-disabled:focus-visible:bg-(--bg-hover)";
+    ? "not-aria-disabled:hover:bg-destructive/10 not-aria-disabled:focus-visible:bg-destructive/10"
+    : "not-aria-disabled:hover:bg-accent not-aria-disabled:focus-visible:bg-secondary";
   return [
     "sidebar-menu-item",
     choice ? "is-choice" : "",
@@ -399,9 +399,9 @@ function itemClassName(item: ActionItem, mode: SurfaceMode, inRow: boolean): str
 }
 
 function iconClassName(item: ActionItem, mode: SurfaceMode): string {
-  const color = item.danger ? "text-(--danger)"
+  const color = item.danger ? "text-destructive"
     : item.checked ? "text-(--accent)"
-    : mode.classic ? "text-inherit" : "text-(--text-muted)";
+    : mode.classic ? "text-inherit" : "text-muted-foreground";
   return [
     "sidebar-menu-icon",
     "inline-flex items-center justify-center shrink-0 grow-0",
@@ -425,13 +425,13 @@ function labelClassName(item: ActionItem, mode: SurfaceMode): string {
 function noteClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-note",
-    "shrink-0 max-w-[45%] overflow-hidden text-(--text-dim) text-ellipsis whitespace-nowrap",
+    "shrink-0 max-w-[45%] overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap",
     mode.sheet ? "text-[13px]" : mode.classic ? "text-[10px]" : "text-[11px]",
   ].filter(Boolean).join(" ");
 }
 
 function shortcutClassName(sheet: boolean): string {
-  return ["sidebar-menu-shortcut", "shrink-0 text-(--text-dim) font-mono text-[10.5px]", sheet ? "hidden" : ""].filter(Boolean).join(" ");
+  return ["sidebar-menu-shortcut", "shrink-0 text-muted-foreground font-mono text-[10.5px]", sheet ? "hidden" : ""].filter(Boolean).join(" ");
 }
 
 function separatorClassName(mode: SurfaceMode): string {
@@ -441,7 +441,7 @@ function separatorClassName(mode: SurfaceMode): string {
 function headerClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-header",
-    "overflow-hidden text-(--text-dim) text-ellipsis whitespace-nowrap",
+    "overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap",
     mode.sheet ? "px-4 pt-2 pb-1 text-xs" : "px-2 pt-1.5 pb-1 text-[11px]",
   ].filter(Boolean).join(" ");
 }
@@ -449,7 +449,7 @@ function headerClassName(mode: SurfaceMode): string {
 function filterClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-filter",
-    "sticky z-[1] border-b border-(--border) bg-(--bg)",
+    "sticky z-[1] border-b border-(--border) bg-background",
     mode.classic
       ? "top-0 m-0 px-2 py-1.5"
       : mode.sheet
@@ -461,7 +461,7 @@ function filterClassName(mode: SurfaceMode): string {
 function filterInputClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-filter-input",
-    "block w-full px-2 box-border border border-(--border) rounded-(--radius-sm) outline-none bg-(--bg) text-(--text) [user-select:text] [-webkit-user-select:text] focus:border-(--accent)",
+    "block w-full px-2 box-border border border-(--border) rounded-(--radius-sm) outline-none bg-background text-foreground [user-select:text] [-webkit-user-select:text] focus:border-(--accent)",
     mode.classic ? "h-auto py-[5px] font-mono text-[11px]" : mode.sheet ? "h-10 text-sm" : "h-7 text-xs",
   ].filter(Boolean).join(" ");
 }
@@ -469,20 +469,20 @@ function filterInputClassName(mode: SurfaceMode): string {
 function emptyClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-empty",
-    "text-(--text-dim)",
+    "text-muted-foreground",
     mode.classic ? "px-2.5 py-2 text-[11px]" : mode.sheet ? "px-4 py-3 text-[15px]" : "px-2 py-1.5 text-xs",
   ].filter(Boolean).join(" ");
 }
 
 function secondaryClassName(secondary: SidebarMenuSecondaryAction, mode: SurfaceMode): string {
   const highlight = secondary.danger
-    ? "not-aria-disabled:hover:bg-(--danger-bg) not-aria-disabled:hover:text-(--danger) not-aria-disabled:focus-visible:bg-(--danger-bg) not-aria-disabled:focus-visible:text-(--danger)"
-    : "not-aria-disabled:hover:bg-(--bg-hover) not-aria-disabled:hover:text-(--text) not-aria-disabled:focus-visible:bg-(--bg-hover) not-aria-disabled:focus-visible:text-(--text)";
+    ? "not-aria-disabled:hover:bg-destructive/10 not-aria-disabled:hover:text-destructive not-aria-disabled:focus-visible:bg-destructive/10 not-aria-disabled:focus-visible:text-destructive"
+    : "not-aria-disabled:hover:bg-accent not-aria-disabled:hover:text-foreground not-aria-disabled:focus-visible:bg-secondary not-aria-disabled:focus-visible:text-foreground";
   return [
     "sidebar-menu-secondary",
     secondary.danger ? "is-danger" : "",
     "inline-flex items-center justify-center shrink-0 grow-0 p-0 border-0 bg-transparent cursor-pointer focus:outline-none",
-    secondary.danger ? "text-(--danger)" : "text-(--text-dim)",
+    secondary.danger ? "text-destructive" : "text-muted-foreground",
     mode.classic ? "w-[34px] h-7 mr-1 rounded-(--radius-sm)" : mode.sheet ? "size-12 rounded-none" : "size-7 rounded-(--radius-sm)",
     highlight,
     "aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
@@ -492,10 +492,10 @@ function secondaryClassName(secondary: SidebarMenuSecondaryAction, mode: Surface
 
 const SHEET_LAYER_CLASS = "sidebar-sheet-layer fixed top-0 right-0 left-0 z-[410] flex flex-col justify-end pointer-events-none focus:outline-none";
 const SHEET_BACKDROP_CLASS = "sidebar-sheet-backdrop fixed inset-0 z-[410] bg-black/35 animate-in fade-in duration-[120ms] ease-out [touch-action:none] [-webkit-tap-highlight-color:transparent] motion-reduce:animate-none";
-const SHEET_CLASS = "sidebar-sheet relative z-[1] box-border max-h-[calc(var(--app-viewport-height,100dvh)-48px)] overflow-y-auto [overscroll-behavior:contain] pt-1 pb-[max(8px,env(safe-area-inset-bottom))] border-t border-(--border) rounded-t-(--radius-lg) bg-(--bg) text-(--text) text-[15px] shadow-[0_-6px_20px_rgba(0,0,0,0.12)] animate-in fade-in slide-in-from-bottom-[16px] duration-[120ms] ease-out pointer-events-auto focus:outline-none motion-reduce:animate-none [html[data-keyboard-open]_&]:pb-2";
-const SHEET_TITLE_CLASS = "sidebar-sheet-title px-4 pt-[10px] pb-[9px] overflow-hidden border-b border-(--border) text-(--text-dim) text-xs text-ellipsis whitespace-nowrap";
+const SHEET_CLASS = "sidebar-sheet relative z-[1] box-border max-h-[calc(var(--app-viewport-height,100dvh)-48px)] overflow-y-auto [overscroll-behavior:contain] pt-1 pb-[max(8px,env(safe-area-inset-bottom))] border-t border-(--border) rounded-t-(--radius-lg) bg-background text-foreground text-[15px] shadow-[0_-6px_20px_rgba(0,0,0,0.12)] animate-in fade-in slide-in-from-bottom-[16px] duration-[120ms] ease-out pointer-events-auto focus:outline-none motion-reduce:animate-none [html[data-keyboard-open]_&]:pb-2";
+const SHEET_TITLE_CLASS = "sidebar-sheet-title px-4 pt-[10px] pb-[9px] overflow-hidden border-b border-(--border) text-muted-foreground text-xs text-ellipsis whitespace-nowrap";
 const SHEET_BODY_CLASS = "sidebar-sheet-body py-1";
-const SHEET_CANCEL_CLASS = ["sidebar-sheet-cancel", "flex items-center justify-center w-full h-12 px-4 border-0 border-t border-(--border) bg-transparent text-(--text-muted) text-[15px] [font:inherit] cursor-pointer hover:bg-(--bg-hover)", FOCUS_RING].filter(Boolean).join(" ");
+const SHEET_CANCEL_CLASS = ["sidebar-sheet-cancel", "flex items-center justify-center w-full h-12 px-4 border-0 border-t border-(--border) bg-transparent text-muted-foreground text-[15px] [font:inherit] cursor-pointer hover:bg-accent", FOCUS_RING].filter(Boolean).join(" ");
 
 /** Enter is taken on the button rather than left to its click, which would not say whether Shift was held. */
 function activateOnEnter(action: MenuAction, onActivate: (action: MenuAction, shiftKey: boolean) => void) {

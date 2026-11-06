@@ -68,10 +68,10 @@ export function SessionSearch({ open, query, children, selectedSessionId, onSele
               {titleMatch ? <>{before}<mark className="rounded-sm bg-primary/20 text-foreground">{match}</mark>{after}</> : session.name || session.firstMessage}
             </span>
             {archivedSessionIds?.has(session.id) && (
-              <span className="shrink-0 rounded-sm border border-border px-1 text-[10px] leading-[14px] text-dim">{t("sidebar.archived")}</span>
+              <span className="shrink-0 rounded-sm border border-border px-1 text-[10px] leading-[14px] text-muted-foreground">{t("sidebar.archived")}</span>
             )}
           </span>
-          <span className="mt-1 flex min-w-0 gap-2 text-[10px] text-dim">
+          <span className="mt-1 flex min-w-0 gap-2 text-[10px] text-muted-foreground">
             <span className="min-w-0 flex-1 truncate" title={session.cwd}>{session.cwd}</span>
             <span className="shrink-0">{formatRelativeTime(session.modified, locale)}</span>
           </span>

@@ -143,7 +143,7 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
     <div className="grid h-[min(600px,75dvh)] min-h-60 grid-cols-[clamp(112px,26%,220px)_minmax(0,1fr)] overflow-hidden border-b bg-card max-[640px]:grid-cols-[112px_minmax(0,1fr)]">
       <nav
         aria-label={translate("tools.title")}
-        className="flex min-h-0 min-w-0 flex-col border-r bg-[color-mix(in_srgb,var(--bg-panel)_94%,var(--bg))]"
+        className="flex min-h-0 min-w-0 flex-col border-r bg-[color-mix(in_srgb,var(--sidebar)_94%,var(--background))]"
       >
         <div className="min-h-0 flex-1 overflow-auto">
           {declaredTools && declaredTools.length > 0 ? declaredTools.map((tool) => {
@@ -177,13 +177,13 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
           <div className="min-h-0 flex-1 overflow-auto p-3.5 pb-5 max-[640px]:p-3">
             {selectedTool.description && (
               <section className="flex flex-col gap-1.5">
-                <div className="text-[11px] font-semibold text-dim">{translate("tools.description")}</div>
+                <div className="text-[11px] font-semibold text-muted-foreground">{translate("tools.description")}</div>
                 <div className="whitespace-pre-wrap text-xs/relaxed text-muted-foreground [overflow-wrap:anywhere]">{selectedTool.description}</div>
               </section>
             )}
 
             <section className={cn("flex flex-col gap-1.5", selectedTool.description && "mt-[18px]")}>
-              <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-dim">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-muted-foreground">
                 <span>{translate("tools.parameters")}</span>
                 <span className="whitespace-nowrap font-normal">{translate("tools.parameterCount", { count: fields.length })}</span>
               </div>
@@ -198,7 +198,7 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
                         <code className="[overflow-wrap:anywhere]">{field.name}</code>
                         <Badge
                           variant="outline"
-                          className={cn("w-fit border-current/35 px-1 py-0 font-mono text-[10px] leading-[14px]", field.required ? "text-primary" : "text-dim")}
+                          className={cn("w-fit border-current/35 px-1 py-0 font-mono text-[10px] leading-[14px]", field.required ? "text-primary" : "text-muted-foreground")}
                         >
                           {translate(field.required ? "tools.required" : "tools.optional")}
                         </Badge>
@@ -207,12 +207,12 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
                         <code className="mb-[3px] block text-foreground">{field.type}</code>
                         {field.description && <div>{field.description}</div>}
                         {field.allowedValues && (
-                          <div className="mt-1 text-dim">
+                          <div className="mt-1 text-muted-foreground">
                             {translate("tools.allowedValues")}: <code className="text-muted-foreground">{field.allowedValues}</code>
                           </div>
                         )}
                         {field.defaultValue !== undefined && (
-                          <div className="mt-1 text-dim">
+                          <div className="mt-1 text-muted-foreground">
                             {translate("tools.defaultValue")}: <code className="text-muted-foreground">{field.defaultValue}</code>
                           </div>
                         )}
@@ -221,13 +221,13 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
                   ))}
                 </div>
               ) : (
-                <div className="pb-2.5 pt-0.5 text-[11px] text-dim">{translate("tools.noParameters")}</div>
+                <div className="pb-2.5 pt-0.5 text-[11px] text-muted-foreground">{translate("tools.noParameters")}</div>
               )}
             </section>
 
             {selectedTool.promptGuidelines && selectedTool.promptGuidelines.length > 0 && (
               <section className="mt-[18px] flex flex-col gap-1.5">
-                <div className="text-[11px] font-semibold text-dim">{translate("tools.guidelines")}</div>
+                <div className="text-[11px] font-semibold text-muted-foreground">{translate("tools.guidelines")}</div>
                 <ul className="m-0 pl-[18px] text-[11px]/[1.5] text-muted-foreground">
                   {selectedTool.promptGuidelines.map((guideline, index) => (
                     <li key={`${selectedTool.name}:${index}`}>{guideline}</li>

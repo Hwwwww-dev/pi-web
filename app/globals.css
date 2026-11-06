@@ -10,28 +10,15 @@
 /* shadcn 组件的 dark: 变体沿用 pi 的 html.dark 开关。 */
 @custom-variant dark (&:is(.dark *));
 
-@theme {
-  --color-bg: var(--bg);
-  --color-bg-panel: var(--bg-panel);
-  --color-bg-hover: var(--bg-hover);
-  --color-bg-selected: var(--bg-selected);
-  --color-border: var(--border);
-  --color-text: var(--text);
-  --color-text-muted: var(--text-muted);
-  --color-text-dim: var(--text-dim);
-  --color-user-bg: var(--user-bg);
-  --color-user-border: var(--user-border);
-  --color-assistant-bg: var(--assistant-bg);
-  --color-tool-bg: var(--tool-bg);
-  --color-bg-subtle: var(--bg-subtle);
-}
-
 /* shadcn 官方 theming：语义 token 是唯一真值源（:root/.dark 下方定义），
-   组件一律消费 --color-* 映射出的 utilities；旧变量名保留为官方 token 的
-   别名，存量 CSS/组件无需感知替换。 */
+   组件一律消费 --color-* 映射出的 utilities。旧调色板的别名层
+   （--bg-panel/--text-dim/--danger 等）已退役，存量 CSS 全部改用官方
+   token；warning/ok/diff 是官方调色板没有的功能色，作为项目语义 token
+   保留在 :root/.dark。 */
 @theme inline {
   --font-sans: var(--font-ui);
   --font-mono: var(--font-mono);
+  --color-border: var(--border);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -58,7 +45,6 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-dim: var(--text-dim);
   --color-warning: var(--warning);
   --color-success: var(--ok);
   --color-diff-add-bg: var(--diff-add-bg);
@@ -212,24 +198,6 @@ html.dark {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  /* 旧变量名 → 官方 token 别名（存量 CSS 与组件继续可用）。 */
-  --bg: var(--background);
-  --bg-panel: var(--sidebar);
-  --bg-hover: var(--secondary);
-  --bg-selected: var(--accent);
-  --text: var(--foreground);
-  --text-muted: var(--muted-foreground);
-  --text-dim: var(--muted-foreground);
-  --accent-hover: var(--accent);
-  --accent-contrast: var(--accent-foreground);
-  --user-bg: var(--secondary);
-  --user-border: transparent;
-  --assistant-bg: var(--card);
-  --tool-bg: var(--muted);
-  --bg-subtle: color-mix(in srgb, var(--foreground) 4%, transparent);
-  --danger: var(--destructive);
-  --danger-border: color-mix(in srgb, var(--destructive) 30%, transparent);
-  --danger-bg: color-mix(in srgb, var(--destructive) 7%, transparent);
   --warning: oklch(0.769 0.15 70.08);
   --warning-border: color-mix(in srgb, var(--warning) 30%, transparent);
   --warning-bg: color-mix(in srgb, var(--warning) 12%, transparent);
@@ -272,24 +240,6 @@ html.dark {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  /* 别名与功能色（暗色）。 */
-  --bg: var(--background);
-  --bg-panel: var(--sidebar);
-  --bg-hover: var(--secondary);
-  --bg-selected: var(--accent);
-  --text: var(--foreground);
-  --text-muted: var(--muted-foreground);
-  --text-dim: var(--muted-foreground);
-  --accent-hover: var(--accent);
-  --accent-contrast: var(--accent-foreground);
-  --user-bg: var(--secondary);
-  --user-border: transparent;
-  --assistant-bg: var(--card);
-  --tool-bg: var(--muted);
-  --bg-subtle: color-mix(in srgb, var(--foreground) 4%, transparent);
-  --danger: var(--destructive);
-  --danger-border: color-mix(in srgb, var(--destructive) 30%, transparent);
-  --danger-bg: color-mix(in srgb, var(--destructive) 10%, transparent);
   --warning: oklch(0.8 0.15 75);
   --warning-border: color-mix(in srgb, var(--warning) 30%, transparent);
   --warning-bg: color-mix(in srgb, var(--warning) 12%, transparent);
@@ -326,12 +276,12 @@ html.dark .catppuccin-file-icon {
    restrained text palette instead of Catppuccin's language-specific colors. */
 @supports (mask-image: url("mask.svg")) or (-webkit-mask-image: url("mask.svg")) {
   .catppuccin-file-icon {
-    background: var(--text-dim);
+    background: var(--muted-foreground);
     mask: center / contain no-repeat var(--catppuccin-icon-light);
     -webkit-mask: center / contain no-repeat var(--catppuccin-icon-light);
   }
   html.dark .catppuccin-file-icon {
-    background: var(--text-dim);
+    background: var(--muted-foreground);
     mask-image: var(--catppuccin-icon-dark);
     -webkit-mask-image: var(--catppuccin-icon-dark);
   }
@@ -376,8 +326,8 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-ui);
   font-weight: var(--font-ui-weight);
   font-size: 14px;
@@ -461,7 +411,7 @@ html.dark {
   min-height: 100%;
   padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   place-items: center;
-  background: var(--bg);
+  background: var(--background);
 }
 
 .web-login-shell {
@@ -482,14 +432,14 @@ html.dark {
 
 .web-login-brand h1 {
   margin: 0 0 3px;
-  color: var(--text);
+  color: var(--foreground);
   font-size: 22px;
   letter-spacing: 0;
 }
 
 .web-login-brand p {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-size: 12px;
 }
 
@@ -505,7 +455,7 @@ html.dark {
   padding: 10px 10px 10px 14px;
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-radius: var(--radius-xl);
-  background: var(--bg);
+  background: var(--background);
   /* neutral slate-black shadow, kept literal: no shadow token */
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.10);
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -536,13 +486,13 @@ html.dark {
   border: none;
   outline: none;
   background: none;
-  color: var(--text);
+  color: var(--foreground);
   font: inherit;
   font-size: 16px;
 }
 
 .web-login-form input::placeholder {
-  color: var(--text-dim);
+  color: var(--muted-foreground);
 }
 
 .web-login-error {
@@ -555,7 +505,7 @@ html.dark {
 }
 
 html.dark .web-login-error {
-  color: var(--danger);
+  color: var(--destructive);
 }
 
 .web-login-form button {
@@ -568,7 +518,7 @@ html.dark .web-login-error {
   border: none;
   border-radius: var(--radius-md);
   background: var(--accent);
-  color: var(--accent-contrast);
+  color: var(--accent-foreground);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
@@ -577,7 +527,7 @@ html.dark .web-login-error {
 }
 
 .web-login-form button:not(:disabled):hover {
-  background: var(--accent-hover);
+  background: var(--accent);
 }
 
 .web-login-form button:focus-visible {
@@ -724,10 +674,10 @@ html[data-keyboard-open] .terminal-extra-keys {
 /* Only ever set background-color here: the `background` shorthand resets
    background-clip and would snap the thumb to the full width on hover. */
 ::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(in srgb, var(--text-dim) 60%, var(--border));
+  background-color: color-mix(in srgb, var(--muted-foreground) 60%, var(--border));
 }
 ::-webkit-scrollbar-thumb:active {
-  background-color: var(--text-dim);
+  background-color: var(--muted-foreground);
 }
 ::-webkit-scrollbar-corner {
   background: transparent;
@@ -737,13 +687,13 @@ html[data-keyboard-open] .terminal-extra-keys {
   background-color: transparent;
 }
 .scrollbar-subtle.scrollbar-visible::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--text-dim) 45%, transparent);
+  background-color: color-mix(in srgb, var(--muted-foreground) 45%, transparent);
 }
 .scrollbar-subtle.scrollbar-visible::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(in srgb, var(--text-dim) 72%, transparent);
+  background-color: color-mix(in srgb, var(--muted-foreground) 72%, transparent);
 }
 .scrollbar-subtle.scrollbar-visible::-webkit-scrollbar-thumb:active {
-  background-color: var(--text-dim);
+  background-color: var(--muted-foreground);
 }
 
 /* A touch screen scrolls by dragging the content, so the extra width buys
@@ -806,7 +756,7 @@ html[data-keyboard-open] .terminal-extra-keys {
   border: 0;
   border-radius: var(--radius-md);
   background: none;
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-family: inherit;
   font-size: 12px;
   line-height: 1;
@@ -817,8 +767,8 @@ html[data-keyboard-open] .terminal-extra-keys {
 
 .composer-chip:hover,
 .composer-chip[aria-expanded="true"] {
-  background: var(--bg-hover);
-  color: var(--text);
+  background: var(--secondary);
+  color: var(--foreground);
 }
 
 .composer-chip:disabled {
@@ -853,7 +803,7 @@ html[data-keyboard-open] .terminal-extra-keys {
 }
 
 .extension-status-dot[data-tone="error"] {
-  background: var(--danger);
+  background: var(--destructive);
 }
 
 .extension-status-popover {
@@ -873,7 +823,7 @@ html[data-keyboard-open] .terminal-extra-keys {
   scrollbar-width: thin;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--bg);
+  background: var(--background);
   box-shadow: 0 -4px 16px rgb(0 0 0 / 10%);
 }
 
@@ -948,7 +898,7 @@ pre, code {
   overflow-x: hidden;
   font-size: calc(13.5px + var(--chat-font-size-offset, 0px));
   line-height: 1.7;
-  color: var(--text);
+  color: var(--foreground);
   word-break: break-word;
 }
 .markdown-body p { margin: 0 0 8px; }
@@ -961,13 +911,13 @@ pre, code {
 .markdown-body h4, .markdown-body h5, .markdown-body h6 {
   font-weight: 600;
   margin: 10px 0 5px;
-  color: var(--text);
+  color: var(--foreground);
   line-height: 1.35;
   letter-spacing: 0;
 }
 .markdown-body h1 { font-size: 1.16em; }
 .markdown-body h2 { font-size: 1.08em; }
-.markdown-body h3 { font-size: 0.98em; color: color-mix(in srgb, var(--text) 88%, var(--text-muted)); }
+.markdown-body h3 { font-size: 0.98em; color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground)); }
 .markdown-body ul, .markdown-body ol {
   padding-left: 22px;
   margin: 5px 0 8px;
@@ -980,14 +930,14 @@ pre, code {
 .markdown-body ol > li { list-style-type: decimal; }
 .markdown-body li > p { margin: 0; }
 .markdown-body li::marker {
-  color: color-mix(in srgb, var(--accent) 72%, var(--text-muted));
+  color: color-mix(in srgb, var(--accent) 72%, var(--muted-foreground));
   font-weight: 600;
 }
 .markdown-body strong {
-  color: color-mix(in srgb, var(--text) 88%, var(--accent));
+  color: color-mix(in srgb, var(--foreground) 88%, var(--accent));
   font-weight: 700;
 }
-.markdown-body em { color: var(--text-muted); }
+.markdown-body em { color: var(--muted-foreground); }
 .markdown-body a {
   color: var(--accent);
   text-decoration: underline;
@@ -1011,7 +961,7 @@ pre, code {
   width: min(360px, 100%);
   height: 36px;
   margin: 8px 0;
-  background: var(--bg-subtle);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
   border: 1px solid var(--border);
   border-radius: var(--radius-2xl);
   clip-path: inset(0 round 18px);
@@ -1027,10 +977,10 @@ pre, code {
   border-radius: var(--radius-sm);
 }
 .markdown-body .markdown-inline-code {
-  background: var(--bg-subtle);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
   border-radius: var(--radius-sm);
   padding: 1px 5px;
-  color: var(--text);
+  color: var(--foreground);
   font-family: var(--font-mono);
   font-size: 0.92em;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
@@ -1057,14 +1007,14 @@ pre, code {
   border: 1px solid var(--border);
   /* 4px micro radius below the token scale, kept literal */
   border-radius: 4px;
-  background: var(--bg);
+  background: var(--background);
   display: inline-grid;
   place-content: center;
 }
 .markdown-body .task-list-item > input[type="checkbox"]:checked,
 .markdown-body .task-list-item > p:first-child > input[type="checkbox"]:first-child:checked {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  background: color-mix(in srgb, var(--accent) 10%, var(--background));
 }
 .markdown-body .task-list-item > input[type="checkbox"]:checked::before,
 .markdown-body .task-list-item > p:first-child > input[type="checkbox"]:first-child:checked::before {
@@ -1076,12 +1026,12 @@ pre, code {
   transform: rotate(45deg) translateY(-1px);
 }
 .markdown-body blockquote {
-  border-left: 3px solid color-mix(in srgb, var(--border) 75%, var(--text-muted));
+  border-left: 3px solid color-mix(in srgb, var(--border) 75%, var(--muted-foreground));
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   margin: 6px 0;
   padding: 6px 11px;
-  background: var(--bg-subtle);
-  color: var(--text-muted);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  color: var(--muted-foreground);
 }
 .markdown-table-frame {
   width: 100%;
@@ -1112,11 +1062,11 @@ pre, code {
 }
 .markdown-body tr:last-child td { border-bottom: 0; }
 .markdown-body th {
-  background: var(--bg-panel);
-  color: color-mix(in srgb, var(--text) 88%, var(--text-muted));
+  background: var(--sidebar);
+  color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground));
   font-weight: 650;
 }
-.markdown-body tbody tr:nth-child(even) td { background: var(--bg-subtle); }
+.markdown-body tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--foreground) 4%, transparent); }
 .markdown-body hr {
   border: none;
   height: 1px;
@@ -1175,7 +1125,7 @@ pre, code {
 .markdown-inline-file {
   cursor: pointer;
   text-decoration: underline dotted;
-  text-decoration-color: var(--text-dim);
+  text-decoration-color: var(--muted-foreground);
   text-underline-offset: 2px;
 }
 .markdown-inline-file:hover {
@@ -1293,7 +1243,7 @@ pre, code {
 .mermaid-block {
   padding: 12px;
   overflow-x: auto;
-  background: color-mix(in srgb, var(--bg) 92%, var(--bg-panel));
+  background: color-mix(in srgb, var(--background) 92%, var(--sidebar));
 }
 .mermaid-block svg {
   display: block;
@@ -1303,7 +1253,7 @@ pre, code {
   min-height: 120px;
 }
 .mermaid-block-error {
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -1365,7 +1315,7 @@ pre, code {
   overflow: hidden;
   border: 0;
   background: transparent;
-  color: var(--text);
+  color: var(--foreground);
 }
 
 .image-preview-dialog[open] {
@@ -1400,8 +1350,8 @@ pre, code {
   margin: 0;
   padding: 0;
   border: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--background);
+  color: var(--foreground);
 }
 .mermaid-zoom-dialog::backdrop {
   /* neutral black backdrop, kept literal: no backdrop token */
@@ -1418,13 +1368,13 @@ pre, code {
   gap: 10px;
   min-height: 40px;
   padding: 7px 10px;
-  background: var(--bg-panel);
+  background: var(--sidebar);
   border-bottom: 1px solid var(--border);
 }
 .mermaid-zoom-title {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
@@ -1442,14 +1392,14 @@ pre, code {
   min-height: 0;
   overflow: auto;
   padding: 24px;
-  background: var(--bg);
+  background: var(--background);
   -webkit-overflow-scrolling: touch;
 }
 .mermaid-zoom-canvas {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--bg-panel);
+  background: var(--sidebar);
   margin: 0 auto;
   transition: width 0.15s ease;
 }
@@ -1523,10 +1473,10 @@ pre, code {
   box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--bg-panel);
-  color: var(--text-muted);
+  background: var(--sidebar);
+  color: var(--muted-foreground);
   cursor: pointer;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--text) 16%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--foreground) 16%, transparent);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -1555,8 +1505,8 @@ pre, code {
 .chat-scroll-to-bottom.is-visible:hover,
 .chat-scroll-to-bottom.is-visible:focus-visible {
   opacity: 1;
-  background: var(--bg-hover);
-  color: var(--text);
+  background: var(--secondary);
+  color: var(--foreground);
 }
 
 .chat-scroll-to-bottom:focus-visible {
@@ -1615,7 +1565,7 @@ pre, code {
 }
 
 .new-session-brand-name {
-  color: var(--text);
+  color: var(--foreground);
   font-size: 22px;
   font-weight: 700;
   line-height: 1.15;
@@ -1630,7 +1580,7 @@ pre, code {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-size: 12px;
   line-height: 1.4;
   white-space: nowrap;
@@ -1665,7 +1615,7 @@ pre, code {
 
 .new-session-update:hover,
 .new-session-update:focus-visible {
-  background: var(--bg-hover);
+  background: var(--secondary);
 }
 
 /* The ring inside the box, clear of the "→" and "·" beside it. */
@@ -1743,8 +1693,8 @@ pre, code {
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--bg-hover);
-  color: var(--text-muted);
+  background: var(--secondary);
+  color: var(--muted-foreground);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -1786,7 +1736,7 @@ pre, code {
 
 .project-picker.is-inline .project-picker-button:hover,
 .project-picker.is-inline .project-picker-button[aria-expanded="true"] {
-  background: var(--bg-hover);
+  background: var(--secondary);
 }
 
 /* The project's name (its display name, else its folder's), cut at its
@@ -1799,7 +1749,7 @@ pre, code {
   min-width: 0;
   max-width: 28ch;
   overflow: hidden;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   white-space: nowrap;
 }
@@ -1815,7 +1765,7 @@ pre, code {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: var(--text);
+  color: var(--foreground);
   text-overflow: ellipsis;
 }
 
@@ -1825,8 +1775,8 @@ pre, code {
 
 .project-picker-button:hover,
 .project-picker-button[aria-expanded="true"] {
-  background: var(--bg-selected);
-  color: var(--text);
+  background: var(--accent);
+  color: var(--foreground);
 }
 
 .project-picker-button:focus-visible {
@@ -1840,12 +1790,12 @@ pre, code {
 }
 
 .project-picker-icon {
-  color: var(--text-dim);
+  color: var(--muted-foreground);
 }
 
 .project-picker-button:hover .project-picker-icon,
 .project-picker-button[aria-expanded="true"] .project-picker-icon {
-  color: var(--text-muted);
+  color: var(--muted-foreground);
 }
 
 /* A linked checkout's branch, not the main one's. */
@@ -1856,7 +1806,7 @@ pre, code {
 }
 
 .project-picker-chevron {
-  color: var(--text-dim);
+  color: var(--muted-foreground);
 }
 
 .project-picker-label {
@@ -1869,7 +1819,7 @@ pre, code {
 /* A project the user named (its group menu's Rename…): the name in the
    path's color and code type, cut at its end. */
 .project-picker-label.is-alias {
-  color: var(--text);
+  color: var(--foreground);
   font-family: var(--font-mono);
 }
 
@@ -1879,7 +1829,7 @@ pre, code {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: var(--text);
+  color: var(--foreground);
   font-family: var(--font-mono);
   text-align: left;
   text-overflow: ellipsis;
@@ -1902,7 +1852,7 @@ pre, code {
 
 .project-picker-note {
   flex: none;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-size: 10px;
 }
 
@@ -1919,21 +1869,21 @@ pre, code {
 .project-picker-button.is-empty {
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
   background: color-mix(in srgb, var(--accent) 6%, transparent);
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
 }
 
 /* No worktree list here (the files tab): a box that says why, and does nothing. */
 .project-picker-button.is-inactive,
 .project-picker-button.is-inactive:hover {
-  background: var(--bg-hover);
-  color: var(--text-dim);
+  background: var(--secondary);
+  color: var(--muted-foreground);
   cursor: default;
   opacity: 0.82;
 }
 
 .project-picker-button.is-inactive:hover .project-picker-icon {
-  color: var(--text-dim);
+  color: var(--muted-foreground);
 }
 
 /* The files tab: full width, one under the other, at the top of its head
@@ -2003,7 +1953,7 @@ pre, code {
 .markdown-file-preview h3 { font-size: 1.15em; }
 .markdown-file-preview p { margin: 0 0 12px; }
 .markdown-file-preview pre {
-  background: var(--bg-panel);
+  background: var(--sidebar);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px 16px;
@@ -2015,7 +1965,7 @@ pre, code {
 .markdown-file-preview code {
   font-family: var(--font-mono);
   font-size: 0.9em;
-  background: var(--bg-panel);
+  background: var(--sidebar);
   padding: 1px 5px;
   /* 3px micro radius below the token scale, kept literal */
   border-radius: 3px;
@@ -2031,13 +1981,13 @@ pre, code {
   padding: 14px 16px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--bg-panel);
+  background: var(--sidebar);
 }
 .markdown-frontmatter-title {
   font-size: 1.3em;
   font-weight: 600;
   line-height: 1.35;
-  color: var(--text);
+  color: var(--foreground);
 }
 .markdown-frontmatter-tags {
   display: flex;
@@ -2048,8 +1998,8 @@ pre, code {
 .markdown-frontmatter-tag {
   font-size: 12px;
   line-height: 1.6;
-  color: var(--text-muted);
-  background: var(--bg-subtle);
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0 10px;
@@ -2066,14 +2016,14 @@ pre, code {
   display: contents;
 }
 .markdown-frontmatter-row dt {
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 0.92em;
   white-space: nowrap;
 }
 .markdown-frontmatter-row dd {
   margin: 0;
-  color: var(--text);
+  color: var(--foreground);
   min-width: 0;
   word-break: break-word;
 }
@@ -2086,7 +2036,7 @@ pre, code {
 /* syntax highlighter line numbers */
 .markdown-body span.linenumber,
 span.linenumber {
-  color: var(--text-dim) !important;
+  color: var(--muted-foreground) !important;
   font-style: normal !important;
 }
 
@@ -2176,12 +2126,12 @@ span.token.table {
   background: none;
   border: none;
   border-radius: var(--radius-sm);
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   cursor: pointer;
 }
 .notice-shelf-close:hover {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  color: var(--danger);
+  background: color-mix(in srgb, var(--destructive) 12%, transparent);
+  color: var(--destructive);
 }
 
 /* Keep the panel border as the idle separator; this element only expands the hit target. */
@@ -2209,7 +2159,7 @@ span.token.table {
 .panel-resize-handle:hover::after,
 .panel-resize-handle:focus-visible::after,
 .panel-resize-handle.is-resizing::after {
-  background: color-mix(in srgb, var(--text-muted) 70%, var(--border));
+  background: color-mix(in srgb, var(--muted-foreground) 70%, var(--border));
 }
 .right-panel-overlay-backdrop {
   display: none;
@@ -2375,8 +2325,8 @@ span.token.table {
 
 @keyframes extension-drawer-in { from { transform: translateY(16px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
 .extension-drawer-in { animation: extension-drawer-in 0.22s ease-out }
-.extension-option { background: var(--bg-panel) }
-.extension-option:not(:disabled):hover { background: var(--bg-hover) }
+.extension-option { background: var(--sidebar) }
+.extension-option:not(:disabled):hover { background: var(--secondary) }
 /* Compact typography for option bodies rendered through MarkdownBody: keep
    previews fully readable without the message-body heading/paragraph sizing. */
 .extension-option .markdown-body { font-size: 12px; line-height: 1.45; }
@@ -2396,17 +2346,17 @@ span.token.table {
 .extension-option .markdown-body blockquote { margin: 3px 0; padding-left: 8px; }
 .extension-option.tone-affirmative { background: color-mix(in srgb, var(--ok) 12%, transparent) }
 .extension-option.tone-affirmative:not(:disabled):hover { background: color-mix(in srgb, var(--ok) 22%, transparent) }
-.extension-option.tone-negative { background: color-mix(in srgb, var(--danger) 10%, transparent) }
-.extension-option.tone-negative:not(:disabled):hover { background: color-mix(in srgb, var(--danger) 20%, transparent) }
+.extension-option.tone-negative { background: color-mix(in srgb, var(--destructive) 10%, transparent) }
+.extension-option.tone-negative:not(:disabled):hover { background: color-mix(in srgb, var(--destructive) 20%, transparent) }
 .extension-multi-option { user-select: none; }
-.extension-multi-option:hover { background: var(--bg-hover); }
+.extension-multi-option:hover { background: var(--secondary); }
 /* Flex rows, not a table: WebKit's auto table layout gives the value column
    only its min-content when overflow-wrap: anywhere is set, crushing values
    like "external_directory" into one character per line on narrow screens. */
 .extension-kv-table { margin-top: 6px; font-size: 12px; line-height: 1.5; }
 .extension-kv-row { display: flex; align-items: baseline; gap: 14px; padding: 3px 0; }
-.extension-kv-label { flex-shrink: 0; color: var(--text-muted); white-space: nowrap; }
-.extension-kv-value { flex: 1; min-width: 0; font-family: var(--font-mono); color: var(--text); overflow-wrap: anywhere; }
+.extension-kv-label { flex-shrink: 0; color: var(--muted-foreground); white-space: nowrap; }
+.extension-kv-value { flex: 1; min-width: 0; font-family: var(--font-mono); color: var(--foreground); overflow-wrap: anywhere; }
 
 /* ── Keep-alive dock: edge button + flyout panel on the chat area ── */
 .keepalive-dock {
@@ -2425,8 +2375,8 @@ span.token.table {
   border: 1px solid var(--border);
   border-left: none;
   border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-  background: var(--bg-panel);
-  color: var(--text-muted);
+  background: var(--sidebar);
+  color: var(--muted-foreground);
   cursor: pointer;
   /* neutral black shadow, kept literal: no shadow token */
   box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.10);
@@ -2436,8 +2386,8 @@ span.token.table {
 }
 .keepalive-dock-button:hover,
 .keepalive-dock-button.is-open {
-  background: var(--bg-hover);
-  color: var(--text);
+  background: var(--secondary);
+  color: var(--foreground);
 }
 .keepalive-dock-count {
   font-size: 12px;
@@ -2463,7 +2413,7 @@ span.token.table {
   max-height: min(440px, 62vh);
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--bg);
+  background: var(--background);
 
   border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
   border-radius: var(--radius-xl);
@@ -2486,8 +2436,8 @@ span.token.table {
   border-radius: var(--radius-md);
   flex-shrink: 0;
 }
-.keepalive-dock-row:hover { background: var(--bg-hover); }
-.keepalive-dock-row.is-active { background: var(--bg-selected); }
+.keepalive-dock-row:hover { background: var(--secondary); }
+.keepalive-dock-row.is-active { background: var(--accent); }
 .keepalive-dock-open {
   flex: 1;
   min-width: 0;
@@ -2504,7 +2454,7 @@ span.token.table {
 .keepalive-dock-name {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2515,7 +2465,7 @@ span.token.table {
   gap: 6px;
   min-width: 0;
   font-size: 12px;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
 }
 .keepalive-dock-status { flex-shrink: 0; }
 .keepalive-dock-status.is-running { color: var(--accent); }
@@ -2527,10 +2477,10 @@ span.token.table {
   border: none;
   border-radius: var(--radius-md);
   background: none;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   cursor: pointer;
 }
-.keepalive-dock-close:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.keepalive-dock-close:hover { background: color-mix(in srgb, var(--destructive) 12%, transparent); color: var(--destructive); }
 .keepalive-dock-footer {
   border-top: 1px solid var(--border);
   margin-top: 4px;
@@ -2542,12 +2492,12 @@ span.token.table {
   border: none;
   border-radius: var(--radius-sm);
   background: none;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   cursor: pointer;
   font-size: 12px;
   text-align: left;
 }
-.keepalive-dock-dismiss-all:hover { background: var(--danger-bg); color: var(--danger); }
+.keepalive-dock-dismiss-all:hover { background: color-mix(in srgb, var(--destructive) 7%, transparent); color: var(--destructive); }
 
 /* On phones the floating dock permanently covers chat text; keep-alive
    sessions are switched from the sidebar there instead. */

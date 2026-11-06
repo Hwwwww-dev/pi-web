@@ -428,7 +428,7 @@ const TONE_TEXT: Record<DebugTone, string> = {
   error: "text-destructive",
   accent: "text-primary",
   muted: "text-muted-foreground",
-  dim: "text-dim",
+  dim: "text-muted-foreground",
 };
 
 // A filled badge's box in its own tone: the border joins the fill (the accent one is the
@@ -438,7 +438,7 @@ const TONE_FILLED: Partial<Record<DebugTone, string>> = {
   warning: "border-warning bg-warning text-card",
   error: "border-destructive bg-destructive text-background",
   muted: "border-muted-foreground bg-muted-foreground text-background",
-  dim: "border-dim bg-dim text-background",
+  dim: "border-muted-foreground bg-muted-foreground text-background",
 };
 const FILLED_ACCENT = "border-primary";
 
@@ -676,7 +676,7 @@ function DebugEmpty({ children }: { children: ReactNode }) {
   return (
     <Empty className="flex-none items-start gap-0 rounded-none border-0 p-0 text-left md:p-0">
       <EmptyHeader className="items-start text-left">
-        <EmptyTitle className="text-xs font-normal text-dim">{children}</EmptyTitle>
+        <EmptyTitle className="text-xs font-normal text-muted-foreground">{children}</EmptyTitle>
       </EmptyHeader>
     </Empty>
   );
@@ -1249,7 +1249,7 @@ function SessionDetail({ detail, clock, ctx, unlisted = false }: { detail: Debug
     <div className="debug-detail">
       <div className="debug-detail-line">
         {titleOf(detail.sessionId) !== null && <span className="debug-detail-id">{shortDebugId(detail.sessionId)}</span>}
-        {!wrapper && <span className="text-xs text-dim">{t(detail.starting ? "debug.server.starting" : "debug.server.noWrapper")}</span>}
+        {!wrapper && <span className="text-xs text-muted-foreground">{t(detail.starting ? "debug.server.starting" : "debug.server.noWrapper")}</span>}
         {/* A listed row has its own ↻ count. */}
         {unlisted && lifecycle && lifecycle.starts > 1 && (
           <span className="debug-starts" title={startsTitle(lifecycle, ago, t)}>{`↻${lifecycle.starts}`}</span>
@@ -1564,7 +1564,7 @@ const DEBUG_PANEL_CSS = `
   .debug-panel {
     --dbg-ok: var(--ok);
     --dbg-warn: var(--warning);
-    --dbg-err: var(--danger);
+    --dbg-err: var(--destructive);
     container-type: inline-size;
     container-name: debug-panel;
   }
@@ -1572,8 +1572,8 @@ const DEBUG_PANEL_CSS = `
   .debug-panel .is-warning { color: var(--dbg-warn); }
   .debug-panel .is-error { color: var(--dbg-err); }
   .debug-panel .is-accent { color: var(--accent); }
-  .debug-panel .is-muted { color: var(--text-muted); }
-  .debug-panel .is-dim { color: var(--text-dim); }
+  .debug-panel .is-muted { color: var(--muted-foreground); }
+  .debug-panel .is-dim { color: var(--muted-foreground); }
   .debug-panel-scroll {
     display: flex;
     min-height: 0;
@@ -1586,12 +1586,12 @@ const DEBUG_PANEL_CSS = `
     line-height: 1.5;
   }
   .debug-section-title {
-    color: var(--text);
+    color: var(--foreground);
     font-size: 11px;
     font-weight: 700;
   }
   .debug-label {
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     font-size: 11px;
     white-space: nowrap;
   }
@@ -1602,7 +1602,7 @@ const DEBUG_PANEL_CSS = `
     white-space: nowrap;
   }
   .debug-line {
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     font-family: var(--font-mono);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
@@ -1673,7 +1673,7 @@ const DEBUG_PANEL_CSS = `
     grid-column: 2 / -1;
     width: 0;
     min-width: 100%;
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     font-family: var(--font-mono);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
@@ -1726,11 +1726,11 @@ const DEBUG_PANEL_CSS = `
   .debug-page-row.debug-list-head {
     min-height: 18px;
     grid-template-columns: minmax(0, 1fr) auto;
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     font-size: 10px;
   }
   .debug-page-row.is-current {
-    background: var(--bg-selected);
+    background: var(--accent);
   }
   .debug-page-row.is-current::before {
     content: "";
@@ -1745,7 +1745,7 @@ const DEBUG_PANEL_CSS = `
   .debug-page-icons {
     display: inline-flex;
     padding-left: 4px;
-    color: var(--text-muted);
+    color: var(--muted-foreground);
   }
   .debug-page-icons svg {
     width: 12px;
@@ -1760,24 +1760,24 @@ const DEBUG_PANEL_CSS = `
     white-space: nowrap;
   }
   .debug-page-client {
-    color: var(--text);
+    color: var(--foreground);
   }
   .debug-page-address {
-    color: var(--text-muted);
+    color: var(--muted-foreground);
     font-family: var(--font-mono);
   }
   .debug-page-holder {
-    color: var(--text-dim);
+    color: var(--muted-foreground);
   }
   .debug-page-count {
     justify-self: end;
-    color: var(--text-muted);
+    color: var(--muted-foreground);
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
   .debug-list-head .debug-page-count {
-    color: var(--text-dim);
+    color: var(--muted-foreground);
   }
   .debug-run {
     display: inline-flex;
@@ -1787,7 +1787,7 @@ const DEBUG_PANEL_CSS = `
     vertical-align: middle;
   }
   .debug-run-more {
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     font-family: var(--font-mono);
     font-size: 10px;
     line-height: 16px;
@@ -1857,7 +1857,7 @@ const DEBUG_PANEL_CSS = `
     top: 0;
     bottom: 0;
     width: 1px;
-    background: var(--bg-panel);
+    background: var(--sidebar);
   }
   .debug-dot {
     display: inline-block;
@@ -1884,7 +1884,7 @@ const DEBUG_PANEL_CSS = `
     width: 7px;
     height: 7px;
     box-sizing: border-box;
-    border: 1.5px solid var(--text-dim);
+    border: 1.5px solid var(--muted-foreground);
     border-radius: 50%;
   }
   .debug-status-ring.is-closing {
@@ -1893,7 +1893,7 @@ const DEBUG_PANEL_CSS = `
   }
   .debug-status-ring.is-none {
     border-style: dotted;
-    border-color: var(--text-dim);
+    border-color: var(--muted-foreground);
   }
   .debug-status-ring.is-starting {
     border-style: dashed;
@@ -1908,7 +1908,7 @@ const DEBUG_PANEL_CSS = `
     margin-bottom: 2px;
     padding: 0 4px 5px 24px;
     border-radius: 0 0 4px 4px;
-    background: var(--bg-selected);
+    background: var(--accent);
   }
   .debug-detail-line {
     display: flex;
@@ -1919,7 +1919,7 @@ const DEBUG_PANEL_CSS = `
   }
   .debug-detail-id,
   .debug-starts {
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     font-family: var(--font-mono);
     font-size: 11px;
   }
@@ -1933,12 +1933,12 @@ const DEBUG_PANEL_CSS = `
     display: flex;
     align-items: center;
     gap: 6px;
-    color: var(--text);
+    color: var(--foreground);
     font-size: 11px;
     font-weight: 700;
   }
   .debug-panel .debug-subhead.is-dim {
-    color: var(--text-dim);
+    color: var(--muted-foreground);
   }
   .debug-run-line {
     display: flex;
@@ -1961,7 +1961,7 @@ const DEBUG_PANEL_CSS = `
   .debug-run-name {
     min-width: 0;
     overflow: hidden;
-    color: var(--text);
+    color: var(--foreground);
     font-size: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1979,7 +1979,7 @@ const DEBUG_PANEL_CSS = `
     font-size: 11px;
   }
   .debug-pill-state {
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     white-space: nowrap;
   }
 
@@ -1992,7 +1992,7 @@ const DEBUG_PANEL_CSS = `
     min-height: 22px;
     align-items: center;
     gap: 5px;
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     font-size: 11px;
   }
   .debug-group-head svg {
@@ -2022,7 +2022,7 @@ const DEBUG_PANEL_CSS = `
   }
   .debug-row.debug-list-head {
     min-height: 18px;
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     font-size: 10px;
   }
   /* At the end of their columns, spilling left rather than out of the row when wider. */
@@ -2033,7 +2033,7 @@ const DEBUG_PANEL_CSS = `
   }
   .debug-row.is-current {
     position: relative;
-    background: var(--bg-selected);
+    background: var(--accent);
   }
   .debug-row.has-detail {
     border-radius: 4px 4px 0 0;
@@ -2077,23 +2077,23 @@ const DEBUG_PANEL_CSS = `
   .debug-row-name {
     min-width: 0;
     overflow: hidden;
-    color: var(--text);
+    color: var(--foreground);
     font-size: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .debug-row.is-sub .debug-row-name {
-    color: var(--text-muted);
+    color: var(--muted-foreground);
   }
   .debug-row.is-current .debug-row-name {
     font-weight: 600;
   }
   .debug-row.is-placeholder .debug-row-name {
-    color: var(--text-dim);
+    color: var(--muted-foreground);
   }
   .debug-row-starts {
     flex-shrink: 0;
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     font-family: var(--font-mono);
     font-size: 10px;
   }
@@ -2130,7 +2130,7 @@ const DEBUG_PANEL_CSS = `
   .debug-server-head {
     flex-wrap: wrap;
     gap: 4px 14px;
-    color: var(--text-dim);
+    color: var(--muted-foreground);
     font-size: 11px;
   }
   .debug-server-item {

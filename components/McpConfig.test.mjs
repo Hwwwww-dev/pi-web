@@ -299,7 +299,7 @@ test("MCP being off, a refused project folder, and file problems are said above 
     load: { state: "loaded", data: overview(), projectError: { error: "cwd must be a directory", reason: "cwd-not-directory" } },
   });
   assert.match(text(projectError), /This project's servers are not listed: The project folder no longer exists or is not a folder\./);
-  assert.match(decode(projectError), /class="px-2 pt-px pb-\[5px\] text-xs leading-\[1\.4\] text-dim \[overflow-wrap:anywhere\]">Not listed</);
+  assert.match(decode(projectError), /class="px-2 pt-px pb-\[5px\] text-xs leading-\[1\.4\] text-muted-foreground \[overflow-wrap:anywhere\]">Not listed</);
 
   const broken = view({
     load: {
@@ -310,7 +310,7 @@ test("MCP being off, a refused project folder, and file problems are said above 
   const shown = text(broken);
   assert.match(decode(broken), /class="config-footer-status-summary is-error">1 file problem</);
   assert.match(shown, /~\/\.pi\/agent\/mcp\.json The file is not valid JSON, so none of its servers load\. Unexpected token \} in JSON at position 9/);
-  assert.match(decode(broken), /class="px-2 pt-px pb-\[5px\] text-xs leading-\[1\.4\] text-dim \[overflow-wrap:anywhere\]">Not listed: see the file problem below</);
+  assert.match(decode(broken), /class="px-2 pt-px pb-\[5px\] text-xs leading-\[1\.4\] text-muted-foreground \[overflow-wrap:anywhere\]">Not listed: see the file problem below</);
   // The detail pane agrees: the servers are hidden by the problem, not missing.
   assert.match(shown, /No servers could be listed: see the file problems below\./);
   assert.doesNotMatch(shown, /No MCP servers yet/);
@@ -455,7 +455,7 @@ test("the Code mode pane offers Automatic and Always on, and says once when its 
     view: { codemodeSave: { saving: true, error: null } },
   });
   assert.deepEqual(codemodeOptions(saving).map(({ disabled }) => disabled), [true, true]);
-  assert.match(decode(saving), /<span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-dim">Saving…<\/span>/);
+  assert.match(decode(saving), /<span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">Saving…<\/span>/);
 });
 
 test("Always on is disabled with a visible reason while no session could offer Code mode", () => {
@@ -599,7 +599,7 @@ test("the Code mode pane's budget field saves a whole number, or empty for pi's 
   assert.match(input(saving), /readOnly=""/);
   assert.doesNotMatch(input(saving), /\sdisabled=/);
   assert.match(save(saving), /disabled=""/);
-  assert.match(field(saving), /<span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-dim">Saving…<\/span>/);
+  assert.match(field(saving), /<span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">Saving…<\/span>/);
   assert.deepEqual(codemodeOptions(saving).map(({ disabled }) => disabled), [true, true]);
   assert.equal(decode(saving).match(/role="status"/g).length, 1);
   // A server change on its way makes the field wait as well.
@@ -778,7 +778,7 @@ test("the exposure dropdown waits like a switch, and points at why it cannot be 
   // While any change is on its way it waits; the one for this server says it is saving.
   const saving = validated({ view: { busy: "exposure:global\0docs" } });
   assert.match(exposureSelect(saving).tag, /disabled=""/);
-  assert.match(decode(saving), /<span class="flex min-w-0 flex-wrap items-center gap-1\.5"><select[^>]*>[\s\S]*?<\/select><span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-dim">Saving…<\/span><\/span>/);
+  assert.match(decode(saving), /<span class="flex min-w-0 flex-wrap items-center gap-1\.5"><select[^>]*>[\s\S]*?<\/select><span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">Saving…<\/span><\/span>/);
   assert.match(exposureSelect(validated({ view: { busy: "switch:global\0pw" } })).tag, /disabled=""/);
   assert.doesNotMatch(exposureSelect(validated()).tag, /disabled/);
   // Where no change may be written, it points at the note that says why.
@@ -1096,10 +1096,10 @@ test("a connected test shows what it listed, and the row reads connected", () =>
   const tools = markup.match(/<div class="config-detail-grid-label">Tools<\/div><div class="config-detail-grid-value">([\s\S]*?)<\/div>/)?.[1];
   assert.ok(tools, "a Tools row");
   assert.match(tools, /<select[\s\S]*<\/select>[\s\S]*<ul class="mt-1 flex min-w-0 flex-col gap-1\.5">/);
-  assert.match(tools, /<li class="flex min-w-0 flex-col gap-0\.5"><span class="flex min-w-0 flex-wrap gap-1"><code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">search<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">read-only<\/span><\/span><span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-dim">Search the docs\.<\/span><\/li>/);
+  assert.match(tools, /<li class="flex min-w-0 flex-col gap-0\.5"><span class="flex min-w-0 flex-wrap gap-1"><code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">search<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-muted-foreground">read-only<\/span><\/span><span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">Search the docs\.<\/span><\/li>/);
   // A tool whose exposure differs from its server's says so; one like its server's does not.
-  assert.match(tools, /<code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">publish<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">direct<\/span>/);
-  assert.doesNotMatch(tools, /<span class="whitespace-nowrap text-xs leading-\[18px\] text-dim">Code mode<\/span>/);
+  assert.match(tools, /<code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">publish<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-muted-foreground">direct<\/span>/);
+  assert.doesNotMatch(tools, /<span class="whitespace-nowrap text-xs leading-\[18px\] text-muted-foreground">Code mode<\/span>/);
   // A tool name is the server's text: hidden characters are shown as codes.
   assert.match(tools, /bidi\\u\{202E\}tool/);
   // More tools than listed say how many are not shown.
@@ -1126,7 +1126,7 @@ test("a failed test shows the error and stderr, a sign-in, and no answer, each w
   assert.match(value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">Gave up after 1\.3 s, tested at/);
   assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Error: <code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">spawn lint-mcp ENOENT<\/code><\/span>/);
   // The stderr tail keeps its lines, and its control characters are shown as codes.
-  assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-dim">The last lines it wrote to stderr:<\/span><pre class="max-h-\[160px\][^"]*">line one\nline\\u\{0007\}two<\/pre>/);
+  assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">The last lines it wrote to stderr:<\/span><pre class="max-h-\[160px\][^"]*">line one\nline\\u\{0007\}two<\/pre>/);
 
   const signIn = testView({ status: testedStatus("needs-auth") });
   assert.match(row(signIn, "docs"), /aria-label="docs: Needs sign-in"/);
@@ -1374,7 +1374,7 @@ test("an OAuth server's pane signs in from its Sign-in row, under the Status row
   }));
   const id = blocked.value.match(/<button data-slot="button" data-variant="default" data-size="sm" class="[^"]*" type="button" disabled="" aria-describedby="([^"]+)">Sign in<\/button>/)?.[1];
   assert.ok(id, "Sign in is disabled and points at the reason");
-  assert.match(blocked.value, new RegExp(`<span id="${id}" class="min-w-0 text-xs leading-normal \\[overflow-wrap:anywhere\\] text-dim">This project is not trusted`));
+  assert.match(blocked.value, new RegExp(`<span id="${id}" class="min-w-0 text-xs leading-normal \\[overflow-wrap:anywhere\\] text-muted-foreground">This project is not trusted`));
   assert.match(blocked.text, /This project is not trusted, so Pi Web does not sign in to or out of its servers\./);
 });
 

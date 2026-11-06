@@ -169,7 +169,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                     </span>
                     <PathLabel
                       text={info.cwd}
-                      className="text-[10px] font-mono text-dim"
+                      className="text-[10px] font-mono text-muted-foreground"
                     />
                   </button>
                   <Button

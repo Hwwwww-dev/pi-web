@@ -131,7 +131,7 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
             "relative flex h-[30px] w-8 shrink-0 items-center justify-center rounded-sm border-0 bg-transparent p-0 outline-none transition-colors duration-300",
             "focus-visible:ring-[3px] focus-visible:ring-ring/50",
             "enabled:cursor-pointer disabled:pointer-events-none disabled:opacity-50",
-            refreshDone ? "text-success" : "text-dim",
+            refreshDone ? "text-success" : "text-muted-foreground",
           )}
         >
           {refreshDone ? (
@@ -141,13 +141,13 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
           )}
         </button>
         {report && (
-          <span title={new Date(report.capturedAt).toLocaleString(locale)} className="text-xs whitespace-nowrap text-dim">
+          <span title={new Date(report.capturedAt).toLocaleString(locale)} className="text-xs whitespace-nowrap text-muted-foreground">
             {t("providerUsage.updated", { time: formatUpdatedTime(report.capturedAt, locale) })}
           </span>
         )}
       </div>
 
-      {!report && !error && <span className="text-xs text-dim">{t("providerUsage.notQueried")}</span>}
+      {!report && !error && <span className="text-xs text-muted-foreground">{t("providerUsage.notQueried")}</span>}
       {error && <span className="text-xs text-destructive">{error}</span>}
       {report && (
         <div className="grid w-[min(100%,420px)] max-w-full min-w-0 grid-cols-[180px_minmax(0,1fr)] items-baseline gap-x-3.5 gap-y-2 text-xs">

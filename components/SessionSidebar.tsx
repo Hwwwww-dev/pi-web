@@ -2569,16 +2569,16 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     // here); the sheet's narrower header inset wins over its own header rule.
     <div className="sidebar-menu-question px-1 pt-0.5 pb-1 [.sidebar-sheet_&]:py-1 [.sidebar-sheet_&]:px-4">
       <div
-        className="sidebar-menu-header overflow-hidden text-(--text-dim) text-ellipsis whitespace-nowrap px-1 pt-1.5 pb-1 text-[11px] [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs"
+        className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-1 pt-1.5 pb-1 text-[11px] [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs"
         title={headingTitle}
       >
         {heading}
       </div>
-      {notes.map((note) => <p key={note} className="sidebar-menu-question-text m-0 pt-0.5 px-1 text-(--text) text-xs leading-[1.4] [.sidebar-sheet_&]:text-sm">{note}</p>)}
+      {notes.map((note) => <p key={note} className="sidebar-menu-question-text m-0 pt-0.5 px-1 text-foreground text-xs leading-[1.4] [.sidebar-sheet_&]:text-sm">{note}</p>)}
       <div className="sidebar-menu-question-buttons flex gap-1.5 mt-2">
         <button
           type="button"
-          className={["sidebar-menu-question-confirm", "flex-1 min-w-0 h-[26px] border border-(--danger) rounded-(--radius-sm) bg-(--danger) text-white text-xs font-semibold cursor-pointer", "disabled:cursor-not-allowed disabled:opacity-50", FOCUS_RING, "[.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"].join(" ")}
+          className={["sidebar-menu-question-confirm", "flex-1 min-w-0 h-[26px] border border-destructive rounded-(--radius-sm) bg-destructive text-white text-xs font-semibold cursor-pointer", "disabled:cursor-not-allowed disabled:opacity-50", FOCUS_RING, "[.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"].join(" ")}
           disabled={count === 0}
           onClick={onConfirm}
         >
@@ -2587,7 +2587,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         {!isMobile && (
           <button
             type="button"
-            className={["sidebar-menu-question-cancel", "flex-1 min-w-0 h-[26px] border border-(--border) rounded-(--radius-sm) bg-(--bg) text-(--text-muted) text-xs cursor-pointer hover:bg-(--bg-hover)", FOCUS_RING].join(" ")}
+            className={["sidebar-menu-question-cancel", "flex-1 min-w-0 h-[26px] border border-(--border) rounded-(--radius-sm) bg-background text-muted-foreground text-xs cursor-pointer hover:bg-accent", FOCUS_RING].join(" ")}
             data-sidebar-menu-autofocus=""
             onClick={onCancel}
           >
@@ -2999,7 +2999,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
             id="session-sidebar-tab-sessions"
             value="sessions"
             aria-controls="session-sidebar-panel-sessions"
-            className="min-h-8 min-w-0 px-[8px] rounded-full cursor-pointer hover:bg-(--bg-hover) data-[state=active]:bg-(--bg-panel) dark:data-[state=active]:bg-(--bg-panel)"
+            className="min-h-8 min-w-0 px-[8px] rounded-full cursor-pointer hover:bg-accent data-[state=active]:bg-sidebar"
           >
             <MessageSquareIcon className="size-[15px]" />
             <span>{t("sidebar.tabSessions")}</span>
@@ -3010,7 +3010,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
             value="files"
             aria-controls="session-sidebar-panel-files"
             title={changedFilesTitle}
-            className="min-h-8 min-w-0 px-[8px] rounded-full cursor-pointer hover:bg-(--bg-hover) data-[state=active]:bg-(--bg-panel) dark:data-[state=active]:bg-(--bg-panel)"
+            className="min-h-8 min-w-0 px-[8px] rounded-full cursor-pointer hover:bg-accent data-[state=active]:bg-sidebar"
           >
             <FolderIcon className="size-[15px]" />
             <span>{t("sidebar.tabFiles")}</span>

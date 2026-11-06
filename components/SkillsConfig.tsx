@@ -230,7 +230,7 @@ function SkillDetail({
         </ConfigDetailHeader>
         <div className="skill-detail-status-row">
           {!enabled && (
-            <span className="text-xs text-dim">
+            <span className="text-xs text-muted-foreground">
               {t("i18n.hiddenButInvocable")}
             </span>
           )}
@@ -530,7 +530,7 @@ function AddSkillPanel({
                   </div>
                   {/* repo + installs + link row */}
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="font-mono text-xs text-dim">
+                    <span className="font-mono text-xs text-muted-foreground">
                       {repopart}
                     </span>
                     <span className="text-xs font-medium text-muted-foreground">

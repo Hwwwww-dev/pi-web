@@ -64,7 +64,7 @@ function Line({ tone, className, ...props }: { tone?: "muted" | "dim" | "warning
       className={cn(
         "mt-1.5 text-xs leading-normal [overflow-wrap:anywhere]",
         tone === "muted" && "text-muted-foreground",
-        tone === "dim" && "text-dim",
+        tone === "dim" && "text-muted-foreground",
         tone === "warning" && "text-warning",
         className,
       )}
@@ -80,7 +80,7 @@ function McpCode({ dim = false, block = false, className, children }: { dim?: bo
       className={cn(
         "font-mono text-xs",
         block ? "mt-1 block" : "inline-block",
-        dim ? "text-dim" : "text-foreground",
+        dim ? "text-muted-foreground" : "text-foreground",
         className,
       )}
     >
@@ -339,7 +339,7 @@ export function ProjectTrustMcpSection({ listing }: { listing: ProjectTrustMcpLi
   if (listing.state === "loading") {
     return (
       <div>
-        <p id={STATUS_ID} role="status" className="mt-3 text-xs leading-normal text-dim">{t("trust.mcp.loading")}</p>
+        <p id={STATUS_ID} role="status" className="mt-3 text-xs leading-normal text-muted-foreground">{t("trust.mcp.loading")}</p>
         <Skeleton className="mt-2 h-3 w-40" />
       </div>
     );
@@ -447,7 +447,7 @@ function McpServerItem({ server }: { server: McpServerInfo }) {
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="min-w-0 text-xs font-semibold text-foreground [overflow-wrap:anywhere]">{revealHiddenCharacters(server.name)}</span>
         {server.transport && (
-          <Badge variant="secondary" className="shrink-0 rounded-[3px] px-[5px] py-px text-[10px] text-dim">
+          <Badge variant="secondary" className="shrink-0 rounded-[3px] px-[5px] py-px text-[10px] text-muted-foreground">
             {t(`mcp.transport.${server.transport}`)}
           </Badge>
         )}

@@ -134,8 +134,8 @@ test("CodeBlock owns the pre background without a competing shorthand", () => {
     if (isStreaming) {
       // The streamed pre carries the block background as a utility class and
       // keeps no inline background of its own.
-      assert.match(pre, /bg-\[color-mix\(in_srgb,var\(--bg\)_92%,var\(--bg-panel\)\)\]/);
-      assert.doesNotMatch(pre, /background/);
+      assert.match(pre, /bg-\[color-mix\(in_srgb,var\(--background\)_92%,var\(--sidebar\)\)\]/);
+      assert.doesNotMatch(pre, /background(?:-color)?:/);
     } else {
       assert.match(pre, /background-color:color-mix/);
       assert.doesNotMatch(pre, /(?:[;\"]|^)background:/);

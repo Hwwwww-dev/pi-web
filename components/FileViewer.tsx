@@ -419,7 +419,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
       <div
         // The checkerboard behind transparent images: one pattern, four
         // gradients; kept as arbitrary values so the tiles stay exact.
-        className="flex flex-1 items-center justify-center overflow-auto bg-card p-4 bg-[image:linear-gradient(45deg,var(--bg)_25%,transparent_25%),linear-gradient(-45deg,var(--bg)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--bg)_75%),linear-gradient(-45deg,transparent_75%,var(--bg)_75%)] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0]"
+        className="flex flex-1 items-center justify-center overflow-auto bg-card p-4 bg-[image:linear-gradient(45deg,var(--background)_25%,transparent_25%),linear-gradient(-45deg,var(--background)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--background)_75%),linear-gradient(-45deg,transparent_75%,var(--background)_75%)] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0]"
       >
         {error ? (
           <div className="text-[13px] text-destructive">{error}</div>
@@ -1498,7 +1498,7 @@ function TextFileViewer({
 
       {showLoadMore && data?.truncated && (
         <div
-          className="absolute right-3 bottom-3 z-[2] mx-3 flex max-w-[calc(100%-24px)] shrink-0 items-center justify-center gap-2.5 rounded-md border border-border bg-card px-2 py-[5px] text-xs text-muted-foreground shadow-[0_3px_12px_color-mix(in_srgb,var(--text)_18%,transparent)] [pointer-events:auto]"
+          className="absolute right-3 bottom-3 z-[2] mx-3 flex max-w-[calc(100%-24px)] shrink-0 items-center justify-center gap-2.5 rounded-md border border-border bg-card px-2 py-[5px] text-xs text-muted-foreground shadow-[0_3px_12px_color-mix(in_srgb,var(--foreground)_18%,transparent)] [pointer-events:auto]"
         >
           <span>{formatFileSize(data.nextOffset)} / {formatFileSize(data.size)}</span>
           <Button

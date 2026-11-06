@@ -260,7 +260,7 @@ function SecretTextInput({
         onClick={() => setVisible((v) => !v)}
          aria-label={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
          title={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
-        className="absolute right-[5px] top-1/2 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-dim"
+        className="absolute right-[5px] top-1/2 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted-foreground"
       >
         {visible ? <Eye size={15} strokeWidth={1.8} /> : <EyeOff size={15} strokeWidth={1.8} />}
       </button>
@@ -277,7 +277,7 @@ function Select({ value, onChange, options, required }: { value: string; onChang
   const { t } = useI18n();
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}
-      className={cn(inputClass, value ? "text-foreground" : "text-dim")}>
+      className={cn(inputClass, value ? "text-foreground" : "text-muted-foreground")}>
        {!required && <option value="">— {t("i18n.default")} / none —</option>}
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -495,7 +495,7 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
                 {t("models.discoverySelectShown")}
               </label>
               {shownDiscoveredModels.length === 0 ? (
-                <div className="p-3 text-xs text-dim">{t("models.discoveryNoMatches")}</div>
+                <div className="p-3 text-xs text-muted-foreground">{t("models.discoveryNoMatches")}</div>
               ) : shownDiscoveredModels.map((model, index) => {
                 const alreadyAdded = existingModelIds.has(model.id);
                 const checked = selectedModelIds.includes(model.id);
@@ -517,16 +517,16 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs text-foreground">{model.name ?? model.id}</span>
-                      {model.name && <code className="block truncate font-mono text-[10px] text-dim">{model.id}</code>}
+                      {model.name && <code className="block truncate font-mono text-[10px] text-muted-foreground">{model.id}</code>}
                     </span>
-                    {alreadyAdded && <span className="text-[10px] text-dim">{t("models.discoveryAdded")}</span>}
+                    {alreadyAdded && <span className="text-[10px] text-muted-foreground">{t("models.discoveryAdded")}</span>}
                   </label>
                 );
               })}
             </div>
 
             <div className="flex items-center justify-between gap-2.5">
-              <span title={discoveryState.endpoint} className="min-w-0 truncate text-[10px] text-dim">
+              <span title={discoveryState.endpoint} className="min-w-0 truncate text-[10px] text-muted-foreground">
                 {filteredDiscoveredModels.length > shownDiscoveredModels.length
                   ? t("models.discoveryShowing", { shown: shownDiscoveredModels.length, total: filteredDiscoveredModels.length })
                   : t("models.discoveryFetched", { count: discoveryState.models.length })}
@@ -558,7 +558,7 @@ type ThinkingLevel = typeof THINKING_LEVELS[number];
 // Per-level dot palette. off/max ride theme tokens; the middle steps keep a
 // fixed chart palette (pi has no blue/violet/pink/orange tokens to map to).
 const LEVEL_DOT_CLASS: Record<ThinkingLevel, string> = {
-  off:     "bg-dim",
+  off:     "bg-muted-foreground",
   minimal: "bg-[#6b7280]",
   low:     "bg-[#60a5fa]",
   medium:  "bg-[#a78bfa]",
@@ -594,7 +594,7 @@ function ThinkingLevelMapEditor({
         ? "bg-primary font-semibold text-primary-foreground"
         : state === "off"
           ? "bg-destructive font-semibold text-white"
-          : "bg-card font-normal text-dim",
+          : "bg-card font-normal text-muted-foreground",
     );
 
   return (
@@ -620,7 +620,7 @@ function ThinkingLevelMapEditor({
               />
               <span className={cn(
                 "font-mono text-xs",
-                state === "null" ? "text-dim line-through" : "text-muted-foreground",
+                state === "null" ? "text-muted-foreground line-through" : "text-muted-foreground",
               )}>
                 {level}
               </span>
@@ -659,7 +659,7 @@ function ThinkingLevelMapEditor({
                 maxLength={10}
                 className={cn(
                   "w-[12ch] border-0 py-1 pl-[7px] pr-1.5 font-mono text-xs outline-none transition-colors",
-                  state === "string" ? "bg-background text-foreground" : "bg-card text-dim",
+                  state === "string" ? "bg-background text-foreground" : "bg-card text-muted-foreground",
                 )}
               />
             </div>
@@ -978,7 +978,7 @@ function ModelDetail({
     ? "text-destructive"
     : catalogState.phase === "success" && catalogState.recommendation.price.status === "unreliable"
       ? "text-warning"
-      : "text-dim";
+      : "text-muted-foreground";
   const costFields = [
     { key: "input", label: t("models.costInput") },
     { key: "output", label: t("models.costOutput") },
@@ -1076,7 +1076,7 @@ function ModelDetail({
               href="https://github.com/anomalyco/models.dev"
               target="_blank"
               rel="noreferrer"
-              className="text-[10px] text-dim no-underline"
+              className="text-[10px] text-muted-foreground no-underline"
             >
               {t("models.catalogSource")}
             </a>
@@ -1141,7 +1141,7 @@ function ModelDetail({
           </div>
 
           <div>
-            <div className="text-[10px] font-semibold uppercase text-dim">
+            <div className="text-[10px] font-semibold uppercase text-muted-foreground">
               {t("models.costPerMillion")}
             </div>
             {costEditing ? (
@@ -1163,8 +1163,8 @@ function ModelDetail({
                   const missing = model.cost?.[key] === undefined;
                   return (
                     <div key={key} className="min-w-0">
-                      <div className="truncate text-[10px] text-dim">{label}</div>
-                      <div className={cn("mt-[3px] font-mono text-xs tabular-nums", missing ? "text-dim" : "text-foreground")}>
+                      <div className="truncate text-[10px] text-muted-foreground">{label}</div>
+                      <div className={cn("mt-[3px] font-mono text-xs tabular-nums", missing ? "text-muted-foreground" : "text-foreground")}>
                         {formatCost(key)}
                       </div>
                     </div>
@@ -1187,14 +1187,14 @@ function ModelDetail({
           >
             <span className="min-w-0">
               <span className="block text-xs font-semibold">{t("models.advancedSettings")}</span>
-              <span className="mt-[3px] block truncate text-[10px] text-dim">
+              <span className="mt-[3px] block truncate text-[10px] text-muted-foreground">
                 {advancedSummary}
               </span>
             </span>
             <ChevronDown
               size={16}
               strokeWidth={1.8}
-              className={cn("text-dim transition-transform", advancedOpen && "rotate-180")}
+              className={cn("text-muted-foreground transition-transform", advancedOpen && "rotate-180")}
             />
           </button>
 
@@ -1214,7 +1214,7 @@ function ModelDetail({
                   headers={model.headers}
                   onChange={(headers) => set("headers", headers)}
                 />
-                <span className="mt-0.5 text-[10px] text-dim">
+                <span className="mt-0.5 text-[10px] text-muted-foreground">
                   {t("models.headersHelp")}
                 </span>
               </Field>
@@ -1227,11 +1227,11 @@ function ModelDetail({
                     placeholder={String(DEFAULT_IMAGE_MAX_BYTES)}
                     invalid={parsedImageLimit === undefined && imageLimit !== undefined}
                   />
-                  <span className="mt-0.5 text-[10px] text-dim">
+                  <span className="mt-0.5 text-[10px] text-muted-foreground">
                     {parsedImageLimit !== undefined && `${formatImageBytes(parsedImageLimit)} · `}
                     {t("models.imageMaxBytesHelp", { size: formatImageBytes(DEFAULT_IMAGE_MAX_BYTES) })}
                   </span>
-                  <code className="font-mono text-[10px] text-dim">
+                  <code className="font-mono text-[10px] text-muted-foreground">
                     inputLimits.images.resize.maxBytes
                   </code>
                 </Field>
@@ -1239,7 +1239,7 @@ function ModelDetail({
 
               {model.reasoning && (
                 <div className="flex flex-col gap-3">
-                  <div className="text-xs font-semibold uppercase text-dim">{t("models.compatibility")}</div>
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">{t("models.compatibility")}</div>
                   <Check
                     label={t("models.deepSeekThinkingCompat")}
                     checked={hasDeepseekCompat(model)}
@@ -1257,19 +1257,19 @@ function ModelDetail({
                         checked={effectiveCompat(provider, model)["forceAdaptiveThinking"] === true}
                         onChange={(v) => onChange(setCompatFlag(model, "forceAdaptiveThinking", v, provider.compat?.["forceAdaptiveThinking"] === true))}
                       />
-                      <code className="pl-[19px] font-mono text-[10px] text-dim">
+                      <code className="pl-[19px] font-mono text-[10px] text-muted-foreground">
                         compat.forceAdaptiveThinking
                       </code>
                     </div>
                   )}
                   <div className="mt-1">
                     <div className="mb-2 flex items-center justify-between gap-2.5">
-                      <div className="text-xs font-semibold uppercase text-dim">{t("models.thinkingLevelMap")}</div>
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">{t("models.thinkingLevelMap")}</div>
                       {model.thinkingLevelMap && (
                         <button
                           type="button"
                           onClick={() => set("thinkingLevelMap", undefined)}
-                          className="cursor-pointer border-0 bg-transparent px-[5px] py-0.5 text-[10px] text-dim"
+                          className="cursor-pointer border-0 bg-transparent px-[5px] py-0.5 text-[10px] text-muted-foreground"
                         >
                           {t("models.clearAll")}
                         </button>
@@ -1428,7 +1428,7 @@ function OAuthDetail({ provider, onRefresh, enabledModels, contextSettings }: {
         <ConfigDetailActions>
           <div className="flex items-center gap-1.5">
             <span className={cn("inline-block size-[7px] rounded-full", provider.loggedIn ? "bg-success" : "bg-border")} />
-            <span className={cn("text-xs", provider.loggedIn ? "text-success" : "text-dim")}>
+            <span className={cn("text-xs", provider.loggedIn ? "text-success" : "text-muted-foreground")}>
                {provider.loggedIn ? t("i18n.connected") : t("i18n.notConnected")}
             </span>
           </div>
@@ -1524,7 +1524,7 @@ function OAuthDetail({ provider, onRefresh, enabledModels, contextSettings }: {
                 <div className="rounded-sm border border-border bg-background px-2.5 py-2 font-mono text-base font-bold text-foreground">
                   {loginState.userCode}
                 </div>
-                <p className="m-0 text-xs leading-normal text-dim">
+                <p className="m-0 text-xs leading-normal text-muted-foreground">
                   <a href={loginState.verificationUri} target="_blank" rel="noopener noreferrer" className="break-all text-primary">
                     {loginState.verificationUri}
                   </a>
@@ -1623,7 +1623,7 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
         <ConfigDetailActions>
           <div className="flex items-center gap-1.5">
             <span className={cn("inline-block size-[7px] rounded-full", provider.configured ? "bg-success" : "bg-border")} />
-            <span className={cn("text-xs", provider.configured ? "text-success" : "text-dim")}>
+            <span className={cn("text-xs", provider.configured ? "text-success" : "text-muted-foreground")}>
                {provider.configured ? t("i18n.configured") : t("i18n.notConfigured")}
             </span>
           </div>
@@ -1669,7 +1669,7 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
                 ? "bg-success text-white"
                 : apiKey.trim()
                   ? "bg-primary text-primary-foreground"
-                  : "bg-card text-dim",
+                  : "bg-card text-muted-foreground",
             )}
           >
             {savedOk && (
@@ -1733,7 +1733,7 @@ function AddProviderPicker({
       <div className="flex max-h-[min(72vh,calc(100vh-32px))] w-[820px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-[0_8px_32px_rgba(0,0,0,0.22)]">
         {/* Search */}
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3.5 py-2.5">
-          <Search size={13} strokeWidth={1.8} className="shrink-0 text-dim" />
+          <Search size={13} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
           <input
             ref={inputRef}
             value={search}
@@ -1746,11 +1746,11 @@ function AddProviderPicker({
         {/* Card grid */}
         <div className="flex-1 overflow-y-auto p-3.5">
           {totalCount === 0 ? (
-            <div className="py-5 text-center text-xs text-dim">{t("i18n.noProviders")}</div>
+            <div className="py-5 text-center text-xs text-muted-foreground">{t("i18n.noProviders")}</div>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-2">
               {showCustom && (
-                 <div className="col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-dim">{t("i18n.custom")}</div>
+                 <div className="col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">{t("i18n.custom")}</div>
               )}
               {showCustom && (
                 <button
@@ -1759,16 +1759,16 @@ function AddProviderPicker({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-xs font-semibold leading-[1.3] text-foreground">OpenAI / Anthropic compatible</div>
-                     <div className="mt-0.5 text-[10px] text-dim">{t("i18n.customEndpoint")}</div>
+                     <div className="mt-0.5 text-[10px] text-muted-foreground">{t("i18n.customEndpoint")}</div>
                   </div>
                   <span className="flex size-[26px] shrink-0 items-center justify-center rounded-sm border border-dashed border-border bg-secondary">
-                    <Plus size={13} strokeWidth={1.8} className="text-dim" />
+                    <Plus size={13} strokeWidth={1.8} className="text-muted-foreground" />
                   </span>
                 </button>
               )}
 
               {availableOAuth.length > 0 && (
-                 <div className={cn("col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-dim", showCustom && "pt-1.5")}>{t("i18n.subscriptions")}</div>
+                 <div className={cn("col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground", showCustom && "pt-1.5")}>{t("i18n.subscriptions")}</div>
               )}
               {availableOAuth.map((p) => (
                 <button key={p.id} onClick={() => { onSelectOAuth(p.id); onClose(); }}
@@ -1776,14 +1776,14 @@ function AddProviderPicker({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-xs font-semibold leading-[1.3] text-foreground">{p.name}</div>
-                    <div className="mt-0.5 text-[10px] text-dim">OAuth</div>
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">OAuth</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
                 </button>
               ))}
 
               {availableApiKey.length > 0 && (
-                <div className={cn("col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-dim", availableOAuth.length > 0 && "pt-1.5")}>API Key</div>
+                <div className={cn("col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground", availableOAuth.length > 0 && "pt-1.5")}>API Key</div>
               )}
               {availableApiKey.map((p) => (
                 <button key={p.id} onClick={() => { onSelectApiKey(p.id); onClose(); }}
@@ -1791,7 +1791,7 @@ function AddProviderPicker({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-xs font-semibold leading-[1.3] text-foreground">{p.displayName}</div>
-                    <div className="mt-0.5 text-[10px] text-dim">{p.modelCount === 1 ? t("models.modelCountOne") : t("models.modelCount", { count: p.modelCount })}</div>
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">{p.modelCount === 1 ? t("models.modelCountOne") : t("models.modelCount", { count: p.modelCount })}</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
                 </button>
@@ -2202,7 +2202,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                       onClick={() => setSelection({ type: "provider", name: pName })}
                       active={isProviderSelected}
                     >
-                      <Cpu size={11} strokeWidth={1.8} className="shrink-0 text-dim" />
+                      <Cpu size={11} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
                       <ConfigSidebarText className="flex-1">
                         {pName}
                       </ConfigSidebarText>
@@ -2219,7 +2219,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                           className="models-sidebar-indented-item"
                           onClick={() => setSelection({ type: "model", providerName: pName, index: i })}
                         >
-                          <ConfigSidebarText className={cn("flex-1", m.id ? "text-muted-foreground" : "text-dim")}>
+                          <ConfigSidebarText className={cn("flex-1", m.id ? "text-muted-foreground" : "text-muted-foreground")}>
                              {modelSidebarLabel(m) || t("i18n.newModel")}
                           </ConfigSidebarText>
                           {/* Reasoning pin: no pi token for the indigo tint, kept literal. */}

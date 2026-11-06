@@ -522,15 +522,15 @@ test("row CSS stays flat, themed and quiet", () => {
   assert.doesNotMatch(css, /@starting-style|prefers-color-scheme/);
   const colors = new Set((css.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).map((color) => color.toLowerCase()));
   for (const color of colors) assert.ok(["#fff"].includes(color), `unexpected color ${color}`);
-  // Three text colors: content, labels, meta (plus the accent for states,
-  // the danger token for errors, the delete button's white and the New
-  // pill's on-accent contrast). No mixes of their own; error red follows the
-  // theme through var(--danger).
+  // Three text colors: content, labels, meta (plus the accent pair for
+  // states, the destructive token for errors, the delete button's white and
+  // the New pill's on-accent contrast). No mixes of their own; error red
+  // follows the theme through var(--destructive).
   const textColors = new Set([...css.matchAll(/(?:^|[\s;{])color: ([^;]+);/g)].map((match) => match[1]));
   for (const color of textColors) {
-    assert.ok(["var(--text)", "var(--text-muted)", "var(--text-dim)", "var(--accent)", "var(--danger)", "var(--accent-contrast)", "inherit", "#fff"].includes(color), `unexpected text color ${color}`);
+    assert.ok(["var(--foreground)", "var(--muted-foreground)", "var(--accent)", "var(--accent-foreground)", "var(--destructive)", "inherit", "#fff"].includes(color), `unexpected text color ${color}`);
   }
-  assert.doesNotMatch(css, /color: color-mix\(in srgb, var\(--text\)/);
+  assert.doesNotMatch(css, /color: color-mix\(in srgb, var\(--foreground\)/);
 });
 
 test("a row's controls fit its height with room to spare: 34px rows on a desktop (children 32px), 40px on a phone", () => {

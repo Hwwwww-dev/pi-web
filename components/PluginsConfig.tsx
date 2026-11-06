@@ -156,15 +156,15 @@ function findInstalledPackage(
 function statusColor(status: PluginPackageInfo["status"]): string {
   if (status === "loaded") return "var(--accent)";
   if (status === "installed") return "var(--warning)";
-  if (status === "disabled") return "var(--text-dim)";
-  return "var(--danger)";
+  if (status === "disabled") return "var(--muted-foreground)";
+  return "var(--destructive)";
 }
 
 /** The detail status row's tone: the same states as token utilities. */
 function statusClassName(status: PluginPackageInfo["status"]): string {
   if (status === "loaded") return "text-primary";
   if (status === "installed") return "text-warning";
-  if (status === "disabled") return "text-dim";
+  if (status === "disabled") return "text-muted-foreground";
   return "text-destructive";
 }
 
@@ -185,7 +185,7 @@ function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
 
   if (groups.length === 0) {
     return (
-      <div className="text-xs text-dim">
+      <div className="text-xs text-muted-foreground">
         {pkg.disabled ? t("i18n.packageDisabled") : t("i18n.noResolvedResources")}
       </div>
     );
@@ -197,7 +197,7 @@ function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
         <Fragment key={group.kind}>
           {groupIndex > 0 && <Separator />}
           <div>
-            <div className="mb-1.5 text-[10px] font-bold uppercase text-dim">
+            <div className="mb-1.5 text-[10px] font-bold uppercase text-muted-foreground">
               {group.label}
             </div>
             <div className="flex flex-col gap-1.5">
@@ -206,7 +206,7 @@ function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
                   <div className="truncate font-mono text-xs text-foreground" title={resource.path}>
                     {resource.name}
                   </div>
-                  <div className="mt-px truncate font-mono text-[10px] text-dim" title={resource.path}>
+                  <div className="mt-px truncate font-mono text-[10px] text-muted-foreground" title={resource.path}>
                     {resource.relativePath}
                   </div>
                 </div>
@@ -342,7 +342,7 @@ function PackageDetail({
           <ConfigDetailHeaderInfo>
             <ConfigScopeTag scope={pkg.scope}>{scopeLabel(pkg.scope, t)}</ConfigScopeTag>
             {pkg.disabled ? (
-              <Badge variant="secondary" className="rounded-[3px] px-1.5 py-px text-[10px] font-normal text-dim">
+              <Badge variant="secondary" className="rounded-[3px] px-1.5 py-px text-[10px] font-normal text-muted-foreground">
                 {t("i18n.disabled")}
               </Badge>
             ) : pkg.filtered && (
@@ -505,7 +505,7 @@ function StandaloneExtensionDetail({ extension }: { extension: PluginStandaloneE
         <ConfigDetailGridRow
           label={t("i18n.status")}
           tone="plain"
-          className={extension.enabled ? "text-primary" : "text-dim"}
+          className={extension.enabled ? "text-primary" : "text-muted-foreground"}
         >
           {statusLabel(status, t)}
         </ConfigDetailGridRow>

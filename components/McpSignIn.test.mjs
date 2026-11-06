@@ -113,7 +113,7 @@ test("a blocked sign-in is disabled and points at the visible reason", () => {
     assert.match(button.attributes, /disabled=""/);
     const id = button.attributes.match(/aria-describedby="([^"]+)"/)?.[1];
     assert.ok(id, button.label);
-    assert.match(html, new RegExp(`<span id="${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" class="min-w-0 text-xs leading-normal \\[overflow-wrap:anywhere\\] text-dim">This project is not trusted, so Pi Web does not sign in to or out of its servers\\.</span>`));
+    assert.match(html, new RegExp(`<span id="${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" class="min-w-0 text-xs leading-normal \\[overflow-wrap:anywhere\\] text-muted-foreground">This project is not trusted, so Pi Web does not sign in to or out of its servers\\.</span>`));
   }
   assert.doesNotMatch(text(html), /may replace|Sign out deletes/, "no explanation of what cannot be done");
   // A PI_WEB_PASSWORD entry cannot sign in, but its tokens can still go.
@@ -133,7 +133,7 @@ test("a sign-in under way says what it does, and offers Cancel instead", () => {
   // Why it cannot be cancelled is a visible line the disabled button points at.
   const noCancel = buttons(finishing)[0].attributes.match(/aria-describedby="([^"]+)"/)?.[1];
   assert.ok(noCancel);
-  assert.match(finishing, new RegExp(`<span id="${noCancel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" class="min-w-0 text-xs leading-normal \\[overflow-wrap:anywhere\\] text-dim">The authorization server has answered, so this step can no longer be cancelled\\.</span>`));
+  assert.match(finishing, new RegExp(`<span id="${noCancel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" class="min-w-0 text-xs leading-normal \\[overflow-wrap:anywhere\\] text-muted-foreground">The authorization server has answered, so this step can no longer be cancelled\\.</span>`));
   assert.doesNotMatch(buttons(connecting)[0].attributes, /aria-describedby/);
   assert.doesNotMatch(text(connecting), /can no longer be cancelled/);
   assert.equal(buttons(row({ run: { flow: flow("connecting"), cancelling: true } }))[0].label, "Cancelling…");

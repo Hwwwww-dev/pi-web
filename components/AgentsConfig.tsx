@@ -78,7 +78,7 @@ const EMPTY_PROFILE: EditableProfile = {
  * taller prompt textarea), so the base carries none.
  */
 const controlClassName =
-  "min-w-0 rounded-md border border-border bg-background px-[9px] text-xs text-foreground outline-none disabled:bg-card disabled:text-dim disabled:cursor-default";
+  "min-w-0 rounded-md border border-border bg-background px-[9px] text-xs text-foreground outline-none disabled:bg-card disabled:text-muted-foreground disabled:cursor-default";
 
 function editableProfile(profile: SubagentProfile): EditableProfile {
   return {
@@ -159,7 +159,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Toggle({ checked, disabled, label, onChange }: { checked: boolean; disabled: boolean; label: string; onChange: (checked: boolean) => void }) {
   return (
     <label className={disabled
-      ? "flex cursor-default items-center gap-[7px] text-xs text-dim"
+      ? "flex cursor-default items-center gap-[7px] text-xs text-muted-foreground"
       : "flex cursor-pointer items-center gap-[7px] text-xs text-muted-foreground"}
     >
       <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
@@ -538,7 +538,7 @@ export function AgentsConfig({
         <ConfigSidebar>
           <ConfigSidebarList>
               {loading ? (
-                <div className="p-2.5 text-xs text-dim">{t("agents.loading")}</div>
+                <div className="p-2.5 text-xs text-muted-foreground">{t("agents.loading")}</div>
               ) : (["project", "global", "workspace", "builtin"] as const).map((scope) => {
                 const scopedProfiles = profiles.filter((profile) => profile.scope === scope);
                 if (scopedProfiles.length === 0) return null;
@@ -650,25 +650,25 @@ export function AgentsConfig({
                     </div>
                     {/* `skills:` and `extensions:` lists are edited in the profile file; show what they load. */}
                     {draft.loadSkills && draft.skills !== undefined && (
-                      <span className="[overflow-wrap:anywhere] text-xs leading-[1.4] text-dim">
+                      <span className="[overflow-wrap:anywhere] text-xs leading-[1.4] text-muted-foreground">
                         {draft.skills.length > 0
                           ? t("agents.skillsOnly", { skills: draft.skills.join(", ") })
                           : t("agents.skillsNone")}
                       </span>
                     )}
                     {draft.loadExtensions && draft.extensions !== undefined && (
-                      <span className="[overflow-wrap:anywhere] text-xs leading-[1.4] text-dim">
+                      <span className="[overflow-wrap:anywhere] text-xs leading-[1.4] text-muted-foreground">
                         {draft.extensions.length > 0
                           ? t("agents.extensionsOnly", { extensions: draft.extensions.join(", ") })
                           : t("agents.extensionsNone")}
                       </span>
                     )}
                     {!disabled && chatOnlyDraft ? (
-                      <span className="text-xs leading-[1.4] text-dim">
+                      <span className="text-xs leading-[1.4] text-muted-foreground">
                         {t("agents.mcpChatOnly")}
                       </span>
                     ) : draft.mcp === "on" && (
-                      <span className="text-xs leading-[1.4] text-dim">
+                      <span className="text-xs leading-[1.4] text-muted-foreground">
                         {t("agents.mcpHint")}
                       </span>
                     )}
@@ -687,7 +687,7 @@ export function AgentsConfig({
                         <option value="on">{t("agents.codemode.on")}</option>
                         <option value="off">{t("agents.codemode.off")}</option>
                       </select>
-                      <span className="text-xs leading-[1.4] text-dim">
+                      <span className="text-xs leading-[1.4] text-muted-foreground">
                         {t("agents.codemodeHint")}
                       </span>
                     </div>

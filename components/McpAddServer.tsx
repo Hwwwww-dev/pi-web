@@ -56,7 +56,7 @@ function Line({ tone, className, children, ...props }: { tone?: "dim" | "warning
       {...props}
       className={cn(
         "min-w-0 text-xs leading-normal text-muted-foreground [overflow-wrap:anywhere]",
-        tone === "dim" && "text-dim",
+        tone === "dim" && "text-muted-foreground",
         tone === "warning" && "text-warning",
         tone === "error" && "text-destructive",
         className,
@@ -115,7 +115,7 @@ function McpImportNotes({ notes, fields = [] }: { notes: readonly McpImportNote[
   const order = { error: 0, warning: 1, info: 2 } as const;
   const sorted = [...notes].sort((a, b) => order[mcpImportNoteSeverity(a)] - order[mcpImportNoteSeverity(b)]);
   const toneClass = (note: McpImportNote): string =>
-    mcpImportNoteSeverity(note) === "error" ? "text-destructive" : mcpImportNoteSeverity(note) === "warning" ? "text-warning" : "text-dim";
+    mcpImportNoteSeverity(note) === "error" ? "text-destructive" : mcpImportNoteSeverity(note) === "warning" ? "text-warning" : "text-muted-foreground";
   return (
     <ul className="flex min-w-0 flex-col gap-1 pl-[18px] text-xs leading-normal">
       {sorted.map((note, index) => (

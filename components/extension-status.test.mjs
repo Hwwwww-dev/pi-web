@@ -222,5 +222,5 @@ test("keeps the status button a compact single-line chip", async () => {
   assert.match(chipRule, /border:\s*0/);
   assert.doesNotMatch(chipRule, /text-overflow/);
   assert.match(dotRule, /border-radius:\s*50%/);
-  assert.match(css, /\.extension-status-dot\[data-tone="error"\]\s*\{\s*background:\s*var\(--danger\);\s*\}/);
+  assert.match(css, /\.extension-status-dot\[data-tone="error"\]\s*\{\s*background:\s*var\(--destructive\);\s*\}/);
 });

@@ -1189,7 +1189,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
           {showFileHeaders && layout === "stacked" && stackedFilePath(file) && (
             <div
               title={stackedFilePath(file)}
-              className="sticky top-0 z-[1] truncate border-b border-border bg-muted px-2.5 py-[5px] text-dim"
+              className="sticky top-0 z-[1] truncate border-b border-border bg-muted px-2.5 py-[5px] text-muted-foreground"
             >
               {stackedFilePath(file)}
             </div>
@@ -1230,7 +1230,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
 function DiffGapRow({ gap }: { gap: SplitDiffGap }) {
   const { t } = useI18n();
   return (
-    <div className="col-span-full select-none border-y border-border bg-muted px-2.5 text-dim">
+    <div className="col-span-full select-none border-y border-border bg-muted px-2.5 text-muted-foreground">
       {gap.count === null ? "⋯" : `⋯ ${diffGapLabel(gap.count, t)}`}
     </div>
   );
@@ -1260,7 +1260,7 @@ function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right
   return (
     <div
       title={title}
-      className={cn("truncate px-2.5 py-[5px] text-dim", side === "left" && "border-r border-border")}
+      className={cn("truncate px-2.5 py-[5px] text-muted-foreground", side === "left" && "border-r border-border")}
     >
       {title}
     </div>
@@ -1277,13 +1277,13 @@ function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" |
         side === "left" && "border-r border-border",
       )}
     >
-      <span className="w-[42px] shrink-0 select-none border-r border-border bg-card px-1.5 text-right text-dim">
+      <span className="w-[42px] shrink-0 select-none border-r border-border bg-card px-1.5 text-right text-muted-foreground">
         {cell.lineNo ?? ""}
       </span>
       <span
         className={cn(
           "w-[18px] shrink-0 select-none px-[5px]",
-          cell.type === "added" ? "font-bold text-diff-add" : cell.type === "removed" ? "font-bold text-diff-del" : "font-normal text-dim",
+          cell.type === "added" ? "font-bold text-diff-add" : cell.type === "removed" ? "font-bold text-diff-del" : "font-normal text-muted-foreground",
         )}
       >
         {marker}
@@ -1291,7 +1291,7 @@ function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" |
       <span
         className={cn(
           "min-w-0 flex-1 pr-2.5 whitespace-pre-wrap wrap-anywhere",
-          cell.type === "empty" ? "text-dim" : "text-foreground",
+          cell.type === "empty" ? "text-muted-foreground" : "text-foreground",
         )}
       >
         {cell.text || "\u00a0"}
@@ -1335,7 +1335,7 @@ function PatchTextView({ text }: { text: string }) {
 
         return (
           <div key={i} className={cn("flex border-l-[3px]", bgClass, colorClass, borderClass)}>
-            <span className="w-12 shrink-0 select-none border-r border-border bg-card px-2 text-right text-dim">
+            <span className="w-12 shrink-0 select-none border-r border-border bg-card px-2 text-right text-muted-foreground">
               {i + 1}
             </span>
             <span className={cn("whitespace-pre-wrap wrap-anywhere px-2.5", colorClass)}>

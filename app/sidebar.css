@@ -88,15 +88,15 @@
  * left inset plus a header toggle's 5px) and the text column 20px in from
  * the inset (that 5px, the chevron's 12px, the toggle's 3px gap), where
  * project names, section labels, session titles, "show more" and the
- * footer's labels all start. Text takes three colors only: content
- * (session titles) --text, labels (project names, section labels)
- * --text-muted, meta (times, counts, branches, a pinned row's project)
- * --text-dim. The accent is a state's, never a label's: the selected
- * row's bar, a run's spinner.
+ * footer's labels all start. Text takes two colors only: content
+ * (session titles) --foreground, labels and meta (project names, section
+ * labels, times, counts, branches, a pinned row's project)
+ * --muted-foreground. The accent is a state's, never a label's: the
+ * selected row's bar, a run's spinner.
  */
 .session-tree-chevron {
   flex: none;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   transition: transform 0.15s;
 }
 
@@ -108,7 +108,7 @@
 .session-tree-group:hover .session-tree-chevron,
 .session-tree-pinned-toggle:hover .session-tree-chevron,
 .sidebar-files-section-toggle:hover .session-tree-chevron {
-  color: var(--text-muted);
+  color: var(--muted-foreground);
 }
 
 /* Pinned section header: the whole row toggles the section. A section
@@ -125,13 +125,13 @@
   gap: 3px;
   min-width: 0;
   padding: 0 8px 0 calc(var(--session-tree-inset-left) + 5px);
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-size: 11px;
   text-align: left;
 }
 
 .session-tree-pinned-toggle:hover {
-  color: var(--text);
+  color: var(--foreground);
 }
 
 .session-tree-pinned-label {
@@ -141,7 +141,7 @@
 }
 
 .session-tree-pinned-count {
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-weight: 400;
 }
 
@@ -182,11 +182,11 @@
 }
 
 .session-tree-session:hover {
-  background: var(--bg-hover);
+  background: var(--secondary);
 }
 
 .session-tree-session.is-selected {
-  background: var(--bg-selected);
+  background: var(--accent);
 }
 
 /* The selected row's mark, the tree's one use of the accent: a bar on the
@@ -214,8 +214,8 @@
 
 .session-tree-session.is-confirming {
   gap: 5px;
-  background: var(--danger-bg);
-  box-shadow: inset 0 0 0 1px var(--danger-border);
+  background: color-mix(in srgb, var(--destructive) 7%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive) 30%, transparent);
   cursor: default;
 }
 
@@ -296,7 +296,7 @@ a.session-tree-main {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: var(--text);
+  color: var(--foreground);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -307,7 +307,7 @@ a.session-tree-main {
 }
 
 .session-tree-session.is-archived .session-tree-title {
-  color: var(--text-muted);
+  color: var(--muted-foreground);
 }
 
 /* A Fork's copy: the ellipsis cuts its title before the suffix that tells it
@@ -332,7 +332,7 @@ a.session-tree-main {
   flex: none;
   max-width: 78px;
   overflow: hidden;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -353,7 +353,7 @@ a.session-tree-main {
   align-items: center;
   justify-content: flex-end;
   min-width: 26px;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -387,18 +387,18 @@ a.session-tree-main {
   margin-left: 2px;
   padding: 0;
   border-radius: var(--radius-sm);
-  color: var(--text-dim);
+  color: var(--muted-foreground);
 }
 
 .session-tree .session-tree-action:hover,
 .session-tree .session-tree-action.is-active {
-  background: var(--bg-selected);
-  color: var(--text);
+  background: var(--accent);
+  color: var(--foreground);
 }
 
 .session-tree .session-tree-session.is-selected .session-tree-action:hover,
 .session-tree .session-tree-session.is-selected .session-tree-action.is-active {
-  background: var(--bg-hover);
+  background: var(--secondary);
 }
 
 /* Desktop: ⋯ (and archive) on hover; ⋯ alone on the selected row or while its menu is open. */
@@ -449,8 +449,8 @@ a.session-tree-main {
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   outline: none;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--background);
+  color: var(--foreground);
   font: inherit;
   font-size: 12px;
   user-select: text;
@@ -461,7 +461,7 @@ a.session-tree-main {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--text);
+  color: var(--foreground);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -484,8 +484,8 @@ a.session-tree-main {
 }
 
 .session-tree-confirm-delete {
-  border: 1px solid var(--danger);
-  background: var(--danger);
+  border: 1px solid var(--destructive);
+  background: var(--destructive);
   /* white on --danger, kept literal: no danger-contrast token */
   color: #fff;
   font-weight: 600;
@@ -493,13 +493,13 @@ a.session-tree-main {
 
 .session-tree-confirm-cancel {
   border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text-muted);
+  background: var(--background);
+  color: var(--muted-foreground);
   font-weight: 500;
 }
 
 .session-tree-confirm-cancel:hover {
-  background: var(--bg-hover);
+  background: var(--secondary);
 }
 
 /* Project group header: a section header over its rows, not one more row:
@@ -522,7 +522,7 @@ a.session-tree-main {
 }
 
 .session-tree-group:hover {
-  background: var(--bg-hover);
+  background: var(--secondary);
 }
 
 /* The project's name field (its menu's Rename…) in place of the header. */
@@ -532,7 +532,7 @@ a.session-tree-main {
 
 /* Picked up by a long-press, before the finger moves. */
 .session-tree-group.is-drag-armed {
-  background: var(--bg-selected);
+  background: var(--accent);
   /* neutral black shadow, kept literal: no shadow token */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
@@ -546,7 +546,7 @@ a.session-tree-main {
   right: var(--session-tree-inset-right);
   left: var(--session-tree-inset-left);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--bg-panel) 55%, transparent);
+  background: color-mix(in srgb, var(--sidebar) 55%, transparent);
   pointer-events: none;
 }
 
@@ -589,10 +589,10 @@ a.session-tree-main {
   border: 1px solid var(--border);
   /* 11px pill (half of the 22px height); no radius token at this size */
   border-radius: 11px;
-  background: var(--bg-panel);
+  background: var(--sidebar);
   /* neutral black shadow, kept literal: no shadow token */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-  color: var(--text);
+  color: var(--foreground);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -616,7 +616,7 @@ a.session-tree-main {
   min-width: 0;
   height: 100%;
   padding: 0 0 0 5px;
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 600;
   text-align: left;
@@ -625,7 +625,7 @@ a.session-tree-main {
 
 .session-tree-group.is-current .session-tree-group-toggle,
 .session-tree-group:hover .session-tree-group-toggle {
-  color: var(--text);
+  color: var(--foreground);
 }
 
 .session-tree-group-name {
@@ -638,7 +638,7 @@ a.session-tree-main {
 .session-tree-group-pin {
   flex: none;
   margin-left: 2px;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
 }
 
 .session-tree-summary {
@@ -647,7 +647,7 @@ a.session-tree-main {
   align-items: center;
   gap: 8px;
   margin-left: auto;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   font-weight: 400;
@@ -732,20 +732,20 @@ a.session-tree-main {
   height: 22px;
   padding: 0;
   border-radius: var(--radius-sm);
-  color: var(--text-dim);
+  color: var(--muted-foreground);
 }
 
 .session-tree .session-tree-group-action:hover,
 .session-tree .session-tree-group-action.is-active {
-  background: var(--bg-selected);
-  color: var(--text);
+  background: var(--accent);
+  color: var(--foreground);
 }
 
 /* In the text column, with the session titles. */
 .session-tree-group-empty,
 .session-tree-more {
   padding-left: calc(var(--session-tree-inset-left) + 20px);
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-size: 11px;
 }
 
@@ -788,7 +788,7 @@ a.session-tree-main {
 }
 
 .session-tree-more-toggle:hover {
-  color: var(--text);
+  color: var(--foreground);
 }
 
 /* Footer links: open another project, the archive. Their 12px icons in the
@@ -807,14 +807,14 @@ a.session-tree-main {
   min-width: 0;
   padding: 0 4px 0 5px;
   border-radius: var(--radius-sm);
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-size: 12px;
   text-align: left;
 }
 
 .session-tree-footer-button:hover {
-  background: var(--bg-hover);
-  color: var(--text-muted);
+  background: var(--secondary);
+  color: var(--muted-foreground);
 }
 
 .session-tree-footer-label {
@@ -835,7 +835,7 @@ a.session-tree-main {
 .session-tree-archive-group-count {
   flex: none;
   margin-left: 2px;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-weight: 400;
 }
 
@@ -956,7 +956,7 @@ a.session-tree-main {
   border-top: 2px solid transparent;
   border-radius: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
@@ -980,12 +980,12 @@ a.session-tree-main {
 
 .sidebar-new-button:not(:disabled):hover,
 .sidebar-search-toggle:hover {
-  background: var(--bg-hover);
-  color: var(--text);
+  background: var(--secondary);
+  color: var(--foreground);
 }
 
 .sidebar-search-toggle.is-active {
-  color: var(--text);
+  color: var(--foreground);
 }
 
 /* With the files below the sessions there is no tab to choose: the brand
@@ -1006,7 +1006,7 @@ a.session-tree-main {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text);
+  color: var(--foreground);
   font-family: var(--font-mono);
   font-size: 15px;
   font-weight: 700;
@@ -1045,7 +1045,7 @@ a.session-tree-main {
 }
 
 .sidebar-new-button:disabled {
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   cursor: not-allowed;
   /* title carries the disabled reason: keep pointer events for it */
   opacity: 0.4;
@@ -1202,7 +1202,7 @@ a.session-tree-main {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font: inherit;
   font-size: 11px;
   text-align: left;
@@ -1211,8 +1211,8 @@ a.session-tree-main {
 }
 
 .sidebar-files-section-toggle:hover {
-  background: var(--bg-hover);
-  color: var(--text);
+  background: var(--secondary);
+  color: var(--foreground);
 }
 
 /* The toggle's first line is as tall as the row: the chevron's box is (its
@@ -1296,7 +1296,7 @@ a.session-tree-main {
 .sidebar-archive-view {
   position: relative;
   z-index: 1;
-  background: var(--bg-panel);
+  background: var(--sidebar);
 }
 
 /* In from the right over the tree; out to the right, the tree back under it.
@@ -1343,19 +1343,19 @@ a.session-tree-main {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
 }
 
 .sidebar-archive-back:hover {
-  background: var(--bg-hover);
-  color: var(--text);
+  background: var(--secondary);
+  color: var(--foreground);
 }
 
 .sidebar-archive-count {
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-weight: 400;
 }
 
@@ -1371,14 +1371,14 @@ a.session-tree-main {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   cursor: pointer;
 }
 
 .sidebar-archive-menu-button:hover,
 .sidebar-archive-menu-button.is-active {
-  background: var(--bg-hover);
-  color: var(--text);
+  background: var(--secondary);
+  color: var(--foreground);
 }
 
 .sidebar-icon-back {
@@ -1454,19 +1454,19 @@ a.session-tree-main {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   cursor: pointer;
   transition: color 0.12s, background 0.12s;
 }
 
 .sidebar-tool-button:not(:disabled):hover {
-  background: var(--bg-selected);
-  color: var(--text);
+  background: var(--accent);
+  color: var(--foreground);
 }
 
 .sidebar-tool-button.is-active,
 .sidebar-tool-button.is-active:not(:disabled):hover {
-  background: var(--bg-selected);
+  background: var(--accent);
   color: var(--accent);
 }
 
@@ -1489,7 +1489,7 @@ a.session-tree-main {
   align-items: flex-start;
   gap: 6px;
   padding: 6px 10px 0;
-  color: var(--danger);
+  color: var(--destructive);
   font-size: 10px;
   line-height: 1.35;
 }
@@ -1610,7 +1610,7 @@ a.session-tree-main {
 
 .sidebar-search-toggle.is-active {
   border-top: 0;
-  background: var(--bg-panel);
+  background: var(--sidebar);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10);
 }
 
@@ -1620,18 +1620,18 @@ a.session-tree-main {
   min-height: 30px;
   padding: 0 14px;
   background: var(--accent);
-  color: var(--accent-contrast);
+  color: var(--accent-foreground);
 }
 
 .sidebar-new-button:not(:disabled):hover {
   background: var(--accent);
   filter: brightness(1.08);
-  color: var(--accent-contrast);
+  color: var(--accent-foreground);
 }
 
 .sidebar-new-button:disabled {
   background: var(--accent);
-  color: var(--accent-contrast);
+  color: var(--accent-foreground);
 }
 
 /* Session rows take the item radius (the draft's 8px); their padding and

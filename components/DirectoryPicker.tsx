@@ -43,7 +43,7 @@ const secondaryActionClass = cn(
   "border border-border bg-transparent text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-50",
 );
 
-const emptyNoticeClass = "p-2 text-xs text-dim";
+const emptyNoticeClass = "p-2 text-xs text-muted-foreground";
 
 const entryButtonClass = "flex w-full cursor-pointer items-center gap-[7px] rounded-sm border-0 bg-transparent px-2 text-left font-mono text-xs text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
 

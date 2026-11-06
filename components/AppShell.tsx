@@ -2075,7 +2075,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             data-mobile-toolbar-action={mobile ? "system" : undefined}
           >
             <FileTextIcon
-              className={cn("size-3.5 shrink-0", systemPrompt ? "text-primary" : "text-dim")}
+              className={cn("size-3.5 shrink-0", systemPrompt ? "text-primary" : "text-muted-foreground")}
               strokeWidth={2}
             />
             <span className="min-w-0 flex-1">{translate("system.label")}</span>
@@ -2090,7 +2090,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <WrenchIcon
               className={cn(
                 "size-3.5 shrink-0",
-                systemTools?.some((tool) => tool.active) ? "text-primary" : "text-dim",
+                systemTools?.some((tool) => tool.active) ? "text-primary" : "text-muted-foreground",
               )}
               strokeWidth={2}
             />
@@ -2100,7 +2100,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 title={translate("tools.mcpTooltip", { ready: mcpServers.ready, total: mcpServers.total })}
                 className={cn(
                   "shrink-0 font-mono text-[10px] font-semibold tabular-nums",
-                  mcpServers.needsAuth > 0 ? "text-warning" : mcpServers.ready > 0 ? "text-primary" : "text-dim",
+                  mcpServers.needsAuth > 0 ? "text-warning" : mcpServers.ready > 0 ? "text-primary" : "text-muted-foreground",
                 )}
               >
                 MCP {mcpServers.ready}/{mcpServers.total}
@@ -2130,7 +2130,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   data-mobile-toolbar-action="branches"
                 >
                   <GitBranchIcon
-                    className={cn("size-3.5 shrink-0", branchTree.length > 0 ? "text-primary" : "text-dim")}
+                    className={cn("size-3.5 shrink-0", branchTree.length > 0 ? "text-primary" : "text-muted-foreground")}
                     strokeWidth={2}
                   />
                   <span className="min-w-0 flex-1">{translate("i18n.branches")}</span>
@@ -2143,7 +2143,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 className="gap-2"
                 data-mobile-toolbar-action={mobile ? "debug" : undefined}
               >
-                <BugIcon className={cn("size-3.5 shrink-0", activeTopPanel === "debug" ? "text-primary" : "text-dim")} strokeWidth={2} />
+                <BugIcon className={cn("size-3.5 shrink-0", activeTopPanel === "debug" ? "text-primary" : "text-muted-foreground")} strokeWidth={2} />
                 <span className="min-w-0 flex-1">{translate("debug.title")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -2257,7 +2257,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         {contextUsage?.contextWindow && (
           <span className="inline-flex items-center gap-1">
             <span className={contextTone}>{contextUsage.percent !== null ? `${contextUsage.percent.toFixed(1)}%` : "?"}</span>
-            <span aria-hidden="true" className="text-dim">/</span>
+            <span aria-hidden="true" className="text-muted-foreground">/</span>
             <span>{formatCompactCount(contextUsage.contextWindow)}</span>
             <span aria-hidden="true" className="h-1 w-10 overflow-hidden rounded-full bg-foreground/15">
               <span
@@ -2538,7 +2538,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       <div className="grid grid-cols-[max-content_minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5">
                         {sectionRows.map((row) => (
                           <div key={`${title}:${row.label}`} className="contents">
-                            <div className="whitespace-nowrap text-[11px] text-dim">{row.label}</div>
+                            <div className="whitespace-nowrap text-[11px] text-muted-foreground">{row.label}</div>
                             <div className={cn(
                               "min-w-0 font-mono text-[11.5px] text-muted-foreground [overflow-wrap:anywhere]",
                               valueAlign === "right" ? "whitespace-nowrap text-right" : "whitespace-normal text-left",
@@ -2744,8 +2744,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 <div>
                    <div className="mb-2 text-lg font-semibold text-foreground">{translate("workspace.getStarted")}</div>
                   <div className="text-xs leading-[1.8] text-muted-foreground">
-                     <span className="mr-1.5 text-dim">1.</span>{translate("workspace.selectProject")}<br />
-                     <span className="mr-1.5 text-dim">2.</span>{translate("workspace.addModels")}
+                     <span className="mr-1.5 text-muted-foreground">1.</span>{translate("workspace.selectProject")}<br />
+                     <span className="mr-1.5 text-muted-foreground">2.</span>{translate("workspace.addModels")}
                   </div>
                 </div>
               </div>
@@ -2873,7 +2873,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               )}
             />
           ) : !terminalTabs.some((tab) => tab.id === activeFileTabId) && !activeAgentTab ? (
-            <div className="flex h-full items-center justify-center text-xs text-dim">
+            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                {translate("files.noneOpen")}
             </div>
           ) : null}

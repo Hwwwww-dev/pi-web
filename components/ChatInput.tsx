@@ -1892,7 +1892,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const thinkingIconTone = thinkingPinned ? "text-primary" : thinkingLevel === "off" ? "opacity-45" : undefined;
   const thinkingSection = onThinkingLevelChange && (
     <div role="radiogroup" aria-label={t("chat.changeReasoningLabel")} className="flex flex-col">
-      <div className="px-2 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-dim">{t("chat.thinkingSection")}</div>
+      <div className="px-2 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t("chat.thinkingSection")}</div>
       {THINKING_LEVELS.filter((lvl) => {
         if (!availableThinkingLevels) return true;
         if (lvl === "auto") return true;
@@ -1927,9 +1927,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             <CheckIcon className={cn("size-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")} strokeWidth={2.2} aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate">
               {displayLabel}
-              {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-dim">({lvl})</span>}
+              {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">({lvl})</span>}
             </span>
-            <span className="whitespace-nowrap text-[11px] text-dim">{desc}</span>
+            <span className="whitespace-nowrap text-[11px] text-muted-foreground">{desc}</span>
             {onSetDefaultThinkingLevel && lvl !== "auto" && (
               <span
                 role={savedDefaultThinkingLevel === lvl ? "img" : "button"}
@@ -1941,7 +1941,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   onSetDefaultThinkingLevel(lvl);
                 }}
                 className={cn(
-                  "pointer-events-auto flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-dim",
+                  "pointer-events-auto flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground",
                   savedDefaultThinkingLevel === lvl && "opacity-100",
                 )}
               >
@@ -2132,7 +2132,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             >
               <div
                 title={t("chat.inputHistory")}
-                className="flex h-[30px] items-center border-b px-2.5 text-dim"
+                className="flex h-[30px] items-center border-b px-2.5 text-muted-foreground"
               >
                 <HistoryIcon size={14} strokeWidth={1.8} aria-hidden="true" />
               </div>
@@ -2156,7 +2156,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         active && "bg-accent",
                       )}
                     >
-                      <span className="shrink-0 pt-px font-mono text-xs text-dim">
+                      <span className="shrink-0 pt-px font-mono text-xs text-muted-foreground">
                         {index + 1}
                       </span>
                       <span className="line-clamp-2 min-w-0 wrap-anywhere">
@@ -2179,19 +2179,19 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   : `min(72.8vh, 598px, ${slashMenuMaxHeight}px)`,
               }}
             >
-              <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2.5 py-2 text-xs text-dim">
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2.5 py-2 text-xs text-muted-foreground">
                  <span>{slashCommandsLoading ? t("chat.loadingCommands") : t("chat.slashCommands", { label: slashCommandCountLabel })}</span>
                  <span className="font-mono">{t("chat.tabEnter")}</span>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
                 {!slashCommandsLoading && filteredSlashCommands.length === 0 ? (
-                  <div className="px-0.5 pb-1 pt-0.5 text-xs text-dim">
+                  <div className="px-0.5 pb-1 pt-0.5 text-xs text-muted-foreground">
                      {t("chat.noCommands")}
                   </div>
                 ) : (
                   groupedSlashCommands.map((group) => (
                     <section key={group.source} className="mb-3">
-                      <div className="sticky -top-2.5 z-[1] flex items-center justify-between gap-2 bg-popover pb-1.5 pt-1 text-[10px] font-semibold uppercase text-dim">
+                      <div className="sticky -top-2.5 z-[1] flex items-center justify-between gap-2 bg-popover pb-1.5 pt-1 text-[10px] font-semibold uppercase text-muted-foreground">
                            <span>{t(SLASH_SOURCE_GROUP_LABEL_KEYS[group.source])}</span>
                         <span className="font-mono font-medium">{group.items.length}</span>
                       </div>
@@ -2218,16 +2218,16 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                                   : "border-border bg-card",
                               )}
                             >
-                              <span className={cn("font-mono text-sm wrap-anywhere", dormant && "text-dim")}>
+                              <span className={cn("font-mono text-sm wrap-anywhere", dormant && "text-muted-foreground")}>
                                 /{command.name}
                                 {dormant && (
-                                  <span className="ml-1.5 whitespace-nowrap rounded-sm border border-border px-1 text-[10px] text-dim">
+                                  <span className="ml-1.5 whitespace-nowrap rounded-sm border border-border px-1 text-[10px] text-muted-foreground">
                                     {t("chat.dormant")}
                                   </span>
                                 )}
                               </span>
                                {command.description && (
-                                <span className="line-clamp-2 text-xs leading-[1.35] text-dim">
+                                <span className="line-clamp-2 text-xs leading-[1.35] text-muted-foreground">
                                    {getSlashDescription(command, t)}
                                 </span>
                               )}
@@ -2260,7 +2260,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     : `min(48vh, 400px, ${atMenuMaxHeight}px)`,
                 }}
               >
-                <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2.5 py-2 text-xs text-dim">
+                <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2.5 py-2 text-xs text-muted-foreground">
                   <span>
                     {indexLoading
                        ? t("chat.loadingFiles")
@@ -2270,7 +2270,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto p-1">
                   {!indexLoading && atMatches.length === 0 ? (
-                    <div className="px-2 py-1.5 text-xs text-dim">
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
                        {needsServerSearch && !serverResultInUse ? t("chat.searching") : t("chat.noMatchingFiles")}
                     </div>
                   ) : (
@@ -2299,9 +2299,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                             {entry.isDir ? <FolderIcon size={14} /> : getFileIcon(name, 14)}
                           </span>
                           <span className="min-w-0 truncate">
-                            {dirPrefix && <span className="text-dim">{dirPrefix}</span>}
+                            {dirPrefix && <span className="text-muted-foreground">{dirPrefix}</span>}
                             {name}
-                            {entry.isDir && <span className="text-dim">/</span>}
+                            {entry.isDir && <span className="text-muted-foreground">/</span>}
                           </span>
                         </button>
                       );
@@ -2482,7 +2482,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         : onToolPresetChange && !isStreaming && rawToolPresetLabel === "full"
                           ? "text-primary hover:bg-accent hover:text-accent-foreground"
                           : onToolPresetChange && !isStreaming && rawToolPresetLabel === "chat-only"
-                            ? "text-dim hover:bg-accent hover:text-accent-foreground"
+                            ? "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                             : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     )}
                   >
@@ -2510,7 +2510,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         return (
                           <DropdownMenuRadioItem key={lvl} value={lvl}>
                             <span className="flex-1 whitespace-nowrap">{lvl === "chat-only" ? t("chat.chatOnly") : titleCaseLabel(lvl)}</span>
-                            {desc && <span className="whitespace-nowrap text-xs text-dim">{desc}</span>}
+                            {desc && <span className="whitespace-nowrap text-xs text-muted-foreground">{desc}</span>}
                           </DropdownMenuRadioItem>
                         );
                       })}
@@ -2573,7 +2573,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
                         <span className="flex-1">{t("chat.changeReasoningLabel")}</span>
-                        <span className="text-xs text-dim">{thinkingDisplayLabel}</span>
+                        <span className="text-xs text-muted-foreground">{thinkingDisplayLabel}</span>
                       </DropdownMenuSubTrigger>
                      <DropdownMenuSubContent className="min-w-[180px]">
                         <DropdownMenuRadioGroup
@@ -2599,9 +2599,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                               <DropdownMenuRadioItem key={lvl} value={lvl}>
                                 <span className="min-w-0 flex-1">
                                   {displayLabel}
-                                  {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-dim">({lvl})</span>}
+                                  {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">({lvl})</span>}
                                 </span>
-                                <span className="text-xs text-dim">{desc}</span>
+                                <span className="text-xs text-muted-foreground">{desc}</span>
                               </DropdownMenuRadioItem>
                             );
                           })}
@@ -2613,7 +2613,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
                         <span className="flex-1">{t("chat.changeToolPreset")}</span>
-                        <span className="text-xs text-dim">{toolPresetLabel}</span>
+                        <span className="text-xs text-muted-foreground">{toolPresetLabel}</span>
                       </DropdownMenuSubTrigger>
                      <DropdownMenuSubContent className="min-w-[120px]">
                         <DropdownMenuRadioGroup
@@ -2633,7 +2633,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                             return (
                               <DropdownMenuRadioItem key={lvl} value={lvl}>
                                 <span className="flex-1 whitespace-nowrap">{lvl === "chat-only" ? t("chat.chatOnly") : titleCaseLabel(lvl)}</span>
-                                {desc && <span className="whitespace-nowrap text-xs text-dim">{desc}</span>}
+                                {desc && <span className="whitespace-nowrap text-xs text-muted-foreground">{desc}</span>}
                               </DropdownMenuRadioItem>
                             );
                           })}

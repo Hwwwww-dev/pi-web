@@ -31,7 +31,7 @@ function Line({ tone, className, children, ...props }: { tone?: "dim" | "warning
       {...props}
       className={cn(
         "min-w-0 text-xs leading-normal text-muted-foreground [overflow-wrap:anywhere]",
-        tone === "dim" && "text-dim",
+        tone === "dim" && "text-muted-foreground",
         tone === "warning" && "text-warning",
         tone === "error" && "text-destructive",
         className,

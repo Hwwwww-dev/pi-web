@@ -206,7 +206,7 @@ function McpRowBadge({ tone, children }: { tone: McpStateTone; children: ReactNo
       variant={toneBadgeVariant(tone)}
       className={cn(
         "max-w-[45%] shrink-0 rounded-full px-1.5 py-0 text-[10px] font-normal",
-        tone !== "warning" && tone !== "error" && "text-dim",
+        tone !== "warning" && tone !== "error" && "text-muted-foreground",
       )}
     >
       {children}
@@ -221,7 +221,7 @@ function Line({ tone, className, children, ...props }: { tone?: "dim" | "warning
       {...props}
       className={cn(
         "min-w-0 text-xs leading-normal text-muted-foreground [overflow-wrap:anywhere]",
-        tone === "dim" && "text-dim",
+        tone === "dim" && "text-muted-foreground",
         tone === "warning" && "text-warning",
         tone === "error" && "text-destructive",
         className,
@@ -1436,7 +1436,7 @@ function McpServerGroupList({
         {scopeLabel(group.scope, t)}
       </ConfigSidebarGroupLabel>
       {statusText && <ConfigSidebarGroupStatus note={statusText.note} error={statusText.error} />}
-      {emptyKey && <div className="px-2 pt-px pb-[5px] text-xs leading-[1.4] text-dim [overflow-wrap:anywhere]">{t(emptyKey)}</div>}
+      {emptyKey && <div className="px-2 pt-px pb-[5px] text-xs leading-[1.4] text-muted-foreground [overflow-wrap:anywhere]">{t(emptyKey)}</div>}
       {group.servers.map((server) => {
         const key = mcpServerKey(server);
         const state = mcpServerRowState(server, context);
@@ -1962,9 +1962,9 @@ function McpTestToolList({ status, serverExposure }: { status: McpServerStatus &
           <li key={`${index}\0${tool.name}`} className="flex min-w-0 flex-col gap-0.5">
             <McpChips>
               <McpCode>{revealHiddenCharacters(tool.name)}</McpCode>
-              {tool.readOnly && <span className="whitespace-nowrap text-xs leading-[18px] text-dim">{t("mcp.test.readOnly")}</span>}
+              {tool.readOnly && <span className="whitespace-nowrap text-xs leading-[18px] text-muted-foreground">{t("mcp.test.readOnly")}</span>}
               {tool.exposure !== (serverExposure ?? "codemode") && (
-                <span className="whitespace-nowrap text-xs leading-[18px] text-dim">{t(MCP_EXPOSURE_SHORT_KEYS[tool.exposure])}</span>
+                <span className="whitespace-nowrap text-xs leading-[18px] text-muted-foreground">{t(MCP_EXPOSURE_SHORT_KEYS[tool.exposure])}</span>
               )}
             </McpChips>
             {tool.description && <Line tone="dim">{revealHiddenCharacters(tool.description)}</Line>}

@@ -77,7 +77,7 @@ export function SelectorRow({
           role="img"
           aria-label={star.defaultLabel}
           title={star.defaultLabel}
-          className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center text-dim"
+          className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center text-muted-foreground"
         >
           <StarIcon size={10} fill="currentColor" />
         </span>

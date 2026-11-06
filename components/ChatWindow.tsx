@@ -848,7 +848,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (element) {
       scrollToMessage(element);
       element.animate([
-        { backgroundColor: "var(--bg-selected)" },
+        { backgroundColor: "var(--accent)" },
         { backgroundColor: "transparent" },
       ], { duration: 2500 });
     }
@@ -1541,7 +1541,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           </div>
           <svg
             width="280" height="280" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg"
-            className="drop-shadow-[0_6px_18px_var(--user-border)]"
           >
             <rect x="28" y="44" width="84" height="60" rx="8" fill="var(--accent)" fill-opacity="0.08" stroke="var(--accent)" stroke-opacity="0.5" strokeWidth="1.8"/>
             <path d="M36 100 L54 72 L68 88 L80 74 L104 100Z" fill="var(--accent)" fill-opacity="0.16" stroke="var(--accent)" stroke-opacity="0.4" strokeWidth="1.4" strokeLinejoin="round"/>
@@ -1994,7 +1993,7 @@ function ExtensionDialogTitle({ title }: { title: string }) {
       {segments.map((segment, index) =>
         segment.kind === "preview" ? (
           <div key={index} className="mt-2.5">
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.4px] text-dim">
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.4px] text-muted-foreground">
               {segment.heading}
             </div>
             {isTuiText(segment.markdown) ? (
@@ -2165,7 +2164,7 @@ function ExtensionDialog({
   }, [request.expiresAt]);
 
   const countdown = remainingSeconds !== null && (
-    <span className="shrink-0 whitespace-nowrap text-xs text-dim">
+    <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
       {t("chat.extensionExpiresIn", { seconds: remainingSeconds })}
     </span>
   );
@@ -2216,7 +2215,7 @@ function ExtensionDialog({
             {request.title}
           </span>
           {summary && (
-            <span className="max-w-[34%] shrink truncate text-xs text-dim">
+            <span className="max-w-[34%] shrink truncate text-xs text-muted-foreground">
               {summary}
             </span>
           )}
@@ -2246,7 +2245,7 @@ function ExtensionDialog({
             {/* Pi's TUI shows the title verbatim, newlines included; select/input have no
                 separate message field, so extensions put multi-line text here. */}
             <ExtensionDialogTitle title={multiSelect ? multiSelect.question || request.title : request.title} />
-            <div className="mt-[3px] flex flex-wrap items-center gap-2 text-xs font-mono text-dim">
+            <div className="mt-[3px] flex flex-wrap items-center gap-2 text-xs font-mono text-muted-foreground">
               <span>{t("chat.extensionRequest")}</span>
               {totalQuestions > 1 && (
                 <span className="inline-flex items-center gap-1">
@@ -2324,12 +2323,12 @@ function ExtensionDialog({
                 {`${(reviewIndex ?? 0) + 1}. ${reviewed.question}`}
               </div>
               <div className="rounded-sm border border-border bg-card px-2.5 py-[9px] text-[13px] leading-[1.6] text-foreground wrap-anywhere whitespace-pre-wrap">
-                <span className="mb-1 block text-xs text-dim">
+                <span className="mb-1 block text-xs text-muted-foreground">
                   {reviewed.cancelled ? t("chat.question.answeredCancelled") : t("chat.question.answerLabel")}
                 </span>
                 {reviewed.answer}
               </div>
-              <div className="text-xs text-dim">{t("chat.question.reviewHint")}</div>
+              <div className="text-xs text-muted-foreground">{t("chat.question.reviewHint")}</div>
             </div>
           ) : (
           <>
@@ -2376,7 +2375,7 @@ function ExtensionDialog({
                   )}
                   // Selected background stays inline: the unlayered .extension-option
                   // background rules in globals.css beat layered bg-accent utilities.
-                  style={selected ? { background: "var(--bg-selected)" } : undefined}
+                  style={selected ? { background: "var(--accent)" } : undefined}
                   aria-label={option}
                   aria-pressed={selected}
                   ref={index === 0 ? focusFirstOption : undefined}
@@ -2416,7 +2415,7 @@ function ExtensionDialog({
                     )}
                     // Checked background stays inline: the unlayered
                     // .extension-multi-option rules in globals.css beat bg-accent utilities.
-                    style={checked ? { background: "var(--bg-selected)" } : undefined}
+                    style={checked ? { background: "var(--accent)" } : undefined}
                     aria-label={option.label}
                     ref={index === 0 ? focusFirstOption : undefined}
                     onClick={() => toggleMultiOption(option.id)}
@@ -2567,7 +2566,7 @@ function ExtensionCustomPanel({
             {t("chat.extensionPanel")}
           </span>
           {summary && (
-            <span className="max-w-[34%] shrink truncate text-xs text-dim">
+            <span className="max-w-[34%] shrink truncate text-xs text-muted-foreground">
               {summary}
             </span>
           )}

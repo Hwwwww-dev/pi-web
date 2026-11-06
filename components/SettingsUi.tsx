@@ -479,7 +479,7 @@ export function ConfigScopeSwitch<S extends string>({
               disabled={option.disabled}
               className={cn(
                 size === "small"
-                  ? "h-auto px-2.5 py-0.5 font-normal text-dim data-[state=on]:font-semibold data-[state=on]:text-foreground"
+                  ? "h-auto px-2.5 py-0.5 font-normal text-muted-foreground data-[state=on]:font-semibold data-[state=on]:text-foreground"
                   : "h-[30px] w-[76px] font-normal text-muted-foreground data-[state=on]:font-medium",
               )}
             >

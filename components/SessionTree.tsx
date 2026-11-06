@@ -419,7 +419,7 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
       )}
       {error && (
         <Alert variant="destructive" className="session-tree-error flex-none border-0 bg-transparent px-3.5 py-3 text-xs">
-          <AlertDescription className="text-xs leading-normal text-(--danger)">{error}</AlertDescription>
+          <AlertDescription className="text-xs leading-normal text-destructive">{error}</AlertDescription>
         </Alert>
       )}
       {showEmpty && (

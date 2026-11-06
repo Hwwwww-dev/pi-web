@@ -278,7 +278,7 @@ export function ModelSelector({
           type="button"
           className={cn(
             "flex h-[34px] w-full min-w-0 items-center gap-[7px] overflow-hidden rounded-md border border-border px-[9px] text-left text-xs transition-colors",
-            locked ? "cursor-default bg-card text-dim" : "cursor-pointer bg-background text-foreground hover:bg-secondary",
+            locked ? "cursor-default bg-card text-muted-foreground" : "cursor-pointer bg-background text-foreground hover:bg-secondary",
           )}
           aria-label={ariaLabel}
           aria-haspopup="listbox"
@@ -300,7 +300,7 @@ export function ModelSelector({
             ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
             : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
           <span className="min-w-0 flex-1 truncate">{currentName}</span>
-          <ChevronDownIcon className="size-3 shrink-0 text-dim" strokeWidth={2} aria-hidden="true" />
+          <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden="true" />
         </button>
       )}
 
@@ -358,7 +358,7 @@ export function ModelSelector({
                     {t(all ? "chat.modelScopeAll" : "chat.modelScopeScoped")}
                   </button>
                 ))}
-                {!isMobile && <span className="ml-auto font-mono text-[10px] text-dim">Tab</span>}
+                {!isMobile && <span className="ml-auto font-mono text-[10px] text-muted-foreground">Tab</span>}
               </div>
             )}
             {showFilter && (
@@ -394,20 +394,20 @@ export function ModelSelector({
                 </SelectorRow>
               )}
               {modelsByProvider.length === 0 ? (
-                <div className="whitespace-nowrap px-3 py-2 text-xs text-dim">
+                <div className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
                   {!listed ? t("agents.modelsLoading") : filter.trim() ? t("chat.noMatchingModels") : t("chat.noAvailableModels")}
                 </div>
               ) : modelsByProvider.map((group, index) => (
                 <div key={group.provider}>
                   {(modelsByProvider.length > 1 || usagePercent[group.provider] !== undefined) && (
-                    <div className={cn("flex items-baseline justify-between gap-2 px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase text-dim", (index > 0 || onClear) && "border-t border-border")}>
+                    <div className={cn("flex items-baseline justify-between gap-2 px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase text-muted-foreground", (index > 0 || onClear) && "border-t border-border")}>
                       {modelsByProvider.length > 1 && <span className="min-w-0 truncate">{group.provider}</span>}
                       {usagePercent[group.provider] !== undefined && (
                         <span
                           title={t("providerUsage.usage")}
                           className={cn(
                             "shrink-0 font-medium normal-case tracking-normal",
-                            usagePercent[group.provider] > 90 ? "text-destructive" : usagePercent[group.provider] > 70 ? "text-warning" : "text-dim",
+                            usagePercent[group.provider] > 90 ? "text-destructive" : usagePercent[group.provider] > 70 ? "text-warning" : "text-muted-foreground",
                           )}
                         >
                           {usagePercent[group.provider]}%

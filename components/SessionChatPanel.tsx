@@ -57,7 +57,7 @@ export function SessionChatPanel({ sessionId, running, ...chatProps }: Props) {
     return <ChatWindow {...chatProps} session={info} sessionRunning={running} newSessionCwd={null} newSessionDraftKey={null} chatInputRef={chatInputRef} panel />;
   }
   return (
-    <div role={state === "error" ? "alert" : undefined} className="px-4 py-6 text-center text-xs text-dim">
+    <div role={state === "error" ? "alert" : undefined} className="px-4 py-6 text-center text-xs text-muted-foreground">
       {t(state === "loading" || running ? "sessionPanel.loading" : state === "missing" ? "sessionPanel.missing" : "sessionPanel.error")}
     </div>
   );

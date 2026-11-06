@@ -429,7 +429,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
       {isStreaming ? (
         <CodeBlockContent
           wrap
-          className="bg-[color-mix(in_srgb,var(--bg)_92%,var(--bg-panel))] px-[13px] py-[11px] text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] leading-[1.62]"
+          className="bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] px-[13px] py-[11px] text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] leading-[1.62]"
         >
           {code}
         </CodeBlockContent>
@@ -438,7 +438,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
           language={highlighted ? lang || "text" : "text"}
           style={isDark ? codeBlockDarkTheme : vs}
           showLineNumbers
-          lineNumberStyle={{ color: "var(--text-dim)", fontStyle: "normal", flexShrink: 0 }}
+          lineNumberStyle={{ color: "var(--muted-foreground)", fontStyle: "normal", flexShrink: 0 }}
           renderer={renderCodeLines}
           // Style object by API: the highlighter applies it as inline style on
           // the <pre> it renders, and its theme's own inline styles can only
@@ -453,7 +453,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
             // ui CodeBlock frame is the only border.
             border: "none",
             borderRadius: 0,
-            backgroundColor: "color-mix(in srgb, var(--bg) 92%, var(--bg-panel))",
+            backgroundColor: "color-mix(in srgb, var(--background) 92%, var(--sidebar))",
           }}
           codeTagProps={{ style: { fontFamily: "var(--font-mono)", fontWeight: "var(--font-mono-weight)" } }}
         >

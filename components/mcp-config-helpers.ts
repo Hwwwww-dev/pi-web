@@ -219,7 +219,7 @@ export function mcpRowStateTone(state: McpServerRowState): McpStateTone {
 export function mcpStatusDot(tone: McpStateTone): { active?: boolean; color?: string } {
   if (tone === "on") return { active: true };
   if (tone === "off") return { active: false };
-  return { color: tone === "error" ? "var(--danger)" : "var(--warning)" };
+  return { color: tone === "error" ? "var(--destructive)" : "var(--warning)" };
 }
 
 /** When a status was written: a test's end, or a session's report, or its closing of that connection. */

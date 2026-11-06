@@ -291,10 +291,11 @@ test("the meter names what it holds on h2 and with no protocol known, not a bare
   const terminal = { id: 3, kind: "terminal", label: "/work/app", state: "open", createdAt: LOCAL - 30 * SECOND, opens: 1, errors: 0, lastOpenAt: null, lastErrorAt: null };
   const h2 = render({ page: page({ protocol: "h2", sources: [...page().sources, terminal] }) });
   assert.ok(ariaLabels(h2).includes("This page · Agent 1 · File watch 1 · Terminal 1 · h2"), ariaLabels(h2).join("\n"));
-  assert.match(h2, /<span data-slot="badge"[^>]*class="[^"]*text-dim[^"]*"[^>]*>h2<\/span>/);
+  assert.match(h2, /<span data-slot="badge"[^>]*class="[^"]*text-muted-foreground[^"]*"[^>]*>h2<\/span>/);
   const unknown = render({ page: page({ protocol: null }) });
   assert.ok(ariaLabels(unknown).includes("This page · Agent 1 · File watch 1 · unknown"));
-  assert.doesNotMatch(unknown, /data-slot="badge"[^>]*class="[^"]*text-dim/);
+  // "unknown" is spoken by the meter's label only — never drawn as a bare badge code.
+  assert.doesNotMatch(unknown, /data-slot="badge"[^>]*>unknown<\/span>/);
 });
 
 test("a timeout: the verdict counts it and its sentence is written once", () => {
@@ -505,7 +506,7 @@ test("a chat that moved on waits for its own answer; a hidden page pauses", () =
   const moved = render({ page: page({ client: client({ sessionId: "s2" }) }), selectedSessionId: "s2" });
   const list = sessionList(moved);
   assert.ok(list.startsWith('<div class="debug-list"><div data-slot="empty"'), "the wait is an Empty state, not a styled div");
-  assert.ok(list.includes(`<div data-slot="empty-title" class="tracking-tight text-xs font-normal text-dim">${t("debug.poll.waiting")}</div>`));
+  assert.ok(list.includes(`<div data-slot="empty-title" class="tracking-tight text-xs font-normal text-muted-foreground">${t("debug.poll.waiting")}</div>`));
   assert.doesNotMatch(list, /debug-detail/);
 
   const hidden = render({ page: page({ visibility: { ...page().visibility, state: "hidden" } }) });
@@ -646,7 +647,7 @@ test("a session closing after Stop carries a stop square, not the amber alone", 
   // Kept at every width: the narrow rules hide the bar, never the square.
   const narrow = panelSource.slice(panelSource.indexOf("@container debug-panel (max-width: 520px)"));
   assert.doesNotMatch(narrow, /debug-row-forced/);
-  assert.match(panelSource, /\.debug-status-ring\.is-none \{\s*border-style: dotted;\s*border-color: var\(--text-dim\);/, "the no-wrapper ring is visible");
+  assert.match(panelSource, /\.debug-status-ring\.is-none \{\s*border-style: dotted;\s*border-color: var\(--muted-foreground\);/, "the no-wrapper ring is visible");
 });
 
 test("the sparklines draw the poll samples against the 5 s timeout", () => {
@@ -698,7 +699,7 @@ test("the panel keeps to the theme and to Safari 16.2: theme tokens for every co
   const colors = new Set((panelSource.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).map((color) => color.toLowerCase()));
   assert.deepEqual([...colors].sort(), []);
   const dbgTones = panelSource.slice(panelSource.indexOf("--dbg-ok:"), panelSource.indexOf(".debug-panel .is-ok"));
-  assert.match(dbgTones, /--dbg-ok: var\(--ok\);\s*--dbg-warn: var\(--warning\);\s*--dbg-err: var\(--danger\);/);
+  assert.match(dbgTones, /--dbg-ok: var\(--ok\);\s*--dbg-warn: var\(--warning\);\s*--dbg-err: var\(--destructive\);/);
   assert.doesNotMatch(panelSource, /AbortSignal\.(any|timeout)|\(\?<[=!]/, "Safari 16.2");
   const css = panelSource.slice(panelSource.indexOf("const DEBUG_PANEL_CSS"));
   assert.doesNotMatch(css, /:has\(|&|transition/);
@@ -743,7 +744,7 @@ test("the Debug menu item only toggles its panel, beside the theme item and the 
   assert.doesNotMatch(item, /handleSystemInfoToggle|sendAgentCommand|fetch\(|setSessionKey|loadSession|systemInfoLoaderRef/);
   assert.match(item, /disabled=\{!showChat\}/);
   assert.match(item, /title=\{translate\("debug\.title"\)\}/);
-  assert.match(item, /activeTopPanel === "debug" \? "text-primary" : "text-dim"/);
+  assert.match(item, /activeTopPanel === "debug" \? "text-primary" : "text-muted-foreground"/);
   assert.notEqual(enLocale.messages["debug.title"], enLocale.messages["session.title"], "e2e finds the stats button by its own name");
 
   // Desktop: the quiet stats lead, then the Agents pill and the toolbar

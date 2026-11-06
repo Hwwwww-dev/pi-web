@@ -71,7 +71,7 @@ export function ProviderIcon({ id, size }: { id: string; size: number }) {
   return (
     <span
       aria-hidden="true"
-      className="inline-flex items-center justify-center shrink-0 rounded-[4px] border border-border text-dim font-bold leading-none"
+      className="inline-flex items-center justify-center shrink-0 rounded-[4px] border border-border text-muted-foreground font-bold leading-none"
       style={{
         width: size,
         height: size,

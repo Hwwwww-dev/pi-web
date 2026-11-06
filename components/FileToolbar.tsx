@@ -70,7 +70,7 @@ export function FileToolbar<Mode extends string = string>({
   const { t } = useI18n();
 
   return (
-    <div className="flex min-h-[35px] min-w-0 shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-[5px] text-xs text-dim max-[380px]:gap-1.5 max-[380px]:px-2">
+    <div className="flex min-h-[35px] min-w-0 shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-[5px] text-xs text-muted-foreground max-[380px]:gap-1.5 max-[380px]:px-2">
       <PathLabel className="min-w-12 flex-[1_1_auto] overflow-hidden font-mono" text={pathLabel} title={pathTitle ?? pathLabel} />
 
       <span className="min-w-0 truncate [flex:0_1_auto] max-[640px]:hidden" title={metaTitle ?? meta}>{meta}</span>

@@ -93,7 +93,7 @@ export function SourceCodeView({ content, language, wrapLines }: {
           margin: 0,
           padding: 0,
           border: 0,
-          background: "var(--bg)",
+          background: "var(--background)",
           ...FILE_CODE_STYLE,
           width: wrapLines ? "100%" : "max-content",
           minWidth: "100%",
