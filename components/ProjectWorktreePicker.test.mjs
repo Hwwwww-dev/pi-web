@@ -47,10 +47,10 @@ test("inline: the project's name and the branch as text, no path and no notes", 
   assert.match(html, /^<div class="project-picker is-inline" role="group" aria-label="Project and worktree">/);
   // A folder icon, the name, a chevron; the whole path only as the tooltip
   // (the menu's rows show it on a desktop).
-  assert.match(html, /<button type="button" class="project-picker-button is-project" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><svg[^>]*width="12" height="12"[^>]*class="lucide[^"]*project-picker-icon"[\s\S]*?<\/svg><span class="project-picker-name"><span class="project-picker-leaf">app<\/span><\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron sidebar-icon-down"[\s\S]*?<\/svg><\/button>/);
+  assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><svg[^>]*width="12" height="12"[^>]*class="lucide[^"]*project-picker-icon[^"]*"[\s\S]*?<\/svg><span class="project-picker-name"><span class="project-picker-leaf">app<\/span><\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron sidebar-icon-down[^"]*"[\s\S]*?<\/svg><\/button>/);
   assert.doesNotMatch(html, /~\/work\/app<|project-picker-label/);
   // The branch, cut at its left, and the chevron: neither "main" nor the count.
-  assert.match(html, /class="lucide[^"]*project-picker-icon is-linked"[\s\S]*?<\/svg><span class="project-picker-path"><span>feature\/x<\/span><\/span><svg[^>]*width="9" height="9"/);
+  assert.match(html, /class="lucide[^"]*project-picker-icon is-linked[^"]*"[\s\S]*?<\/svg><span class="project-picker-path"><span>feature\/x<\/span><\/span><svg[^>]*width="9" height="9"/);
   const main = render({ layout: "inline", context: { ...context, currentWorktreePath: "/home/me/work/app" } });
   assert.match(main, /<span class="project-picker-path"><span>main<\/span><\/span><svg[^>]*width="9"/);
   assert.doesNotMatch(html + main, /project-picker-note|project-picker-divider|is-name/);
@@ -83,7 +83,7 @@ test("row: the files' boxes below the sessions, side by side, with everything th
   // still tells the main one. The tab and the bar keep the note.
   const mainContext = { ...context, currentWorktreePath: "/home/me/work/app" };
   const mainRow = render({ layout: "row", context: mainContext });
-  assert.match(mainRow, /class="lucide[^"]*project-picker-icon"[\s\S]*?<span class="project-picker-path"><span>main<\/span><\/span><span class="project-picker-note">2<\/span><svg/);
+  assert.match(mainRow, /class="lucide[^"]*project-picker-icon[^"]*"[\s\S]*?<span class="project-picker-path"><span>main<\/span><\/span><span class="project-picker-note">2<\/span><svg/);
   assert.doesNotMatch(mainRow, /project-picker-note">main</);
   assert.doesNotMatch(mainRow, /is-linked/);
   assert.match(render({ context: mainContext }), /<span class="project-picker-note">main<\/span>/);
@@ -94,13 +94,13 @@ test("stacked: main's two boxes, the project's whole path and the worktree's bra
   const html = render({ homeDir: "/home/me" });
   assert.match(html, /^<div class="project-picker is-stacked" role="group" aria-label="Project and worktree">/);
   // The project box is its path, cut at its left: no folder icon, no name, no chevron.
-  assert.match(html, /<button type="button" class="project-picker-button is-project" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><span class="project-picker-path"><span>~\/work\/app<\/span><\/span><\/button>/);
+  assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><span class="project-picker-path"><span>~\/work\/app<\/span><\/span><\/button>/);
   assert.doesNotMatch(html, /project-picker-divider|is-name/);
   // A linked checkout: its branch icon in the accent, the branch, how many checkouts there are.
-  assert.match(html, /<svg[^>]*width="11" height="11"[^>]*class="lucide[^"]*project-picker-icon is-linked"[\s\S]*?<\/svg><span class="project-picker-path"><span>feature\/x<\/span><\/span><span class="project-picker-note">2<\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron sidebar-icon-down"/);
+  assert.match(html, /<svg[^>]*width="11" height="11"[^>]*class="lucide[^"]*project-picker-icon is-linked[^"]*"[\s\S]*?<\/svg><span class="project-picker-path"><span>feature\/x<\/span><\/span><span class="project-picker-note">2<\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron sidebar-icon-down[^"]*"/);
   // The main checkout says so, its icon not in the accent.
   const main = render({ context: { ...context, currentWorktreePath: "/home/me/work/app" } });
-  assert.match(main, /class="lucide[^"]*project-picker-icon"[\s\S]*?<span class="project-picker-path"><span>main<\/span><\/span><span class="project-picker-note">main<\/span><span class="project-picker-note">2<\/span>/);
+  assert.match(main, /class="lucide[^"]*project-picker-icon[^"]*"[\s\S]*?<span class="project-picker-path"><span>main<\/span><\/span><span class="project-picker-note">main<\/span><span class="project-picker-note">2<\/span>/);
   assert.doesNotMatch(main, /is-linked/);
   // A checkout without a branch shows its path.
   const detached = render({ homeDir: "/home/me", context: { ...context, worktrees: [context.worktrees[0], { ...context.worktrees[1], branch: null }] } });
@@ -114,7 +114,7 @@ test("a project the user named shows that name in its box, the path as the toolt
   const named = { ...context, project: { ...context.project, alias: "Thermal <b>Models</b>" } };
   for (const layout of ["stacked", "row"]) {
     const html = render({ layout, homeDir: "/home/me", context: named });
-    assert.match(html, /<button type="button" class="project-picker-button is-project" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><span class="project-picker-label is-alias">Thermal &lt;b&gt;Models&lt;\/b&gt;<\/span><\/button>/);
+    assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><span class="project-picker-label is-alias">Thermal &lt;b&gt;Models&lt;\/b&gt;<\/span><\/button>/);
     assert.doesNotMatch(html, /~\/work\/app<\/span>/);
   }
   // Inline every project shows a name: this one its own.
@@ -134,14 +134,14 @@ test("stacked: activity elsewhere shows a dot; the project in use does not count
 
 test("stacked: no project yet, and no worktree list", () => {
   const empty = render({ context: { project: null, worktrees: null, currentWorktreePath: null, projects: [] }, placeholder: "Select project…" });
-  assert.match(empty, /<button type="button" class="project-picker-button is-project is-empty" title="" aria-haspopup="menu" aria-expanded="false">/);
+  assert.match(empty, /<button [^>]*class="[^"]*project-picker-button is-project is-empty[^"]*" type="button" title="" aria-haspopup="menu" aria-expanded="false">/);
   assert.match(empty, /<span class="project-picker-label">Select project…<\/span>/);
   assert.equal((empty.match(/<button /g) ?? []).length, 1);
 
   // A subdirectory of a git checkout: a disabled row says why, out of the tab order.
   const hint = { label: "Open repo root", title: "Open the repository root to manage worktrees." };
   const subdir = render({ context: { ...context, worktrees: null, currentWorktreePath: null }, worktreeHint: hint });
-  assert.match(subdir, /<button type="button" aria-disabled="true" tabindex="-1" title="Open the repository root to manage worktrees\." class="project-picker-button is-inactive"><svg[^>]*class="lucide[^"]*project-picker-icon"[\s\S]*?<span class="project-picker-label">Open repo root<\/span><\/button>/);
+  assert.match(subdir, /<button [^>]*class="[^"]*project-picker-button is-inactive[^"]*" type="button" aria-disabled="true" tabindex="-1" title="Open the repository root to manage worktrees\."><svg[^>]*class="lucide[^"]*project-picker-icon[^"]*"[\s\S]*?<span class="project-picker-label">Open repo root<\/span><\/button>/);
   assert.equal((subdir.match(/aria-haspopup="menu"/g) ?? []).length, 1, "one menu button");
   // A folder outside git gets no hint from the sidebar: the project box
   // alone, in the tab and in the row, where it takes the whole row.
@@ -189,11 +189,11 @@ function removalSurface({ sheet, dirty = true, error = null }) {
 test("the force question starts on a Cancel on a desktop and in a sheet, never on Force", () => {
   const desktop = removalSurface({ sheet: false });
   assert.equal((desktop.match(/data-sidebar-menu-autofocus=""/g) ?? []).length, 1);
-  assert.match(desktop, /<button type="button" class="sidebar-worktree-cancel[^"]*" data-sidebar-menu-autofocus="">Cancel<\/button>/);
+  assert.match(desktop, /<button [^>]*class="[^"]*sidebar-worktree-cancel[^"]*" type="button" data-sidebar-menu-autofocus="">Cancel<\/button>/);
   // The sheet brings its own Cancel, which takes the focus Force would get as the first control.
   const sheet = removalSurface({ sheet: true });
   assert.equal((sheet.match(/data-sidebar-menu-autofocus=""/g) ?? []).length, 1);
-  assert.match(sheet, /<button type="button" class="sidebar-worktree-force[^"]*">Force<\/button>/);
+  assert.match(sheet, /<button [^>]*class="[^"]*sidebar-worktree-force[^"]*" type="button">Force<\/button>/);
   assert.match(sheet, /<button [^>]*class="[^"]*sidebar-sheet-cancel[^"]*"[^>]*data-sidebar-menu-autofocus="">Cancel<\/button><\/div><\/div>$/);
   assert.doesNotMatch(sheet, /sidebar-worktree-cancel/, "one Cancel in the sheet");
   // A failure without the question: the error, and still Cancel first.
