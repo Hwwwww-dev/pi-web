@@ -738,32 +738,31 @@ test("a tooltip holds the view still: the mouse on a titled element freezes what
   assert.match(panelSource, /const shown = held \?\? \{ page, server, samples \};/);
 });
 
-test("the Debug button only toggles its panel, beside the theme pill and the stats", () => {
-  const button = between(shellSource, "const renderDebugThemeGroup = () => {", "const renderMainFileToggle");
-  assert.match(button, /onClick=\{\(\) => toggleTopPanel\("debug"\)\}/);
-  assert.doesNotMatch(button, /handleSystemInfoToggle|sendAgentCommand|fetch\(|setSessionKey|loadSession|systemInfoLoaderRef/);
-  assert.match(button, /aria-label=\{translate\("debug\.title"\)\}/);
-  assert.match(button, /aria-pressed=\{open\}/);
-  // Only a chat owns a Debug panel; the theme pill renders regardless.
-  assert.match(button, /\{showChat && \(/);
+test("the Debug menu item only toggles its panel, beside the theme item and the stats", () => {
+  const item = between(shellSource, 'onSelect={() => toggleTopPanel("debug", mobile)}', "</DropdownMenuItem>");
+  assert.doesNotMatch(item, /handleSystemInfoToggle|sendAgentCommand|fetch\(|setSessionKey|loadSession|systemInfoLoaderRef/);
+  assert.match(item, /disabled=\{!showChat\}/);
+  assert.match(item, /title=\{translate\("debug\.title"\)\}/);
+  assert.match(item, /activeTopPanel === "debug" \? "text-primary" : "text-dim"/);
   assert.notEqual(enLocale.messages["debug.title"], enLocale.messages["session.title"], "e2e finds the stats button by its own name");
 
-  // Desktop: after the Agents pill and the toolbar capsule, then the stats,
-  // then this group, then the file toggle.
-  assert.match(shellSource, /\{renderAgentsButton\(false\)\}\s*\{renderToolbarBGroup\(false\)\}\s*\{renderSessionStats\(false\)\}\s*<Separator orientation="vertical"[^>]* \/>\s*\{renderDebugThemeGroup\(\)\}\s*\{renderMainFileToggle\(false\)\}/);
-  const stats = between(shellSource, "const renderSessionStats = (mobile: boolean) => {", "const renderDebugThemeGroup");
-  // The stats group follows the Debug group's place; it never pushes itself right.
+  // Desktop: the quiet stats lead, then the Agents pill and the toolbar
+  // capsule, then the file toggle; Debug and the theme flip live in the ⋯ menu.
+  assert.match(shellSource, /\{renderSessionStats\(false\)\}\s*<Separator orientation="vertical" className="mx-1 h-4 self-center" \/>\s*\{renderAgentsButton\(false\)\}\s*\{renderToolbarBGroup\(false\)\}\s*\{renderMainFileToggle\(false\)\}/);
+  const stats = between(shellSource, "const renderSessionStats = (mobile: boolean) => {", "const renderMainFileToggle");
+  // The stats group follows the trust warning's place; it never pushes itself right.
   assert.doesNotMatch(stats, /ml-auto/);
   assert.match(shellSource, /!mobile && !showChat && "ml-auto"/);
   // Phones: the chip leads the toolbar row, the file toggle closes it.
   assert.match(shellSource, /\{renderSessionStats\(true\)\}\s*\{renderAgentsButton\(true\)\}\s*\{renderToolbarBGroup\(true\)\}\s*\{renderMainFileToggle\(true\)\}/);
 });
 
-test("Escape with focus in the panel gives it back to the Debug button, after the panel left the page", () => {
+test("Escape with focus in the panel gives it back to the ⋯ control, after the panel left the page", () => {
   assert.match(panelSource, /<section\s+ref=\{sectionRef\}\s+className="debug-panel/);
   assert.match(panelSource, /createDebugPanelEscapeListener\(\s*document,\s*\(\) => sectionRef\.current,\s*\(restoreFocus\) => onCloseRef\.current\(restoreFocus\),\s*\)/);
-  const button = between(shellSource, "const renderDebugThemeGroup = () => {", "const renderMainFileToggle");
-  assert.match(button, /<Button\s+ref=\{debugButtonRef\}/);
+  // The Debug toggle lives in the ⋯ menu; its trigger button is the persistent
+  // restore target (a menu item unmounts with the menu).
+  assert.match(shellSource, /<Button\s+ref=\{debugButtonRef\}/);
   const close = between(shellSource, "const closeDebugPanel = useCallback(", "}, []);");
   assert.match(close, /\(restoreFocus: boolean\) => \{\s*setActiveTopPanel\(\(panel\) => panel === "debug" \? null : panel\);\s*if \(restoreFocus\) requestAnimationFrame\(\(\) => focusIfLost\(document, debugButtonRef\.current\)\);/);
   assert.match(shellSource, /import \{ focusIfLost \} from "@\/lib\/stacked-dialog";/);

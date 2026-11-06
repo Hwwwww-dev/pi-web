@@ -1131,7 +1131,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
     );
     index += 1;
   }
-  return <div className="flex min-w-0 flex-col gap-0.5 [&>[data-message-text]]:my-1">{nodes}</div>;
+  return <div className="flex min-w-0 flex-col gap-1.5 [&>[data-message-text]]:my-1">{nodes}</div>;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

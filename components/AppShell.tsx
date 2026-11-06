@@ -16,7 +16,6 @@ import {
   LoaderCircleIcon,
   MenuIcon,
   MoonIcon,
-  PanelLeftIcon,
   PanelRightIcon,
   PenLineIcon,
   ShieldAlertIcon,
@@ -26,6 +25,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
+import { SidebarProvider, SidebarTrigger } from "./ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
   DropdownMenu,
@@ -634,7 +634,8 @@ export function AppShell() {
   // panel may stay open under it.
   const handleMobileToolbarMoreOpenChange = useCallback((open: boolean) => {
     if (isMobile && open) setSidebarOpen(false);
-    if (open) setActiveTopPanel(null);
+    // 不在这里清 top panel：Debug/系统/工具定义的开关就在本菜单里，菜单打开
+    // 先杀面板、选中再 toggle，等于永远关不掉；互斥由 toggleTopPanel 保证。
     setMobileToolbarMoreOpen(open);
   }, [isMobile]);
 
@@ -1975,54 +1976,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     <div className="flex shrink-0 items-center gap-0.5" role="group">
       {/* A narrow phone keeps only the ⋯ control: branch and history live in
           its menu there. */}
-      {(!mobile || !isNarrowMobile) && sessionHasBranches && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => toggleTopPanel("branches", mobile)}
-              aria-label={translate("i18n.branches")}
-              aria-pressed={activeTopPanel === "branches"}
-              className={cn(
-                "rounded-md text-muted-foreground",
-                activeTopPanel === "branches" && HEADER_CONTROL_OPEN,
-              )}
-              data-mobile-toolbar-action={mobile ? "branches" : undefined}
-            >
-              <GitBranchIcon
-                data-icon
-                className={cn(branchTree.length > 0 ? "text-primary" : "text-dim")}
-                strokeWidth={2}
-              />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{translate("i18n.branches")}</TooltipContent>
-        </Tooltip>
-      )}
-      {(!mobile || !isNarrowMobile) && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={handleViewFullHistory}
-              disabled={!selectedSession}
-              aria-label={translate("history.full")}
-              className="rounded-md text-muted-foreground"
-              data-mobile-toolbar-action={mobile ? "history" : undefined}
-            >
-              <HistoryIcon data-icon strokeWidth={2} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{selectedSession ? translate("history.full") : translate("history.unsaved")}</TooltipContent>
-        </Tooltip>
-      )}
       <DropdownMenu open={mobileToolbarMoreOpen} onOpenChange={handleMobileToolbarMoreOpenChange}>
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
               <Button
+                ref={debugButtonRef}
                 variant="ghost"
                 size="icon-sm"
                 aria-label={moreControlsLabel}
@@ -2105,7 +2064,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               strokeWidth={2}
             />
             <span className="min-w-0 flex-1">{translate("system.label")}</span>
-            {systemPrompt && <CheckIcon className="size-3.5 shrink-0 text-success" strokeWidth={2} />}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => handleSystemInfoToggle("tools")}
@@ -2134,11 +2092,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               </span>
             )}
           </DropdownMenuItem>
-          {/* On a phone the bar holds only the Agents pill, the file toggle
-              and this menu: the rest of the row's actions live here too. */}
-          {mobile && (
-            <>
-              <DropdownMenuSeparator />
+          {/* The dashboard-header rule: the bar holds only the quiet stats and
+              the Agents control; history, branches, Debug and the theme flip
+              live in this menu on every width. */}
+          <>
+            <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={handleViewFullHistory}
                 disabled={!selectedSession}
@@ -2163,19 +2121,27 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   <span className="min-w-0 flex-1">{translate("i18n.branches")}</span>
                 </DropdownMenuItem>
               )}
-              {showChat && (
-                <DropdownMenuItem
-                  onSelect={() => toggleTopPanel("debug", mobile)}
-                  title={translate("debug.title")}
-                  className="gap-2"
-                  data-mobile-toolbar-action="debug"
-                >
-                  <BugIcon className="size-3.5 shrink-0" strokeWidth={2} />
-                  <span className="min-w-0 flex-1">{translate("debug.title")}</span>
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem
+                onSelect={() => toggleTopPanel("debug", mobile)}
+                disabled={!showChat}
+                title={translate("debug.title")}
+                className="gap-2"
+                data-mobile-toolbar-action={mobile ? "debug" : undefined}
+              >
+                <BugIcon className={cn("size-3.5 shrink-0", activeTopPanel === "debug" ? "text-primary" : "text-dim")} strokeWidth={2} />
+                <span className="min-w-0 flex-1">{translate("debug.title")}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => setThemePreference(theme === "dark" ? "light" : "dark")}
+                title={translate("settings.appearance")}
+                className="gap-2"
+              >
+                {theme === "dark"
+                  ? <SunIcon className="size-3.5 shrink-0" strokeWidth={2} />
+                  : <MoonIcon className="size-3.5 shrink-0" strokeWidth={2} />}
+                <span className="min-w-0 flex-1">{translate("settings.appearance")}</span>
+              </DropdownMenuItem>
             </>
-          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -2293,60 +2259,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     );
   };
 
-  // Debug / theme: plain ghost controls. Debug only opens or closes its panel:
-  // nothing is loaded here. The theme control flips light/dark through the
-  // same preference Settings writes.
-  const renderDebugThemeGroup = () => {
-    const open = activeTopPanel === "debug";
-    return (
-      <div className="flex shrink-0 items-center gap-0.5" role="group">
-        {showChat && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                ref={debugButtonRef}
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => toggleTopPanel("debug")}
-                aria-label={translate("debug.title")}
-                aria-pressed={open}
-                className={cn(
-                  "rounded-md text-muted-foreground",
-                  open && HEADER_CONTROL_OPEN,
-                )}
-              >
-                <BugIcon
-                  data-icon
-                  className={cn(open ? "text-primary" : "text-dim")}
-                  strokeWidth={2}
-                />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{translate("debug.title")}</TooltipContent>
-          </Tooltip>
-        )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setThemePreference(theme === "dark" ? "light" : "dark")}
-              aria-label={translate("settings.appearance")}
-              className="rounded-md text-muted-foreground"
-            >
-              {theme === "dark" ? (
-                <SunIcon data-icon strokeWidth={2} />
-              ) : (
-                <MoonIcon data-icon strokeWidth={2} />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{translate("settings.appearance")}</TooltipContent>
-        </Tooltip>
-      </div>
-    );
-  };
-
   const renderMainFileToggle = (mobile: boolean) => (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -2377,6 +2289,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         the body, at the viewport's bottom-right, outside the drawer's
         transform below. */}
     <Toaster />
+    {/* dashboard-01 的壳层组合：官方 SidebarProvider 供 SidebarTrigger 使用，
+        开关状态仍受控于本组件；可拖拽宽度照旧经 --sidebar-width 注入。 */}
+    <SidebarProvider
+      style={{ "--sidebar-width": `${sidebarResizer.width}px`, "--header-height": "3.25rem" } as React.CSSProperties}
+      open={sidebarOpen}
+      onOpenChange={(next: boolean) => { if (next !== sidebarOpen) handleSidebarToggle(); }}
+    >
     <div className="flex h-[var(--app-viewport-height,100dvh)] w-full overflow-hidden bg-background pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       {/* Mobile overlay backdrop */}
       <div
@@ -2425,7 +2344,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         <div ref={topBarRef} className="sticky top-0 z-[5] shrink-0 bg-background">
         {/* The draft's header: 52px, title + crumb left, the pills right. On a
             phone it folds into two rows — the title row, then the controls. */}
-        <div className="relative flex min-h-[52px] flex-wrap items-center border-b border-border px-3 pt-[env(safe-area-inset-top)]">
+        <header className="flex min-h-(--header-height) shrink-0 items-center gap-2 border-b pt-[env(safe-area-inset-top)] transition-[width,height] ease-linear">
+        <div className="flex w-full min-w-0 items-center gap-1 px-4 lg:gap-2 lg:px-6">
           {isMobile ? (
             // 手机：两行结构显式成树——标题行（☰ 同行）与控件行各占一行，
             // 不依赖 flex-wrap 断行（basis-full / 断行元素都会被算序挤变形）。
@@ -2457,25 +2377,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </div>
           ) : (
             <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={handleSidebarToggle}
-                    aria-label={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
-                    className="shrink-0 rounded-md text-muted-foreground"
-                  >
-                    {sidebarOpen ? (
-                      <PanelLeftIcon className="size-4" strokeWidth={2} />
-                    ) : (
-                      <MenuIcon className="size-4.5" strokeWidth={2} />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}</TooltipContent>
-              </Tooltip>
-              <Separator orientation="vertical" className="h-5 self-center" />
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
               <div className="flex h-10 min-w-0 flex-1 items-center gap-2.5">
                 <h1 className="min-w-0 truncate text-base font-semibold text-foreground">
                   {activeSessionTitle ?? "Pi Web"}
@@ -2493,15 +2396,14 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </>
           )}
           {!isMobile && (
-            <>
+            <div className="ml-auto flex shrink-0 items-center gap-1">
               {renderProjectTrustWarning(false)}
+              {renderSessionStats(false)}
+              <Separator orientation="vertical" className="mx-1 h-4 self-center" />
               {renderAgentsButton(false)}
               {renderToolbarBGroup(false)}
-              {renderSessionStats(false)}
-              <Separator orientation="vertical" className="mx-0.5 h-5 self-center" />
-              {renderDebugThemeGroup()}
               {renderMainFileToggle(false)}
-            </>
+            </div>
           )}
           {sessionHasBranches && (
             <BranchNavigator
@@ -2518,6 +2420,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               hideInlineButton
             />
           )}
+        </div>
+        </header>
           {/* Top panels — anchored under the header (the draft's sheet); only
               one open at a time. z-[240] stays below the quote toolbar's 260
               (ChatWindow). */}
@@ -2665,7 +2569,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </div>
           )}
 
-        </div>
         {isMobile && renderProjectTrustWarning(true)}
         </div>
 
@@ -3001,6 +2904,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         </div>
       </div>
     </div>
+    </SidebarProvider>
     {settingsSection && (
       <SettingsPanel
         cwd={projectTrustCwd}

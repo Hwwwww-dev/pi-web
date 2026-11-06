@@ -34,9 +34,9 @@ test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(appShellSource, /pb-\[env\(safe-area-inset-bottom\)\]/);
   assert.match(appShellSource, /pl-\[env\(safe-area-inset-left\)\]/);
   assert.match(appShellSource, /pr-\[env\(safe-area-inset-right\)\]/);
-  // The header keeps its safe-area compensation; the draft's 52px min-height
-  // (its two phone rows size themselves).
-  assert.match(appShellSource, /relative flex min-h-\[52px\] flex-wrap items-center border-b border-border px-3 pt-\[env\(safe-area-inset-top\)\]/);
+  // The header keeps its safe-area compensation; the dashboard's 52px header
+  // height is a minimum so the phone's two rows grow it.
+  assert.match(appShellSource, /flex min-h-\(--header-height\) shrink-0 items-center gap-2 border-b pt-\[env\(safe-area-inset-top\)\] transition-\[width,height\] ease-linear/);
   // Right panel tab bar: the draft's 46px bar with its safe-area compensation.
   assert.match(appShellSource, /h-\[calc\(46px_\+_\env\(safe-area-inset-top\)\)\] shrink-0/);
   assert.match(appShellSource, /h-\[var\(--app-viewport-height,100dvh\)\]/);

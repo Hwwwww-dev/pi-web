@@ -8,12 +8,13 @@ const mobileHookSource = await readFile(new URL("../hooks/useIsMobile.ts", impor
 test("keeps action pills inline in medium mobile toolbars", () => {
   assert.match(mobileHookSource, /NARROW_MOBILE_QUERY = "\(max-width: 480px\)"/);
   assert.match(source, /const isNarrowMobile = useIsNarrowMobile\(\);/);
-  // The toolbar row renders the same controls on every width; a narrow phone's
-  // branch/history controls live in its ⋯ menu instead of the row.
+  // The dashboard-header rule: the row holds only the Agents pill and the file
+  // toggle; branches, history, Debug and the theme flip live in the ⋯ menu on
+  // every width.
   assert.match(source, /\{renderAgentsButton\(true\)\}/);
   assert.match(source, /\{renderToolbarBGroup\(true\)\}/);
-  assert.match(source, /\{\(!mobile \|\| !isNarrowMobile\) && sessionHasBranches && \(/);
-  assert.match(source, /\{\(!mobile \|\| !isNarrowMobile\) && \(\n        <Tooltip>/);
+  assert.doesNotMatch(source, /\{\(!mobile \|\| !isNarrowMobile\) && sessionHasBranches/);
+  assert.doesNotMatch(source, /\{\(!mobile \|\| !isNarrowMobile\) && \(\n        <Tooltip>/);
   assert.match(source, /data-mobile-toolbar-more="true"/);
 });
 
@@ -67,9 +68,12 @@ test("the ⋯ menu is Radix-controlled: outside clicks and Escape close it", () 
   // The old document-level capture listeners are gone; Radix owns dismissal.
   assert.doesNotMatch(source, /document\.addEventListener\("pointerdown", handlePointerDown, true\)/);
   assert.doesNotMatch(source, /event\.key !== "Escape"[\s\S]*?setMobileToolbarMoreOpen\(false\)/);
-  // Opening folds the drawer on a phone and closes any top panel; closing is
-  // a plain state write.
-  assert.match(source, /const handleMobileToolbarMoreOpenChange = useCallback\(\(open: boolean\) => \{\s*if \(isMobile && open\) setSidebarOpen\(false\);\s*if \(open\) setActiveTopPanel\(null\);\s*setMobileToolbarMoreOpen\(open\);/);
+  // Opening folds the drawer on a phone; the top-panel toggles live in this
+  // menu (Debug/系统/工具定义), so opening must not kill the open panel —
+  // otherwise a panel opened from the menu could never be closed again.
+  assert.match(source, /const handleMobileToolbarMoreOpenChange = useCallback\(\(open: boolean\) => \{\s*if \(isMobile && open\) setSidebarOpen\(false\);/);
+  assert.match(source, /setMobileToolbarMoreOpen\(open\);\s*\}, \[isMobile\]\);/);
+  assert.doesNotMatch(source, /if \(open\) setActiveTopPanel\(null\);/);
   // Layout and session changes still close it.
   assert.match(source, /\}, \[isMobile, isNarrowMobile, selectedSession\?\.id, newSessionDraftId\]\);/);
 });
@@ -93,7 +97,7 @@ test("keeps language out of the chat toolbar; the theme control writes the share
   assert.doesNotMatch(source, /data-mobile-toolbar-action=\{mobile \? "language"/);
   assert.match(source, /import \{ useTheme \} from "@\/hooks\/useTheme"/);
   assert.match(source, /setThemePreference\(theme === "dark" \? "light" : "dark"\)/);
-  assert.match(source, /aria-label=\{translate\("settings\.appearance"\)\}/);
+  assert.match(source, /title=\{translate\("settings\.appearance"\)\}/);
 });
 
 test("mobile statistics collapse to a context+cost chip with the rest in the popover", () => {
