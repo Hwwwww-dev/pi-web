@@ -1189,12 +1189,13 @@ function ModelDetail({
 
       <ConfigCard>
         <div className="flex flex-col">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => setAdvancedOpen((open) => !open)}
             aria-expanded={advancedOpen}
             aria-controls="model-advanced-settings"
-            className="grid min-h-12 w-full grid-cols-[minmax(0,1fr)_18px] items-center gap-2.5 rounded-md px-1 py-2 text-left text-foreground hover:bg-accent hover:text-accent-foreground"
+            className="grid h-auto min-h-12 w-full grid-cols-[minmax(0,1fr)_18px] items-center gap-2.5 rounded-md px-1 py-2 text-left font-normal text-foreground"
           >
             <span className="min-w-0">
               <span className="block text-xs font-semibold">{t("models.advancedSettings")}</span>
@@ -1205,9 +1206,9 @@ function ModelDetail({
             <ChevronDown
               size={16}
               strokeWidth={1.8}
-              className={cn("text-muted-foreground transition-transform", advancedOpen && "rotate-180")}
+              className={cn("size-4 text-muted-foreground transition-transform", advancedOpen && "rotate-180")}
             />
-          </button>
+          </Button>
 
           {advancedOpen && (
             <div id="model-advanced-settings" className="flex flex-col gap-3.5 pb-4 pt-1">

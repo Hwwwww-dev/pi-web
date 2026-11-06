@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckIcon, RotateCcwIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { formatUpdatedTime } from "@/lib/i18n/format";
 import { isProviderUsageId } from "@/lib/provider-usage-ids";
 
@@ -121,8 +122,9 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
     <section className="flex flex-col gap-2.5 pt-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[13px] leading-[1.35] font-semibold text-foreground">{t("providerUsage.usage")}</span>
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={query}
           disabled={!enabled || querying}
           title={t(querying ? "providerUsage.refreshing" : "providerUsage.refresh")}
@@ -135,11 +137,11 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
           )}
         >
           {refreshDone ? (
-            <CheckIcon size={14} strokeWidth={2.5} aria-hidden="true" />
+            <CheckIcon size={14} strokeWidth={2.5} className="size-3.5" aria-hidden="true" />
           ) : (
-            <RotateCcwIcon size={14} strokeWidth={2} className={cn("motion-reduce:animate-none", querying && "animate-spin")} aria-hidden="true" />
+            <RotateCcwIcon size={14} strokeWidth={2} className={cn("size-3.5 motion-reduce:animate-none", querying && "animate-spin")} aria-hidden="true" />
           )}
-        </button>
+        </Button>
         {report && (
           <span title={new Date(report.capturedAt).toLocaleString(locale)} className="text-xs whitespace-nowrap text-muted-foreground">
             {t("providerUsage.updated", { time: formatUpdatedTime(report.capturedAt, locale) })}

@@ -49,10 +49,11 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
 
   return (
     <>
-      <button
+      <Button
         ref={triggerRef}
         type="button"
-        className={cn("block cursor-zoom-in border-none bg-transparent p-0 text-inherit", className)}
+        variant="ghost"
+        className={cn("block h-auto cursor-zoom-in border-none bg-transparent p-0 text-inherit hover:bg-transparent", className)}
         style={style}
         onClick={() => setOpen(true)}
         aria-label={triggerLabel}
@@ -61,7 +62,7 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
         title={previewLabel}
       >
         {children}
-      </button>
+      </Button>
       {open && (
         <dialog
           ref={dialogRef}

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
+import { Button } from "@/components/ui/button";
 import {
   CodeBlock,
   DiagramZoomDialog,
@@ -105,15 +106,16 @@ export function SvgBlock({ code, isStreaming }: { code: string; isStreaming?: bo
       ) : (
         <>
           {!zoomOpen && (
-            <button
+            <Button
               type="button"
-              className="mermaid-block mermaid-preview-button"
+              variant="ghost"
+              className="mermaid-block mermaid-preview-button block h-auto rounded-none font-normal focus-visible:ring-0 focus-visible:border-transparent"
               title={t("i18n.openSvgViewer")}
               aria-label={t("i18n.openSvgViewer")}
               onClick={() => setZoomOpen(true)}
             >
               {image("svg-block-image")}
-            </button>
+            </Button>
           )}
           {zoomOpen && (
             <DiagramZoomDialog title={t("i18n.svgImage")} label={t("i18n.svgViewer")} onClose={() => setZoomOpen(false)}>

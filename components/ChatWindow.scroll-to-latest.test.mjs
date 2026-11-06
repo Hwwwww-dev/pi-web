@@ -9,8 +9,8 @@ const cssSource = await readFile(new URL("../app/globals.css", import.meta.url),
 function elementBlock() {
   const start = source.indexOf('className={cn("chat-scroll-to-bottom');
   assert.notEqual(start, -1, "scroll-to-latest button not found");
-  const buttonStart = source.lastIndexOf("<button", start);
-  const buttonEnd = source.indexOf("</button>", start);
+  const buttonStart = source.lastIndexOf("<Button", start);
+  const buttonEnd = source.indexOf("</Button>", start);
   assert.notEqual(buttonStart, -1);
   assert.notEqual(buttonEnd, -1);
   return source.slice(buttonStart, buttonEnd);
@@ -19,7 +19,7 @@ function elementBlock() {
 test("shows the scroll-to-latest button only when the viewport is detached from the tail", () => {
   assert.match(
     source,
-    /className=\{cn\("chat-scroll-to-bottom size-\[34px\]", showScrollToBottom && !pendingScrollRestore && "is-visible"\)\}/,
+    /className=\{cn\("chat-scroll-to-bottom size-\[34px\] h-\[34px\]", showScrollToBottom && !pendingScrollRestore && "is-visible"\)\}/,
     "visibility must be a class toggle so the exit transition can play",
   );
 });

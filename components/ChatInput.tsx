@@ -25,7 +25,6 @@ import {
 import { getMarkdownListContinuation } from "@/lib/markdown-list-continuation";
 import { quoteSeparator } from "@/lib/quoted-selection";
 import { isBareMcpCommand, isBuiltinMcpCommand } from "@/lib/mcp-command";
-import { FolderIcon, getFileIcon } from "./FileIcons";
 import { ImagePreview } from "./ImagePreview";
 import { DismissButton } from "./DismissButton";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -42,6 +41,8 @@ import {
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  FileIcon,
+  FolderClosedIcon,
   HistoryIcon,
   ImageIcon,
   MessagesSquareIcon,
@@ -684,14 +685,18 @@ function QueuedMessageRow({
       )}
       {onAction ? (
         <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass} asChild>
-          <button
+          <Button
             type="button"
+            variant="ghost"
             title={t("chat.queueBehaviorHint")}
             onClick={() => onAction(item.id, "toggle")}
-            className="cursor-pointer transition-opacity hover:opacity-80"
+            className={cn(
+              "h-auto cursor-pointer rounded-full transition-opacity hover:opacity-80",
+              isSteer ? "hover:bg-primary hover:text-primary-foreground" : "hover:bg-muted hover:text-muted-foreground",
+            )}
           >
             {behaviorLabel}
-          </button>
+          </Button>
         </Badge>
       ) : (
         <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass}>{behaviorLabel}</Badge>
@@ -1907,9 +1912,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         const showOriginal = mappedVal != null && mappedVal !== lvl;
         const selected = lvl === "auto" ? isAutoThinkingSelection : (!isAutoThinkingSelection && resolvedThinkingLevel === lvl);
         return (
-          <button
+          <Button
             key={lvl}
             type="button"
+            variant="ghost"
             role="radio"
             aria-checked={selected}
             onClick={() => {
@@ -1923,7 +1929,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               onThinkingLevelChange(lvl as typeof THINKING_LEVELS[number]);
             }}
             className={cn(
-              "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-left text-xs transition-colors hover:bg-accent",
+              "flex h-auto w-full cursor-pointer justify-start rounded-sm px-2 py-1 text-left text-xs font-normal",
               selected ? "text-foreground" : "text-muted-foreground",
             )}
           >
@@ -1948,12 +1954,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   savedDefaultThinkingLevel === lvl && "opacity-100",
                 )}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill={savedDefaultThinkingLevel === lvl ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill={savedDefaultThinkingLevel === lvl ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true" className="size-3 shrink-0">
                   <polygon points="12 2.5 14.9 8.6 21.5 9.4 16.6 13.9 17.9 20.5 12 17.2 6.1 20.5 7.4 13.9 2.5 9.4 9.1 8.6" />
                 </svg>
               </span>
             )}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -2143,19 +2149,20 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 {inputHistory.map((item, index) => {
                   const active = index === historyActiveIndex;
                   return (
-                    <button
+                    <Button
                       key={`${index}:${item}`}
                       ref={(node) => {
                         historyItemRefs.current[index] = node;
                       }}
                       type="button"
+                      variant="ghost"
                       onMouseDown={(e) => {
                         e.preventDefault();
                         applyHistoryInput(item);
                       }}
                       onMouseEnter={() => setHistoryActiveIndex(index)}
                       className={cn(
-                        "flex w-full items-start gap-2 rounded-sm px-2 py-[7px] text-left text-[12.5px] leading-[1.45] text-foreground transition-colors",
+                        "flex h-auto w-full items-start justify-start rounded-sm px-2 py-[7px] text-left text-[12.5px] leading-[1.45] font-normal whitespace-normal text-foreground transition-colors",
                         active && "bg-accent",
                       )}
                     >
@@ -2165,7 +2172,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       <span className="line-clamp-2 min-w-0 wrap-anywhere">
                         {item}
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -2203,19 +2210,20 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                           const active = index === slashActiveIndex;
                           const dormant = isDormantSkillCommand(command, skillDormancy);
                           return (
-                            <button
+                            <Button
                               key={`${command.source}:${command.name}`}
                               ref={(node) => {
                                 slashItemRefs.current[index] = node;
                               }}
                               type="button"
+                              variant="ghost"
                               onMouseDown={(e) => {
                                 e.preventDefault();
                                 applySlashCommand(command);
                               }}
                               onMouseEnter={() => setSlashActiveIndex(index)}
                               className={cn(
-                                "flex min-h-[58px] w-full min-w-0 flex-col justify-center gap-1 rounded-md border px-2.5 py-[9px] text-left transition-colors",
+                                "flex h-auto min-h-[58px] w-full min-w-0 flex-col items-stretch justify-center gap-1 rounded-md border px-2.5 py-[9px] text-left font-normal whitespace-normal transition-colors",
                                 active
                                   ? "border-ring bg-accent"
                                   : "border-border bg-card",
@@ -2234,7 +2242,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                                    {getSlashDescription(command, t)}
                                 </span>
                               )}
-                            </button>
+                            </Button>
                           );
                         })}
                       </div>
@@ -2282,31 +2290,34 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       const name = entry.path.split("/").pop() ?? entry.path;
                       const dirPrefix = entry.path.slice(0, entry.path.length - name.length);
                       return (
-                        <button
+                        <Button
                           key={`${entry.isDir ? "d" : "f"}:${entry.path}`}
                           ref={(node) => {
                             atItemRefs.current[index] = node;
                           }}
                           type="button"
+                          variant="ghost"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             applyAtCompletion(entry);
                           }}
                           onMouseEnter={() => setAtActiveIndex(index)}
                           className={cn(
-                            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left font-mono text-[12.5px] text-foreground transition-colors",
+                            "flex h-auto w-full justify-start rounded-sm px-2 py-1.5 text-left font-mono text-[12.5px] font-normal text-foreground transition-colors",
                             active && "bg-accent",
                           )}
                         >
                           <span className="flex shrink-0 items-center">
-                            {entry.isDir ? <FolderIcon size={14} /> : getFileIcon(name, 14)}
+                            {entry.isDir
+                              ? <FolderClosedIcon size={14} strokeWidth={1.8} className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                              : <FileIcon size={14} strokeWidth={1.8} className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
                           </span>
                           <span className="min-w-0 truncate">
                             {dirPrefix && <span className="text-muted-foreground">{dirPrefix}</span>}
                             {name}
                             {entry.isDir && <span className="text-muted-foreground">/</span>}
                           </span>
-                        </button>
+                        </Button>
                       );
                     })
                   )}
