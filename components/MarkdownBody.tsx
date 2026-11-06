@@ -73,7 +73,8 @@ function MathDisplay({ source, children }: { source: string; children: ReactNode
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const copy = () => {
-    copyText(source).then(() => {
+    copyText(source).then((copied) => {
+      if (!copied) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });

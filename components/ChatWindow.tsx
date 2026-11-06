@@ -306,7 +306,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     lastUserMsgRef, promptAnchorActive,
     handleSend, handleAbort, startSideChat, handleFork, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
-    handleQueuedAction, handleEditContent, dismissCompactError,
+    handleQueuedAction, handleEditContent, dismissCompactError, editEntryId, cancelEdit,
     handleBuiltinSlashCommand,
     handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadSlashCommands, loadAllModels, scrollUserMsgToTop,
     loadContext, activeLeafId, scrollToBottom, scrollToMessage,
@@ -1255,6 +1255,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             onFork={bashRunning || isNew ? undefined : handleFork}
             forking={forkingEntryId === entryIds[idx]}
             onEditContent={sessionBusy ? undefined : handleEditContent}
+            isEditing={entryIds[idx] !== undefined && editEntryId === entryIds[idx]}
+            onCancelEdit={cancelEdit}
             showTimestamp={showTimestamp}
             prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
             sessionId={session?.id ?? sessionIdRef.current ?? undefined}
@@ -1493,7 +1495,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [messages, entryIds, toolResultsMap, hasEarlierMessages, streamState.isStreaming, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
      sessionIdRef, handleFork, handleEditContent, onOpenFile, onOpenSubagent,
-     isNew, messageRefs, lastUserMsgRef, bashRunning]);
+     isNew, messageRefs, lastUserMsgRef, bashRunning, editEntryId, cancelEdit]);
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
   const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
   const hasMoreRendered = startIndex > 0 || hasEarlierMessages;

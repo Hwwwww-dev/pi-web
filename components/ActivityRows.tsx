@@ -710,7 +710,8 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
   const preview = previewText(text, 120);
 
   const copyContent = () => {
-    copyText(text || detailsText).then(() => {
+    copyText(text || detailsText).then((copied) => {
+      if (!copied) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
@@ -959,7 +960,8 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
           variant="ghost"
           size="icon-xs"
           onClick={() => {
-            copyText(copySource).then(() => {
+            copyText(copySource).then((copied) => {
+              if (!copied) return;
               setCopied(true);
               setTimeout(() => setCopied(false), 1500);
             });

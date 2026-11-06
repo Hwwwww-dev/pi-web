@@ -1,6 +1,9 @@
-export function copyText(text: string): Promise<void> {
+export function copyText(text: string): Promise<boolean> {
   if (navigator.clipboard?.writeText) {
-    return navigator.clipboard.writeText(text);
+    return navigator.clipboard.writeText(text).then(
+      () => true,
+      () => false,
+    );
   }
   try {
     const ta = document.createElement("textarea");
@@ -11,8 +14,8 @@ export function copyText(text: string): Promise<void> {
     ta.select();
     document.execCommand("copy");
     document.body.removeChild(ta);
-    return Promise.resolve();
+    return Promise.resolve(true);
   } catch {
-    return Promise.reject();
+    return Promise.resolve(false);
   }
 }

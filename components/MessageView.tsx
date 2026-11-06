@@ -333,7 +333,8 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   const pinnedActions = forking || canCancelEdit;
 
   const copyContent = () => {
-    copyText(copyTarget).then(() => {
+    copyText(copyTarget).then((copied) => {
+      if (!copied) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
@@ -575,7 +576,8 @@ function AssistantMessageView({
   }
 
   const copyContent = () => {
-    copyText(textContent).then(() => {
+    copyText(textContent).then((copied) => {
+      if (!copied) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });

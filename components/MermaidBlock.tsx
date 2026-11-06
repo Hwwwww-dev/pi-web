@@ -401,7 +401,8 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
   }, [isStreaming, highlighted, languagesReady]);
 
   const copy = () => {
-    copyText(code).then(() => {
+    copyText(code).then((copied) => {
+      if (!copied) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });

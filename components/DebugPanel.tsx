@@ -249,12 +249,13 @@ export function DebugPanel({ readerRef, selectedSessionId, sessions, onClose }: 
 
   const handleCopy = () => {
     const payload = { client: page, server: server.reply };
-    void copyText(JSON.stringify(payload, null, 2)).then(() => {
+    void copyText(JSON.stringify(payload, null, 2)).then((copied) => {
+      if (!copied) return;
       if (disposedRef.current) return;
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       setCopied(true);
       copyTimerRef.current = setTimeout(() => setCopied(false), 1400);
-    }, () => {});
+    });
   };
 
   const shown = held ?? { page, server, samples };
