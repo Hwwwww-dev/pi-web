@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -787,7 +788,7 @@ function RenameInput({
   };
 
   return (
-    <input
+    <Input
       ref={inputRef}
       className="session-tree-rename"
       value={value}

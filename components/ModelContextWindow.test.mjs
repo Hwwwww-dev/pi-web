@@ -28,5 +28,7 @@ test("a typed draft that is not a whole number is marked without being truncated
   assert.match(html, /value="500k"/);
   assert.match(html, /aria-invalid="true"/);
   // A value pi accepts in models.json is not flagged, though the field would not take it typed.
-  assert.doesNotMatch(render(400000.5), /aria-invalid/);
+  // The ATTRIBUTE must be absent — `aria-invalid:` utility classes in the
+  // serialized class list do not count.
+  assert.doesNotMatch(render(400000.5), /\saria-invalid[= >]/);
 });

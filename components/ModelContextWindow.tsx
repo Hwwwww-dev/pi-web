@@ -2,6 +2,7 @@
 
 import { useI18n } from "@/hooks/useI18n";
 import { parseContextWindow } from "@/lib/model-context";
+import { Input } from "@/components/ui/input";
 
 export interface ModelContextSettings {
   overrides?: Record<string, unknown>;
@@ -24,7 +25,7 @@ export function ModelContextWindow({ modelName, effective, value, onChange, disa
   const { t } = useI18n();
   const invalid = value !== undefined && parseContextWindow(value) === undefined;
   return (
-    <input
+    <Input
       type="text"
       inputMode="numeric"
       className="model-context-input"
