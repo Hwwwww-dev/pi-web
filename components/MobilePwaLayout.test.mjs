@@ -15,6 +15,7 @@ const mcpAddSource = await readFile(new URL("./McpAddServer.tsx", import.meta.ur
 const newSessionBarSource = await readFile(new URL("./NewSessionContextBar.tsx", import.meta.url), "utf8");
 const layoutSource = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const appShellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
+const settingsPanelSource = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
 
 test("configures iOS standalone mode to use the visible viewport below the status bar", () => {
   // iOS 27 draws an unconditional Liquid Glass blur over the top edge of
@@ -75,10 +76,17 @@ test("prevents iOS focus zoom from widening the layout", () => {
 });
 
 test("keeps modal dialogs clear of the iOS status bar in standalone mode", () => {
-  assert.match(settingsCssSource, /@supports \(-webkit-touch-callout: none\) \{[\s\S]*?@media \(display-mode: standalone\) \{/);
+  // The settings dialog fills a phone's screen (.settings-phone-safe), and the
+  // stylesheet pads it with env() insets; iOS standalone's env() can report 0,
+  // so the @supports fallback pads with device sizes instead.
+  assert.match(settingsPanelSource, /settings-phone-safe z-\[1000\]/);
+  assert.match(settingsPanelSource, /max-sm:inset-0 max-sm:h-full max-sm:w-full/);
+  assert.match(settingsCssSource, /@media \(max-width: 640px\) \{\s*\.settings-phone-safe \{\s*padding: env\(safe-area-inset-top\)/);
+  assert.match(settingsCssSource, /@supports \(-webkit-touch-callout: none\) \{[\s\S]*?@media \(display-mode: standalone\) \{\s*\.settings-phone-safe \{/);
   assert.match(settingsCssSource, /padding-top: max\(59px, env\(safe-area-inset-top\)\);[\s\S]*?padding-right: max\(8px, env\(safe-area-inset-right\)\);[\s\S]*?padding-bottom: max\(24px, env\(safe-area-inset-bottom\)\);[\s\S]*?padding-left: max\(8px, env\(safe-area-inset-left\)\);/);
-  assert.match(settingsCssSource, /@media \(display-mode: standalone\) and \(orientation: landscape\) \{[\s\S]*?padding-top: max\(8px, env\(safe-area-inset-top\)\);[\s\S]*?padding-right: max\(59px, env\(safe-area-inset-right\)\);[\s\S]*?padding-bottom: max\(8px, env\(safe-area-inset-bottom\)\);[\s\S]*?padding-left: max\(59px, env\(safe-area-inset-left\)\);/);
-  assert.match(settingsCssSource, /\.settings-dialog-surface,[\s\S]*?\.config-panel-root\.is-modal > \.config-panel-surface \{[\s\S]*?max-width: 100%;[\s\S]*?max-height: 100%;/);
+  assert.match(settingsCssSource, /@media \(display-mode: standalone\) and \(orientation: landscape\) \{\s*\.settings-phone-safe \{[\s\S]*?padding-top: max\(8px, env\(safe-area-inset-top\)\);[\s\S]*?padding-right: max\(59px, env\(safe-area-inset-right\)\);[\s\S]*?padding-bottom: max\(8px, env\(safe-area-inset-bottom\)\);[\s\S]*?padding-left: max\(59px, env\(safe-area-inset-left\)\);/);
+  // A config panel opened on its own stays capped to the viewport under the same query.
+  assert.match(settingsCssSource, /\.config-panel-root\.is-modal > \.config-panel-surface \{\s*width: 100%;\s*max-width: 100%;\s*height: 100%;\s*max-height: 100%;/);
 });
 
 test("collapses secondary composer chrome while the mobile keyboard is open", () => {

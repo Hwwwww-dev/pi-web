@@ -341,7 +341,7 @@ test("a summary row without details shows an ellipsis instead of a message count
 test("rename mode swaps the row for a field seeded with the title", () => {
   const html = rowMarkup(render({ rows: [sessionRow(session("r", { name: "Old name" }))], renamingRootId: "r" }), "session:group:r");
   assert.match(html, /class="session-tree-row session-tree-session is-child is-renaming"/);
-  assert.match(html, /<input class="session-tree-rename" aria-label="Rename" value="Old name"\/>/);
+  assert.match(html, /<input data-slot="input" class="[^"]*session-tree-rename" aria-label="Rename" value="Old name"\/>/);
   assert.doesNotMatch(html, /session-tree-actions/);
 });
 
@@ -358,7 +358,7 @@ test("a named project shows its name as plain text in its header, the path as th
 test("a project's rename swaps its header for a name field seeded with the name shown", () => {
   const html = rowMarkup(render({ rows: [groupRow({}, { name: "Thermal Models", customName: "Thermal Models" })], renamingProjectKey: "/work/app" }), "group:/work/app");
   assert.match(html, /^<div class="session-tree-row session-tree-group is-current is-renaming" style="top:0;height:34px" data-row-key="group:\/work\/app">/);
-  assert.match(html, /<input class="session-tree-rename" aria-label="Project name" maxLength="80" value="Thermal Models"\/>/);
+  assert.match(html, /<input data-slot="input" class="[^"]*session-tree-rename" aria-label="Project name" maxLength="80" value="Thermal Models"\/>/);
   assert.doesNotMatch(html, /session-tree-group-toggle|session-tree-group-actions/);
   // Another group, or none being renamed: the header as usual.
   assert.match(rowMarkup(render({ rows: [groupRow()], renamingProjectKey: "/elsewhere" }), "group:/work/app"), /session-tree-group-toggle/);

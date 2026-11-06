@@ -11,11 +11,11 @@ const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 const {
-  ProjectTrustDialog,
-  ProjectTrustDialogView,
+  ProjectTrustDialogBody,
   ProjectTrustMcpSection,
   projectTrustListingFrom,
 } = await jiti.import("./ProjectTrustDialog.tsx");
+const { AlertDialog } = await jiti.import("@/components/ui/alert-dialog");
 const { enLocale } = await jiti.import("@/lib/i18n/messages/en.ts");
 const source = await readFile(new URL("./ProjectTrustDialog.tsx", import.meta.url), "utf8");
 const apiTypesSource = await readFile(new URL("../lib/api-types.ts", import.meta.url), "utf8");
@@ -67,7 +67,11 @@ function loaded({ servers = [], file = {}, status = untrusted } = {}) {
 }
 
 function view(props) {
-  return render(h(ProjectTrustDialogView, {
+  // The Radix content sits in a portal, which renders nothing server-side;
+  // tests render the body inside an open root, which is the least context its
+  // Title and Description need. Its Cancel is a plain button (the page
+  // unmounts the dialog on cancel), so it needs no content context.
+  return render(h(AlertDialog, { open: true }, h(ProjectTrustDialogBody, {
     cwd: "/repo",
     busy: false,
     error: null,
@@ -75,7 +79,7 @@ function view(props) {
     onCancel() {},
     onConfirm() {},
     ...props,
-  }));
+  })));
 }
 
 test("each server shows its transport, what it would run or reach, and why it is flagged", () => {
@@ -216,8 +220,13 @@ test("an empty file, a missing one, and an unchecked listing", () => {
 });
 
 test("while the listing loads it says so, and Trust waits for it", () => {
-  const html = render(h(ProjectTrustDialog, { cwd: "/repo", busy: false, error: null, onCancel() {}, onConfirm() {} }));
-  assert.match(html, /role="dialog" aria-modal="true" aria-labelledby="project-trust-title" aria-describedby="project-trust-description" tabindex="-1" class="project-trust-dialog"/);
+  // The shell is Radix's AlertDialog — its portal renders nothing server-side,
+  // so its safe-area class and labelled ids are asserted in source, and the
+  // body renders inside an open root.
+  assert.match(source, /<AlertDialogContent\s*\n\s*className="settings-phone-safe z-\[1100\] /);
+  assert.match(source, /<AlertDialogTitle id="project-trust-title"/);
+  assert.match(source, /<AlertDialogDescription id="project-trust-description"/);
+  const html = view({ listing: { state: "loading" } });
   assert.match(html, /<p id="project-trust-mcp-status" role="status" class="mt-3 text-xs leading-normal text-muted-foreground">Reading \.pi\/mcp\.json…<\/p>/);
   assert.match(html, /<button data-slot="button" data-variant="default" data-size="sm" class="[^"]*" type="button" disabled="" aria-describedby="project-trust-mcp-status">Trust project<\/button>/);
   assert.match(html, /<button data-slot="button" data-variant="outline" data-size="sm" class="[^"]*" type="button">Cancel<\/button>/);
@@ -227,18 +236,15 @@ test("while the listing loads it says so, and Trust waits for it", () => {
 });
 
 test("the trust error stays outside the scrolling body, translated from its reason", () => {
-  const busy = render(h(ProjectTrustDialog, {
-    cwd: "/repo",
+  const busy = view({
     busy: true,
     error: { error: "Wait for the active session to finish before trusting this project", reason: "session-busy" },
-    onCancel() {},
-    onConfirm() {},
-  }));
+  });
   assert.match(
     busy,
-    /<\/div><\/div><div data-slot="alert" role="alert" class="[^"]*"><div data-slot="alert-description"[^>]*>Wait for the running session in this folder to finish, then trust the project\.<\/div><\/div><div data-orientation="horizontal"/,
+    /<\/div><div data-slot="alert" role="alert" class="[^"]*">[\s\S]*?<div data-slot="alert-description"[^>]*>Wait for the running session in this folder to finish, then trust the project\.<\/div><\/div><div data-orientation="horizontal"/,
   );
-  assert.match(busy, /type="button" disabled="" aria-busy="true" aria-describedby="project-trust-mcp-status">Trusting\.\.\.<\/button>/);
+  assert.match(busy, /type="button" disabled="" aria-busy="true">Trusting\.\.\.<\/button>/);
 
   // An internal or network failure has nothing to translate: its diagnostic follows a generic line.
   const internal = view({ error: { error: "Lock file is already being held", reason: "internal" } });
