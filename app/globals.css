@@ -2192,11 +2192,9 @@ span.token.table {
   }
 }
 
-/* Compact desktop file panel: overlay the chat instead of collapsing it. */
+/* Compact desktop file panel: overlay the chat instead of collapsing it.
+   The resize handle's show/hide lives in AppShell's own classes. */
 @media (min-width: 641px) and (max-width: 959px) {
-  .right-panel-resize-handle {
-    display: none;
-  }
   .right-panel-overlay-backdrop {
     position: fixed;
     inset: 0;

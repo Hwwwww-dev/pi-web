@@ -11,6 +11,8 @@ export const RIGHT_PANEL_MAX_WIDTH = 1200;
 
 const COMPACT_CHAT_MIN_WIDTH = 320;
 const DESKTOP_CHAT_MIN_WIDTH = 420;
+/** window.innerWidth includes the page scrollbar the layout can't use. */
+const DESKTOP_SCROLLBAR_ALLOWANCE = 15;
 
 export function clampPanelWidth(width: number, minWidth: number, maxWidth: number): number {
   const finiteWidth = Number.isFinite(width) ? width : minWidth;
@@ -32,8 +34,9 @@ export function getSidebarMaxWidth(options: {
 
   const compact = viewportWidth < SPLIT_PANEL_MIN_WIDTH;
   const chatWidth = compact ? COMPACT_CHAT_MIN_WIDTH : DESKTOP_CHAT_MIN_WIDTH;
+  const scrollbar = compact ? 0 : DESKTOP_SCROLLBAR_ALLOWANCE;
   const visibleRightPanelWidth = !compact && rightPanelOpen ? rightPanelWidth : 0;
-  return Math.min(SIDEBAR_MAX_WIDTH, viewportWidth - chatWidth - visibleRightPanelWidth);
+  return Math.min(SIDEBAR_MAX_WIDTH, viewportWidth - chatWidth - visibleRightPanelWidth - scrollbar);
 }
 
 export function getRightPanelMaxWidth(options: {
@@ -47,6 +50,6 @@ export function getRightPanelMaxWidth(options: {
   const visibleSidebarWidth = sidebarOpen ? sidebarWidth : 0;
   return Math.min(
     RIGHT_PANEL_MAX_WIDTH,
-    viewportWidth - DESKTOP_CHAT_MIN_WIDTH - visibleSidebarWidth,
+    viewportWidth - DESKTOP_CHAT_MIN_WIDTH - visibleSidebarWidth - DESKTOP_SCROLLBAR_ALLOWANCE,
   );
 }
