@@ -555,7 +555,7 @@ export function AgentsConfig({
                         >
                           <ConfigSidebarText className={`flex-1${profile.enabled ? "" : " text-muted-foreground"}`}>{profile.displayName}</ConfigSidebarText>
                           {!profile.enabled && (
-                            <Badge variant="secondary" className="shrink-0 rounded-full px-1.5 py-0 text-[10px] font-normal text-muted-foreground">
+                            <Badge variant="secondary" className="shrink-0 px-1.5 text-[10px] font-normal text-muted-foreground">
                               {t("agents.codemode.off")}
                             </Badge>
                           )}

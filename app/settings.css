@@ -877,180 +877,10 @@
   opacity: 0.45;
 }
 
-.settings-dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* neutral black backdrop, kept literal: no backdrop token */
-  background: rgba(0, 0, 0, 0.38);
-}
-
-/* Focus moves to the dialog itself when Settings opens (tabIndex -1); it is not a control, so no ring. */
-.settings-dialog-backdrop:focus {
-  outline: none;
-}
-
-/* §4.4: a 780×min(560px,100%) Dialog, left rail + scrolling body; the close
-   floats over the body's top-right corner, so it needs its own background. */
-.settings-dialog-surface {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: min(780px, 100%);
-  height: min(560px, 100%);
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--background);
-  /* neutral black shadow, kept literal: no shadow token */
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-}
-
-.settings-dialog-header {
-  position: relative;
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  min-height: 50px;
-  padding: 0 52px 0 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.settings-dialog-title {
-  flex-shrink: 0;
-  color: var(--foreground);
-  font-size: 15px;
-  white-space: nowrap;
-}
-
-.settings-dialog-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 20;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--background);
-  color: var(--muted-foreground);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
-
-.settings-dialog-close:hover {
-  background: color-mix(in srgb, var(--accent) 50%, transparent);
-  color: var(--foreground);
-}
-
-.settings-dialog-close:disabled {
-  pointer-events: none;
-  opacity: 0.5;
-}
-
-.settings-dialog-close svg {
-  width: 16px;
-  height: 16px;
-}
-
 /* §7.3/§4.4: a desktop picks the section from a fixed rail on the left (its
    items carry their states as utilities in SettingsPanel); a phone turns the
    rail into a horizontal chip row at its section level and lists the sections
    on its home level instead. */
-.settings-dialog-body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.settings-section-rail {
-  display: flex;
-  flex-shrink: 0;
-  flex-direction: column;
-  gap: 2px;
-  width: 176px;
-  padding: 14px 10px;
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-}
-
-.settings-section-rail-item {
-  flex: none;
-  width: 100%;
-  height: 34px;
-  padding: 0 10px;
-  border-radius: var(--radius-lg);
-  font-size: 13px;
-}
-
-/* A phone's Back button and home list carry their presentation as utilities in
-   SettingsPanel; the rail dims a row's icon, so it stays here. */
-.settings-phone-home-item .settings-section-icon {
-  color: var(--muted-foreground);
-}
-
-.settings-dialog-main {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.settings-section-host {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-}
-
-/* §4.4: the desktop body's own column — the dialog's page title (§3.5, the
-   draft's pm-set-title) over the scrolling section. The floating close sits
-   over the title row, so it carries the room the close button needs. */
-.settings-dialog-page {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-
-.settings-dialog-page-title {
-  flex: none;
-  min-width: 0;
-  padding: 18px 20px 0;
-  overflow: hidden;
-  color: var(--foreground);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The title row owns the top strip the floating close floats over, so the
-   section below it needs no extra room of its own. */
-.settings-dialog-page .settings-section-host {
-  height: auto;
-}
-
-/* The floating close button sits over the body's top-right corner: the detail
-   headers' actions (Test connection, Remove, the update check) start below it,
-   as does MCP's notices card above its split view. */
-.settings-dialog-main .config-detail {
-  padding-top: 14px;
-}
-
-.settings-dialog-main .mcp-config-notices {
-  padding-top: 14px;
-}
-
 /* §4.4: a theme chip grid — auto-fill cards, the name truncating, the chosen
    chip ringed in the foreground color, each chip led by a 14px swatch dot. */
 .settings-theme-options {
@@ -1205,7 +1035,6 @@
   /* A phone shows Settings, and a config panel opened on its own, full
      screen: the page's own colour under the safe areas, no frame. iOS
      standalone's fallback insets (end of file) still pad the root. */
-  .settings-dialog-backdrop,
   .config-panel-root.is-modal {
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     background: var(--background);
@@ -1217,16 +1046,6 @@
     font-size: 24px;
   }
 
-  /* The close keeps its corner alone in the 50px header area, never over the
-     chip row below it; a larger target for a finger. */
-  .settings-dialog-close {
-    top: 7px;
-    right: 7px;
-    width: 40px;
-    height: 40px;
-  }
-
-  .settings-dialog-surface,
   .config-panel-root.is-modal > .config-panel-surface {
     width: 100%;
     max-width: 100%;
@@ -1259,68 +1078,16 @@
   }
 
   /* The close lives in the 50px header here, not over the body. */
-  .settings-dialog-main .config-detail {
+  .settings-section-body .config-detail,
+  .settings-section-host .config-detail {
     padding-top: 16px;
   }
 
-  .settings-dialog-main .mcp-config-notices {
+  .settings-section-body .mcp-config-notices,
+  .settings-section-host .mcp-config-notices {
     padding-top: 0;
   }
 
-  /* §4.4: the section rail becomes a horizontally scrolling chip row under the
-     50px header, shown at the section level only (the home level lists the
-     sections as rows; the detail level keeps its Back button). Hidden by
-     default, so pre-hydration phones see no flash of the desktop rail. */
-  .settings-section-rail {
-    display: none;
-  }
-
-  /* The desktop page title stays off a phone: its 50px header names the level. */
-  .settings-dialog-page-title {
-    display: none;
-  }
-
-  /* At the section level the chips own the row above the section: the body
-     stacks so the full-width rail no longer squeezes the main to zero. */
-  .settings-dialog-surface[data-phone-level="section"] .settings-dialog-body {
-    flex-direction: column;
-  }
-
-  .settings-dialog-surface[data-phone-level="section"] .settings-section-rail {
-    display: flex;
-    flex-direction: row;
-    flex: none;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    padding: 10px 12px;
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
-  }
-
-  .settings-dialog-surface[data-phone-level="section"] .settings-section-rail::-webkit-scrollbar {
-    display: none;
-  }
-
-  .settings-section-rail::-webkit-scrollbar {
-    display: none;
-  }
-
-  .settings-section-rail-item {
-    width: auto;
-    height: 32px;
-    padding: 0 12px;
-    border-radius: 999px;
-    font-size: 12.5px;
-  }
-
-  .settings-section-rail-item.is-selected {
-    background: var(--accent);
-    color: var(--foreground);
-  }
 
   /* Back, title, close: equal side columns keep the title in the middle
      whatever Back says; a long title is cut short in its own column. The
@@ -1458,66 +1225,27 @@
   z-index: 1101;
 }
 
-/* Project trust dialog (components/ProjectTrustDialog.tsx). It sits above
-   Settings (z-index 1000), which opens it too, keeps clear of the notch and
-   the home indicator, and only its body scrolls, so a long MCP server list
-   never pushes the buttons or the trust error off the screen. */
-.project-trust-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-  /* neutral black backdrop, kept literal: no backdrop token */
-  background: rgba(0, 0, 0, 0.4);
+/* A Radix dialog that fills a phone's screen under the safe areas
+   (SettingsPanel, ProjectTrustDialog carry the class; iOS standalone's env()
+   can report 0, so the fallback pads with device sizes). */
+@media (max-width: 640px) {
+  .settings-phone-safe {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
 }
 
-.project-trust-dialog {
-  display: flex;
-  flex-direction: column;
-  width: 480px;
-  max-width: 100%;
-  max-height: 100%;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--background);
-  /* neutral black shadow, kept literal: no shadow token */
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.24);
-}
-
-/* Focus moves to the dialog itself when it opens (tabIndex -1); it is not a control, so no ring. */
-.project-trust-dialog:focus {
-  outline: none;
-}
-
-
-/* iOS standalone: env() can report 0, so keep a device-sized fallback on the
-   status-bar edge and cap dialog surfaces to the resulting safe box. */
 @supports (-webkit-touch-callout: none) {
   @media (display-mode: standalone) {
-    .settings-dialog-backdrop,
-    .project-trust-backdrop,
-    .config-panel-root.is-modal {
+    .settings-phone-safe {
       padding-top: max(59px, env(safe-area-inset-top));
       padding-right: max(8px, env(safe-area-inset-right));
       padding-bottom: max(24px, env(safe-area-inset-bottom));
       padding-left: max(8px, env(safe-area-inset-left));
     }
-
-    .settings-dialog-surface,
-    .config-panel-root.is-modal > .config-panel-surface {
-      max-width: 100%;
-      max-height: 100%;
-    }
   }
 
   @media (display-mode: standalone) and (orientation: landscape) {
-    .settings-dialog-backdrop,
-    .project-trust-backdrop,
-    .config-panel-root.is-modal {
+    .settings-phone-safe {
       padding-top: max(8px, env(safe-area-inset-top));
       padding-right: max(59px, env(safe-area-inset-right));
       padding-bottom: max(8px, env(safe-area-inset-bottom));
