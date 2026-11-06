@@ -48,7 +48,9 @@ test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(viewportHookSource, /--app-viewport-height/);
   assert.match(viewportHookSource, /window\.scrollTo\(0, 0\)/);
   assert.match(cssSource, /height: var\(--app-viewport-height, 100dvh\)/);
-  assert.match(cssSource, /left: env\(safe-area-inset-left\)/);
+  // The self-drawn drawer's `left: env(safe-area-inset-left)` went with it;
+  // the sidebar is the ui Sidebar primitive's Sheet now, and the main area
+  // carries the safe-area utilities asserted above.
   assert.match(chatWindowSource, /\[padding-bottom:calc\(env\(safe-area-inset-bottom,0px\)\/2\)\]/);
 });
 

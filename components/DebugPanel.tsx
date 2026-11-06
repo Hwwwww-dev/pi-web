@@ -261,17 +261,30 @@ export function DebugPanel({ readerRef, selectedSessionId, sessions, onClose }: 
   return (
     // The desktop right sheet. Non-modal (no overlay, nothing locks): the page
     // keeps scrolling and the chat keeps focus. Radix must not own Escape (the
-    // panel's own document listener does, so it can restore focus) and must
-    // not close on an outside click or steal focus on open.
-    <Sheet open modal={false}>
+    // panel's own document listener does, so it can restore focus) and must not
+    // steal focus on open. An outside click closes it — the blank area is the
+    // panel's visible dismissal; the ⋯ menu's 调试 item stays the toggle.
+    <Sheet
+      open
+      modal={false}
+      onOpenChange={(open) => {
+        if (!open) onCloseRef.current(false);
+      }}
+    >
       <SheetContent
         side="right"
         showCloseButton={false}
         aria-describedby={undefined}
         onOpenAutoFocus={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
-        onInteractOutside={(event) => event.preventDefault()}
-        className="w-[min(680px,94vw)] gap-0 border-l border-border p-0 sm:max-w-[680px]"
+        // Focus leaving is not a dismissal: the menu's focus restore lands on
+        // the ⋯ trigger right after mount and would close the panel instantly,
+        // and tabbing into the composer must not kill it either. Only a
+        // pointer press outside closes (via onOpenChange above).
+        onFocusOutside={(event) => event.preventDefault()}
+        // 桌面：面板从页头下方开始（--header-height），页头 ⋯/文件开关保持
+        // 可点可切换；手机保持全高覆盖（页头是两行，高度不同）。
+        className="w-[min(680px,94vw)] gap-0 border-l border-border p-0 sm:max-w-[680px] min-[641px]:inset-y-auto min-[641px]:top-(--header-height) min-[641px]:bottom-0 min-[641px]:h-auto"
       >
         <SheetTitle className="sr-only">{t("debug.title")}</SheetTitle>
         <SheetDescription className="sr-only">{t("debug.readOnly")}</SheetDescription>

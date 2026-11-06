@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { ChevronDownIcon, GitBranchIcon } from "lucide-react";
 import type { BranchPreview, SessionEntry, SessionTreeNode } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
+import { useOutsideDismiss } from "@/hooks/useOutsideDismiss";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -227,6 +228,14 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   const open = openProp !== undefined ? openProp : openInternal;
   const btnRef = useRef<HTMLButtonElement>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  // 点空白关闭：浮层与触发钮（data-outside-dismiss-ignore）之外的一次
+  // pointerdown 都算关闭请求，交给 onToggle 收起。
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const setDropdownEl = useCallback((el: HTMLDivElement | null) => { dropdownRef.current = el; }, []);
+  useOutsideDismiss(open, dropdownRef, useCallback(() => {
+    if (openProp !== undefined) onToggle?.();
+    else setOpenInternal(false);
+  }, [openProp, onToggle]));
 
   useEffect(() => {
     if (!open || !inline) return;
@@ -301,6 +310,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
         <button
           ref={btnRef}
           onClick={() => onToggle ? onToggle() : setOpenInternal((v) => !v)}
+          data-outside-dismiss-ignore="true"
           className={cn(
             "h-full cursor-pointer items-center gap-1.5 border-0 border-r border-r-border border-t-2 px-3 text-xs whitespace-nowrap transition-colors duration-100",
             "outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
@@ -319,6 +329,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
         {open && dropdownPos && (
           // top/left/width 锚定自触发器的 getBoundingClientRect（测量值），保留 inline style。
           <div
+            ref={setDropdownEl}
             className="fixed z-[500] border-b border-border bg-card"
             style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
           >

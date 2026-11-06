@@ -1969,15 +1969,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Set in the commit that swaps Stop for Compact, before any click can reach it.
-  const runEndedAtRef = useRef(Number.NEGATIVE_INFINITY);
-  useLayoutEffect(() => {
-    if (!isStreaming) return;
-    return () => { runEndedAtRef.current = performance.now(); };
-  }, [isStreaming]);
-  const isStrayClick = (e: React.MouseEvent) => isRunEndStrayClick(e.detail, performance.now() - runEndedAtRef.current);
-
-
+  // The run-end stray-click guard's pure helper (isRunEndStrayClick) stays
+  // exported for its tests; the composer currently has no consumer wiring.
 
   const permissiveStatus = compact ? null : splitExtensionStatuses(extensionStatuses ?? []).permissive;
 

@@ -78,6 +78,8 @@
    玻璃配方为浮层组件变体专用。禁止在组件里新写裸值。 */
 :root {
   --radius: 10px;
+  /* 页头高度：AppShell 页头与 Portal 到 body 的浮层（调试面板）共用这一个值。 */
+  --header-height: 3.25rem;
   --z-sticky: 10;
   --z-shelf: 20;
   --z-panel: 100;
@@ -2213,36 +2215,6 @@ span.token.table {
   display: none;
 }
 
-/* Desktop sidebar: animate width */
-@media (min-width: 641px) {
-  .sidebar-overlay-backdrop {
-    display: none !important;
-  }
-  .sidebar-container {
-    position: relative;
-    overflow: hidden;
-    transition: width 0.2s ease, min-width 0.2s ease;
-  }
-  .sidebar-container.sidebar-open {
-    width: var(--sidebar-width, 260px);
-    min-width: var(--sidebar-width, 260px);
-  }
-  .sidebar-container.sidebar-closed {
-    width: 0;
-    min-width: 0;
-    border-right: none !important;
-  }
-  /* keep inner content at fixed width so it doesn't reflow during animation */
-  .sidebar-container > * {
-    width: var(--sidebar-width, 260px);
-    min-width: var(--sidebar-width, 260px);
-  }
-  .sidebar-container.sidebar-resizing,
-  .sidebar-container.sidebar-resizing > * {
-    transition: none !important;
-  }
-}
-
 /* Wide desktop file panel: participate in the split layout. */
 @media (min-width: 960px) {
   .right-panel-container {
@@ -2336,36 +2308,9 @@ span.token.table {
   }
 }
 
-/* Mobile sidebar: slide in/out as overlay */
+/* Mobile: the session sidebar lives in the ui Sidebar primitive's Sheet; the
+   self-drawn drawer rules are gone. */
 @media (max-width: 640px) {
-  .sidebar-container {
-    position: fixed !important;
-    top: 0;
-    left: env(safe-area-inset-left);
-    bottom: 0;
-    width: 280px;
-    max-width: 85vw;
-    height: var(--app-viewport-height, 100dvh);
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-  }
-  .sidebar-container.sidebar-open {
-    transform: translateX(0);
-    box-shadow: 4px 0 20px rgba(0,0,0,0.15);
-  }
-  .sidebar-container.sidebar-closed {
-    transform: translateX(calc(-100% - env(safe-area-inset-left)));
-    box-shadow: none;
-  }
-  /* 挂载完成前（sidebar-mobile-pending）：抽屉与遮罩不闪现。 */
-  .sidebar-overlay-backdrop.sidebar-mobile-pending {
-    opacity: 0 !important;
-    pointer-events: none !important;
-  }
-  .sidebar-container.sidebar-mobile-pending.sidebar-open {
-    transform: translateX(calc(-100% - env(safe-area-inset-left)));
-    box-shadow: none;
-  }
-
   .right-panel-container {
     position: fixed;
     inset: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);

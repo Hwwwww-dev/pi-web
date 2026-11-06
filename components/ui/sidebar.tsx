@@ -32,6 +32,11 @@ const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
+// pi-web copy-in 同构适配，与上游的两处偏差：
+// 1. 断点用本应用 640px 的手机阈值（min-[641px]），不用 Tailwind 的 md；
+// 2. 桌面收起与手机抽屉共用一个受控 open（AppShell 的 sidebarOpen），
+//    不保留 openMobile 第二份状态——两份状态曾让抽屉与 URL/布局状态互不同步。
+
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
   open: boolean
@@ -67,7 +72,6 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void
 }) {
   const isMobile = useIsMobile()
-  const [openMobile, setOpenMobile] = React.useState(false)
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -90,8 +94,8 @@ function SidebarProvider({
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, setOpen, setOpenMobile])
+    setOpen((open) => !open)
+  }, [setOpen])
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -119,11 +123,11 @@ function SidebarProvider({
       open,
       setOpen,
       isMobile,
-      openMobile,
-      setOpenMobile,
+      openMobile: open,
+      setOpenMobile: setOpen,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, toggleSidebar]
   )
 
   return (
@@ -207,7 +211,7 @@ function Sidebar({
 
   return (
     <div
-      className="group peer hidden text-sidebar-foreground md:block"
+      className="group peer hidden text-sidebar-foreground min-[641px]:block"
       data-state={state}
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
@@ -229,7 +233,7 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear min-[641px]:flex",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -310,7 +314,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
       data-slot="sidebar-inset"
       className={cn(
         "relative flex w-full flex-1 flex-col bg-background",
-        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
+        "min-[641px]:peer-data-[variant=inset]:m-2 min-[641px]:peer-data-[variant=inset]:ml-0 min-[641px]:peer-data-[variant=inset]:rounded-xl min-[641px]:peer-data-[variant=inset]:shadow-sm min-[641px]:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
         className
       )}
       {...props}
