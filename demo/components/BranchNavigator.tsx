@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { ChevronDownIcon, GitBranchIcon } from "lucide-react";
 import type { BranchPreview, SessionEntry, SessionTreeNode } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
+import { useOutsideDismiss } from "@/hooks/useOutsideDismiss";
+import { cn } from "@/lib/utils";
 
 interface Props {
   tree: SessionTreeNode[];
@@ -22,6 +25,8 @@ interface Props {
   compact?: boolean;
   /** Keep the inline dropdown mounted while another control supplies its trigger */
   hideInlineButton?: boolean;
+  /** The session is running: the tree stays readable but branches cannot be switched */
+  locked?: boolean;
 }
 
 // Find the visible entry IDs on the path from root to activeLeafId.
@@ -122,7 +127,8 @@ interface TreeNodeProps {
   depth: number;
   isLast: boolean;
   parentLines: boolean[]; // whether ancestor at each depth has more siblings after
-  onSelect: (id: string) => void;
+  /** Absent while switching is locked */
+  onSelect?: (id: string) => void;
 }
 
 function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelect }: TreeNodeProps) {
@@ -140,100 +146,62 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
     <div>
       {/* This node row */}
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          height: 24,
-          cursor: "pointer",
-        }}
-        onClick={() => onSelect(rep.entry.id)}
+        className={cn("flex h-6 items-center", onSelect ? "cursor-pointer" : "cursor-default")}
+        onClick={onSelect ? () => onSelect(rep.entry.id) : undefined}
       >
         {/* Indent guide lines */}
         {parentLines.map((hasLine, i) => (
-          <div key={i} style={{ width: 16, flexShrink: 0, position: "relative", height: "100%", alignSelf: "stretch" }}>
+          <div key={i} className="relative h-full w-4 shrink-0 self-stretch">
             {hasLine && (
-              <div style={{
-                position: "absolute",
-                left: 7,
-                top: 0,
-                bottom: 0,
-                width: 1,
-                background: "var(--border)",
-              }} />
+              <div className="absolute top-0 bottom-0 left-[7px] w-px bg-border" />
             )}
           </div>
         ))}
 
         {/* Branch connector */}
-        <div style={{ width: 16, flexShrink: 0, position: "relative", height: "100%", alignSelf: "stretch" }}>
+        <div className="relative h-full w-4 shrink-0 self-stretch">
           {/* vertical line up (to parent) */}
-          <div style={{
-            position: "absolute",
-            left: 7,
-            top: 0,
-            bottom: isLast ? "50%" : 0,
-            width: 1,
-            background: "var(--border)",
-          }} />
+          <div className={cn("absolute top-0 left-[7px] w-px bg-border", isLast ? "bottom-1/2" : "bottom-0")} />
           {/* horizontal line to node */}
-          <div style={{
-            position: "absolute",
-            left: 7,
-            top: "50%",
-            width: 9,
-            height: 1,
-            background: "var(--border)",
-          }} />
+          <div className="absolute top-1/2 left-[7px] h-px w-[9px] bg-border" />
         </div>
 
         {/* Node dot */}
-        <div style={{
-          width: 7,
-          height: 7,
-          borderRadius: "50%",
-          flexShrink: 0,
-          background: isActive ? "var(--accent)" : isOnPath ? "var(--text-muted)" : "var(--border)",
-          border: isActive ? "none" : "1px solid var(--text-dim)",
-          marginRight: 6,
-          transition: "background 0.12s",
-        }} />
+        <div
+          className={cn(
+            "mr-1.5 size-[7px] shrink-0 rounded-full transition-colors duration-100",
+            isActive ? "border-0 bg-primary" : isOnPath ? "border border-muted-foreground/50 bg-muted-foreground" : "border border-muted-foreground/50 bg-border",
+          )}
+        />
 
         {/* Role badge */}
         {role && (
-          <span style={{
-            fontSize: 9,
-            fontFamily: "var(--font-mono)",
-            color: role === "user" ? "var(--accent)" : "var(--text-dim)",
-            background: role === "user" ? "rgba(37,99,235,0.08)" : "var(--bg-hover)",
-            border: `1px solid ${role === "user" ? "rgba(37,99,235,0.2)" : "var(--border)"}`,
-            borderRadius: 3,
-            padding: "0 4px",
-            marginRight: 5,
-            flexShrink: 0,
-            lineHeight: "16px",
-          }}>
+          <span
+            className={cn(
+              "mr-[5px] shrink-0 rounded-[3px] border px-1 font-mono text-[10px] leading-4",
+              role === "user"
+                ? "border-primary/20 bg-primary/8 text-primary"
+                : "border-border bg-secondary text-muted-foreground",
+            )}
+          >
             {role === "user" ? "U" : "A"}
           </span>
         )}
 
         {/* Skipped indicator */}
         {skipped > 0 && (
-          <span style={{ fontSize: 10, color: "var(--text-dim)", marginRight: 5, flexShrink: 0 }}>
+          <span className="mr-[5px] shrink-0 text-[10px] text-muted-foreground">
             +{skipped}
           </span>
         )}
 
         {/* Label */}
-        <span style={{
-          fontSize: 11,
-          color: isActive ? "var(--text)" : isOnPath ? "var(--text-muted)" : "var(--text-dim)",
-          fontWeight: isActive ? 500 : 400,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          flex: 1,
-          minWidth: 0,
-        }}>
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-xs",
+            isActive ? "font-medium text-foreground" : isOnPath ? "font-normal text-muted-foreground" : "font-normal text-muted-foreground/70",
+          )}
+        >
           {label}
         </span>
       </div>
@@ -254,12 +222,20 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
   );
 }
 
-export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, containerRef, open: openProp, onToggle, hasSession, compact, hideInlineButton }: Props) {
+export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, containerRef, open: openProp, onToggle, hasSession, compact, hideInlineButton, locked = false }: Props) {
   const { t } = useI18n();
   const [openInternal, setOpenInternal] = useState(false);
   const open = openProp !== undefined ? openProp : openInternal;
   const btnRef = useRef<HTMLButtonElement>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  // 点空白关闭：浮层与触发钮（data-outside-dismiss-ignore）之外的一次
+  // pointerdown 都算关闭请求，交给 onToggle 收起。
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const setDropdownEl = useCallback((el: HTMLDivElement | null) => { dropdownRef.current = el; }, []);
+  useOutsideDismiss(open, dropdownRef, useCallback(() => {
+    if (openProp !== undefined) onToggle?.();
+    else setOpenInternal(false);
+  }, [openProp, onToggle]));
 
   useEffect(() => {
     if (!open || !inline) return;
@@ -283,6 +259,13 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   const handleSelect = useCallback((id: string) => {
     onLeafChange(id);
   }, [onLeafChange]);
+  const selectBranch = locked ? undefined : handleSelect;
+
+  const lockedNotice = locked && (
+    <div className="pt-0.5 pb-1 text-xs italic text-muted-foreground">
+      {t("i18n.branchesLockedWhileRunning")}
+    </div>
+  );
 
   const noBranchReason = !hasSession
     ? t("i18n.noActiveSession")
@@ -294,78 +277,69 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   const hasContent = !noBranchReason && topLevel.length > 0;
 
   const branchIcon = (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: hasContent ? "var(--accent)" : "var(--text-dim)", flexShrink: 0 }}>
-      <line x1="6" y1="3" x2="6" y2="15" />
-      <circle cx="18" cy="6" r="3" />
-      <circle cx="6" cy="18" r="3" />
-      <path d="M18 9a9 9 0 0 1-9 9" />
-    </svg>
+    <GitBranchIcon size={12} strokeWidth={2} className={cn("shrink-0", hasContent ? "text-primary" : "text-muted-foreground")} />
   );
 
   const chevron = (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--text-dim)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 2, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
-      <polyline points="2 3.5 5 6.5 8 3.5" />
-    </svg>
+    <ChevronDownIcon
+      size={10}
+      strokeWidth={1.8}
+      className={cn("ml-0.5 text-muted-foreground transition-transform duration-150", open && "rotate-180")}
+    />
   );
 
+  const treeScrollClass = "max-h-[260px] overflow-y-auto px-3 pt-1 pb-2";
+  const emptyNoticeClass = "px-4 py-2.5 text-xs italic text-muted-foreground";
+
+  const renderTreeRows = () =>
+    topLevel.map((child, idx) => (
+      <TreeNodeView
+        key={child.entry.id}
+        node={child}
+        activePathIds={activePathIds}
+        depth={0}
+        isLast={idx === topLevel.length - 1}
+        parentLines={[]}
+        onSelect={selectBranch}
+      />
+    ));
 
   if (inline) {
     return (
-      <div style={{ height: "100%", display: "flex", alignItems: "stretch" }}>
+      <div className="flex h-full items-stretch">
         <button
           ref={btnRef}
           onClick={() => onToggle ? onToggle() : setOpenInternal((v) => !v)}
-          style={{
-            display: hideInlineButton ? "none" : "flex",
-            alignItems: "center",
-            gap: 6,
-            height: "100%",
-            padding: "0 12px",
-            background: open ? "var(--bg-selected)" : "none",
-            border: "none",
-            borderTop: open ? "2px solid var(--accent)" : "2px solid transparent",
-            borderRight: "1px solid var(--border)",
-            cursor: "pointer",
-            color: open ? "var(--text)" : "var(--text-muted)",
-            fontSize: 11,
-            whiteSpace: "nowrap",
-            transition: "color 0.1s, background 0.1s",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = open ? "var(--text)" : "var(--text-muted)"; }}
-           title={t("i18n.branches")}
-           aria-label={t("i18n.branches")}
+          data-outside-dismiss-ignore="true"
+          className={cn(
+            "h-full cursor-pointer items-center gap-1.5 border-0 border-r border-r-border border-t-2 px-3 text-xs whitespace-nowrap transition-colors duration-100",
+            "outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            open
+              ? "flex border-t-primary bg-accent text-foreground"
+              : "flex border-t-transparent bg-transparent text-muted-foreground",
+            hideInlineButton && "hidden",
+          )}
+          title={t("i18n.branches")}
+          aria-label={t("i18n.branches")}
           aria-pressed={open}
         >
           {branchIcon}
            {!compact && <span>{t("i18n.branches")}</span>}
         </button>
         {open && dropdownPos && (
-          <div style={{
-            position: "fixed",
-            top: dropdownPos.top,
-            left: dropdownPos.left,
-            width: dropdownPos.width,
-            background: "var(--bg-panel)",
-            borderBottom: "1px solid var(--border)",
-            zIndex: 500,
-          }}>
+          // top/left/width 锚定自触发器的 getBoundingClientRect（测量值），保留 inline style。
+          <div
+            ref={setDropdownEl}
+            className="fixed z-[500] border-b border-border bg-card"
+            style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+          >
             {hasContent ? (
-              <div style={{ padding: "4px 12px 8px 12px", maxHeight: 260, overflowY: "auto" }}>
-                {topLevel.map((child, idx) => (
-                  <TreeNodeView
-                    key={child.entry.id}
-                    node={child}
-                    activePathIds={activePathIds}
-                    depth={0}
-                    isLast={idx === topLevel.length - 1}
-                    parentLines={[]}
-                    onSelect={handleSelect}
-                  />
-                ))}
+              <div className={treeScrollClass}>
+                {lockedNotice}
+                {renderTreeRows()}
               </div>
             ) : (
-              <div style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
+              <div className={emptyNoticeClass}>
                 {noBranchReason}
               </div>
             )}
@@ -376,57 +350,27 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   }
 
   return (
-    <div style={{ borderBottom: "1px solid var(--border)", background: "var(--bg)", flexShrink: 0, position: "relative" }}>
+    <div className="relative shrink-0 border-b border-border bg-background">
       {/* Header toggle */}
       <button
         onClick={() => setOpenInternal((v) => !v)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          width: "100%",
-          padding: "5px 12px",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: "var(--text-muted)",
-          fontSize: 11,
-          textAlign: "left",
-        }}
+        className="flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent px-3 py-[5px] text-left text-xs text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         {branchIcon}
-         <span style={{ color: "var(--text-muted)" }}>{t("i18n.branches")}</span>
+         <span className="text-muted-foreground">{t("i18n.branches")}</span>
         {chevron}
       </button>
 
       {/* Tree panel - overlay */}
       {open && (
-        <div style={{
-          position: "absolute",
-          top: "100%",
-          left: 0,
-          right: 0,
-          background: "var(--bg)",
-          borderBottom: "1px solid var(--border)",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-          zIndex: 100,
-        }}>
+        <div className="absolute top-full right-0 left-0 z-[100] border-b border-border bg-background shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
           {hasContent ? (
-            <div style={{ padding: "4px 12px 8px 12px", maxHeight: 260, overflowY: "auto" }}>
-              {topLevel.map((child, idx) => (
-                <TreeNodeView
-                  key={child.entry.id}
-                  node={child}
-                  activePathIds={activePathIds}
-                  depth={0}
-                  isLast={idx === topLevel.length - 1}
-                  parentLines={[]}
-                  onSelect={handleSelect}
-                />
-              ))}
+            <div className={treeScrollClass}>
+              {lockedNotice}
+              {renderTreeRows()}
             </div>
           ) : (
-            <div style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
+            <div className={emptyNoticeClass}>
               {noBranchReason ?? t("i18n.noBranches")}
             </div>
           )}

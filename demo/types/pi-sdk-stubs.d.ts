@@ -6,6 +6,39 @@ declare module "@earendil-works/pi-coding-agent" {
   export type AgentSessionEvent = any;
   export type BashOperations = any;
   export type JsonAgentSessionEvent = any;
+  export type LoadExtensionsResult = {
+    extensions: { path: string; sourceInfo?: { source?: string; origin?: string }; tools: Map<string, unknown> }[];
+    runtime: {
+      pendingProviderRegistrations: { extensionPath: string }[];
+      pendingNativeProviderRegistrations: { extensionPath: string }[];
+      pendingVirtualModelRegistrations: { extensionPath: string }[];
+    };
+  };
+  export type McpExposure = "codemode" | "deferred" | "direct" | "hidden";
+  export interface McpStdioServerConfig {
+    type?: "stdio";
+    command: string;
+    args?: string[];
+    env?: Record<string, string>;
+    cwd?: string;
+    exposure?: McpExposure;
+    description?: string;
+    toolExposure?: Record<string, McpExposure>;
+    enabled?: boolean;
+    timeout?: number;
+  }
+  export interface McpRemoteServerConfig {
+    type?: "http" | "sse" | string;
+    url: string;
+    headers?: Record<string, string>;
+    oauth?: { clientId?: string; clientSecret?: string; scopes?: string[] };
+    exposure?: McpExposure;
+    description?: string;
+    toolExposure?: Record<string, McpExposure>;
+    enabled?: boolean;
+    timeout?: number;
+  }
+  export type McpServerConfig = McpStdioServerConfig | McpRemoteServerConfig;
   export type ResourceDiagnostic = any;
   export type SessionManager = any;
   export type SettingsManager = any;

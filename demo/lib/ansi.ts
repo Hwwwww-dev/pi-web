@@ -2,6 +2,32 @@ const ANSI_ESCAPE_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\
 const ANSI_ESCAPE_AT_START_RE = /^\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/;
 const TUI_CURSOR_MARKER_RE = /\x1B_pi:c\x07/g;
 
+// Glyphs that only a terminal renderer produces: box drawing, block elements,
+// geometric shapes (spinners, markers) and braille spinner frames.
+const TUI_GLYPH_RE = /[\u2500-\u257f\u2580-\u259f\u25a0-\u25ff\u2800-\u28ff]/;
+// A rule line, or padding spaces lining columns up (tables, key/value blocks).
+const TUI_RULE_RE = /^\s*[=\-_*~─━]{8,}\s*$/;
+const TUI_COLUMN_RE = /\S {3,}\S/;
+const TUI_ALIGNED_LINE_COUNT = 2;
+
+/**
+ * Terminal output carries its meaning in the layout: reflowing it to the
+ * container width tears box art, tables and progress bars apart. Detect that
+ * shape so such text renders unwrapped and scrolls instead.
+ */
+export function isTuiText(text: string): boolean {
+  if (!text) return false;
+  if (TUI_GLYPH_RE.test(text)) return true;
+  let quoted = 0;
+  let aligned = 0;
+  for (const line of text.split("\n")) {
+    quoted += 1;
+    if (TUI_RULE_RE.test(line)) return true;
+    if (TUI_COLUMN_RE.test(line)) aligned += 1;
+  }
+  return quoted > 1 && aligned >= TUI_ALIGNED_LINE_COUNT;
+}
+
 export function stripAnsi(text: string): string {
   return text.replace(TUI_CURSOR_MARKER_RE, "").replace(ANSI_ESCAPE_RE, "");
 }

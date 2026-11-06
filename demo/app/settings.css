@@ -17,6 +17,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* neutral black backdrop, kept literal: no backdrop token */
   background: rgba(0, 0, 0, 0.35);
 }
 
@@ -26,7 +27,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--background);
 }
 
 .config-panel-root.is-embedded > .config-panel-surface {
@@ -41,7 +42,8 @@
   width: min(var(--config-panel-width), calc(100vw - 16px));
   height: min(var(--config-panel-height), calc(100dvh - 16px));
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
+  /* neutral black shadow, kept literal: no shadow token */
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
 }
 
@@ -56,16 +58,16 @@
 }
 
 .config-panel-title {
-  color: var(--text);
+  color: var(--foreground);
   font-size: 15px;
 }
 
 .config-panel-subtitle {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -78,9 +80,9 @@
   margin-left: auto;
   padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   cursor: pointer;
   font-size: 20px;
   line-height: 1;
@@ -88,8 +90,8 @@
 
 .config-close-button:hover,
 .config-close-button:focus-visible {
-  background: var(--bg-hover);
-  color: var(--text);
+  background: var(--secondary);
+  color: var(--foreground);
   outline: none;
 }
 
@@ -101,85 +103,12 @@
   overflow: hidden;
 }
 
-.config-sidebar {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  width: 240px;
-  min-height: 0;
-  border-right: 1px solid var(--border);
-  background: var(--bg-panel);
-}
-
-.config-sidebar-list {
-  flex: 1;
-  min-height: 0;
-  padding: 8px 6px;
-  overflow-y: auto;
-}
-
-.config-sidebar-group {
-  margin-bottom: 6px;
-}
-
-.config-sidebar-group-label {
-  padding: 4px 8px 3px;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.config-sidebar-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  height: 30px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 5px;
-  outline: none;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 400;
-  text-align: left;
-  transition: background-color 0.12s ease, color 0.12s ease;
-}
-
-.config-sidebar-item:not(:disabled):hover,
-.config-sidebar-item:not(:disabled):focus-visible {
-  background: var(--bg-hover);
-}
-
-.config-sidebar-item:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.config-sidebar-item[aria-current="page"] {
-  background: var(--bg-selected);
-  font-weight: 600;
-}
-
-.config-sidebar-item:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
 .models-sidebar-indented-item {
   padding-left: 26px;
 }
 
 .models-sidebar-add-item {
-  color: var(--text-dim);
+  color: var(--muted-foreground);
 }
 
 .models-sidebar-add-item:not(:disabled):hover,
@@ -189,9 +118,72 @@
 
 .models-sidebar-badge {
   flex-shrink: 0;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 10px;
+}
+
+.oauth-paste-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oauth-paste-message,
+.oauth-paste-hint {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.oauth-paste-message {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.oauth-paste-hint {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.oauth-paste-hint a {
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.oauth-paste-row {
+  display: flex;
+  gap: 6px;
+}
+
+.oauth-paste-input {
+  flex: 1;
+  /* An input's intrinsic width would otherwise push the button out of a narrow pane. */
+  min-width: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+}
+
+.oauth-paste-submit {
+  flex-shrink: 0;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--secondary);
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.oauth-paste-submit:disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .enabled-models-banner {
@@ -200,7 +192,7 @@
   gap: 10px;
   padding: 7px 12px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
+  background: var(--sidebar);
 }
 
 .enabled-models-banner-text {
@@ -209,15 +201,15 @@
   gap: 4px;
   min-width: 0;
   flex: 1;
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--muted-foreground);
+  font-size: 12px;
   line-height: 1.4;
 }
 
 .enabled-models-banner-key {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -225,7 +217,7 @@
 
 .enabled-models-banner-facts {
   flex: none;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   white-space: nowrap;
 }
@@ -239,15 +231,15 @@
 
 /* Matches the usage summary heading right above it. */
 .enabled-models-title {
-  color: var(--text);
+  color: var(--foreground);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
 }
 
 .enabled-models-switch-error {
-  color: #ef4444;
-  font-size: 11px;
+  color: var(--destructive);
+  font-size: 12px;
 }
 
 .enabled-models-header {
@@ -259,30 +251,30 @@
 
 .enabled-models-count {
   margin-right: auto;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 10px;
 }
 
 .enabled-models-note {
-  color: var(--text-dim);
-  font-size: 11px;
+  color: var(--muted-foreground);
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .enabled-models-error {
   padding: 7px 9px;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 5px;
-  color: #ef4444;
-  font-size: 11px;
+  border: 1px solid color-mix(in srgb, var(--destructive) 30%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--destructive);
+  font-size: 12px;
   line-height: 1.4;
 }
 
 .enabled-models-empty {
   padding: 12px;
-  color: var(--text-dim);
-  font-size: 11px;
+  color: var(--muted-foreground);
+  font-size: 12px;
 }
 
 .enabled-models-filter {
@@ -292,10 +284,10 @@
   height: 30px;
   padding: 0 9px;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   outline: none;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--background);
+  color: var(--foreground);
   font-family: inherit;
   font-size: 12px;
 }
@@ -303,8 +295,8 @@
 .enabled-models-list {
   max-height: 360px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-panel);
+  border-radius: var(--radius-sm);
+  background: var(--sidebar);
   overflow-y: auto;
 }
 
@@ -320,6 +312,33 @@
   border-top: 1px solid var(--border);
 }
 
+/* Eight digits wide (ch follows the phones' 16px form text), and no taller
+   than the name and id beside it, so the row keeps its height. */
+.model-context-input {
+  flex-shrink: 0;
+  width: calc(8ch + 16px);
+  height: 24px;
+  box-sizing: border-box;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* §5.6 焦点环：ring-[3px] ring-ring/50 的手写 CSS 等价。 */
+.model-context-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.model-context-input::placeholder { color: var(--muted-foreground); }
+.model-context-input[aria-invalid="true"] { border-color: var(--destructive); }
+.model-context-input:disabled { cursor: not-allowed; opacity: 0.5; }
+
 .enabled-models-row-text {
   min-width: 0;
   flex: 1;
@@ -328,8 +347,8 @@
 .enabled-models-row-name {
   display: block;
   overflow: hidden;
-  color: var(--text);
-  font-size: 11px;
+  color: var(--foreground);
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -337,92 +356,44 @@
 .enabled-models-row-id {
   display: block;
   overflow: hidden;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* Thinking-level pin: the indigo tint has no pi token, kept literal. */
 .enabled-models-pin {
   flex-shrink: 0;
   padding: 1px 4px;
+  /* 3px micro radius below the token scale, kept literal */
   border-radius: 3px;
   background: rgba(99, 102, 241, 0.12);
   color: rgba(99, 102, 241, 0.8);
-  font-size: 9px;
-}
-
-.config-sidebar-text {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  font-family: inherit;
-  font-size: 12px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.config-sidebar-text.is-grow {
-  flex: 1;
-}
-
-.config-sidebar-text.is-muted {
-  color: var(--text-dim);
+  font-size: 10px;
 }
 
 .agents-overridden-label {
   flex: 0 0 auto;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-size: 10px;
   line-height: 1;
   white-space: nowrap;
 }
 
-.agents-feature-setting {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  min-height: 68px;
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
-}
-
-.agents-feature-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  color: var(--text);
-  font-size: 12px;
-}
-
-.agents-feature-copy > span {
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-.agents-feature-copy > .agents-feature-reload-notice {
-  color: #d97706;
-}
-
-.agents-feature-actions {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 10px;
+/* §7.3: the built-in switch group renders as a ConfigCard; the class stays on
+   it as the hook the phone-level hide rule (settings-section-host) targets. */
+.agents-feature-reload-notice {
+  color: var(--warning);
 }
 
 .agents-concurrency-control {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--muted-foreground);
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -431,32 +402,19 @@
   height: 28px;
   padding: 0 6px;
   border: 1px solid var(--border);
+  /* 4px micro radius below the token scale, kept literal */
   border-radius: 4px;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--background);
+  color: var(--foreground);
   font: inherit;
   text-align: center;
-}
-
-.config-sidebar-message {
-  padding: 10px 8px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.config-sidebar-message.is-error {
-  color: #ef4444;
-}
-
-.config-sidebar-message.is-empty {
-  color: var(--text-dim);
 }
 
 .config-detail {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 20px;
+  padding: 18px 20px;
   overflow-y: auto;
   font-family: inherit;
   font-size: 12px;
@@ -466,7 +424,7 @@
 .config-detail-stack {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   width: 100%;
   min-width: 0;
 }
@@ -512,26 +470,19 @@
 }
 
 .config-detail-title {
-  color: var(--text);
+  color: var(--foreground);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.35;
 }
 
 .config-section-title {
-  color: var(--text-dim);
-  font-size: 11px;
+  color: var(--muted-foreground);
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: 0;
   text-transform: uppercase;
-}
-
-.config-field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
 }
 
 /* Keep the native resize corner usable when the global scrollbar is present. */
@@ -552,58 +503,184 @@
   background: var(--border);
   border: 5px solid transparent;
   background-clip: padding-box;
-  border-radius: 7px;
-}
-
-.config-field-label {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.35;
-}
-
-.config-empty-state {
-  display: grid;
-  flex: 1;
-  place-items: center;
-  min-height: 160px;
-  color: var(--text-dim);
-  font-size: 12px;
-  line-height: 1.5;
-  text-align: center;
+  border-radius: var(--radius-sm);
 }
 
 .config-detail-path {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.config-scope-tag {
+/* The scope switch's wrappers (the switch itself is a ToggleGroup): the switch
+   and what the caller puts beside it; the reason goes underneath. */
+.config-scope-switch-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.config-scope-switch-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.config-scope-switch-reason {
+  max-width: 320px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Where an add or create pane saves: the scope switch, then the path that
+   choice writes to, whole. A path too long for the switch's line moves under
+   it and breaks anywhere, never cut short, since it is the answer to where. */
+.config-save-target {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.config-save-target-path {
+  flex: 1 1 14em;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.config-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(96px, 130px) minmax(0, 1fr);
+  gap: 9px 14px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.config-detail-grid-label {
+  color: var(--muted-foreground);
+}
+
+.config-detail-grid-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.config-detail-grid-value.is-muted {
+  color: var(--muted-foreground);
+}
+
+.config-detail-grid-value.is-dim {
+  color: var(--muted-foreground);
+}
+
+.config-detail-grid-value.is-error {
+  color: var(--destructive);
+}
+
+.config-detail-grid-value.is-mono {
+  font-family: var(--font-mono);
+}
+
+/* A reason under a detail header, such as why an action is unavailable. */
+.config-detail-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-detail-heading-note {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  text-align: right;
+}
+
+.config-add-source-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.config-add-source-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.config-add-source-catalogs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 12px;
+}
+
+.config-add-source-catalog {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.config-add-source-catalog svg {
   flex-shrink: 0;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(120, 120, 120, 0.12);
-  color: var(--text-dim);
-  font-size: 10px;
 }
 
-.config-scope-tag.is-project {
-  background: rgba(99, 102, 241, 0.12);
-  color: rgba(99, 102, 241, 0.8);
+
+.config-add-source-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
 }
 
-.config-trust-notice {
+.config-add-source-examples-label {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.config-add-source-error {
+  color: var(--destructive);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.config-notice {
   padding: 8px 18px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
-  color: var(--text-muted);
+  background: var(--sidebar);
+  color: var(--muted-foreground);
   font-size: 12px;
+}
+
+.config-notice.has-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.config-notice-text {
+  min-width: 0;
 }
 
 .skill-detail-heading {
@@ -649,7 +726,7 @@
 
 .skill-version-value,
 .skill-name-value {
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -660,11 +737,11 @@
 }
 
 .skill-name-value {
-  color: var(--text);
+  color: var(--foreground);
 }
 
 .skill-update-status {
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-size: 12px;
 }
 
@@ -673,23 +750,40 @@
 }
 
 .skill-update-status.is-success {
-  color: #16a34a;
+  color: var(--ok);
 }
 
 .skill-update-status.is-error {
-  color: #ef4444;
+  color: var(--destructive);
 }
 
 .skill-description {
-  color: var(--text-muted);
+  color: var(--muted-foreground);
   font-size: 12px;
   line-height: 1.5;
 }
 
-.skill-update-indicator {
-  flex-shrink: 0;
+.skill-instructions {
   font-size: 13px;
-  line-height: 1;
+}
+
+.skill-instructions > :first-child { margin-top: 0; }
+.skill-instructions > :last-child { margin-bottom: 0; }
+
+.skill-instructions-status {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.skill-instructions-status.is-error {
+  color: var(--destructive);
+  overflow-wrap: anywhere;
+}
+
+/* The update arrow is a lucide icon: sized by its size prop, not by type. */
+.skill-update-indicator {
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .config-footer {
@@ -706,8 +800,32 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--text-dim);
-  font-size: 11px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.config-footer-status-summary.is-warning {
+  color: var(--warning);
+}
+
+.config-footer-status-summary.is-error {
+  color: var(--destructive);
+}
+
+.config-footer-status-details summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.config-footer-status-list {
+  max-height: 8.5em;
+  margin: 4px 0 0;
+  padding-left: 16px;
+  overflow-y: auto;
+  color: var(--muted-foreground);
+  list-style: disc;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .config-footer-actions {
@@ -718,93 +836,15 @@
   gap: 8px;
 }
 
-.config-footer-actions .config-button-default {
+/* What a stock Button carries on the settings surfaces beyond its own variants:
+   the footer's default button, the saved state and the pushed-right add button. */
+.config-footer-actions [data-slot="button"][data-size="sm"] {
   min-width: 96px;
 }
 
-.config-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-width: 1px;
-  border-style: solid;
-  border-radius: 5px;
-  cursor: pointer;
-  font-family: inherit;
-  letter-spacing: 0;
-  line-height: 1;
-  white-space: nowrap;
-  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
-}
-
-.config-button-default {
-  height: 32px;
-  padding: 0 14px;
-  font-size: 12px;
-}
-
-.config-button-small {
-  height: 28px;
-  padding: 0 10px;
-  font-size: 11px;
-}
-
-.config-button-primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-contrast);
-  font-weight: 600;
-}
-
-.config-button-secondary {
-  border-color: var(--border);
-  background: transparent;
-  color: var(--text-muted);
-}
-
-.config-button-danger {
-  border-color: rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.06);
-  color: #ef4444;
-}
-
-.config-button-ghost {
-  border-color: transparent;
-  background: transparent;
-  color: var(--text-muted);
-}
-
-.config-button-primary:not(:disabled):hover {
-  border-color: var(--accent-hover);
-  background: var(--accent-hover);
-}
-
-.config-button-secondary:not(:disabled):hover,
-.config-button-ghost:not(:disabled):hover {
-  border-color: var(--border);
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.config-button-danger:not(:disabled):hover {
-  border-color: rgba(239, 68, 68, 0.5);
-  background: rgba(239, 68, 68, 0.12);
-}
-
-.config-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.config-button:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.config-button-primary.is-success {
-  border-color: #16a34a;
-  background: #16a34a;
+[data-slot="button"][data-variant="default"].is-success {
+  border-color: var(--ok);
+  background: var(--ok);
   animation: saved-pop 0.45s ease;
 }
 
@@ -814,127 +854,27 @@
   animation: saved-check-draw 0.35s ease forwards;
 }
 
-.config-button.is-pushed-right {
+[data-slot="button"].is-pushed-right {
   margin-left: auto;
 }
 
-.config-switch {
-  position: relative;
-  flex-shrink: 0;
-  width: 32px;
-  height: 18px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--bg-selected);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.config-switch[aria-checked="true"] {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-.config-switch:not(:disabled):hover {
-  border-color: var(--text-muted);
-}
-
-.config-switch[aria-checked="true"]:not(:disabled):hover {
-  border-color: var(--accent-hover);
-  background: var(--accent-hover);
-}
-
-.config-switch::before {
-  content: "";
-  position: absolute;
-  inset: -5px -3px;
-}
-
-.config-switch:disabled {
-  cursor: default;
-  opacity: 0.55;
-}
-
-.config-switch.is-loading:disabled {
-  cursor: wait;
-}
-
-.config-switch-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  transition: transform 0.15s, background 0.15s;
-}
-
-.config-switch[aria-checked="true"] .config-switch-knob {
-  transform: translateX(14px);
-  background: var(--bg);
-}
-
-.config-switch:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.config-list-action {
-  flex-shrink: 0;
-  padding: 8px 6px;
-  border-top: 1px solid var(--border);
-}
-
-.config-list-action-button {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
-  width: 100%;
-  height: 30px;
-  min-height: 30px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.config-list-action-button:not(:disabled):hover,
-.config-list-action-button:not(:disabled):focus-visible {
-  background: var(--bg-hover);
-  color: var(--text-muted);
-  outline: none;
-}
-
-.config-list-action-button[aria-current="page"] {
-  background: var(--bg-selected);
-  color: var(--accent);
-}
-
-.config-list-action-button:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
 
 .config-status-dot {
   flex-shrink: 0;
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: var(--text-dim);
+  background: var(--muted-foreground);
 }
 
+/* A quiet fill instead of the old bullet-black dot: state reads from the
+   dot's presence and tone, not from a heavy ink circle. */
 .config-status-dot.is-active {
-  background: var(--accent);
+  background: var(--muted-foreground);
 }
 
 .config-status-dot.is-inactive {
-  opacity: 0.7;
+  opacity: 0.45;
 }
 
 .settings-dialog-backdrop {
@@ -944,21 +884,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* neutral black backdrop, kept literal: no backdrop token */
   background: rgba(0, 0, 0, 0.38);
 }
 
+/* Focus moves to the dialog itself when Settings opens (tabIndex -1); it is not a control, so no ring. */
+.settings-dialog-backdrop:focus {
+  outline: none;
+}
+
+/* §4.4: a 780×min(560px,100%) Dialog, left rail + scrolling body; the close
+   floats over the body's top-right corner, so it needs its own background. */
 .settings-dialog-surface {
+  position: relative;
   display: flex;
   flex-direction: column;
-  width: 1080px;
-  max-width: calc(100vw - 16px);
-  height: 84vh;
-  max-height: calc(100dvh - 16px);
+  width: min(780px, 100%);
+  height: min(560px, 100%);
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+  border-radius: var(--radius-xl);
+  background: var(--background);
+  /* neutral black shadow, kept literal: no shadow token */
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
 }
 
 .settings-dialog-header {
@@ -967,108 +915,82 @@
   flex-shrink: 0;
   align-items: center;
   min-height: 50px;
-  padding: 0 52px 0 18px;
+  padding: 0 52px 0 8px;
   border-bottom: 1px solid var(--border);
 }
 
 .settings-dialog-title {
   flex-shrink: 0;
-  color: var(--text);
+  color: var(--foreground);
   font-size: 15px;
   white-space: nowrap;
-}
-
-.settings-section-tabs {
-  display: flex;
-  align-items: stretch;
-  gap: 2px;
-  min-width: 0;
-  height: 50px;
-  margin-left: 22px;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.settings-section-tab {
-  position: relative;
-  display: flex;
-  flex: 0 0 96px;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 96px;
-  height: 100%;
-  padding: 0 2px;
-  border: 0;
-  outline: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 400;
-  white-space: nowrap;
-  transition: color 0.15s ease;
-}
-
-.settings-section-tab::after {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 24px;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: var(--accent);
-  content: "";
-  opacity: 0;
-  transform: translateX(-50%) scaleX(0.5);
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.settings-section-tab[aria-current="page"] {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.settings-section-tab[aria-current="page"]::after {
-  opacity: 1;
-  transform: translateX(-50%) scaleX(1);
-}
-
-.settings-section-tab:not(:disabled):hover {
-  color: var(--text);
-}
-
-.settings-section-tab:disabled {
-  cursor: default;
-  opacity: 0.38;
-}
-
-.settings-section-tab:focus-visible:not([aria-current="page"]) {
-  border-radius: 4px;
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.settings-section-tab:focus-visible[aria-current="page"] {
-  outline: none;
-}
-
-.settings-section-icon {
-  flex-shrink: 0;
-}
-
-.settings-section-icon.is-agent {
-  transform: scale(1.25);
-}
-
-.settings-mobile-section-picker {
-  display: none;
 }
 
 .settings-dialog-close {
   position: absolute;
   top: 10px;
-  right: 14px;
+  right: 10px;
+  z-index: 20;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--background);
+  color: var(--muted-foreground);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.settings-dialog-close:hover {
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
+  color: var(--foreground);
+}
+
+.settings-dialog-close:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.settings-dialog-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* §7.3/§4.4: a desktop picks the section from a fixed rail on the left (its
+   items carry their states as utilities in SettingsPanel); a phone turns the
+   rail into a horizontal chip row at its section level and lists the sections
+   on its home level instead. */
+.settings-dialog-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-section-rail {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 2px;
+  width: 176px;
+  padding: 14px 10px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.settings-section-rail-item {
+  flex: none;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+}
+
+/* A phone's Back button and home list carry their presentation as utilities in
+   SettingsPanel; the rail dims a row's icon, so it stays here. */
+.settings-phone-home-item .settings-section-icon {
+  color: var(--muted-foreground);
 }
 
 .settings-dialog-main {
@@ -1087,172 +1009,164 @@
   min-height: 0;
 }
 
-.settings-general {
-  width: 100%;
-  max-height: 100%;
-  max-width: 680px;
-  padding: 26px clamp(18px, 4vw, 40px) 40px;
-  overflow-y: auto;
+/* §4.4: the desktop body's own column — the dialog's page title (§3.5, the
+   draft's pm-set-title) over the scrolling section. The floating close sits
+   over the title row, so it carries the room the close button needs. */
+.settings-dialog-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
 
-.settings-general-title {
-  margin: 0;
-  color: var(--text);
-  font-size: 18px;
-  font-weight: 700;
+.settings-dialog-page-title {
+  flex: none;
+  min-width: 0;
+  padding: 18px 20px 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.settings-general-section {
-  margin-top: 30px;
+/* The title row owns the top strip the floating close floats over, so the
+   section below it needs no extra room of its own. */
+.settings-dialog-page .settings-section-host {
+  height: auto;
 }
 
-.settings-general-section:first-of-type {
-  margin-top: 24px;
+/* The floating close button sits over the body's top-right corner: the detail
+   headers' actions (Test connection, Remove, the update check) start below it,
+   as does MCP's notices card above its split view. */
+.settings-dialog-main .config-detail {
+  padding-top: 14px;
 }
 
-.settings-general-heading {
-  margin: 0 0 5px;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 650;
+.settings-dialog-main .mcp-config-notices {
+  padding-top: 14px;
 }
 
-.settings-general-description {
-  margin: 0 0 12px;
-  color: var(--text-dim);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
+/* §4.4: a theme chip grid — auto-fill cards, the name truncating, the chosen
+   chip ringed in the foreground color, each chip led by a 14px swatch dot. */
 .settings-theme-options {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 7px;
   width: 100%;
-  max-width: 420px;
-  padding: 3px;
 }
 
 .settings-theme-option {
   position: relative;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 7px;
   min-width: 0;
-  min-height: 44px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-muted);
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background);
+  color: var(--foreground);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 400;
+  line-height: 1;
+  transition: background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.settings-theme-option:hover {
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 .settings-theme-option:has(input:checked) {
-  background: var(--bg-selected);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.settings-theme-option:not(:has(input:checked)):hover {
-  background: var(--bg-hover);
+  border-color: var(--foreground);
+  box-shadow: 0 0 0 1px var(--foreground);
 }
 
 .settings-theme-option:has(input:focus-visible) {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 .settings-theme-option-label {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.settings-chat-options {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  max-width: 420px;
+/* The 14px swatch dot; one rule per palette, kept literal — these are the
+   palettes' own background values, not tokens of the running theme. */
+.settings-theme-swatch {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--background);
 }
 
-.settings-chat-option {
-  width: 100%;
-  color: var(--text);
-  font-size: 12px;
+.settings-theme-option[data-theme-option="auto"] .settings-theme-swatch {
+  border-color: var(--border);
+  background: linear-gradient(90deg, #ffffff 50%, #1a1a1a 50%);
 }
 
-.settings-chat-switch-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 28px;
+.settings-theme-option[data-theme-option="light"] .settings-theme-swatch { background: #ffffff; }
+.settings-theme-option[data-theme-option="dark"] .settings-theme-swatch { background: #1a1a1a; }
+
+/* The font name field is drawn in the font it names: the live preview. The
+   Input component carries the box; only the dynamic faces stay here. */
+.settings-font-input {
+  font-family: var(--font-ui);
+  font-weight: var(--font-ui-weight);
 }
 
-.settings-chat-range-option {
-  padding: 0;
-}
-
-.settings-chat-range-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 28px;
-  align-items: center;
-  gap: 8px;
-}
-
-.settings-chat-range-header output {
-  color: var(--text-muted);
+.settings-font-input.is-mono {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-weight: var(--font-mono-weight);
 }
 
-.settings-chat-reset {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-}
-
-.settings-chat-range-option input {
-  display: block;
-  width: 100%;
-  margin-top: 2px;
-  accent-color: var(--accent);
+@media (max-width: 640px) {
+  /* Phones get 16px form text (no focus zoom), so the name field needs the height. */
+  .settings-font-input {
+    height: 32px;
+  }
 }
 
 .settings-language-options {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   width: 100%;
-  max-width: 420px;
 }
 
 .settings-language-option {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 44px;
+  height: 36px;
   padding: 0 10px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-lg);
   background: transparent;
-  color: var(--text);
+  color: var(--foreground);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   text-align: left;
 }
 
 .settings-language-option[aria-checked="true"] {
-  background: var(--bg-selected);
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
+  font-weight: 500;
 }
 
 .settings-language-option:not([aria-checked="true"]):hover,
 .settings-language-option:focus-visible {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
   outline: none;
 }
 
@@ -1282,36 +1196,45 @@
 }
 
 .settings-language-code {
-  color: var(--text-dim);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 10px;
 }
 
-.settings-shell-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  max-width: 420px;
-  min-height: 44px;
-  padding: 0 10px;
-  border-radius: 5px;
-  background: var(--bg-panel);
-  color: var(--text);
-  font-size: 12px;
-}
-
-.settings-general-error {
-  margin: 8px 0 0;
-  color: #ef4444;
-  font-size: 11px;
-}
-
 @media (max-width: 640px) {
+  /* A phone shows Settings, and a config panel opened on its own, full
+     screen: the page's own colour under the safe areas, no frame. iOS
+     standalone's fallback insets (end of file) still pad the root. */
+  .settings-dialog-backdrop,
+  .config-panel-root.is-modal {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: var(--background);
+  }
+
+  .config-close-button {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+  }
+
+  /* The close keeps its corner alone in the 50px header area, never over the
+     chip row below it; a larger target for a finger. */
+  .settings-dialog-close {
+    top: 7px;
+    right: 7px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .settings-dialog-surface,
   .config-panel-root.is-modal > .config-panel-surface {
-    width: calc(100vw - 16px);
-    height: calc(100dvh - 16px);
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .config-split-view {
@@ -1325,50 +1248,140 @@
     border-bottom: 1px solid var(--border);
   }
 
-  .agents-feature-setting {
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 14px;
-  }
-
-  .agents-feature-actions {
+  /* The feature card's action row wraps under itself on a phone. */
+  .agents-feature-setting [data-slot="card-action"] {
     flex-wrap: wrap;
     justify-content: flex-end;
   }
 
   .config-detail {
-    padding: 14px;
+    padding: 16px;
   }
 
-  .settings-dialog-surface {
-    width: calc(100vw - 12px);
-    height: calc(100dvh - 12px);
+  /* The close lives in the 50px header here, not over the body. */
+  .settings-dialog-main .config-detail {
+    padding-top: 16px;
   }
 
-  .settings-section-tabs {
+  .settings-dialog-main .mcp-config-notices {
+    padding-top: 0;
+  }
+
+  /* §4.4: the section rail becomes a horizontally scrolling chip row under the
+     50px header, shown at the section level only (the home level lists the
+     sections as rows; the detail level keeps its Back button). Hidden by
+     default, so pre-hydration phones see no flash of the desktop rail. */
+  .settings-section-rail {
     display: none;
   }
 
-  .settings-mobile-section-picker {
-    display: block;
+  /* The desktop page title stays off a phone: its 50px header names the level. */
+  .settings-dialog-page-title {
+    display: none;
+  }
+
+  /* At the section level the chips own the row above the section: the body
+     stacks so the full-width rail no longer squeezes the main to zero. */
+  .settings-dialog-surface[data-phone-level="section"] .settings-dialog-body {
+    flex-direction: column;
+  }
+
+  .settings-dialog-surface[data-phone-level="section"] .settings-section-rail {
+    display: flex;
+    flex-direction: row;
+    flex: none;
+    align-items: center;
+    gap: 6px;
     width: 100%;
-    max-width: 210px;
-    min-width: 0;
+    padding: 10px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .settings-dialog-surface[data-phone-level="section"] .settings-section-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-section-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-section-rail-item {
+    width: auto;
     height: 32px;
-    margin-left: 14px;
-    padding: 0 9px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--bg-panel);
-    color: var(--text);
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 12.5px;
+  }
+
+  .settings-section-rail-item.is-selected {
+    background: var(--accent);
+    color: var(--foreground);
+  }
+
+  /* Back, title, close: equal side columns keep the title in the middle
+     whatever Back says; a long title is cut short in its own column. The
+     close floats alone at the surface's top-right corner. */
+  .settings-dialog-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr) minmax(0, 1fr);
+    align-items: center;
+    padding: 0 4px;
+  }
+
+  .settings-phone-back {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .settings-dialog-title {
+    grid-column: 2;
+    overflow: hidden;
     font-size: 16px;
+    text-align: center;
+    text-overflow: ellipsis;
+  }
+
+  /* Inside Settings a split view shows one pane at a time (ConfigSplitView's
+     data-pane): the list fills the screen with rows for a finger, and a row
+     opens its detail in its place. */
+  .config-split-view[data-pane] > .config-sidebar {
+    flex: 1 1 auto;
+    height: auto;
+    border-bottom: 0;
+  }
+
+  .config-split-view[data-pane="list"] > .config-detail,
+  .config-split-view[data-pane="detail"] > .config-sidebar {
+    display: none;
+  }
+
+  .config-split-view[data-pane] .config-sidebar-item,
+  .config-split-view[data-pane] .config-list-action-button {
+    height: 44px;
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .config-split-view[data-pane] .config-sidebar-group-label {
+    padding-top: 10px;
+    font-size: 12px;
+  }
+
+  /* A section's settings above its list (Models' enabledModels, Sub-agents'
+     switch) belong to the list level, not to each row's detail. */
+  .settings-section-host[data-phone-level="detail"] :is(.enabled-models-banner, .agents-feature-setting) {
+    display: none;
   }
 }
 
 @keyframes saved-pop {
-  0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55); }
-  40%  { transform: scale(1.08); box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.25); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+  0%   { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); }
+  40%  { transform: scale(1.08); box-shadow: 0 0 0 6px color-mix(in srgb, var(--ok) 25%, transparent); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
 }
 
 @keyframes saved-check-draw {
@@ -1376,11 +1389,117 @@
   to   { stroke-dashoffset: 0;  opacity: 1; }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="button"][data-variant="default"].is-success,
+  .config-button-success-icon {
+    animation: none;
+  }
+}
+
+/* Settings › MCP (components/McpConfig.tsx, McpAddServer.tsx). The panels'
+   presentation lives in their utility classes; these rules are what a Card
+   cannot carry: the notice box's scroll, and the native selects' chevron. */
+
+/*
+ * Settings › MCP can show up to six notices above its list (MCP off, another
+ * extension's /mcp, the project's trust, Undo, Added). They scroll in their
+ * own box instead of squeezing the split view to nothing: a notice never
+ * shrinks below its text, and the split view does. The notices are a Card's
+ * rows here, so the last one needs no separator.
+ */
+.mcp-config-notices {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.mcp-config-notices .config-notice:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .mcp-config-notices {
+    max-height: 30vh;
+    max-height: 30dvh;
+  }
+
+  /* Short of height, the 190px sidebar gives way to a few rows before the detail pane is clipped. */
+  .mcp-config-notices + .config-split-view > .config-sidebar {
+    flex-shrink: 1;
+    min-height: 96px;
+  }
+
+  .mcp-config-notices + .config-split-view > .config-detail {
+    min-height: 120px;
+  }
+}
+
+/* The panel's native selects (a portaled dropdown would not stack over the
+   Settings dialog): macOS draws the native arrow against the border, ignoring
+   the padding, so a chevron of our own, in the theme's dim text color, as far
+   from the right edge as the text is from the left. */
+.mcp-select-arrow {
+  appearance: none;
+  padding-right: 30px;
+  background-image:
+    linear-gradient(45deg, transparent 40%, var(--muted-foreground) 40%, var(--muted-foreground) 60%, transparent 60%),
+    linear-gradient(-45deg, transparent 40%, var(--muted-foreground) 40%, var(--muted-foreground) 60%, transparent 60%);
+  background-size: 5px 5px;
+  background-position: right 15px center, right 10px center;
+  background-repeat: no-repeat;
+}
+
+/* Remove's confirmation (McpConfig's AlertDialog) portals to the body, which
+   would put it under the Settings dialog (z-index 1000): raise the overlay and
+   the box above it, in their own layer beside the trust dialog's 1100. */
+[data-slot="alert-dialog-overlay"]:has(+ [data-slot="alert-dialog-content"].mcp-remove-confirm),
+[data-slot="alert-dialog-content"].mcp-remove-confirm {
+  z-index: 1101;
+}
+
+/* Project trust dialog (components/ProjectTrustDialog.tsx). It sits above
+   Settings (z-index 1000), which opens it too, keeps clear of the notch and
+   the home indicator, and only its body scrolls, so a long MCP server list
+   never pushes the buttons or the trust error off the screen. */
+.project-trust-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  /* neutral black backdrop, kept literal: no backdrop token */
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.project-trust-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 480px;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--background);
+  /* neutral black shadow, kept literal: no shadow token */
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.24);
+}
+
+/* Focus moves to the dialog itself when it opens (tabIndex -1); it is not a control, so no ring. */
+.project-trust-dialog:focus {
+  outline: none;
+}
+
+
 /* iOS standalone: env() can report 0, so keep a device-sized fallback on the
    status-bar edge and cap dialog surfaces to the resulting safe box. */
 @supports (-webkit-touch-callout: none) {
   @media (display-mode: standalone) {
     .settings-dialog-backdrop,
+    .project-trust-backdrop,
     .config-panel-root.is-modal {
       padding-top: max(59px, env(safe-area-inset-top));
       padding-right: max(8px, env(safe-area-inset-right));
@@ -1397,6 +1516,7 @@
 
   @media (display-mode: standalone) and (orientation: landscape) {
     .settings-dialog-backdrop,
+    .project-trust-backdrop,
     .config-panel-root.is-modal {
       padding-top: max(8px, env(safe-area-inset-top));
       padding-right: max(59px, env(safe-area-inset-right));

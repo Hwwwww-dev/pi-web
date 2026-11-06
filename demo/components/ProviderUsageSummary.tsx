@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CheckIcon, RotateCcwIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { cn } from "@/lib/utils";
 import { formatUpdatedTime } from "@/lib/i18n/format";
 import { isProviderUsageId } from "@/lib/provider-usage-ids";
 
@@ -25,6 +27,45 @@ type UsageResponse = { providerId: string; status: "ready" | "auth-unavailable" 
 
 const STORAGE_PREFIX = "pi-web:provider-usage:";
 
+export type ProviderUsageSnapshot = UsageResponse;
+
+/** Reads the shared localStorage snapshot the summary panel writes; null when absent or malformed. */
+export function readProviderUsageSnapshot(providerId: string): ProviderUsageSnapshot | null {
+  let cached: string | null;
+  try {
+    cached = localStorage.getItem(`${STORAGE_PREFIX}${providerId}`);
+  } catch {
+    return null; // Storage unavailable (private mode): treat as no snapshot.
+  }
+  if (!cached) return null;
+  try {
+    const parsed = JSON.parse(cached) as ProviderUsageSnapshot;
+    if (parsed?.status === "ready" && parsed.report && Array.isArray(parsed.report.buckets) && Array.isArray(parsed.report.metrics)) return parsed;
+  } catch {
+    return null; // Corrupt snapshot: the next successful query overwrites it.
+  }
+  try {
+    localStorage.removeItem(`${STORAGE_PREFIX}${providerId}`);
+  } catch {
+    return null; // Removal is cosmetic: the stale entry lingers but reads stay null.
+  }
+  return null;
+}
+
+export function writeProviderUsageSnapshot(providerId: string, snapshot: ProviderUsageSnapshot): void {
+  try {
+    localStorage.setItem(`${STORAGE_PREFIX}${providerId}`, JSON.stringify(snapshot));
+  } catch {
+    console.debug("provider usage snapshot not persisted", providerId); // Quota or private mode.
+  }
+}
+
+/** The headline percent bucket's used value, or null when the report carries no percent usage. */
+export function primaryUsagePercent(report: UsageReport): number | null {
+  const bucket = report.buckets.find((entry) => entry.unit === "percent" && typeof entry.used === "number");
+  return bucket ? Math.round(bucket.used as number) : null;
+}
+
 export function ProviderUsageSummary({ providerId, enabled }: { providerId: string; enabled: boolean }) {
   if (!isProviderUsageId(providerId)) return null;
   return <ProviderUsageContent providerId={providerId} enabled={enabled} />;
@@ -41,18 +82,7 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
   useEffect(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     setRefreshDone(false);
-    setSnapshot(null);
-    try {
-      const cached = localStorage.getItem(`${STORAGE_PREFIX}${providerId}`);
-      if (cached) {
-        const parsed = JSON.parse(cached) as UsageResponse;
-        if (parsed?.status === "ready" && parsed.report && Array.isArray(parsed.report.buckets) && Array.isArray(parsed.report.metrics)) {
-          setSnapshot(parsed);
-        }
-      }
-    } catch {
-      try { localStorage.removeItem(`${STORAGE_PREFIX}${providerId}`); } catch {}
-    }
+    setSnapshot(readProviderUsageSnapshot(providerId));
     setError(null);
     return () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
@@ -72,7 +102,7 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
       if (!response.ok) throw new Error(result.error ?? `HTTP ${response.status}`);
       if (result.status === "ready") {
         setSnapshot(result);
-        try { localStorage.setItem(`${STORAGE_PREFIX}${providerId}`, JSON.stringify(result)); } catch {}
+        writeProviderUsageSnapshot(providerId, result);
         setRefreshDone(true);
         if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
         refreshTimerRef.current = setTimeout(() => setRefreshDone(false), 2000);
@@ -88,49 +118,49 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
 
   const report = snapshot?.status === "ready" ? snapshot.report : undefined;
   return (
-    <section style={{ paddingTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 600, lineHeight: 1.35 }}>{t("providerUsage.usage")}</span>
+    <section className="flex flex-col gap-2.5 pt-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[13px] leading-[1.35] font-semibold text-foreground">{t("providerUsage.usage")}</span>
         <button
           type="button"
           onClick={query}
           disabled={!enabled || querying}
           title={t(querying ? "providerUsage.refreshing" : "providerUsage.refresh")}
           aria-label={t(querying ? "providerUsage.refreshing" : "providerUsage.refresh")}
-          style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 30, padding: 0, background: "none", border: "none", color: refreshDone ? "#4ade80" : "var(--text-dim)", cursor: enabled && !querying ? "pointer" : "default", borderRadius: 5, flexShrink: 0, opacity: enabled ? 1 : 0.6, transition: "color 0.3s" }}
+          className={cn(
+            "relative flex h-[30px] w-8 shrink-0 items-center justify-center rounded-sm border-0 bg-transparent p-0 outline-none transition-colors duration-300",
+            "focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            "enabled:cursor-pointer disabled:pointer-events-none disabled:opacity-50",
+            refreshDone ? "text-success" : "text-muted-foreground",
+          )}
         >
           {refreshDone ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
+            <CheckIcon size={14} strokeWidth={2.5} aria-hidden="true" />
           ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={querying ? { animation: "spin 0.8s linear infinite" } : undefined} aria-hidden="true">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-            </svg>
+            <RotateCcwIcon size={14} strokeWidth={2} className={cn("motion-reduce:animate-none", querying && "animate-spin")} aria-hidden="true" />
           )}
         </button>
         {report && (
-          <span title={new Date(report.capturedAt).toLocaleString(locale)} style={{ fontSize: 11, color: "var(--text-dim)", whiteSpace: "nowrap" }}>
+          <span title={new Date(report.capturedAt).toLocaleString(locale)} className="text-xs whitespace-nowrap text-muted-foreground">
             {t("providerUsage.updated", { time: formatUpdatedTime(report.capturedAt, locale) })}
           </span>
         )}
       </div>
 
-      {!report && !error && <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{t("providerUsage.notQueried")}</span>}
-      {error && <span style={{ fontSize: 12, color: "#f87171" }}>{error}</span>}
+      {!report && !error && <span className="text-xs text-muted-foreground">{t("providerUsage.notQueried")}</span>}
+      {error && <span className="text-xs text-destructive">{error}</span>}
       {report && (
-        <div style={{ display: "grid", gridTemplateColumns: "180px minmax(0, 1fr)", columnGap: 14, rowGap: 8, alignItems: "baseline", minWidth: 0, width: "min(100%, 420px)", maxWidth: "100%", fontSize: 12 }}>
+        <div className="grid w-[min(100%,420px)] max-w-full min-w-0 grid-cols-[180px_minmax(0,1fr)] items-baseline gap-x-3.5 gap-y-2 text-xs">
           {report.buckets.map((bucket) => (
-            <div key={bucket.id} style={{ display: "contents" }}>
-              <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bucket.groupLabel ? `${bucket.groupLabel} / ${bucket.label}` : bucket.label}</span>
-              <span style={{ color: "var(--text)", fontFamily: "var(--font-mono)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{formatBucket(bucket, t("providerUsage.available"))}</span>
+            <div key={bucket.id} className="contents">
+              <span className="overflow-hidden font-mono text-ellipsis whitespace-nowrap text-muted-foreground">{bucket.groupLabel ? `${bucket.groupLabel} / ${bucket.label}` : bucket.label}</span>
+              <span className="overflow-hidden font-mono text-ellipsis whitespace-nowrap text-foreground">{formatBucket(bucket, t("providerUsage.available"))}</span>
             </div>
           ))}
           {report.metrics.map((metric) => (
-            <div key={metric.id} style={{ display: "contents" }}>
-              <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{metric.label}</span>
-              <span style={{ color: "var(--text)", fontFamily: "var(--font-mono)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{formatMetric(metric)}</span>
+            <div key={metric.id} className="contents">
+              <span className="overflow-hidden font-mono text-ellipsis whitespace-nowrap text-muted-foreground">{metric.label}</span>
+              <span className="overflow-hidden font-mono text-ellipsis whitespace-nowrap text-foreground">{formatMetric(metric)}</span>
             </div>
           ))}
         </div>

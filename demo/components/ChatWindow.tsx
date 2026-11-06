@@ -1,33 +1,56 @@
 "use client";
-import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
-import Image from "next/image";
 import { demoAssetPath } from "@/mock/base-path";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
+import { isHiddenRelation } from "@/lib/session-family";
+import { ArrowDownIcon, ChevronRightIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from "lucide-react";
+import Image from "next/image";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, UserMessage } from "@/lib/types";
-import { normalizeCustomPanelLines } from "@/lib/ansi";
+import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage } from "@/lib/types";
+import { isTuiText, normalizeCustomPanelLines } from "@/lib/ansi";
+import { splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
-import { countToolCallBlocks, getAssistantErrorMessage, getDisplayableAssistantBlocks, hasAssistantAnswer, isAssistantTruncated, isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
-import { extractTurnWrittenFiles, type WrittenFile } from "@/lib/turn-written-files";
+import { isHiddenCustomMessage, isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
+import { getToolCategory, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
+import { buildTurnActivityItems, getFinishedTurnView } from "@/lib/turn-view";
+import { type WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
-import { MessageView } from "./MessageView";
+import { dropMentionText, splitDroppedItems, uploadFiles, type DroppedItem } from "@/lib/file-upload-client";
+import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
+import { TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
-import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
+import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH, MINIMAP_RAIL_STRIP } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
-import { useAgentSession, type AgentPhase, type NoticeItem } from "@/hooks/useAgentSession";
+import { phaseLabel } from "@/lib/chat-phase-label";
+import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
+import { selectHasStreamingContent, selectIsStreaming, selectStreamingMessage, useStreamingSelector } from "@/hooks/useStreamingSelector";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useDialogMaxHeight } from "@/hooks/useDialogMaxHeight";
 import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
+import { COLLAPSIBLE_EXPANDED_EVENT } from "@/lib/tool-call-expansion";
 import type { SessionStatsInfo } from "@/lib/pi-types";
+import type { DebugClientSession } from "@/lib/debug-types";
 import type { AppUpdateResponse } from "@/lib/api-types";
 import type { ToolEntry } from "@/lib/tool-presets";
+import type { SettingsSection } from "@/lib/settings-navigation";
 import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll-position";
 import {
   captureScrollDistance,
+  getNextVisibleCount,
   getPromptAnchorSpacerHeight,
   getVisibleRenderWindow,
   isScrollAtTail,
@@ -44,21 +67,42 @@ interface Props {
   sessionRunning?: boolean;
   newSessionCwd: string | null;
   newSessionDraftKey: string | null;
-  onAgentEnd?: () => void;
+  /** Shown above the composer while a fresh composer is still empty: where its session starts. */
+  newSessionContextBar?: ReactNode;
+  /** A fresh composer's model and reasoning picks, carried from the composer it replaces. */
+  initialNewSessionChoices?: NewSessionChoices | null;
+  onNewSessionChoicesChange?: (choices: NewSessionChoices) => void;
+  onAgentEnd?: (end: AgentEndInfo) => void;
+  onToolEnd?: (toolName: string) => void;
   onAttentionNeeded?: (request: BlockingExtensionUiRequest) => void;
   onSessionCreated?: (session: SessionInfo, sourceDraftKey: string) => void;
   onSessionForked?: (newSessionId: string) => void;
+  /** A subagent's or side chat's tab beside the main chat: the page's global shortcuts stay with the main chat. */
+  panel?: boolean;
+  /** `/side`: a side chat was forked from this session; open its tab. */
+  onSideSession?: (session: SessionInfo, prompt: string | null) => void;
   modelsRefreshKey?: number;
   chatInputRef?: React.RefObject<ChatInputHandle | null>;
-  onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;
+  onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void, locked: boolean) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
   onSystemToolsChange?: (tools: ToolEntry[] | null) => void;
+  onMcpServersChange?: (summary: { total: number; ready: number; needsAuth: number } | null) => void;
   onSystemInfoLoaderChange?: (loader: (() => Promise<void>) | null) => void;
+  /** Keep-alive background slot: skip AppShell-wide state reporting so background instances cannot overwrite the visible session's state. */
+  background?: boolean;
+  /** Dormant keep-alive slot: this slot's message list was unloaded; the hook reloads it when the slot is shown again. */
+  dormant?: boolean;
+  /** Registers the debug panel's read-only reader of this chat's stream and lease. */
+  onDebugSnapshotReaderChange?: (reader: (() => DebugClientSession) | null) => void;
   onSessionStatsChange?: (stats: SessionStatsInfo | null) => void;
   onSessionStatsPanelOpen?: () => void;
+  /** Opens Settings on a section: a bare `/mcp` that pi's built-in MCP extension owns opens Settings › MCP. */
+  onOpenSettings?: (section: SettingsSection) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
-  onOpenFile?: (filePath: string, page?: number) => void;
-  onOpenSession?: (sessionId: string) => void;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
+  onOpenSubagent?: (sessionId: string, label: string) => void;
+  /** Files dropped onto the chat were written into the working directory. */
+  onFilesUploaded?: () => void;
   onAskInNewChat?: (prompt: string, sourceSessionId: string, sourceEntryId: string) => Promise<void>;
   quoteSelectionEnabled?: boolean;
   initialPrompt?: string;
@@ -69,90 +113,81 @@ interface Props {
   onSoundToggle?: () => void;
   playDoneSound?: () => void;
   unlockAudio?: () => void;
+  /** Keeps the completion sound's audio running until the returned release is called. */
+  holdAudio?: () => () => void;
 }
 
-function phaseLabel(phase: AgentPhase, t: (key: string, params?: Record<string, string | number>) => string): string | null {
-  if (phase?.kind === "running_tools") {
-    const latest = phase.tools[phase.tools.length - 1];
-    if (latest?.progress) {
-      return `${t("chat.runningNamedTool", { name: latest.name })} ${latest.progress}`;
-    }
-    const names = phase.tools.map((t) => t.name);
-    if (names.length === 0) return t("chat.runningTool");
-    if (names.length === 1) return t("chat.runningNamedTool", { name: names[0] });
-    if (names.length <= 3) return t("chat.runningTools", { names: names.join(", ") });
-    return t("chat.runningToolsMore", { names: names.slice(0, 2).join(", "), count: names.length - 2 });
-  }
-  if (phase?.kind === "waiting_model") return t("chat.waitingModel");
-  if (phase?.kind === "running_command") return t("chat.runningCommand");
-  return null;
-}
+// The message column's page gutter and width, from the visual draft (§4.2):
+// 28px around a 700px column on desktop, half the gutter on phones. The
+// column's 700px cap lives in the message content's max-w-[700px].
+const CHAT_COLUMN_PADDING = 28;
+const CHAT_COLUMN_PADDING_MOBILE = 14;
 
-const CHAT_MINIMAP_WIDTH = 36;
-const CHAT_COLUMN_PADDING = 16;
+// One update check per page. Every fresh composer mounts the header again
+// (each move of the new-session bar does), and a link that turned up late
+// each time would lengthen the versions line under the reader's eyes; from
+// the second header on it is there in the first paint.
+let appUpdateCheck: Promise<AppUpdateResponse | null> | null = null;
+let appUpdateFound: AppUpdateResponse | null = null;
+
+function checkAppUpdate(): Promise<AppUpdateResponse | null> {
+  appUpdateCheck ??= fetch("/api/app-update")
+    .then(async (response) => {
+      if (!response.ok) return null;
+      const result = await response.json() as AppUpdateResponse;
+      return result.updateAvailable && result.latestVersion && result.releaseUrl ? result : null;
+    })
+    .then((result) => {
+      appUpdateFound = result;
+      return result;
+    })
+    .catch(() => {
+      // Update checks are best-effort and must not interrupt a new session;
+      // a later header asks again.
+      appUpdateCheck = null;
+      return null;
+    });
+  return appUpdateCheck;
+}
 
 function NewSessionUpdateLink({
   label,
 }: {
   label: (version: string) => string;
 }) {
-  const [update, setUpdate] = useState<AppUpdateResponse | null>(null);
+  const [update, setUpdate] = useState<AppUpdateResponse | null>(() => appUpdateFound);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/app-update", { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return response.json() as Promise<AppUpdateResponse>;
-      })
-      .then((result) => {
-        if (result?.updateAvailable && result.latestVersion && result.releaseUrl) {
-          setUpdate(result);
-        }
-      })
-      .catch(() => {
-        // Update checks are best-effort and must not interrupt a new session.
-      });
-    return () => controller.abort();
+    if (appUpdateFound) return;
+    let cancelled = false;
+    void checkAppUpdate().then((result) => {
+      if (!cancelled && result) setUpdate(result);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   if (!update) return null;
   const accessibleLabel = label(update.latestVersion);
 
+  // In the versions line, after the version in use: "→ v<latest> ↗".
   return (
-    <a
-      href={update.releaseUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={accessibleLabel}
-      aria-label={accessibleLabel}
-      onMouseEnter={(event) => { event.currentTarget.style.background = "var(--bg-hover)"; }}
-      onMouseLeave={(event) => { event.currentTarget.style.background = "transparent"; }}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        alignSelf: "center",
-        gap: 3,
-        minHeight: 32,
-        minWidth: 0,
-        padding: "0 4px",
-        background: "transparent",
-        borderRadius: 5,
-        color: "var(--accent)",
-        fontSize: 12,
-        fontWeight: 600,
-        lineHeight: 1.2,
-        textDecoration: "none",
-        transition: "background 0.12s",
-        whiteSpace: "nowrap",
-      }}
-    >
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>v{update.latestVersion}</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-        <path d="M7 17 17 7" />
-        <path d="M7 7h10v10" />
-      </svg>
-    </a>
+    <>
+      <span className="new-session-meta-arrow" aria-hidden="true">→</span>
+      <a
+        className="new-session-update"
+        href={update.releaseUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={accessibleLabel}
+        aria-label={accessibleLabel}
+      >
+        v{update.latestVersion}
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M7 17 17 7" />
+          <path d="M7 7h10v10" />
+        </svg>
+      </a>
+    </>
   );
 }
 
@@ -187,66 +222,48 @@ function getUserInputText(message: AgentMessage): string | null {
   return text.length > 0 ? text : null;
 }
 
-function withAssistantBlocks(
-  message: AssistantMessage,
-  content: AssistantContentBlock[],
-  options: { omitUsage?: boolean } = {},
-): AssistantMessage {
-  const next = { ...message, content };
-  if (options.omitUsage) next.usage = undefined;
-  return next;
-}
-
-function ProcessDetailsGroup({ messageCount, toolCallCount, defaultExpanded = false, reveal = false, children, t }: { messageCount: number; toolCallCount: number; defaultExpanded?: boolean; reveal?: boolean; children: ReactNode; t: (key: string, params?: Record<string, string | number>) => string }) {
+function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false, children, t }: { summary: string; defaultExpanded?: boolean; reveal?: boolean; children: ReactNode; t: (key: string, params?: Record<string, string | number>) => string }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   useLayoutEffect(() => {
     if (reveal) setExpanded(true);
   }, [reveal]);
-  const parts = [t("chat.processDetails"), `${messageCount} ${t(messageCount === 1 ? "chat.message" : "chat.messages")}`];
-  if (toolCallCount > 0) parts.push(`${toolCallCount} ${t(toolCallCount === 1 ? "chat.toolCall" : "chat.toolCalls")}`);
 
   return (
-    <div style={{ marginBottom: 14 }}>
-      <button
-        type="button"
-        aria-expanded={expanded || reveal}
-        onClick={() => setExpanded((v) => !v)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          width: "auto",
-          minHeight: 24,
-          padding: "2px 0",
-          border: "none",
-          background: "transparent",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          fontSize: 12,
-          textAlign: "left",
-        }}
+    <Collapsible
+      open={expanded || reveal}
+      onOpenChange={(open) => {
+        if (!reveal) setExpanded(open);
+      }}
+      className="mb-5"
+    >
+      <CollapsibleTrigger
+        className="flex max-w-full min-h-6 cursor-pointer items-center gap-2 border-0 bg-transparent px-0 py-0.5 text-left text-xs text-muted-foreground"
         title={expanded ? t("chat.collapseProcess") : t("chat.expandProcess")}
+        aria-label={summary}
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>
-          <polyline points="4 2.5 7.5 6 4 9.5" />
-        </svg>
-        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {parts.join(" · ")}
+        <ChevronRightIcon
+          size={12}
+          strokeWidth={1.6}
+          className={cn("shrink-0 transition-transform", (expanded || reveal) && "rotate-90")}
+          aria-hidden="true"
+        />
+        <span className="min-w-0 truncate">
+          {summary}
         </span>
-      </button>
-      {(expanded || reveal) && (
-        <div style={{ marginTop: 8 }}>
-          {children}
-        </div>
-      )}
-    </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
-export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile, onOpenSession, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, onSoundToggle, playDoneSound = () => {}, unlockAudio }: Props) {
+// memo：后台 dock 常驻渲染，非流式内容变更不应触发重渲
+export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, panel = false, onSideSession, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onDebugSnapshotReaderChange, background = false, dormant = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
-  const completionNotificationsEnabled = session?.relation?.kind !== "subagent";
+  const columnPadding = isMobile ? CHAT_COLUMN_PADDING_MOBILE : CHAT_COLUMN_PADDING;
+  const completionNotificationsEnabled = !isHiddenRelation(session?.relation);
 
   // Wrap onAgentEnd to play the completion sound. This is more reliable than
   // wrapping handleAgentEventRef because useAgentSession overwrites that ref
@@ -257,17 +274,13 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
   const soundedExtensionDialogIdRef = useRef<string | null>(null);
-  const wrappedOnAgentEnd = useCallback(() => {
-    if (completionNotificationsEnabled && soundEnabledRef.current) {
+  const wrappedOnAgentEnd = useCallback((end: AgentEndInfo) => {
+    // A run someone stopped did not finish anything, and one whose subagents still work did not finish the task.
+    if (completionNotificationsEnabled && soundEnabledRef.current && !end.aborted && !end.subagentsActive) {
       playDoneSoundRef.current();
     }
-    onAgentEnd?.();
+    onAgentEnd?.(end);
   }, [completionNotificationsEnabled, onAgentEnd]);
-
-  // 稳定化 onEditContent 引用，配合 React.memo 防止历史消息重渲染
-  const handleEditContent = useCallback((message: UserMessage) => {
-    chatInputRef?.current?.replaceMessage(message);
-  }, [chatInputRef]);
 
   const initialScrollPositionRef = useRef(searchTarget ? null : initialScrollPosition ?? null);
   const [pendingScrollRestore, setPendingScrollRestore] = useState<Extract<ChatScrollPosition, { atBottom: false }> | null>(() => {
@@ -277,38 +290,88 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   const [restoreAnchorReady, setRestoreAnchorReady] = useState(false);
 
   const {
-    loading, error, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, streamState,
-    agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
+    loading, error, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, earlierTurnCount, streamingStore,
+    agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, missingCwd, modelScopeWarnings, isModelScopeActive, allModelList, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
-    slashCommands, slashCommandsLoading, queuedMessages,
-    notices, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused,
+    slashCommands, slashCommandsLoading, queuedSubmissions,
+    notices, extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused, dismissNotice, addNotice,
     isAutoModelSelection,
     isAutoThinkingSelection,
+    defaultModel,
+    savedDefaultThinkingLevel,
     agentPhase,
     isNew,
     showScrollToBottom,
     sessionIdRef, scrollContainerRef,
     lastUserMsgRef, promptAnchorActive,
-    handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
+    handleSend, handleAbort, startSideChat, handleFork, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
-    handleRecallQueue,
+    handleQueuedAction, handleEditContent, dismissCompactError, editEntryId, cancelEdit,
     handleBuiltinSlashCommand,
-    handleToolPresetChange, handleThinkingLevelChange, loadSlashCommands, scrollUserMsgToTop,
+    handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadSlashCommands, loadAllModels, scrollUserMsgToTop,
     loadContext, activeLeafId, scrollToBottom, scrollToMessage,
   } = useAgentSession({
-    session, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd: wrappedOnAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked,
-    modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen,
+    session, sessionRunning, newSessionCwd, newSessionDraftKey, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd: wrappedOnAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
+    modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen,
+    background,
+    dormant,
+    onOpenSettings, onDebugSnapshotReaderChange, t,
     deferInitialScroll: Boolean(pendingScrollRestore),
   });
+  // Only whether a reply is streaming and has content yet: the chunks themselves
+  // re-render StreamingReply alone.
+  const isStreaming = useStreamingSelector(streamingStore, selectIsStreaming);
+  const hasStreamingContent = useStreamingSelector(streamingStore, selectHasStreamingContent);
+  const streamingMessage = useStreamingSelector(streamingStore, selectStreamingMessage);
+  // streamState shape kept from the dev hook contract; derived from the store selectors.
+  const streamState = useMemo(() => ({ isStreaming, streamingMessage }), [isStreaming, streamingMessage]);
+  const getStreamingMessage = useCallback(() => streamingStore.getState().streamingMessage, [streamingStore]);
   const sessionBusy = agentRunning || bashRunning;
+  // Context window + live reading for usage lines: the polled reading when a
+  // run is active, the session-stats fallback while just browsing. Held in a
+  // ref so an update does not recompute the whole memoized message list.
+  const ctxInfoRef = useRef(contextUsage ?? sessionStats?.contextUsage ?? null);
+  ctxInfoRef.current = contextUsage ?? sessionStats?.contextUsage ?? null;
+  // Read-only record of this run's answered dialogs, shown in the dialog header
+  // so sequential questions ("问题 1/2") keep their earlier answers visible.
+  const [answeredDialogs, setAnsweredDialogs] = useState<Array<{ id: string; question: string; answer: string; cancelled?: boolean }>>([]);
+  // Answers belong to one ask sequence; a new run starts a clean page so the
+  // previous run's answers cannot inflate the next dialog's "N/M" pager.
+  const sessionBusyPrevRef = useRef(sessionBusy);
+  useEffect(() => {
+    if (sessionBusy && !sessionBusyPrevRef.current) setAnsweredDialogs([]);
+    sessionBusyPrevRef.current = sessionBusy;
+  }, [sessionBusy]);
+  const handleDialogRespond = useCallback((request: ExtensionDialogRequest, response: { value: string } | { confirmed: boolean } | { cancelled: true }) => {
+    const question = (request.title.split("\n").find((line: string) => line.trim()) ?? request.title).trim().slice(0, 80);
+    let answer: string;
+    let cancelled = false;
+    if ("cancelled" in response) {
+      answer = t("chat.cancel");
+      cancelled = true;
+    } else if ("confirmed" in response) {
+      answer = t("chat.confirm");
+    } else {
+      answer = response.value;
+    }
+    setAnsweredDialogs((prev) => [...prev.slice(-9), { id: request.id, question, answer, cancelled }]);
+    respondToExtensionUi(request, response);
+  }, [respondToExtensionUi, t]);
+  // While this session's run is under way its chime may come with the phone
+  // locked, where a suspended context cannot start again (#1157).
+  useEffect(() => {
+    if (!agentRunning || !holdAudio) return;
+    return holdAudio();
+  }, [agentRunning, holdAudio]);
   const [quotedSelection, setQuotedSelection] = useState<{
     text: string;
+    sourceEntryId?: string;
     top: number;
     left: number;
-    sourceEntryId?: string;
   } | null>(null);
   const [quoteInputOpen, setQuoteInputOpen] = useState(false);
+  const [quoteAskTarget, setQuoteAskTarget] = useState<"side" | "new">("side");
   const [quoteSubmitting, setQuoteSubmitting] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const quotePopoverRef = useRef<HTMLDivElement | null>(null);
@@ -348,7 +411,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       ? range.endContainer as Element
       : range.endContainer.parentElement;
     const sourceEntryId = [ancestor, start, end]
-      .map((element) => element?.closest<HTMLElement>("[data-message-role=\"assistant\"]")?.dataset.entryId)
+      .map((element) => element?.closest<HTMLElement>('[data-message-role="assistant"]')?.dataset.entryId)
       .find((entryId): entryId is string => Boolean(entryId));
     setQuotedSelection({
       text,
@@ -417,6 +480,42 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     closeQuotedSelection();
   }, [chatInputRef, quotedSelection, closeQuotedSelection]);
 
+  const askSelectionInSideChat = useCallback(async (prompt: string) => {
+    if (quoteSubmitting || !prompt.trim() || !quotedSelection) return;
+    setQuoteSubmitting(true);
+    setQuoteError(null);
+    try {
+      const refusal = await startSideChat(prompt, quotedSelection.text);
+      if (!refusal) {
+        closeQuotedSelection();
+        return;
+      }
+      quoteChatInputRef.current?.restoreSubmission(prompt);
+      setQuoteError(refusal);
+    } catch (error) {
+      quoteChatInputRef.current?.restoreSubmission(prompt);
+      setQuoteError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setQuoteSubmitting(false);
+    }
+  }, [quotedSelection, quoteSubmitting, closeQuotedSelection, startSideChat]);
+
+  // The composer's Side chat button: its draft goes back on a refusal, as a failed send's does.
+  const askInSideChat = useCallback(async (message: string) => {
+    let refusal: string | null;
+    try {
+      refusal = await startSideChat(message);
+    } catch (error) {
+      refusal = error instanceof Error ? error.message : String(error);
+    }
+    if (!refusal) return;
+    chatInputRef?.current?.restoreSubmission(message);
+    addNotice({ type: "error", message: refusal });
+  }, [addNotice, chatInputRef, startSideChat]);
+
+  const initialPromptSentRef = useRef(false);
+
+  // dev：引用选区到新会话提问（上游 v0.14 同一弹窗改成了侧聊入口，两个入口并存）
   const askSelectionInNewChat = useCallback(async (prompt: string) => {
     const sourceSessionId = sessionIdRef.current ?? session?.id;
     if (quoteSubmitting || !prompt.trim() || !quotedSelection?.sourceEntryId || !sourceSessionId || !onAskInNewChat) return;
@@ -437,8 +536,6 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       setQuoteSubmitting(false);
     }
   }, [onAskInNewChat, quotedSelection, quoteSubmitting, session?.id, sessionIdRef, closeQuotedSelection, unlockAudio]);
-
-  const initialPromptSentRef = useRef(false);
   useEffect(() => {
     if (loading || error || !initialPrompt || initialPromptSentRef.current) return;
     initialPromptSentRef.current = true;
@@ -446,10 +543,10 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     void handleSend(initialPrompt);
   }, [initialPrompt, loading, error, handleSend, onInitialPromptConsumed]);
 
+  // Play the completion sound the first time a given extension dialog
+  // surfaces; queued dialogs behind it only ring when they reach the front.
   useEffect(() => {
-    if (
-      !completionNotificationsEnabled
-      || !extensionDialog
+    if (!extensionDialog || completionNotificationsEnabled === false
       || soundedExtensionDialogIdRef.current === extensionDialog.id
     ) return;
     soundedExtensionDialogIdRef.current = extensionDialog.id;
@@ -458,14 +555,63 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
   // Register the abort handler for the global Esc shortcut
   useEffect(() => {
-    registerAbortHandler(sessionBusy ? handleAbort : null);
-  }, [sessionBusy, handleAbort]);
+    if (!panel) registerAbortHandler(sessionBusy ? handleAbort : null);
+  }, [panel, sessionBusy, handleAbort]);
 
   // --- Lazy-load historical messages ---
   // Only render the last N messages initially. When the user scrolls to the
   // top, load another page while keeping the scroll position stable.
   const [visibleCount, setVisibleCount] = useState(VISIBLE_PAGE_SIZE);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useMessageRefs(messages.length);
+  const messagesLenRef = useRef(0);
+  messagesLenRef.current = messages.length;
+  // Whole-branch turn index for the minimap's listing: turns the chat has not
+  // loaded still show their preview there and page in when clicked. Absent
+  // (fetch failed or still loading), the minimap falls back to loaded turns.
+  const [minimapTurnIndex, setMinimapTurnIndex] = useState<MinimapTurnDescriptor[]>([]);
+  // The chat pane's width decides whether the minimap shows at all — the
+  // message column reserves the rail strip at any width, so overlap is never
+  // the question. Callback ref + element state: the component first renders a
+  // loading branch without the pane, so the observer must start when the pane
+  // actually mounts. State holds only the visibility decision: dragging the
+  // panel divider fires per pixel, and a boolean keeps every non-crossing
+  // frame a no-op instead of re-rendering the whole chat window.
+  const [chatPaneElement, setChatPaneElement] = useState<HTMLDivElement | null>(null);
+  const [minimapPaneWide, setMinimapPaneWide] = useState(false);
+  useLayoutEffect(() => {
+    if (!chatPaneElement) return;
+    const observer = new ResizeObserver((entries) => {
+      setMinimapPaneWide((entries[0]?.contentRect.width ?? 0) >= MINIMAP_MIN_PANE_WIDTH);
+    });
+    observer.observe(chatPaneElement);
+    return () => observer.disconnect();
+  }, [chatPaneElement]);
+  // The rail's own visibility lives in ChatMinimap (scroll-handler + measure
+  // path on one source of truth); it reports up so the reserved strip — and
+  // the centering shift it causes — keys on the same fact instead of a
+  // duplicate computation with its own lifecycle holes.
+  const [minimapRailVisible, setMinimapRailVisible] = useState(false);
+  useEffect(() => {
+    const sid = session?.id;
+    if (!sid) {
+      setMinimapTurnIndex([]);
+      return;
+    }
+    const controller = new AbortController();
+    const params = activeLeafId ? `?leafId=${encodeURIComponent(activeLeafId)}` : "";
+    fetch(`/api/sessions/${encodeURIComponent(sid)}/turns${params}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { turns?: MinimapTurnDescriptor[] } | null) => {
+        if (data && Array.isArray(data.turns)) setMinimapTurnIndex(data.turns);
+      })
+      .catch(() => {
+        // Aborted or transient; the minimap lists loaded turns only.
+      });
+    return () => controller.abort();
+  }, [session?.id, activeLeafId]);
+  // State, not a ref: the sentinel can appear with nothing else changing (a
+  // finished turn regrouped into more rows), and must get an observer then.
+  const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   const prevScrollDistanceRef = useRef<number | null>(null);
   const loadingOlderRef = useRef(false);
@@ -492,6 +638,25 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     if (!context && requestedCursorRef.current === before) requestedCursorRef.current = null;
     return context;
   }, [activeLeafId, loadContext]);
+  // Jump to a minimap turn: reveal everything already in memory, then page
+  // ancestors in until the turn's anchor entry is loaded. Pages are small
+  // (≈10–15 turns each) and the loop stops the moment the anchor lands, so
+  // clicking a nearby turn never drags in thirty; the minimap scrolls once
+  // the anchor renders.
+  const revealTurnForMinimap = useCallback(async (turnNumber: number) => {
+    setVisibleCount((current) => Math.max(current, messagesLenRef.current * 2));
+    const sid = session?.id;
+    const target = minimapTurnIndex[turnNumber];
+    if (!sid || !target) return;
+    for (let guard = 0; guard < 100; guard++) {
+      const snapshot = searchHistoryRef.current;
+      if (snapshot.entryIds.includes(target.entryId)) break;
+      if (!snapshot.historyCursor || !snapshot.hasEarlierMessages) break;
+      const page = await loadOlderPage(sid, snapshot.historyCursor, { tail: 100 });
+      if (!page) break;
+    }
+    setVisibleCount((current) => Math.max(current, messagesLenRef.current));
+  }, [session?.id, minimapTurnIndex, loadOlderPage]);
   useEffect(() => {
     // A reloaded history can come back to a cursor asked for before.
     if (historyCursor !== requestedCursorRef.current) requestedCursorRef.current = null;
@@ -527,6 +692,56 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   useEffect(() => {
     if (searchTarget) setPendingScrollRestore(null);
   }, [searchTarget]);
+
+  // Expanding a collapsed thinking row or tool card grows the content. While
+  // the user reads at the tail, keep the tail in view instead of letting the
+  // opened body fall below the fold.
+  useEffect(() => {
+    const onExpanded = () => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      // Measured synchronously: the expansion has not painted yet, so this is
+      // the pre-expand distance from the tail.
+      if (!isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)) return;
+      requestAnimationFrame(() => scrollToBottom("smooth"));
+    };
+    window.addEventListener(COLLAPSIBLE_EXPANDED_EVENT, onExpanded);
+    return () => window.removeEventListener(COLLAPSIBLE_EXPANDED_EVENT, onExpanded);
+  }, [scrollContainerRef, scrollToBottom]);
+
+  // Focusing the composer on a phone opens the keyboard, and the browser then
+  // scrolls every ancestor it can to reveal the caret — the message list lands
+  // somewhere the user never asked for (queue rows make the composer taller and
+  // the jump worse). Put the list back where it was: once after layout settles
+  // and again on the keyboard's first viewport resize. At the tail the restore
+  // clamps to the new (shorter) maximum, so tail-stick survives; mid-list the
+  // reading position holds.
+  useEffect(() => {
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.matches?.("[data-chat-composer]")) return;
+      const container = scrollContainerRef.current;
+      const containerTop = container?.scrollTop ?? null;
+      const pageTop = window.scrollY;
+      let seenViewportResize = false;
+      const restore = () => {
+        if (container && containerTop !== null) container.scrollTop = containerTop;
+        window.scrollTo(0, pageTop);
+      };
+      const viewport = window.visualViewport;
+      const onViewportResize = () => {
+        if (seenViewportResize) return;
+        seenViewportResize = true;
+        restore();
+        viewport?.removeEventListener("resize", onViewportResize);
+      };
+      requestAnimationFrame(() => requestAnimationFrame(restore));
+      viewport?.addEventListener("resize", onViewportResize);
+      window.setTimeout(() => viewport?.removeEventListener("resize", onViewportResize), 800);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, [scrollContainerRef]);
 
   useEffect(() => {
     const position = pendingScrollRestore;
@@ -634,7 +849,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     if (element) {
       scrollToMessage(element);
       element.animate([
-        { backgroundColor: "var(--bg-selected)" },
+        { backgroundColor: "var(--accent)" },
         { backgroundColor: "transparent" },
       ], { duration: 2500 });
     }
@@ -645,17 +860,24 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   // IntersectionObserver on the sentinel div at the top of the message list.
   // When it becomes visible, load the next page of older messages.
   useEffect(() => {
-    const sentinel = sentinelRef.current;
     const container = scrollContainerRef.current;
     if (!sentinel || !container) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
-        // No older history loaded yet: fetch the previous page from the server
-        // and prepend it (loadContext handles prepend + scroll anchoring).
-        // Skip while a page is already loading or nothing older exists.
+        // Skip while a page is already loading.
         if (loadingOlderRef.current) return;
-        if (!hasEarlierMessages) return;
+        if (!hasEarlierMessages) {
+          // Everything is loaded, yet the sentinel shows: the messages render as
+          // more rows than the window holds (an answer and its thinking are
+          // two), so widen the window. The observer is renewed with it, in case
+          // the sentinel stays in view.
+          prevScrollDistanceRef.current = captureScrollDistance(container.scrollHeight, container.scrollTop);
+          setVisibleCount((current) => getNextVisibleCount(current));
+          return;
+        }
+        // Fetch the previous page from the server and prepend it (loadContext
+        // handles prepend + scroll anchoring).
         const oldestId = historyCursor;
         // Its page already landed; the next cursor has not rendered yet.
         if (!oldestId || oldestId === requestedCursorRef.current) return;
@@ -671,7 +893,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef]);
+  }, [sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef]);
 
   // Keep the rendered window at least as large as what's loaded, so prepended
   // (older) pages stay visible instead of being sliced off the top.
@@ -712,8 +934,9 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   const sessionStatsRef = useRef(sessionStats);
   sessionStatsRef.current = sessionStats;
   useEffect(() => {
+    if (background) return;
     onSessionStatsChange?.(sessionStatsRef.current);
-  }, [statsKey, onSessionStatsChange]);
+  }, [background, statsKey, onSessionStatsChange]);
   useEffect(() => () => { onSessionStatsChange?.(null); }, [onSessionStatsChange]);
 
   // Push context usage up to AppShell as well.
@@ -723,19 +946,59 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   const contextUsageRef = useRef(contextUsage);
   contextUsageRef.current = contextUsage;
   useEffect(() => {
+    if (background) return;
     onContextUsageChange?.(contextUsageRef.current);
-  }, [ctxKey, onContextUsageChange]);
+  }, [background, ctxKey, onContextUsageChange]);
   useEffect(() => () => { onContextUsageChange?.(null); }, [onContextUsageChange]);
 
-  const onDrop = useCallback((files: File[]) => {
-    chatInputRef?.current?.addImages(files);
-  }, [chatInputRef]);
+  // Images attach to the prompt. Other files go through the file explorer's
+  // upload into the working directory, never replacing a file already there,
+  // and come back as @mentions. The composer's attach button takes the same
+  // path, for phones that cannot drop files.
+  const uploadDroppedFiles = useCallback(async (files: File[]) => {
+    const cwd = session?.cwd ?? newSessionCwd;
+    if (!cwd) {
+      addNotice({ type: "warning", message: t("chat.dropNeedsCwd") });
+      return;
+    }
+    try {
+      const { status, data } = await uploadFiles(cwd, files, "skip");
+      if (status !== 200 && status !== 207) throw new Error(data.error ?? `HTTP ${status}`);
+      const uploaded = data.uploaded ?? [];
+      const skipped = data.skipped ?? [];
+      const mentions = dropMentionText(files, [...uploaded, ...skipped]);
+      if (mentions) chatInputRef?.current?.insertText(mentions);
+      if (uploaded.length > 0) {
+        addNotice({ type: "success", message: t("chat.dropUploaded", { count: uploaded.length }) });
+        onFilesUploaded?.();
+      }
+      if (skipped.length > 0) {
+        addNotice({ type: "warning", message: t("chat.dropAlreadyExists", { names: skipped.join(", ") }) });
+      }
+      for (const failure of data.errors ?? []) {
+        addNotice({ type: "error", message: t("chat.dropFailed", { message: `${failure.name}: ${failure.error}` }) });
+      }
+    } catch (uploadError) {
+      addNotice({ type: "error", message: t("chat.dropFailed", { message: uploadError instanceof Error ? uploadError.message : String(uploadError) }) });
+    }
+  }, [addNotice, chatInputRef, newSessionCwd, onFilesUploaded, session?.cwd, t]);
+
+  const onDrop = useCallback((items: DroppedItem[]) => {
+    const { images, files, folders } = splitDroppedItems(items);
+    if (images.length > 0) chatInputRef?.current?.addImages(images);
+    if (folders.length > 0) {
+      addNotice({ type: "warning", message: t("chat.dropFoldersUnsupported", { names: folders.join(", ") }) });
+    }
+    if (files.length > 0) void uploadDroppedFiles(files);
+  }, [addNotice, chatInputRef, t, uploadDroppedFiles]);
+
+  const onAttachFiles = useCallback((files: File[]) => {
+    onDrop(files.map((file) => ({ kind: "file", file })));
+  }, [onDrop]);
 
   const { isDragOver, handleDragEnter, handleDragOver, handleDragLeave, handleDrop } = useDragDrop(onDrop);
-
-  const visibleMessages = messages.filter((m) => isMessageGroupAnchor(m) || m.role === "assistant");
   // Stable Map identity: `messages` doesn't change during streaming updates
-  // (the streaming message lives in streamState), so memoized MessageViews
+  // (the streaming message lives in streamingStore), so memoized MessageViews
   // skip re-rendering on every message_update event. An inline `new Map()`
   // here used to defeat MessageView's memo() on each streamed chunk.
   const toolResultsMap = useMemo(() => {
@@ -759,14 +1022,8 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     }
     return history.reverse();
   }, [messages]);
-  const messageRefs = useMessageRefs(visibleMessages.length);
-  const revealHistoryForMinimap = useCallback(() => {
-    setVisibleCount((current) => Math.max(current, messages.length * 2));
-  }, [messages.length]);
-
   const isEmptyNew = isNew && messages.length === 0 && !streamState.isStreaming && !sessionBusy;
   useScrollbarVisibility(scrollContainerRef, Boolean(session?.id) || !isEmptyNew);
-  const hasStreamingContent = Boolean(streamState.streamingMessage?.content.length);
   const messageCwd = session?.cwd ?? newSessionCwd ?? undefined;
   const promptAnchorSpacerRef = useRef<HTMLDivElement | null>(null);
   const promptAnchorSpacerHeightRef = useRef(0);
@@ -862,9 +1119,11 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     scrollUserMsgToTop,
   ]);
 
-  useLayoutEffect(() => {
+  // Each streamed chunk StreamingReply commits, and the bubble coming and going.
+  const updatePromptAnchor = useCallback(() => {
     promptAnchorUpdateRef.current?.();
-  }, [streamState.streamingMessage]);
+  }, []);
+  useLayoutEffect(updatePromptAnchor, [isStreaming, hasStreamingContent, updatePromptAnchor]);
 
   const availableThinkingLevels = displayModelValue
     ? (modelThinkingLevels[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
@@ -879,8 +1138,9 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       ref={chatInputRef}
       onSend={handleSend}
       onAbort={handleAbort}
-      onSteer={agentRunning ? handleSteer : undefined}
+      onSideChat={onSideSession && !isHiddenRelation(session?.relation) ? askInSideChat : undefined}
       onFollowUp={agentRunning ? handleFollowUp : undefined}
+      onSteer={agentRunning ? handleSteer : undefined}
       onPromptWithStreamingBehavior={agentRunning ? handlePromptWithStreamingBehavior : undefined}
       isStreaming={sessionBusy}
       model={displayModelValue}
@@ -888,81 +1148,407 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       modelNames={modelNames}
       modelList={modelList}
       modelError={modelError}
+      missingCwd={missingCwd}
       modelScopeWarnings={modelScopeWarnings}
+      allModelList={allModelList}
+      onLoadAllModels={isModelScopeActive ? loadAllModels : undefined}
       onModelChange={handleModelChange}
       modelSwitching={modelSwitching}
+      defaultModel={defaultModel}
+      onSetDefaultModel={handleSetDefaultModel}
       onCompact={session || isNew ? handleCompact : undefined}
       onAbortCompaction={handleAbortCompaction}
       isCompacting={isCompacting}
       compactError={compactError}
+      onDismissCompactError={dismissCompactError}
       compactResult={compactResult}
       toolPreset={toolPreset}
-      onToolPresetChange={session || isNew ? handleToolPresetChange : undefined}
+      extensionStatuses={extensionStatuses}
+      onToolPresetChange={(session && !isHiddenRelation(session.relation)) || isNew ? handleToolPresetChange : undefined}
       thinkingLevel={thinkingLevel}
       isAutoThinkingSelection={isAutoThinkingSelection}
       onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
       availableThinkingLevels={availableThinkingLevels}
       thinkingLevelMap={currentThinkingLevelMap}
+      savedDefaultThinkingLevel={savedDefaultThinkingLevel}
+      onSetDefaultThinkingLevel={session || isNew ? handleSetDefaultThinkingLevel : undefined}
       retryInfo={retryInfo}
-      queuedMessages={queuedMessages}
+      queuedSubmissions={queuedSubmissions}
       inputHistory={inputHistory}
-      onRecallQueue={handleRecallQueue}
+      onQueuedAction={handleQueuedAction}
       slashCommands={slashCommands}
       slashCommandsLoading={slashCommandsLoading}
       onLoadSlashCommands={loadSlashCommands}
       onBuiltinCommand={handleBuiltinSlashCommand}
-      soundEnabled={soundEnabled}
-      onSoundToggle={onSoundToggle}
       onAudioUnlock={unlockAudio}
       draftKey={session?.id ?? newSessionDraftKey ?? undefined}
       cwd={session?.cwd ?? newSessionCwd}
+      onAttachFiles={onAttachFiles}
     />
   );
 
+  // The message list is built in one memoized pass. Streaming chunks only change
+  // `streamState`, so the memo holds across them: per-chunk renders reuse the
+  // previous element identities and the memoized message/activity views skip
+  // re-rendering. Recomputes happen on message appends (a few times per turn),
+  // search reveals, and run boundaries.
+  const messageListView = useMemo(() => {
+    let liveActivityRendered = false;
+      let lastUserIdx = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "user") { lastUserIdx = i; break; }
+      }
+      // Anchor for live-tail detection. A compaction summary or subagent
+      // completion can sit after the last user message and own the
+      // still-streaming segment. lastUserIdx stays the scroll target.
+      let lastAnchorIdx = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (isMessageGroupAnchor(messages[i])) { lastAnchorIdx = i; break; }
+      }
+
+      const visibleRefIndexByMessage = new Map<number, number>();
+      let refIdx = 0;
+      messages.forEach((msg, idx) => {
+        if (isMessageGroupAnchor(msg) || msg.role === "assistant") {
+          visibleRefIndexByMessage.set(idx, refIdx++);
+        }
+      });
+
+      const attachVisibleRef = (idx: number, refIndex: number) => (el: HTMLDivElement | null) => {
+        messageRefs.current[refIndex] = el;
+        if (idx === lastUserIdx) { (lastUserMsgRef as { current: HTMLDivElement | null }).current = el; }
+      };
+
+      const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; showModelLabel?: boolean; hideCopy?: boolean } = {}): ReactNode => {
+        const msg = options.messageOverride ?? messages[idx];
+        // pi's TUI never renders custom messages without a display payload; one
+        // card per idle session restart flooded the chat (#1043).
+        if (isHiddenCustomMessage(msg as { role?: AgentMessage["role"]; display?: boolean })) return null;
+        const isVisible = isMessageGroupAnchor(msg) || msg.role === "assistant";
+        const currentRefIdx = visibleRefIndexByMessage.get(idx);
+        const keyPrefix = options.keyPrefix ?? "message";
+        const messageKey = entryIds[idx] ?? idx;
+        let showTimestamp = false;
+        if (msg.role === "assistant") {
+          showTimestamp = true;
+          for (let j = idx + 1; j < messages.length; j++) {
+            const r = messages[j].role;
+            if (r === "user") break;
+            if (r === "assistant") { showTimestamp = false; break; }
+          }
+          // Hide on the currently-streaming tail (the streaming bubble owns the live timestamp)
+          if (showTimestamp && streamState.isStreaming && idx === messages.length - 1) {
+            showTimestamp = false;
+          }
+        }
+        if (options.showTimestamp !== undefined) showTimestamp = options.showTimestamp;
+        const view = (
+          <MessageView
+            key={`${keyPrefix}-view-${messageKey}`}
+            message={msg}
+            toolResults={toolResultsMap}
+            modelNames={modelNames}
+            cwd={messageCwd}
+            onOpenFile={onOpenFile}
+            onOpenSubagent={onOpenSubagent}
+            entryId={entryIds[idx]}
+            searchBlock={entryIds[idx] === pendingSearchScroll?.entryId ? searchBlock : undefined}
+            onFork={bashRunning || isNew ? undefined : handleFork}
+            forking={forkingEntryId === entryIds[idx]}
+            onEditContent={sessionBusy ? undefined : handleEditContent}
+            isEditing={entryIds[idx] !== undefined && editEntryId === entryIds[idx]}
+            onCancelEdit={cancelEdit}
+            showTimestamp={showTimestamp}
+            prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
+            sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+            writtenFiles={options.writtenFiles}
+            showModelLabel={options.showModelLabel}
+            hideCopy={options.hideCopy}
+          />
+        );
+        if (!isVisible || currentRefIdx === undefined) return view;
+        return (
+          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} className="cv-block" ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
+            {view}
+          </div>
+        );
+      };
+
+      const rendered: ReactNode[] = [];
+      let idx = 0;
+      // Lazy pagination: the loaded window may begin mid-turn, before
+      // this turn's user message, so the anchor scan cannot group it.
+      // Render that partial head as flat activity rows (like the live
+      // tail) instead of standalone messages; once earlier messages
+      // finish loading the turn regroups normally.
+      if (hasEarlierMessages && messages.length > 0 && !isMessageGroupAnchor(messages[0])) {
+        let headEnd = 0;
+        while (headEnd < messages.length && !isMessageGroupAnchor(messages[headEnd])) headEnd += 1;
+        const headItems = buildTurnActivityItems({
+          messages,
+          startIdx: 0,
+          endIdx: headEnd,
+          entryIds,
+          toolResults: toolResultsMap,
+          searchEntryId: pendingSearchScroll?.entryId,
+          searchBlock,
+        });
+        if (headItems.length > 0) {
+          rendered.push(
+            <TurnActivityBody
+              key="head-activity"
+              items={headItems}
+              ctxWindow={ctxInfoRef.current?.contextWindow}
+              cwd={messageCwd}
+              onOpenFile={onOpenFile}
+              onOpenSubagent={onOpenSubagent}
+              sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+            />,
+          );
+        } else {
+          for (let headIdx = 0; headIdx < headEnd; headIdx++) {
+            rendered.push(renderMessage(headIdx, { showModelLabel: true }));
+          }
+        }
+        idx = headEnd;
+      }
+      for (; idx < messages.length;) {
+        const msg = messages[idx];
+        if (!isMessageGroupAnchor(msg)) {
+          rendered.push(renderMessage(idx, { showModelLabel: true }));
+          idx += 1;
+          continue;
+        }
+
+        const userIdx = idx;
+        let endIdx = userIdx + 1;
+        while (endIdx < messages.length && !isMessageGroupAnchor(messages[endIdx])) endIdx += 1;
+
+        const finalAssistantIdx = findFinalAssistantIndex(messages, userIdx, endIdx);
+
+        if (finalAssistantIdx === -1) {
+          for (let renderIdx = userIdx; renderIdx < endIdx; renderIdx++) {
+            rendered.push(renderMessage(renderIdx, { showModelLabel: true }));
+          }
+          idx = endIdx;
+          continue;
+        }
+
+        const isLiveTail = (sessionBusy || streamState.isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
+        if (isLiveTail) {
+          // A running turn streams as flat activity rows (no wrapper, no
+          // final-answer split); once settled the turn regroups below.
+          rendered.push(renderMessage(userIdx));
+          const liveItems = buildTurnActivityItems({
+            messages,
+            startIdx: userIdx + 1,
+            endIdx,
+            entryIds,
+            toolResults: toolResultsMap,
+            searchEntryId: pendingSearchScroll?.entryId,
+            searchBlock,
+          });
+          if (liveItems.length > 0) {
+            liveActivityRendered = true;
+            rendered.push(
+              <TurnActivityBody
+                key={`live-activity-${entryIds[userIdx] ?? userIdx}`}
+                items={liveItems}
+                ctxWindow={ctxInfoRef.current?.contextWindow}
+                cwd={messageCwd}
+                onOpenFile={onOpenFile}
+                onOpenSubagent={onOpenSubagent}
+                sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+                live
+              />,
+            );
+          }
+          idx = endIdx;
+          continue;
+        }
+
+        rendered.push(renderMessage(userIdx));
+
+        // Per-turn view model, cached by the turn's entry fingerprint so its
+        // object identities survive list recomputes (memoized MessageView /
+        // TurnActivityBody then skip finished turns entirely).
+        const turnView = getFinishedTurnView({
+          messages,
+          userIdx,
+          endIdx,
+          finalAssistantIdx,
+          entryIds,
+          cwd: messageCwd,
+          searchEntryId: pendingSearchScroll?.entryId,
+          searchBlockKey: pendingSearchScroll?.blockIndex,
+          searchBlock,
+        });
+        const { finalAnswerMessage, writtenFiles, activityItems, processBlockLimitByIdx } = turnView;
+
+        // Search reveal: the outer group opens when the hit sits inside it.
+        let revealProcess = false;
+        let processRefIdx: number | undefined;
+        for (let processIdx = userIdx + 1; processIdx <= finalAssistantIdx; processIdx++) {
+          const processMessage = messages[processIdx];
+          if (processMessage.role === "custom" && isHiddenCustomMessage(processMessage)) continue;
+          const hitsEntry = Boolean(pendingSearchScroll && pendingSearchScroll.entryId === entryIds[processIdx]);
+          if (processMessage.role === "custom") {
+            revealProcess ||= hitsEntry;
+            processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
+            continue;
+          }
+          if (processMessage.role !== "assistant") continue;
+          const processContent = (processMessage as AssistantMessage).content ?? [];
+          const processLimit = processBlockLimitByIdx?.get(processIdx) ?? processContent.length;
+          if (processLimit === 0) continue;
+          processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
+          revealProcess ||= hitsEntry && (!searchBlock || processContent.slice(0, processLimit).includes(searchBlock));
+        }
+
+        const categoryCounts = new Map<ToolCategory, number>();
+        for (const item of activityItems) {
+          if (item.kind === "tool") {
+            const category = getToolCategory(item.block.toolName);
+            categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
+          }
+        }
+        let processMessageCount = 0;
+        for (let processIdx = userIdx + 1; processIdx <= finalAssistantIdx; processIdx++) {
+          const role = messages[processIdx]?.role;
+          if (role === "custom" && isHiddenCustomMessage(messages[processIdx])) continue;
+          if (role === "assistant" || role === "custom") processMessageCount += 1;
+        }
+        const categorySummary = [...categoryCounts.entries()]
+          .map(([category, count]) => `${count} ${t(TOOL_CATEGORY_LABEL_KEYS[category])}`)
+          .join(" · ");
+        const processSummary = categorySummary
+          ? `${t("chat.processDetails")} · ${categorySummary}`
+          : `${t("chat.processDetails")} · ${processMessageCount} ${t(processMessageCount === 1 ? "chat.message" : "chat.messages")}`;
+
+        if (activityItems.length > 0) {
+          rendered.push(
+            <div
+              key={`process-group-${entryIds[userIdx] ?? userIdx}`}
+              className="cv-block"
+              ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
+            >
+              <ProcessDetailsGroup key={finalAnswerMessage ? "answered" : "unanswered"} summary={processSummary} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
+                <TurnActivityBody
+                  items={activityItems}
+                  ctxWindow={ctxInfoRef.current?.contextWindow}
+                  cwd={messageCwd}
+                  onOpenFile={onOpenFile}
+                  onOpenSubagent={onOpenSubagent}
+                  sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+                />
+              </ProcessDetailsGroup>
+            </div>,
+          );
+        }
+
+        if (finalAnswerMessage) {
+          rendered.push(renderMessage(finalAssistantIdx, {
+            messageOverride: finalAnswerMessage,
+            writtenFiles,
+            // The turn's timestamp lives on the TurnMetaLine right below; a
+            // second copy in the message footer read like a rendering glitch.
+            showTimestamp: false,
+            // The copy affordance joins the TurnMetaLine instead of hanging
+            // alone under the reply.
+            hideCopy: true,
+          }));
+        }
+
+        // One aggregated usage/model/time line per turn replaces the
+        // per-message usage rows and model labels. ctx = context occupancy
+        // after this turn: the next request's prompt, or the live reading
+        // while this is still the conversation tail.
+        const { usage: turnUsage, lastAssistant: turnLastAssistant } = turnView;
+        const finalAnswerCopyText = finalAnswerMessage
+          ? (finalAnswerMessage.content ?? [])
+              .filter((b): b is TextContent => b.type === "text")
+              .map((b) => b.text)
+              .join("\n")
+          : "";
+        const isConversationTail = endIdx >= messages.length;
+        const liveCtx = turnView.nextPromptTokens === undefined && isConversationTail
+          ? ctxInfoRef.current ?? null
+          : null;
+        rendered.push(
+          <TurnMetaLine
+            key={`turn-meta-${entryIds[userIdx] ?? userIdx}`}
+            usage={turnUsage}
+            model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
+            time={formatTime(turnLastAssistant?.timestamp)}
+            copySource={finalAnswerCopyText || undefined}
+            ctxTokens={turnView.nextPromptTokens}
+            liveCtx={liveCtx}
+            ctxWindow={ctxInfoRef.current?.contextWindow}
+          />,
+        );
+
+        for (let renderIdx = finalAssistantIdx + 1; renderIdx < endIdx; renderIdx++) {
+          rendered.push(renderMessage(renderIdx, { showModelLabel: true }));
+        }
+        idx = endIdx;
+      }
+    return { rendered, liveActivityRendered };
+  }, [messages, entryIds, toolResultsMap, hasEarlierMessages, streamState.isStreaming, sessionBusy,
+     forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
+     sessionIdRef, handleFork, handleEditContent, onOpenFile, onOpenSubagent,
+     isNew, messageRefs, lastUserMsgRef, bashRunning, editEntryId, cancelEdit]);
+  const { rendered: turnRendered, liveActivityRendered } = messageListView;
+  const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
+  const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-text-muted">
-         {t("chat.loadingSession")}
+      <div className="flex h-full flex-col justify-center gap-3 px-10">
+        <Skeleton className="h-4 w-2/5" />
+        <Skeleton className="h-4 w-3/5" />
+        <Skeleton className="h-4 w-1/2" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center text-red-400">
-        {error}
+      <div className="flex h-full items-center justify-center p-6">
+        <Alert variant="destructive" className="max-w-[560px]">
+          <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
+            {error}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
 
+
   return (
     <div
-      className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden [padding-bottom:calc(env(safe-area-inset-bottom,0px)/2)]"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {isDragOver && (
-        <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] items-center justify-center bg-[rgba(37,99,235,0.06)] backdrop-blur-[1px]">
+        <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] motion-reduce:animate-none items-center justify-center bg-primary/[0.06] backdrop-blur-[1px]">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             {[0, 0.8, 1.6].map((delay) => (
               <div
                 key={delay}
-                className="absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid border-[rgba(37,99,235,0.5)] animate-[drop-ripple_2.4s_ease-out_infinite_backwards]"
+                className="absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid border-primary/50 animate-[drop-ripple_2.4s_ease-out_infinite_backwards] motion-reduce:animate-none"
                 style={{ transformOrigin: "center", animationDelay: `${delay}s` }}
               />
             ))}
           </div>
           <svg
             width="280" height="280" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg"
-            className="drop-shadow-[0_6px_18px_rgba(37,99,235,0.18)]"
           >
-            <rect x="28" y="44" width="84" height="60" rx="8" fill="rgba(37,99,235,0.08)" stroke="rgba(37,99,235,0.50)" strokeWidth="1.8"/>
-            <path d="M36 100 L54 72 L68 88 L80 74 L104 100Z" fill="rgba(37,99,235,0.16)" stroke="rgba(37,99,235,0.40)" strokeWidth="1.4" strokeLinejoin="round"/>
-            <circle cx="96" cy="58" r="8" fill="rgba(37,99,235,0.22)" stroke="rgba(37,99,235,0.55)" strokeWidth="1.6"/>
-            <g stroke="rgba(37,99,235,0.45)" strokeWidth="1.4" strokeLinecap="round">
+            <rect x="28" y="44" width="84" height="60" rx="8" fill="var(--accent)" fill-opacity="0.08" stroke="var(--accent)" stroke-opacity="0.5" strokeWidth="1.8"/>
+            <path d="M36 100 L54 72 L68 88 L80 74 L104 100Z" fill="var(--accent)" fill-opacity="0.16" stroke="var(--accent)" stroke-opacity="0.4" strokeWidth="1.4" strokeLinejoin="round"/>
+            <circle cx="96" cy="58" r="8" fill="var(--accent)" fill-opacity="0.22" stroke="var(--accent)" stroke-opacity="0.55" strokeWidth="1.6"/>
+            <g stroke="var(--accent)" stroke-opacity="0.45" strokeWidth="1.4" strokeLinecap="round">
               <line x1="96" y1="46" x2="96" y2="43"/>
               <line x1="96" y1="70" x2="96" y2="73"/>
               <line x1="84" y1="58" x2="81" y2="58"/>
@@ -977,255 +1563,63 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       )}
 
       <div
-        style={{
-          position: "absolute",
-          top: 12,
-          left: 0,
-          right: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
-          zIndex: 40,
-          display: "flex",
-          // Toasts live in the top-right corner
-          justifyContent: "flex-end",
-          padding: `0 ${CHAT_COLUMN_PADDING}px`,
-          pointerEvents: "none",
-        }}
+        className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-end"
+        style={{ padding: `0 ${columnPadding}px` }}
       >
-        <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} />
+        <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} onDismiss={dismissNotice} />
       </div>
 
-      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div ref={setChatPaneElement} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {extensionDialog && (
-          <ExtensionDialog key={extensionDialog.id} request={extensionDialog} onRespond={respondToExtensionUi} />
+          <ExtensionDialog
+            key={extensionDialog.id}
+            request={extensionDialog}
+            waitingCount={waitingExtensionDialogCount}
+            queueTotal={extensionDialogQueue.length}
+            answered={answeredDialogs}
+            onRespond={handleDialogRespond}
+          />
         )}
         {extensionCustomUi && (
-          <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} onInput={sendExtensionCustomInput} />
+          <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} waitingCount={waitingExtensionCustomUiCount} onInput={sendExtensionCustomInput} />
         )}
         {!isEmptyNew && <>
         <div
           ref={scrollContainerRef}
           // The message list is the one place long output has to be dragged through,
-          // so it shows its scrollbar instead of hiding it behind the minimap (#788).
+          // so it shows its scrollbar instead of hiding it behind an overlay (#788).
           // A stable gutter keeps the centred column from shifting when a short
           // session grows past one screen.
-          className="scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-gutter:stable]"
-          style={{ visibility: pendingScrollRestore ? "hidden" : undefined }}
+          className={cn(
+            "scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-[22px] pb-2 max-sm:pt-4 [scrollbar-gutter:stable]",
+            pendingScrollRestore && "invisible",
+          )}
         >
-          <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
-            <div ref={messageContentRef} onPointerUp={captureQuotedSelection} style={{ width: "100%", minWidth: 0, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
-            {(() => {
-              let lastUserIdx = -1;
-              for (let i = messages.length - 1; i >= 0; i--) {
-                if (messages[i].role === "user") { lastUserIdx = i; break; }
-              }
-              // Anchor for live-tail detection. A compaction summary or subagent
-              // completion can sit after the last user message and own the
-              // still-streaming segment. lastUserIdx stays the scroll target.
-              let lastAnchorIdx = -1;
-              for (let i = messages.length - 1; i >= 0; i--) {
-                if (isMessageGroupAnchor(messages[i])) { lastAnchorIdx = i; break; }
-              }
-
-              const visibleRefIndexByMessage = new Map<number, number>();
-              let refIdx = 0;
-              messages.forEach((msg, idx) => {
-                if (isMessageGroupAnchor(msg) || msg.role === "assistant") {
-                  visibleRefIndexByMessage.set(idx, refIdx++);
-                }
-              });
-
-              const attachVisibleRef = (idx: number, refIndex: number) => (el: HTMLDivElement | null) => {
-                messageRefs.current[refIndex] = el;
-                if (idx === lastUserIdx) { (lastUserMsgRef as { current: HTMLDivElement | null }).current = el; }
-              };
-
-              const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; recoverTruncation?: boolean } = {}): ReactNode => {
-                const msg = options.messageOverride ?? messages[idx];
-                const isVisible = isMessageGroupAnchor(msg) || msg.role === "assistant";
-                const currentRefIdx = visibleRefIndexByMessage.get(idx);
-                const keyPrefix = options.keyPrefix ?? "message";
-                const messageKey = entryIds[idx] ?? idx;
-                let showTimestamp = false;
-                if (msg.role === "assistant") {
-                  showTimestamp = true;
-                  for (let j = idx + 1; j < messages.length; j++) {
-                    const r = messages[j].role;
-                    if (r === "user") break;
-                    if (r === "assistant") { showTimestamp = false; break; }
-                  }
-                  // Hide on the currently-streaming tail (the streaming bubble owns the live timestamp)
-                  if (showTimestamp && streamState.isStreaming && idx === messages.length - 1) {
-                    showTimestamp = false;
-                  }
-                }
-                if (options.showTimestamp !== undefined) showTimestamp = options.showTimestamp;
-                const view = (
-                  <MessageView
-                    key={`${keyPrefix}-view-${messageKey}`}
-                    message={msg}
-                    toolResults={toolResultsMap}
-                    modelNames={modelNames}
-                    cwd={messageCwd}
-                    onOpenFile={onOpenFile}
-                    onOpenSession={onOpenSession}
-                    entryId={entryIds[idx]}
-                    searchBlock={entryIds[idx] === pendingSearchScroll?.entryId ? searchBlock : undefined}
-                    onFork={sessionBusy || isNew ? undefined : handleFork}
-                    forking={forkingEntryId === entryIds[idx]}
-                    onNavigate={sessionBusy ? undefined : handleNavigate}
-                    onEditContent={handleEditContent}
-                    showTimestamp={showTimestamp}
-                    prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
-                    sessionId={session?.id ?? sessionIdRef.current ?? undefined}
-                    writtenFiles={options.writtenFiles}
-                    onCompact={options.recoverTruncation ? handleCompact : undefined}
-                    isCompacting={options.recoverTruncation ? isCompacting : undefined}
-                    compactError={options.recoverTruncation ? compactError : undefined}
-                  />
-                );
-                if (!isVisible || currentRefIdx === undefined) return view;
-                return (
-                  <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
-                    {view}
-                  </div>
-                );
-              };
-
-              const rendered: ReactNode[] = [];
-              for (let idx = 0; idx < messages.length;) {
-                const msg = messages[idx];
-                if (!isMessageGroupAnchor(msg)) {
-                  rendered.push(renderMessage(idx));
-                  idx += 1;
-                  continue;
-                }
-
-                const userIdx = idx;
-                let endIdx = userIdx + 1;
-                while (endIdx < messages.length && !isMessageGroupAnchor(messages[endIdx])) endIdx += 1;
-
-                const finalAssistantIdx = findFinalAssistantIndex(messages, userIdx, endIdx);
-
-                if (finalAssistantIdx === -1) {
-                  for (let renderIdx = userIdx; renderIdx < endIdx; renderIdx++) {
-                    rendered.push(renderMessage(renderIdx));
-                  }
-                  idx = endIdx;
-                  continue;
-                }
-
-                const isLiveTail = (sessionBusy || streamState.isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
-                if (isLiveTail) {
-                  for (let renderIdx = userIdx; renderIdx < endIdx; renderIdx++) {
-                    rendered.push(renderMessage(renderIdx));
-                  }
-                  idx = endIdx;
-                  continue;
-                }
-
-                rendered.push(renderMessage(userIdx));
-
-                const finalAssistant = messages[finalAssistantIdx] as AssistantMessage;
-                const finalSplit = splitFinalAssistantBlocks(finalAssistant);
-                const finalAnswerMessage = finalSplit.answerBlocks.length > 0 || getAssistantErrorMessage(finalAssistant) || isAssistantTruncated(finalAssistant)
-                  ? withAssistantBlocks(finalAssistant, finalSplit.answerBlocks)
-                  : null;
-
-                const finalProcessEnd = finalAssistant.content.indexOf(finalSplit.answerBlocks[0]);
-                // Keep the original prefix so deferred thinking retains its stored block indices.
-                const finalProcessBlocks = finalAssistant.content.slice(0, finalProcessEnd < 0 ? undefined : finalProcessEnd);
-
-                const processViews: ReactNode[] = [];
-                let processToolCount = 0;
-                let processRefIdx: number | undefined;
-                let revealProcess = false;
-
-                for (let processIdx = userIdx + 1; processIdx <= finalAssistantIdx; processIdx++) {
-                  const processMessage = messages[processIdx];
-                  if (processMessage.role === "custom") {
-                    revealProcess ||= Boolean(pendingSearchScroll && pendingSearchScroll.entryId === entryIds[processIdx]);
-                    processViews.push(renderMessage(processIdx, { attachRef: false, keyPrefix: "process" }));
-                    continue;
-                  }
-                  if (processMessage.role !== "assistant") continue;
-                  const message = processIdx === finalAssistantIdx
-                    ? withAssistantBlocks(processMessage, finalProcessBlocks, { omitUsage: Boolean(finalAnswerMessage) })
-                    : processMessage;
-                  const blocks = getDisplayableAssistantBlocks(message);
-                  if (blocks.length === 0) continue;
-                  processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
-                  processToolCount += countToolCallBlocks(blocks);
-                  revealProcess ||= Boolean(pendingSearchScroll && entryIds[processIdx] === pendingSearchScroll.entryId && (!searchBlock || blocks.includes(searchBlock)));
-                  processViews.push(renderMessage(processIdx, {
-                    attachRef: false,
-                    keyPrefix: "process",
-                    messageOverride: message,
-                    showTimestamp: false,
-                  }));
-                }
-
-                if (processViews.length > 0) {
-                  rendered.push(
-                    <div
-                      key={`process-group-${entryIds[userIdx] ?? userIdx}`}
-                      ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
-                    >
-                      <ProcessDetailsGroup messageCount={processViews.length} toolCallCount={processToolCount} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
-                        {processViews}
-                      </ProcessDetailsGroup>
-                    </div>,
-                  );
-                }
-
-                if (finalAnswerMessage) {
-                  // Each tool call is stored as its own assistant entry, so the
-                  // final answer alone carries no record of what the turn wrote.
-                  // Gather the turn's assistant blocks and derive the file list
-                  // from the write/edit calls among them.
-                  const turnContent: AssistantContentBlock[] = [];
-                  for (let i = userIdx + 1; i <= finalAssistantIdx; i++) {
-                    const m = messages[i];
-                    if (m?.role === "assistant") {
-                      for (const b of (m as AssistantMessage).content ?? []) turnContent.push(b);
-                    }
-                  }
-                  const writtenFiles = extractTurnWrittenFiles(turnContent, toolResultsMap, messageCwd);
-                  rendered.push(renderMessage(finalAssistantIdx, {
-                    messageOverride: finalAnswerMessage,
-                    writtenFiles,
-                    recoverTruncation: endIdx === messages.length && !streamState.isStreaming && !hasAssistantAnswer(finalAnswerMessage),
-                  }));
-                }
-                for (let renderIdx = finalAssistantIdx + 1; renderIdx < endIdx; renderIdx++) {
-                  rendered.push(renderMessage(renderIdx));
-                }
-                idx = endIdx;
-              }
-              const { startIndex } = getVisibleRenderWindow(rendered.length, visibleCount);
-              const hasMore = startIndex > 0 || hasEarlierMessages;
-              return (
-                <>
-                  {hasMore && (
-                     <div ref={sentinelRef} className="py-3 text-center text-xs text-text-muted">
-                       {t("chat.loadEarlier")}
-                    </div>
-                  )}
-                  {rendered.slice(startIndex)}
-                </>
-              );
-            })()}
+          <div style={{ minWidth: 0, padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
+            <div
+              ref={messageContentRef}
+              onPointerUp={captureQuotedSelection}
+              className="mx-auto w-full min-w-0 max-w-[700px] text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] max-sm:text-[length:calc(14px+var(--chat-font-size-offset,0px))]"
+            >
+            {hasMoreRendered && (
+              <div ref={setSentinel} className="py-3 text-center text-xs text-muted-foreground">
+                {t("chat.loadEarlier")}
+              </div>
+            )}
+            {turnRendered.slice(startIndex)}
             {streamState.isStreaming && hasStreamingContent && streamState.streamingMessage && (
-              <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSession={onOpenSession} />
+              <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
             )}
 
-            {agentRunning && !hasStreamingContent && agentPhase && (
-              <div className="break-words py-2 text-[13px] text-text-muted">
-                <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t)}</span>
+            {(agentRunning || isCompacting) && !hasStreamingContent && (agentPhase || isCompacting) && !liveActivityRendered && (
+              <div className="break-words py-2 text-[13px] text-muted-foreground">
+                <span className="animate-[pulse_1.5s_infinite] motion-reduce:animate-none">{phaseLabel(agentPhase, t, isCompacting, queuedSubmissions.length)}</span>
               </div>
             )}
 
             {bashRunning && !pendingBash && (
-              <div className="py-2 text-[13px] text-text-muted">
-                 <span className="animate-[pulse_1.5s_infinite]">{t("chat.runningCommand")}</span>
+              <div className="py-2 text-[13px] text-muted-foreground">
+                 <span className="animate-[pulse_1.5s_infinite] motion-reduce:animate-none">{t("chat.runningCommand")}</span>
               </div>
             )}
 
@@ -1238,7 +1632,6 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                   excludeFromContext: pendingBash.excludeFromContext,
                 } as BashExecutionMessage}
                 sessionId={session?.id ?? sessionIdRef.current ?? undefined}
-                onOpenSession={onOpenSession}
               />
             )}
 
@@ -1246,13 +1639,16 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
             </div>
           </div>
         </div>
-        {isMobile || pendingScrollRestore ? null : (
+        {isMobile || pendingScrollRestore || !minimapPaneWide ? null : (
           <ChatMinimap
             messages={messages}
-            streamingMessage={streamState.streamingMessage}
+            getStreamingMessage={getStreamingMessage}
             scrollContainer={scrollContainerRef}
             messageRefs={messageRefs}
-            onRevealHistory={revealHistoryForMinimap}
+            onRevealTurn={revealTurnForMinimap}
+            onVisibleChange={setMinimapRailVisible}
+            turnsBefore={earlierTurnCount}
+            turnIndex={minimapTurnIndex}
           />
         )}
         </>}
@@ -1263,137 +1659,133 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           ref={quotePopoverRef}
           role={quoteInputOpen ? "dialog" : "toolbar"}
           aria-label={t(quoteInputOpen ? "chat.newQuoteChat" : "chat.selectionActions")}
+          className={cn(
+            "fixed z-[260] flex flex-wrap items-start gap-[3px] max-w-[calc(100vw-16px)] max-h-[calc(var(--app-viewport-height,100dvh)-16px)] overflow-y-auto rounded-md border border-border bg-popover shadow-md",
+            quoteInputOpen ? "w-[min(420px,calc(100vw-16px))] p-3" : "p-[3px]",
+          )}
           style={{
-            position: "fixed",
             top: quotedSelection.top,
             left: quotedSelection.left,
-            zIndex: 260,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 3,
-            width: quoteInputOpen ? "min(420px, calc(100vw - 16px))" : undefined,
-            maxWidth: "calc(100vw - 16px)",
-            maxHeight: "calc(var(--app-viewport-height, 100dvh) - 16px)",
-            overflowY: "auto",
-            padding: quoteInputOpen ? 12 : 3,
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "var(--bg)",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
           }}
         >
           {quoteInputOpen ? (
             <fieldset
               disabled={quoteSubmitting}
               aria-busy={quoteSubmitting}
-              style={{ width: "100%", minWidth: 0, margin: 0, padding: 0, border: "none", display: "flex", flexDirection: "column", gap: 10 }}
+              className="m-0 flex w-full min-w-0 flex-col gap-2.5 border-0 p-0"
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600 }}>{t("chat.askInNewChat")}</span>
-                <button type="button" className="file-viewer-icon-button" title={t("i18n.close")} aria-label={t("i18n.close")} disabled={quoteSubmitting} onClick={closeQuotedSelection} style={{ border: "none" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-                </button>
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 text-xs font-semibold">{t(quoteAskTarget === "side" ? "chat.askInSideChat" : "chat.askInNewChat")}</span>
+                <Button type="button" variant="ghost" size="icon-sm" title={t("i18n.close")} aria-label={t("i18n.close")} disabled={quoteSubmitting} onClick={closeQuotedSelection}>
+                  <XIcon aria-hidden="true" />
+                </Button>
               </div>
               <ChatInput
                 ref={quoteChatInputRef}
                 compact
-                onSend={askSelectionInNewChat}
+                onSend={quoteAskTarget === "side" ? askSelectionInSideChat : askSelectionInNewChat}
                 onAbort={closeQuotedSelection}
                 isStreaming={false}
               />
-              {quoteError && <div role="alert" style={{ color: "#dc2626", fontSize: 12, overflowWrap: "anywhere" }}>{quoteError}</div>}
+              {quoteError && <div role="alert" className="text-xs text-destructive wrap-anywhere">{quoteError}</div>}
             </fieldset>
           ) : <>
-          <button
+          <Button
             type="button"
-            className="file-viewer-icon-button"
+            variant="ghost"
             title={t("chat.quoteSelection")}
             aria-label={t("chat.quoteSelection")}
             onPointerDown={(event) => event.preventDefault()}
             onClick={quoteSelectionHere}
-            style={{ width: "auto", height: 35, flex: "0 0 auto", gap: 5, padding: "0 10px", border: "none", fontSize: 12, fontWeight: 500 }}
+            className="h-[35px] gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z" />
-              <path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z" />
-            </svg>
+            <QuoteIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
             <span>{t("chat.quoteSelection")}</span>
-          </button>
-          {onAskInNewChat && quotedSelection.sourceEntryId && !sessionBusy && (
-            <button
+          </Button>
+          {onSideSession && !isHiddenRelation(session?.relation) && (
+            <Button
               type="button"
-              className="file-viewer-icon-button"
+              variant="ghost"
+              title={t("chat.askInSideChat")}
+              aria-label={t("chat.askInSideChat")}
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={() => { setQuoteAskTarget("side"); setQuoteInputOpen(true); window.getSelection()?.removeAllRanges(); }}
+              className="h-[35px] gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              <MessagesSquareIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
+              <span>{t("chat.askInSideChat")}</span>
+            </Button>
+          )}
+          {onAskInNewChat && (
+            <Button
+              type="button"
+              variant="ghost"
               title={t("chat.askInNewChat")}
               aria-label={t("chat.askInNewChat")}
               onPointerDown={(event) => event.preventDefault()}
-              onClick={() => { setQuoteInputOpen(true); window.getSelection()?.removeAllRanges(); }}
-              style={{ width: "auto", height: 35, flex: "0 0 auto", gap: 5, padding: "0 10px", border: "none", fontSize: 12, fontWeight: 500 }}
+              onClick={() => { setQuoteAskTarget("new"); setQuoteInputOpen(true); window.getSelection()?.removeAllRanges(); }}
+              className="h-[35px] gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M6 3v12M18 9a9 9 0 0 1-9 9" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" />
-              </svg>
+              <GitForkIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
               <span>{t("chat.askInNewChat")}</span>
-            </button>
+            </Button>
           )}
           </>}
         </div>,
         document.body,
       )}
 
-      <div className="relative flex min-h-0 flex-col">
+      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
         {!isEmptyNew && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "100%",
-              left: 0,
-              right: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
-              display: "flex",
-              justifyContent: "center",
-              paddingBottom: 10,
-              pointerEvents: "none",
-              zIndex: 20,
-            }}
-          >
+          <div className="pointer-events-none absolute bottom-full right-4 z-20 max-sm:right-2.5">
             <button
               type="button"
-              className={`chat-scroll-to-bottom${showScrollToBottom && !pendingScrollRestore ? " is-visible" : ""}`}
+              className={cn("chat-scroll-to-bottom size-[34px]", showScrollToBottom && !pendingScrollRestore && "is-visible")}
               title={t("chat.scrollToLatest")}
               aria-label={t("chat.scrollToLatest")}
+              style={{ marginBottom: isMobile ? 10 : 14 }}
               onClick={() => scrollToBottom("smooth")}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
+              <ArrowDownIcon size={16} strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
         )}
+        {/* The brand (the logo, "Pi Web" and its versions line), then the
+            project/worktree row right above the composer, all on the
+            composer's left edge (.new-session-brand, .new-session-meta and
+            .new-session-context in app/globals.css; the side padding and
+            width are inline here). */}
         {isEmptyNew && (
-          <div className="mb-3 w-full" style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto", fontFamily: "var(--font-mono)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 7 : 10, minWidth: 0, flex: 1, lineHeight: 1.4, overflow: "hidden" }}>
-                <Image src={demoAssetPath("/icons/apple-touch-icon.png")} width={32} height={32} alt="" priority style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: 22, color: "var(--text)", fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap" }}>Pi Web</span>
-                <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
+          <div className="new-session-hero max-md:px-4 md:px-4">
+            <div className="new-session-hero-inner flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-center">
+              <div className="new-session-brand">
+                <Image src={demoAssetPath("/icons/apple-touch-icon.png")} width={40} height={40} alt="" priority className="new-session-logo" />
+                <div className="new-session-brand-text">
+                  <span className="new-session-brand-name">Pi Web</span>
+                  <span className="new-session-meta">
+                    <span>web v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
+                    <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
+                    <span aria-hidden="true">·</span>
+                    <span className="new-session-meta-pi">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
+                  </span>
+                </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  web <span style={{ color: "var(--text)" }}>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
-                </span>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  pi <span style={{ color: "var(--text)" }}>v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
-                </span>
-              </div>
+              <div className="flex w-full justify-center">{newSessionContextBar}</div>
             </div>
           </div>
         )}
         {chatInputElement}
-        <ExtensionStatusBar statuses={extensionStatuses} widgets={extensionWidgets} />
+        <ExtensionStatusBar
+          statuses={extensionStatuses}
+          widgets={extensionWidgets}
+          onCommand={handleSend}
+          commandsDisabled={sessionBusy}
+        />
       </div>
       {isEmptyNew && <div className="min-h-0 flex-1" />}
     </div>
   );
-}
+});
 
 // A one-line notice is exactly as tall as its entrance animation pins it, and
 // its line sits dead centre: the two 1px borders, a 21px line box (14px at
@@ -1408,30 +1800,15 @@ const NOTICE_TEXT_PADDING_Y_PX = (NOTICE_MIN_HEIGHT_PX - 2 - NOTICE_LINE_BOX_PX)
 const NOTICE_MAX_HEIGHT_PX = 500;
 const NOTICE_TEXT_MAX_HEIGHT_PX = NOTICE_MAX_HEIGHT_PX - 2;
 
-function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: NoticeItem[]; floating?: boolean; onPauseChange?: (id: string | null) => void }) {
+function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { notices: NoticeItem[]; floating?: boolean; onPauseChange?: (id: string | null) => void; onDismiss?: (id: string) => void }) {
   if (notices.length === 0) return null;
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        // Right-anchored: every toast's right edge aligns here, widths extend leftward
-        alignItems: "flex-end",
-        marginBottom: floating ? 0 : 10,
-      }}
-    >
+    <div className={cn("flex flex-col items-end", floating ? "mb-0" : "mb-2.5")}>
       {notices.map((notice, index) => {
-        const color = notice.type === "error"
-          ? "#ef4444"
-          : notice.type === "warning"
-            ? "#d97706"
-            : notice.type === "success"
-              ? "#10b981"
-              : "var(--accent)";
         return (
           <div
             key={notice.id}
-            className="notice-shelf-item"
+            className="notice-shelf-item pointer-events-auto flex items-start gap-2.5 overflow-hidden rounded-xl border border-border/70 bg-background w-fit max-w-[min(100%,620px)] px-3 text-sm leading-normal text-muted-foreground origin-top-right shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.10)]"
             onMouseEnter={() => onPauseChange?.(notice.id)}
             onMouseLeave={(event) => {
               if (!event.currentTarget.contains(document.activeElement)) onPauseChange?.(null);
@@ -1441,48 +1818,28 @@ function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: No
               if (!event.currentTarget.matches(":hover")) onPauseChange?.(null);
             }}
             style={{
-              display: "flex",
-              // Top-align children so the type dot sits by the first line on multi-line toasts
-              alignItems: "flex-start",
-              gap: 10,
               minHeight: NOTICE_MIN_HEIGHT_PX,
-              height: "auto",
               // 整体高度上限：超出后由文本区内部滚动承担（见下方 span 的 overflowY），
               // 容器自身保持 hidden，小圆点固定在顶部不随文本滚动
               maxHeight: NOTICE_MAX_HEIGHT_PX,
-              // The floating wrapper is pointerEvents:"none" (click-through by design),
-              // so the toast itself must opt back into interactivity or hover events never reach it
-              pointerEvents: "auto",
               marginBottom: index === notices.length - 1 ? 0 : 6,
-              overflow: "hidden",
-              borderRadius: 14,
-              border: "1px solid color-mix(in srgb, var(--border) 70%, transparent)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
-              width: "fit-content",
-              maxWidth: "min(100%, 620px)",
               boxShadow: floating
                 ? "0 1px 2px rgba(15,23,42,0.05), 0 10px 28px -14px rgba(15,23,42,0.24)"
-                : "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
-              fontSize: 14,
-              lineHeight: 1.5,
-              transformOrigin: "top right",
+                : undefined,
               // Use backwards fill for the entrance animation so height styles return to
               // inline styles once it finishes; otherwise the keyframe's fixed 60px would
               // stick around in fill mode and permanently clamp the expanded toast
               animation: notice.exiting
                 ? "notice-shelf-out 0.18s ease-in forwards"
                 : "notice-shelf-in 0.18s ease-out backwards",
-              padding: "0 12px",
             }}
           >
             <span
+              className={cn(
+                "size-[7px] shrink-0 rounded-full",
+                notice.type === "error" ? "bg-destructive" : notice.type === "warning" ? "bg-warning" : notice.type === "success" ? "bg-success" : "bg-primary",
+              )}
               style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: color,
-                flexShrink: 0,
                 // Align with the optical center of the first text line: the text's
                 // vertical padding + (21px line box - 7px dot) / 2
                 marginTop: NOTICE_TEXT_PADDING_Y_PX + 7,
@@ -1491,12 +1848,43 @@ function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: No
             {/* Full text by default: pre-line preserves \n (nowrap/normal collapse
                 newlines into spaces) and long lines wrap instead of truncating;
                 content taller than the cap scrolls inside the text area */}
-            <span
-              tabIndex={0}
-              style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, minWidth: 0, maxWidth: "100%", maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX, overflowY: "auto", scrollbarWidth: "thin", whiteSpace: "pre-line", wordBreak: "break-word" }}
-            >
-              {notice.message}
-            </span>
+            {isTuiText(notice.message) ? (
+              <TuiText
+                tabIndex={0}
+                text={notice.message}
+                className="min-w-0 max-w-full"
+                style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
+              />
+            ) : (
+              <span
+                tabIndex={0}
+                className="min-w-0 max-w-full overflow-y-auto [scrollbar-width:thin] whitespace-pre-line break-words"
+                style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
+              >
+                {splitNoticeText(notice.message).map((part, partIndex) => part.kind === "art" ? (
+                  // A terminal QR code or bar (#755): every space kept, rows touching, and a
+                  // font stack whose first font has the blocks too (the bundled Noto subset
+                  // has none, so spaces and blocks would come from fonts of different widths).
+                  <span
+                    key={partIndex}
+                    className="inline-block max-w-full overflow-x-auto whitespace-pre align-top font-mono leading-none text-foreground"
+                  >
+                    {part.text}
+                  </span>
+                ) : part.text)}
+              </span>
+            )}
+            {onDismiss && (
+              <button
+                type="button"
+                className="notice-shelf-close mt-3.5 shrink-0"
+                aria-label="Dismiss notification"
+                title="Dismiss notification"
+                onClick={() => onDismiss(notice.id)}
+              >
+                <XIcon size={12} strokeWidth={2} aria-hidden="true" />
+              </button>
+            )}
           </div>
         );
       })}
@@ -1515,10 +1903,161 @@ function getExtensionDialogSummary(request: ExtensionDialogRequest): string | un
   return undefined;
 }
 
+// Extensions pack structured details (e.g. permission prompts: tool/command/paths)
+// into the dialog title as "key : value" lines. Render those lines as a two-column
+// table so the values align. ask_user_question's RPC path appends per-option
+// preview blocks as "--- N. label preview ---" followed by raw markdown; those
+// blocks render through MarkdownBody so the preview shows fully formatted.
+const PREVIEW_HEADING_RE = /^--- (.+) preview ---$/;
+
+type DialogTitleSegment =
+  | { kind: "plain"; text: string }
+  | { kind: "preview"; heading: string; markdown: string };
+
+function parseDialogTitleSegments(title: string): DialogTitleSegment[] {
+  const segments: DialogTitleSegment[] = [];
+  let plain: string[] = [];
+  let preview: { heading: string; lines: string[] } | null = null;
+  const flushPlain = () => {
+    if (plain.length > 0) segments.push({ kind: "plain", text: plain.join("\n") });
+    plain = [];
+  };
+  const flushPreview = () => {
+    if (preview) segments.push({ kind: "preview", heading: preview.heading, markdown: preview.lines.join("\n") });
+    preview = null;
+  };
+  for (const line of title.split("\n")) {
+    const match = PREVIEW_HEADING_RE.exec(line.trim());
+    if (match) {
+      flushPlain();
+      flushPreview();
+      preview = { heading: match[1], lines: [] };
+    } else if (preview) {
+      preview.lines.push(line);
+    } else {
+      plain.push(line);
+    }
+  }
+  flushPlain();
+  flushPreview();
+  return segments;
+}
+
+function DialogTitlePlainText({ text }: { text: string }) {
+  const [heading, ...rest] = text.split("\n");
+  const headingClass = "text-sm font-semibold leading-[1.45] text-foreground";
+  // Terminal text is laid out for a fixed width: render it verbatim so box
+  // drawing, tables and progress bars keep their shape (see TuiText).
+  const body = rest.join("\n").replace(/^\n+|\n+$/g, "");
+  if (isTuiText(body)) {
+    return (
+      <div className="min-w-0">
+        <div className={headingClass}>{heading}</div>
+        <TuiText text={body} className="mt-1 text-xs leading-[1.45] text-muted-foreground" />
+      </div>
+    );
+  }
+  const rows: Array<{ label: string; value: string }> = [];
+  const plain: string[] = [];
+  for (const line of rest) {
+    const match = /^\s*([^:\n]{1,48}?)\s*:\s*(.+)$/.exec(line);
+    if (match) rows.push({ label: match[1].trim(), value: match[2].trim() });
+    else plain.push(line.trim());
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="whitespace-pre-wrap wrap-anywhere">
+        <div className={headingClass}>{heading}</div>
+        {plain.map((line, index) => (
+          <div key={index} className="mt-0.5 text-xs text-muted-foreground">{line}</div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className={headingClass}>{heading}</div>
+      <div className="extension-kv-table">
+        {rows.map((row) => (
+          <div key={row.label + row.value} className="extension-kv-row">
+            <div className="extension-kv-label">{row.label}</div>
+            <div className="extension-kv-value">{row.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExtensionDialogTitle({ title }: { title: string }) {
+  const segments = parseDialogTitleSegments(title);
+  return (
+    <div className="min-w-0">
+      {segments.map((segment, index) =>
+        segment.kind === "preview" ? (
+          <div key={index} className="mt-2.5">
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.4px] text-muted-foreground">
+              {segment.heading}
+            </div>
+            {isTuiText(segment.markdown) ? (
+              <TuiText
+                text={segment.markdown}
+                className="rounded-sm border border-border bg-card px-2 py-1.5 text-[11px] leading-[1.4] text-muted-foreground"
+              />
+            ) : (
+              <MarkdownBody>{segment.markdown}</MarkdownBody>
+            )}
+          </div>
+        ) : (
+          <DialogTitlePlainText key={index} text={segment.text} />
+        ),
+      )}
+    </div>
+  );
+}
+
+// Permission-style options read as approve/deny; tint them so the choice
+// is recognizable at a glance. Only matches at the start of the option text.
+function extensionOptionTone(option: string): "affirmative" | "negative" | "neutral" {
+  const text = option.trim().toLowerCase();
+  if (/^(yes|y|ok|okay|allow|approve|accept|continue|always)\b/.test(text) || /^[是允禄确认同意好的]/.test(option.trim())) return "affirmative";
+  if (/^(no|n|deny|reject|cancel|never|stop|don'?t)\b/.test(text) || /^[否不拒绝取消]/.test(option.trim())) return "negative";
+  return "neutral";
+}
+
+// pi has no toggle RPC for multi-select questions: the host sends an
+// input-method dialog whose title carries a numbered option list and asks
+// for comma-separated numbers ("1,3") in the text field. Detect that shape
+// so the web UI can offer real checkboxes instead of typed digits.
+function parseMultiSelectPrompt(title: string): { question: string; options: Array<{ id: string; label: string }> } | null {
+  const lines = title.split("\n");
+  const hintIndex = lines.findIndex((line) => /enter the numbers/i.test(line));
+  if (hintIndex < 0) return null;
+  const options: Array<{ id: string; label: string }> = [];
+  const question: string[] = [];
+  for (let i = 0; i < hintIndex; i++) {
+    const match = /^\s*(\d+)[.、)]\s*(.+)$/.exec(lines[i]);
+    if (match) options.push({ id: match[1], label: match[2].trim() });
+    else question.push(lines[i]);
+  }
+  if (options.length < 2) return null;
+  return { question: question.join("\n"), options };
+}
+
+function ExtensionWaitingCount({ count }: { count: number }) {
+  const { t } = useI18n();
+  if (count <= 0) return null;
+  return (
+    <Badge variant="ghost" className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-primary">
+      {t("chat.extensionMoreWaiting", { count })}
+    </Badge>
+  );
+}
+
 /** Corner brackets pointing outward; when expanded they point inward (restore). */
 function ExtensionSizeIcon({ expanded }: { expanded: boolean }) {
   return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {expanded
         ? <path d="M3.5 1v2.5H1M6.5 1v2.5H9M6.5 9v-2.5H9M3.5 9v-2.5H1" />
         : <path d="M1 3.5V1h2.5M6.5 1H9v2.5M9 6.5V9H6.5M3.5 9H1V6.5" />}
@@ -1528,14 +2067,51 @@ function ExtensionSizeIcon({ expanded }: { expanded: boolean }) {
 
 function ExtensionDialog({
   request,
+  waitingCount,
   onRespond,
+  queueTotal,
+  answered,
 }: {
   request: ExtensionDialogRequest;
+  /** Further dialogs queued behind this one; each opens after this one is answered. */
+  waitingCount: number;
   onRespond: (request: ExtensionDialogRequest, response: { value: string } | { confirmed: boolean } | { cancelled: true }) => void;
+  /** Requests still queued including this one — the ask tool sends several. */
+  queueTotal?: number;
+  answered?: Array<{ id: string; question: string; answer: string; cancelled?: boolean }>;
 }) {
   const { t } = useI18n();
   const [value, setValue] = useState(request.method === "editor" ? request.prefill ?? "" : "");
+  const multiSelect = request.method === "input" ? parseMultiSelectPrompt(request.title) : null;
+  const [checkedIds, setCheckedIds] = useState<readonly string[]>([]);
+  const [customAnswer, setCustomAnswer] = useState("");
+  // Select is two-step: a click only marks the choice; the Confirm button (or
+  // double-click) sends it, so a stray click can be revised before it counts.
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const toggleMultiOption = (id: string) => {
+    setCheckedIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
+  };
   const [collapsed, setCollapsed] = useState(false);
+  // Multi-question asks page: ‹ › steps back through the answers already sent
+  // (read-only review — those responses are with the agent) and forward to the
+  // question awaiting a response.
+  const totalQuestions = (answered?.length ?? 0) + (queueTotal ?? 1);
+  const currentQuestionIndex = (answered?.length ?? 0) + 1;
+  const [reviewIndex, setReviewIndex] = useState<number | null>(null);
+  const reviewed = reviewIndex !== null ? answered?.[reviewIndex] : undefined;
+  const stepToPrevious = () => {
+    const count = answered?.length ?? 0;
+    if (!count) return;
+    setReviewIndex((current) => current === null ? count - 1 : Math.max(0, current - 1));
+  };
+  const stepToNext = () => {
+    const count = answered?.length ?? 0;
+    setReviewIndex((current) => current === null || current + 1 >= count ? null : current + 1);
+  };
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  // The panel this dialog is anchored in, not the visual viewport, is what
+  // bounds it: on mobile the chat panel is far shorter than the viewport.
+  const dialogMaxHeight = useDialogMaxHeight(wrapperRef);
   // Dialogs open at the historical width and grow only when their own content cannot
   // fit (a code block or table that would scroll sideways), so no extension has to ask
   // for room. The maximize button is the user's own override for this dialog (#947).
@@ -1591,7 +2167,7 @@ function ExtensionDialog({
   }, [request.expiresAt]);
 
   const countdown = remainingSeconds !== null && (
-    <span style={{ fontSize: 11, color: "var(--text-dim)", whiteSpace: "nowrap", flexShrink: 0 }}>
+    <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
       {t("chat.extensionExpiresIn", { seconds: remainingSeconds })}
     </span>
   );
@@ -1599,6 +2175,13 @@ function ExtensionDialog({
   const submitValue = () => {
     if (request.method === "confirm") {
       onRespond(request, { confirmed: true });
+    } else if (request.method === "select") {
+      if (selectedOption !== null) onRespond(request, { value: selectedOption });
+    } else if (multiSelect) {
+      const value = checkedIds.length > 0
+        ? checkedIds.slice().sort((a, b) => Number(a) - Number(b)).join(",")
+        : customAnswer;
+      onRespond(request, { value });
     } else {
       onRespond(request, { value });
     }
@@ -1606,58 +2189,42 @@ function ExtensionDialog({
 
   return (
     <div
+      ref={wrapperRef}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
         event.preventDefault();
         event.stopPropagation();
+        // Reviewing a previous question: Escape returns to the live one
+        // instead of cancelling a response the user did not intend.
+        if (reviewIndex !== null) {
+          setReviewIndex(null);
+          return;
+        }
         onRespond(request, { cancelled: true });
       }}
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 90,
-        display: "flex",
-        alignItems: collapsed ? "flex-start" : "center",
-        justifyContent: "center",
-        padding: 20,
-        pointerEvents: "none",
-      }}
+      className={cn("absolute inset-0 z-[90] flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-end")}
     >
       {collapsed ? (
         <button
           type="button"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          style={{
-            pointerEvents: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            maxWidth: "min(560px, 100%)",
-            width: "100%",
-            padding: "10px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg)",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-            color: "var(--text)",
-            cursor: "pointer",
-            textAlign: "left",
-          }}
+          className="pointer-events-auto flex w-full max-w-[min(560px,100%)] cursor-pointer items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left text-foreground shadow-lg"
         >
-          <span style={{ fontSize: 11, fontWeight: 650, color: "var(--accent)", flexShrink: 0 }}>
+          <span className="shrink-0 text-xs font-[650] text-primary">
             {t("chat.extensionPending")}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
             {request.title}
           </span>
           {summary && (
-            <span style={{ fontSize: 12, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "34%", flexShrink: 1 }}>
+            <span className="max-w-[34%] shrink truncate text-xs text-muted-foreground">
               {summary}
             </span>
           )}
+          <ExtensionWaitingCount count={waitingCount} />
           {countdown}
-          <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+          <span className="shrink-0 text-xs text-muted-foreground">
             {t("chat.extensionExpand")}
           </span>
         </button>
@@ -1666,85 +2233,112 @@ function ExtensionDialog({
         ref={dialogRef}
         role="dialog"
         aria-label={request.title}
+        className="extension-drawer-in pointer-events-auto relative mx-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl"
         style={{
-          pointerEvents: "auto",
           // "Full" fills the content region above the composer: the overlay is inset:0 with
           // 20px padding, so 100% keeps that breathing room without covering the input.
           width: full ? "100%" : `min(${fitWidth ?? EXTENSION_DIALOG_BASE_WIDTH}px, 100%)`,
-          maxHeight: full ? "100%" : "min(760px, 100%)",
-          display: "flex",
-          flexDirection: "column",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          background: "var(--bg)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
-          overflow: "hidden",
+          // Bounded by the panel that holds it, so a tall option preview cannot
+          // push the drawer past the chat area and clip its header.
+          maxHeight: full ? "100%" : dialogMaxHeight,
         }}
       >
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border)", maxHeight: "50%", overflowY: "auto" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="flex shrink min-h-0 items-start gap-2 border-b border-border px-3.5 py-3 max-h-[180px] overflow-y-auto">
+          <div className="min-w-0 flex-1">
             {/* Pi's TUI shows the title verbatim, newlines included; select/input have no
                 separate message field, so extensions put multi-line text here. */}
-            <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 650, lineHeight: 1.45, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{request.title}</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
+            <ExtensionDialogTitle title={multiSelect ? multiSelect.question || request.title : request.title} />
+            <div className="mt-[3px] flex flex-wrap items-center gap-2 text-xs font-mono text-muted-foreground">
               <span>{t("chat.extensionRequest")}</span>
+              {totalQuestions > 1 && (
+                <span className="inline-flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-xs"
+                    onClick={stepToPrevious}
+                    disabled={!answered?.length || reviewIndex === 0}
+                    aria-label={t("chat.question.previous")}
+                    title={t("chat.question.previous")}
+                    className="size-[18px] rounded-[4px] p-0"
+                  >
+                    <svg className="size-2 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="6.5 2 3 5 6.5 8" />
+                    </svg>
+                  </Button>
+                  <span className={cn("tabular-nums", reviewIndex !== null ? "text-foreground" : "text-primary")}>
+                    {t("chat.question.pager", { index: reviewIndex !== null ? reviewIndex + 1 : currentQuestionIndex, total: totalQuestions })}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-xs"
+                    onClick={stepToNext}
+                    disabled={reviewIndex === null}
+                    aria-label={t("chat.question.next")}
+                    title={t("chat.question.next")}
+                    className="size-[18px] rounded-[4px] p-0"
+                  >
+                    <svg className="size-2 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="3.5 2 7 5 3.5 8" />
+                    </svg>
+                  </Button>
+                </span>
+              )}
+              <ExtensionWaitingCount count={waitingCount} />
               {countdown}
             </div>
           </div>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon-xs"
             onClick={toggleFull}
             title={full ? t("chat.extensionRestoreSize") : t("chat.extensionMaximize")}
             aria-label={full ? t("chat.extensionRestoreSize") : t("chat.extensionMaximize")}
-            style={{
-              display: "grid",
-              placeItems: "center",
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg-panel)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
+            className="size-7 shrink-0 rounded-sm"
           >
             <ExtensionSizeIcon expanded={full} />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
+            size="icon-xs"
             onClick={() => setCollapsed(true)}
             aria-expanded={true}
             title={t("chat.extensionCollapse")}
             aria-label={t("chat.extensionCollapse")}
-            style={{
-              display: "grid",
-              placeItems: "center",
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg-panel)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
+            className="size-7 shrink-0 rounded-sm"
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="2 3.5 5 6.5 8 3.5" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         <div
           ref={bodyRef}
-          style={{
-            padding: 14,
-            flex: "1 1 auto", minHeight: 0, overflowY: "auto",
-          }}
+          className="min-h-0 flex-[1_1_auto] overflow-y-auto p-3.5"
         >
+          {reviewed ? (
+            <div className="grid gap-2.5">
+              <div className="text-[13.5px] font-semibold leading-[1.55] text-foreground wrap-anywhere">
+                {`${(reviewIndex ?? 0) + 1}. ${reviewed.question}`}
+              </div>
+              <div className="rounded-sm border border-border bg-card px-2.5 py-[9px] text-[13px] leading-[1.6] text-foreground wrap-anywhere whitespace-pre-wrap">
+                <span className="mb-1 block text-xs text-muted-foreground">
+                  {reviewed.cancelled ? t("chat.question.answeredCancelled") : t("chat.question.answerLabel")}
+                </span>
+                {reviewed.answer}
+              </div>
+              <div className="text-xs text-muted-foreground">{t("chat.question.reviewHint")}</div>
+            </div>
+          ) : (
+          <>
           {request.method === "confirm" && (
-            <MarkdownBody>{request.message}</MarkdownBody>
+            <div className="text-[13px] leading-[1.6]">
+              <MarkdownBody>{request.message}</MarkdownBody>
+            </div>
           )}
           {request.method === "select" && (
             <div
@@ -1760,48 +2354,109 @@ function ExtensionDialog({
                 buttons[next].focus({ preventScroll: true });
                 buttons[next].scrollIntoView({ block: "nearest" });
               }}
-              style={{ display: "grid", gap: 8 }}
+              className="grid gap-1.5"
             >
-              {request.options.map((option, index) => (
+              {request.options.map((option, index) => {
+                const tone = extensionOptionTone(option);
+                const selected = selectedOption === option;
+                return (
                 <div
                   key={option}
                   role="button"
                   tabIndex={0}
                   data-extension-option
-                  aria-label={option}
-                  ref={index === 0 ? focusFirstOption : undefined}
-                  onClick={() => onRespond(request, { value: option })}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.preventDefault();
-                    onRespond(request, { value: option });
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "9px 10px",
-                    borderRadius: 7,
-                    border: "1px solid var(--border)",
-                    background: "var(--bg-panel)",
-                    color: "var(--text)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 13,
-                    overflowWrap: "anywhere",
+                  className={cn(
+                    `extension-option${tone === "neutral" ? "" : ` tone-${tone}`}${selected ? " selected" : ""}`,
+                    "w-full cursor-pointer rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere",
+                    selected ? "border-ring" : "border-border",
+                    tone !== "neutral" && "font-semibold",
                     // Match the scroller's padding so keyboard navigation never parks the
                     // option flush against the edge, where whole-pixel scroll snapping and
                     // overflow clipping cut off its focus ring.
-                    scrollMargin: 14,
+                    "scroll-m-[14px]",
+                    tone === "affirmative" ? "text-success" : tone === "negative" ? "text-destructive" : "text-foreground",
+                  )}
+                  // Selected background stays inline: the unlayered .extension-option
+                  // background rules in globals.css beat layered bg-accent utilities.
+                  style={selected ? { background: "var(--accent)" } : undefined}
+                  aria-label={option}
+                  aria-pressed={selected}
+                  ref={index === 0 ? focusFirstOption : undefined}
+                  onClick={() => setSelectedOption((current) => current === option ? null : option)}
+                  onDoubleClick={() => {
+                    setSelectedOption(option);
+                    onRespond(request, { value: option });
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    setSelectedOption((current) => current === option ? null : option);
                   }}
                 >
                   <div inert>
                     <MarkdownBody>{option}</MarkdownBody>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
-          {request.method === "input" && (
-            <input
+          {request.method === "input" && (multiSelect ? (
+            <div className="grid gap-1.5">
+              {multiSelect.options.map((option, index) => {
+                const checked = checkedIds.includes(option.id);
+                return (
+                  <div
+                    key={option.id}
+                    role="checkbox"
+                    aria-checked={checked}
+                    tabIndex={0}
+                    className={cn(
+                      "extension-multi-option",
+                      "flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere scroll-m-[14px]",
+                      checked ? "border-ring" : "border-border",
+                    )}
+                    // Checked background stays inline: the unlayered
+                    // .extension-multi-option rules in globals.css beat bg-accent utilities.
+                    style={checked ? { background: "var(--accent)" } : undefined}
+                    aria-label={option.label}
+                    ref={index === 0 ? focusFirstOption : undefined}
+                    onClick={() => toggleMultiOption(option.id)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      toggleMultiOption(option.id);
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "grid size-[15px] shrink-0 place-items-center rounded-[4px] border text-[10px] font-bold text-primary-foreground",
+                        checked ? "border-ring" : "border-border",
+                        checked ? "bg-primary" : "bg-transparent",
+                      )}
+                    >
+                      {checked ? "✓" : ""}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="mr-1.5 font-semibold">{option.id}.</span>
+                      {option.label}
+                    </span>
+                  </div>
+                );
+              })}
+              <Input
+                value={customAnswer}
+                placeholder={t("chat.extensionCustomAnswer")}
+                onChange={(e) => setCustomAnswer(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
+                }}
+                className="rounded-sm border-border bg-card px-2.5 text-[13px]"
+              />
+            </div>
+          ) : (
+            <Input
               autoFocus
               value={value}
               placeholder={request.placeholder}
@@ -1809,89 +2464,61 @@ function ExtensionDialog({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              style={{
-                width: "100%",
-                padding: "9px 10px",
-                borderRadius: 7,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text)",
-                outline: "none",
-                fontSize: 13,
-              }}
+              className="rounded-sm border-border bg-card px-2.5 text-[13px]"
             />
-          )}
+          ))}
           {request.method === "editor" && (
-            <textarea
+            <Textarea
               autoFocus
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              style={{
-                width: "100%",
-                minHeight: 220,
-                padding: 10,
-                borderRadius: 7,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text)",
-                outline: "none",
-                resize: "vertical",
-                fontSize: 13,
-                lineHeight: 1.55,
-                fontFamily: "var(--font-mono)",
-              }}
+              className="min-h-[220px] rounded-sm border-border bg-card p-2.5 text-[13px] leading-[1.55] font-mono"
             />
+          )}
+          </>
           )}
         </div>
 
-        <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--bg-panel)" }}>
-          <button
+        {reviewed ? (
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-card px-3.5 py-2.5">
+            <Button type="button" onClick={() => setReviewIndex(null)}>
+              {t("chat.question.backToCurrent")}
+            </Button>
+          </div>
+        ) : (
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-card px-3.5 py-2.5">
+          <Button
+            type="button"
+            variant="outline"
             autoFocus={request.method === "confirm" || (request.method === "select" && request.options.length === 0)}
             onClick={() => onRespond(request, { cancelled: true })}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-            }}
+            className="text-muted-foreground"
           >
              {t("chat.cancel")}
-          </button>
+          </Button>
           {request.method === "confirm" ? (
-            <button
+            <Button type="button" onClick={submitValue}>
+               {t("chat.confirm")}
+            </Button>
+          ) : request.method === "select" ? (
+            <Button
+              type="button"
               onClick={submitValue}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "var(--accent-contrast)",
-                cursor: "pointer",
-              }}
+              disabled={selectedOption === null}
+              autoFocus={request.options.length === 0}
             >
                {t("chat.confirm")}
-            </button>
-          ) : request.method !== "select" ? (
-            <button
-              onClick={submitValue}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "var(--accent-contrast)",
-                cursor: "pointer",
-              }}
-            >
+            </Button>
+          ) : (
+            <Button type="button" onClick={submitValue}>
                {t("chat.submit")}
-            </button>
-          ) : null}
+            </Button>
+          )}
         </div>
+        )}
       </div>
       )}
     </div>
@@ -1902,15 +2529,20 @@ type ExtensionCustomRequest = Extract<ExtensionUiRequest, { method: "custom" }>;
 
 function ExtensionCustomPanel({
   request,
+  waitingCount,
   onInput,
 }: {
   request: ExtensionCustomRequest;
+  /** Further custom panels queued behind this one; each opens after this one closes. */
+  waitingCount: number;
   onInput: (request: ExtensionCustomRequest, data: string) => void;
 }) {
   const { t } = useI18n();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composingRef = useRef(false);
   const [collapsed, setCollapsed] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const dialogMaxHeight = useDialogMaxHeight(wrapperRef);
   const displayLines = normalizeCustomPanelLines(request.lines);
   const summary = displayLines.find((line) => line.trim())?.trim();
 
@@ -1920,51 +2552,29 @@ function ExtensionCustomPanel({
 
   return (
     <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 95,
-        display: "flex",
-        alignItems: collapsed ? "flex-start" : "center",
-        justifyContent: "center",
-        padding: 20,
-        pointerEvents: "none",
-      }}
+      ref={wrapperRef}
+      className={cn("absolute inset-0 z-[95] flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-center")}
     >
       {collapsed ? (
         <button
           type="button"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          style={{
-            pointerEvents: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            maxWidth: "min(920px, 100%)",
-            width: "100%",
-            padding: "10px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg)",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-            color: "var(--text)",
-            cursor: "pointer",
-            textAlign: "left",
-          }}
+          className="pointer-events-auto flex w-full max-w-[min(920px,100%)] cursor-pointer items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left text-foreground shadow-lg"
         >
-          <span style={{ fontSize: 11, fontWeight: 650, color: "var(--accent)", flexShrink: 0 }}>
+          <span className="shrink-0 text-xs font-[650] text-primary">
             {t("chat.extensionPending")}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
             {t("chat.extensionPanel")}
           </span>
           {summary && (
-            <span style={{ fontSize: 12, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "34%", flexShrink: 1 }}>
+            <span className="max-w-[34%] shrink truncate text-xs text-muted-foreground">
               {summary}
             </span>
           )}
-          <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+          <ExtensionWaitingCount count={waitingCount} />
+          <span className="shrink-0 text-xs text-muted-foreground">
             {t("chat.extensionExpand")}
           </span>
         </button>
@@ -1974,23 +2584,13 @@ function ExtensionCustomPanel({
         onClick={(event) => {
           if (!(event.target as HTMLElement).closest("button")) inputRef.current?.focus();
         }}
+        // The extension already wrapped its lines to the width it asked for; show them
+        // whole when that is wider than the usual 920px instead of scrolling sideways.
+        className="pointer-events-auto relative flex w-max min-w-[min(920px,100%)] max-w-full flex-col overflow-hidden rounded-md border border-border bg-background shadow-2xl outline-none"
         style={{
-          pointerEvents: "auto",
-          position: "relative",
-          // The extension already wrapped its lines to the width it asked for; show them
-          // whole when that is wider than the usual 920px instead of scrolling sideways.
-          width: "max-content",
-          minWidth: "min(920px, 100%)",
-          maxWidth: "100%",
-          maxHeight: "min(760px, 100%)",
-          display: "flex",
-          flexDirection: "column",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          background: "var(--bg)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
-          overflow: "hidden",
-          outline: "none",
+          // Bounded by the panel that holds it, so a tall editor cannot push the
+          // drawer past the chat area and clip its header.
+          maxHeight: dialogMaxHeight,
         }}
       >
         <textarea
@@ -2031,72 +2631,38 @@ function ExtensionCustomPanel({
             const text = event.clipboardData.getData("text");
             if (text) onInput(request, asBracketedPaste(text));
           }}
-          style={{
-            position: "absolute",
-            width: 1,
-            height: 1,
-            padding: 0,
-            border: 0,
-            opacity: 0,
-            pointerEvents: "none",
-          }}
+          className="absolute h-px w-px border-0 p-0 opacity-0 pointer-events-none"
         />
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
-           <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 650 }}>{t("chat.extensionPanel")}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2.5">
+           <div className="text-[13px] font-[650] text-foreground">{t("chat.extensionPanel")}</div>
+          <div className="flex items-center gap-2">
+            <ExtensionWaitingCount count={waitingCount} />
+            <Button
               type="button"
+              variant="outline"
+              size="icon-xs"
               onClick={() => setCollapsed(true)}
               aria-expanded={true}
               title={t("chat.extensionCollapse")}
               aria-label={t("chat.extensionCollapse")}
-              style={{
-                display: "grid",
-                placeItems: "center",
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
+              className="size-7 shrink-0 rounded-sm"
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="2 3.5 5 6.5 8 3.5" />
               </svg>
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               onClick={() => onInput(request, "\x03")}
-              style={{
-                padding: "5px 9px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                fontSize: 12,
-              }}
+              className="text-muted-foreground"
             >
                {t("chat.close")}
-            </button>
+            </Button>
           </div>
         </div>
-        <pre
-          style={{
-            margin: 0,
-            padding: 14,
-            minHeight: 0,
-            overflow: "auto",
-            background: "var(--bg-panel)",
-            color: "var(--text)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 13,
-            lineHeight: 1.45,
-            whiteSpace: "pre",
-          }}
-        >
+        <pre className="m-0 min-h-0 overflow-auto bg-card p-3.5 text-[13px] leading-[1.45] text-foreground font-mono whitespace-pre">
           <AnsiText text={displayLines.join("\n")} />
         </pre>
       </div>

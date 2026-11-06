@@ -1,6 +1,7 @@
 export const TEXT_PREVIEW_MAX_BYTES = 256 * 1024;
 export const IMAGE_PREVIEW_MAX_BYTES = 10 * 1024 * 1024;
 export const DOCX_PREVIEW_MAX_BYTES = 10 * 1024 * 1024;
+export const HTML_PREVIEW_MAX_BYTES = 10 * 1024 * 1024;
 
 export type DocumentPreviewKind = "pdf" | "docx";
 
@@ -47,6 +48,40 @@ function getBaseName(filePath: string): string {
 
 export function getFileExt(filePath: string): string {
   return getBaseName(filePath).toLowerCase().split(".").pop() ?? "";
+}
+
+/** Byte count for viewer toolbars. */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Extension → syntax-highlighter language id, shared by the file API and the
+ *  git commit file API so both render a path with the same language. */
+export const EXT_TO_LANGUAGE: Record<string, string> = {
+  ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+  mjs: "javascript", cjs: "javascript", py: "python", rb: "ruby",
+  go: "go", rs: "rust", java: "java", kt: "kotlin", swift: "swift",
+  c: "c", cpp: "cpp", h: "c", hpp: "cpp", cs: "csharp",
+  html: "html", htm: "html", css: "css", scss: "css", less: "css",
+  json: "json", jsonl: "json", yaml: "yaml", yml: "yaml",
+  toml: "toml", xml: "xml", md: "markdown", mdx: "markdown",
+  sh: "bash", bash: "bash", zsh: "bash", fish: "bash",
+  sql: "sql", graphql: "graphql", gql: "graphql",
+  dockerfile: "dockerfile", tf: "hcl", hcl: "hcl",
+  env: "bash", gitignore: "bash", txt: "text",
+  pdf: "pdf", docx: "word",
+};
+
+export function getLanguage(filePath: string): string {
+  const base = getBaseName(filePath).toLowerCase();
+  // Special full-name matches
+  if (base === "dockerfile" || base.startsWith("dockerfile.")) return "dockerfile";
+  if (base === ".env" || base.startsWith(".env.")) return "bash";
+  if (base === "makefile" || base === "gnumakefile") return "makefile";
+  const ext = base.split(".").pop() ?? "";
+  return EXT_TO_LANGUAGE[ext] ?? "text";
 }
 
 export function getImageMime(filePath: string): string | null {
