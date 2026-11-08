@@ -521,7 +521,7 @@ export function AgentsConfig({
                 {reloading ? t("agents.reloading") : t("agents.reloadSession")}
               </ConfigButton>
             )}
-            <label className="agents-concurrency-control" title={t("agents.maxConcurrentDescription")}>
+            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground" title={t("agents.maxConcurrentDescription")}>
               <span>{t("agents.maxConcurrent")}</span>
               <Input
                 aria-label={t("agents.maxConcurrent")}
@@ -532,6 +532,7 @@ export function AgentsConfig({
                 disabled={settingsLoading || settingsSaving}
                 onChange={(event) => setMaxConcurrent(Number(event.target.value))}
                 onBlur={() => void updateMaxConcurrent(maxConcurrent)}
+                className="h-7 w-[52px] px-1.5 text-center"
               />
             </label>
             <ConfigSwitch
@@ -544,7 +545,7 @@ export function AgentsConfig({
           </>
         }
         footer={reloadNeeded ? (
-          <span role="status" className="agents-feature-reload-notice">{t("agents.reloadRequired")}</span>
+          <span role="status" className="text-warning">{t("agents.reloadRequired")}</span>
         ) : undefined}
       />
       <ConfigSplitView>
@@ -572,7 +573,7 @@ export function AgentsConfig({
                               {t("agents.codemode.off")}
                             </Badge>
                           )}
-                          {overridden && <span className="agents-overridden-label">{t("agents.overridden")}</span>}
+                          {overridden && <span className="shrink-0 text-[10px] leading-none whitespace-nowrap text-muted-foreground">{t("agents.overridden")}</span>}
                         </ConfigSidebarItem>
                       );
                     })}
@@ -589,7 +590,7 @@ export function AgentsConfig({
         </ConfigSidebar>
 
         <ConfigDetail>
-          <ConfigDetailStack className="is-fill">
+          <ConfigDetailStack className="min-h-full">
               {!selected && !creating ? (
                 <ConfigEmptyState>{t("agents.empty")}</ConfigEmptyState>
               ) : (
@@ -614,7 +615,7 @@ export function AgentsConfig({
                           {displayedScope && (
                             <ConfigScopeTag scope={displayedScope}>{t(`agents.scope.${displayedScope}`)}</ConfigScopeTag>
                           )}
-                          <PathLabel className="config-detail-path" text={displayedPath} title={fullPath} />
+                          <PathLabel className="min-w-0 flex-1 overflow-hidden font-mono text-xs text-muted-foreground" text={displayedPath} title={fullPath} />
                         </>
                       )}
                     </ConfigDetailHeaderInfo>
@@ -643,7 +644,10 @@ export function AgentsConfig({
                     <Input aria-label={t("agents.description")} value={draft.description} disabled={disabled} onChange={(event) => update("description", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
                   </Field>
                   <Field label={t("agents.prompt")}>
-                    <Textarea className={`${controlClassName} agents-system-prompt h-[195px] min-h-[195px] max-h-[60vh] w-full py-[9px] overflow-auto leading-normal resize-y disabled:resize-none`} aria-label={t("agents.prompt")} value={draft.systemPrompt} disabled={disabled} onChange={(event) => update("systemPrompt", event.target.value)} />
+                    {/* Keep the native resize corner usable when the global scrollbar is present. */}
+                    <Textarea
+                      className={`${controlClassName} h-[195px] min-h-[195px] max-h-[60vh] w-full py-[9px] overflow-auto leading-normal resize-y disabled:resize-none [scrollbar-width:auto] [&::-webkit-scrollbar]:w-3.5 [&::-webkit-scrollbar]:h-3.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb]:border-[5px] [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:bg-clip-padding`}
+                      aria-label={t("agents.prompt")} value={draft.systemPrompt} disabled={disabled} onChange={(event) => update("systemPrompt", event.target.value)} />
                   </Field>
 
                   <Field label={t("agents.tools")}>
@@ -771,10 +775,10 @@ export function AgentsConfig({
             variant="primary"
             onClick={() => void save()}
             disabled={saving || savedOk || toggling || !draft.name.trim()}
-            className={savedOk ? "is-success" : undefined}
+            className={savedOk ? "border-success bg-success animate-[saved-pop_0.45s_ease] motion-reduce:animate-none" : undefined}
           >
             {savedOk && (
-              <CheckIcon size={14} strokeWidth={3} className="config-button-success-icon" />
+              <CheckIcon size={14} strokeWidth={3} className="shrink-0 [stroke-dasharray:18] animate-[saved-check-draw_0.35s_ease_forwards] motion-reduce:animate-none" />
             )}
             <span>{savedOk ? t("i18n.saved") : saving ? t("agents.saving") : t("agents.save")}</span>
           </ConfigButton>

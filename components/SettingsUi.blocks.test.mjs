@@ -49,7 +49,7 @@ test("a scope switch shows why an option is unavailable as visible text", () => 
   }));
   assert.match(html, /role="radiogroup" data-slot="toggle-group"[^>]*aria-label="Scope"/);
   assert.match(html, /<button[^>]*aria-checked="true"[^>]*>global<\/button>/);
-  const reasonId = html.match(/<span id="([^"]+)" class="config-scope-switch-reason">Project installs are unavailable<\/span>/)?.[1];
+  const reasonId = html.match(/<span id="([^"]+)" class="config-scope-switch-reason[^"]*">Project installs are unavailable<\/span>/)?.[1];
   assert.ok(reasonId, "the reason is rendered as text");
   // The disabled option points at the visible reason instead of a tooltip.
   assert.match(html, new RegExp(`<button[^>]*aria-checked="false"[^>]*aria-describedby="${reasonId}"[^>]*disabled=""[^>]*>project<\\/button>`));
@@ -81,7 +81,7 @@ test("a scope switch keeps the caller's controls on its line and the reason unde
   // against the switch plus its reason, out of line with the switch.
   assert.match(
     html,
-    /^<div class="config-scope-switch-field"><div class="config-scope-switch-row"><div dir="ltr" role="radiogroup"[^>]*>[\s\S]*?<\/div><button type="button">Install<\/button><\/div><span id="[^"]+" class="config-scope-switch-reason">Project installs are unavailable<\/span><\/div>$/,
+    /^<div class="config-scope-switch-field[^"]*"><div class="config-scope-switch-row[^"]*"><div dir="ltr" role="radiogroup"[^>]*>[\s\S]*?<\/div><button type="button">Install<\/button><\/div><span id="[^"]+" class="config-scope-switch-reason[^"]*">Project installs are unavailable<\/span><\/div>$/,
   );
 });
 
@@ -96,12 +96,12 @@ test("a save target is the scope switch with the path it writes to, the reason a
   }, h("p", null, "Trust project…")));
   assert.match(
     html,
-    /^<div class="config-save-target"><div class="config-scope-switch-field"><div class="config-scope-switch-row"><div dir="ltr" role="radiogroup"[^>]*aria-label="Save to"[^>]*>[\s\S]*?<\/div><span class="config-save-target-path">~\/<wbr\/>\.pi\/<wbr\/>agent\/<wbr\/>mcp\.json<\/span><\/div><span id="[^"]+" class="config-scope-switch-reason">Project installs are unavailable<\/span><\/div><p>Trust project…<\/p><\/div>$/,
+    /^<div class="config-save-target[^"]*"><div class="config-scope-switch-field[^"]*"><div class="config-scope-switch-row[^"]*"><div dir="ltr" role="radiogroup"[^>]*aria-label="Save to"[^>]*>[\s\S]*?<\/div><span class="config-save-target-path[^"]*">~\/<wbr\/>\.pi\/<wbr\/>agent\/<wbr\/>mcp\.json<\/span><\/div><span id="[^"]+" class="config-scope-switch-reason[^"]*">Project installs are unavailable<\/span><\/div><p>Trust project…<\/p><\/div>$/,
   );
   // The path is shown whole, never cut short behind a tooltip; a narrow pane breaks it between folders.
   assert.doesNotMatch(html, /title=/);
   const windows = render(h(ConfigSaveTarget, { value: "global", options: [], label: "Save to", path: "C:\\Users\\me\\mcp.json", onChange: noop }));
-  assert.match(windows, /<span class="config-save-target-path">C:\\<wbr\/>Users\\<wbr\/>me\\<wbr\/>mcp\.json<\/span>/);
+  assert.match(windows, /<span class="config-save-target-path[^"]*">C:\\<wbr\/>Users\\<wbr\/>me\\<wbr\/>mcp\.json<\/span>/);
 });
 
 test("a detail grid pairs each label with its value", () => {
@@ -110,13 +110,11 @@ test("a detail grid pairs each label with its value", () => {
     h(ConfigDetailGridRow, { label: "Path", mono: true }, "~/x"),
     h(ConfigDetailGridRow, { label: "Installed path", tone: "error" }, "Not found"),
   ));
-  assert.equal(html, [
-    '<div class="config-detail-grid">',
-    '<div class="config-detail-grid-label">Status</div><div class="config-detail-grid-value" style="color:red">loaded</div>',
-    '<div class="config-detail-grid-label">Path</div><div class="config-detail-grid-value is-muted is-mono">~/x</div>',
-    '<div class="config-detail-grid-label">Installed path</div><div class="config-detail-grid-value is-error">Not found</div>',
-    "</div>",
-  ].join(""));
+  // The grid values wrap anywhere; the tone classes keep their hook names.
+  assert.match(html, /<div class="config-detail-grid[^"]*">/);
+  assert.match(html, /<div class="config-detail-grid-label[^"]*">Status<\/div><div class="config-detail-grid-value min-w-0 \[overflow-wrap:anywhere\]" style="color:red">loaded<\/div>/);
+  assert.match(html, /<div class="config-detail-grid-label[^"]*">Path<\/div><div class="config-detail-grid-value is-muted is-mono min-w-0 \[overflow-wrap:anywhere\] text-muted-foreground font-mono">~\/x<\/div>/);
+  assert.match(html, /<div class="config-detail-grid-label[^"]*">Installed path<\/div><div class="config-detail-grid-value is-error min-w-0 \[overflow-wrap:anywhere\] text-destructive">Not found<\/div>/);
 });
 
 test("a footer status with details opens a visible list instead of a tooltip", () => {
@@ -126,21 +124,21 @@ test("a footer status with details opens a visible list instead of a tooltip", (
     tone: "error",
     details: ["error: a: broken", "warning: b"],
   }));
-  assert.match(html, /^<details class="config-footer-status-details"><summary class="config-footer-status-summary is-error">2 diagnostics<\/summary>/);
-  assert.match(html, /<ul class="config-footer-status-list"><li>error: a: broken<\/li><li>warning: b<\/li><\/ul>/);
+  assert.match(html, /^<details class="config-footer-status-details"><summary class="config-footer-status-summary is-error text-destructive w-fit cursor-pointer">2 diagnostics<\/summary>/);
+  assert.match(html, /<ul class="config-footer-status-list[^"]*"><li>error: a: broken<\/li><li>warning: b<\/li><\/ul>/);
   assert.doesNotMatch(html, /title=/);
 });
 
 test("a trust notice offers its button only when the caller can trust the project", () => {
   assert.equal(
     render(h(ConfigTrustNotice, { message: "Project plugins are not loaded." })),
-    '<div role="status" class="config-notice">Project plugins are not loaded.</div>',
+    '<div role="status" class="config-notice border-b bg-sidebar px-4 py-2 text-xs text-muted-foreground">Project plugins are not loaded.</div>',
   );
   // A label without a handler would be a button that does nothing.
   assert.doesNotMatch(render(h(ConfigTrustNotice, { message: "x", trustLabel: "Trust project" })), /<button/);
   const html = render(h(ConfigTrustNotice, { message: "x", trustLabel: "Trust project", onTrust: noop }));
-  assert.match(html, /^<div role="status" class="config-notice has-action"><span class="config-notice-text">x<\/span><button data-slot="button" data-variant="outline" data-size="xs"[^>]*>Trust project<\/button><\/div>$/);
-  assert.match(render(h(ConfigNotice, { action: h("a", { href: "#" }, "Open") }, "Off")), /class="config-notice has-action"/);
+  assert.match(html, /^<div role="status" class="config-notice[^"]*has-action[^"]*"><span class="config-notice-text[^"]*">x<\/span><button data-slot="button" data-variant="outline" data-size="xs"[^>]*>Trust project<\/button><\/div>$/);
+  assert.match(render(h(ConfigNotice, { action: h("a", { href: "#" }, "Open") }, "Off")), /class="config-notice[^"]*has-action/);
 });
 
 test("the add panel lays out the catalog, save target, source box, caller controls and examples", () => {
@@ -159,15 +157,15 @@ test("the add panel lays out the catalog, save target, source box, caller contro
     examples: ["npm:a", "git:b"],
     error: "boom",
   }, h("div", { className: "caller-controls" }, "controls")));
-  assert.match(html, /<div class="config-detail-title">Add plugin<\/div><span class="config-add-source-catalogs"><a href="https:\/\/pi\.dev\/packages" target="_blank" rel="noopener noreferrer" class="config-add-source-catalog">pi\.dev\/packages<\/a><\/span>/);
+  assert.match(html, /<div class="config-detail-title[^"]*">Add plugin<\/div><span class="config-add-source-catalogs[^"]*"><a href="https:\/\/pi\.dev\/packages" target="_blank" rel="noopener noreferrer" class="config-add-source-catalog[^"]*">pi\.dev\/packages<\/a><\/span>/);
   // Where it saves comes first under the title, before the source box.
   assert.match(html, /<\/a><\/span><\/div><div class="save-target">~\/\.pi\/agent\/\{npm,git\}<\/div><\/div><div role="group" data-slot="field"/);
   assert.match(html, /<label data-slot="field-label"[^>]*>Source<\/label><input data-slot="input"[^>]*id="plugin-source" aria-label="Source" placeholder="npm:@scope\/package" value=""\/>/);
   // The caller's controls sit between the box and the examples.
-  assert.match(html, /<\/div><div class="caller-controls">controls<\/div><div class="config-add-source-examples">/);
-  assert.match(html, /<div class="config-add-source-examples-label">Examples<\/div>/);
+  assert.match(html, /<\/div><div class="caller-controls">controls<\/div><div class="config-add-source-examples[^"]*">/);
+  assert.match(html, /<div class="config-add-source-examples-label[^"]*">Examples<\/div>/);
   assert.match(html, /<button data-slot="button" data-variant="outline" data-size="default" class="[^"]*config-add-source-example[^"]*" type="button">npm:a<\/button><button data-slot="button" data-variant="outline" data-size="default" class="[^"]*config-add-source-example[^"]*" type="button">git:b<\/button>/);
-  assert.match(html, /<div role="alert" class="config-add-source-error">boom<\/div>/);
+  assert.match(html, /<div role="alert" class="config-add-source-error[^"]*">boom<\/div>/);
 });
 
 test("a labeled example shows what it is beside its text", () => {

@@ -148,7 +148,7 @@ test("waiting for the browser shows the page as a link, the paste box, and where
   assert.match(html, /<p class="oauth-paste-message">Open the sign-in page and approve access\./);
   assert.match(html, new RegExp(`<p class="oauth-paste-hint">Sign-in page: <a href="${PAGE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" target="_blank" rel="noopener noreferrer">`));
   // The box is never focused by itself, has a name, and submits only a value.
-  assert.match(html, /<input data-slot="input" class="[^"]*oauth-paste-input" placeholder="http:\/\/127\.0\.0\.1:…\/callback\?code=…" aria-label="Address the browser landed on" value=""\/>/);
+  assert.match(html, /<input data-slot="input" class="[^"]*oauth-paste-input[^"]*" placeholder="http:\/\/127\.0\.0\.1:…\/callback\?code=…" aria-label="Address the browser landed on" value=""\/>/);
   assert.match(html, /<button data-slot="button"[^>]*class="[^"]*oauth-paste-submit[^"]*"[^>]*disabled="">Continue<\/button>/);
   assert.match(text(html), /After you approve, the browser is sent to http:\/\/127\.0\.0\.1:53682\/callback, which only the computer running Pi Web can open\./);
   assert.match(text(html), /Pi Web waits up to 5 minutes from the start of the sign-in\./);
@@ -162,12 +162,12 @@ test("waiting for the browser shows the page as a link, the paste box, and where
   // A refused paste says why in the panel's words, and the box stays.
   const refused = row({ run: { flow: flow("authorize", { authorizationUrl: PAGE }), pasteError: { error: "x", reason: "redirect-state-mismatch" } } });
   assert.match(refused, /<span role="alert" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">That address does not finish this sign-in: That address belongs to another sign-in\./);
-  assert.match(refused, /class="[^"]*oauth-paste-input"/);
+  assert.match(refused, /class="[^"]*oauth-paste-input[^"]*"/);
   const denied = row({ run: { flow: flow("authorize", { authorizationUrl: PAGE }), pasteError: { error: "The user said no", reason: "redirect-denied" } } });
   assert.match(text(denied), /The authorization server did not grant access\. Open the sign-in page again, or cancel\. The user said no/);
   // While a paste is checked, the box and its button wait.
   const pasting = row({ run: { flow: flow("authorize", { authorizationUrl: PAGE }), pasting: true } });
-  assert.match(pasting, /<input data-slot="input" class="[^"]*oauth-paste-input"[^>]*disabled=""/);
+  assert.match(pasting, /<input data-slot="input" class="[^"]*oauth-paste-input[^"]*"[^>]*disabled=""/);
   assert.match(pasting, /<button data-slot="button"[^>]*class="[^"]*oauth-paste-submit[^"]*"[^>]*disabled="">Checking…<\/button>/);
 });
 

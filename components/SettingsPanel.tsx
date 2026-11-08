@@ -269,14 +269,14 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   // behind its own list (the three-level stack); the desktop stacks them as
   // Cards in the scrolling body (§4.4).
   const themeGroup = (
-    <div role="radiogroup" aria-label={t("settings.appearance")} className="settings-theme-options">
+    <div role="radiogroup" aria-label={t("settings.appearance")} className="grid w-full grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
       {THEME_OPTIONS.map((option) => {
         const selected = preference === option.id;
         return (
           <label
             key={option.id}
             data-theme-option={option.id}
-            className="settings-theme-option"
+            className="relative inline-flex h-8 min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-xs leading-none text-foreground transition-colors hover:bg-accent/50 has-[:checked]:border-foreground has-[:checked]:ring-[1px] has-[:checked]:ring-foreground has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-accent/50"
           >
             <input
               type="radio"
@@ -286,8 +286,17 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
               onChange={() => setThemePreference(option.id)}
               className="sr-only"
             />
-            <span className="settings-theme-swatch" aria-hidden="true" />
-            <span className="settings-theme-option-label">{t(option.label)}</span>
+            {/* The palettes' own backgrounds, not tokens of the running theme. */}
+            <span
+              aria-hidden="true"
+              className={cn(
+                "size-3.5 shrink-0 rounded-full border border-border",
+                option.id === "auto" && "bg-[linear-gradient(90deg,#ffffff_50%,#1a1a1a_50%)]",
+                option.id === "light" && "bg-white",
+                option.id === "dark" && "bg-[#1a1a1a]",
+              )}
+            />
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{t(option.label)}</span>
           </label>
         );
       })}
@@ -507,7 +516,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     </>
   );
   const languageGroup = (
-    <div role="radiogroup" aria-label={t("common.language")} className="settings-language-options">
+    <div role="radiogroup" aria-label={t("common.language")} className="flex w-full flex-col gap-0.5">
       {supportedLocales.map((plugin) => {
         const selected = locale === plugin.id;
         return (
@@ -517,13 +526,19 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             role="radio"
             aria-checked={selected}
             onClick={() => setLocale(plugin.id as typeof locale)}
-            className="settings-language-option"
+            className="group flex h-9 min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50 aria-checked:bg-accent/50 aria-checked:font-medium"
           >
-            <span className="settings-language-radio">
-              {selected && <span className="settings-language-radio-dot" />}
+            <span
+              aria-hidden="true"
+              className={cn(
+                "grid size-4 shrink-0 place-items-center rounded-full border",
+                selected ? "border-primary" : "border-border",
+              )}
+            >
+              {selected && <span className="size-2 rounded-full bg-primary" />}
             </span>
-            <span className="settings-language-label">{plugin.label}</span>
-            <span className="settings-language-code">{plugin.id}</span>
+            <span className="min-w-0 flex-1">{plugin.label}</span>
+            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{plugin.id}</span>
           </button>
         );
       })}
@@ -557,7 +572,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           )}
         </ConfigSidebar>
         <ConfigDetail>
-          <ConfigDetailStack className="is-fill">
+          <ConfigDetailStack className="min-h-full">
             <ConfigDetailHeader>
               <ConfigDetailTitle>{activeDetailLabel}</ConfigDetailTitle>
             </ConfigDetailHeader>
@@ -748,7 +763,9 @@ export function SettingsPanel({
       key={id}
       hidden={section !== id || phone.level === "home"}
       data-phone-level={isPhone ? phone.level : undefined}
-      className="settings-section-host"
+      // A section's settings above its list (Models' enabledModels, Sub-agents'
+      // switch) belong to the list level, not to each row's detail.
+      className="min-h-0 min-w-0 w-full flex-1 max-[640px]:data-[phone-level=detail]:[&_.enabled-models-banner]:hidden max-[640px]:data-[phone-level=detail]:[&_.agents-feature-setting]:hidden"
     >
       {content}
     </div>
@@ -808,7 +825,7 @@ export function SettingsPanel({
               );
             })()}
             {/* A phone names the level it shows: Settings, the section, the detail's row. */}
-            <strong className="settings-dialog-title shrink-0 text-[15px] font-semibold whitespace-nowrap">
+            <strong className="settings-dialog-title shrink-0 text-[15px] font-semibold whitespace-nowrap max-[640px]:truncate max-[640px]:text-center">
               {!isPhone || phone.level === "home"
                 ? t("settings.title")
                 : phone.level === "section" ? sectionLabel : detailTitle}

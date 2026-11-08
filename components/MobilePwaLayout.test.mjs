@@ -16,6 +16,7 @@ const newSessionBarSource = await readFile(new URL("./NewSessionContextBar.tsx",
 const layoutSource = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const appShellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 const settingsPanelSource = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
+const settingsUiSource = await readFile(new URL("./SettingsUi.tsx", import.meta.url), "utf8");
 
 test("configures iOS standalone mode to use the visible viewport below the status bar", () => {
   // iOS 27 draws an unconditional Liquid Glass blur over the top edge of
@@ -85,8 +86,11 @@ test("keeps modal dialogs clear of the iOS status bar in standalone mode", () =>
   assert.match(settingsCssSource, /@supports \(-webkit-touch-callout: none\) \{[\s\S]*?@media \(display-mode: standalone\) \{\s*\.settings-phone-safe \{/);
   assert.match(settingsCssSource, /padding-top: max\(59px, env\(safe-area-inset-top\)\);[\s\S]*?padding-right: max\(8px, env\(safe-area-inset-right\)\);[\s\S]*?padding-bottom: max\(24px, env\(safe-area-inset-bottom\)\);[\s\S]*?padding-left: max\(8px, env\(safe-area-inset-left\)\);/);
   assert.match(settingsCssSource, /@media \(display-mode: standalone\) and \(orientation: landscape\) \{\s*\.settings-phone-safe \{[\s\S]*?padding-top: max\(8px, env\(safe-area-inset-top\)\);[\s\S]*?padding-right: max\(59px, env\(safe-area-inset-right\)\);[\s\S]*?padding-bottom: max\(8px, env\(safe-area-inset-bottom\)\);[\s\S]*?padding-left: max\(59px, env\(safe-area-inset-left\)\);/);
-  // A config panel opened on its own stays capped to the viewport under the same query.
-  assert.match(settingsCssSource, /\.config-panel-root\.is-modal > \.config-panel-surface \{\s*width: 100%;\s*max-width: 100%;\s*height: 100%;\s*max-height: 100%;/);
+  // A config panel opened on its own stays capped to the viewport under the
+  // same query: the shell's own utilities (ConfigPanelShell in SettingsUi)
+  // fill the phone's screen under the safe areas, frameless.
+  assert.match(settingsUiSource, /max-\[640px\]:bg-background max-\[640px\]:p-\[env\(safe-area-inset-top\)_env\(safe-area-inset-right\)_env\(safe-area-inset-bottom\)_env\(safe-area-inset-left\)\]/);
+  assert.match(settingsUiSource, /max-\[640px\]:h-full max-\[640px\]:max-h-full max-\[640px\]:w-full max-\[640px\]:max-w-full max-\[640px\]:rounded-none max-\[640px\]:border-0 max-\[640px\]:shadow-none/);
 });
 
 test("collapses secondary composer chrome while the mobile keyboard is open", () => {
@@ -118,12 +122,14 @@ test("every class the keyboard-open rules target exists on its component", () =>
   assert.match(newSessionBarSource, /<div className="new-session-context">/);
 });
 
-test("every .mcp-* rule in settings.css matches a class the MCP panel renders, and back", () => {
-  // Every .mcp-* rule targets a class the panel (its Sign-in row, its add pane) renders, and every
-  // class it renders has a rule, so a rename cannot leave a phone rule silently dead.
+test("every .mcp-* rule in settings.css matches a class the MCP panel renders", () => {
+  // The panels' presentation lives in their utility classes; the stylesheet
+  // keeps only what a Card cannot carry (the Remove confirmation's z-index).
+  // Every .mcp-* rule left must target a class the panel (its Sign-in row,
+  // its add pane) renders, so a rename cannot leave a rule silently dead.
   const styled = new Set([...settingsCssSource.matchAll(/\.(mcp-[a-z-]+)/g)].map((match) => match[1]));
   const rendered = new Set([...`${mcpConfigSource}\n${mcpSignInSource}\n${mcpAddSource}`.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)]
     .flatMap((match) => (match[1] ?? match[2]).split(/\s+/))
     .filter((name) => name.startsWith("mcp-")));
-  assert.deepEqual([...styled].sort(), [...rendered].sort());
+  for (const name of styled) assert.ok(rendered.has(name), `.mcp-${name} has no rendered class`);
 });

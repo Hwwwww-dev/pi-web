@@ -40,7 +40,8 @@ export function FontSettings() {
             </FieldLabel>
             <Input
               id={`settings-font-${kind}`}
-              className={`settings-font-input h-[26px] px-2 text-xs${kind === "mono" ? " is-mono" : ""}`}
+              // The field is drawn in the font it names: the live preview.
+              className={`h-[26px] px-2 text-xs ${kind === "mono" ? "[font-family:var(--font-mono)] [font-weight:var(--font-mono-weight)]" : "[font-family:var(--font-ui)] [font-weight:var(--font-ui-weight)]"} max-[640px]:h-8`}
               type="text"
               value={fonts[kind]}
               placeholder={t(placeholder)}

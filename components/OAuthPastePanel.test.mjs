@@ -24,7 +24,7 @@ function render(props) {
 test("the paste box is always shown, with the submit button off until there is a value", () => {
   const empty = render({ value: "  " });
   assert.match(empty, /<p class="oauth-paste-message">Paste the redirected address below\.<\/p>/);
-  assert.match(empty, /<input data-slot="input" class="[^"]*oauth-paste-input" placeholder="http:\/\/localhost:1455\/auth\/callback\?code=…" value="  "\/>/);
+  assert.match(empty, /<input data-slot="input" class="[^"]*oauth-paste-input[^"]*" placeholder="http:\/\/localhost:1455\/auth\/callback\?code=…" value="  "\/>/);
   assert.match(empty, /<button [^>]*class="[^"]*oauth-paste-submit[^"]*"[^>]*disabled="">Submit<\/button>/);
   assert.doesNotMatch(empty, /oauth-paste-hint/);
 
@@ -42,9 +42,9 @@ test("the hint line carries the caller's link to the sign-in page", () => {
 
 test("the box can carry an accessible name, and waits with its button while a value is checked", () => {
   const named = render({ value: "http://x/?code=1", inputLabel: "Address the browser landed on" });
-  assert.match(named, /<input data-slot="input" class="[^"]*oauth-paste-input" placeholder="[^"]*" aria-label="Address the browser landed on" value="http:\/\/x\/\?code=1"\/>/);
+  assert.match(named, /<input data-slot="input" class="[^"]*oauth-paste-input[^"]*" placeholder="[^"]*" aria-label="Address the browser landed on" value="http:\/\/x\/\?code=1"\/>/);
   const waiting = render({ value: "http://x/?code=1", disabled: true });
-  assert.match(waiting, /<input data-slot="input" class="[^"]*oauth-paste-input" placeholder="[^"]*" disabled="" value="http:\/\/x\/\?code=1"\/>/);
+  assert.match(waiting, /<input data-slot="input" class="[^"]*oauth-paste-input[^"]*" placeholder="[^"]*" disabled="" value="http:\/\/x\/\?code=1"\/>/);
   assert.match(waiting, /<button [^>]*class="[^"]*oauth-paste-submit[^"]*"[^>]*disabled="">Submit<\/button>/);
 });
 

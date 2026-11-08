@@ -1082,8 +1082,9 @@ export function McpConfigView({
       closeLabel={t("i18n.close")}
       onClose={onClose}
     >
-      {/* Up to six at once: they scroll in their own box, so the list and the pane keep most of the height. */}
-      <div className="mcp-config-notices">
+      {/* Up to six at once: they scroll in their own box, so the list and the pane keep most of the height.
+          The last notice needs no separator above the split view. */}
+      <div className="mcp-config-notices max-h-[40vh] min-h-0 flex-[0_1_auto] overflow-y-auto max-[640px]:max-h-[30dvh] [&_.config-notice:last-child]:border-b-0">
         {hasNotices && (
           <ConfigCard className="py-1">
             {unavailable && (
@@ -1134,7 +1135,8 @@ export function McpConfigView({
       </div>
 
       <ConfigSplitView>
-        <ConfigSidebar>
+        {/* Short of height, the 190px sidebar gives way to a few rows before the detail pane is clipped. */}
+        <ConfigSidebar className="max-[640px]:min-h-24 max-[640px]:shrink">
           <ConfigSidebarList>
             {load.state === "loading" ? (
               <div className="flex min-w-0 flex-col gap-1.5">
@@ -1186,8 +1188,8 @@ export function McpConfigView({
           )}
         </ConfigSidebar>
 
-        <ConfigDetail>
-          <ConfigDetailStack className="is-fill">
+        <ConfigDetail className="max-[640px]:min-h-[120px]">
+          <ConfigDetailStack className="min-h-full">
             {!data || !context || !autoEnable || !emptyKey ? null : adding ? (
               <McpAddServer
                 data={data}
@@ -1596,7 +1598,7 @@ function McpServerDetail({
 
   return (
     <ConfigDetailStack>
-      <div className="config-detail-heading">
+      <div className="flex flex-col gap-1">
         <ConfigDetailHeader>
           <ConfigDetailHeaderInfo>
             <ConfigScopeTag scope={server.scope}>{scopeLabel(server.scope, t)}</ConfigScopeTag>
@@ -1646,7 +1648,7 @@ function McpServerDetail({
             />
           </ConfigDetailActions>
         </ConfigDetailHeader>
-        {note && <div id={noteId} className="config-detail-heading-note">{note}</div>}
+        {note && <div id={noteId} className="config-detail-heading-note text-right text-xs text-muted-foreground">{note}</div>}
       </div>
       {actionError && (
         <p role="alert" className="text-xs leading-normal text-destructive [overflow-wrap:anywhere]">

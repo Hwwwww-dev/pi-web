@@ -65,7 +65,7 @@ test("offers system, light and dark selection with native radios (shadcn theme o
 
 test("keeps language selection in General settings", () => {
   assert.match(panelSource, /t\("common\.language"\)/);
-  assert.match(panelSource, /className="settings-language-options"/);
+  assert.match(panelSource, /<div role="radiogroup" aria-label=\{t\("common\.language"\)\} className="flex w-full flex-col gap-0\.5">/);
   assert.match(panelSource, /setLocale\(plugin\.id/);
 });
 
@@ -141,8 +141,11 @@ test("hosts the sections in one full-size layer, listed on a phone's home level"
   assert.match(panelSource, /openSectionFromHome/);
   assert.match(panelSource, /hidden=\{section !== id \|\| phone\.level === "home"\}/);
   assert.match(panelSource, /data-phone-level=\{isPhone \? phone\.level : undefined\}/);
-  assert.match(panelSource, /className="settings-section-host"/);
-  assert.match(cssSource, /\.settings-section-host \{/);
+  // The host fills the dialog body; a phone's detail level hides a section's
+  // own list-level settings (Models' banner, Sub-agents' switch card), the
+  // old `.settings-section-host` phone rules carried by utilities now.
+  assert.match(panelSource, /className="min-h-0 min-w-0 w-full flex-1 max-\[640px\]:data-\[phone-level=detail\]:\[\&_\.enabled-models-banner\]:hidden max-\[640px\]:data-\[phone-level=detail\]:\[\&_\.agents-feature-setting\]:hidden"/);
+  assert.doesNotMatch(cssSource, /\.settings-section-host/);
   // The v2 rail and the chip row are gone; the pre-Tabs self-drawn classes are
   // gone from panel and stylesheet (the aria-describedby id prefix
   // `settings-phone-home-*` is not a class).

@@ -68,7 +68,7 @@ test("the paste box is a textarea that never takes focus by itself on a phone, a
   assert.doesNotMatch(html, /autofocus|autoFocus/i, "focus is decided on mount, by pointer, never in the markup");
   // The catalogs to browse, in order, at the right of the title.
   assert.deepEqual(
-    [...html.matchAll(/<a href="([^"]+)" target="_blank" rel="noopener noreferrer" class="config-add-source-catalog">([^<]+)<\/a>/g)].map((match) => [match[1], match[2]]),
+    [...html.matchAll(/<a href="([^"]+)" target="_blank" rel="noopener noreferrer" class="config-add-source-catalog[^"]*">([^<]+)<\/a>/g)].map((match) => [match[1], match[2]]),
     [
       ["https://glama.ai/mcp/servers", "glama.ai"],
       ["https://smithery.ai/servers", "smithery.ai"],
@@ -79,9 +79,9 @@ test("the paste box is a textarea that never takes focus by itself on a phone, a
   );
   // The placeholder lists what may be pasted; no sentence under the box repeats it.
   assert.doesNotMatch(html, /config-add-source-hint|Cmd\/Ctrl\+Enter adds it/);
-  assert.match(html, /<div class="config-add-source-examples">/, "an empty box offers examples");
+  assert.match(html, /<div class="config-add-source-examples[^"]*">/, "an empty box offers examples");
   // Every supported format, each named as the preview would name it.
-  assert.match(html, /<div class="config-add-source-examples-label">Supported formats \(click one to fill in an example\)<\/div>/);
+  assert.match(html, /<div class="config-add-source-examples-label[^"]*">Supported formats \(click one to fill in an example\)<\/div>/);
   assert.match(html, /<span class="config-add-source-example-label text-xs text-muted-foreground">codex mcp add<\/span><span class="config-add-source-example-value font-mono text-xs">codex mcp add fetch -- uvx mcp-server-fetch<\/span>/);
   assert.match(html, /<span class="config-add-source-example-label text-xs text-muted-foreground">Zed settings<\/span>/);
   assert.equal(html.match(/config-add-source-example has-label/g)?.length, 19);
@@ -137,8 +137,8 @@ test("a fresh folder is trusted in the same step, and the button and a line say 
   assert.match(text(html), /~?\/?.*repo\/\.pi\/mcp\.json/, "the location names the project file");
   // Where it saves, the file and what choosing it means come first, under the title; the button stays at the end.
   const decoded = decode(html);
-  const target = decoded.slice(decoded.indexOf('<div class="config-save-target">'), decoded.indexOf("<textarea"));
-  assert.match(target.replace(/<wbr\/>/g, ""), /<span class="config-save-target-path">[^<]*repo\/\.pi\/mcp\.json<\/span>/);
+  const target = decoded.slice(decoded.indexOf('<div class="config-save-target'), decoded.indexOf("<textarea"));
+  assert.match(target.replace(/<wbr\/>/g, ""), /<span class="config-save-target-path[^"]*">[^<]*repo\/\.pi\/mcp\.json<\/span>/);
   assert.match(target, /Add trusts ~?\/?.*repo in the same step\./);
   assert.ok(decoded.indexOf("config-save-target") < decoded.indexOf("<textarea"), "before the paste box");
   assert.ok(decoded.indexOf("<textarea") < decoded.indexOf("Add and trust this folder"), "Add after it");
@@ -147,7 +147,7 @@ test("a fresh folder is trusted in the same step, and the button and a line say 
 test("why Project is unavailable is visible text under the switch, never only a tooltip", () => {
   const breadth = { kind: "contains-folder", path: "/Users/me/repo/app" };
   let html = decode(pane({ data: overview({ cwd: "/Users/me/repo", trust: fresh, trustFolder: { allowed: false, reason: "trust-too-broad", breadth } }), draft: { text: "npx x" } }));
-  const reason = html.match(/<span id="([^"]+)" class="config-scope-switch-reason">([^<]*)<\/span>/);
+  const reason = html.match(/<span id="([^"]+)" class="config-scope-switch-reason[^"]*">([^<]*)<\/span>/);
   assert.ok(reason, "the reason is rendered");
   assert.match(reason[2], /This folder holds .*repo\/app, another folder Pi Web knows/);
   assert.match(html, new RegExp(`<button[^>]*aria-checked="false"[^>]*aria-describedby="${reason[1]}"[^>]*disabled=""[^>]*>project<\\/button>`));
@@ -180,7 +180,7 @@ test("why Project is unavailable is visible text under the switch, never only a 
   });
   assert.match(text(html), /This project is not trusted, so Pi Web does not write its \.pi\/mcp\.json\. Trust it first\./);
   // The way to make Project available sits under its reason, in the save target.
-  assert.match(html, /<div class="config-save-target">[\s\S]*?class="config-scope-switch-reason">This project is not trusted[^<]*<\/span><\/div><span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]"><button[^>]*>Trust project…<\/button><\/span><\/div>/);
+  assert.match(html, /<div class="config-save-target[^"]*">[\s\S]*?class="config-scope-switch-reason[^"]*">This project is not trusted[^<]*<\/span><\/div><span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]"><button[^>]*>Trust project…<\/button><\/span><\/div>/);
 });
 
 test("the name comes right after the paste, with the importer's notes about it, which go once it is edited", () => {
@@ -357,7 +357,7 @@ test("Settings › MCP opens the add pane from the sidebar, keeps the draft, and
   const notice = addedView();
   // Short on a phone: the project file from the panel's folder, and that folder as the button named it.
   assert.match(text(notice), /Added docs to \.\/\.pi\/mcp\.json, and trusted this folder\. It asks for a sign-in\./);
-  assert.match(decode(notice), /<div role="status" class="config-notice has-action">[\s\S]*?<button data-slot="button" data-variant="default" data-size="xs" class="[^"]*" type="button">Sign in<\/button>/);
+  assert.match(decode(notice), /<div role="status" class="config-notice[^"]*has-action[^"]*">[\s\S]*?<button data-slot="button" data-variant="default" data-size="xs" class="[^"]*" type="button">Sign in<\/button>/);
   // Outside the home folder too, where `~` shortens nothing (the e2e run's folder). The detail
   // pane's File row still shows the whole path.
   const far = "/private/tmp/work/some/long/folder/project";
