@@ -113,9 +113,9 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
   }
 
   const body = renderState?.key === currentKey && renderState.status === "error" ? (
-      <div className="mermaid-block mermaid-block-error">{t("i18n.invalidMermaid")}</div>
+      <div className="mermaid-block mermaid-block-error p-3 overflow-x-auto bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] text-muted-foreground font-mono text-xs">{t("i18n.invalidMermaid")}</div>
     ) : renderState?.key !== currentKey || renderState.status !== "ready" ? (
-      <div className="mermaid-block mermaid-block-loading" aria-label={t("i18n.renderingMermaid")} />
+      <div className="mermaid-block mermaid-block-loading p-3 overflow-x-auto bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] min-h-[120px]" aria-label={t("i18n.renderingMermaid")} />
     ) : (
       <>
         {!zoomOpen && (
@@ -243,7 +243,7 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
   return (
     <dialog
       ref={dialogRef}
-      className="mermaid-zoom-dialog"
+      className="mermaid-zoom-dialog w-screen max-w-none h-dvh max-h-none m-0 border-0 bg-background p-0 text-foreground backdrop:bg-black/35"
       aria-label={label}
       onCancel={(event) => {
         event.preventDefault();
@@ -255,10 +255,10 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
         onClose();
       }}
     >
-      <div className="mermaid-zoom-layout">
-        <div className="mermaid-zoom-toolbar">
-          <span className="mermaid-zoom-title">{title}</span>
-          <div className="mermaid-zoom-actions">
+      <div className="mermaid-zoom-layout grid grid-rows-[auto_minmax(0,1fr)] h-full">
+        <div className="mermaid-zoom-toolbar flex min-h-10 items-center gap-2.5 border-b border-border bg-sidebar px-2.5 py-[7px] max-[480px]:px-2">
+          <span className="mermaid-zoom-title min-w-0 overflow-hidden font-mono text-xs font-semibold text-ellipsis whitespace-nowrap text-muted-foreground max-[480px]:text-[10px]">{title}</span>
+          <div className="mermaid-zoom-actions ml-auto flex items-center gap-1.5">
             <div className="flex h-6 items-center overflow-hidden rounded-md border border-border bg-background">
               <Button
                 type="button"
@@ -311,13 +311,14 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
           </div>
         </div>
         <div
-          className="mermaid-zoom-viewport"
+          className="mermaid-zoom-viewport min-h-0 min-w-0 overflow-auto bg-background p-6 [-webkit-overflow-scrolling:touch] max-[480px]:p-3"
           onClick={(event) => {
             if (event.target === event.currentTarget) onClose();
           }}
         >
-          {/* The zoom factor is a computed width, not a static presentation. */}
-          <div className="mermaid-zoom-canvas" style={{ width: `${zoom * 100}%` }}>
+          {/* The zoom factor is a computed width, not a static presentation.
+              mermaid 生成的 svg 的块级铺满规则留在 globals（.mermaid-zoom-canvas svg）。 */}
+          <div className="mermaid-zoom-canvas mx-auto border border-border rounded-(--radius-sm) bg-sidebar p-3 transition-[width] duration-150 ease-[ease]" style={{ width: `${zoom * 100}%` }}>
             {children}
           </div>
         </div>
@@ -347,11 +348,12 @@ delete codeBlockDarkTheme['pre[class*="language-"]'].background;
 type CodeLinesProps = Parameters<NonNullable<SyntaxHighlighterProps["renderer"]>>[0];
 
 /**
- * A fence's lines, each a row of its number and its text (`.markdown-code-line`
- * in app/globals.css): long lines wrap, as in pi's TUI, and a wrapped line goes
- * on under its own text, never under the number. The text keeps the row's own
- * classes, which color the later lines of a token that spans several (a block
- * comment).
+ * A fence's lines, each a row of its number and its text: long lines wrap, as
+ * in pi's TUI, and a wrapped line goes on under its own text, never under the
+ * number. The text keeps the row's own classes, which color the later lines of
+ * a token that spans several (a block comment). While an extension dialog
+ * measures its fences unwrapped (ChatWindow toggles body's
+ * .extension-dialog-measuring), the text stops wrapping.
  */
 function renderCodeLines({ rows, stylesheet, useInlineStyles }: CodeLinesProps) {
   return rows.map((row, index) => {
@@ -359,11 +361,18 @@ function renderCodeLines({ rows, stylesheet, useInlineStyles }: CodeLinesProps) 
     const number = children[0]?.properties?.className.includes("react-syntax-highlighter-line-number") ? children[0] : null;
     const text = {
       ...row,
-      properties: { ...row.properties, className: [...(row.properties?.className ?? []), "markdown-code-line-text"] },
+      properties: {
+        ...row.properties,
+        className: [
+          ...(row.properties?.className ?? []),
+          "markdown-code-line-text",
+          "min-w-0 flex-1 basis-0 whitespace-pre-wrap [overflow-wrap:anywhere] in-[.extension-dialog-measuring]:whitespace-pre",
+        ],
+      },
       children: number ? children.slice(1) : children,
     };
     return (
-      <span key={index} className="markdown-code-line">
+      <span key={index} className="markdown-code-line flex">
         {number && renderSyntaxNode({ node: number, stylesheet, useInlineStyles, key: "number" })}
         {renderSyntaxNode({ node: text, stylesheet, useInlineStyles, key: "text" })}
       </span>

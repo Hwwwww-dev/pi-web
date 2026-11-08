@@ -292,7 +292,9 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
     // The CodeBlock sm container, kept on the section so the terminal grid,
     // data-terminal-theme and its own xterm palette stay untouched.
     <section
-      className="terminal-panel cn-code-block group/code-block relative flex w-full min-w-0 flex-col overflow-hidden rounded-lg border border-input text-xs dark:bg-input/30"
+      // 面板壳的网格布局（38px 头行 / 状态行 / 终端行）批 4 自 app/globals.css
+      // 迁入；--terminal-* 调色板仍由 globals 的 .terminal-panel 按主题注入。
+      className="terminal-panel cn-code-block group/code-block relative grid h-full min-h-0 w-full min-w-0 grid-rows-[38px_auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-input bg-(--terminal-bg) text-xs dark:bg-input/30"
       data-terminal-theme={theme}
       aria-label={t("terminal.title")}
     >
@@ -330,7 +332,7 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
         {error && <div role="alert" className="border-b bg-(--terminal-error-bg) px-3 py-[7px] font-mono text-xs text-(--terminal-error-text) border-(--terminal-error-border)">{error}</div>}
         {status === "exited" && <div role="status" className="px-3 py-[7px] font-mono text-xs text-(--terminal-muted)">{exitCode === null ? t("terminal.exited") : t("terminal.exitCode", { code: exitCode })}</div>}
       </div>
-      <div className="terminal-xterm"><div ref={containerRef} className="terminal-xterm-host" /></div>
+      <div className="terminal-xterm min-h-0 min-w-0 overflow-hidden pt-2.5 pr-2 pb-[22px] pl-3 [grid-row:-2/-1]"><div ref={containerRef} className="terminal-xterm-host size-full" /></div>
       {showExtraKeys && <TerminalExtraKeys modifiers={modifiers} onKey={sendExtraKey} onToggleModifier={toggleModifier} />}
     </section>
   );

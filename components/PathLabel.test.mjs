@@ -3,12 +3,13 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(new URL("./PathLabel.tsx", import.meta.url), "utf8");
-const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
 test("path labels ellipsize on the left and keep the path itself left-to-right", () => {
   // direction: rtl moves the ellipsis to the left edge, so the trailing segments
   // stay visible; the inner plaintext isolation stops bidi reordering the path.
-  assert.match(css, /\.path-label \{\n  display: block;[\s\S]{0,260}direction: rtl;[\s\S]{0,160}text-overflow: ellipsis;/);
+  assert.match(source, /\[direction:rtl\]/);
+  assert.match(source, /\[text-overflow:ellipsis\]/);
+  assert.match(source, /text-left/);
   assert.match(source, /unicodeBidi: "plaintext"/);
   // The hidden head stays reachable.
   assert.match(source, /title=\{title \?\? text\}/);

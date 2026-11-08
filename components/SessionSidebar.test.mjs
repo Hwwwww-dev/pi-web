@@ -35,6 +35,7 @@ const searchSource = await readFile(new URL("./SessionSearch.tsx", import.meta.u
 const globalStyles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const sidebarStyles = await readFile(new URL("../app/sidebar.css", import.meta.url), "utf8");
 const explorerSource = await readFile(new URL("./FileExplorer.tsx", import.meta.url), "utf8");
+const pickerSource = await readFile(new URL("./ProjectWorktreePicker.tsx", import.meta.url), "utf8");
 
 const h = React.createElement;
 const noop = () => {};
@@ -168,7 +169,7 @@ test("with the files below the sessions, both are in view under the track", () =
   // changed, so no count after the label.
   const filesPanel = html.slice(html.indexOf(files) + files.length);
   assert.match(filesPanel, /^<div class="[^"]*sidebar-files-section[^"]*"><button [^>]*class="[^"]*sidebar-files-section-toggle[^"]*" type="button" aria-expanded="true" aria-controls="session-sidebar-files-body"><svg[^>]*width="12"[^>]*stroke-width="3"[^>]*class="lucide[^"]*rotate-90"[^>]*>[\s\S]*?<\/svg><span class="[^"]*sidebar-files-section-label[^"]*">Files<\/span><\/button><div class="[^"]*sidebar-files-keys[^"]*" role="group" aria-label="File actions"><button [^>]*class="[^"]*sidebar-tool-button[^"]*" type="button" title="Open workspace terminal" aria-label="Open workspace terminal">/);
-  assert.match(filesPanel, /<div id="session-sidebar-files-body" class="[^"]*sidebar-files-body[^"]*"><div class="[^"]*sidebar-files-head[^"]*"><div class="project-picker is-row" role="group"/);
+  assert.match(filesPanel, /<div id="session-sidebar-files-body" class="[^"]*sidebar-files-body[^"]*"><div class="[^"]*sidebar-files-head[^"]*"><div class="project-picker is-row[^"]*" role="group"/);
   assert.match(filesPanel, /<div class="[^"]*sidebar-files-scroll[^"]*">/);
   assert.doesNotMatch(filesPanel, /sidebar-files-toolbar|sidebar-files-title|sidebar-files-actions|sidebar-files-section-search|sidebar-files-changes/);
   assert.doesNotMatch(filesPanel, /sidebar-files-section-count/);
@@ -417,9 +418,13 @@ test("below the sessions the picker is one row under the header row, lined up wi
   const treeTop = Number(explorerSource.match(/\(changesCollapsed \|\| gitFiles\.length === 0\) && \(!fileSearchOpen \|\| !hasSearchQuery\) && \(\s*<div className="px-1 py-\[(\d+)px\]">/)[1]);
   assert.equal(headBottom + scrollTop + treeTop, 4, "the tree's first row 4px under the boxes");
   // The paths start in the text column (the chevron column's 6px + 5px, the
-  // 12px chevron, a 3px gap), after the box's 1px line and 10px padding.
-  const [boxLine] = px(globalStyles.slice(globalStyles.indexOf("\n.project-picker-button {")), "border");
-  const [, boxPadding] = px(globalStyles.slice(globalStyles.indexOf("\n.project-picker-button {")), "padding");
+  // 12px chevron, a 3px gap), after the box's 1px line and 10px padding —
+  // the picker's below-sessions box classes (ProjectWorktreePicker's
+  // non-inline box: `border border-border` is the 1px line, px-2.5 the 10px).
+  const belowBox = pickerSource.match(/px-([\d.]+) border border-border/);
+  assert.ok(belowBox, "the below-sessions box's line and padding are its own classes");
+  const boxLine = 1;
+  const boxPadding = Number(belowBox[1]) * 4;
   const textColumn = 6 + 5 + 12 + 3;
   assert.equal(headLeft + boxLine + boxPadding, textColumn, "the paths in the text column");
   // The boxes end where the keys end and where a session row's time does,

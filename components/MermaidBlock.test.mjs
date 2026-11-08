@@ -71,7 +71,7 @@ function renderCode(props) {
 
 /** Each line's number, read off the row that pairs it with its text. */
 function lineRows(html) {
-  return [...html.matchAll(/<span class="markdown-code-line"><span class="linenumber react-syntax-highlighter-line-number"[^>]*>(\d+)<\/span><span class="(?:token )?markdown-code-line-text"/g)]
+  return [...html.matchAll(/<span class="markdown-code-line[^"]*"><span class="linenumber react-syntax-highlighter-line-number"[^>]*>(\d+)<\/span><span class="(?:token )?markdown-code-line-text[^"]*"/g)]
     .map((match) => match[1]);
 }
 
@@ -120,7 +120,7 @@ test("CodeBlock keeps a block comment's color on every line it spans", () => {
 
   // The comment's middle line is a row of its own, styled by the row's classes.
   const first = html.match(/<span class="token" style="([^"]*)">\/\* one\n<\/span>/)?.[1];
-  const middle = html.match(/<span class="token markdown-code-line-text" style="([^"]*)">   two\n<\/span>/)?.[1];
+  const middle = html.match(/<span class="token markdown-code-line-text[^"]*" style="([^"]*)">   two\n<\/span>/)?.[1];
   assert.ok(first);
   assert.equal(middle, first);
   assert.deepEqual(lineRows(html), ["1", "2", "3", "4"]);

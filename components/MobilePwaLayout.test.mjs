@@ -115,11 +115,11 @@ test("every class the keyboard-open rules target exists on its component", () =>
   // While streaming with an empty composer the main button stops the run.
   assert.match(chatInputSource, /aria-label=\{t\("chat\.stopAgent"\)\}/);
   // A fresh composer's project bar goes too, in a rule of its own inside the same query.
-  assert.match(newSessionBarSource, /<div className="new-session-context">/);
+  assert.match(newSessionBarSource, /<div className="new-session-context[ "]/);
   assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{[^@]*?html\[data-keyboard-open\] \.new-session-context \{\s*display: none !important;/);
   // Mobile send is icon-only but keeps an accessible name.
   assert.match(chatInputSource, /aria-label=\{t\("chat\.send"\)\}/);
-  assert.match(newSessionBarSource, /<div className="new-session-context">/);
+  assert.match(newSessionBarSource, /<div className="new-session-context[ "]/);
 });
 
 test("every .mcp-* rule in settings.css matches a class the MCP panel renders", () => {

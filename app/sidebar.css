@@ -2,8 +2,7 @@
    classes (components/SessionSidebar.tsx, components/SessionTree.tsx carry
    everything else as Tailwind utilities). These are the virtualizer's row
    geometry, the scrollbar-aware insets and gutter, the header-fit states
-   useHeaderFit reports, the fold's and the archive view's motion, the
-   separator's overrides of globals.css's .panel-resize-handle, and the
+   useHeaderFit reports, the fold's and the archive view's motion, and the
    awaiting dot the Debug panel renders outside the tree too. */
 
 /* The tree's rows: absolutely positioned by the virtualizer, which also
@@ -152,25 +151,4 @@
   50% {
     transform: scale(1.6);
   }
-}
-
-/* The files' separator: globals.css's .panel-resize-handle turned on its
-   side — a 12px hit area centred on the files section's top border, which
-   is the line it shows, so hover, focus and a drag look the same. Kept
-   unlayered: globals.css's rule is unlayered too, and this one must win. */
-.panel-resize-handle.sidebar-files-resize-handle {
-  width: auto;
-  height: 12px;
-  margin: -6px 0;
-  flex: 0 0 12px;
-  cursor: row-resize;
-}
-
-.panel-resize-handle.sidebar-files-resize-handle::after {
-  top: 5px;
-  right: 0;
-  bottom: auto;
-  left: 0;
-  width: auto;
-  height: 2px;
 }

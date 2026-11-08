@@ -169,11 +169,13 @@ function NewSessionUpdateLink({
   const accessibleLabel = label(update.latestVersion);
 
   // In the versions line, after the version in use: "→ v<latest> ↗".
+  // The box's padding is offset by equal negative margins, so hover and focus
+  // never move the line; on a coarse pointer they grow the tap target instead.
   return (
     <>
-      <span className="new-session-meta-arrow" aria-hidden="true">→</span>
+      <span aria-hidden="true">→</span>
       <a
-        className="new-session-update"
+        className="new-session-update inline-flex items-center gap-[3px] -mx-1 -my-[3px] px-1 py-[3px] rounded-(--radius-sm) font-semibold no-underline text-primary transition-colors duration-100 hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:flex-none pointer-coarse:-my-2 pointer-coarse:py-2"
         href={update.releaseUrl}
         target="_blank"
         rel="noopener noreferrer"
@@ -1267,7 +1269,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         );
         if (!isVisible || currentRefIdx === undefined) return view;
         return (
-          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} className="cv-block" ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
+          // 性能: 离屏消息块跳过布局与绘制；contain-intrinsic-size 的 auto 关键字
+          // 让浏览器记住渲染过的真实高度，占位估算随访问收敛。
+          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} className="[content-visibility:auto] [contain-intrinsic-size:auto_160px]" ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
             {view}
           </div>
         );
@@ -1428,7 +1432,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           rendered.push(
             <div
               key={`process-group-${entryIds[userIdx] ?? userIdx}`}
-              className="cv-block"
+              className="[content-visibility:auto] [contain-intrinsic-size:auto_160px]"
               ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
             >
               <ProcessDetailsGroup key={finalAnswerMessage ? "answered" : "unanswered"} summary={processSummary} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
@@ -1761,21 +1765,20 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the
-            composer's left edge (.new-session-brand, .new-session-meta and
-            .new-session-context in app/globals.css; the side padding and
-            width are inline here). */}
+            composer's left edge; the side padding and width are inline here,
+            the hero's styles批 4 迁入为工具类。 */}
         {isEmptyNew && (
           <div className="new-session-hero max-md:px-4 md:px-4">
-            <div className="new-session-hero-inner flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-center">
-              <div className="new-session-brand">
-                <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo" />
-                <div className="new-session-brand-text">
-                  <span className="new-session-brand-name">Pi Web</span>
-                  <span className="new-session-meta">
+            <div className="new-session-hero-inner mx-auto flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-center">
+              <div className="new-session-brand flex min-w-0 items-center gap-3 mb-5 max-[640px]:mb-4">
+                <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
+                <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
+                  <span className="new-session-brand-name text-[22px] font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
+                  <span className="new-session-meta flex min-w-0 items-center gap-1.5 text-xs leading-[1.4] whitespace-nowrap text-muted-foreground [&>*]:flex-none">
                     <span>web v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
                     <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
                     <span aria-hidden="true">·</span>
-                    <span className="new-session-meta-pi">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
+                    <span className="new-session-meta-pi min-w-0 overflow-hidden text-ellipsis">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
                   </span>
                 </div>
               </div>

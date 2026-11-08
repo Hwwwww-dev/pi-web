@@ -71,7 +71,7 @@ test("the tabs layout renders the brand row, its track and no files section head
   // Both panels are tab panels; the files' is hidden behind its tab.
   assert.match(html, /<div id="session-sidebar-panel-files" role="tabpanel" aria-labelledby="session-sidebar-tab-files" hidden="" class="[^"]*sidebar-panel sidebar-files-panel[^"]*">/);
   // The picker's two boxes one under the other, then the keys.
-  assert.match(html, /<div class="[^"]*sidebar-files-head[^"]*"><div class="project-picker is-stacked" role="group"/);
+  assert.match(html, /<div class="[^"]*sidebar-files-head[^"]*"><div class="project-picker is-stacked[^"]*" role="group"/);
   // No file search key: the toolbar row's search is the tab's.
   assert.doesNotMatch(html, /aria-controls="file-search-input"/);
 });
