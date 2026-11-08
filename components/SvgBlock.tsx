@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   CodeBlock,
@@ -74,13 +75,14 @@ export function SvgBlock({ code, isStreaming }: { code: string; isStreaming?: bo
   }
 
   const ready = url !== null && failedUrl !== url;
-  const image = (className: string) => (
+  // An SVG with neither a viewBox nor a width and height has no size of its own:
+  // the `unsized` classes give it one when the load reports naturalWidth 0.
+  const image = (baseClass: string, unsizedClass: string) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={url ?? undefined}
       alt={t("i18n.svgImage")}
-      // Neither a viewBox nor a width and height: the image has no size of its own.
-      className={[className, unsizedUrl === url ? "is-unsized" : ""].filter(Boolean).join(" ")}
+      className={cn(baseClass, unsizedUrl === url && unsizedClass)}
       onLoad={(event) => {
         const { naturalWidth, naturalHeight } = event.currentTarget;
         if (!naturalWidth || !naturalHeight) setUnsizedUrl(url);
@@ -109,17 +111,19 @@ export function SvgBlock({ code, isStreaming }: { code: string; isStreaming?: bo
             <Button
               type="button"
               variant="ghost"
-              className="mermaid-block mermaid-preview-button block h-auto rounded-none font-normal focus-visible:ring-0 focus-visible:border-transparent"
+              className="block h-auto max-h-[min(600px,60dvh)] w-full overflow-auto rounded-none border-0 text-left font-normal text-inherit cursor-zoom-in hover:opacity-85"
               title={t("i18n.openSvgViewer")}
               aria-label={t("i18n.openSvgViewer")}
               onClick={() => setZoomOpen(true)}
             >
-              {image("svg-block-image")}
+              {/* An SVG with only a viewBox has a ratio but no size, so it would
+                  fill the column: capped like a diagram's height. */}
+              {image("block h-auto w-auto max-w-full max-h-[min(360px,50dvh)]", "h-[240px] w-full")}
             </Button>
           )}
           {zoomOpen && (
             <DiagramZoomDialog title={t("i18n.svgImage")} label={t("i18n.svgViewer")} onClose={() => setZoomOpen(false)}>
-              {image("svg-zoom-image")}
+              {image("block h-auto w-full", "aspect-[2/1]")}
             </DiagramZoomDialog>
           )}
         </>

@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { AgentMessage, AssistantMessage, CustomMessage, MinimapTurnDescriptor, TextContent, UserMessage } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
-import styles from "./ChatMinimap.module.css";
 
 interface Props {
   messages: AgentMessage[];
@@ -628,7 +627,7 @@ export const ChatMinimap = memo(function ChatMinimap({
       {minimapHovered && nearestSlot !== null && allNodes.length > 0 && (
         <div
           ref={previewBoxRef}
-          className={styles.preview}
+          className="pointer-events-auto absolute top-1/2 right-[calc(100%+12px)] z-[100] -translate-y-1/2 max-h-[calc(100%-24px)] w-[340px] cursor-default select-text overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-2 shadow-md animate-[minimap-preview-in_160ms_ease_both] [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
           data-minimap-preview-box=""
           onMouseEnter={showPreview}
           onMouseDown={(event) => event.stopPropagation()}
@@ -637,6 +636,7 @@ export const ChatMinimap = memo(function ChatMinimap({
           {allNodes.map((node) => {
             const isLocated = nearestNodeIndex === node.index;
             const turn = node.targetTurn;
+            const isUnloaded = turn.scrollTop === null;
             const metaParts: string[] = [];
             if (turn.afterCompaction) metaParts.push(t("chatMinimap.compactionBoundary"));
             if (turn.scrollTop === null) {
@@ -661,31 +661,57 @@ export const ChatMinimap = memo(function ChatMinimap({
                   if (element) previewItemRefs.current.set(node.index, element);
                   else previewItemRefs.current.delete(node.index);
                 }}
-                className={styles.turn}
+                className={cn(
+                  // One hairline between turns keeps the card scannable without
+                  // boxing every row.
+                  "grid grid-cols-[22px_minmax(0,1fr)] gap-x-1 rounded-[10px] px-1.5 pt-[5px] pb-[3px] transition-colors duration-[120ms]",
+                  "[&:not(:first-child)]:border-t [&:not(:first-child)]:rounded-t-none [&:not(:first-child)]:border-border/55",
+                  isLocated && "bg-accent/10",
+                )}
                 data-minimap-preview-index={node.index}
                 data-located={isLocated ? "true" : undefined}
-                data-unloaded={turn.scrollTop === null ? "" : undefined}
+                data-unloaded={isUnloaded ? "" : undefined}
               >
-                <span className={styles.number} aria-hidden="true">
+                <span
+                  className={cn(
+                    "pt-1.5 text-center font-mono text-[10px] leading-[18px] tabular-nums",
+                    isLocated ? "text-primary" : "text-muted-foreground",
+                  )}
+                  aria-hidden="true"
+                >
                   {String(node.index + 1 + (turnIndex.length > 0 ? 0 : turnsBefore)).padStart(2, "0")}
                 </span>
-                <div className={styles.content}>
+                <div className="min-w-0">
                   <Button
                     type="button"
                     variant="ghost"
-                    className={cn(styles.user, "h-auto focus-visible:ring-0 focus-visible:border-transparent")}
+                    className={cn(
+                      "block h-auto w-full overflow-hidden rounded-lg px-2 pt-[5px] pb-[3px] text-left text-[13px] font-semibold leading-[18px] tracking-normal transition-colors duration-100",
+                      isLocated ? "bg-foreground/[0.06] text-primary" : "bg-transparent text-foreground hover:bg-foreground/[0.06]",
+                      "focus-visible:bg-foreground/[0.06] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-ring/60",
+                    )}
                     data-minimap-preview-user={node.index}
                     onClick={() => {
                       scrollToNode(node, "smooth");
                     }}
                   >
-                      <span className={styles.userText}>
+                    <span className={cn("line-clamp-2 whitespace-pre-wrap [overflow-wrap:anywhere]", isUnloaded && "opacity-60")}>
                       {getUserPreview(node.targetTurn.userMessage)}
                     </span>
                   </Button>
 
                   {metaParts.length > 0 && (
-                    <div className={styles.meta}>{metaParts.join(" · ")}</div>
+                    <div
+                      className={cn(
+                        "ml-2 mt-px mb-[3px] truncate font-mono text-[10.5px] leading-[15px] tabular-nums",
+                        isLocated
+                          ? "text-[color-mix(in_srgb,var(--primary)_65%,var(--muted-foreground))]"
+                          : "text-muted-foreground",
+                        isUnloaded && "italic",
+                      )}
+                    >
+                      {metaParts.join(" · ")}
+                    </div>
                   )}
                 </div>
               </div>

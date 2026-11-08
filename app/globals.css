@@ -732,100 +732,6 @@ html[data-keyboard-open] .terminal-extra-keys {
   background-color: rgb(var(--terminal-scrollbar));
 }
 
-/* Extension widgets (shadcn rebuild): triggers are ghost buttons in one row with
-   the status line; the expanded panel is a popover-style card above them. On
-   phones the card opens upward so an expanded TUI box cannot eat the list. */
-@media (max-width: 640px) {
-  /* Touch targets get a little taller; every control grows together. */
-  .composer-chip {
-    height: 34px;
-  }
-}
-
-/* One chip recipe for every control in the composer toolbar — thinking level,
-  model name, tool preset, YOLO marker, extension status, More, attach. Flat by
-  default: same height, padding, radius and type size, background only on hover,
-  so the row reads as one flat group instead of a row of boxes. */
-.composer-chip {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 32px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--muted-foreground);
-  font-family: inherit;
-  font-size: 12px;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-
-.composer-chip:hover,
-.composer-chip[aria-expanded="true"] {
-  background: var(--secondary);
-  color: var(--foreground);
-}
-
-.composer-chip:disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-/* Extension status texts (LSP state, goal mode, …) moved off the shelf behind
-   this chip, so the shelf only ever carries widget triggers. The popover opens
-   upward, right-aligned, and lists one line per reporting extension. */
-
-/* pi-lens reports green/red itself; the dot carries those two signals. */
-.extension-status-dot {
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
-.extension-status-dot[data-tone="ok"] {
-  background: var(--ok);
-}
-
-.extension-status-dot[data-tone="warning"] {
-  background: var(--warning);
-}
-
-.extension-status-dot[data-tone="error"] {
-  background: var(--destructive);
-}
-
-.extension-status-entry {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* Bullet for the first line of the entry, not its middle. */
-.extension-status-entry .extension-status-dot {
-  margin-top: 5px;
-}
-
-/* Status text is TUI output as well: it scrolls sideways instead of wrapping a
-  line into a broken row. */
-.extension-status-entry-text {
-  margin: 0;
-  min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  white-space: pre-wrap;
-}
-
-/* pi-permission-system's permissive-mode pill (`yolo`) is styled inline in
-  components/ExtensionStatus.tsx: it is a marker with no responsive variants, and
-  inline keeps it from flickering when the stylesheet reloads behind the app. */
-
 /* The chat's top bar, the sidebar's toolbar row and the file panel's tab bar
    share one height, so they read as one bar. A phone or touch screen gets a
    finger's 44px; its icon buttons stay square. The file tree's rows
@@ -860,7 +766,8 @@ pre, code {
   font-weight: inherit;
 }
 
-/* react-markdown output styles */
+/* react-markdown output styles — 渲染产物无法逐节点携带类名，规则保留在 CSS，
+   视觉全部走 shadcn token，间距统一 8px 刻度。 */
 .chat-content {
   --chat-font-size-offset: calc(var(--chat-content-font-size, 14px) - 14px);
 }
@@ -883,42 +790,41 @@ pre, code {
 .markdown-body h1, .markdown-body h2, .markdown-body h3,
 .markdown-body h4, .markdown-body h5, .markdown-body h6 {
   font-weight: 600;
-  margin: 10px 0 5px;
+  margin: 8px 0 4px;
   color: var(--foreground);
-  line-height: 1.35;
-  letter-spacing: 0;
+  line-height: 1.4;
 }
-.markdown-body h1 { font-size: 1.16em; }
-.markdown-body h2 { font-size: 1.08em; }
-.markdown-body h3 { font-size: 0.98em; color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground)); }
+.markdown-body h1 { font-size: 1.2em; }
+.markdown-body h2 { font-size: 1.1em; }
+.markdown-body h3 { font-size: 1em; }
 .markdown-body ul, .markdown-body ol {
-  padding-left: 22px;
-  margin: 5px 0 8px;
+  padding-left: 24px;
+  margin: 4px 0 8px;
   list-style-position: outside;
 }
 /* Room for the widest bold "N. " marker; MarkdownBody sets the digit count. */
 .markdown-body ol { padding-left: calc(0.8em + var(--ol-marker-digits, 2) * 0.62em); }
-.markdown-body li { margin: 3px 0; padding-left: 2px; }
+.markdown-body li { margin: 2px 0; }
 .markdown-body ul > li { list-style-type: disc; }
 .markdown-body ol > li { list-style-type: decimal; }
 .markdown-body li > p { margin: 0; }
 .markdown-body li::marker {
-  color: color-mix(in srgb, var(--accent) 72%, var(--muted-foreground));
+  color: var(--muted-foreground);
   font-weight: 600;
 }
 .markdown-body strong {
-  color: color-mix(in srgb, var(--foreground) 88%, var(--accent));
+  color: var(--foreground);
   font-weight: 700;
 }
 .markdown-body em { color: var(--muted-foreground); }
 .markdown-body a {
-  color: var(--accent);
+  color: var(--primary);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
-  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--primary) 40%, transparent);
 }
-.markdown-body a:hover { text-decoration-color: var(--accent); }
+.markdown-body a:hover { text-decoration-color: var(--primary); }
 .markdown-body a[role="link"] { cursor: pointer; }
 .markdown-body img {
   display: block;
@@ -934,7 +840,7 @@ pre, code {
   width: min(360px, 100%);
   height: 36px;
   margin: 8px 0;
-  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  background: var(--muted);
   border: 1px solid var(--border);
   border-radius: var(--radius-2xl);
   clip-path: inset(0 round 18px);
@@ -950,13 +856,12 @@ pre, code {
   border-radius: var(--radius-sm);
 }
 .markdown-body .markdown-inline-code {
-  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  background: var(--muted);
   border-radius: var(--radius-sm);
-  padding: 1px 5px;
+  padding: 1px 4px;
   color: var(--foreground);
   font-family: var(--font-mono);
   font-size: 0.92em;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
 }
 .markdown-body .contains-task-list {
   padding-left: 0;
@@ -965,7 +870,7 @@ pre, code {
 .markdown-body .task-list-item {
   display: block;
   position: relative;
-  padding-left: 25px;
+  padding-left: 24px;
 }
 .markdown-body .task-list-item::marker { content: ""; }
 .markdown-body .task-list-item > input[type="checkbox"],
@@ -986,24 +891,22 @@ pre, code {
 }
 .markdown-body .task-list-item > input[type="checkbox"]:checked,
 .markdown-body .task-list-item > p:first-child > input[type="checkbox"]:first-child:checked {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-  background: color-mix(in srgb, var(--accent) 10%, var(--background));
+  border-color: var(--primary);
+  background: var(--primary);
 }
 .markdown-body .task-list-item > input[type="checkbox"]:checked::before,
 .markdown-body .task-list-item > p:first-child > input[type="checkbox"]:first-child:checked::before {
   content: "";
   width: 4px;
   height: 8px;
-  border: solid var(--accent);
+  border: solid var(--primary-foreground);
   border-width: 0 1.5px 1.5px 0;
   transform: rotate(45deg) translateY(-1px);
 }
 .markdown-body blockquote {
-  border-left: 3px solid color-mix(in srgb, var(--border) 75%, var(--muted-foreground));
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  margin: 6px 0;
-  padding: 6px 11px;
-  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  border-left: 2px solid var(--border);
+  margin: 8px 0;
+  padding: 2px 12px;
   color: var(--muted-foreground);
 }
 .markdown-table-frame {
@@ -1029,22 +932,22 @@ pre, code {
   max-width: 240px;
   border: 0;
   border-bottom: 1px solid var(--border);
-  padding: 6px 10px;
+  padding: 6px 8px;
   text-align: left;
   vertical-align: top;
 }
 .markdown-body tr:last-child td { border-bottom: 0; }
 .markdown-body th {
-  background: var(--sidebar);
-  color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground));
-  font-weight: 650;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-weight: 500;
 }
-.markdown-body tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--foreground) 4%, transparent); }
+.markdown-body tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--muted) 40%, transparent); }
 .markdown-body hr {
   border: none;
   height: 1px;
   margin: 12px 0;
-  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  background: var(--border);
 }
 .markdown-body .katex-display {
   margin: 0.6em 0;
@@ -1094,18 +997,6 @@ pre, code {
 
 /* ── Activity rows: compact one-line rendering of a turn's process ── */
 
-/* Inline code that holds a filesystem path opens the file viewer. */
-.markdown-inline-file {
-  cursor: pointer;
-  text-decoration: underline dotted;
-  text-decoration-color: var(--muted-foreground);
-  text-underline-offset: 2px;
-}
-.markdown-inline-file:hover {
-  color: var(--accent);
-  text-decoration-color: var(--accent);
-}
-
 /* The page's mono font ships Latin and Cyrillic only, so arrows, box drawing and
    blocks fell back to glyphs 12-17px wide in a 7.8px column. These faces take
    those characters from a system mono font, sized to the 0.6em column. */
@@ -1141,16 +1032,16 @@ pre, code {
 .markdown-custom-message h5,
 .markdown-custom-message h6 {
   margin: 4px 0 2px;
-  line-height: 1.18;
+  line-height: 1.2;
 }
 .markdown-custom-message ul,
 .markdown-custom-message ol {
-  margin: 2px 0 3px;
+  margin: 2px 0 4px;
 }
 .markdown-custom-message li { margin: 0; }
 .markdown-custom-message blockquote {
-  margin: 3px 0;
-  padding: 4px 8px;
+  margin: 4px 0;
+  padding: 2px 8px;
 }
 .markdown-custom-message .markdown-table-frame,
 .markdown-custom-message [data-slot="code-block"] {
@@ -1160,14 +1051,14 @@ pre, code {
 .markdown-compaction-message {
   line-height: 1.5;
 }
-.markdown-compaction-message p { margin: 0 0 7px; }
+.markdown-compaction-message p { margin: 0 0 8px; }
 .markdown-compaction-message h1,
 .markdown-compaction-message h2,
 .markdown-compaction-message h3,
 .markdown-compaction-message h4,
 .markdown-compaction-message h5,
 .markdown-compaction-message h6 {
-  margin: 8px 0 3px;
+  margin: 8px 0 4px;
   line-height: 1.25;
 }
 .markdown-compaction-message ul,
@@ -1177,7 +1068,7 @@ pre, code {
 .markdown-compaction-message li { margin: 2px 0; }
 .markdown-compaction-message .markdown-table-frame,
 .markdown-compaction-message [data-slot="code-block"] {
-  margin: 6px 0;
+  margin: 8px 0;
 }
 
 /* Code fences wrap long lines, as pi's TUI does: a line is a row of its number
@@ -1230,90 +1121,6 @@ pre, code {
   font-family: var(--font-mono);
   font-size: 12px;
 }
-
-.mermaid-preview-button {
-  width: 100%;
-  max-height: min(600px, 60dvh);
-  overflow: auto;
-  border: 0;
-  color: inherit;
-  cursor: zoom-in;
-  text-align: left;
-}
-.mermaid-preview-button:hover {
-  opacity: 0.85;
-}
-.mermaid-preview-button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
-}
-
-/* A ```svg fence's <img> (components/SvgBlock.tsx). An SVG with neither a
-   viewBox nor a width and height has no size of its own: is-unsized gives it one. */
-.svg-block-image,
-.svg-zoom-image {
-  display: block;
-  height: auto;
-}
-/* An SVG with only a viewBox has a ratio but no size, so it would fill the
-   column: cap its height like a diagram's. */
-.svg-block-image {
-  width: auto;
-  max-width: 100%;
-  max-height: min(360px, 50dvh);
-}
-.svg-block-image.is-unsized {
-  width: 100%;
-  height: 240px;
-}
-.svg-zoom-image {
-  width: 100%;
-}
-.svg-zoom-image.is-unsized {
-  aspect-ratio: 2 / 1;
-}
-
-.image-preview-dialog {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  max-width: none;
-  height: 100dvh;
-  max-height: none;
-  margin: 0;
-  padding-top: max(16px, env(safe-area-inset-top));
-  padding-right: max(16px, env(safe-area-inset-right));
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
-  padding-left: max(16px, env(safe-area-inset-left));
-  overflow: hidden;
-  border: 0;
-  background: transparent;
-  color: var(--foreground);
-}
-
-.image-preview-dialog[open] {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.image-preview-dialog::backdrop {
-  /* neutral black backdrop, kept literal: no backdrop token */
-  background: rgba(0, 0, 0, 0.72);
-}
-
-.image-preview-image {
-  display: block;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: var(--radius-md);
-  /* neutral black shadow, kept literal: no shadow token */
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-}
-
-
-
 
 .mermaid-zoom-dialog {
   width: 100vw;
@@ -1434,76 +1241,6 @@ pre, code {
   }
   100% {
     background: transparent;
-  }
-}
-
-.chat-scroll-to-bottom {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  /* size comes from the component's size-[34px] utility */
-  padding: 0;
-  box-sizing: border-box;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--sidebar);
-  color: var(--muted-foreground);
-  cursor: pointer;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--foreground) 16%, transparent);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(4px) scale(0.96);
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease,
-    background 0.12s,
-    color 0.12s,
-    visibility 0s linear 0.16s;
-}
-
-.chat-scroll-to-bottom.is-visible {
-  opacity: 0.28;
-  visibility: visible;
-  pointer-events: auto;
-  transform: none;
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease,
-    background 0.12s,
-    color 0.12s,
-    visibility 0s;
-}
-
-.chat-scroll-to-bottom.is-visible:hover,
-.chat-scroll-to-bottom.is-visible:focus-visible {
-  opacity: 1;
-  background: var(--secondary);
-  color: var(--foreground);
-}
-
-.chat-scroll-to-bottom:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chat-scroll-to-bottom,
-  .chat-scroll-to-bottom.is-visible {
-    transform: none;
-    transition:
-      opacity 0.16s ease,
-      background 0.12s,
-      color 0.12s,
-      visibility 0s linear 0.16s;
-  }
-
-  .chat-scroll-to-bottom.is-visible {
-    transition:
-      opacity 0.16s ease,
-      background 0.12s,
-      color 0.12s,
-      visibility 0s;
   }
 }
 
@@ -1920,26 +1657,26 @@ pre, code {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
-/* File viewer markdown preview — larger headings */
+/* File viewer markdown preview — 渲染产物保留 CSS，视觉走 token 与 8px 刻度 */
 .markdown-file-preview h1 { font-size: 1.8em; }
 .markdown-file-preview h2 { font-size: 1.4em; }
 .markdown-file-preview h3 { font-size: 1.15em; }
-.markdown-file-preview p { margin: 0 0 12px; }
+.markdown-file-preview p { margin: 0 0 16px; }
 .markdown-file-preview pre {
-  background: var(--sidebar);
+  background: var(--muted);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px 16px;
   overflow-x: auto;
   font-family: var(--font-mono);
   font-size: 13px;
-  margin: 12px 0;
+  margin: 16px 0;
 }
 .markdown-file-preview code {
   font-family: var(--font-mono);
   font-size: 0.9em;
-  background: var(--sidebar);
-  padding: 1px 5px;
+  background: var(--muted);
+  padding: 1px 4px;
   /* 3px micro radius below the token scale, kept literal */
   border-radius: 3px;
 }
@@ -1948,40 +1685,40 @@ pre, code {
   padding: 0;
 }
 
-/* YAML frontmatter metadata card (file preview) */
+/* YAML frontmatter metadata card (file preview, FrontmatterCard) */
 .markdown-frontmatter {
-  margin-bottom: 20px;
-  padding: 14px 16px 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--sidebar);
+  background: var(--muted);
 }
 .markdown-frontmatter-title {
   font-size: 1.3em;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.4;
   color: var(--foreground);
 }
 .markdown-frontmatter-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   margin-top: 8px;
 }
 .markdown-frontmatter-tag {
   font-size: 12px;
   line-height: 1.6;
   color: var(--muted-foreground);
-  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  background: var(--background);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0 10px;
+  padding: 0 8px;
 }
 .markdown-frontmatter-rows {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 5px 14px;
-  margin: 10px 0 0;
+  gap: 4px 12px;
+  margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.55;
 }
@@ -2001,7 +1738,7 @@ pre, code {
   word-break: break-word;
 }
 .markdown-frontmatter-row dd a {
-  color: var(--accent);
+  color: var(--primary);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -2075,36 +1812,9 @@ span.token.table {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .notice-shelf-item {
-    animation-duration: 0.001ms !important;
-  }
-
-  .file-viewer-line-flash,
-  .extension-drawer-in,
-  .keepalive-dock {
+  .file-viewer-line-flash {
     animation: none;
   }
-}
-
-/* Manual dismiss button on notice toasts; layout mirrors keepalive-sidebar-close */
-.notice-shelf-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  align-self: flex-start;
-  margin-left: 2px;
-  padding: 0;
-  background: none;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-.notice-shelf-close:hover {
-  background: color-mix(in srgb, var(--destructive) 12%, transparent);
-  color: var(--destructive);
 }
 
 /* Keep the panel border as the idle separator; this element only expands the hit target. */
@@ -2301,185 +2011,37 @@ span.token.table {
 }
 
 @keyframes extension-drawer-in { from { transform: translateY(16px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
-.extension-drawer-in { animation: extension-drawer-in 0.22s ease-out }
-.extension-option { background: var(--sidebar) }
-.extension-option:not(:disabled):hover { background: var(--secondary) }
-/* Compact typography for option bodies rendered through MarkdownBody: keep
-   previews fully readable without the message-body heading/paragraph sizing. */
+
+/* Extension option boxes carry their surface as Tailwind utilities in
+   ChatWindow; only the compact typography of an embedded markdown preview stays
+   here — the generated markdown nodes cannot carry class names. */
 .extension-option .markdown-body { font-size: 12px; line-height: 1.45; }
 .extension-option .markdown-body > :first-child { margin-top: 0; }
 .extension-option .markdown-body > :last-child { margin-bottom: 0; }
-.extension-option .markdown-body p { margin: 0 0 3px; }
+.extension-option .markdown-body p { margin: 0 0 4px; }
 .extension-option .markdown-body h1, .extension-option .markdown-body h2,
 .extension-option .markdown-body h3, .extension-option .markdown-body h4,
 .extension-option .markdown-body h5, .extension-option .markdown-body h6 {
-  font-size: 12px; font-weight: 650; margin: 4px 0 2px; }
-.extension-option .markdown-body ul, .extension-option .markdown-body ol { margin: 2px 0 3px; padding-left: 16px; }
+  font-size: 12px; font-weight: 600; margin: 4px 0 2px; }
+.extension-option .markdown-body ul, .extension-option .markdown-body ol { margin: 2px 0 4px; padding-left: 16px; }
 .extension-option .markdown-body li { margin: 0; }
-.extension-option .markdown-body pre { margin: 3px 0; font-size: 12px; line-height: 1.4; }
+.extension-option .markdown-body pre { margin: 4px 0; font-size: 12px; line-height: 1.4; }
 .extension-option .markdown-body code { font-size: 12px; }
 .extension-option .markdown-body table { font-size: 12px; }
 .extension-option .markdown-body hr { margin: 4px 0; }
-.extension-option .markdown-body blockquote { margin: 3px 0; padding-left: 8px; }
-.extension-option.tone-affirmative { background: color-mix(in srgb, var(--ok) 12%, transparent) }
-.extension-option.tone-affirmative:not(:disabled):hover { background: color-mix(in srgb, var(--ok) 22%, transparent) }
-.extension-option.tone-negative { background: color-mix(in srgb, var(--destructive) 10%, transparent) }
-.extension-option.tone-negative:not(:disabled):hover { background: color-mix(in srgb, var(--destructive) 20%, transparent) }
-.extension-multi-option { user-select: none; }
-.extension-multi-option:hover { background: var(--secondary); }
-/* Flex rows, not a table: WebKit's auto table layout gives the value column
-   only its min-content when overflow-wrap: anywhere is set, crushing values
-   like "external_directory" into one character per line on narrow screens. */
-.extension-kv-table { margin-top: 6px; font-size: 12px; line-height: 1.5; }
-.extension-kv-row { display: flex; align-items: baseline; gap: 14px; padding: 3px 0; }
-.extension-kv-label { flex-shrink: 0; color: var(--muted-foreground); white-space: nowrap; }
-.extension-kv-value { flex: 1; min-width: 0; font-family: var(--font-mono); color: var(--foreground); overflow-wrap: anywhere; }
+.extension-option .markdown-body blockquote { margin: 4px 0; padding-left: 8px; }
 
-/* ── Keep-alive dock: edge button + flyout panel on the chat area ── */
-.keepalive-dock {
-  position: absolute;
-  left: 0;
-  z-index: 30;
-  transform: translateY(-50%);
-}
-.keepalive-dock-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  height: 36px;
-  padding: 0 7px;
-  border: 1px solid var(--border);
-  border-left: none;
-  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-  background: var(--sidebar);
-  color: var(--muted-foreground);
-  cursor: pointer;
-  /* neutral black shadow, kept literal: no shadow token */
-  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.10);
-  /* The button doubles as a vertical drag handle. */
-  touch-action: none;
-  user-select: none;
-}
-.keepalive-dock-button:hover,
-.keepalive-dock-button.is-open {
-  background: var(--secondary);
-  color: var(--foreground);
-}
-.keepalive-dock-count {
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.keepalive-dock-running,
-.keepalive-dock-unread {
-  display: inline-flex;
-}
-.keepalive-dock-running svg,
-.keepalive-dock-unread svg {
-  width: 11px;
-  height: 11px;
-}
-.keepalive-dock-panel {
-  position: absolute;
-  /* Anchor past the button's right edge — a fixed offset clips the button,
-     whose width varies with the slot count. */
-  left: calc(100% + 8px);
-  top: -18px;
-  width: min(320px, calc(100vw - 56px));
-  max-height: min(440px, 62vh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: var(--background);
-
-  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
-  border-radius: var(--radius-xl);
-  /* neutral black shadow, kept literal: no shadow token */
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14), 0 4px 12px rgba(0, 0, 0, 0.07);
-  padding: 6px;
-  animation: keepalive-dock-in 160ms ease-out;
-}
+/* ── Keep-alive dock (KeepAliveDock.tsx): edge button + flyout panel, all
+   Tailwind utilities; only the panel's entrance keyframes stay here. ── */
 @keyframes keepalive-dock-in {
   from { opacity: 0; transform: translateX(-6px); }
   to { opacity: 1; transform: none; }
 }
-.keepalive-dock-list {
-  display: flex;
-  flex-direction: column;
-}
-.keepalive-dock-row {
-  display: flex;
-  align-items: stretch;
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-}
-.keepalive-dock-row:hover { background: var(--secondary); }
-.keepalive-dock-row.is-active { background: var(--accent); }
-.keepalive-dock-open {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 7px 8px;
-  background: none;
-  border: none;
-  border-radius: var(--radius-md);
-  text-align: left;
-  cursor: pointer;
-}
-.keepalive-dock-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--foreground);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.keepalive-dock-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
-.keepalive-dock-status { flex-shrink: 0; }
-.keepalive-dock-status.is-running { color: var(--accent); }
-.keepalive-dock-status.is-done { color: var(--ok); }
-.keepalive-dock-close {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-.keepalive-dock-close:hover { background: color-mix(in srgb, var(--destructive) 12%, transparent); color: var(--destructive); }
-.keepalive-dock-footer {
-  border-top: 1px solid var(--border);
-  margin-top: 4px;
-  padding: 4px 6px 2px;
-}
-.keepalive-dock-dismiss-all {
-  width: 100%;
-  padding: 5px 8px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--muted-foreground);
-  cursor: pointer;
-  font-size: 12px;
-  text-align: left;
-}
-.keepalive-dock-dismiss-all:hover { background: color-mix(in srgb, var(--destructive) 7%, transparent); color: var(--destructive); }
 
-/* On phones the floating dock permanently covers chat text; keep-alive
-   sessions are switched from the sidebar there instead. */
-@media (max-width: 640px) {
-  .keepalive-dock { display: none; }
+/* ChatMinimap preview card's entrance (the component holds the layout). */
+@keyframes minimap-preview-in {
+  from { opacity: 0; transform: translateY(-50%) translateX(8px); }
+  to { opacity: 1; transform: translateY(-50%); }
 }
 
 /* Keep-alive settings (SettingsPanel → Chat) */

@@ -123,7 +123,7 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
             ref={previewRef}
             type="button"
             variant="ghost"
-            className="mermaid-block mermaid-preview-button block h-auto rounded-none font-normal focus-visible:ring-0 focus-visible:border-transparent"
+            className="block h-auto max-h-[min(600px,60dvh)] w-full overflow-auto rounded-none border-0 text-left font-normal text-inherit cursor-zoom-in hover:opacity-85"
             title={t("i18n.openMermaidViewer")}
             aria-label={t("i18n.openMermaidViewer")}
             onClick={() => setZoomOpen(true)}
