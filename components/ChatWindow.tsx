@@ -1739,8 +1739,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       )}
 
       <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
+        {/* The reveal wrapper sits above the minimap rail (zIndex 25), which
+            otherwise swallows the button's clicks across its whole strip. */}
         {!isEmptyNew && (
-          <div className="pointer-events-none absolute bottom-full right-4 z-20 max-sm:right-2.5">
+          <div className="pointer-events-none absolute bottom-full right-4 z-30 max-sm:right-2.5">
             <Button
               type="button"
               variant="ghost"
