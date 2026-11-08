@@ -2,7 +2,7 @@
 
 import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect, useRef } from "react";
 import type { ButtonHTMLAttributes, ClipboardEvent, CSSProperties, HTMLAttributes, ReactNode, Ref } from "react";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -60,30 +60,46 @@ export function ConfigPanelShell({
       role={embedded ? undefined : "dialog"}
       aria-modal={embedded ? undefined : "true"}
       aria-label={title}
-      className={`config-panel-root ${embedded ? "is-embedded" : "is-modal"}`}
+      // A phone shows it full screen under the safe areas: the page's own
+      // colour, no frame (the standalone fallback pads via env() insets).
+      className={cn(
+        "min-h-0 min-w-0",
+        embedded
+          ? "flex h-full w-full"
+          : "fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 max-[640px]:bg-background max-[640px]:p-[env(safe-area-inset-top)_env(safe-area-inset-right)_env(safe-area-inset-bottom)_env(safe-area-inset-left)]",
+      )}
       onClick={(event) => {
         if (!embedded && event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="config-panel-surface" style={panelStyle}>
+      <div
+        className={cn(
+          "flex min-h-0 min-w-0 flex-col overflow-hidden bg-background",
+          embedded ? "h-full w-full" : cn(
+            "h-[min(var(--config-panel-height),calc(100dvh-16px))] w-[min(var(--config-panel-width),calc(100vw-16px))] rounded-xl border border-border shadow-lg",
+            "max-[640px]:h-full max-[640px]:max-h-full max-[640px]:w-full max-[640px]:max-w-full max-[640px]:rounded-none max-[640px]:border-0 max-[640px]:shadow-none",
+          ),
+        )}
+        style={panelStyle}
+      >
         {!embedded && (
-          <div className="config-panel-header">
-            <strong className="config-panel-title">{title}</strong>
+          <div className="flex h-[50px] shrink-0 items-center gap-2.5 border-b pr-3 pl-4">
+            <strong className="min-w-0 text-[15px]">{title}</strong>
             {subtitle && (
-              <code className="config-panel-subtitle" title={subtitle}>
+              <code className="min-w-0 overflow-hidden font-mono text-xs text-muted-foreground truncate" title={subtitle}>
                 {subtitle}
               </code>
             )}
             <Button
               type="button"
               variant="ghost"
-              size="icon"
-              className="config-close-button"
+              size="icon-sm"
+              className="ml-auto max-[640px]:size-11"
               onClick={onClose}
               title={closeLabel}
               aria-label={closeLabel}
             >
-              ×
+              <XIcon />
             </Button>
           </div>
         )}
@@ -142,11 +158,13 @@ function useReportDetailTitle(active: boolean, ref: Ref<HTMLButtonElement> | und
   };
 }
 
-export function ConfigSplitView({ children }: { children: ReactNode }) {
+export function ConfigSplitView({ children, className }: { children: ReactNode; className?: string }) {
   const navigation = useContext(ConfigDetailNavigationContext);
   return (
     <div
-      className="config-split-view"
+      // `config-split-view` stays as the shell hook the MCP panel's tests read;
+      // inside Settings it carries `data-pane`, which drives the phone panes.
+      className={cn("config-split-view flex min-h-0 flex-1 flex-row overflow-hidden max-[640px]:flex-col", className)}
       data-pane={navigation ? (navigation.detailOpen ? "detail" : "list") : undefined}
     >
       {children}
@@ -154,9 +172,28 @@ export function ConfigSplitView({ children }: { children: ReactNode }) {
   );
 }
 
-export function ConfigSidebar({ children }: { children: ReactNode }) {
-  // `config-sidebar` stays as the phone pane layout hook (settings.css media).
-  return <aside className="config-sidebar flex w-full min-h-0 shrink-0 flex-col border-sidebar-border bg-sidebar md:w-[240px] md:border-r">{children}</aside>;
+export function ConfigSidebar({ children, className }: { children: ReactNode; className?: string }) {
+  const navigation = useConfigDetailNavigation();
+  // Inside Settings the split view shows one pane at a time on a phone: the
+  // list fills the screen with rows for a finger, a row's detail replaces it.
+  const pane = navigation === NO_DETAIL_NAVIGATION ? undefined : navigation.detailOpen ? "detail" : "list";
+  return (
+    <aside
+      // `config-sidebar` stays as the phone pane layout hook (detail-navigation pins the attribute).
+      className={cn(
+        "config-sidebar flex w-full min-h-0 shrink-0 flex-col border-sidebar-border bg-sidebar md:w-[240px] md:border-r",
+        pane
+          ? cn(
+              "max-[640px]:h-auto max-[640px]:flex-[1_1_auto] max-[640px]:border-b-0",
+              pane === "detail" && "max-[640px]:hidden",
+            )
+          : "max-[640px]:h-[190px] max-[640px]:border-b max-[640px]:border-border max-[640px]:border-r-0",
+        className,
+      )}
+    >
+      {children}
+    </aside>
+  );
 }
 
 export function ConfigSidebarList({ children }: { children: ReactNode }) {
@@ -165,9 +202,15 @@ export function ConfigSidebarList({ children }: { children: ReactNode }) {
 
 /** A sidebar group heading; `aside` sits at its right edge. */
 export function ConfigSidebarGroupLabel({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
-  // `config-sidebar-group-label` stays as the phone sizing hook (settings.css).
+  const navigation = useConfigDetailNavigation();
   return (
-    <div className="config-sidebar-group-label flex items-center gap-1.5 px-2 pt-1 pb-1 text-[11px] font-medium text-muted-foreground">
+    // `config-sidebar-group-label` stays as the phone sizing hook (group-switch pins it).
+    <div
+      className={cn(
+        "config-sidebar-group-label flex items-center gap-1.5 px-2 pt-1 pb-1 text-[11px] font-medium text-muted-foreground",
+        navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:pt-2.5 max-[640px]:text-xs",
+      )}
+    >
       <span className="min-w-0 truncate">{children}</span>
       {aside}
     </div>
@@ -239,7 +282,8 @@ export function ConfigSidebarItem({
   ref,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean; ref?: Ref<HTMLButtonElement> }) {
-  const { openDetail } = useConfigDetailNavigation();
+  const navigation = useConfigDetailNavigation();
+  const { openDetail } = navigation;
   const buttonRef = useReportDetailTitle(active, ref);
   return (
     <Button
@@ -253,8 +297,9 @@ export function ConfigSidebarItem({
       }}
       aria-current={active ? "page" : undefined}
       className={cn(
-        // `config-sidebar-item` stays as the phone row-height hook (settings.css).
+        // `config-sidebar-item` stays as the phone row-height hook (McpConfig's tests read it).
         "config-sidebar-item h-9 w-full min-w-0 justify-start gap-2 px-2 text-left text-[13px] font-normal text-sidebar-foreground [&[aria-current='page']]:bg-sidebar-accent [&[aria-current='page']]:font-medium [&[aria-current='page']]:text-sidebar-accent-foreground",
+        navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:h-11 max-[640px]:min-h-11 max-[640px]:text-sm",
         className,
       )}
     >
@@ -276,7 +321,7 @@ export function ConfigDetailStack({ className, ...props }: HTMLAttributes<HTMLDi
   return (
     <div
       {...props}
-      className={["config-detail-stack", className].filter(Boolean).join(" ")}
+      className={cn("flex w-full min-w-0 flex-col gap-4", className)}
     />
   );
 }
@@ -285,7 +330,7 @@ export function ConfigDetailHeader({ className, ...props }: HTMLAttributes<HTMLD
   return (
     <div
       {...props}
-      className={["config-detail-header", className].filter(Boolean).join(" ")}
+      className={cn("flex min-h-8 min-w-0 flex-wrap items-center gap-4", className)}
     />
   );
 }
@@ -294,26 +339,28 @@ export function ConfigDetailHeaderInfo({ className, ...props }: HTMLAttributes<H
   return (
     <div
       {...props}
-      className={["config-detail-header-info", className].filter(Boolean).join(" ")}
+      className={cn("flex min-w-0 flex-[1_1_160px] items-center gap-2", className)}
     />
   );
 }
 
 export function ConfigDetailActions({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
+    // `config-detail-actions` stays as the hook the MCP panel's tests read.
     <div
       {...props}
-      className={["config-detail-actions", className].filter(Boolean).join(" ")}
+      className={cn("config-detail-actions ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2", className)}
     />
   );
 }
 
 export function ConfigDetailTitle({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("config-detail-title", className)}>{children}</div>;
+  // `config-detail-title` stays as the hook the MCP panel's tests read.
+  return <div className={cn("config-detail-title text-[15px] leading-[1.35] font-semibold", className)}>{children}</div>;
 }
 
 export function ConfigSectionTitle({ children }: { children: ReactNode }) {
-  return <div className="config-section-title">{children}</div>;
+  return <div className="text-xs leading-[1.35] font-medium text-muted-foreground">{children}</div>;
 }
 
 /**
@@ -371,10 +418,11 @@ export function ConfigField({ label, children, style, ref }: { label: ReactNode;
 /**
  * A detail pane's two-column label/value grid. Each row is a
  * `ConfigDetailGridRow`; values wrap anywhere so a long path never widens the
- * pane.
+ * pane. The `config-detail-grid*` names stay as the hooks the MCP panel's
+ * tests read.
  */
 export function ConfigDetailGrid({ children }: { children: ReactNode }) {
-  return <div className="config-detail-grid">{children}</div>;
+  return <div className="config-detail-grid grid grid-cols-[96px_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-[13px] leading-[1.5]">{children}</div>;
 }
 
 export function ConfigDetailGridRow({
@@ -395,14 +443,18 @@ export function ConfigDetailGridRow({
 }) {
   return (
     <>
-      <div className="config-detail-grid-label">{label}</div>
+      <div className="config-detail-grid-label text-muted-foreground">{label}</div>
       <div
-        className={[
+        className={cn(
           "config-detail-grid-value",
           tone === "plain" ? null : `is-${tone}`,
           mono ? "is-mono" : null,
+          "min-w-0 [overflow-wrap:anywhere]",
+          (tone === "muted" || tone === "dim") && "text-muted-foreground",
+          tone === "error" && "text-destructive",
+          mono && "font-mono",
           className,
-        ].filter(Boolean).join(" ")}
+        )}
         style={style}
       >
         {children}
@@ -462,8 +514,9 @@ export function ConfigScopeSwitch<S extends string>({
   const reasonId = useId();
   const reason = disabledReason && options.some((option) => option.disabled) ? disabledReason : null;
   return (
-    <div className="config-scope-switch-field">
-      <div className="config-scope-switch-row">
+    // The `config-scope-switch-*` names stay as the hooks the blocks tests read.
+    <div className="config-scope-switch-field flex min-w-0 flex-col gap-1">
+      <div className="config-scope-switch-row flex min-w-0 flex-wrap items-center gap-2.5">
         {/* Radix hands back "" when the active option is clicked again; keep the value. */}
         <ToggleGroup
           type="single"
@@ -495,7 +548,7 @@ export function ConfigScopeSwitch<S extends string>({
         {children}
       </div>
       {reason && (
-        <span id={reasonId} className="config-scope-switch-reason">
+        <span id={reasonId} className="config-scope-switch-reason max-w-80 text-xs leading-[1.4] text-muted-foreground">
           {reason}
         </span>
       )}
@@ -543,7 +596,8 @@ export function ConfigSaveTarget<S extends string>({
   children?: ReactNode;
 }) {
   return (
-    <div className="config-save-target">
+    // `config-save-target(-path)` stay as the hooks the blocks tests read.
+    <div className="config-save-target flex min-w-0 flex-[1_1_auto] flex-col gap-1.5">
       <ConfigScopeSwitch
         value={value}
         options={options}
@@ -552,7 +606,9 @@ export function ConfigSaveTarget<S extends string>({
         size="small"
         onChange={onChange}
       >
-        <span className="config-save-target-path">{typeof path === "string" ? pathWithBreaks(path) : path}</span>
+        <span className="config-save-target-path min-w-0 flex-[1_1_14em] font-mono text-xs leading-[1.4] text-muted-foreground [overflow-wrap:anywhere]">
+          {typeof path === "string" ? pathWithBreaks(path) : path}
+        </span>
       </ConfigScopeSwitch>
       {children}
     </div>
@@ -598,12 +654,19 @@ export function ConfigAddSourceHeading({
   target: ReactNode;
 }) {
   return (
-    <div className="config-add-source-heading">
-      <div className="config-add-source-title-row">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <ConfigDetailTitle>{title}</ConfigDetailTitle>
-        <span className="config-add-source-catalogs">
+        {/* `config-add-source-catalog(s)` stay as the hooks the blocks tests read. */}
+        <span className="config-add-source-catalogs flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
           {catalogs.map((catalog) => (
-            <a key={catalog.href} href={catalog.href} target="_blank" rel="noopener noreferrer" className="config-add-source-catalog">
+            <a
+              key={catalog.href}
+              href={catalog.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="config-add-source-catalog inline-flex items-center gap-1.5 text-xs text-primary no-underline whitespace-nowrap [&>svg]:shrink-0"
+            >
               {catalog.icon}
               {catalog.label}
             </a>
@@ -690,7 +753,7 @@ export function ConfigAddSourcePanel({
   };
 
   return (
-    <ConfigDetailStack className="is-fill">
+    <ConfigDetailStack className="min-h-full">
       <ConfigAddSourceHeading
         title={title}
         catalogs={catalogs}
@@ -744,8 +807,9 @@ export function ConfigAddSourcePanel({
       {children}
 
       {examples.length > 0 && (
-        <div className="config-add-source-examples">
-          <div className="config-add-source-examples-label">{examplesLabel}</div>
+        // `config-add-source-examples*` stay as the hooks the blocks tests read.
+        <div className="config-add-source-examples flex flex-col gap-2">
+          <div className="config-add-source-examples-label text-xs font-medium text-muted-foreground">{examplesLabel}</div>
           <div className="flex flex-col gap-1.5">
             {examples.map((example) => typeof example === "string" ? (
               <Button
@@ -774,7 +838,7 @@ export function ConfigAddSourcePanel({
       )}
 
       {error && (
-        <div role="alert" className="config-add-source-error">
+        <div role="alert" className="config-add-source-error text-xs text-destructive whitespace-pre-wrap">
           {error}
         </div>
       )}
@@ -782,11 +846,19 @@ export function ConfigAddSourcePanel({
   );
 }
 
-/** A banner above a panel's split view; `action` sits at its right edge. `id` lets a control it explains point at it. */
+/** A banner above a panel's split view; `action` sits at its right edge. `id` lets a control it explains point at it.
+    The `config-notice*` names stay as the hooks the MCP panel's tests read. */
 export function ConfigNotice({ id, action, children }: { id?: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <div id={id} role="status" className={`config-notice${action ? " has-action" : ""}`}>
-      {action ? <span className="config-notice-text">{children}</span> : children}
+    <div
+      id={id}
+      role="status"
+      className={cn(
+        "config-notice border-b bg-sidebar px-4 py-2 text-xs text-muted-foreground",
+        action && "has-action flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5",
+      )}
+    >
+      {action ? <span className="config-notice-text min-w-0">{children}</span> : children}
       {action}
     </div>
   );
@@ -834,9 +906,20 @@ export function ConfigEmptyState({ children }: { children: ReactNode }) {
   );
 }
 
-export function ConfigDetail({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function ConfigDetail({ children, style, className }: { children: ReactNode; style?: CSSProperties; className?: string }) {
+  const navigation = useConfigDetailNavigation();
+  const pane = navigation === NO_DETAIL_NAVIGATION ? undefined : navigation.detailOpen ? "detail" : "list";
   return (
-    <div className="config-detail" style={style}>
+    <div
+      className={cn(
+        "min-h-0 min-w-0 flex-1 overflow-y-auto p-6 text-[13px] leading-[1.55]",
+        "max-[640px]:p-4",
+        // Inside Settings a phone shows one pane at a time: the list hides its detail.
+        pane === "list" && "max-[640px]:hidden",
+        className,
+      )}
+      style={style}
+    >
       {children}
     </div>
   );
@@ -844,9 +927,11 @@ export function ConfigDetail({ children, style }: { children: ReactNode; style?:
 
 export function ConfigFooter({ status, children }: { status?: ReactNode; children?: ReactNode }) {
   return (
-    <footer className="config-footer">
-      <div className="config-footer-status">{status}</div>
-      <div className="config-footer-actions">{children}</div>
+    <footer className="flex min-h-[52px] shrink-0 items-center gap-2 border-t px-3.5 py-2">
+      <div className="min-w-0 flex-1 overflow-hidden text-xs text-muted-foreground">{status}</div>
+      <div className="flex shrink-0 items-center justify-end gap-2 [&_[data-slot=button][data-size=sm]]:min-w-24">
+        {children}
+      </div>
     </footer>
   );
 }
@@ -854,7 +939,8 @@ export function ConfigFooter({ status, children }: { status?: ReactNode; childre
 /**
  * A footer's one-line status. With `details` the summary opens a visible
  * list, so diagnostics are readable on a touch screen instead of hiding in a
- * tooltip.
+ * tooltip. The `config-footer-status*` names stay as the hooks the MCP
+ * panel's tests read.
  */
 export function ConfigFooterStatus({
   summary,
@@ -865,12 +951,17 @@ export function ConfigFooterStatus({
   tone?: "default" | "warning" | "error";
   details?: readonly ReactNode[];
 }) {
-  const className = `config-footer-status-summary${tone === "default" ? "" : ` is-${tone}`}`;
+  const className = cn(
+    "config-footer-status-summary",
+    tone !== "default" && `is-${tone}`,
+    tone === "warning" && "text-warning",
+    tone === "error" && "text-destructive",
+  );
   if (!details?.length) return <span className={className}>{summary}</span>;
   return (
     <details className="config-footer-status-details">
-      <summary className={className}>{summary}</summary>
-      <ul className="config-footer-status-list">
+      <summary className={cn(className, "w-fit cursor-pointer")}>{summary}</summary>
+      <ul className="config-footer-status-list mt-1 max-h-[8.5em] overflow-y-auto pr-0 pl-4 text-muted-foreground list-disc [overflow-wrap:anywhere] whitespace-pre-wrap">
         {details.map((detail, index) => (
           <li key={index}>{detail}</li>
         ))}
@@ -941,7 +1032,8 @@ export function ConfigSwitch({
 
 /** The list's add button; like a row, its click opens the detail on a phone unless prevented. */
 export function ConfigListAction({ active = false, children, className, onClick, ref, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean; ref?: Ref<HTMLButtonElement> }) {
-  const { openDetail } = useConfigDetailNavigation();
+  const navigation = useConfigDetailNavigation();
+  const { openDetail } = navigation;
   const buttonRef = useReportDetailTitle(active, ref);
   return (
     <div className="shrink-0 px-2 pb-2">
@@ -956,8 +1048,9 @@ export function ConfigListAction({ active = false, children, className, onClick,
         }}
         aria-current={active ? "page" : undefined}
         className={cn(
-          // `config-list-action-button` stays as the phone row-height hook.
+          // `config-list-action-button` stays as the phone row-height hook (McpAddServer's tests read it).
           "config-list-action-button h-9 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-[13px] font-normal text-muted-foreground",
+          navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:h-11 max-[640px]:min-h-11 max-[640px]:text-sm",
           className,
         )}
       >
@@ -972,7 +1065,8 @@ export function ConfigStatusDot({ active, color }: { active?: boolean; color?: s
   return (
     <span
       aria-hidden="true"
-      className={`config-status-dot${active ? " is-active" : active === false ? " is-inactive" : ""}`}
+      // State reads from the dot's presence and tone, never from colour alone: the row says it too.
+      className={cn("size-1.5 shrink-0 rounded-full bg-muted-foreground", active === false && "opacity-45")}
       style={color ? { backgroundColor: color } : undefined}
     />
   );

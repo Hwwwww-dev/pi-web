@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LayersIcon, XIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import { loadKeepAliveDockTopPct, saveKeepAliveDockTopPct, type KeepAliveSlot } from "@/lib/chat-keepalive";
 import type { SessionInfo } from "@/lib/types";
@@ -113,32 +114,45 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
   const hasUnread = slots.some((slot) => !runningSessionIds.has(slot.session.id) && unreadSessionIds.has(slot.session.id));
 
   return (
-    <div ref={rootRef} className="keepalive-dock" style={{ top: `${topPct}%` }}>
+    <div
+      ref={rootRef}
+      className="absolute left-0 z-30 max-[640px]:hidden -translate-y-1/2"
+      style={{ top: `${topPct}%` }}
+    >
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             ref={buttonRef}
             type="button"
             variant="ghost"
-            className={`keepalive-dock-button${open ? " is-open" : ""}${hasRunning ? " is-running" : ""}`}
+            className={cn(
+              "h-9 gap-1 rounded-l-none rounded-r-lg border border-l-0 bg-sidebar px-[7px] text-muted-foreground shadow-sm select-none [touch-action:none]",
+              "hover:bg-secondary hover:text-foreground",
+              open && "bg-secondary text-foreground",
+            )}
             aria-expanded={open}
             aria-label={`${t("keepalive.title")} (${slots.length})`}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
           >
-            {hasRunning && <span className="keepalive-dock-running"><RunningSessionIndicator /></span>}
-            {!hasRunning && hasUnread && <span className="keepalive-dock-unread"><UnreadSessionIndicator /></span>}
+            {hasRunning && <span className="inline-flex [&_svg]:size-[11px]"><RunningSessionIndicator /></span>}
+            {!hasRunning && hasUnread && <span className="inline-flex [&_svg]:size-[11px]"><UnreadSessionIndicator /></span>}
             <LayersIcon className="size-[11px]" aria-hidden="true" />
-            <span className="keepalive-dock-count">{slots.length}</span>
+            <span className="text-xs font-bold tabular-nums">{slots.length}</span>
           </Button>
         </TooltipTrigger>
         <TooltipContent side="right">{t("keepalive.title")}</TooltipContent>
       </Tooltip>
 
       {open && (
-        <div ref={panelRef} className="keepalive-dock-panel" role="menu" aria-label={t("keepalive.title")}>
-          <div className="keepalive-dock-list">
+        <div
+          ref={panelRef}
+          className="absolute -top-[18px] left-[calc(100%+8px)] max-h-[min(440px,62vh)] w-[min(320px,calc(100vw-56px))] overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-1.5 shadow-md animate-[keepalive-dock-in_160ms_ease-out]"
+          role="menu"
+          aria-label={t("keepalive.title")}
+        >
+          <div className="flex flex-col">
             {slots.map((slot) => {
               // Counts and timing come from the live catalogue so this panel and
               // the session tree never disagree; the slot snapshot is only the
@@ -148,21 +162,27 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
               const isRunning = runningSessionIds.has(info.id);
               const isUnread = !isRunning && unreadSessionIds.has(info.id);
               return (
-                <div key={info.id} className={`keepalive-dock-row${isSelected ? " is-active" : ""}`}>
+                <div
+                  key={info.id}
+                  className={cn(
+                    "flex shrink-0 items-stretch rounded-md",
+                    isSelected ? "bg-accent" : "hover:bg-secondary",
+                  )}
+                >
                   <Button
                     type="button"
                     variant="ghost"
-                    className="keepalive-dock-open h-auto items-stretch justify-start font-normal"
+                    className="h-auto min-w-0 flex-1 flex-col items-stretch justify-start gap-0.5 rounded-md px-2 py-[7px] text-left font-normal hover:bg-transparent hover:text-current"
                     onClick={() => {
                       if (!isSelected) onSelect(info);
                       setOpen(false);
                     }}
                   >
-                    <span className="keepalive-dock-name">{info.name || info.firstMessage || info.id}</span>
-                    <span className="keepalive-dock-meta">
+                    <span className="truncate text-xs font-semibold text-foreground">{info.name || info.firstMessage || info.id}</span>
+                    <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                       {isRunning && <RunningSessionIndicator />}
                       {isUnread && <UnreadSessionIndicator />}
-                      <span className={`keepalive-dock-status${isRunning ? " is-running" : isUnread ? " is-done" : ""}`}>
+                      <span className={cn("shrink-0", isRunning ? "text-primary" : isUnread ? "text-success" : "")}>
                         {t(isRunning ? "keepalive.statusRunning" : isUnread ? "keepalive.statusDone" : "keepalive.statusIdle")}
                       </span>
                       <span>{t("sidebar.messagesCount", { count: info.messageCount })}</span>
@@ -177,7 +197,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    className="keepalive-dock-close h-auto w-[30px]"
+                    className="h-auto w-[30px] rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     title={t("keepalive.close")}
                     aria-label={`${t("keepalive.close")}: ${info.name || info.id}`}
                     onClick={() => onDismiss(info.id)}
@@ -189,11 +209,11 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
             })}
           </div>
           {slots.some((slot) => slot.session.id !== selectedSessionId) && (
-            <div className="keepalive-dock-footer">
+            <div className="mt-1 border-t border-border px-1.5 pb-0.5 pt-1">
               <Button
                 type="button"
                 variant="ghost"
-                className="keepalive-dock-dismiss-all h-auto w-full justify-start px-2 py-[5px] text-xs font-normal"
+                className="h-auto w-full justify-start rounded-sm px-2 py-[5px] text-left text-xs font-normal text-muted-foreground hover:bg-destructive/[0.07] hover:text-destructive"
                 onClick={() => { onDismissAll(); setOpen(false); }}
               >
                 {t("keepalive.dismissAll")}

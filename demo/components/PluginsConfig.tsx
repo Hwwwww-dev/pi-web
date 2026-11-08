@@ -290,7 +290,7 @@ function AddPluginPanel({
         variant="primary"
         onClick={onInstall}
         disabled={busy || !source.trim()}
-        className="is-pushed-right"
+        className="ml-auto"
       >
         {busy ? t("i18n.installing") : t("i18n.install")}
       </ConfigButton>
@@ -337,8 +337,8 @@ function PackageDetail({
 
   return (
     <ConfigDetailStack>
-      <div className="config-detail-heading">
-        <ConfigDetailHeader className="is-top-aligned">
+      <div className="flex flex-col gap-1">
+        <ConfigDetailHeader className="items-start">
           <ConfigDetailHeaderInfo>
             <div className="flex min-w-0 flex-col gap-1.5">
               <ConfigDetailTitle className="truncate">{pkg.source}</ConfigDetailTitle>
@@ -400,7 +400,7 @@ function PackageDetail({
           </ConfigDetailActions>
         </ConfigDetailHeader>
         {!sessionId && (
-          <div id={reloadReasonId} className="config-detail-heading-note">
+          <div id={reloadReasonId} className="text-right text-xs text-muted-foreground">
             {t("i18n.openSessionToReload")}
           </div>
         )}
@@ -430,22 +430,22 @@ function PackageDetail({
           tone="plain"
           className="flex flex-col gap-1"
         >
-          <div className="skill-version-row">
-            <span className="skill-version-value">{versionSummary(pkg, t)}</span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="font-mono text-xs text-muted-foreground">{versionSummary(pkg, t)}</span>
             {updateAvailable && (
-              <span className="skill-version-value is-update" title={updateStatus.displayName}>
+              <span className="font-mono text-xs text-warning" title={updateStatus.displayName}>
                 {t("i18n.updateAvailable")}
               </span>
             )}
             {canCheckForUpdates && (checkingUpdate || (updateStatus && !updateAvailable)) && (
               <span
-                className={`skill-update-status ${checkingUpdate
-                  ? "is-checking"
+                className={checkingUpdate
+                  ? "text-xs text-muted-foreground"
                   : updateStatus?.state === "up-to-date"
-                    ? "is-success"
+                    ? "text-xs text-success"
                     : updateStatus?.state === "error"
-                      ? "is-error"
-                      : "is-muted"}`}
+                      ? "text-xs text-destructive"
+                      : "text-xs text-muted-foreground"}
               >
                 {checkingUpdate
                   ? t("i18n.checking")
@@ -939,7 +939,7 @@ export function PluginsConfig({
                                 {pkg.source}
                               </ConfigSidebarText>
                               {updateStatuses[packageKey(pkg)]?.state === "update-available" && (
-                                <span title={t("i18n.updateAvailable")} className="skill-update-indicator">
+                                <span title={t("i18n.updateAvailable")} className="inline-flex shrink-0 text-warning">
                                   <ArrowUpIcon size={13} strokeWidth={1.8} />
                                 </span>
                               )}
@@ -965,7 +965,7 @@ export function PluginsConfig({
           </ConfigSidebar>
 
           <ConfigDetail>
-            <ConfigDetailStack className="is-fill">
+            <ConfigDetailStack className="min-h-full">
               {addMode ? (
               <AddPluginPanel
                 cwd={cwd}

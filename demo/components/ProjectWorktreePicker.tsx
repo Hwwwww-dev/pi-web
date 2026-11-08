@@ -629,14 +629,51 @@ export function ProjectWorktreePicker({
     ([key, { running, unread }]) => key !== project?.key && (running > 0 || unread > 0),
   );
 
+  // 盒子与文字的样式批 4 自 app/globals.css 迁入。交互面对齐 shadcn：files 的
+  // 灰盒沿用 ghost 的 hover:bg-accent，inline 的页面文字按钮 hover 到 secondary；
+  // aria-expanded 与 hover 同面（菜单开着时保持高亮）；焦点环是 Button 自带的
+  // focus-visible ring。尾部类经 cn/twMerge 覆盖 ghost 的同名面。
+  const boxClass = inline
+    ? "inline-flex shrink min-w-0 items-center gap-1 h-[26px] px-1.5 rounded-(--radius-sm) text-left text-xs font-normal text-muted-foreground transition-colors hover:bg-secondary aria-expanded:bg-secondary dark:hover:bg-secondary dark:aria-expanded:bg-secondary pointer-coarse:min-h-9"
+    : "inline-flex shrink min-w-0 items-center gap-1.5 h-[29px] px-2.5 border border-border rounded-(--radius-sm) bg-secondary text-left text-[11px] font-normal text-muted-foreground transition-colors aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:aria-expanded:bg-accent pointer-coarse:min-h-9";
+  // 每个布局里盒子的伸缩：inline 的两个按钮只缩到自己的最小宽度（一个百万
+  // 倍的 shrink 系数让分支先让路），files 的行里路径/分支吃满剩下的空间。
+  const projectBoxFlex = inline ? "min-w-14" : layout === "row" ? "grow basis-0" : "w-full";
+  const worktreeBoxFlex = inline ? "min-w-18 shrink-[1000000]" : layout === "row" ? "max-w-[55%]" : "w-full";
+  // 路径/名字文本：files 的两种布局吃满盒子，inline 截到定长。
+  const pathFlex = stacked ? "flex-1" : "flex-[0_1_auto] max-w-[32ch]";
+  const labelFlex = stacked ? "flex-1" : "";
+
   return (
-    <div className={`project-picker is-${layout}`} role="group" aria-label={label}>
+    <div
+      className={
+        inline
+          ? "project-picker is-inline flex min-w-0 items-center gap-0.5 text-xs leading-none font-normal"
+          : layout === "row"
+            ? "project-picker is-row flex flex-none flex-row min-w-0 items-center gap-1.5 text-[11px] leading-none font-normal"
+            : "project-picker is-stacked flex flex-none flex-col min-w-0 items-stretch gap-1.5 text-[11px] leading-none font-normal"
+      }
+      role="group"
+      aria-label={label}
+    >
       <Button
         ref={projectRef}
         type="button"
         variant="ghost"
         size="default"
-        className={`h-auto justify-start focus-visible:ring-0 focus-visible:border-(--border) ${project ? "project-picker-button is-project" : "project-picker-button is-project is-empty"}`}
+        className={[
+          "project-picker-button is-project",
+          boxClass,
+          projectBoxFlex,
+          project
+            ? ""
+            : [
+                "is-empty font-mono",
+                inline
+                  ? ""
+                  : "border-primary/40 bg-primary/[0.06] hover:bg-primary/[0.06] hover:text-muted-foreground dark:hover:bg-primary/[0.06] dark:hover:text-muted-foreground",
+              ].join(" "),
+        ].join(" ")}
         title={project?.root ?? ""}
         aria-haspopup="menu"
         aria-expanded={menu?.kind === "project"}
@@ -647,24 +684,24 @@ export function ProjectWorktreePicker({
             left (the folder name at its end is what tells paths apart), no
             icon and no chevron: the path is the box. A project the user
             named shows that name; the tooltip keeps the path. */}
-        {inline && <FolderIcon size={12} className="project-picker-icon size-3" />}
+        {inline && <FolderIcon size={12} className="project-picker-icon size-3 shrink-0 text-muted-foreground" />}
         {/* A twin's parent folder is cut before its name, the "/" never. */}
         {inline && project ? (
-          <span className="project-picker-name">
-            {project.alias === undefined && projectName?.note && <><span className="project-picker-parent">{projectName.note}</span>/</>}
-            <span className="project-picker-leaf">{project.alias ?? projectName?.name ?? projectNameOf(project.root)}</span>
+          <span className="project-picker-name inline-flex min-w-0 max-w-[28ch] overflow-hidden whitespace-nowrap font-mono text-muted-foreground leading-[normal]">
+            {project.alias === undefined && projectName?.note && <><span className="project-picker-parent min-w-0 flex-[0_1000000_auto] overflow-hidden text-ellipsis">{projectName.note}</span>/</>}
+            <span className="project-picker-leaf min-w-0 flex-[0_1_auto] overflow-hidden text-ellipsis text-foreground">{project.alias ?? projectName?.name ?? projectNameOf(project.root)}</span>
           </span>
         ) : project?.alias !== undefined ? (
-          <span className="project-picker-label is-alias">{project.alias}</span>
+          <span className={`project-picker-label is-alias min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-[normal] font-mono text-foreground ${labelFlex}`}>{project.alias}</span>
         ) : project ? (
-          <span className="project-picker-path"><span>{displayPath(project.root, homeDir)}</span></span>
+          <span className={`project-picker-path min-w-0 overflow-hidden text-left text-ellipsis whitespace-nowrap font-mono text-foreground leading-[normal] [direction:rtl] ${pathFlex}`}><span className="[unicode-bidi:plaintext]">{displayPath(project.root, homeDir)}</span></span>
         ) : (
-          <span className="project-picker-label">{placeholder}</span>
+          <span className={`project-picker-label min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-[normal] ${labelFlex}`}>{placeholder}</span>
         )}
         {otherActivity && (
-          <span className="project-picker-activity" role="img" title={t("sidebar.newActivity")} aria-label={t("sidebar.newActivity")} />
+          <span className="project-picker-activity size-2 flex-none rounded-full bg-primary" role="img" title={t("sidebar.newActivity")} aria-label={t("sidebar.newActivity")} />
         )}
-        {inline && <ChevronRightIcon size={9} className="project-picker-chevron sidebar-icon-down size-[9px]" />}
+        {inline && <ChevronRightIcon size={9} className="project-picker-chevron size-[9px] shrink-0 rotate-90 text-muted-foreground" />}
       </Button>
       {worktrees && (
         <Button
@@ -672,28 +709,28 @@ export function ProjectWorktreePicker({
           type="button"
           variant="ghost"
           size="default"
-          className="h-auto justify-start focus-visible:ring-0 focus-visible:border-(--border) project-picker-button"
+          className={`project-picker-button ${boxClass} ${worktreeBoxFlex}`}
           title={current ? t("sidebar.worktreePath", { path: current.path }) : t("sidebar.switchWorktree")}
           aria-haspopup="menu"
           aria-expanded={menu?.kind === "worktree"}
           onClick={(event) => openMenu("worktree", event.currentTarget)}
         >
-          {/* A linked checkout's branch icon in the accent, as the main checkout's is not. */}
-          <GitBranchIcon size={11} className={current && !current.isMain ? "project-picker-icon is-linked size-[11px]" : "project-picker-icon size-[11px]"} />
-          <span className="project-picker-path"><span>{current ? current.branch ?? displayPath(current.path, homeDir) : "…"}</span></span>
+          {/* A linked checkout's branch icon in the primary, as the main checkout's is not. */}
+          <GitBranchIcon size={11} className={current && !current.isMain ? "project-picker-icon is-linked size-[11px] shrink-0 text-primary" : "project-picker-icon size-[11px] shrink-0 text-muted-foreground"} />
+          <span className={`project-picker-path min-w-0 overflow-hidden text-left text-ellipsis whitespace-nowrap font-mono text-foreground leading-[normal] [direction:rtl] ${pathFlex}`}><span className="[unicode-bidi:plaintext]">{current ? current.branch ?? displayPath(current.path, homeDir) : "…"}</span></span>
           {/* Only in the files tab: in the row the box is a share of a
               narrow sidebar and the branch needs the room; inline the
-              branch is text on the page. The icon (the accent only for a
+              branch is text on the page. The icon (the primary only for a
               linked checkout) still tells the main one. */}
-          {current?.isMain && layout === "stacked" && <span className="project-picker-note">{t("sidebar.main")}</span>}
-          {stacked && worktrees.length > 1 && <span className="project-picker-note">{worktrees.length}</span>}
-          <ChevronRightIcon size={9} className="project-picker-chevron sidebar-icon-down size-[9px]" />
+          {current?.isMain && layout === "stacked" && <span className="project-picker-note text-[10px] leading-none flex-none text-muted-foreground">{t("sidebar.main")}</span>}
+          {stacked && worktrees.length > 1 && <span className="project-picker-note text-[10px] leading-none flex-none text-muted-foreground">{worktrees.length}</span>}
+          <ChevronRightIcon size={9} className="project-picker-chevron size-[9px] shrink-0 rotate-90 text-muted-foreground" />
         </Button>
       )}
       {!worktrees && stacked && worktreeHint && (
-        <Button type="button" variant="ghost" size="default" aria-disabled="true" tabIndex={-1} title={worktreeHint.title} className="h-auto justify-start focus-visible:ring-0 focus-visible:border-(--border) project-picker-button is-inactive">
-          <GitBranchIcon size={11} className="project-picker-icon size-[11px]" />
-          <span className="project-picker-label">{worktreeHint.label}</span>
+        <Button type="button" variant="ghost" size="default" aria-disabled="true" tabIndex={-1} title={worktreeHint.title} className={`project-picker-button is-inactive ${boxClass} w-full cursor-default opacity-[0.82] hover:bg-secondary hover:text-muted-foreground dark:hover:bg-secondary dark:hover:text-muted-foreground`}>
+          <GitBranchIcon size={11} className="project-picker-icon size-[11px] shrink-0 text-muted-foreground" />
+          <span className={`project-picker-label min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-[normal] ${labelFlex}`}>{worktreeHint.label}</span>
         </Button>
       )}
       <SidebarMenu

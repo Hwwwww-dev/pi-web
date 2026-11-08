@@ -1066,10 +1066,10 @@ function ModelDetail({
             onClick={testState.phase === "success" ? () => setTestState({ phase: "idle" }) : handleTest}
             disabled={!model.id.trim() || testState.phase === "testing"}
             title={t("i18n.testConnection")}
-            className={testState.phase === "success" ? "is-success" : undefined}
+            className={testState.phase === "success" ? "border-success bg-success animate-[saved-pop_0.45s_ease] motion-reduce:animate-none" : undefined}
           >
             {testState.phase === "success" && (
-              <CheckIcon size={11} strokeWidth={2.5} className="config-button-success-icon" />
+              <CheckIcon size={11} strokeWidth={2.5} className="shrink-0 [stroke-dasharray:18] animate-[saved-check-draw_0.35s_ease_forwards] motion-reduce:animate-none" />
             )}
              {testState.phase === "testing" ? t("i18n.checking") : testState.phase === "success" ? t("common.ok") : t("i18n.test")}
           </ConfigButton>
@@ -2103,7 +2103,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
   // `12/40` next to a provider makes a narrowed selector visible at a glance.
   const scopeBadge = (providerId: string) => {
     const label = providerBadgeLabel(enabledModels.view, providerId);
-    return label ? <span className="models-sidebar-badge">{label}</span> : null;
+    return label ? <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{label}</span> : null;
   };
   const activeOAuth = oauthProviders.filter((p) => p.loggedIn);
   const activeApiKey = apiKeyProviders.filter((p) => p.configured);
@@ -2238,7 +2238,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                         <ConfigSidebarItem
                           key={i}
                           active={isModelSelected}
-                          className="models-sidebar-indented-item"
+                          className="pl-[26px]"
                           onClick={() => setSelection({ type: "model", providerName: pName, index: i })}
                         >
                           <ConfigSidebarText className={cn("flex-1", m.id ? "text-muted-foreground" : "text-muted-foreground")}>
@@ -2254,7 +2254,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
 
                     {/* Add model button */}
                     <ConfigSidebarItem
-                      className="models-sidebar-indented-item models-sidebar-add-item"
+                      className="pl-[26px] text-muted-foreground hover:text-foreground focus-visible:text-foreground"
                       onClick={(e) => { e.stopPropagation(); addModel(pName); }}
                     >
                        <ConfigSidebarText>+ {t("i18n.model")}</ConfigSidebarText>
@@ -2271,7 +2271,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
 
           {/* Right: detail */}
           <ConfigDetail>
-            <ConfigDetailStack className="is-fill">
+            <ConfigDetailStack className="min-h-full">
               {loading ? null : detailContent ?? (
                 <ConfigEmptyState>{t("i18n.selectProviderModel")}</ConfigEmptyState>
               )}
@@ -2290,10 +2290,10 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
             variant="primary"
             onClick={handleSave}
             disabled={saving || savedOk || loadError !== null}
-            className={savedOk ? "is-success" : undefined}
+            className={savedOk ? "border-success bg-success animate-[saved-pop_0.45s_ease] motion-reduce:animate-none" : undefined}
           >
             {savedOk && (
-              <CheckIcon size={14} strokeWidth={2.5} className="config-button-success-icon" />
+              <CheckIcon size={14} strokeWidth={2.5} className="shrink-0 [stroke-dasharray:18] animate-[saved-check-draw_0.35s_ease_forwards] motion-reduce:animate-none" />
             )}
              <span>{savedOk ? t("i18n.saved") : saving ? t("i18n.saving") : t("i18n.save")}</span>
           </ConfigButton>

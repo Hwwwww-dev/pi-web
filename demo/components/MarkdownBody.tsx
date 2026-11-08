@@ -158,7 +158,8 @@ export const MarkdownBody = memo(function MarkdownBody({ children, className, is
           const openFile = () => onOpenFile(filePath, lineSuffix ? { line: lineSuffix.line } : undefined);
           return (
             <code
-              className="markdown-inline-code markdown-inline-file"
+              // Inline code that holds a filesystem path opens the file viewer.
+              className="markdown-inline-code cursor-pointer underline decoration-dotted decoration-muted-foreground underline-offset-2 hover:text-primary hover:decoration-primary"
               title={filePath}
               role="button"
               tabIndex={0}

@@ -47,11 +47,21 @@ export function ExtensionStatusButton({ statuses }: { statuses: ExtensionStatusI
   if (!tone) return null;
   const summary = entries.length > 1 ? `${label} · ${entries.length}` : label;
 
+  // The status dot mirrors the umbrella tone; `data-tone` keeps the signal
+  // readable in the DOM while Tailwind variants map it to the palette.
+  const dotClass = "size-[7px] shrink-0 rounded-full data-[tone=ok]:bg-success data-[tone=warning]:bg-warning data-[tone=error]:bg-destructive";
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="ghost" className="composer-chip" title={label} aria-label={summary}>
-          <span className="extension-status-dot" data-tone={tone} aria-hidden="true" />
+        <Button
+          type="button"
+          variant="ghost"
+          title={label}
+          aria-label={summary}
+          className="h-8 max-[640px]:h-[34px] gap-[5px] rounded-md px-2 text-xs leading-none text-muted-foreground hover:bg-secondary hover:text-foreground aria-expanded:bg-secondary aria-expanded:text-foreground"
+        >
+          <span className={dotClass} data-tone={tone} aria-hidden="true" />
           {summary}
         </Button>
       </PopoverTrigger>
@@ -64,13 +74,15 @@ export function ExtensionStatusButton({ statuses }: { statuses: ExtensionStatusI
         className="flex max-h-[min(320px,40dvh)] w-max max-w-(--radix-popover-content-available-width) flex-col gap-[7px] overflow-auto overscroll-contain p-2 px-2.5"
       >
         {entries.map((status) => (
-          <div key={status.key} className="extension-status-entry">
+          <div key={status.key} className="flex min-w-0 items-start gap-2">
             <span
-              className="extension-status-dot"
+              className={`${dotClass} mt-[5px]`}
               data-tone={extensionStatusEntryTone(status.text)}
               aria-hidden="true"
             />
-            <pre className="extension-status-entry-text">
+            {/* Status text is TUI output as well: it scrolls sideways instead of
+                wrapping a line into a broken row. */}
+            <pre className="m-0 min-w-0 overflow-x-auto overscroll-contain whitespace-pre-wrap">
               <AnsiText text={status.text} />
             </pre>
           </div>

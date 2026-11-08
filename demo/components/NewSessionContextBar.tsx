@@ -96,7 +96,9 @@ export function NewSessionContextBar({
   }, []);
 
   return (
-    <div className="new-session-context">
+    // .new-session-context 是 html[data-keyboard-open] 规则（app/globals.css）
+    // 的钩子类，键盘打开时整行隐藏；布局批 4 迁入为工具类。
+    <div className="new-session-context flex min-w-0 flex-nowrap min-h-7 items-center mb-1.5">
       <ProjectWorktreePicker
         handleRef={pickerRef}
         layout="inline"

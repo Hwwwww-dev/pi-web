@@ -170,11 +170,13 @@ function NewSessionUpdateLink({
   const accessibleLabel = label(update.latestVersion);
 
   // In the versions line, after the version in use: "→ v<latest> ↗".
+  // The box's padding is offset by equal negative margins, so hover and focus
+  // never move the line; on a coarse pointer they grow the tap target instead.
   return (
     <>
-      <span className="new-session-meta-arrow" aria-hidden="true">→</span>
+      <span aria-hidden="true">→</span>
       <a
-        className="new-session-update"
+        className="new-session-update inline-flex items-center gap-[3px] -mx-1 -my-[3px] px-1 py-[3px] rounded-(--radius-sm) font-semibold no-underline text-primary transition-colors duration-100 hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:flex-none pointer-coarse:-my-2 pointer-coarse:py-2"
         href={update.releaseUrl}
         target="_blank"
         rel="noopener noreferrer"
@@ -1268,7 +1270,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         );
         if (!isVisible || currentRefIdx === undefined) return view;
         return (
-          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} className="cv-block" ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
+          // 性能: 离屏消息块跳过布局与绘制；contain-intrinsic-size 的 auto 关键字
+          // 让浏览器记住渲染过的真实高度，占位估算随访问收敛。
+          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} className="[content-visibility:auto] [contain-intrinsic-size:auto_160px]" ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
             {view}
           </div>
         );
@@ -1429,7 +1433,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           rendered.push(
             <div
               key={`process-group-${entryIds[userIdx] ?? userIdx}`}
-              className="cv-block"
+              className="[content-visibility:auto] [contain-intrinsic-size:auto_160px]"
               ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
             >
               <ProcessDetailsGroup key={finalAnswerMessage ? "answered" : "unanswered"} summary={processSummary} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
@@ -1736,12 +1740,23 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       )}
 
       <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
+        {/* The reveal wrapper sits above the minimap rail (zIndex 25), which
+            otherwise swallows the button's clicks across its whole strip. */}
         {!isEmptyNew && (
-          <div className="pointer-events-none absolute bottom-full right-4 z-20 max-sm:right-2.5">
+          <div className="pointer-events-none absolute bottom-full right-4 z-30 max-sm:right-2.5">
             <Button
               type="button"
               variant="ghost"
-              className={cn("chat-scroll-to-bottom size-[34px] h-[34px]", showScrollToBottom && !pendingScrollRestore && "is-visible")}
+              className={cn(
+                // The ghost Button's transition-all fades opacity and flips
+                // visibility discretely, which is exactly the reveal/hide curve.
+                "size-[34px] cursor-pointer rounded-full border border-border bg-card p-0 text-muted-foreground shadow-sm duration-[160ms]",
+                // Reduced motion keeps the fade but drops the slide/scale.
+                "motion-reduce:translate-y-0 motion-reduce:scale-100",
+                showScrollToBottom && !pendingScrollRestore
+                  ? "pointer-events-auto visible translate-y-0 scale-100 opacity-[0.28] hover:opacity-100 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 focus-visible:bg-secondary focus-visible:text-foreground"
+                  : "pointer-events-none invisible translate-y-1 scale-[0.96] opacity-0",
+              )}
               title={t("chat.scrollToLatest")}
               aria-label={t("chat.scrollToLatest")}
               style={{ marginBottom: isMobile ? 10 : 14 }}
@@ -1753,21 +1768,20 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the
-            composer's left edge (.new-session-brand, .new-session-meta and
-            .new-session-context in app/globals.css; the side padding and
-            width are inline here). */}
+            composer's left edge; the side padding and width are inline here,
+            the hero's styles批 4 迁入为工具类。 */}
         {isEmptyNew && (
           <div className="new-session-hero max-md:px-4 md:px-4">
-            <div className="new-session-hero-inner flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-center">
-              <div className="new-session-brand">
-                <Image src={demoAssetPath("/icons/apple-touch-icon.png")} width={40} height={40} alt="" priority className="new-session-logo" />
-                <div className="new-session-brand-text">
-                  <span className="new-session-brand-name">Pi Web</span>
-                  <span className="new-session-meta">
+            <div className="new-session-hero-inner mx-auto flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-center">
+              <div className="new-session-brand flex min-w-0 items-center gap-3 mb-5 max-[640px]:mb-4">
+                <Image src={demoAssetPath("/icons/apple-touch-icon.png")} width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
+                <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
+                  <span className="new-session-brand-name text-[22px] font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
+                  <span className="new-session-meta flex min-w-0 items-center gap-1.5 text-xs leading-[1.4] whitespace-nowrap text-muted-foreground [&>*]:flex-none">
                     <span>web v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
                     <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
                     <span aria-hidden="true">·</span>
-                    <span className="new-session-meta-pi">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
+                    <span className="new-session-meta-pi min-w-0 overflow-hidden text-ellipsis">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
                   </span>
                 </div>
               </div>
@@ -1809,7 +1823,7 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
         return (
           <div
             key={notice.id}
-            className="notice-shelf-item pointer-events-auto flex items-start gap-2.5 overflow-hidden rounded-xl border border-border/70 bg-background w-fit max-w-[min(100%,620px)] px-3 text-sm leading-normal text-muted-foreground origin-top-right shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.10)]"
+            className="notice-shelf-item pointer-events-auto flex items-start gap-2.5 overflow-hidden rounded-xl border border-border/70 bg-background w-fit max-w-[min(100%,620px)] px-3 text-sm leading-normal text-muted-foreground origin-top-right shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.10)] motion-reduce:[animation-duration:0.001ms]!"
             onMouseEnter={() => onPauseChange?.(notice.id)}
             onMouseLeave={(event) => {
               if (!event.currentTarget.contains(document.activeElement)) onPauseChange?.(null);
@@ -1879,7 +1893,7 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
               <Button
                 type="button"
                 variant="ghost"
-                className="notice-shelf-close mt-3.5 shrink-0"
+                className="ml-0.5 mt-3.5 size-6 shrink-0 rounded-sm p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 aria-label="Dismiss notification"
                 title="Dismiss notification"
                 onClick={() => onDismiss(notice.id)}
@@ -1979,11 +1993,14 @@ function DialogTitlePlainText({ text }: { text: string }) {
   return (
     <div>
       <div className={headingClass}>{heading}</div>
-      <div className="extension-kv-table">
+      {/* Flex rows, not a table: WebKit's auto table layout gives the value column
+          only its min-content when overflow-wrap: anywhere is set, crushing values
+          like "external_directory" into one character per line on narrow screens. */}
+      <div className="mt-1.5 text-xs leading-[1.5]">
         {rows.map((row) => (
-          <div key={row.label + row.value} className="extension-kv-row">
-            <div className="extension-kv-label">{row.label}</div>
-            <div className="extension-kv-value">{row.value}</div>
+          <div key={row.label + row.value} className="flex items-baseline gap-3.5 py-[3px]">
+            <div className="shrink-0 whitespace-nowrap text-muted-foreground">{row.label}</div>
+            <div className="min-w-0 flex-1 font-mono text-foreground wrap-anywhere">{row.value}</div>
           </div>
         ))}
       </div>
@@ -2236,7 +2253,7 @@ function ExtensionDialog({
         ref={dialogRef}
         role="dialog"
         aria-label={request.title}
-        className="extension-drawer-in pointer-events-auto relative mx-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl"
+        className="pointer-events-auto relative mx-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl animate-[extension-drawer-in_0.22s_ease-out] motion-reduce:animate-none"
         style={{
           // "Full" fills the content region above the composer: the overlay is inset:0 with
           // 20px padding, so 100% keeps that breathing room without covering the input.
@@ -2369,19 +2386,21 @@ function ExtensionDialog({
                   tabIndex={0}
                   data-extension-option
                   className={cn(
-                    `extension-option${tone === "neutral" ? "" : ` tone-${tone}`}${selected ? " selected" : ""}`,
-                    "w-full cursor-pointer rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere",
-                    selected ? "border-ring" : "border-border",
-                    tone !== "neutral" && "font-semibold",
+                    "extension-option w-full cursor-pointer rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere",
                     // Match the scroller's padding so keyboard navigation never parks the
                     // option flush against the edge, where whole-pixel scroll snapping and
                     // overflow clipping cut off its focus ring.
                     "scroll-m-[14px]",
-                    tone === "affirmative" ? "text-success" : tone === "negative" ? "text-destructive" : "text-foreground",
+                    selected ? "border-ring bg-accent" : cn(
+                      "border-border",
+                      // Permission-style tints stay readable through hover; the
+                      // selected option keeps its accent surface instead.
+                      tone === "affirmative" ? "bg-success/[0.12] hover:bg-success/[0.22] text-success"
+                        : tone === "negative" ? "bg-destructive/10 hover:bg-destructive/20 text-destructive"
+                          : "bg-sidebar hover:bg-secondary text-foreground",
+                    ),
+                    tone !== "neutral" && "font-semibold",
                   )}
-                  // Selected background stays inline: the unlayered .extension-option
-                  // background rules in globals.css beat layered bg-accent utilities.
-                  style={selected ? { background: "var(--accent)" } : undefined}
                   aria-label={option}
                   aria-pressed={selected}
                   ref={index === 0 ? focusFirstOption : undefined}
@@ -2415,13 +2434,9 @@ function ExtensionDialog({
                     aria-checked={checked}
                     tabIndex={0}
                     className={cn(
-                      "extension-multi-option",
-                      "flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere scroll-m-[14px]",
-                      checked ? "border-ring" : "border-border",
+                      "flex cursor-pointer select-none items-start gap-2 rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere scroll-m-[14px]",
+                      checked ? "border-ring bg-accent" : "border-border hover:bg-secondary",
                     )}
-                    // Checked background stays inline: the unlayered
-                    // .extension-multi-option rules in globals.css beat bg-accent utilities.
-                    style={checked ? { background: "var(--accent)" } : undefined}
                     aria-label={option.label}
                     ref={index === 0 ? focusFirstOption : undefined}
                     onClick={() => toggleMultiOption(option.id)}

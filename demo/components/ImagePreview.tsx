@@ -66,7 +66,7 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
       {open && (
         <dialog
           ref={dialogRef}
-          className="image-preview-dialog"
+          className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden border-0 bg-transparent text-foreground open:flex open:items-center open:justify-center pt-[max(16px,env(safe-area-inset-top))] pr-[max(16px,env(safe-area-inset-right))] pb-[max(16px,env(safe-area-inset-bottom))] pl-[max(16px,env(safe-area-inset-left))] [&::backdrop]:bg-black/72"
           aria-label={t("chat.previewImage")}
           onCancel={(event) => {
             event.preventDefault();
@@ -84,7 +84,7 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="image-preview-image" src={src} alt={alt} />
+          <img className="block max-h-full max-w-full rounded-md object-contain shadow-2xl" src={src} alt={alt} />
           <Button
             ref={closeButtonRef}
             type="button"

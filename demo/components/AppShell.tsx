@@ -2623,7 +2623,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 return (
                   <div
                     key={slot.session.id}
-                    className="chat-slot"
+                    // 可见性由 data 属性驱动（翻译扩展观察这四个属性），批 4
+                    // 自 globals 的 .chat-slot 迁入为 data 变体工具类。
+                    className="h-full w-full data-[slot-state=hidden]:hidden"
                     data-slot-state={isActive ? "active" : "hidden"}
                     inert={!isActive}
                   >

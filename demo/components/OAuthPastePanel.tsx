@@ -62,14 +62,16 @@ export function OAuthPastePanel({
 }) {
   const canSubmit = !disabled && value.trim().length > 0;
   return (
-    <div className="oauth-paste-panel">
+    // The message and hint paragraphs keep only their hook names: the panel
+    // styles them (and the hint's link) from here, so serialized markup pins hold.
+    <div className="oauth-paste-panel flex flex-col gap-2.5 [&_p]:m-0 [&_p]:text-xs [&_p]:leading-[1.5] [&_p]:text-muted-foreground [&_a]:break-all [&_a]:text-primary">
       <p className="oauth-paste-message">{message}</p>
       {hint && <p className="oauth-paste-hint">{hint}</p>}
-      <div className="oauth-paste-row">
+      <div className="oauth-paste-row flex gap-1.5">
         <Input
           ref={inputRef}
           value={value}
-          className="oauth-paste-input"
+          className="oauth-paste-input h-auto bg-background px-2.5 py-1.5 font-mono text-xs md:text-xs shadow-none disabled:opacity-100"
           placeholder={placeholder}
           aria-label={inputLabel}
           disabled={disabled || undefined}
@@ -85,7 +87,7 @@ export function OAuthPastePanel({
             if (submits && canSubmit) onSubmit();
           }}
         />
-        <Button type="button" variant="outline" size="default" className="h-auto oauth-paste-submit" onClick={onSubmit} disabled={!canSubmit}>
+        <Button type="button" variant="outline" size="default" className="oauth-paste-submit h-auto shrink-0 px-3 text-xs font-medium" onClick={onSubmit} disabled={!canSubmit}>
           {submitLabel}
         </Button>
       </div>

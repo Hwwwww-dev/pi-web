@@ -214,11 +214,11 @@ function SkillDetail({
   return (
     <ConfigDetailStack>
       {/* Path + tag + toggle, with a stable status row below. */}
-      <div className="skill-detail-heading">
+      <div className="flex flex-col gap-1">
         <ConfigDetailHeader>
           <ConfigDetailHeaderInfo>
             <ConfigScopeTag scope={label}>{scopeLabel(label, t)}</ConfigScopeTag>
-            <PathLabel className="config-detail-path" text={label === "project" ? displayPathWithin(skill.filePath, cwd) : shortenPath(skill.filePath)} />
+            <PathLabel className="min-w-0 flex-1 overflow-hidden font-mono text-xs text-muted-foreground" text={label === "project" ? displayPathWithin(skill.filePath, cwd) : shortenPath(skill.filePath)} />
           </ConfigDetailHeaderInfo>
           <ConfigDetailActions>
             <ConfigSwitch
@@ -229,7 +229,7 @@ function SkillDetail({
             />
           </ConfigDetailActions>
         </ConfigDetailHeader>
-        <div className="skill-detail-status-row">
+        <div className="flex min-h-4 flex-wrap items-center justify-end gap-2 text-right">
           {!enabled && (
             <span className="text-xs text-muted-foreground">
               {t("i18n.hiddenButInvocable")}
@@ -253,9 +253,9 @@ function SkillDetail({
                 target="_blank"
                 rel="noreferrer"
                 title={skill.install.skillsShUrl}
-                className="skill-source-link"
+                className="flex max-w-full w-fit items-center gap-2 text-primary no-underline"
               >
-                <span className="skill-source-link-text">
+                <span className="overflow-hidden font-mono text-xs text-ellipsis whitespace-nowrap">
                   {skill.install.skillsShUrl.replace(/^https?:\/\//, "")} ↗
                 </span>
               </a>
@@ -264,8 +264,8 @@ function SkillDetail({
 
           {skill.install && (
             <ConfigField label={t("i18n.version")}>
-              <div className="skill-version-row">
-                <span className="skill-version-value">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="font-mono text-xs text-muted-foreground">
                   {shortVersion(updateStatus?.currentVersion ?? skill.install.versionHash, t("i18n.unknown"))}
                 </span>
                 {skill.install.canCheckForUpdates && (
@@ -278,20 +278,20 @@ function SkillDetail({
                   </ConfigButton>
                 )}
                 {updateStatus?.state === "update-available" && (
-                  <span className="skill-version-value is-update">
+                  <span className="font-mono text-xs text-warning">
                     {shortVersion(updateStatus.latestVersion, t("i18n.unknown"))}
                   </span>
                 )}
                 {(checkingUpdate ||
                   (updateStatus && updateStatus.state !== "update-available")) && (
                   <span
-                    className={`skill-update-status ${checkingUpdate
-                      ? "is-checking"
+                    className={checkingUpdate
+                      ? "text-xs text-muted-foreground"
                       : updateStatus?.state === "up-to-date"
-                        ? "is-success"
+                        ? "text-xs text-success"
                         : updateStatus?.state === "error"
-                          ? "is-error"
-                          : "is-muted"}`}
+                          ? "text-xs text-destructive"
+                          : "text-xs text-muted-foreground"}
                   >
                     {checkingUpdate
                        ? t("i18n.checking")
@@ -320,13 +320,13 @@ function SkillDetail({
           )}
 
           <ConfigField label={t("config.name")}>
-            <span className="skill-name-value">
+            <span className="font-mono text-xs text-foreground">
               {skill.name}
             </span>
           </ConfigField>
 
           <ConfigField label={t("i18n.description")}>
-            <span className="skill-description">
+            <span className="text-xs leading-[1.5] text-muted-foreground">
               {skill.description}
             </span>
           </ConfigField>
@@ -343,20 +343,23 @@ function SkillDetail({
                 <ConfigButton size="small" onClick={() => { pendingAnchor.current = ""; setDocuments((open) => open.slice(0, -1)); }}>
                   {t("skills.documentBack")}
                 </ConfigButton>
-                <span className="config-detail-path" title={documentPath}>{documentPath}</span>
+                <span className="min-w-0 flex-1 overflow-hidden font-mono text-xs text-muted-foreground" title={documentPath}>{documentPath}</span>
               </ConfigDetailHeaderInfo>
             </ConfigDetailHeader>
           )}
           {instructionsError ? (
-            <span role="alert" className="skill-instructions-status is-error">{instructionsError}</span>
+            <span role="alert" className="text-xs break-words text-destructive [overflow-wrap:anywhere]">{instructionsError}</span>
           ) : instructions === null ? (
-            <span role="status" className="skill-instructions-status">{t("i18n.loading")}</span>
+            <span role="status" className="text-xs text-muted-foreground">{t("i18n.loading")}</span>
           ) : instructions ? (
-            <MarkdownBody className="skill-instructions" cwd={[skill.baseDir, ...documentPath.split("/").slice(0, -1)].join("/")} onNavigateLink={openLink}>
+            <MarkdownBody
+              className="[&>*:first-child]:mt-0! [&>*:last-child]:mb-0!"
+              cwd={[skill.baseDir, ...documentPath.split("/").slice(0, -1)].join("/")} onNavigateLink={openLink}
+            >
               {instructions}
             </MarkdownBody>
           ) : (
-            <span className="skill-instructions-status">{t("skills.noInstructions")}</span>
+            <span className="text-xs text-muted-foreground">{t("skills.noInstructions")}</span>
           )}
         </div>
       </ConfigCard>
@@ -454,7 +457,7 @@ function AddSkillPanel({
       : `${shortenPath(cwd)}/.pi/skills/`;
 
   return (
-    <ConfigDetailStack className="is-full-height">
+    <ConfigDetailStack className="h-full">
       {/* ── Header area ── */}
       <div className="mb-5 flex flex-col gap-3">
         <ConfigAddSourceHeading
@@ -916,7 +919,7 @@ export function SkillsConfig({
                           const status = key ? updateStatuses[key] : undefined;
                           if (status?.state !== "update-available") return null;
                           return (
-                            <span title={t("i18n.updateAvailable")} className="skill-update-indicator">
+                            <span title={t("i18n.updateAvailable")} className="inline-flex shrink-0 text-warning">
                               <ArrowUpIcon size={13} strokeWidth={1.8} />
                             </span>
                           );
@@ -964,7 +967,7 @@ export function SkillsConfig({
 
           {/* Right: detail or add panel */}
           <ConfigDetail>
-            <ConfigDetailStack className="is-fill">
+            <ConfigDetailStack className="min-h-full">
               {addMode ? (
               <AddSkillPanel
                 cwd={cwd}
