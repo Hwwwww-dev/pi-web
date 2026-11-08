@@ -66,6 +66,7 @@ import { createActiveToolsStore } from "@/lib/active-tools";
 import { getToolExecutionProgress } from "@/lib/tool-execution-progress";
 import { CODEMODE_TOOL_NAME, getCodemodeProgress } from "@/lib/codemode-view";
 import { updateExtensionWidgets } from "@/lib/extension-widgets";
+import { createShownNotices, extensionErrorMessage } from "@/lib/startup-issues";
 import { bareMcpOpensSettings } from "@/lib/mcp-command";
 import { copyText } from "@/lib/clipboard";
 import type { SettingsSection } from "@/lib/settings-navigation";
@@ -317,6 +318,9 @@ const MODELS_RETRY_DELAYS_MS = [2_000, 5_000, 10_000];
 const MAX_NOTICES = 5;
 const NOTICE_VISIBLE_MS = 5000;
 const NOTICE_EXIT_ANIMATION_MS = 180;
+// A session's startup issues come with every stream it opens (lib/rpc-manager.ts): this page
+// shows each once, through reconnects and returns to the session.
+const isFirstNoticeShowing = createShownNotices();
 function createNoticeId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -1819,6 +1823,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
       }
       case "notify": {
+        if (request.id && !isFirstNoticeShowing(request.id)) break;
         addNotice({
           id: request.id,
           message: stripAnsi(request.message),
@@ -2263,7 +2268,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       case "extension_error":
         addNotice({
           type: "error",
-          message: (event.error as string | undefined) ?? "Extension command failed",
+          message: extensionErrorMessage(event.extensionPath, (event.error as string | undefined) ?? "Extension command failed"),
         });
         break;
       case "message_start":
