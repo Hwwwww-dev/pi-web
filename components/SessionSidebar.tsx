@@ -188,7 +188,7 @@ function ToolbarIconButton({
       aria-controls={controls}
       variant="ghost"
       size="icon-sm"
-      className={`disabled:pointer-events-auto focus-visible:ring-0 focus-visible:border-transparent sidebar-tool-button${pressed || expanded ? " is-active" : ""}${done ? " is-done" : ""}${className ? ` ${className}` : ""}`}
+      className={`sidebar-tool-button flex-[0_1_32px] min-w-[21px] disabled:pointer-events-auto disabled:opacity-40 [@media(pointer:coarse)]:flex-[0_1_36px] [@media(pointer:coarse)]:size-9 ${pressed || expanded ? "bg-accent text-accent-foreground" : ""}${done ? " text-accent" : ""}${className ? ` ${className}` : ""}`}
     >
       {children}
     </Button>
@@ -2497,7 +2497,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "move-up",
         label: t("sidebar.moveProjectUp"),
-        icon: <ChevronRightIcon size={13} className="sidebar-icon-up" />,
+        icon: <ChevronRightIcon size={13} className="-rotate-90" />,
         disabled: up === null,
         onSelect: () => { if (up) moveProject(project.key, up.anchorKey, up.position); },
       },
@@ -2505,7 +2505,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "move-down",
         label: t("sidebar.moveProjectDown"),
-        icon: <ChevronRightIcon size={13} className="sidebar-icon-down" />,
+        icon: <ChevronRightIcon size={13} className="rotate-90" />,
         disabled: down === null,
         onSelect: () => { if (down) moveProject(project.key, down.anchorKey, down.position); },
       },
@@ -2522,7 +2522,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "expand-all",
         label: t("sidebar.expandAllGroups"),
-        icon: <ChevronRightIcon size={13} className="sidebar-icon-down" />,
+        icon: <ChevronRightIcon size={13} className="rotate-90" />,
         disabled: model.projects.every((other) => isGroupExpanded(other, shownGroupExpansion)),
         onSelect: () => setAllGroupsExpanded(() => true),
       },
@@ -2664,7 +2664,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         type: "item",
         id: "expand-all",
         label: t("sidebar.expandAllGroups"),
-        icon: <ChevronRightIcon size={13} className="sidebar-icon-down" />,
+        icon: <ChevronRightIcon size={13} className="rotate-90" />,
         disabled: folded === 0,
         onSelect: () => setAllArchiveGroupsExpanded(true),
       },
@@ -2835,11 +2835,18 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   const keyIconSize = filesBelow ? 13 : 14;
   // The size class keeps the icon's measure under Button's svg default (16px).
   const keyIconSizeClass = filesBelow ? "size-[13px]" : "size-[14px]";
+  // The header row's keys give way together to the section's label (a zero
+  // basis shared alike, 18px at least, 26px at most); a finger gets the
+  // picker boxes' 32px square. The files pane's row keeps the plain 32px keys.
+  const fileKeyClass = filesBelow
+    ? "flex-[1_1_0] min-w-[18px] max-w-[26px] h-[26px] [@media(pointer:coarse)]:flex-[0_1_32px] [@media(pointer:coarse)]:min-w-[15px] [@media(pointer:coarse)]:max-w-none [@media(pointer:coarse)]:size-8"
+    : undefined;
   const terminalButton = (
     <ToolbarIconButton
       onClick={() => { if (explorerCwd) onOpenTerminal?.(explorerCwd); }}
       disabled={!explorerCwd || !onOpenTerminal}
       title={t("terminal.open")}
+      className={fileKeyClass}
     >
       <TerminalIcon size={keyIconSize} className={keyIconSizeClass} />
     </ToolbarIconButton>
@@ -2858,6 +2865,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       title={fileManagerUnavailable
         ? t(fileManager?.reason === "remote" ? "sidebar.openInExplorerRemoteOnly" : "sidebar.openInExplorerUnsupported")
         : fileManagerLabel}
+      className={fileKeyClass}
     >
       <FolderIcon size={keyIconSize} className={keyIconSizeClass} />
     </ToolbarIconButton>
@@ -2871,6 +2879,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       }}
       disabled={!explorerCwd || explorerUploadBusy}
       title={t("sidebar.uploadFilesTitle")}
+      className={fileKeyClass}
     >
       <UploadIcon size={keyIconSize} className={keyIconSizeClass} />
     </ToolbarIconButton>
@@ -2887,6 +2896,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       disabled={!explorerCwd}
       title={t("sidebar.refreshExplorer")}
       done={explorerRefreshDone}
+      className={fileKeyClass}
     >
       {explorerRefreshDone ? <CheckIcon size={keyIconSize} className={keyIconSizeClass} /> : <RotateCcwIcon size={keyIconSize} className={keyIconSizeClass} />}
     </ToolbarIconButton>
@@ -2901,7 +2911,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       disabled={!explorerCwd}
       title={t("sidebar.showIgnoredFiles")}
       pressed={showIgnoredFiles}
-      className={className}
+      className={[fileKeyClass, className].filter(Boolean).join(" ") || undefined}
     >
       <EyeIcon size={keyIconSize} className={keyIconSizeClass} />
     </ToolbarIconButton>
@@ -2924,6 +2934,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       disabled={changesKeyDisabled}
       title={t("sidebar.changedFiles", { count: changesCount })}
       pressed={!changesKeyDisabled && !changesCollapsed}
+      className={fileKeyClass}
     >
       <GitCommitHorizontalIcon size={keyIconSize} className={keyIconSizeClass} />
     </ToolbarIconButton>
@@ -2932,7 +2943,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   return (
     <div
       ref={setSidebarRoot}
-      className={`session-sidebar${filesBelow ? " is-files-below" : ""}${filesBelow && filesCollapsed ? " is-files-collapsed" : ""}${filesBelow && filesFold.moving ? " is-files-folding" : ""}`}
+      className={`session-sidebar relative flex h-full min-h-0 flex-col overflow-hidden p-2.5${filesBelow ? " is-files-below" : ""}${filesBelow && filesFold.moving ? " is-files-folding" : ""}`}
       style={{ "--sidebar-files-height": `${filesSizer.width}px` } as CSSProperties}
       onFocus={(event) => { sidebarFocusRef.current = event.target; }}
       onBlur={(event) => { if (event.relatedTarget === null && !document.hasFocus()) return; if (!event.currentTarget.contains(event.relatedTarget)) sidebarFocusRef.current = null; }}
@@ -2960,17 +2971,17 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           the Sessions | Files track, in every layout — the panes switch in
           the files-below layout too, where the files pane takes the files
           section's place. Only the two tabs are the tablist. */}
-      <div ref={headerRef} className="sidebar-header">
+      <div ref={headerRef} className="sidebar-header flex flex-none min-h-[calc(var(--top-bar-height)-4px)] items-center">
         <PiWebTitle onWidthChange={fitHeader} />
-        <span className="sidebar-header-spacer" />
+        <span className="sidebar-header-spacer min-w-0 flex-1" />
         <Button
           type="button"
-          variant="ghost"
+          variant="default"
           size="default"
           onClick={handleNewSession}
           disabled={!selectedCwd}
           title={selectedCwd ? t("sidebar.newSessionTitle", { path: selectedCwd }) : t("sidebar.selectProject")}
-          className="h-auto disabled:pointer-events-auto focus-visible:ring-0 focus-visible:border-transparent sidebar-new-button"
+          className="sidebar-new-button h-8 gap-1.5 rounded-full px-3.5 text-xs disabled:pointer-events-auto"
         >
           <PlusIcon size={12} className="size-3" />
           <span className="sidebar-new-label">{t("sidebar.new")}</span>
@@ -2998,7 +3009,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           aria-controls={searchesFiles ? "file-search-input" : "session-search-input"}
           variant="ghost"
           size="icon-sm"
-          className={`h-auto focus-visible:ring-0 focus-visible:border-transparent sidebar-search-toggle${(searchesFiles ? fileSearchOpen : sessionSearchOpen) ? " is-active" : ""}`}
+          className={`sidebar-search-toggle rounded-full${(searchesFiles ? fileSearchOpen : sessionSearchOpen) ? " bg-accent text-accent-foreground" : ""}`}
         >
           <SearchIcon size={16} className="size-4" />
         </Button>
@@ -3006,7 +3017,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       {/* The segmented control: Radix's roving focus owns the arrows and
           Home/End, activating the tab it lands on. */}
       <Tabs value={sidebarTab} onValueChange={(value) => switchTab(value as SidebarTab)} className="flex-none">
-        <TabsList aria-label={t("sidebar.tabsLabel")} className="sidebar-tabs-list w-full rounded-full p-[3px]">
+        <TabsList aria-label={t("sidebar.tabsLabel")} className="sidebar-tabs-list mb-1 mt-0.5 h-auto w-full gap-0.5 rounded-full p-[3px]">
           <TabsTrigger
             ref={sessionsTabRef}
             id="session-sidebar-tab-sessions"
@@ -3045,11 +3056,11 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         role="tabpanel"
         aria-labelledby="session-sidebar-tab-sessions"
         hidden={sidebarTab !== "sessions"}
-        className="sidebar-panel sidebar-sessions-panel"
+        className={`sidebar-panel sidebar-sessions-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${filesBelow ? " min-h-[120px] basis-0" : ""}`}
         onScrollCapture={rememberScroll}
       >
         {sessionSearchOpen && (
-          <div className="sidebar-search">
+          <div className="sidebar-search flex-none px-2 pt-2 pb-1">
             {/* The files' search field (FileExplorer), mirrored. */}
             <InputGroup className="h-8 rounded-full bg-muted">
               <InputGroupInput
@@ -3083,10 +3094,10 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         >
           {/* The tree and the archive view share one cell: the archive
               slides in over the tree and away from it again. */}
-          <div className="sidebar-sessions-views">
+          <div className="sidebar-sessions-views grid min-h-0 min-w-0 flex-1 [grid-template:minmax(0,1fr)_/_minmax(0,1fr)]">
             {/* Kept mounted under the archive view, so going back finds it as
                 it was: inert while the archive slides in, then hidden. */}
-            <div className="sidebar-sessions-view" hidden={archiveMotion.mainHidden} inert={archiveMotion.mainInert}>
+            <div className="sidebar-sessions-view col-start-1 row-start-1 flex min-h-0 min-w-0 flex-col" hidden={archiveMotion.mainHidden} inert={archiveMotion.mainInert}>
               <SessionTree
                 {...treeProps}
                 rows={model.rows}
@@ -3099,30 +3110,30 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 in it is clicked twice; the tree is back under it at once. */}
             {archiveMotion.archiveMounted && (
               <div
-                className={`sidebar-sessions-view sidebar-archive-view${archiveMotion.archiveClass ? ` ${archiveMotion.archiveClass}` : ""}`}
+                className={`sidebar-sessions-view sidebar-archive-view col-start-1 row-start-1 relative z-[1] flex min-h-0 min-w-0 flex-col bg-sidebar${archiveMotion.archiveClass ? ` ${archiveMotion.archiveClass}` : ""}`}
                 inert={archiveMotion.archiveInert}
                 onAnimationEnd={(event) => { if (event.target === event.currentTarget) endArchiveMotion(); }}
               >
-                <div className="sidebar-archive-bar">
+                <div className="sidebar-archive-bar flex h-9 flex-none items-center border-b border-border px-1.5">
                   <Button
                     ref={archiveBackRef}
                     type="button"
                     variant="ghost"
                     size="default"
-                    className="focus-visible:ring-0 focus-visible:border-transparent sidebar-archive-back"
+                    className="sidebar-archive-back h-8 gap-1 rounded-md px-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
                     title={t("sidebar.backToSessions")}
                     aria-label={`${t("sidebar.backToSessions")}: ${t("sidebar.archivedCount", { count: archivedCount })}`}
                     onClick={() => setArchiveView(false)}
                   >
-                    <ChevronRightIcon size={13} className="sidebar-icon-back size-[13px]" />
+                    <ChevronRightIcon size={13} className="size-[13px] rotate-180" />
                     <span>{t("sidebar.archived")}</span>
-                    <span className="sidebar-archive-count">· {archivedCount}</span>
+                    <span className="sidebar-archive-count font-normal text-muted-foreground">· {archivedCount}</span>
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    className={`disabled:pointer-events-auto focus-visible:ring-0 focus-visible:border-transparent sidebar-archive-menu-button${menu?.kind === "archive" ? " is-active" : ""}`}
+                    className={`disabled:pointer-events-auto sidebar-archive-menu-button ml-auto${menu?.kind === "archive" ? " bg-accent text-accent-foreground" : ""}`}
                     title={t("sidebar.archiveActions")}
                     aria-label={t("sidebar.archiveActions")}
                     aria-haspopup="menu"
@@ -3170,7 +3181,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         role="tabpanel"
         aria-labelledby="session-sidebar-tab-files"
         hidden={!filesBelow && sidebarTab !== "files"}
-        className="sidebar-panel sidebar-files-panel"
+        className={`sidebar-panel sidebar-files-panel flex min-h-0 min-w-0 flex-col overflow-hidden${filesBelow ? " h-[var(--sidebar-files-height,320px)] min-h-[29px] flex-[0_1_auto] border-t border-border [@media(pointer:coarse)]:min-h-[37px]" : " flex-1"}${filesBelow && filesCollapsed ? " h-[29px] [@media(pointer:coarse)]:h-[37px]" : ""}`}
         onScrollCapture={rememberScroll}
         onTransitionEnd={(event) => { if (event.target === event.currentTarget && event.propertyName === "height") endFilesFold(); }}
       >
@@ -3179,19 +3190,19 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
             right end, in the files pane's order with the search last. They
             stay in this row while the section is folded. */}
         {filesBelow && (
-          <div className="sidebar-files-section">
+          <div className="sidebar-files-section flex h-7 flex-none items-center gap-0.5 pr-(--sidebar-files-inset-right) pl-1.5 [@media(pointer:coarse)]:h-9">
             <Button
               type="button"
               variant="ghost"
               size="default"
-              className="justify-start focus-visible:ring-0 focus-visible:border-transparent sidebar-files-section-toggle"
+              className="sidebar-files-section-toggle flex h-full min-w-[17px] flex-[1_1_auto] flex-wrap items-center gap-[3px] overflow-hidden rounded-md px-[5px] py-0 text-left text-[11px] whitespace-nowrap text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:flex-[1_1_0]"
               aria-expanded={!filesCollapsed}
               aria-controls="session-sidebar-files-body"
               title={changedFilesTitle}
               onClick={() => setFilesSectionCollapsed(!filesCollapsed)}
             >
-              <ChevronRightIcon size={12} strokeWidth={3} className={`size-3 session-tree-chevron${filesCollapsed ? "" : " is-open"}`} />
-              <span className="sidebar-files-section-label">{t("sidebar.tabFiles")}</span>
+              <ChevronRightIcon size={12} strokeWidth={3} className={`size-3 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${filesCollapsed ? "" : " rotate-90"}`} />
+              <span className="sidebar-files-section-label min-w-0 truncate font-semibold tracking-[0.05em] uppercase">{t("sidebar.tabFiles")}</span>
               {/* As the pinned section's count; the changes key says it to a screen reader. */}
               {changedFilesTitle && (
                 <Badge variant="secondary" className="h-4 min-w-4 px-1 py-0 font-normal tabular-nums" aria-hidden="true">
@@ -3199,7 +3210,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 </Badge>
               )}
             </Button>
-            <div className="sidebar-files-keys" role="group" aria-label={t("sidebar.fileActions")}>
+            <div className="sidebar-files-keys flex flex-[1000_0_calc(7*18px)] max-w-[calc(7*26px)] items-center [@media(pointer:coarse)]:min-w-0 [@media(pointer:coarse)]:max-w-none [@media(pointer:coarse)]:flex-[0_1_auto]" role="group" aria-label={t("sidebar.fileActions")}>
               {terminalButton}
               {fileManagerButton}
               {uploadButton}
@@ -3220,6 +3231,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 title={t("sidebar.searchFiles")}
                 expanded={fileSearchOpen}
                 controls="file-search-input"
+                className={fileKeyClass}
               >
                 <SearchIcon size={13} className="size-[13px]" />
               </ToolbarIconButton>
@@ -3229,12 +3241,12 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         {/* Everything under that header row: hidden while the section is
             folded, never unmounted. Shown from the start of an unfold, and
             until the end of a fold, inert then. */}
-        <div id="session-sidebar-files-body" className="sidebar-files-body" hidden={filesBelow && filesFold.bodyHidden} inert={filesBelow && filesFold.bodyInert}>
+        <div id="session-sidebar-files-body" className="sidebar-files-body flex min-h-0 min-w-0 flex-1 flex-col" hidden={filesBelow && filesFold.bodyHidden} inert={filesBelow && filesFold.bodyInert}>
           {/* One head: the folder in use, then (in the files pane) what is
               done with it; below the sessions the keys are the header row's.
               The buttons are the head's, not the picker's: its group names
               only the project and worktree. */}
-          <div className="sidebar-files-head">
+          <div className={`sidebar-files-head flex flex-none flex-col${filesBelow ? " border-b-0 pb-0.5 pt-0.5 pl-[15px] pr-(--sidebar-files-inset-right)" : " border-b border-border px-2.5 pt-2.5 pb-1"}`}>
             {/* The project and worktree in use: the same picker as the bar above a
                 fresh composer, as two boxes, side by side below the sessions,
                 one under the other in the files tab (the same instance: a
@@ -3270,7 +3282,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 tree's two views last (what it lists, then its changes); its
                 search is the toolbar row's search button. */}
             {!filesBelow && explorerCwd && (
-              <div className="sidebar-files-actions" role="group" aria-label={t("sidebar.fileActions")}>
+              <div className="sidebar-files-actions mt-1 flex items-center gap-1.5" role="group" aria-label={t("sidebar.fileActions")}>
                 {onOpenTerminal && terminalButton}
                 {onOpenGitPanel && (
                   <ToolbarIconButton
@@ -3288,22 +3300,22 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 {fileManagerButton}
                 {uploadButton}
                 {refreshButton}
-                {ignoredFilesButton("sidebar-files-views-start")}
+                {ignoredFilesButton("sidebar-files-views-start ml-auto")}
                 {changesButton}
               </div>
             )}
           </div>
 
           {explorerCwd && fileManagerErrorMessage && (
-            <div role="alert" className="sidebar-files-error">
-              <span className="sidebar-files-error-text">{fileManagerErrorMessage}</span>
+            <div role="alert" className={`sidebar-files-error flex flex-none items-start gap-1.5 text-[10px] leading-[1.35] text-destructive${filesBelow ? " pb-1 pt-0.5 pl-[15px] pr-(--sidebar-files-inset-right)" : " px-2.5 pt-1.5"}`}>
+              <span className="sidebar-files-error-text min-w-0 flex-1 [overflow-wrap:anywhere]">{fileManagerErrorMessage}</span>
               <DismissButton onClick={() => setFileManagerError(null)} title={t("files.dismissError")} />
             </div>
           )}
           {/* Mounted whenever there is a cwd, also while the tab or the folded
               section hides it, so the expanded tree, a search and an upload in
               progress survive a switch. */}
-          <div ref={explorerScrollRef} className="sidebar-files-scroll scrollbar-subtle">
+          <div ref={explorerScrollRef} className={`sidebar-files-scroll scrollbar-subtle min-h-0 flex-1 overflow-x-hidden overflow-y-auto${filesBelow ? "" : " pt-0.5"}`}>
             {explorerCwd && (
               <FileExplorer
                 ref={fileExplorerRef}

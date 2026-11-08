@@ -664,7 +664,7 @@ export function ProjectWorktreePicker({
         {otherActivity && (
           <span className="project-picker-activity" role="img" title={t("sidebar.newActivity")} aria-label={t("sidebar.newActivity")} />
         )}
-        {inline && <ChevronRightIcon size={9} className="project-picker-chevron sidebar-icon-down size-[9px]" />}
+        {inline && <ChevronRightIcon size={9} className="project-picker-chevron size-[9px] rotate-90" />}
       </Button>
       {worktrees && (
         <Button
@@ -687,7 +687,7 @@ export function ProjectWorktreePicker({
               linked checkout) still tells the main one. */}
           {current?.isMain && layout === "stacked" && <span className="project-picker-note">{t("sidebar.main")}</span>}
           {stacked && worktrees.length > 1 && <span className="project-picker-note">{worktrees.length}</span>}
-          <ChevronRightIcon size={9} className="project-picker-chevron sidebar-icon-down size-[9px]" />
+          <ChevronRightIcon size={9} className="project-picker-chevron size-[9px] rotate-90" />
         </Button>
       )}
       {!worktrees && stacked && worktreeHint && (

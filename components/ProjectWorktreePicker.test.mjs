@@ -47,7 +47,7 @@ test("inline: the project's name and the branch as text, no path and no notes", 
   assert.match(html, /^<div class="project-picker is-inline" role="group" aria-label="Project and worktree">/);
   // A folder icon, the name, a chevron; the whole path only as the tooltip
   // (the menu's rows show it on a desktop).
-  assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><svg[^>]*width="12" height="12"[^>]*class="lucide[^"]*project-picker-icon[^"]*"[\s\S]*?<\/svg><span class="project-picker-name"><span class="project-picker-leaf">app<\/span><\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron sidebar-icon-down[^"]*"[\s\S]*?<\/svg><\/button>/);
+  assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><svg[^>]*width="12" height="12"[^>]*class="lucide[^"]*project-picker-icon[^"]*"[\s\S]*?<\/svg><span class="project-picker-name"><span class="project-picker-leaf">app<\/span><\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron size-\[9px\] rotate-90[^"]*"[\s\S]*?<\/svg><\/button>/);
   assert.doesNotMatch(html, /~\/work\/app<|project-picker-label/);
   // The branch, cut at its left, and the chevron: neither "main" nor the count.
   assert.match(html, /class="lucide[^"]*project-picker-icon is-linked[^"]*"[\s\S]*?<\/svg><span class="project-picker-path"><span>feature\/x<\/span><\/span><svg[^>]*width="9" height="9"/);
@@ -97,7 +97,7 @@ test("stacked: main's two boxes, the project's whole path and the worktree's bra
   assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><span class="project-picker-path"><span>~\/work\/app<\/span><\/span><\/button>/);
   assert.doesNotMatch(html, /project-picker-divider|is-name/);
   // A linked checkout: its branch icon in the accent, the branch, how many checkouts there are.
-  assert.match(html, /<svg[^>]*width="11" height="11"[^>]*class="lucide[^"]*project-picker-icon is-linked[^"]*"[\s\S]*?<\/svg><span class="project-picker-path"><span>feature\/x<\/span><\/span><span class="project-picker-note">2<\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron sidebar-icon-down[^"]*"/);
+  assert.match(html, /<svg[^>]*width="11" height="11"[^>]*class="lucide[^"]*project-picker-icon is-linked[^"]*"[\s\S]*?<\/svg><span class="project-picker-path"><span>feature\/x<\/span><\/span><span class="project-picker-note">2<\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron size-\[9px\] rotate-90[^"]*"/);
   // The main checkout says so, its icon not in the accent.
   const main = render({ context: { ...context, currentWorktreePath: "/home/me/work/app" } });
   assert.match(main, /class="lucide[^"]*project-picker-icon[^"]*"[\s\S]*?<span class="project-picker-path"><span>main<\/span><\/span><span class="project-picker-note">main<\/span><span class="project-picker-note">2<\/span>/);

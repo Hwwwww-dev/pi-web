@@ -40,7 +40,7 @@ function render(props = {}) {
 
 /** The files tab's row of keys under the picker. */
 function actionsRow(html) {
-  const start = html.indexOf('<div class="sidebar-files-actions"');
+  const start = html.indexOf('<div class="sidebar-files-actions ');
   assert.notEqual(start, -1, "the files tab's keys are rendered");
   return html.slice(start, html.indexOf("</div>", start) + "</div>".length);
 }
@@ -64,21 +64,21 @@ test("the tabs layout renders the brand row, its track and no files section head
   const html = render({ selectedCwd: "/work/alpha", onOpenTerminal: noop });
   // The brand row first (the track hangs below it, in every layout), then
   // New and the search. Brand and New are shadcn Buttons.
-  assert.match(html, /^<div class="session-sidebar" style="--sidebar-files-height:320px"><div class="sidebar-header"><button data-slot="button" data-variant="ghost" [^>]*class="[^"]*sidebar-brand" type="button" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button data-slot="button" [^>]*class="[^"]*sidebar-new-button[^"]*"/);
+  assert.match(html, /^<div class="session-sidebar[^"]*" style="--sidebar-files-height:320px"><div class="[^"]*sidebar-header[^"]*"><button data-slot="button" data-variant="ghost" [^>]*class="[^"]*sidebar-brand[^"]*" type="button" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="[^"]*sidebar-header-spacer[^"]*"><\/span><button data-slot="button" [^>]*class="[^"]*sidebar-new-button[^"]*"/);
   assert.match(html, /<div dir="ltr" data-orientation="horizontal" data-slot="tabs" class="[^"]*"><div role="tablist" aria-orientation="horizontal" data-slot="tabs-list" data-variant="default" class="[^"]*sidebar-tabs-list[^"]*" aria-label="Sidebar view"/);
   assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
   assert.doesNotMatch(html, /sidebar-files-section|sidebar-files-keys|sidebar-files-changes|is-files-below/);
   // Both panels are tab panels; the files' is hidden behind its tab.
-  assert.match(html, /<div id="session-sidebar-panel-files" role="tabpanel" aria-labelledby="session-sidebar-tab-files" hidden="" class="sidebar-panel sidebar-files-panel">/);
+  assert.match(html, /<div id="session-sidebar-panel-files" role="tabpanel" aria-labelledby="session-sidebar-tab-files" hidden="" class="[^"]*sidebar-panel sidebar-files-panel[^"]*">/);
   // The picker's two boxes one under the other, then the keys.
-  assert.match(html, /<div class="sidebar-files-head"><div class="project-picker is-stacked" role="group"/);
+  assert.match(html, /<div class="[^"]*sidebar-files-head[^"]*"><div class="project-picker is-stacked" role="group"/);
   // No file search key: the toolbar row's search is the tab's.
   assert.doesNotMatch(html, /aria-controls="file-search-input"/);
 });
 
 test("the files tab's keys: the folder's four, then the tree's two views, always the same", () => {
   const row = actionsRow(render({ selectedCwd: "/work/alpha", onOpenTerminal: noop }));
-  assert.match(row, /^<div class="sidebar-files-actions" role="group" aria-label="File actions">/);
+  assert.match(row, /^<div class="[^"]*sidebar-files-actions[^"]*" role="group" aria-label="File actions">/);
   // The changes view is there without changes too, disabled, and its count
   // is the tab's.
   assert.deepEqual(keyLabels(row), [
@@ -90,7 +90,7 @@ test("the files tab's keys: the folder's four, then the tree's two views, always
     "0 changed files (disabled) pressed=false",
   ]);
   // The tree's views start at the right end.
-  assert.match(row, /class="[^"]*sidebar-tool-button sidebar-files-views-start[^"]*" type="button" title="Show ignored files" aria-label="Show ignored files" aria-pressed="false"/);
+  assert.match(row, /class="[^"]*sidebar-tool-button[^"]*sidebar-files-views-start[^"]*" type="button" title="Show ignored files" aria-label="Show ignored files" aria-pressed="false"/);
   assert.equal((row.match(/sidebar-files-views-start/g) ?? []).length, 1);
   // Their icons stay 14px here (the section header row's are 13px).
   assert.deepEqual([...row.matchAll(/<svg[^>]*width="(\d+)" height="(\d+)"/g)].map((match) => `${match[1]}x${match[2]}`), Array(6).fill("14x14"));
