@@ -30,9 +30,11 @@ test("floats the scroll-to-latest button above the composer's right edge", () =>
   const container = source.slice(gate, marker);
   const block = elementBlock();
 
+  // z-30 clears the minimap rail's zIndex 25, which otherwise covers the
+  // button's whole strip and swallows its clicks.
   assert.match(
     container,
-    /className="pointer-events-none absolute bottom-full right-4 z-20 max-sm:right-2\.5"/,
+    /className="pointer-events-none absolute bottom-full right-4 z-30 max-sm:right-2\.5"/,
   );
   // The detached-tail state is a faint floating chip; hover or focus reveals it.
   assert.match(block, /rounded-full border border-border bg-card p-0 text-muted-foreground shadow-sm/);
