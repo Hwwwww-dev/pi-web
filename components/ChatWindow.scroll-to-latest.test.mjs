@@ -22,7 +22,7 @@ test("shows the scroll-to-latest button only when the viewport is detached from 
   assert.match(block, /: "pointer-events-none invisible translate-y-1 scale-\[0\.96\] opacity-0"/);
 });
 
-test("floats the scroll-to-latest button above the composer's 700px card, not the pane edge", () => {
+test("floats the scroll-to-latest button centered over the composer's 700px card", () => {
   const gate = source.indexOf("{!isEmptyNew && (");
   const marker = source.indexOf("size-[34px] cursor-pointer rounded-full", gate);
   assert.notEqual(gate, -1);
@@ -31,14 +31,14 @@ test("floats the scroll-to-latest button above the composer's 700px card, not th
   const block = elementBlock();
 
   // The wrapper spans the pane, but the button anchors to an inner mx-auto
-  // max-w-[700px] layer — the same column as the composer card — so a wide
-  // pane cannot strand it in the right whitespace.
+  // max-w-[700px] layer — the same column as the composer card — and centers
+  // itself on it, so a wide pane cannot strand it at the pane edge.
   assert.match(
     container,
     /className="pointer-events-none absolute inset-x-0 bottom-full z-30"/,
   );
   assert.match(container, /className="relative mx-auto w-full max-w-\[700px\]"/);
-  assert.match(block, /absolute right-4 bottom-\[14px\] max-sm:right-2\.5 max-sm:bottom-\[10px\]/);
+  assert.match(block, /absolute left-1\/2 -translate-x-1\/2 bottom-\[14px\] max-sm:bottom-\[10px\]/);
   // z-30 clears the minimap rail's zIndex 25, which otherwise covers the
   // button's whole strip and swallows its clicks.
   // The detached-tail state is a faint floating chip; hover or focus reveals it.

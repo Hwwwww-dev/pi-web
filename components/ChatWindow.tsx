@@ -1738,9 +1738,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         {/* Floats just above the composer's right edge; z-30 also keeps it
             clear of the rail's zIndex 25. */}
         {!isEmptyNew && (
-          // Anchored to the composer's 700px card (the same mx-auto column as
-          // the messages), not the pane edge; z-30 also keeps it clear of the
-          // rail's zIndex 25.
+          // Centered over the composer's 700px card (the same mx-auto column as
+          // the messages); z-30 also keeps it clear of the rail's zIndex 25.
           <div className="pointer-events-none absolute inset-x-0 bottom-full z-30">
             <div className="relative mx-auto w-full max-w-[700px]">
               <Button
@@ -1749,7 +1748,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 className={cn(
                   // The ghost Button's transition-all fades opacity and flips
                   // visibility discretely, which is exactly the reveal/hide curve.
-                  "absolute right-4 bottom-[14px] max-sm:right-2.5 max-sm:bottom-[10px]",
+                  "absolute left-1/2 -translate-x-1/2 bottom-[14px] max-sm:bottom-[10px]",
                   "size-[34px] cursor-pointer rounded-full border border-border bg-card p-0 text-muted-foreground shadow-sm duration-[160ms]",
                   // Reduced motion keeps the fade but drops the slide/scale.
                   "motion-reduce:translate-y-0 motion-reduce:scale-100",
