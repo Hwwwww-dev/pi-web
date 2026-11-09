@@ -571,7 +571,7 @@ const SessionRowView = memo(function SessionRowView({
   // never a full-width band: the rows end 6px in, or on the tree's classic
   // scrollbar's gutter where that is further in (the scroll box's vars).
   const className = [
-    "session-tree-row session-tree-session group",
+    "session-tree-row session-tree-session group/tree-row",
     ROW_INSETS,
     "flex min-w-0 items-center overflow-hidden rounded-md",
     // A delete confirmation's row is not clickable, and its red frame stands
@@ -700,14 +700,14 @@ const SessionRowView = memo(function SessionRowView({
   // up with :focus-visible on anything in the row.
   const actionVisibility = isMobile
     ? "flex"
-    : "hidden group-hover:flex group-has-[:focus-visible]:flex";
+    : "hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex";
   const moreVisibility = isMobile || menuOpen || status.selected
     ? "flex"
     : // Touch screens wider than a phone have no hover: keep ⋯ reachable.
-      "hidden group-hover:flex group-has-[:focus-visible]:flex [@media(hover:none)]:flex";
+      "hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex [@media(hover:none)]:flex";
   const metaVisibility = isMobile || status.running
     ? ""
-    : "group-hover:hidden group-has-[:focus-visible]:hidden";
+    : "group-hover/tree-row:hidden group-has-[:focus-visible]/tree-row:hidden";
 
   const titleClass = [
     "session-tree-title min-w-0 flex-1 truncate",
@@ -1029,7 +1029,7 @@ const GroupRowView = memo(function GroupRowView({
   // its text or open the iOS callout. touch-action stays as it is, so a
   // swipe that starts on a header still scrolls the list.
   const className = [
-    "session-tree-row session-tree-group group",
+    "session-tree-row session-tree-group group/tree-row",
     ROW_INSETS,
     "flex min-w-0 select-none items-center gap-0.5 rounded-md pr-1 [-webkit-touch-callout:none] hover:bg-accent",
     project.current ? "is-current" : "",
@@ -1097,12 +1097,12 @@ const GroupRowView = memo(function GroupRowView({
             running={row.running}
             awaiting={row.awaiting}
             unread={row.unread}
-            className={isMobile ? "" : "group-hover:hidden group-has-[:focus-visible]:hidden"}
+            className={isMobile ? "" : "group-hover/tree-row:hidden group-has-[:focus-visible]/tree-row:hidden"}
             t={t}
           />
         )}
       </Button>
-      <span className={`session-tree-group-actions flex flex-none items-center gap-0.5${isMobile ? "" : " hidden group-hover:flex group-has-[:focus-visible]:flex"}`}>
+      <span className={`session-tree-group-actions flex flex-none items-center gap-0.5${isMobile ? "" : " hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex"}`}>
         <Button
           type="button"
           variant="ghost"
@@ -1311,7 +1311,7 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
   const { t } = useI18n();
   const { project, expanded } = row;
   const className = [
-    "session-tree-row session-tree-group session-tree-archive-group group",
+    "session-tree-row session-tree-group session-tree-archive-group group/tree-row",
     ROW_INSETS,
     "flex min-w-0 select-none items-center gap-0.5 rounded-md pr-1 [-webkit-touch-callout:none] hover:bg-accent",
     project.current ? "is-current" : "",
@@ -1331,7 +1331,7 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
         <span className="session-tree-group-name min-w-0 truncate">{project.name}</span>
         <span className="session-tree-archive-group-count ml-0.5 shrink-0 font-normal text-muted-foreground">· {row.count}</span>
       </Button>
-      <span className={`session-tree-group-actions flex flex-none items-center gap-0.5${layout === "mobile" ? "" : " hidden group-hover:flex group-has-[:focus-visible]:flex"}`}>
+      <span className={`session-tree-group-actions flex flex-none items-center gap-0.5${layout === "mobile" ? "" : " hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex"}`}>
         <Button
           type="button"
           variant="ghost"

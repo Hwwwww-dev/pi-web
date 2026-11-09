@@ -6,7 +6,6 @@ import { useI18n } from "@/hooks/useI18n";
 import { AnsiText } from "@/components/AnsiText";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ExtensionWidgetItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -171,46 +170,32 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
             </>
           );
 
+          // No tooltip: the key is already the trigger's whole text, and the
+          // placement/expand line only repeated it in jargon.
           return expandable ? (
-            <Tooltip key={widget.key}>
-              <TooltipTrigger asChild>
-                <Button
-                  id={triggerId}
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  data-expanded={expanded || undefined}
-                  className={triggerClass}
-                  aria-controls={panelId}
-                  aria-expanded={expanded}
-                  aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-                  onClick={() => toggleWidget(widget)}
-                >
-                  {content}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="flex flex-col gap-0.5">
-                <span>{widget.key}</span>
-                <span className="text-xs text-muted-foreground">
-                  {placementLabel} · {expanded ? t("i18n.collapse") : t("i18n.expand")}
-                </span>
-              </TooltipContent>
-            </Tooltip>
+            <Button
+              key={widget.key}
+              id={triggerId}
+              type="button"
+              variant="ghost"
+              size="xs"
+              data-expanded={expanded || undefined}
+              className={triggerClass}
+              aria-controls={panelId}
+              aria-expanded={expanded}
+              aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
+              onClick={() => toggleWidget(widget)}
+            >
+              {content}
+            </Button>
           ) : (
-            <Tooltip key={widget.key}>
-              <TooltipTrigger asChild>
-                <span
-                  className="inline-flex h-6 shrink-0 items-center rounded-md px-2 font-mono text-[11.5px] text-muted-foreground"
-                  aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-                >
-                  {content}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent className="flex flex-col gap-0.5">
-                <span>{widget.key}</span>
-                <span className="text-xs text-muted-foreground">{placementLabel}</span>
-              </TooltipContent>
-            </Tooltip>
+            <span
+              key={widget.key}
+              className="inline-flex h-6 shrink-0 items-center rounded-md px-2 font-mono text-[11.5px] text-muted-foreground"
+              aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
+            >
+              {content}
+            </span>
           );
         })}
       </div>

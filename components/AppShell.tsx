@@ -2353,7 +2353,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         {/* 全屏文件面板时页头 inert：面板盖住全屏，页头不该接收焦点；
             注意 inert 只落在页头与聊天列——文件面板是 SidebarInset 的兄弟
             顶级列，落在 SidebarInset 上会连面板自己的还原/关闭按钮一起禁用。 */}
-        <div ref={topBarRef} inert={rightPanelFullWidth} className="sticky top-0 z-[5] shrink-0 bg-background">
+        {/* z-30 keeps the header's hanging panels (z-[240] inside its sticky
+            context) above the chat column's minimap rail (zIndex 25), which
+            otherwise paints over the session-info card. Chat overlays above
+            this (notice shelf 40, quote toolbar 260) keep their order. */}
+        <div ref={topBarRef} inert={rightPanelFullWidth} className="sticky top-0 z-[30] shrink-0 bg-background">
         {/* The draft's header: 52px, title + crumb left, the pills right. On a
             phone it folds into two rows — the title row, then the controls. */}
         <header className="flex min-h-(--header-height) shrink-0 items-center gap-2 border-b pt-[env(safe-area-inset-top)] transition-[width,height] ease-linear">
