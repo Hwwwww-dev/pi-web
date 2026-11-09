@@ -101,7 +101,7 @@ test("the desktop dialog is a horizontal section tab bar over the sections", () 
   // active trigger is underlined; the phone's Back rides in the same bar.
   assert.doesNotMatch(panelSource, /orientation="vertical"/);
   assert.match(panelSource, /<TabsList\s*\n\s*variant="line"/);
-  assert.match(panelSource, /flex-none gap-1\.5 rounded-none px-3 py-0 text-\[12\.5px\] font-normal data-\[state=active\]:font-semibold/);
+  assert.match(panelSource, /h-full flex-none gap-1\.5 rounded-none px-3 py-0 text-\[12\.5px\] font-normal after:bottom-0 data-\[state=active\]:font-semibold/);
   // General keeps one shape on every size: the sub-section list beside its
   // detail (a phone shows one pane at a time through the navigation context).
   const generalReturn = panelSource.slice(

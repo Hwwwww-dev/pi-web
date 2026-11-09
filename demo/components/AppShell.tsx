@@ -2512,7 +2512,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               side="bottom"
               align="end"
               sideOffset={0}
-              className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto"
+              className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto p-0"
             >
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;

@@ -171,7 +171,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
         onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}
         onInteractOutside={(event) => { if (busy) event.preventDefault(); }}
         className={cn(
-          "directory-picker-panel relative flex h-[min(620px,calc(100dvh-16px))] max-h-[calc(100dvh-16px)] w-[520px] max-w-[calc(100vw-16px)] flex-col gap-0 overflow-hidden p-0",
+          "directory-picker-panel relative flex h-[min(620px,calc(100dvh-16px))] max-h-[calc(100dvh-16px)] w-[520px] max-w-[calc(100vw-16px)] sm:max-w-[calc(100vw-16px)] flex-col gap-0 overflow-hidden p-0",
           panelSurfaceClass,
         )}
       >

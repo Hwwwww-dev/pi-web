@@ -1736,7 +1736,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       )}
 
       <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding}px` }}>
-        {/* Floats just above the composer's right edge; z-30 also keeps it
+        {/* Floats centered over the composer's 700px card; z-30 also keeps it
             clear of the rail's zIndex 25. */}
         {!isEmptyNew && (
           // Centered over the composer's 700px card (the same mx-auto column as
@@ -1768,8 +1768,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the
-            composer's left edge; the side padding and width are inline here,
-            the hero's styles批 4 迁入为工具类。 */}
+            composer's left edge. */}
         {isEmptyNew && (
           <div className="new-session-hero max-md:px-4 md:px-4">
             <div className="new-session-hero-inner mx-auto flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-center">
