@@ -149,8 +149,14 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
           onPointerDownOutside={(event) => {
             if (buttonRef.current?.contains(event.target as Node)) event.preventDefault();
           }}
+          // The dock is draggable while the menu is open; the default optimized
+          // popper only repositions on scroll/resize, so a dragged anchor would
+          // leave the panel behind. Per-frame updates keep the old co-movement.
+          updatePositionStrategy="always"
           side="right"
           align="start"
+          sideOffset={8}
+          alignOffset={-18}
           role="menu"
           aria-label={t("keepalive.title")}
           className="max-h-[min(440px,62vh)] w-[min(320px,calc(100vw-56px))] overflow-y-auto overscroll-contain rounded-xl border-border/75 bg-background p-1.5"

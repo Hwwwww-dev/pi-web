@@ -53,13 +53,16 @@ test("trusting from Settings › MCP reloads, in place, the other mounted sectio
   assert.match(panelSource, /sectionHost\("models", <ModelsConfig embedded cwd=\{cwd\} onClose=\{onClose\} \/>\)/);
 });
 
-test("offers system, light and dark selection with native radios (shadcn theme only)", () => {
+test("offers system, light and dark selection with the RadioGroup (shadcn theme only)", () => {
   for (const preference of ["auto", "light", "dark"]) {
     assert.match(themeOptionsSource, new RegExp(`id: "${preference}"`));
   }
   assert.match(panelSource, /THEME_OPTIONS\.map/);
-  assert.match(panelSource, /type="radio"/);
-  assert.match(panelSource, /onChange=\{\(\) => setThemePreference\(option\.id\)\}/);
+  // The official RadioGroup carries the group semantics; each palette card is
+  // the label of its visually-hidden RadioGroupItem.
+  assert.match(panelSource, /<RadioGroup\s*\n\s*value=\{preference\}/);
+  assert.match(panelSource, /onValueChange=\{\(value\) => setThemePreference\(value as ThemePreference\)\}/);
+  assert.match(panelSource, /<RadioGroupItem value=\{option\.id\} className="sr-only" \/>/);
   assert.match(themeSource, /const setThemePreference = useCallback/);
 });
 
@@ -98,7 +101,7 @@ test("the desktop dialog is a horizontal section tab bar over the sections", () 
   // active trigger is underlined; the phone's Back rides in the same bar.
   assert.doesNotMatch(panelSource, /orientation="vertical"/);
   assert.match(panelSource, /<TabsList\s*\n\s*variant="line"/);
-  assert.match(panelSource, /w-24 flex-none gap-1\.5 rounded-none px-1 py-0 text-\[12\.5px\] font-normal data-\[state=active\]:font-semibold/);
+  assert.match(panelSource, /flex-none gap-1\.5 rounded-none px-3 py-0 text-\[12\.5px\] font-normal data-\[state=active\]:font-semibold/);
   // General keeps one shape on every size: the sub-section list beside its
   // detail (a phone shows one pane at a time through the navigation context).
   const generalReturn = panelSource.slice(

@@ -29,14 +29,11 @@
 - 四面板改为受控 **Popover** + `PopoverAnchor virtualRef={topBarRef}`（锚定头部容器，面板宽度取 `--radix-popover-anchor-width`；session 卡片 align="end"）；外点/Esc/进出动画由 Radix 承担，手拼的 pointer-events/data-state 动画类删除。
 - 删除 `hooks/useOutsideDismiss.ts`（全项目已无使用者）；`useDelayedUnmount` 在 AppShell 的四处使用删除（hook 本身保留给 ExtensionWidgets）。触发按钮保持原 toggle（非 PopoverTrigger，避免与指针点击双重处理）。
 
-### A2. SidebarMenu（自研菜单系统，1178 行，最大的单块）
+### A2. SidebarMenu——判定修正：已经是 Radix 实现，保留（此前"1178 行自研"系未读全文的误判）
 
-- 现状：`SidebarMenu.tsx` 自研 role=menu 浮层 + 手机端底部 sheet（role=dialog aria-modal），自研焦点环、Escape 堆叠、动画；使用者：`SessionTree.tsx`（行菜单）、`SessionSidebar.tsx`（筛选/分组菜单）、`ProjectWorktreePicker.tsx`（项目/工作树 picker）。
-- 替换为（按场景分流）：
-  - 纯菜单项场景（行菜单、归档/置顶/重命名/排序）→ **DropdownMenu**（含 CheckboxItem / RadioGroup）；
-  - 带表单/自定义内容的场景（WorktreeCreateForm、筛选字段、picker 面板）→ 桌面 **Popover** + 手机 **Sheet**（bottom side）。
-- 风险：手机 sheet 与桌面浮层的响应式切换逻辑（`isMobile` 分支）要在 Popover/Sheet 两形态间重排；`role="menuitemradio"` 的多选菜单用 DropdownMenu CheckboxItem 表达。
-- 工作量：大（涉及 3 个使用方）。收益：删 ~1178 行自研焦点/键盘/动画/层叠代码，无障碍语义交给 Radix。
+- 实际现状：外壳就是 Radix——桌面 `DropdownMenuPrimitive`、手机 `DialogPrimitive`（`modal={false}`，注释明确 "The shell is Radix: a DropdownMenu on a desktop, a Dialog on a phone"）。碰撞定位、Escape（捕获相、标记已处理，避免误触"停 agent"）、pointer-down-outside、焦点圈全部由 Radix 承担；旧的手写 CSS（app/sidebar-menu.css）在更早的迁移中已并入 Tailwind 类。
+- 不走 `ui/dropdown-menu.tsx` 包装层的原因（文件内注释写明）：隐藏零尺寸 trigger 停在锚点坐标（point/rect 锚定，非真实按钮）；项保持自定义标记以支持单字母快捷键、行内次级按钮、自定义 body（WorktreeCreateForm）、过滤字段——这些是 Radix menu collection 与 shadcn DropdownMenuItem 都表达不了的**产品功能**；手机 sheet 是非模态（下层抽屉保留自己的关闭），`ui/sheet.tsx` 不支持 modal=false。
+- 结论：**保留**。重写只会退化功能或重造同样的原语接线；"引擎置换"无从谈起。三个使用方（SessionTree/SessionSidebar/ProjectWorktreePicker）不动。
 
 ### A3. DirectoryPicker（目录选择弹窗）✅ 已完成（批次 2）
 
@@ -67,23 +64,20 @@
 
 - 放弃理由：自研版是 shadcn 官方 use-mobile 的**超集**（useIsMobile 640px 断点与 globals.css 对齐 + useIsNarrowMobile 480px + useCoarsePointer 指针类型），官方版单一 768px hook 会丢功能，非纯文件归位。
 
-## 三、可替换 —— 需要新增 shadcn 生态依赖
+## 三、评估后保留 —— 需新依赖的两项，读实接线后判定为"现状即最佳实践"
 
-### B1. hooks/useResizablePanel.ts（323 行）→ Resizable（react-resizable-panels）
+### B1. hooks/useResizablePanel.ts（323 行）——保留
 
-- 现状：侧栏与右侧文件面板两处拖宽：pointer 拖拽 + CSS 变量 + localStorage + 键盘调整 + clamp 持久化策略（窗口过窄的临时 clamp 不保存）。
-- 替换为：shadcn **Resizable**（`react-resizable-panels`，shadcn 官方组件之一）。
-- 风险：AppShell 顶层布局要从 flex 宽度变量改为 `PanelGroup/Panel/ResizeHandle` 结构（牵动聊天列/文件面板/侧栏三层）；`persistClamp` 语义要用其 `storage` 适配层重实现。
-- 收益：删 323 行 hook + 两个实例的接线；标准 handle 拖拽/双击重置/键盘语义。
-- 工作量：中偏大。
+- **决定性证据**：宽度注入方式（`--sidebar-width` CSS 变量 + flex 布局消费）正是 shadcn 官方 `ui/sidebar.tsx` 自身的模式——项目当前实现**已经是** shadcn 生态对"可调侧栏宽度"的标准做法；`Resizable`（react-resizable-panels）适合新设计的 PanelGroup 布局，而这里是既有 shell。
+- 接管成本：AppShell 顶层 DOM 全部重构为 PanelGroup/Panel/PanelResizeHandle（牵动聊天列/文件面板/侧栏三层、sticky 头部 z 上下文、KeepAliveDock 锚定、inert/invisible 逻辑）；`persistClamp`（窄窗口的临时 clamp 不落盘）与 `reclampWidth`（窗口变化重钳制）要在库的 storage/onLayout 之上重写为自定义代码——净删除量趋零。
+- 结论：保留 hook（有测试覆盖），文档化"shadcn Sidebar 同款 CSS 变量模式"。
 
-### B2. hooks/useTheme.ts（169 行）→ next-themes（shadcn 官方主题方案）
+### B2. hooks/useTheme.ts（169 行）——保留
 
-- 现状：自研 useSyncExternalStore 全局主题 store（preference/system 跟随/localStorage），外加自研的视图过渡动画起点（ToggleOrigin）。
-- 替换为：**next-themes**（ThemeProvider + useTheme），shadcn 所有主题示例的标配。
-- 风险：ToggleOrigin 起点动画 next-themes 不提供，需保留一个薄包装或放弃该效果；`lib/theme.ts` 是全局真值源，替换波及 ThemeIcon、设置页外观区块、useTerminalTheme（后者独立不受影响）。
-- 收益：删 169 行 store 代码；SSR 闪烁（blocking script）由 next-themes 处理，比现在更稳。
-- 工作量：中。
+- **决定性证据**：next-themes 的核心价值（阻塞式防闪烁初始化脚本）项目已自备——`app/layout.tsx` 注入 `THEME_INIT_SCRIPT`（lib/theme.ts），与 next-themes 内部机制同款；换库只把一段脚本换成另一段。
+- 直接冲突：next-themes 的 `useTheme` 首帧返回 `undefined`（防 hydration 不匹配），而 MermaidBlock/SourceCodeView 需要**首帧立即解析**主题为图表/代码着色；弥补它就得在包装层重读 localStorage——等于重造现有 store。
+- 无法承接的行为：origin 视图过渡动画（450ms clip-path 圆形展开）与 Safari 后台丢事件的 focus/visibilitychange 补同步——都要留在包装层，包装后公开 API 不变、净删除约 60 行、新增一个依赖。
+- 结论：保留。
 
 ## 四、保留自研（shadcn 无对应，或替换得不偿失）
 
@@ -130,16 +124,14 @@
 - `SettingsUi.tsx` native `<details>` 折叠 → Collapsible ✅ 已完成（批次 1，`config-footer-status*` 类名保留为测试锚点）。
 - 大量 `role="alert"` / `role="status"`（55 处）：是提示文字的语义角色，不是组件问题；仅在需要样式化提示条时用 ui/alert 包裹。
 
-## 五、建议执行批次
+## 五、执行批次（最终状态）
 
-1. **批次 1（小，纯删除自研基础设施）**：A4 引用浮层、A5 扩展组件卡、A10 KeepAliveDock 菜单、A11 RadioGroup（新增 `ui/radio-group.tsx`）、A12 扩展请求对话框（连带删 A7 `useDialogMaxHeight`）、A8 use-mobile 归位 + 删 SidebarToast.test.mjs 残留 + A13 三项类级推广（spinner/Collapsible/图标按钮 Tooltip）。A9（SourceCodeView 高亮统一、删 react-syntax-highlighter）可并入本批或单独提交。
-2. **批次 2（中）**：A1 头部四面板 → Popover（删 useOutsideDismiss/useDelayedUnmount）、A3 DirectoryPicker → Dialog。
-3. **批次 3（大）**：A2 SidebarMenu 分流 DropdownMenu/Popover/Sheet（1178 行，三个使用方）。
-4. **批次 4（新依赖）**：B1 Resizable、B2 next-themes。
-5. 批次 2/3 完成后统一删除 `lib/stacked-dialog.ts`（A6）。
-
-每批次独立提交，可单独回滚。批次 1–3 不引入任何新 npm 依赖（radio-group 是复制官方组件源码，非新包）。
+1. **批次 1 ✅ 已完成（67ac080）**：A10 KeepAliveDock 菜单 → 受控 Popover、A12 多选卡 → ui/checkbox、A11 新增 `ui/radio-group.tsx` 接入外观三选、A13.3 `<details>` → Collapsible、删 SidebarToast.test.mjs 残留。评估后放弃：A4（选区坐标锚定）、A5（pill 行锚定 + SSR 测试）、A8（自研 useIsMobile 是官方超集）、A13.2 spinner（英文 aria-label 不合 i18n）。A9（SourceCodeView 高亮统一）待做。
+2. **批次 2 ✅ 已完成（d5a4390）**：A1 头部四面板 → 受控 Popover（virtualRef 锚头部、sideOffset 0、全宽条 avoidCollisions=false，删 useOutsideDismiss）、A3 DirectoryPicker → Dialog、A6 stacked-dialog 删 Escape 死代码半边（201 → 63 行，焦点工具保留）。
+3. **批次 3 ✅ 核对后结案**：A2 SidebarMenu 经全文核对已是 Radix 实现（见上文判定修正），无重写必要。
+4. **批次 4 ✅ 评估后结案**：B1/B2 均为"现状即 shadcn 最佳实践"（见上文证据），不引入依赖。
+5. 未尽事项：A9（SourceCodeView 的 react-syntax-highlighter → Prism 统一）、A13.1 纯图标按钮的 Tooltip 批量替换——两者都是独立可做的小批次，与"能用 shadcn 替换的已全部替换"无冲突（A9 换的是高亮内核不是 shadcn 组件，A13.1 是类级推广）。
 
 ## 六、结论
 
-自研交互 UI 至此全部盘点完毕（70 个业务组件 + 30 个 hooks + lib 交互基础设施逐一核对）：可替换项 A1–A13 + B1–B2 共 15 项，替换完成后可删除的自研基础设施合计约 **2100 行**（SidebarMenu 1178、useResizablePanel 323、stacked-dialog 201、useTheme 169、useDialogMaxHeight 38、useOutsideDismiss + useDelayedUnmount ~120、各浮层外壳散码 ~100）；其余均为无 shadcn 对应的业务组件与 hooks，保留。
+自研交互 UI 盘点完毕（70 个业务组件 + 30 个 hooks + lib 交互基础设施逐一核对，含读全文后的判定修正）。最终动手替换 7 项（A1、A3、A10、A11、A12、A13.3、A6 死代码），删自研代码约 **550 行**（useOutsideDismiss 90 + useResizablePanel 之外的浮层外壳/动画类 ~150、stacked-dialog Escape 半边 ~140、散点 ~170）；评估后保留 8 项，每项都有具体证据（锚定模型不适配、SSR 测试约束、自研超集、i18n 冲突、shadcn 官方同款模式、next-themes 首帧 undefined 冲突）。SidebarMenu 与 useResizablePanel/useTheme 的保留判定推翻了本文档初版的估算——以本版为准。

@@ -124,8 +124,10 @@ test("a footer status with details opens a visible list instead of a tooltip", (
     tone: "error",
     details: ["error: a: broken", "warning: b"],
   }));
-  assert.match(html, /^<details class="config-footer-status-details"><summary class="config-footer-status-summary is-error text-destructive w-fit cursor-pointer">2 diagnostics<\/summary>/);
-  assert.match(html, /<ul class="config-footer-status-list[^"]*"><li>error: a: broken<\/li><li>warning: b<\/li><\/ul>/);
+  // The official Collapsible replaced the native <details>; forceMount keeps
+  // the list in the static markup the way <details> always rendered it.
+  assert.match(html, /^<div data-state="closed" data-slot="collapsible" class="config-footer-status-details"><button type="button" aria-expanded="false" data-state="closed" data-slot="collapsible-trigger" class="config-footer-status-summary is-error text-destructive w-fit cursor-pointer text-left">2 diagnostics<\/button>/);
+  assert.match(html, /<div data-state="closed" id="radix-[^"]*" data-slot="collapsible-content" class="data-\[state=closed\]:hidden"><ul class="config-footer-status-list[^"]*"><li>error: a: broken<\/li><li>warning: b<\/li><\/ul><\/div><\/div>$/);
   assert.doesNotMatch(html, /title=/);
 });
 

@@ -588,6 +588,13 @@ export function AppShell() {
   const closeTopPanel = useCallback((panel: "branches" | "system" | "tools" | "session") => {
     setActiveTopPanel((cur) => cur === panel ? null : cur);
   }, []);
+  // The stats button (data-outside-dismiss-ignore) toggles the session card
+  // with its click; a press on it must not ALSO count as an outside press, or
+  // the pointerdown closes the card and the click toggles it right back open.
+  const holdOpenOnMarkedOpeners = useCallback((event: CustomEvent<{ originalEvent: PointerEvent }>) => {
+    const target = event.detail.originalEvent.target;
+    if (target instanceof Element && target.closest("[data-outside-dismiss-ignore]")) event.preventDefault();
+  }, []);
 
   // Escape inside the debug panel; it never closes another panel that took its place. With focus
   // in the panel, that focus leaves the page with it: once the panel is gone (the next frame), the
@@ -2347,10 +2354,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         {/* 全屏文件面板时页头 inert：面板盖住全屏，页头不该接收焦点；
             注意 inert 只落在页头与聊天列——文件面板是 SidebarInset 的兄弟
             顶级列，落在 SidebarInset 上会连面板自己的还原/关闭按钮一起禁用。 */}
-        {/* z-30 keeps the header's hanging panels (z-[240] inside its sticky
-            context) above the chat column's minimap rail (zIndex 25), which
-            otherwise paints over the session-info card. Chat overlays above
-            this (notice shelf 40, quote toolbar 260) keep their order. */}
+        {/* z-30 keeps the header above the chat column's minimap rail (zIndex 25),
+            which otherwise paints over the header row. The hanging panels are
+            portaled to the body (Radix Popover) and layer by their own z-[240]. */}
         <div ref={topBarRef} inert={rightPanelFullWidth} className="sticky top-0 z-[30] shrink-0 bg-background">
         {/* The draft's header: 52px, title + crumb left, the pills right. On a
             phone it folds into two rows — the title row, then the controls. */}
@@ -2441,9 +2447,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           >
             <PopoverAnchor virtualRef={topBarRef} />
             <PopoverContent
+              onPointerDownOutside={holdOpenOnMarkedOpeners}
               side="bottom"
               align="start"
-              className="z-[240] w-[var(--radix-popover-anchor-width)] min-w-0 rounded-none border-0 border-b bg-card p-0 shadow-none"
+              sideOffset={0}
+              avoidCollisions={false}
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 rounded-none border-0 border-b bg-card p-0 shadow-none"
             >
               <SystemPromptPanel
                 loading={systemInfoLoading}
@@ -2458,9 +2467,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           >
             <PopoverAnchor virtualRef={topBarRef} />
             <PopoverContent
+              onPointerDownOutside={holdOpenOnMarkedOpeners}
               side="bottom"
               align="start"
-              className="z-[240] w-[var(--radix-popover-anchor-width)] min-w-0 rounded-none border-0 border-b bg-card p-0 shadow-none"
+              sideOffset={0}
+              avoidCollisions={false}
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 rounded-none border-0 border-b bg-card p-0 shadow-none"
             >
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
@@ -2476,8 +2488,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <PopoverAnchor virtualRef={topBarRef} />
             {/* 会话信息浮层：标准弹层观感；session-info-popover 类名保留作 e2e 定位锚。 */}
             <PopoverContent
+              onPointerDownOutside={holdOpenOnMarkedOpeners}
               side="bottom"
               align="end"
+              sideOffset={0}
               className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto"
             >
               {sessionStats ? (() => {
@@ -2595,9 +2609,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           >
             <PopoverAnchor virtualRef={topBarRef} />
             <PopoverContent
+              onPointerDownOutside={holdOpenOnMarkedOpeners}
               side="bottom"
               align="start"
-              className="z-[240] w-[var(--radix-popover-anchor-width)] min-w-0 rounded-none border-0 border-b bg-card p-0 shadow-none"
+              sideOffset={0}
+              avoidCollisions={false}
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 rounded-none border-0 border-b bg-card p-0 shadow-none"
             >
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
