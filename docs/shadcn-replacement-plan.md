@@ -1,0 +1,157 @@
+# 自研 UI / 组件 / 功能的 shadcn 替换方案
+
+盘点范围：`components/`（业务组件与 `ui/`）、`hooks/`、`lib/` 的交互基础设施。
+判断标准：shadcn 官方组件（含其生态依赖）能提供等价能力才列入替换；纯业务逻辑（会话流、文件访问、markdown 渲染等）不在候选之列。
+
+## 结论
+
+- 已有 37 个 `components/ui/` 官方组件，但**采用率低**：dialog 仅 1 处（SettingsPanel）、sonner 1 处、command 1 处，大量浮层/菜单/弹窗仍是自研条件渲染。
+- 可替换的自研交互基础设施约 **1900+ 行**（SidebarMenu 1178、useResizablePanel 323、stacked-dialog 201、useTheme 169、useDialogMaxHeight 38），加上散落各处的自研浮层外壳（AppShell 头部四面板、DirectoryPicker、ChatWindow 引用浮层、ExtensionWidgetPanel）。
+- 真正无可替换的只有业务 hooks 和渲染类组件（minimap、markdown、diff、终端等）。
+
+## 一、已经是 shadcn，无需处理
+
+| 组件 | 实现载体 |
+|---|---|
+| 模型选择器 | `ModelSelector.tsx` = Popover + Command |
+| 分支切换器 | `BranchNavigator.tsx` = Popover |
+| 聊天输入控件（工具预设菜单等） | `ChatInput.tsx` = DropdownMenu |
+| 设置面板弹窗 | `SettingsPanel.tsx` = ui/dialog |
+| 侧栏 toast | `SessionSidebar.tsx` = sonner（SidebarToast.tsx 已删，`SidebarToast.test.mjs` 是残留测试文件，顺手删除） |
+| **Base 系列（shadcn 新版 base-ui 组件）** | `ui/code-block.tsx`（FileViewer/DiffView/MarkdownBody/MermaidBlock/SvgBlock/TerminalPanel/ActivityRows 七处）、`ui/trace.tsx`、`ui/message.tsx`、`ui/bubble.tsx`（ActivityRows/MessageView）均已安装并在用 |
+| agent 切换器清单 | `AgentSessionPanel.tsx`：外壳已是 PopoverContent，`role="listbox"` 是其内的语义清单，保留 |
+| 字号/外观滑块 | `FontSettings.tsx`、`SettingsPanel.tsx` = ui/slider |
+
+## 二、可替换 —— shadcn 组件现成（无需新依赖）
+
+### A1. AppShell 头部四个顶部面板（本阶段刚补过退出动画的那批）
+
+- 现状：`{activeTopPanel === "system" && <div className="absolute top-full z-[240]">}` 条件渲染 × 4（system / tools / session / debug），自研 `useOutsideDismiss`（3 处）+ 刚写的 `useDelayedUnmount`（4 处）+ 手拼 data-state 动画类；`session-info-popover` 是卡片里带 `role="dialog"` 的自研浮层。
+- 替换为：shadcn **Popover**（Radix Popover）。outside-dismiss、Escape、开/关动画（data-[state] animate-out）全部内建，`useOutsideDismiss` 与 `useDelayedUnmount` 直接删除。
+- 风险：头部面板的锚点是 header（PopoverTrigger 需包住对应头部按钮）；DebugPanel 的轮询生命周期不受影响（内容组件原样保留）。
+- 工作量：中。收益：删两个自研 hook（~120 行）+ 四处手拼动画/层级代码，行为与全站浮层统一。
+
+### A2. SidebarMenu（自研菜单系统，1178 行，最大的单块）
+
+- 现状：`SidebarMenu.tsx` 自研 role=menu 浮层 + 手机端底部 sheet（role=dialog aria-modal），自研焦点环、Escape 堆叠、动画；使用者：`SessionTree.tsx`（行菜单）、`SessionSidebar.tsx`（筛选/分组菜单）、`ProjectWorktreePicker.tsx`（项目/工作树 picker）。
+- 替换为（按场景分流）：
+  - 纯菜单项场景（行菜单、归档/置顶/重命名/排序）→ **DropdownMenu**（含 CheckboxItem / RadioGroup）；
+  - 带表单/自定义内容的场景（WorktreeCreateForm、筛选字段、picker 面板）→ 桌面 **Popover** + 手机 **Sheet**（bottom side）。
+- 风险：手机 sheet 与桌面浮层的响应式切换逻辑（`isMobile` 分支）要在 Popover/Sheet 两形态间重排；`role="menuitemradio"` 的多选菜单用 DropdownMenu CheckboxItem 表达。
+- 工作量：大（涉及 3 个使用方）。收益：删 ~1178 行自研焦点/键盘/动画/层叠代码，无障碍语义交给 Radix。
+
+### A3. DirectoryPicker（目录选择弹窗）
+
+- 现状：`createPortal` + `fixed inset-0 bg-black/35` 自研 backdrop + `role="dialog"`，内部还有"新建子目录"小表单弹窗。
+- 替换为：外壳 **Dialog**（backdrop、Escape、焦点陷阱内建），内部文件树列表保留自研；新建目录小弹窗 → **AlertDialog** 或嵌套 Dialog。
+- 工作量：小。收益：删 backdrop/层级/焦点代码。
+
+### A4. ChatWindow 引用追问浮层（quote 输入 portal）
+
+- 现状：`ChatWindow.tsx` 行 1656 `createPortal` 到 body 的 absolute 浮层（引用选中文字追问）。
+- 替换为：**Popover**（锚定触发按钮），动画/层级/Esc 内建。
+- 工作量：小。
+
+### A5. ExtensionWidgetPanel（扩展组件展开卡）
+
+- 现状：`ExtensionWidgets.tsx` 条件渲染 `absolute bottom-full` 卡片（本阶段刚补了退出动画 + 保留旧内容渲染）。
+- 替换为：**Popover**（trigger 是组件 pill）。刚写的 `useDelayedUnmount` + lastExpandedKeyRef 延迟卸载逻辑整体删除（Radix 动画内建）。
+- 工作量：小。
+
+### A6. lib/stacked-dialog.ts（Escape 堆叠，201 行）
+
+- 现状：自研 Escape/dismiss 层级协调，使用者 McpConfig、AppShell、SessionSidebar、NewSessionContextBar、McpSignIn。
+- 替换为：无独立替换物——Radix Dialog/Popover/AlertDialog/Sheet 全部基于 DismissableLayer，**天然自带 dismiss 层级堆叠**。第二至五项换完后此文件与各调用点删除。
+- 工作量：随 A1–A5 顺带删。
+
+### A7. hooks/useDialogMaxHeight.ts（38 行）
+
+- 现状：ChatWindow 扩展请求弹窗手工测量视口高度限制弹窗高度。
+- 替换为：shadcn DialogContent 官方类已含 `max-h` 约束；该 hook 的调用点（extension-ui-queue 面板壳）改用 Dialog 后删除。
+- 工作量：小。
+
+### A8. hooks/useIsMobile.ts（可选，文件归位）
+
+- 现状：自研 matchMedia hook，`ui/sidebar.tsx` 引用它（官方版是 `hooks/use-mobile.ts`）。
+- 替换为：shadcn 官方 `use-mobile`。功能等价，纯归位，无行为收益；只在追求"与官方结构逐文件一致"时做。
+- 工作量：极小。
+
+## 三、可替换 —— 需要新增 shadcn 生态依赖
+
+### B1. hooks/useResizablePanel.ts（323 行）→ Resizable（react-resizable-panels）
+
+- 现状：侧栏与右侧文件面板两处拖宽：pointer 拖拽 + CSS 变量 + localStorage + 键盘调整 + clamp 持久化策略（窗口过窄的临时 clamp 不保存）。
+- 替换为：shadcn **Resizable**（`react-resizable-panels`，shadcn 官方组件之一）。
+- 风险：AppShell 顶层布局要从 flex 宽度变量改为 `PanelGroup/Panel/ResizeHandle` 结构（牵动聊天列/文件面板/侧栏三层）；`persistClamp` 语义要用其 `storage` 适配层重实现。
+- 收益：删 323 行 hook + 两个实例的接线；标准 handle 拖拽/双击重置/键盘语义。
+- 工作量：中偏大。
+
+### B2. hooks/useTheme.ts（169 行）→ next-themes（shadcn 官方主题方案）
+
+- 现状：自研 useSyncExternalStore 全局主题 store（preference/system 跟随/localStorage），外加自研的视图过渡动画起点（ToggleOrigin）。
+- 替换为：**next-themes**（ThemeProvider + useTheme），shadcn 所有主题示例的标配。
+- 风险：ToggleOrigin 起点动画 next-themes 不提供，需保留一个薄包装或放弃该效果；`lib/theme.ts` 是全局真值源，替换波及 ThemeIcon、设置页外观区块、useTerminalTheme（后者独立不受影响）。
+- 收益：删 169 行 store 代码；SSR 闪烁（blocking script）由 next-themes 处理，比现在更稳。
+- 工作量：中。
+
+## 四、保留自研（shadcn 无对应，或替换得不偿失）
+
+| 项 | 原因 |
+|---|---|
+| ChatMinimap（导轨/预览卡） | 纯业务几何，无任何 shadcn 对应 |
+| SessionTree 虚拟滚动 | shadcn 无虚拟化方案；引入 @tanstack/react-virtual 属新依赖+重构，不在"shadcn 替换"范畴 |
+| TabBar（文件标签页，role=tab） | 动态文件 tab 集带关闭/中键/拖拽语义，Radix Tabs 的固定面板模型不适配；shadcn 无文件标签组件 |
+| KeepAliveDock 本体（可拖拽圆钮） | 无对应；其菜单浮层见 A10 |
+| FileExplorer / FileViewer / DelimitedTable / SourceCodeView | 文件面板业务组件 |
+| MarkdownBody / AnsiText / TuiText / MermaidBlock / SvgBlock / DiffView | 渲染类 |
+| DebugPanel / TerminalPanel / ExtensionStatusBar / SessionChatPanel | 业务面板 |
+| useAgentSession / useSessionUiState / useStreamingSelector | 会话流核心，非 UI |
+| useKeyboardShortcuts / useViewportHeight / usePageHidden / useScrollbarVisibility / useSidebarMotion / useFontPreferences / useEnterSendMode / useChatAppearance / useAudio / usePrismLanguages | 交互/平台细节，shadcn 无对应 |
+| useDragDrop / useGroupDrag | 拖放业务（shadcn 无拖放组件） |
+| ProjectTrustDialog / OAuthPastePanel / McpAddServer 等 | 内容型面板，替换意义只在"外壳换 Dialog/Popover"，随 A 类顺带评估 |
+
+### A9. SourceCodeView 的语法高亮内核 → 统一到 CodeBlock + Prism（可选）
+
+- 现状：`SourceCodeView.tsx`（155 行，DiffView/GitPanel/FileViewer 引用）用 **react-syntax-highlighter**（vs / vscDarkPlus 两套主题 + 自研行号/懒渲染），而项目另有 Prism 体系（`highlight-queue` / `prism-languages` / `usePrismLanguages`，MarkdownBody 用）——两套高亮体系并存；外壳层 FileViewer/DiffView 已经用 Base CodeBlock 的行变体。
+- 替换为：高亮内核换成已有 Prism 链路，行号/换行布局沿用 CodeBlock 行变体（`cn-code-block-line`），删除 react-syntax-highlighter 及其 @types 依赖。
+- 风险：SourceCodeView 的行号 gutter、wrap、超过阈值延迟渲染逻辑要迁到 Prism 版本；DiffView 的共享 FILE_CODE_STYLE 需同步。
+- 工作量：中。严格说不是"换 shadcn 组件"（code-block 不做高亮），而是借 CodeBlock 统一掉第二套高亮依赖。
+
+### A10. KeepAliveDock 的会话菜单浮层
+
+- 现状：`KeepAliveDock.tsx` 行 148–152：自研条件渲染 `absolute -top-[18px] left-[calc(100%+8px)]` 浮层 + `role="menu"` + 自研进场动画（keepalive-dock-in）+ panelRef 管理；dock 本体（可垂直拖拽的圆钮）无 shadcn 对应，保留。
+- 替换为：**Popover**（锚定圆钮）+ 内部项改 DropdownMenu 语义（`DropdownMenuItem`），动画/Esc/外点关闭内建。
+- 工作量：小。
+
+### A11. 自研单选组 → ui/radio-group（需新增该 shadcn 组件文件）
+
+- 现状：两处 `role="radiogroup"` + `role="radio"` 的 Button 列表——`ChatInput.tsx` 行 1902（模型弹层里的思考级别选择）、`SettingsPanel.tsx`（外观主题三选）。
+- 替换为：shadcn **Radio Group**（`components/ui/radio-group.tsx`，官方组件，`ui/` 目前缺这个文件，按官方源码添加）。Popover 内的思考级别用 RadioGroup + label 行；外观三选用带卡片的 RadioGroup item。
+- 工作量：小（组件文件 + 两处调用点）。
+
+### A12. 扩展请求多选对话框 → Dialog + Checkbox
+
+- 现状：`ChatWindow.tsx` 行 2425 起：extension-ui-request 的多选选项面板，自研 `role="checkbox"` div + tabIndex + 手工焦点第一个选项（focusFirstOption）+ Enter/Space 键处理；配套 `useDialogMaxHeight`（A7）手工测高。
+- 替换为：**Dialog**（焦点陷阱/Esc 内建，删除 focusFirstOption 与按键手写）+ **Checkbox**（`ui/checkbox.tsx` 已有）+ `Label`；高度交给 DialogContent 的 max-h 约束，删 `useDialogMaxHeight`。
+- 工作量：中（extension-ui-queue 的面板壳涉及）。单选变体同理换 `RadioGroup`。
+
+### A13. 最佳实践推广档（类级/属性级，非组件替换）
+
+- native `title={t(...)}` tooltip：全项目 **~90 处**（FileExplorer 14、SessionTree 12、ChatInput 12、SessionSidebar 10、ChatWindow 9…）。shadcn 最佳实践是 **Tooltip** 组件（`ui/tooltip.tsx` 已有，3 处在用）。全量替换成本高、native title 也有触达成本为零的价值：建议只对**纯图标按钮**（无文字、语义依赖 tooltip）批量换 Tooltip，文字按钮保留 title。
+- `animate-spin` 手写 spinner：7 处（AgentSessionPanel/AppShell/DebugPanel/FileExplorer/ModelSelector/SessionIndicators/ProviderUsageSummary）→ **ui/spinner**（已有，ActivityRows 在用）。类级替换。
+- `SettingsUi.tsx` 行 962 残留的 native `<details>` 折叠 → **Collapsible**（ActivityRows 已完成同类迁移，照抄模式）。
+- 大量 `role="alert"` / `role="status"`（55 处）：是提示文字的语义角色，不是组件问题；仅在需要样式化提示条时用 ui/alert 包裹。
+
+## 五、建议执行批次
+
+1. **批次 1（小，纯删除自研基础设施）**：A4 引用浮层、A5 扩展组件卡、A10 KeepAliveDock 菜单、A11 RadioGroup（新增 `ui/radio-group.tsx`）、A12 扩展请求对话框（连带删 A7 `useDialogMaxHeight`）、A8 use-mobile 归位 + 删 SidebarToast.test.mjs 残留 + A13 三项类级推广（spinner/Collapsible/图标按钮 Tooltip）。A9（SourceCodeView 高亮统一、删 react-syntax-highlighter）可并入本批或单独提交。
+2. **批次 2（中）**：A1 头部四面板 → Popover（删 useOutsideDismiss/useDelayedUnmount）、A3 DirectoryPicker → Dialog。
+3. **批次 3（大）**：A2 SidebarMenu 分流 DropdownMenu/Popover/Sheet（1178 行，三个使用方）。
+4. **批次 4（新依赖）**：B1 Resizable、B2 next-themes。
+5. 批次 2/3 完成后统一删除 `lib/stacked-dialog.ts`（A6）。
+
+每批次独立提交，可单独回滚。批次 1–3 不引入任何新 npm 依赖（radio-group 是复制官方组件源码，非新包）。
+
+## 六、结论
+
+自研交互 UI 至此全部盘点完毕（70 个业务组件 + 30 个 hooks + lib 交互基础设施逐一核对）：可替换项 A1–A13 + B1–B2 共 15 项，替换完成后可删除的自研基础设施合计约 **2100 行**（SidebarMenu 1178、useResizablePanel 323、stacked-dialog 201、useTheme 169、useDialogMaxHeight 38、useOutsideDismiss + useDelayedUnmount ~120、各浮层外壳散码 ~100）；其余均为无 shadcn 对应的业务组件与 hooks，保留。
