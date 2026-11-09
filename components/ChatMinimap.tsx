@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo, memo, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, type RefObject } from "react";
 import { isMessageGroupAnchor } from "@/lib/message-display";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -141,15 +141,12 @@ export function layoutSlots(allNodes: NodeInfo[], minimapHeight: number): SlotLa
 
   // Long sessions fold turns into buckets: one dash per bucket keeps the rail
   // readable instead of collapsing into a solid line once the 3px dashes meet.
-  // The cap bounds the count only; short sessions below it keep their own
-  // tight, centered block.
-  // The buckets span the whole usable height, so a dash's position reads as
-  // conversation progress: a centered block leaves the rail's ends claiming
-  // turns they never point at, and a long session's dashes float mid-rail
-  // however far the list is scrolled.
+  // The cap bounds the count only — the geometry stays the same tight, centered
+  // block short sessions get; a tall rail must not stretch the gaps apart.
   if (allNodes.length > maxSlots && maxSlots > 1) {
-    const gap = usableHeight / (maxSlots - 1);
-    const top = MINIMAP_PADDING;
+    const spread = usableHeight / (maxSlots - 1);
+    const gap = Math.min(MAX_NODE_GAP, spread);
+    const top = MINIMAP_PADDING + Math.max(0, (usableHeight - gap * (maxSlots - 1)) / 2);
     const slots = Array.from({ length: maxSlots }, (_, slotIndex) => {
       const from = Math.floor((slotIndex * allNodes.length) / maxSlots);
       const to = Math.floor(((slotIndex + 1) * allNodes.length) / maxSlots);
@@ -168,9 +165,7 @@ export function layoutSlots(allNodes: NodeInfo[], minimapHeight: number): SlotLa
         indexes: allNodes.slice(from, to).map((node) => node.index),
       };
     });
-    // Dense buckets fill the rail (any point is a valid target); sparse ones
-    // keep the pointer-proximity gate, so brushing empty rail does nothing.
-    return { slots, gap, fillsHeight: gap <= MAX_NODE_GAP };
+    return { slots, gap, fillsHeight: spread <= MAX_NODE_GAP };
   }
 
   if (allNodes.length === 1) {
@@ -237,6 +232,17 @@ export const ChatMinimap = memo(function ChatMinimap({
     () => layoutSlots(allNodes, minimapHeight),
     [allNodes, minimapHeight],
   );
+  // The slot geometry centers on the rail's height; the measure path only
+  // runs on scroll and message changes, so a resize would leave the block
+  // centered on a stale height (visibly off-center). Watch the element.
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setMinimapHeight(el.clientHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [visible]);
   const { slots: positionedSlots, gap: slotGap } = slotLayout;
   slotLayoutRef.current = slotLayout;
   const activeSlot =
@@ -628,9 +634,12 @@ export const ChatMinimap = memo(function ChatMinimap({
       })}
 
       {minimapHovered && nearestSlot !== null && allNodes.length > 0 && (
+        // Centered by the animation's fill-both end frame (translateY(-50%));
+        // a -translate-y-1/2 class here would compose with it in Tailwind v4
+        // (translate property + transform) and shift the card a full height.
         <div
           ref={previewBoxRef}
-          className="pointer-events-auto absolute top-1/2 left-[calc(100%+12px)] z-[100] -translate-y-1/2 max-h-[calc(100%-24px)] w-[340px] cursor-default select-text overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-2 shadow-md animate-[minimap-preview-in_160ms_ease_both] [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
+          className="pointer-events-auto absolute top-1/2 left-[calc(100%+12px)] z-[100] max-h-[calc(100%-24px)] w-[340px] cursor-default select-text overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-2 shadow-md animate-[minimap-preview-in_160ms_ease_both] [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
           data-minimap-preview-box=""
           onMouseEnter={showPreview}
           onMouseDown={(event) => event.stopPropagation()}
