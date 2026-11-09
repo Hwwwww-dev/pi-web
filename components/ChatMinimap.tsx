@@ -168,7 +168,9 @@ export function layoutSlots(allNodes: NodeInfo[], minimapHeight: number): SlotLa
         indexes: allNodes.slice(from, to).map((node) => node.index),
       };
     });
-    return { slots, gap, fillsHeight: true };
+    // Dense buckets fill the rail (any point is a valid target); sparse ones
+    // keep the pointer-proximity gate, so brushing empty rail does nothing.
+    return { slots, gap, fillsHeight: gap <= MAX_NODE_GAP };
   }
 
   if (allNodes.length === 1) {
@@ -523,7 +525,7 @@ export const ChatMinimap = memo(function ChatMinimap({
     window.addEventListener("mouseup", onUp);
   }, [findNearestSlot, scrollToNode, showPreview, visible]);
 
-  // The overlay covers the chat's right edge, so wheel events over it would be
+  // The overlay covers the chat's left edge, so wheel events over it would be
   // swallowed; forward them so scrolling keeps working under the trigger zone.
   // The preview card scrolls itself, and forwarding its wheel events on top of
   // that scrolled the chat at the same time.
@@ -565,15 +567,13 @@ export const ChatMinimap = memo(function ChatMinimap({
         if (findNearestSlot(ratio)) showPreview();
         else if (!draggingRef.current) schedulePreviewHide();
       }}
-      // Canvas anchoring: the rail hugs the chat pane's right edge at the shared
+      // Canvas anchoring: the rail hugs the chat pane's LEFT edge at the shared
       // MINIMAP_WIDTH layout constant — measured positioning, kept as a style.
       style={{
         position: "absolute",
         top: 0,
         bottom: 0,
-        // Inside the chat pane's right edge, clear of its scrollbar — flush
-        // right: 0 sat on top of the scrollbar and read as "outside" the pane.
-        right: 14,
+        left: 14,
         width: MINIMAP_WIDTH,
         zIndex: 25,
       }}
@@ -630,7 +630,7 @@ export const ChatMinimap = memo(function ChatMinimap({
       {minimapHovered && nearestSlot !== null && allNodes.length > 0 && (
         <div
           ref={previewBoxRef}
-          className="pointer-events-auto absolute top-1/2 right-[calc(100%+12px)] z-[100] -translate-y-1/2 max-h-[calc(100%-24px)] w-[340px] cursor-default select-text overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-2 shadow-md animate-[minimap-preview-in_160ms_ease_both] [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
+          className="pointer-events-auto absolute top-1/2 left-[calc(100%+12px)] z-[100] -translate-y-1/2 max-h-[calc(100%-24px)] w-[340px] cursor-default select-text overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-2 shadow-md animate-[minimap-preview-in_160ms_ease_both] [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
           data-minimap-preview-box=""
           onMouseEnter={showPreview}
           onMouseDown={(event) => event.stopPropagation()}

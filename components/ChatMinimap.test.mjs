@@ -58,7 +58,9 @@ test("a tall rail folds long sessions into at most MAX_VISIBLE_SLOTS dashes", ()
   // buckets span the whole rail so dash position reads as progress.
   const layout = layoutSlots(fakeNodes(200), 2000);
   assert.equal(layout.slots.length, MAX_VISIBLE_SLOTS);
-  assert.equal(layout.fillsHeight, true);
+  // The 2000px rail stretches 20 buckets past the dense-pitch threshold, so
+  // empty-rail hover stays a no-op (pointer-proximity gate).
+  assert.equal(layout.fillsHeight, false);
   assert.equal(layout.gap, (2000 - 12 * 2) / (MAX_VISIBLE_SLOTS - 1));
   // Buckets partition every node exactly once, in order.
   const covered = layout.slots.flatMap((slot) => slot.indexes);

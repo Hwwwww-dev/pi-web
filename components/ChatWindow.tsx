@@ -1598,7 +1598,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             pendingScrollRestore && "invisible",
           )}
         >
-          <div style={{ minWidth: 0, padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
+          <div style={{ minWidth: 0, padding: `0 ${columnPadding}px 0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px` }}>
             <div
               ref={messageContentRef}
               onPointerUp={captureQuotedSelection}
@@ -1738,9 +1738,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         document.body,
       )}
 
-      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
-        {/* The reveal wrapper sits above the minimap rail (zIndex 25), which
-            otherwise swallows the button's clicks across its whole strip. */}
+      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding}px 0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px` }}>
+        {/* Floats just above the composer's right edge (the wrapper's right
+            padding is the plain column padding — the minimap rail reserves
+            the left side); z-30 also keeps it clear of the rail's zIndex 25. */}
         {!isEmptyNew && (
           <div className="pointer-events-none absolute bottom-full right-4 z-30 max-sm:right-2.5">
             <Button
