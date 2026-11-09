@@ -21,7 +21,7 @@ import { TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
-import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH, MINIMAP_RAIL_STRIP } from "./ChatMinimap";
+import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -570,13 +570,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // loaded still show their preview there and page in when clicked. Absent
   // (fetch failed or still loading), the minimap falls back to loaded turns.
   const [minimapTurnIndex, setMinimapTurnIndex] = useState<MinimapTurnDescriptor[]>([]);
-  // The chat pane's width decides whether the minimap shows at all — the
-  // message column reserves the rail strip at any width, so overlap is never
-  // the question. Callback ref + element state: the component first renders a
-  // loading branch without the pane, so the observer must start when the pane
-  // actually mounts. State holds only the visibility decision: dragging the
-  // panel divider fires per pixel, and a boolean keeps every non-crossing
-  // frame a no-op instead of re-rendering the whole chat window.
+  // The chat pane's width decides whether the minimap shows at all: the rail
+  // floats in the pane's left margin (MINIMAP_MIN_PANE_WIDTH = the 700px
+  // column + one rail strip each side), so the message column stays
+  // symmetrically centered and overlap is never the question. Callback ref +
+  // element state: the component first renders a loading branch without the
+  // pane, so the observer must start when the pane actually mounts. State
+  // holds only the visibility decision: dragging the panel divider fires per
+  // pixel, and a boolean keeps every non-crossing frame a no-op instead of
+  // re-rendering the whole chat window.
   const [chatPaneElement, setChatPaneElement] = useState<HTMLDivElement | null>(null);
   const [minimapPaneWide, setMinimapPaneWide] = useState(false);
   useLayoutEffect(() => {
@@ -587,11 +589,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     observer.observe(chatPaneElement);
     return () => observer.disconnect();
   }, [chatPaneElement]);
-  // The rail's own visibility lives in ChatMinimap (scroll-handler + measure
-  // path on one source of truth); it reports up so the reserved strip — and
-  // the centering shift it causes — keys on the same fact instead of a
-  // duplicate computation with its own lifecycle holes.
-  const [minimapRailVisible, setMinimapRailVisible] = useState(false);
   useEffect(() => {
     const sid = session?.id;
     if (!sid) {
@@ -1598,7 +1595,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             pendingScrollRestore && "invisible",
           )}
         >
-          <div style={{ minWidth: 0, padding: `0 ${columnPadding}px 0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px` }}>
+          <div style={{ minWidth: 0, padding: `0 ${columnPadding}px` }}>
             <div
               ref={messageContentRef}
               onPointerUp={captureQuotedSelection}
@@ -1649,7 +1646,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             scrollContainer={scrollContainerRef}
             messageRefs={messageRefs}
             onRevealTurn={revealTurnForMinimap}
-            onVisibleChange={setMinimapRailVisible}
             turnsBefore={earlierTurnCount}
             turnIndex={minimapTurnIndex}
           />
@@ -1738,10 +1734,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         document.body,
       )}
 
-      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding}px 0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px` }}>
-        {/* Floats just above the composer's right edge (the wrapper's right
-            padding is the plain column padding — the minimap rail reserves
-            the left side); z-30 also keeps it clear of the rail's zIndex 25. */}
+      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding}px` }}>
+        {/* Floats just above the composer's right edge; z-30 also keeps it
+            clear of the rail's zIndex 25. */}
         {!isEmptyNew && (
           <div className="pointer-events-none absolute bottom-full right-4 z-30 max-sm:right-2.5">
             <Button
