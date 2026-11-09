@@ -964,7 +964,9 @@ export function ConfigFooterStatus({
     // used to; the config-footer-status* classes stay as the MCP tests' hooks.
     <Collapsible className="config-footer-status-details">
       <CollapsibleTrigger className={cn(className, "w-fit cursor-pointer text-left")}>{summary}</CollapsibleTrigger>
-      <CollapsibleContent>
+      {/* forceMount keeps the list in the static SSR markup (the native
+          <details> always rendered it); closed hides it client-side. */}
+      <CollapsibleContent forceMount className="data-[state=closed]:hidden">
         <ul className="config-footer-status-list mt-1 max-h-[8.5em] overflow-y-auto pr-0 pl-4 text-muted-foreground list-disc [overflow-wrap:anywhere] whitespace-pre-wrap">
           {details.map((detail, index) => (
             <li key={index}>{detail}</li>

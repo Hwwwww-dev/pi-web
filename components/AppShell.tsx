@@ -35,7 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { cn } from "@/lib/utils";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
@@ -64,9 +64,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile, useIsNarrowMobile } from "@/hooks/useIsMobile";
 import { useViewportHeight } from "@/hooks/useViewportHeight";
 import { useResizablePanel } from "@/hooks/useResizablePanel";
-import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
 import { useAudio } from "@/hooks/useAudio";
-import { useOutsideDismiss } from "@/hooks/useOutsideDismiss";
 import { copyText } from "@/lib/clipboard";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { getFileName } from "@/lib/file-paths";
@@ -583,25 +581,13 @@ export function AppShell() {
   // The Debug button on screen (one of its three places at a time); Escape gives focus back to it.
   const debugButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  // 页头下挂的非模态面板（系统 / 工具定义 / 会话信息）：点空白即关。
-  // stats 按钮是"会话信息"的触发钮（data-outside-dismiss-ignore），点它走
-  // 原有 toggle，避免 pointerdown 关、click 又开的双重处理。
+  // 页头下挂的非模态面板（系统 / 工具定义 / 会话信息 / 调试）：四者都是
+  // 受控 Popover（anchor = 头部容器 topBarRef 的 virtualRef），外点关闭、
+  // Esc、进出动画由 Radix 承担；触发按钮走原有 toggle（非 PopoverTrigger，
+  // 避免与指针点击双重处理）。
   const closeTopPanel = useCallback((panel: "branches" | "system" | "tools" | "session") => {
     setActiveTopPanel((cur) => cur === panel ? null : cur);
   }, []);
-  const systemPanelRef = useRef<HTMLDivElement | null>(null);
-  const toolsPanelRef = useRef<HTMLDivElement | null>(null);
-  const sessionInfoPanelRef = useRef<HTMLDivElement | null>(null);
-  useOutsideDismiss(activeTopPanel === "system", systemPanelRef, useCallback(() => closeTopPanel("system"), [closeTopPanel]));
-  useOutsideDismiss(activeTopPanel === "tools", toolsPanelRef, useCallback(() => closeTopPanel("tools"), [closeTopPanel]));
-  useOutsideDismiss(activeTopPanel === "session", sessionInfoPanelRef, useCallback(() => closeTopPanel("session"), [closeTopPanel]));
-  // The top panels play tw-animate-css's animate-out on close: the panel stays
-  // mounted for the animation and only then unmounts (useDelayedUnmount), with
-  // data-state telling the closing frame from the live one.
-  const systemPanelMounted = useDelayedUnmount(activeTopPanel === "system");
-  const toolsPanelMounted = useDelayedUnmount(activeTopPanel === "tools");
-  const sessionPanelMounted = useDelayedUnmount(activeTopPanel === "session");
-  const debugPanelMounted = useDelayedUnmount(activeTopPanel === "debug");
 
   // Escape inside the debug panel; it never closes another panel that took its place. With focus
   // in the panel, that focus leaves the page with it: once the panel is gone (the next frame), the
@@ -2446,42 +2432,53 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           )}
         </div>
         </header>
-          {/* Top panels — anchored under the header (the draft's sheet); only
+          {/* Top panels — anchored to the header container (virtualRef), only
               one open at a time. z-[240] stays below the quote toolbar's 260
               (ChatWindow). */}
-          {(activeTopPanel === "system" || systemPanelMounted) && (
-            <div
-              ref={systemPanelRef}
-              data-state={activeTopPanel === "system" ? "open" : "closed"}
-              className="absolute inset-x-0 top-full z-[240] pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+          <Popover
+            open={activeTopPanel === "system"}
+            onOpenChange={(next) => next ? setActiveTopPanel("system") : closeTopPanel("system")}
+          >
+            <PopoverAnchor virtualRef={topBarRef} />
+            <PopoverContent
+              side="bottom"
+              align="start"
+              className="z-[240] w-[var(--radix-popover-anchor-width)] min-w-0 rounded-none border-0 border-b bg-card p-0 shadow-none"
             >
               <SystemPromptPanel
                 loading={systemInfoLoading}
                 prompt={systemPrompt}
                 translate={translate}
               />
-            </div>
-          )}
-          {(activeTopPanel === "tools" || toolsPanelMounted) && (
-            <div
-              ref={toolsPanelRef}
-              data-state={activeTopPanel === "tools" ? "open" : "closed"}
-              className="absolute inset-x-0 top-full z-[240] pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+            </PopoverContent>
+          </Popover>
+          <Popover
+            open={activeTopPanel === "tools"}
+            onOpenChange={(next) => next ? setActiveTopPanel("tools") : closeTopPanel("tools")}
+          >
+            <PopoverAnchor virtualRef={topBarRef} />
+            <PopoverContent
+              side="bottom"
+              align="start"
+              className="z-[240] w-[var(--radix-popover-anchor-width)] min-w-0 rounded-none border-0 border-b bg-card p-0 shadow-none"
             >
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
                 tools={systemTools}
                 translate={translate}
               />
-            </div>
-          )}
-          {(activeTopPanel === "session" || sessionPanelMounted) && (
-            // 会话信息浮层：标准弹层观感（bg-popover + border + shadow-md）。
-            // 开关仍由 toggleTopPanel 驱动，非 Radix Popover；类名保留作 e2e 定位锚。
-            <div
-              ref={sessionInfoPanelRef}
-              data-state={activeTopPanel === "session" ? "open" : "closed"}
-              className="session-info-popover absolute top-full right-0 z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+            </PopoverContent>
+          </Popover>
+          <Popover
+            open={activeTopPanel === "session"}
+            onOpenChange={(next) => next ? setActiveTopPanel("session") : closeTopPanel("session")}
+          >
+            <PopoverAnchor virtualRef={topBarRef} />
+            {/* 会话信息浮层：标准弹层观感；session-info-popover 类名保留作 e2e 定位锚。 */}
+            <PopoverContent
+              side="bottom"
+              align="end"
+              className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto"
             >
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
@@ -2588,12 +2585,19 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                    {translate("session.load")}
                 </div>
               )}
-            </div>
-          )}
-          {(activeTopPanel === "debug" || debugPanelMounted) && (
-            <div
-              data-state={activeTopPanel === "debug" ? "open" : "closed"}
-              className="absolute inset-x-0 top-full z-[240] pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+            </PopoverContent>
+          </Popover>
+          <Popover
+            open={activeTopPanel === "debug"}
+            onOpenChange={(next) => next
+              ? setActiveTopPanel("debug")
+              : setActiveTopPanel((cur) => cur === "debug" ? null : cur)}
+          >
+            <PopoverAnchor virtualRef={topBarRef} />
+            <PopoverContent
+              side="bottom"
+              align="start"
+              className="z-[240] w-[var(--radix-popover-anchor-width)] min-w-0 rounded-none border-0 border-b bg-card p-0 shadow-none"
             >
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
@@ -2603,8 +2607,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   onClose={closeDebugPanel}
                 />
               </DebugPanelBoundary>
-            </div>
-          )}
+            </PopoverContent>
+          </Popover>
 
         {isMobile && renderProjectTrustWarning(true)}
         </div>

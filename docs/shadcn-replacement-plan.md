@@ -24,12 +24,10 @@
 
 ## 二、可替换 —— shadcn 组件现成（无需新依赖）
 
-### A1. AppShell 头部四个顶部面板（本阶段刚补过退出动画的那批）
+### A1. AppShell 头部四个顶部面板 ✅ 已完成（批次 2）
 
-- 现状：`{activeTopPanel === "system" && <div className="absolute top-full z-[240]">}` 条件渲染 × 4（system / tools / session / debug），自研 `useOutsideDismiss`（3 处）+ 刚写的 `useDelayedUnmount`（4 处）+ 手拼 data-state 动画类；`session-info-popover` 是卡片里带 `role="dialog"` 的自研浮层。
-- 替换为：shadcn **Popover**（Radix Popover）。outside-dismiss、Escape、开/关动画（data-[state] animate-out）全部内建，`useOutsideDismiss` 与 `useDelayedUnmount` 直接删除。
-- 风险：头部面板的锚点是 header（PopoverTrigger 需包住对应头部按钮）；DebugPanel 的轮询生命周期不受影响（内容组件原样保留）。
-- 工作量：中。收益：删两个自研 hook（~120 行）+ 四处手拼动画/层级代码，行为与全站浮层统一。
+- 四面板改为受控 **Popover** + `PopoverAnchor virtualRef={topBarRef}`（锚定头部容器，面板宽度取 `--radix-popover-anchor-width`；session 卡片 align="end"）；外点/Esc/进出动画由 Radix 承担，手拼的 pointer-events/data-state 动画类删除。
+- 删除 `hooks/useOutsideDismiss.ts`（全项目已无使用者）；`useDelayedUnmount` 在 AppShell 的四处使用删除（hook 本身保留给 ExtensionWidgets）。触发按钮保持原 toggle（非 PopoverTrigger，避免与指针点击双重处理）。
 
 ### A2. SidebarMenu（自研菜单系统，1178 行，最大的单块）
 
@@ -40,11 +38,10 @@
 - 风险：手机 sheet 与桌面浮层的响应式切换逻辑（`isMobile` 分支）要在 Popover/Sheet 两形态间重排；`role="menuitemradio"` 的多选菜单用 DropdownMenu CheckboxItem 表达。
 - 工作量：大（涉及 3 个使用方）。收益：删 ~1178 行自研焦点/键盘/动画/层叠代码，无障碍语义交给 Radix。
 
-### A3. DirectoryPicker（目录选择弹窗）
+### A3. DirectoryPicker（目录选择弹窗）✅ 已完成（批次 2）
 
-- 现状：`createPortal` + `fixed inset-0 bg-black/35` 自研 backdrop + `role="dialog"`，内部还有"新建子目录"小表单弹窗。
-- 替换为：外壳 **Dialog**（backdrop、Escape、焦点陷阱内建），内部文件树列表保留自研；新建目录小弹窗 → **AlertDialog** 或嵌套 Dialog。
-- 工作量：小。收益：删 backdrop/层级/焦点代码。
+- 外壳换 **Dialog**（`showCloseButton={false}` + sr-only DialogTitle；backdrop、Escape、焦点陷阱、按压起点守卫全部内建）；`busy` 时在 `onEscapeKeyDown`/`onInteractOutside` preventDefault 保持原"校验中不可关"语义；panel 面板样式类原样迁移。
+- 内嵌"新建子目录"小弹窗保留：它是面板内的嵌套覆盖层（absolute inset-0 相对 panel），不是全屏模态，AlertDialog/嵌套 Dialog 反而改变形态。收益：删 backdrop/层级/焦点代码。
 
 ### A4. ChatWindow 引用追问浮层（quote 输入 portal）——评估后放弃
 
@@ -56,11 +53,10 @@
 - 现状：`ExtensionWidgets.tsx` 条件渲染 `absolute bottom-full left-0` 卡片。
 - 放弃理由：面板锚定的是 pill **行**（shelf 根），不是单个 pill——Popover 的 trigger 锚定模型不适配；该组件的 SSR 静态渲染测试断言 `<section`/`<pre` 输出，Radix 的 portal 渲染与之不兼容。现有受控面板已带退出动画，保留。
 
-### A6. lib/stacked-dialog.ts（Escape 堆叠，201 行）
+### A6. lib/stacked-dialog.ts ✅ 已完成（批次 2，死代码清理）
 
-- 现状：自研 Escape/dismiss 层级协调，使用者 McpConfig、AppShell、SessionSidebar、NewSessionContextBar、McpSignIn。
-- 替换为：无独立替换物——Radix Dialog/Popover/AlertDialog/Sheet 全部基于 DismissableLayer，**天然自带 dismiss 层级堆叠**。第二至五项换完后此文件与各调用点删除。
-- 工作量：随 A1–A5 顺带删。
+- 核查结论：文件名有误导——Escape 堆叠半边（listenForStackedDialogEscape / listenForPanelEscape / openStackedDialog / focusModalPanel）**本就是 0 使用者的死代码**；活跃的只有 `focusIfLost`（24 处）/ `focusAfterChange`（2 处）跨面板焦点恢复工具，Radix 无对应，保留。
+- 已删除 Escape 半边及其测试（201 → 63 行），文件头注明 Radix DismissableLayer 现在承担该职责。
 
 ### A7. hooks/useDialogMaxHeight.ts（38 行）——保留
 
