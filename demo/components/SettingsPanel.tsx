@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme, type ThemePreference } from "@/hooks/useTheme";
 import { THEME_OPTIONS } from "@/lib/theme";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
@@ -25,6 +25,7 @@ import { Input } from "./ui/input";
 import { Slider } from "./ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import {
   CHAT_CONTENT_WIDTH_DEFAULT,
   CHAT_CONTENT_WIDTH_MAX,
@@ -269,23 +270,22 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   // behind its own list (the three-level stack); the desktop stacks them as
   // Cards in the scrolling body (§4.4).
   const themeGroup = (
-    <div role="radiogroup" aria-label={t("settings.appearance")} className="grid w-full grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
+    <RadioGroup
+      value={preference}
+      onValueChange={(value) => setThemePreference(value as ThemePreference)}
+      aria-label={t("settings.appearance")}
+      className="grid w-full grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2"
+    >
       {THEME_OPTIONS.map((option) => {
-        const selected = preference === option.id;
         return (
           <label
             key={option.id}
             data-theme-option={option.id}
-            className="relative inline-flex h-8 min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-xs leading-none text-foreground transition-colors hover:bg-accent/50 has-[:checked]:border-foreground has-[:checked]:ring-[1px] has-[:checked]:ring-foreground has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-accent/50"
+            className="relative inline-flex h-8 min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-xs leading-none text-foreground transition-colors hover:bg-accent/50 has-[[data-state=checked]]:border-foreground has-[[data-state=checked]]:ring-[1px] has-[[data-state=checked]]:ring-foreground has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-accent/50"
           >
-            <input
-              type="radio"
-              name="theme"
-              value={option.id}
-              checked={selected}
-              onChange={() => setThemePreference(option.id)}
-              className="sr-only"
-            />
+            {/* The Radix radio carries the group's semantics (roving focus,
+                arrow keys); the palette card stays the visual. */}
+            <RadioGroupItem value={option.id} className="sr-only" />
             {/* The palettes' own backgrounds, not tokens of the running theme. */}
             <span
               aria-hidden="true"
@@ -300,7 +300,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           </label>
         );
       })}
-    </div>
+    </RadioGroup>
   );
   const chatOptions = (
     <div className="flex w-full flex-col gap-2.5">
@@ -833,7 +833,7 @@ export function SettingsPanel({
             {!isPhone && (
               <TabsList
                 variant="line"
-                className="ml-4 h-auto min-h-0 w-full min-w-0 flex-1 items-stretch justify-start gap-0.5 self-stretch overflow-x-auto rounded-none border-0 bg-transparent p-0 pb-[5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="ml-4 shrink-0 self-center justify-start gap-1 overflow-x-auto rounded-none border-0 bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 {sections.map((item) => {
                   const disabled = item.requiresProject && !cwd;
@@ -843,7 +843,7 @@ export function SettingsPanel({
                       value={item.id}
                       disabled={disabled}
                       title={disabled ? t("settings.projectRequired") : item.label}
-                      className="h-auto w-24 flex-none gap-1.5 rounded-none px-1 py-0 text-[12.5px] font-normal data-[state=active]:font-semibold"
+                      className="flex-none gap-1.5 rounded-none px-3 py-0 text-[12.5px] font-normal data-[state=active]:font-semibold"
                     >
                       <SettingsSectionIcon section={item.id} size={15} />
                       <span className="truncate">{item.label}</span>

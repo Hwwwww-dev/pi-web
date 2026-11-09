@@ -8,6 +8,7 @@ import { formatRelativeTime } from "@/lib/i18n/format";
 import { loadKeepAliveDockTopPct, saveKeepAliveDockTopPct, type KeepAliveSlot } from "@/lib/chat-keepalive";
 import type { SessionInfo } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PathLabel } from "./PathLabel";
 import { RunningSessionIndicator, UnreadSessionIndicator } from "./SessionIndicators";
@@ -36,7 +37,6 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
   const [topPct, setTopPct] = useState(() => loadKeepAliveDockTopPct());
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const panelRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<{ startY: number; startTopPx: number; moved: boolean } | null>(null);
   const hasHydratedRef = useRef(false);
 
@@ -47,7 +47,8 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
     setTopPct(loadKeepAliveDockTopPct());
   }, []);
 
-  // Close on Escape and on pointer presses outside button + panel.
+  // Escape closes before the global shortcuts see it (Esc also stops the
+  // running agent otherwise); outside presses are Radix's dismissal.
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -56,16 +57,9 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
         setOpen(false);
       }
     };
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (panelRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
-      setOpen(false);
-    };
     document.addEventListener("keydown", onKeyDown, true);
-    document.addEventListener("pointerdown", onPointerDown, true);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
-      document.removeEventListener("pointerdown", onPointerDown, true);
     };
   }, [open]);
 
@@ -121,36 +115,51 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
     >
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button
-            ref={buttonRef}
-            type="button"
-            variant="ghost"
-            className={cn(
-              "h-9 gap-1 rounded-l-none rounded-r-lg border border-l-0 bg-sidebar px-[7px] text-muted-foreground shadow-sm select-none [touch-action:none]",
-              "hover:bg-secondary hover:text-foreground",
-              open && "bg-secondary text-foreground",
-            )}
-            aria-expanded={open}
-            aria-label={`${t("keepalive.title")} (${slots.length})`}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-          >
-            {hasRunning && <span className="inline-flex [&_svg]:size-[11px]"><RunningSessionIndicator /></span>}
-            {!hasRunning && hasUnread && <span className="inline-flex [&_svg]:size-[11px]"><UnreadSessionIndicator /></span>}
-            <LayersIcon className="size-[11px]" aria-hidden="true" />
-            <span className="text-xs font-bold tabular-nums">{slots.length}</span>
-          </Button>
+          <PopoverAnchor asChild>
+            <Button
+              ref={buttonRef}
+              type="button"
+              variant="ghost"
+              className={cn(
+                "h-9 gap-1 rounded-l-none rounded-r-lg border border-l-0 bg-sidebar px-[7px] text-muted-foreground shadow-sm select-none [touch-action:none]",
+                "hover:bg-secondary hover:text-foreground",
+                open && "bg-secondary text-foreground",
+              )}
+              aria-expanded={open}
+              aria-label={`${t("keepalive.title")} (${slots.length})`}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+            >
+              {hasRunning && <span className="inline-flex [&_svg]:size-[11px]"><RunningSessionIndicator /></span>}
+              {!hasRunning && hasUnread && <span className="inline-flex [&_svg]:size-[11px]"><UnreadSessionIndicator /></span>}
+              <LayersIcon className="size-[11px]" aria-hidden="true" />
+              <span className="text-xs font-bold tabular-nums">{slots.length}</span>
+            </Button>
+          </PopoverAnchor>
         </TooltipTrigger>
         <TooltipContent side="right">{t("keepalive.title")}</TooltipContent>
       </Tooltip>
 
-      {open && (
-        <div
-          ref={panelRef}
-          className="absolute -top-[18px] left-[calc(100%+8px)] max-h-[min(440px,62vh)] w-[min(320px,calc(100vw-56px))] overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-1.5 shadow-md animate-[keepalive-dock-in_160ms_ease-out]"
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverContent
+          // The dock button toggles on its own pointer-up (a drag ends without
+          // a click), so a press on it must not count as an outside dismissal.
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onPointerDownOutside={(event) => {
+            if (buttonRef.current?.contains(event.target as Node)) event.preventDefault();
+          }}
+          // The dock is draggable while the menu is open; the default optimized
+          // popper only repositions on scroll/resize, so a dragged anchor would
+          // leave the panel behind. Per-frame updates keep the old co-movement.
+          updatePositionStrategy="always"
+          side="right"
+          align="start"
+          sideOffset={8}
+          alignOffset={-18}
           role="menu"
           aria-label={t("keepalive.title")}
+          className="max-h-[min(440px,62vh)] w-[min(320px,calc(100vw-56px))] overflow-y-auto overscroll-contain rounded-xl border-border/75 bg-background p-1.5"
         >
           <div className="flex flex-col">
             {slots.map((slot) => {
@@ -220,8 +229,8 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
               </Button>
             </div>
           )}
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

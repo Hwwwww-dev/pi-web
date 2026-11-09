@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { Empty, EmptyDescription, EmptyHeader } from "./ui/empty";
 import { Field, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
@@ -959,14 +960,20 @@ export function ConfigFooterStatus({
   );
   if (!details?.length) return <span className={className}>{summary}</span>;
   return (
-    <details className="config-footer-status-details">
-      <summary className={cn(className, "w-fit cursor-pointer")}>{summary}</summary>
-      <ul className="config-footer-status-list mt-1 max-h-[8.5em] overflow-y-auto pr-0 pl-4 text-muted-foreground list-disc [overflow-wrap:anywhere] whitespace-pre-wrap">
-        {details.map((detail, index) => (
-          <li key={index}>{detail}</li>
-        ))}
-      </ul>
-    </details>
+    // The official Collapsible carries the details list the native <details>
+    // used to; the config-footer-status* classes stay as the MCP tests' hooks.
+    <Collapsible className="config-footer-status-details">
+      <CollapsibleTrigger className={cn(className, "w-fit cursor-pointer text-left")}>{summary}</CollapsibleTrigger>
+      {/* forceMount keeps the list in the static SSR markup (the native
+          <details> always rendered it); closed hides it client-side. */}
+      <CollapsibleContent forceMount className="data-[state=closed]:hidden">
+        <ul className="config-footer-status-list mt-1 max-h-[8.5em] overflow-y-auto pr-0 pl-4 text-muted-foreground list-disc [overflow-wrap:anywhere] whitespace-pre-wrap">
+          {details.map((detail, index) => (
+            <li key={index}>{detail}</li>
+          ))}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

@@ -1,9 +1,9 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { ChevronUpIcon, FolderIcon, HardDriveIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
@@ -84,7 +84,6 @@ interface Props {
 
 export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false, error }: Props) {
   const { t } = useI18n();
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [currentPath, setCurrentPath] = useState("");
   const [parentDirectory, setParentDirectory] = useState<string | null>(null);
   const [pathInput, setPathInput] = useState(initialPath ?? "");
@@ -96,7 +95,6 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
   const [directoryName, setDirectoryName] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const backdropPressRef = useRef(false);
   const createBackdropPressRef = useRef(false);
 
   const navigateTo = useCallback(async (directory?: string) => {
@@ -118,7 +116,6 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
   }, []);
 
   useEffect(() => {
-    setPortalTarget(document.body);
     void navigateTo(initialPath || undefined);
   }, [initialPath, navigateTo]);
 
@@ -159,34 +156,26 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
   const canSelect = Boolean(currentPath) && !hasUncommittedPath && !busy && !loading;
   const canNavigateUp = Boolean(parentDirectory) || isWindowsDriveRoot(currentPath);
 
-  if (!portalTarget) return null;
-
-  return createPortal(
-    <div
-      className="directory-picker-backdrop fixed inset-0 z-[1000] flex items-center justify-center bg-black/35"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("directoryPicker.selectDirectory")}
-      onPointerDown={(event) => {
-        backdropPressRef.current = event.target === event.currentTarget;
-      }}
-      onClick={(event) => {
-        // A click's target is the common ancestor of where the press started and
-        // ended, so selecting text in the path input and releasing on the backdrop
-        // dispatches a backdrop click. Only a press that began on the backdrop
-        // dismisses the picker.
-        const pressedBackdrop = backdropPressRef.current;
-        backdropPressRef.current = false;
-        if (pressedBackdrop && event.target === event.currentTarget && !busy) onCancel();
-      }}
-      onPointerCancel={() => {
-        backdropPressRef.current = false;
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !busy) onCancel();
-      }}
+  return (
+    // The official Dialog carries the overlay, Escape, focus trap and the
+    // press-started-on-backdrop guard; busy holds it open via the two
+    // preventDefault hooks.
+    <Dialog
+      open
+      onOpenChange={(next) => { if (!next && !busy) onCancel(); }}
     >
-      <div className={cn("directory-picker-panel relative flex h-[min(620px,calc(100dvh-16px))] max-h-[calc(100dvh-16px)] w-[520px] max-w-[calc(100vw-16px)] flex-col", panelSurfaceClass)}>
+      <DialogContent
+        showCloseButton={false}
+        aria-describedby={undefined}
+        aria-label={t("directoryPicker.selectDirectory")}
+        onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}
+        onInteractOutside={(event) => { if (busy) event.preventDefault(); }}
+        className={cn(
+          "directory-picker-panel relative flex h-[min(620px,calc(100dvh-16px))] max-h-[calc(100dvh-16px)] w-[520px] max-w-[calc(100vw-16px)] flex-col gap-0 overflow-hidden p-0",
+          panelSurfaceClass,
+        )}
+      >
+        <DialogTitle className="sr-only">{t("directoryPicker.selectDirectory")}</DialogTitle>
         <div className="flex shrink-0 items-center justify-between border-b border-border px-[18px] py-3">
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-bold text-foreground">{t("directoryPicker.selectDirectory")}</div>
@@ -396,8 +385,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
             </form>
           </div>
         )}
-      </div>
-    </div>,
-    portalTarget,
+      </DialogContent>
+    </Dialog>
   );
 }

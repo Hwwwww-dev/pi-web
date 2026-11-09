@@ -1,6 +1,6 @@
 "use client";
-import { demoAssetPath } from "@/mock/base-path";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
+import { demoAssetPath } from "@/mock/base-path";
 import { isHiddenRelation } from "@/lib/session-family";
 import { ArrowDownIcon, ChevronRightIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from "lucide-react";
 import Image from "next/image";
@@ -22,12 +22,13 @@ import { TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
-import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH, MINIMAP_RAIL_STRIP } from "./ChatMinimap";
+import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -571,13 +572,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // loaded still show their preview there and page in when clicked. Absent
   // (fetch failed or still loading), the minimap falls back to loaded turns.
   const [minimapTurnIndex, setMinimapTurnIndex] = useState<MinimapTurnDescriptor[]>([]);
-  // The chat pane's width decides whether the minimap shows at all — the
-  // message column reserves the rail strip at any width, so overlap is never
-  // the question. Callback ref + element state: the component first renders a
-  // loading branch without the pane, so the observer must start when the pane
-  // actually mounts. State holds only the visibility decision: dragging the
-  // panel divider fires per pixel, and a boolean keeps every non-crossing
-  // frame a no-op instead of re-rendering the whole chat window.
+  // The chat pane's width decides whether the minimap shows at all: the rail
+  // floats in the pane's left margin (MINIMAP_MIN_PANE_WIDTH = the 700px
+  // column + one rail strip each side), so the message column stays
+  // symmetrically centered and overlap is never the question. Callback ref +
+  // element state: the component first renders a loading branch without the
+  // pane, so the observer must start when the pane actually mounts. State
+  // holds only the visibility decision: dragging the panel divider fires per
+  // pixel, and a boolean keeps every non-crossing frame a no-op instead of
+  // re-rendering the whole chat window.
   const [chatPaneElement, setChatPaneElement] = useState<HTMLDivElement | null>(null);
   const [minimapPaneWide, setMinimapPaneWide] = useState(false);
   useLayoutEffect(() => {
@@ -588,11 +591,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     observer.observe(chatPaneElement);
     return () => observer.disconnect();
   }, [chatPaneElement]);
-  // The rail's own visibility lives in ChatMinimap (scroll-handler + measure
-  // path on one source of truth); it reports up so the reserved strip — and
-  // the centering shift it causes — keys on the same fact instead of a
-  // duplicate computation with its own lifecycle holes.
-  const [minimapRailVisible, setMinimapRailVisible] = useState(false);
   useEffect(() => {
     const sid = session?.id;
     if (!sid) {
@@ -1599,7 +1597,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             pendingScrollRestore && "invisible",
           )}
         >
-          <div style={{ minWidth: 0, padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
+          <div style={{ minWidth: 0, padding: `0 ${columnPadding}px` }}>
             <div
               ref={messageContentRef}
               onPointerUp={captureQuotedSelection}
@@ -1650,7 +1648,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             scrollContainer={scrollContainerRef}
             messageRefs={messageRefs}
             onRevealTurn={revealTurnForMinimap}
-            onVisibleChange={setMinimapRailVisible}
             turnsBefore={earlierTurnCount}
             turnIndex={minimapTurnIndex}
           />
@@ -1739,31 +1736,35 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         document.body,
       )}
 
-      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding + (minimapRailVisible ? MINIMAP_RAIL_STRIP : 0)}px 0 ${columnPadding}px` }}>
-        {/* The reveal wrapper sits above the minimap rail (zIndex 25), which
-            otherwise swallows the button's clicks across its whole strip. */}
+      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding}px` }}>
+        {/* Floats just above the composer's right edge; z-30 also keeps it
+            clear of the rail's zIndex 25. */}
         {!isEmptyNew && (
-          <div className="pointer-events-none absolute bottom-full right-4 z-30 max-sm:right-2.5">
-            <Button
-              type="button"
-              variant="ghost"
-              className={cn(
-                // The ghost Button's transition-all fades opacity and flips
-                // visibility discretely, which is exactly the reveal/hide curve.
-                "size-[34px] cursor-pointer rounded-full border border-border bg-card p-0 text-muted-foreground shadow-sm duration-[160ms]",
-                // Reduced motion keeps the fade but drops the slide/scale.
-                "motion-reduce:translate-y-0 motion-reduce:scale-100",
-                showScrollToBottom && !pendingScrollRestore
-                  ? "pointer-events-auto visible translate-y-0 scale-100 opacity-[0.28] hover:opacity-100 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 focus-visible:bg-secondary focus-visible:text-foreground"
-                  : "pointer-events-none invisible translate-y-1 scale-[0.96] opacity-0",
-              )}
-              title={t("chat.scrollToLatest")}
-              aria-label={t("chat.scrollToLatest")}
-              style={{ marginBottom: isMobile ? 10 : 14 }}
-              onClick={() => scrollToBottom("smooth")}
-            >
+          // Centered over the composer's 700px card (the same mx-auto column as
+          // the messages); z-30 also keeps it clear of the rail's zIndex 25.
+          <div className="pointer-events-none absolute inset-x-0 bottom-full z-30">
+            <div className="relative mx-auto w-full max-w-[700px]">
+              <Button
+                type="button"
+                variant="ghost"
+                className={cn(
+                  // The ghost Button's transition-all fades opacity and flips
+                  // visibility discretely, which is exactly the reveal/hide curve.
+                  "absolute left-1/2 -translate-x-1/2 bottom-[14px] max-sm:bottom-[10px]",
+                  "size-[34px] cursor-pointer rounded-full border border-border bg-card p-0 text-muted-foreground shadow-sm duration-[160ms]",
+                  // Reduced motion keeps the fade but drops the slide/scale.
+                  "motion-reduce:translate-y-0 motion-reduce:scale-100",
+                  showScrollToBottom && !pendingScrollRestore
+                    ? "pointer-events-auto visible translate-y-0 scale-100 opacity-[0.28] hover:opacity-100 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 focus-visible:bg-secondary focus-visible:text-foreground"
+                    : "pointer-events-none invisible translate-y-1 scale-[0.96] opacity-0",
+                )}
+                title={t("chat.scrollToLatest")}
+                aria-label={t("chat.scrollToLatest")}
+                onClick={() => scrollToBottom("smooth")}
+              >
               <ArrowDownIcon size={16} strokeWidth={2} className="size-4" aria-hidden="true" />
-            </Button>
+              </Button>
+            </div>
           </div>
         )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
@@ -2140,7 +2141,8 @@ function ExtensionDialog({
   const [full, setFull] = useState(false);
   const toggleFull = useCallback(() => setFull((prev) => !prev), []);
   const [now, setNow] = useState(() => Date.now());
-  const focusFirstOption = useCallback((element: HTMLDivElement | null) => element?.focus(), []);
+  const focusFirstOption = useCallback((element: HTMLElement | null) => element?.focus(), []);
+
   const summary = getExtensionDialogSummary(request);
   const remainingSeconds = request.expiresAt === undefined
     ? null
@@ -2428,39 +2430,28 @@ function ExtensionDialog({
               {multiSelect.options.map((option, index) => {
                 const checked = checkedIds.includes(option.id);
                 return (
-                  <div
+                  // The official Checkbox carries the semantics and the Space
+                  // key; the palette card stays the label wrapping it.
+                  <label
                     key={option.id}
-                    role="checkbox"
-                    aria-checked={checked}
-                    tabIndex={0}
                     className={cn(
                       "flex cursor-pointer select-none items-start gap-2 rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere scroll-m-[14px]",
-                      checked ? "border-ring bg-accent" : "border-border hover:bg-secondary",
+                      "border-border hover:bg-secondary has-[[data-state=checked]]:border-ring has-[[data-state=checked]]:bg-accent",
+                      "has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/40",
                     )}
-                    aria-label={option.label}
-                    ref={index === 0 ? focusFirstOption : undefined}
-                    onClick={() => toggleMultiOption(option.id)}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
-                      toggleMultiOption(option.id);
-                    }}
                   >
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "grid size-[15px] shrink-0 place-items-center rounded-[4px] border text-[10px] font-bold text-primary-foreground",
-                        checked ? "border-ring" : "border-border",
-                        checked ? "bg-primary" : "bg-transparent",
-                      )}
-                    >
-                      {checked ? "✓" : ""}
-                    </span>
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggleMultiOption(option.id)}
+                      aria-label={option.label}
+                      ref={index === 0 ? focusFirstOption : undefined}
+                      className="mt-[1px] size-[15px] shrink-0 rounded-[4px]"
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="mr-1.5 font-semibold">{option.id}.</span>
                       {option.label}
                     </span>
-                  </div>
+                  </label>
                 );
               })}
               <Input
