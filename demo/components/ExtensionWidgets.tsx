@@ -3,10 +3,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
 import { AnsiText } from "@/components/AnsiText";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ExtensionWidgetItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -111,12 +111,24 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
     updateClearTimersRef.current.clear();
   }, []);
 
+  // The expanded panel plays tw-animate-css's animate-out on close: it stays
+  // mounted for the animation (useDelayedUnmount) and keeps the last expanded
+  // widget's content while it plays.
+  const panelOpen = expandedWidgetKey !== null;
+  const panelMounted = useDelayedUnmount(panelOpen);
+  const lastExpandedKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (expandedWidgetKey) lastExpandedKeyRef.current = expandedWidgetKey;
+  }, [expandedWidgetKey]);
+
   if (widgets.length === 0) return null;
 
   const expandedWidget = widgets.find((widget) => (
     widget.key === expandedWidgetKey
     && widget.lines.length > 0
   ));
+  const panelWidget: ExtensionWidgetItem | null = expandedWidget
+    ?? (panelMounted ? widgets.find((widget) => widget.key === lastExpandedKeyRef.current) ?? null : null);
 
   const toggleWidget = (widget: ExtensionWidgetItem) => {
     setExpandedWidgetKey((current) => getNextExpandedWidgetKey(current, widget.key));
@@ -130,11 +142,12 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
 
   return (
     <>
-      {expandedWidget && (
+      {(panelOpen || panelMounted) && panelWidget && (
         <ExtensionWidgetPanel
-          widget={expandedWidget}
-          triggerId={`${idPrefix}-trigger-${widgets.indexOf(expandedWidget)}`}
-          panelId={`${idPrefix}-panel-${widgets.indexOf(expandedWidget)}`}
+          widget={panelWidget}
+          triggerId={`${idPrefix}-trigger-${widgets.indexOf(panelWidget)}`}
+          panelId={`${idPrefix}-panel-${widgets.indexOf(panelWidget)}`}
+          closing={!panelOpen}
         />
       )}
       <div className="flex min-w-0 flex-1 items-center gap-1 px-1.5 py-1">
@@ -171,46 +184,32 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
             </>
           );
 
+          // No tooltip: the key is already the trigger's whole text, and the
+          // placement/expand line only repeated it in jargon.
           return expandable ? (
-            <Tooltip key={widget.key}>
-              <TooltipTrigger asChild>
-                <Button
-                  id={triggerId}
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  data-expanded={expanded || undefined}
-                  className={triggerClass}
-                  aria-controls={panelId}
-                  aria-expanded={expanded}
-                  aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-                  onClick={() => toggleWidget(widget)}
-                >
-                  {content}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="flex flex-col gap-0.5">
-                <span>{widget.key}</span>
-                <span className="text-xs text-muted-foreground">
-                  {placementLabel} · {expanded ? t("i18n.collapse") : t("i18n.expand")}
-                </span>
-              </TooltipContent>
-            </Tooltip>
+            <Button
+              key={widget.key}
+              id={triggerId}
+              type="button"
+              variant="ghost"
+              size="xs"
+              data-expanded={expanded || undefined}
+              className={triggerClass}
+              aria-controls={panelId}
+              aria-expanded={expanded}
+              aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
+              onClick={() => toggleWidget(widget)}
+            >
+              {content}
+            </Button>
           ) : (
-            <Tooltip key={widget.key}>
-              <TooltipTrigger asChild>
-                <span
-                  className="inline-flex h-6 shrink-0 items-center rounded-md px-2 font-mono text-[11.5px] text-muted-foreground"
-                  aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-                >
-                  {content}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent className="flex flex-col gap-0.5">
-                <span>{widget.key}</span>
-                <span className="text-xs text-muted-foreground">{placementLabel}</span>
-              </TooltipContent>
-            </Tooltip>
+            <span
+              key={widget.key}
+              className="inline-flex h-6 shrink-0 items-center rounded-md px-2 font-mono text-[11.5px] text-muted-foreground"
+              aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
+            >
+              {content}
+            </span>
           );
         })}
       </div>
@@ -224,10 +223,12 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
 /**
  * Expanded widget content: a small popover-style card above the trigger row.
  */
-export function ExtensionWidgetPanel({ widget, triggerId, panelId }: {
+export function ExtensionWidgetPanel({ widget, triggerId, panelId, closing = false }: {
   widget: ExtensionWidgetItem;
   triggerId: string;
   panelId: string;
+  /** True while the exit animation plays; the panel is already logically closed. */
+  closing?: boolean;
 }) {
   return (
     // Floats above the shelf bar (the bar root is its positioned ancestor): the
@@ -236,7 +237,8 @@ export function ExtensionWidgetPanel({ widget, triggerId, panelId }: {
     <section
       id={panelId}
       aria-labelledby={triggerId}
-      className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md"
+      data-state={closing ? "closed" : "open"}
+      className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
     >
       <div className="border-b px-3 py-1.5 font-mono text-[11px] text-muted-foreground">{widget.key}</div>
       {/* Extension widgets render TUI output: tables, progress bars and box drawing

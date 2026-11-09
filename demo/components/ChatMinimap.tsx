@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo, memo, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, type RefObject } from "react";
 import { isMessageGroupAnchor } from "@/lib/message-display";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,10 +21,6 @@ interface Props {
   /** Whole-branch turn index, oldest first: turns before the loaded window
    *  list from it and page their messages in on click. */
   turnIndex?: MinimapTurnDescriptor[];
-  /** The rail's own visibility decision (the scroll handler and the measure
-   *  path both set it), reported up so the host can reserve the strip for the
-   *  same fact. */
-  onVisibleChange?: (visible: boolean) => void;
 }
 
 const MINIMAP_WIDTH = 36;
@@ -38,14 +34,14 @@ const MINIMAP_PADDING = 12;
 // folds turns into buckets regardless of height, so a long session stays at a
 // readable handful of nodes instead of one dash per turn.
 export const MAX_VISIBLE_SLOTS = 20;
-// The chat pane hides the rail only below this floor — the message column
-// reserves the rail strip (MINIMAP_RAIL_STRIP) at any width, so overlap is
-// already impossible; the floor just avoids a pane too narrow to read next
-// to the rail. Mobile hides the rail unconditionally already.
-export const MINIMAP_MIN_PANE_WIDTH = 440;
-// The message column reserves this right strip while the rail shows:
-// rail width + its right offset + breathing gap.
-export const MINIMAP_RAIL_STRIP = MINIMAP_WIDTH + 14 + 8;
+// Rail width + its left offset + breathing gap: the pane margin the rail needs.
+const MINIMAP_RAIL_STRIP = MINIMAP_WIDTH + 14 + 8;
+// The chat pane hides the rail below this floor: the rail floats in the pane's
+// left margin instead of the message column reserving a strip for it, so the
+// pane must fit the 700px column plus one rail strip on each side. The column
+// stays symmetrically centered and the rail never overlaps it. Mobile hides
+// the rail unconditionally already.
+export const MINIMAP_MIN_PANE_WIDTH = 700 + 2 * MINIMAP_RAIL_STRIP;
 const PREVIEW_SHOW_DELAY = 200;
 const PREVIEW_HIDE_DELAY = 250;
 const NAVIGATION_ACTIVE_LOCK_MS = 1600;
@@ -197,7 +193,6 @@ export const ChatMinimap = memo(function ChatMinimap({
   scrollContainer,
   messageRefs,
   onRevealTurn,
-  onVisibleChange,
   turnsBefore = 0,
   turnIndex = EMPTY_TURN_INDEX,
 }: Props) {
@@ -232,6 +227,17 @@ export const ChatMinimap = memo(function ChatMinimap({
     () => layoutSlots(allNodes, minimapHeight),
     [allNodes, minimapHeight],
   );
+  // The slot geometry centers on the rail's height; the measure path only
+  // runs on scroll and message changes, so a resize would leave the block
+  // centered on a stale height (visibly off-center). Watch the element.
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setMinimapHeight(el.clientHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [visible]);
   const { slots: positionedSlots, gap: slotGap } = slotLayout;
   slotLayoutRef.current = slotLayout;
   const activeSlot =
@@ -275,9 +281,8 @@ export const ChatMinimap = memo(function ChatMinimap({
     const scrollable = scrollEl.scrollHeight - scrollEl.clientHeight;
     const currentNodes = allNodesRef.current;
     setVisible(scrollable > 20);
-    onVisibleChange?.(scrollable > 20);
     syncActiveNode(scrollEl, currentNodes);
-  }, [scrollContainer, syncActiveNode, onVisibleChange]);
+  }, [scrollContainer, syncActiveNode]);
 
   const measureThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const measureNodes = useCallback(() => {
@@ -367,7 +372,6 @@ export const ChatMinimap = memo(function ChatMinimap({
       setAllNodes(nextNodes);
       const nextVisible = scrollEl.scrollHeight - scrollEl.clientHeight > 20;
       setVisible(nextVisible);
-      onVisibleChange?.(nextVisible);
       syncActiveNode(scrollEl, nextNodes);
 
       const pendingNavigation = pendingNavigationRef.current;
@@ -383,7 +387,7 @@ export const ChatMinimap = memo(function ChatMinimap({
         scrollEl.scrollTo({ top: Math.max(0, targetTop - targetOffset), behavior: "smooth" });
       }
     }, 150);
-  }, [getStreamingMessage, lockActiveNode, messageRefs, onVisibleChange, scrollContainer, syncActiveNode, turnIndex, turnsBefore]);
+  }, [getStreamingMessage, lockActiveNode, messageRefs, scrollContainer, syncActiveNode, turnIndex, turnsBefore]);
 
   useEffect(() => {
     const el = scrollContainer.current;
@@ -520,7 +524,7 @@ export const ChatMinimap = memo(function ChatMinimap({
     window.addEventListener("mouseup", onUp);
   }, [findNearestSlot, scrollToNode, showPreview, visible]);
 
-  // The overlay covers the chat's right edge, so wheel events over it would be
+  // The overlay covers the chat's left edge, so wheel events over it would be
   // swallowed; forward them so scrolling keeps working under the trigger zone.
   // The preview card scrolls itself, and forwarding its wheel events on top of
   // that scrolled the chat at the same time.
@@ -562,15 +566,13 @@ export const ChatMinimap = memo(function ChatMinimap({
         if (findNearestSlot(ratio)) showPreview();
         else if (!draggingRef.current) schedulePreviewHide();
       }}
-      // Canvas anchoring: the rail hugs the chat pane's right edge at the shared
+      // Canvas anchoring: the rail hugs the chat pane's LEFT edge at the shared
       // MINIMAP_WIDTH layout constant — measured positioning, kept as a style.
       style={{
         position: "absolute",
         top: 0,
         bottom: 0,
-        // Inside the chat pane's right edge, clear of its scrollbar — flush
-        // right: 0 sat on top of the scrollbar and read as "outside" the pane.
-        right: 14,
+        left: 14,
         width: MINIMAP_WIDTH,
         zIndex: 25,
       }}
@@ -625,9 +627,12 @@ export const ChatMinimap = memo(function ChatMinimap({
       })}
 
       {minimapHovered && nearestSlot !== null && allNodes.length > 0 && (
+        // Centered by the animation's fill-both end frame (translateY(-50%));
+        // a -translate-y-1/2 class here would compose with it in Tailwind v4
+        // (translate property + transform) and shift the card a full height.
         <div
           ref={previewBoxRef}
-          className="pointer-events-auto absolute top-1/2 right-[calc(100%+12px)] z-[100] -translate-y-1/2 max-h-[calc(100%-24px)] w-[340px] cursor-default select-text overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-2 shadow-md animate-[minimap-preview-in_160ms_ease_both] [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
+          className="pointer-events-auto absolute top-1/2 left-[calc(100%+12px)] z-[100] max-h-[calc(100%-24px)] w-[340px] cursor-default select-text overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-2 shadow-md animate-[minimap-preview-in_160ms_ease_both] [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
           data-minimap-preview-box=""
           onMouseEnter={showPreview}
           onMouseDown={(event) => event.stopPropagation()}
