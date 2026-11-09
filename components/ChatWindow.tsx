@@ -1738,27 +1738,32 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         {/* Floats just above the composer's right edge; z-30 also keeps it
             clear of the rail's zIndex 25. */}
         {!isEmptyNew && (
-          <div className="pointer-events-none absolute bottom-full right-4 z-30 max-sm:right-2.5">
-            <Button
-              type="button"
-              variant="ghost"
-              className={cn(
-                // The ghost Button's transition-all fades opacity and flips
-                // visibility discretely, which is exactly the reveal/hide curve.
-                "size-[34px] cursor-pointer rounded-full border border-border bg-card p-0 text-muted-foreground shadow-sm duration-[160ms]",
-                // Reduced motion keeps the fade but drops the slide/scale.
-                "motion-reduce:translate-y-0 motion-reduce:scale-100",
-                showScrollToBottom && !pendingScrollRestore
-                  ? "pointer-events-auto visible translate-y-0 scale-100 opacity-[0.28] hover:opacity-100 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 focus-visible:bg-secondary focus-visible:text-foreground"
-                  : "pointer-events-none invisible translate-y-1 scale-[0.96] opacity-0",
-              )}
-              title={t("chat.scrollToLatest")}
-              aria-label={t("chat.scrollToLatest")}
-              style={{ marginBottom: isMobile ? 10 : 14 }}
-              onClick={() => scrollToBottom("smooth")}
-            >
+          // Anchored to the composer's 700px card (the same mx-auto column as
+          // the messages), not the pane edge; z-30 also keeps it clear of the
+          // rail's zIndex 25.
+          <div className="pointer-events-none absolute inset-x-0 bottom-full z-30">
+            <div className="relative mx-auto w-full max-w-[700px]">
+              <Button
+                type="button"
+                variant="ghost"
+                className={cn(
+                  // The ghost Button's transition-all fades opacity and flips
+                  // visibility discretely, which is exactly the reveal/hide curve.
+                  "absolute right-4 bottom-[14px] max-sm:right-2.5 max-sm:bottom-[10px]",
+                  "size-[34px] cursor-pointer rounded-full border border-border bg-card p-0 text-muted-foreground shadow-sm duration-[160ms]",
+                  // Reduced motion keeps the fade but drops the slide/scale.
+                  "motion-reduce:translate-y-0 motion-reduce:scale-100",
+                  showScrollToBottom && !pendingScrollRestore
+                    ? "pointer-events-auto visible translate-y-0 scale-100 opacity-[0.28] hover:opacity-100 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 focus-visible:bg-secondary focus-visible:text-foreground"
+                    : "pointer-events-none invisible translate-y-1 scale-[0.96] opacity-0",
+                )}
+                title={t("chat.scrollToLatest")}
+                aria-label={t("chat.scrollToLatest")}
+                onClick={() => scrollToBottom("smooth")}
+              >
               <ArrowDownIcon size={16} strokeWidth={2} className="size-4" aria-hidden="true" />
-            </Button>
+              </Button>
+            </div>
           </div>
         )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the

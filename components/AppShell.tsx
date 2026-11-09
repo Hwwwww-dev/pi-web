@@ -64,6 +64,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile, useIsNarrowMobile } from "@/hooks/useIsMobile";
 import { useViewportHeight } from "@/hooks/useViewportHeight";
 import { useResizablePanel } from "@/hooks/useResizablePanel";
+import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
 import { useAudio } from "@/hooks/useAudio";
 import { useOutsideDismiss } from "@/hooks/useOutsideDismiss";
 import { copyText } from "@/lib/clipboard";
@@ -594,6 +595,13 @@ export function AppShell() {
   useOutsideDismiss(activeTopPanel === "system", systemPanelRef, useCallback(() => closeTopPanel("system"), [closeTopPanel]));
   useOutsideDismiss(activeTopPanel === "tools", toolsPanelRef, useCallback(() => closeTopPanel("tools"), [closeTopPanel]));
   useOutsideDismiss(activeTopPanel === "session", sessionInfoPanelRef, useCallback(() => closeTopPanel("session"), [closeTopPanel]));
+  // The top panels play tw-animate-css's animate-out on close: the panel stays
+  // mounted for the animation and only then unmounts (useDelayedUnmount), with
+  // data-state telling the closing frame from the live one.
+  const systemPanelMounted = useDelayedUnmount(activeTopPanel === "system");
+  const toolsPanelMounted = useDelayedUnmount(activeTopPanel === "tools");
+  const sessionPanelMounted = useDelayedUnmount(activeTopPanel === "session");
+  const debugPanelMounted = useDelayedUnmount(activeTopPanel === "debug");
 
   // Escape inside the debug panel; it never closes another panel that took its place. With focus
   // in the panel, that focus leaves the page with it: once the panel is gone (the next frame), the
@@ -2441,8 +2449,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           {/* Top panels — anchored under the header (the draft's sheet); only
               one open at a time. z-[240] stays below the quote toolbar's 260
               (ChatWindow). */}
-          {activeTopPanel === "system" && (
-            <div ref={systemPanelRef} className="absolute inset-x-0 top-full z-[240]">
+          {(activeTopPanel === "system" || systemPanelMounted) && (
+            <div
+              ref={systemPanelRef}
+              data-state={activeTopPanel === "system" ? "open" : "closed"}
+              className="absolute inset-x-0 top-full z-[240] pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+            >
               <SystemPromptPanel
                 loading={systemInfoLoading}
                 prompt={systemPrompt}
@@ -2450,8 +2462,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               />
             </div>
           )}
-          {activeTopPanel === "tools" && (
-            <div ref={toolsPanelRef} className="absolute inset-x-0 top-full z-[240]">
+          {(activeTopPanel === "tools" || toolsPanelMounted) && (
+            <div
+              ref={toolsPanelRef}
+              data-state={activeTopPanel === "tools" ? "open" : "closed"}
+              className="absolute inset-x-0 top-full z-[240] pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+            >
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
                 tools={systemTools}
@@ -2459,12 +2475,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               />
             </div>
           )}
-          {activeTopPanel === "session" && (
+          {(activeTopPanel === "session" || sessionPanelMounted) && (
             // 会话信息浮层：标准弹层观感（bg-popover + border + shadow-md）。
             // 开关仍由 toggleTopPanel 驱动，非 Radix Popover；类名保留作 e2e 定位锚。
             <div
               ref={sessionInfoPanelRef}
-              className="session-info-popover absolute top-full right-0 z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md"
+              data-state={activeTopPanel === "session" ? "open" : "closed"}
+              className="session-info-popover absolute top-full right-0 z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
             >
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
@@ -2573,8 +2590,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               )}
             </div>
           )}
-          {activeTopPanel === "debug" && (
-            <div className="absolute inset-x-0 top-full z-[240]">
+          {(activeTopPanel === "debug" || debugPanelMounted) && (
+            <div
+              data-state={activeTopPanel === "debug" ? "open" : "closed"}
+              className="absolute inset-x-0 top-full z-[240] pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+            >
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
                   readerRef={debugSnapshotReaderRef}
