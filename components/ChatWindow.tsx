@@ -27,6 +27,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -2139,7 +2140,8 @@ function ExtensionDialog({
   const [full, setFull] = useState(false);
   const toggleFull = useCallback(() => setFull((prev) => !prev), []);
   const [now, setNow] = useState(() => Date.now());
-  const focusFirstOption = useCallback((element: HTMLDivElement | null) => element?.focus(), []);
+  const focusFirstOption = useCallback((element: HTMLElement | null) => element?.focus(), []);
+
   const summary = getExtensionDialogSummary(request);
   const remainingSeconds = request.expiresAt === undefined
     ? null
@@ -2427,39 +2429,28 @@ function ExtensionDialog({
               {multiSelect.options.map((option, index) => {
                 const checked = checkedIds.includes(option.id);
                 return (
-                  <div
+                  // The official Checkbox carries the semantics and the Space
+                  // key; the palette card stays the label wrapping it.
+                  <label
                     key={option.id}
-                    role="checkbox"
-                    aria-checked={checked}
-                    tabIndex={0}
                     className={cn(
                       "flex cursor-pointer select-none items-start gap-2 rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere scroll-m-[14px]",
-                      checked ? "border-ring bg-accent" : "border-border hover:bg-secondary",
+                      "border-border hover:bg-secondary has-[[data-state=checked]]:border-ring has-[[data-state=checked]]:bg-accent",
+                      "has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/40",
                     )}
-                    aria-label={option.label}
-                    ref={index === 0 ? focusFirstOption : undefined}
-                    onClick={() => toggleMultiOption(option.id)}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
-                      toggleMultiOption(option.id);
-                    }}
                   >
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "grid size-[15px] shrink-0 place-items-center rounded-[4px] border text-[10px] font-bold text-primary-foreground",
-                        checked ? "border-ring" : "border-border",
-                        checked ? "bg-primary" : "bg-transparent",
-                      )}
-                    >
-                      {checked ? "✓" : ""}
-                    </span>
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggleMultiOption(option.id)}
+                      aria-label={option.label}
+                      ref={index === 0 ? focusFirstOption : undefined}
+                      className="mt-[1px] size-[15px] shrink-0 rounded-[4px]"
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="mr-1.5 font-semibold">{option.id}.</span>
                       {option.label}
                     </span>
-                  </div>
+                  </label>
                 );
               })}
               <Input

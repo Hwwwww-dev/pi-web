@@ -46,17 +46,15 @@
 - 替换为：外壳 **Dialog**（backdrop、Escape、焦点陷阱内建），内部文件树列表保留自研；新建目录小弹窗 → **AlertDialog** 或嵌套 Dialog。
 - 工作量：小。收益：删 backdrop/层级/焦点代码。
 
-### A4. ChatWindow 引用追问浮层（quote 输入 portal）
+### A4. ChatWindow 引用追问浮层（quote 输入 portal）——评估后放弃
 
-- 现状：`ChatWindow.tsx` 行 1656 `createPortal` 到 body 的 absolute 浮层（引用选中文字追问）。
-- 替换为：**Popover**（锚定触发按钮），动画/层级/Esc 内建。
-- 工作量：小。
+- 现状：`ChatWindow.tsx` 行 1656 `createPortal` 到 body 的 fixed 浮层，锚点是**动态文字选区坐标**（quotedSelection.top/left），随选区出现/消失（toolbar→输入两态）。
+- 放弃理由：Radix 的锚定模型是元素锚（即使 virtual element 也要自行维护选区 rect 的同步与清理），选区驱动的浮动工具栏用固定定位跟随选区本就是正确形态（GitHub/Notion 同款）；套 Popover 增加的 Esc/外点关闭对选区生命周期是冗余（选区消失即关）。
 
-### A5. ExtensionWidgetPanel（扩展组件展开卡）
+### A5. ExtensionWidgetPanel（扩展组件展开卡）——评估后放弃
 
-- 现状：`ExtensionWidgets.tsx` 条件渲染 `absolute bottom-full` 卡片（本阶段刚补了退出动画 + 保留旧内容渲染）。
-- 替换为：**Popover**（trigger 是组件 pill）。刚写的 `useDelayedUnmount` + lastExpandedKeyRef 延迟卸载逻辑整体删除（Radix 动画内建）。
-- 工作量：小。
+- 现状：`ExtensionWidgets.tsx` 条件渲染 `absolute bottom-full left-0` 卡片。
+- 放弃理由：面板锚定的是 pill **行**（shelf 根），不是单个 pill——Popover 的 trigger 锚定模型不适配；该组件的 SSR 静态渲染测试断言 `<section`/`<pre` 输出，Radix 的 portal 渲染与之不兼容。现有受控面板已带退出动画，保留。
 
 ### A6. lib/stacked-dialog.ts（Escape 堆叠，201 行）
 
@@ -64,17 +62,14 @@
 - 替换为：无独立替换物——Radix Dialog/Popover/AlertDialog/Sheet 全部基于 DismissableLayer，**天然自带 dismiss 层级堆叠**。第二至五项换完后此文件与各调用点删除。
 - 工作量：随 A1–A5 顺带删。
 
-### A7. hooks/useDialogMaxHeight.ts（38 行）
+### A7. hooks/useDialogMaxHeight.ts（38 行）——保留
 
-- 现状：ChatWindow 扩展请求弹窗手工测量视口高度限制弹窗高度。
-- 替换为：shadcn DialogContent 官方类已含 `max-h` 约束；该 hook 的调用点（extension-ui-queue 面板壳）改用 Dialog 后删除。
-- 工作量：小。
+- 现状：扩展对话框的 max-height 以**其锚定的聊天面板**（而非视口）为界（useDialogMaxHeight(wrapperRef)，#947 的 fit-width/最大化体系一部分）。
+- 结论：这些对话框是聊天列内嵌面板，不是 Radix Dialog 的全屏模态形态，Dialog 化不成立；hook 保留。
 
-### A8. hooks/useIsMobile.ts（可选，文件归位）
+### A8. hooks/useIsMobile.ts——评估后放弃
 
-- 现状：自研 matchMedia hook，`ui/sidebar.tsx` 引用它（官方版是 `hooks/use-mobile.ts`）。
-- 替换为：shadcn 官方 `use-mobile`。功能等价，纯归位，无行为收益；只在追求"与官方结构逐文件一致"时做。
-- 工作量：极小。
+- 放弃理由：自研版是 shadcn 官方 use-mobile 的**超集**（useIsMobile 640px 断点与 globals.css 对齐 + useIsNarrowMobile 480px + useCoarsePointer 指针类型），官方版单一 768px hook 会丢功能，非纯文件归位。
 
 ## 三、可替换 —— 需要新增 shadcn 生态依赖
 
@@ -117,29 +112,26 @@
 - 风险：SourceCodeView 的行号 gutter、wrap、超过阈值延迟渲染逻辑要迁到 Prism 版本；DiffView 的共享 FILE_CODE_STYLE 需同步。
 - 工作量：中。严格说不是"换 shadcn 组件"（code-block 不做高亮），而是借 CodeBlock 统一掉第二套高亮依赖。
 
-### A10. KeepAliveDock 的会话菜单浮层
+### A10. KeepAliveDock 的会话菜单浮层 ✅ 已完成（批次 1）
 
-- 现状：`KeepAliveDock.tsx` 行 148–152：自研条件渲染 `absolute -top-[18px] left-[calc(100%+8px)]` 浮层 + `role="menu"` + 自研进场动画（keepalive-dock-in）+ panelRef 管理；dock 本体（可垂直拖拽的圆钮）无 shadcn 对应，保留。
-- 替换为：**Popover**（锚定圆钮）+ 内部项改 DropdownMenu 语义（`DropdownMenuItem`），动画/Esc/外点关闭内建。
-- 工作量：小。
+- 受控 `Popover` + `PopoverAnchor`（圆钮保持 pointer 拖拽/点击手势，不接管 click）；外点关闭交给 Radix（`onPointerDownOutside` 豁免圆钮，避免"外点先关、pointer-up 再开"的竞态）；Esc 捕获 stopPropagation 保留（防止冒泡触发"停 agent"）；`onOpenAutoFocus` preventDefault 保持原"不抢焦点"行为。删除自研 outside-dismiss effect、panelRef 与手写进场动画。
 
-### A11. 自研单选组 → ui/radio-group（需新增该 shadcn 组件文件）
+### A11. 自研单选组 → ui/radio-group ✅ 已完成（批次 1）
 
-- 现状：两处 `role="radiogroup"` + `role="radio"` 的 Button 列表——`ChatInput.tsx` 行 1902（模型弹层里的思考级别选择）、`SettingsPanel.tsx`（外观主题三选）。
-- 替换为：shadcn **Radio Group**（`components/ui/radio-group.tsx`，官方组件，`ui/` 目前缺这个文件，按官方源码添加）。Popover 内的思考级别用 RadioGroup + label 行；外观三选用带卡片的 RadioGroup item。
-- 工作量：小（组件文件 + 两处调用点）。
+- 新增 `components/ui/radio-group.tsx`（官方源码，统一 radix-ui 包的 `Indicator` 命名）。
+- `SettingsPanel.tsx` 外观主题三选：native sr-only radio + `has-[:checked]` → RadioGroup + sr-only RadioGroupItem + `has-[[data-state=checked]]`，卡片视觉不变，方向键/roving focus 由 Radix 承担。
+- 语言选择行与 ChatInput 思考级别行保持 `role="radio"` Button 行：它们是弹层内的菜单行形态（官方在菜单内的单选惯例），不套表单 RadioGroup。
 
-### A12. 扩展请求多选对话框 → Dialog + Checkbox
+### A12. 扩展请求多选对话框 → ui/checkbox ✅ 已完成（批次 1，范围修正）
 
-- 现状：`ChatWindow.tsx` 行 2425 起：extension-ui-request 的多选选项面板，自研 `role="checkbox"` div + tabIndex + 手工焦点第一个选项（focusFirstOption）+ Enter/Space 键处理；配套 `useDialogMaxHeight`（A7）手工测高。
-- 替换为：**Dialog**（焦点陷阱/Esc 内建，删除 focusFirstOption 与按键手写）+ **Checkbox**（`ui/checkbox.tsx` 已有）+ `Label`；高度交给 DialogContent 的 max-h 约束，删 `useDialogMaxHeight`。
-- 工作量：中（extension-ui-queue 的面板壳涉及）。单选变体同理换 `RadioGroup`。
+- 多选选项卡：自研 `role="checkbox"` div + 手写 Enter/Space + 手绘 ✓ 方框 → label 包 `ui/checkbox`（Radix 语义/Space/勾选图标内建），卡片视觉经 `has-[[data-state=checked]]` 保留；`focusFirstOption` 泛化为 HTMLElement。
+- 外壳 Dialog 化不成立（A7 结论：聊天列内嵌面板设计），`useDialogMaxHeight` 保留。
 
 ### A13. 最佳实践推广档（类级/属性级，非组件替换）
 
 - native `title={t(...)}` tooltip：全项目 **~90 处**（FileExplorer 14、SessionTree 12、ChatInput 12、SessionSidebar 10、ChatWindow 9…）。shadcn 最佳实践是 **Tooltip** 组件（`ui/tooltip.tsx` 已有，3 处在用）。全量替换成本高、native title 也有触达成本为零的价值：建议只对**纯图标按钮**（无文字、语义依赖 tooltip）批量换 Tooltip，文字按钮保留 title。
-- `animate-spin` 手写 spinner：7 处（AgentSessionPanel/AppShell/DebugPanel/FileExplorer/ModelSelector/SessionIndicators/ProviderUsageSummary）→ **ui/spinner**（已有，ActivityRows 在用）。类级替换。
-- `SettingsUi.tsx` 行 962 残留的 native `<details>` 折叠 → **Collapsible**（ActivityRows 已完成同类迁移，照抄模式）。
+- `animate-spin` 手写 spinner：7 处——评估后放弃：ui/spinner 内建英文 `aria-label="Loading"`（项目 i18n、多数 spinner 是装饰性旁注），且各处尺寸/动画时长定制不同；`animate-spin` 本身就是标准做法。
+- `SettingsUi.tsx` native `<details>` 折叠 → Collapsible ✅ 已完成（批次 1，`config-footer-status*` 类名保留为测试锚点）。
 - 大量 `role="alert"` / `role="status"`（55 处）：是提示文字的语义角色，不是组件问题；仅在需要样式化提示条时用 ui/alert 包裹。
 
 ## 五、建议执行批次
