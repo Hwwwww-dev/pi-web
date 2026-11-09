@@ -833,7 +833,7 @@ export function SettingsPanel({
             {!isPhone && (
               <TabsList
                 variant="line"
-                className="ml-4 h-auto min-h-0 shrink-0 items-stretch justify-start gap-1 self-stretch overflow-x-auto rounded-none border-0 bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="ml-4 shrink-0 self-center justify-start gap-1 overflow-x-auto rounded-none border-0 bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 {sections.map((item) => {
                   const disabled = item.requiresProject && !cwd;
@@ -843,7 +843,7 @@ export function SettingsPanel({
                       value={item.id}
                       disabled={disabled}
                       title={disabled ? t("settings.projectRequired") : item.label}
-                      className="h-auto flex-none gap-1.5 rounded-none px-3 py-0 text-[12.5px] font-normal data-[state=active]:font-semibold"
+                      className="flex-none gap-1.5 rounded-none px-3 py-0 text-[12.5px] font-normal data-[state=active]:font-semibold"
                     >
                       <SettingsSectionIcon section={item.id} size={15} />
                       <span className="truncate">{item.label}</span>
