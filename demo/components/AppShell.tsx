@@ -607,6 +607,16 @@ export function AppShell() {
     if (restoreFocus) requestAnimationFrame(() => focusIfLost(document, debugButtonRef.current));
   }, []);
 
+  // A ⋯-menu item's select closes the menu, and Radix then restores focus to
+  // the ⋯ trigger — outside every top panel. Opening a panel synchronously in
+  // onSelect lets that restore land after the panel Popover's own focus grab,
+  // so the panel reads a focus-outside and dismisses the instant it opened.
+  // Deferring past the menu's unmount + focus restore opens the panel last:
+  // its content takes focus and nothing is left to dismiss it.
+  const openTopPanelFromMenu = useCallback((open: () => void) => {
+    window.setTimeout(open, 0);
+  }, []);
+
   const handleSystemInfoToggle = useCallback((
     panel: "system" | "tools",
     keepMobileToolbarOpen = false,
@@ -2091,7 +2101,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             );
           })()}
           <DropdownMenuItem
-            onSelect={() => handleSystemInfoToggle("system")}
+            onSelect={() => openTopPanelFromMenu(() => handleSystemInfoToggle("system"))}
             disabled={mobile && !showChat}
             title={translate("system.prompt")}
             className="gap-2"
@@ -2104,7 +2114,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <span className="min-w-0 flex-1">{translate("system.label")}</span>
           </DropdownMenuItem>
           <DropdownMenuItem
-            onSelect={() => handleSystemInfoToggle("tools")}
+            onSelect={() => openTopPanelFromMenu(() => handleSystemInfoToggle("tools"))}
             disabled={mobile && !showChat}
             title={translate("tools.title")}
             className="gap-2"
@@ -2147,7 +2157,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               </DropdownMenuItem>
               {sessionHasBranches && (
                 <DropdownMenuItem
-                  onSelect={() => toggleTopPanel("branches", true)}
+                  onSelect={() => openTopPanelFromMenu(() => toggleTopPanel("branches", true))}
                   title={translate("i18n.branches")}
                   className="gap-2"
                   data-mobile-toolbar-action="branches"
@@ -2160,7 +2170,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
-                onSelect={() => toggleTopPanel("debug", mobile)}
+                onSelect={() => openTopPanelFromMenu(() => toggleTopPanel("debug", mobile))}
                 disabled={!showChat}
                 title={translate("debug.title")}
                 className="gap-2"
