@@ -7,7 +7,7 @@ import Image from "next/image";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage } from "@/lib/types";
-import { isTuiText, normalizeCustomPanelLines } from "@/lib/ansi";
+import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
 import { splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
@@ -1913,9 +1913,9 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
 type ExtensionDialogRequest = Extract<ExtensionUiRequest, { method: "select" | "confirm" | "input" | "editor" }>;
 
 function getExtensionDialogSummary(request: ExtensionDialogRequest): string | undefined {
-  if (request.method === "select" && request.options.length > 0) return request.options[0];
+  if (request.method === "select" && request.options.length > 0) return stripAnsi(request.options[0]);
   if (request.method === "confirm") {
-    const firstLine = request.message.split("\n").find((line) => line.trim());
+    const firstLine = stripAnsi(request.message).split("\n").find((line) => line.trim());
     return firstLine?.trim();
   }
   return undefined;
@@ -2238,7 +2238,7 @@ function ExtensionDialog({
             {t("chat.extensionPending")}
           </span>
           <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
-            {request.title}
+            {stripAnsi(request.title)}
           </span>
           {summary && (
             <span className="max-w-[34%] shrink truncate text-xs text-muted-foreground">
@@ -2255,7 +2255,7 @@ function ExtensionDialog({
       <div
         ref={dialogRef}
         role="dialog"
-        aria-label={request.title}
+        aria-label={stripAnsi(request.title)}
         className="pointer-events-auto relative mx-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl animate-[extension-drawer-in_0.22s_ease-out] motion-reduce:animate-none"
         style={{
           // "Full" fills the content region above the composer: the overlay is inset:0 with
@@ -2270,7 +2270,7 @@ function ExtensionDialog({
           <div className="min-w-0 flex-1">
             {/* Pi's TUI shows the title verbatim, newlines included; select/input have no
                 separate message field, so extensions put multi-line text here. */}
-            <ExtensionDialogTitle title={multiSelect ? multiSelect.question || request.title : request.title} />
+            <ExtensionDialogTitle title={multiSelect ? stripAnsi(multiSelect.question || request.title) : stripAnsi(request.title)} />
             <div className="mt-[3px] flex flex-wrap items-center gap-2 text-xs font-mono text-muted-foreground">
               <span>{t("chat.extensionRequest")}</span>
               {totalQuestions > 1 && (
@@ -2360,7 +2360,7 @@ function ExtensionDialog({
           <>
           {request.method === "confirm" && (
             <div className="text-[13px] leading-[1.6]">
-              <MarkdownBody>{request.message}</MarkdownBody>
+              <MarkdownBody>{stripAnsi(request.message)}</MarkdownBody>
             </div>
           )}
           {request.method === "select" && (
@@ -2404,7 +2404,7 @@ function ExtensionDialog({
                     ),
                     tone !== "neutral" && "font-semibold",
                   )}
-                  aria-label={option}
+                  aria-label={stripAnsi(option)}
                   aria-pressed={selected}
                   ref={index === 0 ? focusFirstOption : undefined}
                   onClick={() => setSelectedOption((current) => current === option ? null : option)}
@@ -2419,7 +2419,7 @@ function ExtensionDialog({
                   }}
                 >
                   <div inert>
-                    <MarkdownBody>{option}</MarkdownBody>
+                    <MarkdownBody>{stripAnsi(option)}</MarkdownBody>
                   </div>
                 </div>
                 );
@@ -2554,7 +2554,7 @@ function ExtensionCustomPanel({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const dialogMaxHeight = useDialogMaxHeight(wrapperRef);
   const displayLines = normalizeCustomPanelLines(request.lines);
-  const summary = displayLines.find((line) => line.trim())?.trim();
+  const summary = displayLines.map(stripAnsi).find((line) => line.trim())?.trim();
 
   useEffect(() => {
     if (!collapsed) inputRef.current?.focus();

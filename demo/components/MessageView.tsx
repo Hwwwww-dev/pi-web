@@ -456,6 +456,48 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   );
 }
 
+export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = null, className }: {
+  modelName?: string;
+  estimatedTokens?: number;
+  tps?: number | null;
+  className?: string;
+}) {
+  const { t } = useI18n();
+  return (
+    // Fixed row height, tabular numerals and minimum widths keep the streaming
+    // token count and the speed badge from jittering while they count up.
+    <div className={cn(
+      "flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-[11px] leading-[1.5] text-muted-foreground [font-variant-numeric:tabular-nums]",
+      className,
+    )}>
+      {modelName && <span className="min-w-0 truncate">{modelName}</span>}
+      {estimatedTokens > 0 && (
+        <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground" title={t("i18n.estimatedTokens")}>
+          <span className="flex items-center gap-0.5 text-[11px] font-normal">
+            <ArrowDownIcon aria-hidden className="size-2.5" strokeWidth={1.5} />
+            {/* Both minimum widths leave a pixel for per-glyph rounding at the widest value. */}
+            <span className="min-w-[calc(6ch+1px)]">{estimatedTokens}</span>
+          </span>
+          {tps !== null && (
+            <Badge
+              variant="ghost"
+              className={cn(
+                "ml-1.5 box-content min-w-[calc(9ch+1px)] justify-center text-center",
+                tps >= 50 ? "bg-primary/15 text-primary"
+                  : tps >= 30 ? "bg-success/15 text-success"
+                  : tps >= 15 ? "bg-warning/15 text-warning"
+                  : "bg-destructive/15 text-destructive",
+              )}
+            >
+              {tps.toFixed(1)} t/s
+            </Badge>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function AssistantMessageView({
   message,
   isStreaming,
@@ -647,49 +689,15 @@ function AssistantMessageView({
       {/* Streaming status (estimated tokens + throughput); the model name lives
           in the turn meta line / the per-message label for standalone messages. */}
       {(showModelLabel || isStreaming) && (
-        <div
-          className={cn(
-            "mb-1 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground",
-            // The live-tail streaming message renders next to the activity
-            // rows: line its tokens/rate up with the rows' icon column, and
-            // keep it clear of the tool row above.
-            isStreaming && !showModelLabel && "mt-1.5 pl-1",
-          )}
-        >
-          {showModelLabel && message.provider && (
-            <span>{getModelDisplayName(message.provider, message.model, modelNames)}</span>
-          )}
-          {isStreaming && (() => {
-            const est = Math.round(estimatedTokens);
-            return (
-              <>
-
-                {est > 0 && (
-                  <span className="flex items-center gap-1 text-foreground" title={t("i18n.estimatedTokens")}>
-                    <span className="flex items-center gap-0.5 text-[11px] font-normal">
-                      <ArrowDownIcon aria-hidden className="size-2.5" strokeWidth={1.5} />
-                      {est}
-                    </span>
-                    {tps !== null && (
-                      <Badge
-                        variant="ghost"
-                        className={cn(
-                          "ml-1.5",
-                          tps >= 50 ? "bg-primary/15 text-primary"
-                            : tps >= 30 ? "bg-success/15 text-success"
-                            : tps >= 15 ? "bg-warning/15 text-warning"
-                            : "bg-destructive/15 text-destructive",
-                        )}
-                      >
-                        {tps.toFixed(1)} t/s
-                      </Badge>
-                    )}
-                  </span>
-                )}
-              </>
-            );
-          })()}
-        </div>
+        <AssistantMessageHeader
+          modelName={showModelLabel && message.provider ? getModelDisplayName(message.provider, message.model, modelNames) : undefined}
+          estimatedTokens={isStreaming ? Math.round(estimatedTokens) : 0}
+          tps={isStreaming ? tps : null}
+          // The live-tail streaming message renders next to the activity rows:
+          // line its tokens/rate up with the rows' icon column, and keep it
+          // clear of the tool row above.
+          className={cn(isStreaming && !showModelLabel && "mt-1.5 pl-1")}
+        />
       )}
 
       {/* Not keyed by the entry id: a message of this run gets one when the file is

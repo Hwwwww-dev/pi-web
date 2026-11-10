@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getFileIcon } from "./FileIcons";
 import { BotIcon, GitBranchIcon, MessagesSquareIcon, TerminalIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,11 +27,14 @@ interface Props {
   activeTabId: string;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
+  onReorderTab?: (source: string, target: string, after: boolean) => void;
 }
 
-export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
+export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onReorderTab }: Props) {
   const { t } = useI18n();
   const listRef = useRef<HTMLDivElement>(null);
+  const draggedId = useRef<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; after: boolean } | null>(null);
 
   // The strip has no scrollbar (globals.css), so a vertical wheel scrolls it
   // sideways. Non-passive: the page must not scroll as well.
@@ -77,6 +80,35 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
             role="tab"
             aria-label={tab.kind === "terminal" ? t("terminal.tabLabel", { name: tab.label }) : tab.kind === "git" ? t("gitPanel.title") : tab.kind === "agent" ? t("subagent.tabLabel", { name: tab.label }) : tab.kind === "side" ? t("sideChat.tabLabel") : tab.label}
             aria-selected={isActive}
+            draggable={Boolean(onReorderTab)}
+            onDragStart={(event) => {
+              if (!onReorderTab) return;
+              draggedId.current = tab.id;
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", tab.id);
+            }}
+            onDragOver={(event) => {
+              if (!draggedId.current || draggedId.current === tab.id) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              const rect = event.currentTarget.getBoundingClientRect();
+              const after = event.clientX >= rect.left + rect.width / 2;
+              setDropTarget((prev) => prev?.id === tab.id && prev.after === after ? prev : { id: tab.id, after });
+            }}
+            onDrop={(event) => {
+              if (!draggedId.current || draggedId.current === tab.id) return;
+              event.preventDefault();
+              event.stopPropagation();
+              const rect = event.currentTarget.getBoundingClientRect();
+              onReorderTab?.(draggedId.current, tab.id, event.clientX >= rect.left + rect.width / 2);
+              draggedId.current = null;
+              setDropTarget(null);
+            }}
+            onDragLeave={(event) => {
+              if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+              setDropTarget((prev) => prev?.id === tab.id ? null : prev);
+            }}
+            onDragEnd={() => { draggedId.current = null; setDropTarget(null); }}
             tabIndex={isActive || (!activeTabId && tabs[0].id === tab.id) ? 0 : -1}
             onKeyDown={(event) => {
               if (event.target !== event.currentTarget) return;
@@ -107,6 +139,10 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               isActive
                 ? "bg-background font-medium text-foreground shadow-xs"
                 : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+              // Drop line on the half the dragged tab is over.
+              dropTarget?.id === tab.id && (dropTarget.after
+                ? "shadow-[inset_-2px_0_0_var(--accent)]"
+                : "shadow-[inset_2px_0_0_var(--accent)]"),
             )}
           >
             <span className={cn("flex shrink-0 items-center", isActive ? "opacity-100" : "opacity-70")}>
@@ -130,6 +166,8 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               type="button"
               variant="ghost"
               size="icon-xs"
+              draggable={false}
+              onDragStart={(event) => event.stopPropagation()}
               disabled={tab.closing}
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
               className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent p-0 text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"

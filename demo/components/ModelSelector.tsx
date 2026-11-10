@@ -24,8 +24,16 @@ const PROVIDER_USAGE_CACHE_TTL_MS = 5 * 60_000;
 
 export interface ModelSelectorOption {
   provider: string;
+  /** The provider's display name; falls back to `provider` in the group heading. */
+  providerName?: string;
   modelId: string;
   name: string;
+}
+
+export interface ModelSelectorGroup {
+  provider: string;
+  providerName: string;
+  options: ModelSelectorOption[];
 }
 
 interface ModelSelectorProps {
@@ -57,6 +65,27 @@ interface ModelSelectorProps {
   iconClassName?: string;
   /** Appended to the trigger tooltip after the default text. */
   titleHint?: string;
+}
+
+/** Groups in first-appearance order; never re-sorts, so a models.json provider keeps its file's order (#783). */
+export function groupModelOptions(options: ModelSelectorOption[]): ModelSelectorGroup[] {
+  const groups: ModelSelectorGroup[] = [];
+  for (const option of options) {
+    const existing = groups.find((group) => group.provider === option.provider);
+    if (existing) {
+      existing.options.push(option);
+      if (existing.providerName === existing.provider && option.providerName?.trim()) {
+        existing.providerName = option.providerName.trim();
+      }
+    } else {
+      groups.push({
+        provider: option.provider,
+        providerName: option.providerName?.trim() || option.provider,
+        options: [option],
+      });
+    }
+  }
+  return groups;
 }
 
 export function ModelSelector({
@@ -94,13 +123,7 @@ export function ModelSelector({
     if (!showAll) onShowAll?.();
     setShowAll(!showAll);
   };
-  const modelsByProvider: { provider: string; options: ModelSelectorOption[] }[] = [];
-
-  for (const option of listed ?? []) {
-    const group = modelsByProvider.find((item) => item.provider === option.provider);
-    if (group) group.options.push(option);
-    else modelsByProvider.push({ provider: option.provider, options: [option] });
-  }
+  const modelsByProvider = groupModelOptions(listed ?? []);
 
   const currentName = selectedLabel ?? (value
     ? (isListed(options, value) ?? isListed(allOptions, value))?.name ?? value.modelId
@@ -287,7 +310,9 @@ export function ModelSelector({
           {modelsByProvider.map((group) => (
             <DropdownMenuGroup key={group.provider}>
               <DropdownMenuLabel className="flex w-full items-baseline justify-between gap-2 py-1 font-medium">
-                {modelsByProvider.length > 1 && <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">{group.provider}</span>}
+                {modelsByProvider.length > 1 && (
+                  <span title={group.providerName === group.provider ? undefined : group.provider} className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">{group.providerName}</span>
+                )}
                 {usagePercent[group.provider] !== undefined && (
                   <span
                     title={t("providerUsage.usage")}
