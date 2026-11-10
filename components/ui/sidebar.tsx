@@ -14,7 +14,6 @@ import {
   Sheet,
   SheetDescription,
   SheetHeader,
-  SheetOverlay,
   SheetPortal,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -217,10 +216,23 @@ function Sidebar({
   }
 
   if (isMobile) {
+    // modal={false}：Radix modal Overlay 内部包着 react-remove-scroll，
+    // forceMount 常挂载后即使 display:none 也在 document 级拦截
+    // touchmove/wheel——消息列表等页面内滚动全部卡死。非 modal 后
+    // Radix 不再渲染 Overlay/滚动锁/hideOthers，遮罩改为普通 div 自绘。
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props} modal={false}>
         <SheetPortal forceMount>
-          <SheetOverlay forceMount className="data-[state=closed]:fill-mode-forwards" style={{ display: drawerVisible ? undefined : "none" }} />
+          <div
+            data-sidebar="sidebar-overlay"
+            className={cn(
+              "fixed inset-0 z-50 bg-black/50",
+              openMobile
+                ? "animate-in fade-in-0"
+                : "animate-out fade-out-0 fill-mode-forwards"
+            )}
+            style={{ display: drawerVisible ? undefined : "none" }}
+          />
           <SheetPrimitive.Content
             forceMount
             data-sidebar="sidebar"

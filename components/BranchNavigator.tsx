@@ -353,9 +353,6 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
           sideOffset={6}
           collisionPadding={8}
           onOpenAutoFocus={(event) => event.preventDefault()}
-          // 从 ⋯ 菜单打开时，菜单关闭的焦点归还会落在弹层之外；
-          // 面板沿用旧语义：只有外部 pointerdown 或 Escape 才关闭。
-          onFocusOutside={(event) => event.preventDefault()}
           className={contentClassName}
         >
           {panel}
@@ -382,7 +379,6 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
         sideOffset={6}
         collisionPadding={8}
         onOpenAutoFocus={(event) => event.preventDefault()}
-        onFocusOutside={(event) => event.preventDefault()}
         className={contentClassName}
       >
         {panel}

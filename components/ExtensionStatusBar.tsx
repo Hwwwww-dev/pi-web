@@ -114,8 +114,10 @@ export function ExtensionStatusBar({
   return (
     // `extension-status-bar` is a layout hook (keyboard-open collapse below); the
     // styling itself is shadcn utilities on the row's pills. `relative` anchors
-    // an expanded widget's floating panel above the row.
-    <div className="extension-status-bar relative -mt-3 mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] shrink-0 items-stretch pt-1 pb-1">
+    // an expanded widget's floating panel above the row. The px 与 composer 外壳
+    // （chat-input-shell 的 px-7/max-sm:px-2.5）一致：本行是 ChatInput 的兄弟
+    // 节点，吃不到外壳内边距，缺了它两端会从卡片圆角末端超出去。
+    <div className="extension-status-bar relative -mt-3 mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] shrink-0 items-stretch px-7 max-sm:px-2.5 pt-1 pb-1">
       {widgets.length > 0 ? <ExtensionWidgets widgets={widgets}>{statusLine}</ExtensionWidgets> : statusLine}
     </div>
   );

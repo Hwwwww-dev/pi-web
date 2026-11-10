@@ -58,9 +58,6 @@ import { AgentSessionPanel } from "./AgentSessionPanel";
 import { DebugPanel, DebugPanelBoundary } from "./DebugPanel";
 import { SessionChatPanel } from "./SessionChatPanel";
 import { TerminalPanel } from "./TerminalPanel";
-import { demoRouterPath } from "@/mock/base-path";
-import { PROJECT_ROOT as DEMO_PROJECT_ROOT } from "@/mock/paths";
-import { openDemoHistory } from "@/mock/export";
 import { newTerminalTab, restoreTerminalTabs, TERMINAL_TABS_KEY, type TerminalTab } from "./terminal-tab-state";
 import { appendSideTab, restoreSideTabs, sideTabsKey } from "./side-tab-state";
 import { useTheme } from "@/hooks/useTheme";
@@ -578,12 +575,10 @@ export function AppShell() {
 
   const toggleTopPanel = useCallback((
     panel: "agents" | "branches" | "system" | "tools" | "session" | "debug",
-    keepMobileToolbarOpen = false,
   ) => {
     if (isMobile) setSidebarOpen(false);
     setActiveTopPanel((cur) => cur === panel ? null : panel);
-    if (isMobile && isNarrowMobile && keepMobileToolbarOpen) setMobileToolbarMoreOpen(true);
-  }, [isMobile, isNarrowMobile]);
+  }, [isMobile]);
 
   // The Debug button on screen (one of its three places at a time); Escape gives focus back to it.
   const debugButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -595,25 +590,15 @@ export function AppShell() {
   const closeTopPanel = useCallback((panel: "branches" | "system" | "tools" | "session") => {
     setActiveTopPanel((cur) => cur === panel ? null : cur);
   }, []);
-  // The stats button (data-outside-dismiss-ignore) toggles the session card
-  // with its click; a press on it must not ALSO count as an outside press, or
-  // the pointerdown closes the card and the click toggles it right back open.
-  // Outside presses and focus moves aimed at a marked opener (the stats
-  // button that toggles the session card, the ⋯ trigger and its menu whose
-  // items open these panels) must not dismiss a panel: the ⋯ menu's close
-  // restores focus to its trigger, and on a phone with a panel open from the
-  // menu the menu re-opens and takes focus again — either would otherwise
-  // read as focus-outside and close the panel the same tick it opened.
-  const outsideEventHitsMarkedOpener = (event: CustomEvent<{ originalEvent: Event }>) => {
-    const target = event.detail.originalEvent.target;
-    return target instanceof Element && target.closest("[data-outside-dismiss-ignore]") !== null;
+  // The stats buttons keep their press from reaching DismissableLayer's
+  // document pointerdown listener (stopPropagation) and from moving focus
+  // (preventDefault): the press would otherwise dismiss the session card the
+  // same tick their click toggles it. No other element is exempt — every
+  // panel closes on any outside press or focus move, Radix defaults only.
+  const holdStatsPress = (event: React.PointerEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
   };
-  const holdOpenOnMarkedOpeners = useCallback((event: CustomEvent<{ originalEvent: PointerEvent }>) => {
-    if (outsideEventHitsMarkedOpener(event)) event.preventDefault();
-  }, []);
-  const holdFocusOnMarkedOpeners = useCallback((event: CustomEvent<{ originalEvent: FocusEvent }>) => {
-    if (outsideEventHitsMarkedOpener(event)) event.preventDefault();
-  }, []);
 
   // Escape inside the debug panel; it never closes another panel that took its place. With focus
   // in the panel, that focus leaves the page with it: once the panel is gone (the next frame), the
@@ -623,22 +608,19 @@ export function AppShell() {
     if (restoreFocus) requestAnimationFrame(() => focusIfLost(document, debugButtonRef.current));
   }, []);
 
-  // A ⋯-menu item's select closes the menu, and Radix then restores focus to
-  // the ⋯ trigger — outside every top panel. Opening a panel synchronously in
-  // onSelect lets that restore land after the panel Popover's own focus grab,
-  // so the panel reads a focus-outside and dismisses the instant it opened.
-  // Deferring past the menu's unmount + focus restore opens the panel last:
-  // its content takes focus and nothing is left to dismiss it.
+  // A ⋯-menu item's select closes the menu synchronously in the same tick;
+  // deferring the panel open past that unmount keeps the two state changes
+  // from interleaving (the menu content also no longer bounces focus back to
+  // the trigger, see its onCloseAutoFocus).
   const openTopPanelFromMenu = useCallback((open: () => void) => {
     window.setTimeout(open, 0);
   }, []);
 
   const handleSystemInfoToggle = useCallback((
     panel: "system" | "tools",
-    keepMobileToolbarOpen = false,
   ) => {
     const opening = activeTopPanel !== panel;
-    toggleTopPanel(panel, keepMobileToolbarOpen);
+    toggleTopPanel(panel);
     if (!opening || systemInfoLoading) return;
 
     const load = systemInfoLoaderRef.current;
@@ -840,6 +822,8 @@ export function AppShell() {
     }
   }, [activeFileTabId, fileTabs, rememberSideTabs, rightPanelOpen]);
 
+  // Same @mention format as the chat input's @ autocomplete, so the agent's
+  // read tool resolves it the same way (it strips the @ prefix).
   const handleAtMention = useCallback((relativePath: string, isDir: boolean) => {
     chatInputRef.current?.insertText(buildAtMentionText(relativePath, isDir));
     if (isMobile) { setRightPanelOpen(false); setSidebarOpen(false); }
@@ -1090,7 +1074,7 @@ export function AppShell() {
       // the default welcome page when none is remembered.
       if (!skipWorkspaceRestore) restoreWorkspaceContext(newProject, cwd);
     }
-    router.replace(demoRouterPath(), { scroll: false });
+    router.replace(typeof window !== "undefined" ? window.location.pathname : "/", { scroll: false });
   }, [activeCwd, changeFileWorkspace, invalidateWorkspaceRestore, newSessionCwd, router, selectedSession, restoreWorkspaceContext]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false, entryId?: string, blockIndex?: number, options?: SelectSessionOptions) => {
@@ -1447,7 +1431,7 @@ export function AppShell() {
     setSystemTools(null);
     setSystemInfoLoading(false);
     setActiveTopPanel(null);
-    router.replace(cwd ? `?cwd=${encodeURIComponent(cwd)}` : demoRouterPath(), { scroll: false });
+    router.replace(cwd ? `?cwd=${encodeURIComponent(cwd)}` : (typeof window !== "undefined" ? window.location.pathname : "/"), { scroll: false });
   }, [router]);
 
   // Dismissing a keep-alive slot must leave nothing behind: the ChatWindow
@@ -1521,7 +1505,7 @@ export function AppShell() {
       setSystemTools(null);
       setSystemInfoLoading(false);
       setActiveTopPanel((panel) => panel === "debug" ? panel : null);
-      router.replace(cwd ? `?cwd=${encodeURIComponent(cwd)}` : demoRouterPath(), { scroll: false });
+      router.replace(cwd ? `?cwd=${encodeURIComponent(cwd)}` : (typeof window !== "undefined" ? window.location.pathname : "/"), { scroll: false });
     }
   }, [invalidateWorkspaceRestore, router]);
 
@@ -1558,29 +1542,6 @@ export function AppShell() {
       line: options?.line,
     });
   }, [handleOpenFile, selectedSession?.id]);
-
-  // Demo: show the project README (rendered) next to the first session, the way
-  // a visitor would open it themselves. Phones keep the chat in front, and a
-  // reload into the scratch project keeps it too: that folder has no README.
-  const demoReadmeOpenedRef = useRef(false);
-  useEffect(() => {
-    if (demoReadmeOpenedRef.current || isMobile || !selectedSession || !activeCwd) return;
-    demoReadmeOpenedRef.current = true;
-    const projectRoot = selectedSession.projectRoot ?? activeCwd;
-    if (projectRoot !== DEMO_PROJECT_ROOT) return;
-    const filePath = `${projectRoot}/README.md`;
-    const tabId = `file:${filePath}`;
-    setFileTabs((prev) => prev.some((tab) => tab.id === tabId) ? prev : [...prev, {
-      id: tabId,
-      label: "README.md",
-      filePath,
-      initialDisplayMode: "preview",
-      viewerState: { displayMode: "preview", wrapLines: false, scrollTop: 0, scrollLeft: 0 },
-      viewerRevision: 0,
-    }]);
-    setActiveFileTabId(tabId);
-    setRightPanelOpen(true);
-  }, [activeCwd, isMobile, selectedSession]);
 
   const handleOpenTerminal = useCallback((cwd: string) => {
     const existing = terminalTabs.find((tab) => tab.cwd === cwd);
@@ -1725,8 +1686,14 @@ export function AppShell() {
 
   const handleViewFullHistory = useCallback(() => {
     if (!selectedSession) return;
-    // Demo: no server export route — the mock renders the history in a new tab.
-    openDemoHistory(selectedSession.id);
+    // selectedSession.id is a server-generated uuid; enforce the internal
+    // export route so the redirect target can never leave this origin.
+    const id = encodeURIComponent(selectedSession.id);
+    if (!/^[A-Za-z0-9-]+$/.test(id)) return;
+    const url = `/api/sessions/${id}/export?inline=1`;
+    if (!url.startsWith("/api/sessions/")) return;
+    // pi-lens-ignore: no-open-redirect
+    window.open(url, "_blank", "noopener,noreferrer");
   }, [selectedSession]);
 
   // Show chat area if a session is selected, or if we have a cwd to start a new session in
@@ -2050,7 +2017,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
   const renderAgentsButton = (mobile: boolean) => (
     <Popover
       open={activeTopPanel === "agents" && Boolean(activeSessionFamily)}
-      onOpenChange={() => toggleTopPanel("agents", mobile && !isNarrowMobile)}
+      onOpenChange={() => toggleTopPanel("agents")}
     >
       <Tooltip>
         <TooltipTrigger asChild>
@@ -2119,7 +2086,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             aria-label={moreControlsLabel}
             aria-expanded={mobileToolbarMoreOpen}
             data-mobile-toolbar-more="true"
-            data-outside-dismiss-ignore="true"
             className={cn(
               "rounded-md text-muted-foreground",
               mobileToolbarMoreOpen && HEADER_CONTROL_OPEN,
@@ -2133,7 +2099,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           id="mobile-toolbar-actions"
           className="w-64 p-1.5"
           data-mobile-toolbar-actions="true"
-          data-outside-dismiss-ignore="true"
+          // 关闭后 Radix 默认把焦点归还 ⋯ 触发钮；从菜单项开面板时这记人工
+          // 焦点回跳落在面板外，面板刚开就被读成失焦自关。源头掐掉归还：
+          // 面板开在自己的位置上并接管焦点，外点/Esc 照常收尾不偷焦点。
+          onCloseAutoFocus={(event) => event.preventDefault()}
         >
           {(() => {
             // 上下文压缩后当前消息可能不再包含 user 消息，需同时参考会话文件的消息总数。
@@ -2240,7 +2209,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               </DropdownMenuItem>
               {sessionHasBranches && (
                 <DropdownMenuItem
-                  onSelect={() => openTopPanelFromMenu(() => toggleTopPanel("branches", true))}
+                  onSelect={() => openTopPanelFromMenu(() => toggleTopPanel("branches"))}
                   title={translate("i18n.branches")}
                   className="gap-2"
                   data-mobile-toolbar-action="branches"
@@ -2253,7 +2222,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
-                onSelect={() => openTopPanelFromMenu(() => toggleTopPanel("debug", mobile))}
+                onSelect={() => openTopPanelFromMenu(() => toggleTopPanel("debug"))}
                 disabled={!showChat}
                 title={translate("debug.title")}
                 className="gap-2"
@@ -2314,8 +2283,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         <Button
           variant="ghost"
           size="sm"
+          onPointerDown={holdStatsPress}
           onClick={() => toggleTopPanel("session")}
-          data-outside-dismiss-ignore="true"
           disabled={!showChat}
           title={tooltip || translate("session.title")}
           aria-label={translate("session.title")}
@@ -2353,8 +2322,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       <Button
         variant="ghost"
         size="sm"
+        onPointerDown={holdStatsPress}
         onClick={() => toggleTopPanel("session")}
-        data-outside-dismiss-ignore="true"
         title={tooltip || translate("session.title")}
         aria-label={translate("session.title")}
         aria-pressed={activeTopPanel === "session"}
@@ -2553,13 +2522,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           >
             <PopoverAnchor virtualRef={topBarRef} />
             <PopoverContent
-              onPointerDownOutside={holdOpenOnMarkedOpeners}
-          onFocusOutside={holdFocusOnMarkedOpeners}
               side="bottom"
               align="start"
               sideOffset={0}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-t-none rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
             >
               <SystemPromptPanel
                 loading={systemInfoLoading}
@@ -2574,13 +2541,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           >
             <PopoverAnchor virtualRef={topBarRef} />
             <PopoverContent
-              onPointerDownOutside={holdOpenOnMarkedOpeners}
-          onFocusOutside={holdFocusOnMarkedOpeners}
               side="bottom"
               align="start"
               sideOffset={0}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-t-none rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
             >
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
@@ -2596,12 +2561,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <PopoverAnchor virtualRef={topBarRef} />
             {/* 会话信息浮层：标准弹层观感；session-info-popover 类名保留作 e2e 定位锚。 */}
             <PopoverContent
-              onPointerDownOutside={holdOpenOnMarkedOpeners}
-          onFocusOutside={holdFocusOnMarkedOpeners}
               side="bottom"
               align="end"
               sideOffset={0}
-              className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto p-0"
+              className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-t-none p-0"
             >
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
@@ -2718,13 +2681,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           >
             <PopoverAnchor virtualRef={topBarRef} />
             <PopoverContent
-              onPointerDownOutside={holdOpenOnMarkedOpeners}
-          onFocusOutside={holdFocusOnMarkedOpeners}
               side="bottom"
               align="start"
               sideOffset={0}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-t-none rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
             >
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
