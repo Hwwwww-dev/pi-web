@@ -2541,7 +2541,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               align="start"
               sideOffset={0}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
             >
               <SystemPromptPanel
                 loading={systemInfoLoading}
@@ -2562,7 +2562,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               align="start"
               sideOffset={0}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
             >
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
@@ -2706,7 +2706,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               align="start"
               sideOffset={0}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
             >
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
