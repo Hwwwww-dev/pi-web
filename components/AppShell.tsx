@@ -2208,7 +2208,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           aria-label={translate("session.title")}
           aria-pressed={activeTopPanel === "session"}
           className={cn(
-            "min-w-0 flex-1 justify-end overflow-hidden whitespace-nowrap rounded-md px-2 text-xs font-normal text-muted-foreground",
+            "min-w-0 shrink-0 justify-end overflow-hidden whitespace-nowrap rounded-md px-2 text-xs font-normal text-muted-foreground",
             !showChat && "cursor-default",
             activeTopPanel === "session" && HEADER_CONTROL_OPEN,
             "enabled:hover:bg-accent enabled:hover:text-foreground",
@@ -2363,33 +2363,26 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         <header className="flex min-h-(--header-height) shrink-0 items-center gap-2 border-b pt-[env(safe-area-inset-top)] transition-[width,height] ease-linear">
         <div className="flex w-full min-w-0 items-center gap-1 px-4 lg:gap-2 lg:px-6">
           {isMobile ? (
-            // 手机：两行结构显式成树——标题行（☰ 同行）与控件行各占一行，
-            // 不依赖 flex-wrap 断行（basis-full / 断行元素都会被算序挤变形）。
-            <div className="flex min-w-0 flex-1 flex-col items-stretch">
-              <div className="flex h-10 min-w-0 items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={handleSidebarToggle}
-                  title={translate("sidebar.show")}
-                  aria-label={translate("sidebar.show")}
-                  className="shrink-0 rounded-md text-muted-foreground"
-                >
-                  <MenuIcon className="size-4.5" strokeWidth={2} />
-                </Button>
-                <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">
-                  {activeSessionTitle ?? "Pi Web"}
-                </span>
-              </div>
-              <div
-                data-mobile-toolbar="true"
-                className="flex h-10 min-w-0 flex-wrap items-center gap-1.5 pb-1"
+            // 手机：单行顶栏——☰、标题（可截断）、stats 与控件同一行，标题用
+            // flex-1 吃掉富余把右侧控件推到行尾，空间不足先截标题。
+            <div className="flex h-10 min-w-0 flex-1 items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleSidebarToggle}
+                title={translate("sidebar.show")}
+                aria-label={translate("sidebar.show")}
+                className="shrink-0 rounded-md text-muted-foreground"
               >
-                {renderSessionStats(true)}
-                {renderAgentsButton(true)}
-                {renderToolbarBGroup(true)}
-                {renderMainFileToggle(true)}
-              </div>
+                <MenuIcon className="size-4.5" strokeWidth={2} />
+              </Button>
+              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">
+                {activeSessionTitle ?? "Pi Web"}
+              </span>
+              {renderSessionStats(true)}
+              {renderAgentsButton(true)}
+              {renderToolbarBGroup(true)}
+              {renderMainFileToggle(true)}
             </div>
           ) : (
             <>

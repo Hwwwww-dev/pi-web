@@ -341,7 +341,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   };
 
   return (
-    <Message align="end" className="group mb-5 flex flex-col items-end gap-1">
+    <Message align="end" className="group mb-5 flex flex-col! items-end gap-1">
       <Bubble variant="secondary" align="end" className="max-w-[82%] max-sm:max-w-[86%]">
         {/* Cap the height so an abnormally long message does not push the
             conversation off screen; overflow scrolls inside the bubble. */}
