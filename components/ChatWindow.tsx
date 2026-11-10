@@ -1528,7 +1528,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
   return (
     <div
-      className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden [padding-bottom:calc(env(safe-area-inset-bottom,0px)/2)]"
+      className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden [padding-bottom:env(safe-area-inset-bottom,0px)]"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

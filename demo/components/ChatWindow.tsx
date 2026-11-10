@@ -1,6 +1,7 @@
 "use client";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { isHiddenRelation } from "@/lib/session-family";
+import { demoAssetPath } from "@/mock/base-path";
 import { ArrowDownIcon, ChevronRightIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -1528,7 +1529,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
   return (
     <div
-      className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden [padding-bottom:calc(env(safe-area-inset-bottom,0px)/2)]"
+      className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden [padding-bottom:env(safe-area-inset-bottom,0px)]"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -1775,7 +1776,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <div className="new-session-hero max-md:px-4 md:px-4">
             <div className="new-session-hero-inner mx-auto flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-start">
               <div className="new-session-brand flex min-w-0 items-center gap-3 mb-5 max-[640px]:mb-4">
-                <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
+                <Image src={demoAssetPath("/icons/apple-touch-icon.png")} width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
                 <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
                   <span className="new-session-brand-name text-[22px] font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
                   <span className="new-session-meta flex min-w-0 items-center gap-1.5 text-xs leading-[1.4] whitespace-nowrap text-muted-foreground [&>*]:flex-none">
