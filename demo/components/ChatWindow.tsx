@@ -1774,7 +1774,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             composer's left edge. */}
         {isEmptyNew && (
           <div className="new-session-hero max-md:px-4 md:px-4">
-            <div className="new-session-hero-inner mx-auto flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-center">
+            <div className="new-session-hero-inner mx-auto flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-start">
               <div className="new-session-brand flex min-w-0 items-center gap-3 mb-5 max-[640px]:mb-4">
                 <Image src={demoAssetPath("/icons/apple-touch-icon.png")} width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
                 <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
@@ -1787,7 +1787,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                   </span>
                 </div>
               </div>
-              <div className="flex w-full justify-center">{newSessionContextBar}</div>
+              <div className="flex w-full justify-start">{newSessionContextBar}</div>
             </div>
           </div>
         )}

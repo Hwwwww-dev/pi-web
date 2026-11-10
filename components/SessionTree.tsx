@@ -733,12 +733,15 @@ const SessionRowView = memo(function SessionRowView({
         <span className={titleClass}>{title}</span>
       )}
       {branch && (
-        // A worktree's branch: meta, in the rows' own type, the icon inline
-        // so the ellipsis still cuts the name (the base styles make an svg a
-        // block).
-        <span className="max-w-[78px] shrink-0 truncate text-[11px] text-muted-foreground">
-          <GitBranchIcon size={10} className="mr-[3px] inline-block -translate-y-px" />
-          {branch}
+        // A worktree's branch: icon only — the name crowded the row and the
+        // title's ellipsis; the tooltip (and title=) carries the branch name.
+        <span
+          className="shrink-0 text-muted-foreground"
+          title={branch}
+          role="img"
+          aria-label={t("sidebar.worktreeBranch", { branch })}
+        >
+          <GitBranchIcon size={10} className="inline-block -translate-y-px" />
         </span>
       )}
       <span

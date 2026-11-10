@@ -196,8 +196,8 @@ test("an idle session row shows its short time, branch and both actions", () => 
   assert.match(html, /^<div class="session-tree-row session-tree-session[^"]*is-child[^"]*" style="top:0;height:32px" data-row-key="session:group:idle">/);
   // Nothing before the title: it gets the room; the time sits at the right.
   // A saved session's title is a real link to it (middle-click, Ctrl/Cmd-click).
-  // The branch keeps the upstream icon and type; the tooltip keeps the ⑂ glyph.
-  assert.match(html, /<a class="[^"]*session-tree-main[^"]*" href="\?session=idle" title="[^"]*"><span class="[^"]*session-tree-title[^"]*">first idle<\/span><span class="max-w-\[78px\][^"]*"><svg[^>]*width="10" height="10"[^>]*aria-hidden="true">[\s\S]*?<\/svg>feat\/rows<\/span><span class="[^"]*min-w-\[26px\][^"]*">5m<\/span><\/a>/);
+  // The branch is icon-only: the name crowded the row, the tooltip carries it.
+  assert.match(html, /<a class="[^"]*session-tree-main[^"]*" href="\?session=idle" title="[^"]*"><span class="[^"]*session-tree-title[^"]*">first idle<\/span><span class="shrink-0 text-muted-foreground" title="feat\/rows" role="img" aria-label="Worktree branch: feat\/rows"><svg[^>]*width="10" height="10"[^>]*aria-hidden="true">[\s\S]*?<\/svg><\/span><span class="[^"]*min-w-\[26px\][^"]*">5m<\/span><\/a>/);
   assert.match(html, /title="first idle\n3 msgs · 5 minutes ago · ⑂ feat\/rows"/);
   assert.match(html, /class="[^"]*session-tree-action session-tree-quick-action[^"]*"[^>]*aria-label="Archive" title="Archive"/);
   assert.match(html, /class="[^"]*session-tree-action session-tree-more-action[^"]*"[^>]*aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded="false"/);

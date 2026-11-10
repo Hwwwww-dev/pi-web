@@ -584,6 +584,7 @@ export const zhCNLocale: LocalePlugin = {
     "sidebar.agentRunning": "Agent 运行中…",
     "sidebar.agentAwaitingInput": "Agent 等待你的输入",
     "sidebar.newActivity": "有新活动",
+    "sidebar.worktreeBranch": "worktree 分支：{branch}",
     "sidebar.newSessionActivity": "会话有新活动",
     "sidebar.deleteSession": "删除 {title}？",
     "sidebar.rename": "重命名",
