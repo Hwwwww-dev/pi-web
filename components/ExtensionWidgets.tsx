@@ -247,7 +247,10 @@ export function ExtensionWidgetPanel({ widget, triggerId, panelId, closing = fal
       id={panelId}
       aria-labelledby={triggerId}
       data-state={closing ? "closed" : "open"}
-      className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+      // fill-mode-forwards：退场动画播完到 useDelayedUnmount 真正卸载之间
+      // 有一帧以上的空档，缺省 fill-mode none 会让面板弹回可见（同抽屉
+      // 关闭闪烁的根因）， forwards 把终态钉在透明/缩小上。
+      className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:fill-mode-forwards"
     >
       <div className="border-b px-3 py-1.5 font-mono text-[11px] text-muted-foreground">{widget.key}</div>
       {/* Extension widgets render TUI output: tables, progress bars and box drawing
