@@ -385,7 +385,7 @@ function itemClassName(item: ActionItem, mode: SurfaceMode, inRow: boolean): str
     item.danger ? "is-danger" : "",
     item.checked ? "is-checked" : "",
     mode.classic
-      ? "flex items-center gap-[7px] h-auto px-2.5 py-2 rounded-none text-[11px] leading-[1.35] text-left"
+      ? "flex items-center gap-[7px] h-auto px-2.5 py-2 rounded-xs text-[11px] leading-[1.35] text-left"
       : mode.sheet
         ? "flex items-center gap-3 h-12 px-4 rounded-none text-[15px] text-left"
         : "flex items-center gap-2 w-full h-7 px-2 rounded-(--radius-sm) text-left",

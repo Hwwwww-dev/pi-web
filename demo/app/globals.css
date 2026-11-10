@@ -151,6 +151,30 @@
   scrollbar-color: var(--border) transparent;
 }
 
+/* 可点击元素统一 pointer 光标。必须留在 base 层：utilities 层的
+   cursor-default / cursor-not-allowed（禁用态、展示徽标、只读面板）按类
+   覆盖这里的规则，cursor-not-allowed 等层级因此得以保留。 */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"],
+  [role="menuitemradio"],
+  [role="menuitemcheckbox"],
+  [role="option"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="radio"]:not([aria-disabled="true"]),
+  [role="checkbox"]:not([aria-disabled="true"], :disabled),
+  [role="switch"]:not([aria-disabled="true"]),
+  a[href],
+  summary,
+  label:has(input[type="checkbox"]:enabled, input[type="radio"]:enabled),
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 :root {
   color-scheme: light;
   /* shadcn 官方 neutral 基色（ui.shadcn.com/docs/theming 原值）。 */
@@ -1336,7 +1360,7 @@ span.token.table {
   /* Except while its model picker is open: the picker's filter is the field
      the keyboard is for, and hiding its row would hide the picker (#1271).
      Its own rule, so a browser without :has() drops only this one. */
-  html[data-keyboard-open] .chat-input-controls:not(:has(.model-selector [role="listbox"])) {
+  html[data-keyboard-open] .chat-input-controls:not(:has(.model-selector [role="menu"])) {
     display: none !important;
   }
   html[data-keyboard-open] .chat-content {
