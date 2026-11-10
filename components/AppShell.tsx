@@ -591,9 +591,21 @@ export function AppShell() {
   // The stats button (data-outside-dismiss-ignore) toggles the session card
   // with its click; a press on it must not ALSO count as an outside press, or
   // the pointerdown closes the card and the click toggles it right back open.
-  const holdOpenOnMarkedOpeners = useCallback((event: CustomEvent<{ originalEvent: PointerEvent }>) => {
+  // Outside presses and focus moves aimed at a marked opener (the stats
+  // button that toggles the session card, the ⋯ trigger and its menu whose
+  // items open these panels) must not dismiss a panel: the ⋯ menu's close
+  // restores focus to its trigger, and on a phone with a panel open from the
+  // menu the menu re-opens and takes focus again — either would otherwise
+  // read as focus-outside and close the panel the same tick it opened.
+  const outsideEventHitsMarkedOpener = (event: CustomEvent<{ originalEvent: Event }>) => {
     const target = event.detail.originalEvent.target;
-    if (target instanceof Element && target.closest("[data-outside-dismiss-ignore]")) event.preventDefault();
+    return target instanceof Element && target.closest("[data-outside-dismiss-ignore]") !== null;
+  };
+  const holdOpenOnMarkedOpeners = useCallback((event: CustomEvent<{ originalEvent: PointerEvent }>) => {
+    if (outsideEventHitsMarkedOpener(event)) event.preventDefault();
+  }, []);
+  const holdFocusOnMarkedOpeners = useCallback((event: CustomEvent<{ originalEvent: FocusEvent }>) => {
+    if (outsideEventHitsMarkedOpener(event)) event.preventDefault();
   }, []);
 
   // Escape inside the debug panel; it never closes another panel that took its place. With focus
@@ -2018,6 +2030,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             aria-label={moreControlsLabel}
             aria-expanded={mobileToolbarMoreOpen}
             data-mobile-toolbar-more="true"
+            data-outside-dismiss-ignore="true"
             className={cn(
               "rounded-md text-muted-foreground",
               mobileToolbarMoreOpen && HEADER_CONTROL_OPEN,
@@ -2031,6 +2044,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           id="mobile-toolbar-actions"
           className="w-64 p-1.5"
           data-mobile-toolbar-actions="true"
+          data-outside-dismiss-ignore="true"
         >
           {(() => {
             // 上下文压缩后当前消息可能不再包含 user 消息，需同时参考会话文件的消息总数。
@@ -2451,6 +2465,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <PopoverAnchor virtualRef={topBarRef} />
             <PopoverContent
               onPointerDownOutside={holdOpenOnMarkedOpeners}
+          onFocusOutside={holdFocusOnMarkedOpeners}
               side="bottom"
               align="start"
               sideOffset={0}
@@ -2471,6 +2486,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <PopoverAnchor virtualRef={topBarRef} />
             <PopoverContent
               onPointerDownOutside={holdOpenOnMarkedOpeners}
+          onFocusOutside={holdFocusOnMarkedOpeners}
               side="bottom"
               align="start"
               sideOffset={0}
@@ -2492,6 +2508,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             {/* 会话信息浮层：标准弹层观感；session-info-popover 类名保留作 e2e 定位锚。 */}
             <PopoverContent
               onPointerDownOutside={holdOpenOnMarkedOpeners}
+          onFocusOutside={holdFocusOnMarkedOpeners}
               side="bottom"
               align="end"
               sideOffset={0}
@@ -2613,6 +2630,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <PopoverAnchor virtualRef={topBarRef} />
             <PopoverContent
               onPointerDownOutside={holdOpenOnMarkedOpeners}
+          onFocusOutside={holdFocusOnMarkedOpeners}
               side="bottom"
               align="start"
               sideOffset={0}
