@@ -1,6 +1,5 @@
 "use client";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
-import { demoAssetPath } from "@/mock/base-path";
 import { isHiddenRelation } from "@/lib/session-family";
 import { ArrowDownIcon, ChevronRightIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from "lucide-react";
 import Image from "next/image";
@@ -1776,7 +1775,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <div className="new-session-hero max-md:px-4 md:px-4">
             <div className="new-session-hero-inner mx-auto flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-start">
               <div className="new-session-brand flex min-w-0 items-center gap-3 mb-5 max-[640px]:mb-4">
-                <Image src={demoAssetPath("/icons/apple-touch-icon.png")} width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
+                <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
                 <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
                   <span className="new-session-brand-name text-[22px] font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
                   <span className="new-session-meta flex min-w-0 items-center gap-1.5 text-xs leading-[1.4] whitespace-nowrap text-muted-foreground [&>*]:flex-none">
@@ -1875,7 +1874,7 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
             ) : (
               <span
                 tabIndex={0}
-                className="min-w-0 max-w-full overflow-y-auto [scrollbar-width:thin] whitespace-pre-line break-words"
+                className="min-w-0 max-w-full overflow-y-auto scrollbar-thin whitespace-pre-line break-words"
                 style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
               >
                 {splitNoticeText(notice.message).map((part, partIndex) => part.kind === "art" ? (

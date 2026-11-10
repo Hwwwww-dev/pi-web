@@ -82,7 +82,7 @@ export function ExtensionStatusBar({
   const statusLine = cells.length > 0 ? (
     <div
       role="status"
-      className="flex min-w-0 flex-1 items-center gap-1 overflow-auto pl-0.5 pr-1.5 [scrollbar-width:thin]"
+      className="flex min-w-0 flex-1 items-center gap-1 overflow-auto pl-0.5 pr-1.5 scrollbar-thin"
       aria-label={plainStatusLine}
       title={plainStatusLine}
     >

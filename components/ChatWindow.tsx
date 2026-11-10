@@ -1874,7 +1874,7 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
             ) : (
               <span
                 tabIndex={0}
-                className="min-w-0 max-w-full overflow-y-auto [scrollbar-width:thin] whitespace-pre-line break-words"
+                className="min-w-0 max-w-full overflow-y-auto scrollbar-thin whitespace-pre-line break-words"
                 style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
               >
                 {splitNoticeText(notice.message).map((part, partIndex) => part.kind === "art" ? (

@@ -144,6 +144,11 @@
 }
 @utility scrollbar-thin {
   scrollbar-width: thin;
+  /* Same thumb as the ::-webkit-scrollbar rules below: Chrome 121+ disables
+     those selectors on any element that sets a standard scrollbar property,
+     which is what made some scrollbars render native-dark next to the styled
+     light ones. */
+  scrollbar-color: var(--border) transparent;
 }
 
 :root {

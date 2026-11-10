@@ -253,7 +253,7 @@ export function ExtensionWidgetPanel({ widget, triggerId, panelId, closing = fal
       {/* Extension widgets render TUI output: tables, progress bars and box drawing
           only line up while the monospace grid survives, so the panel scrolls
           sideways rather than wrapping a line into a broken row. */}
-      <pre className="max-h-40 overflow-auto px-3 py-2 font-mono text-xs/relaxed [font-size:calc(12px+var(--chat-font-size-offset,0px))] [scrollbar-width:thin] [overflow-wrap:normal] whitespace-pre">
+      <pre className="max-h-40 overflow-auto px-3 py-2 font-mono text-xs/relaxed [font-size:calc(12px+var(--chat-font-size-offset,0px))] scrollbar-thin [overflow-wrap:normal] whitespace-pre">
         <AnsiText text={formatExtensionWidgetContent(widget.lines)} />
       </pre>
     </section>

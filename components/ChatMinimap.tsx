@@ -632,7 +632,7 @@ export const ChatMinimap = memo(function ChatMinimap({
         // (translate property + transform) and shift the card a full height.
         <div
           ref={previewBoxRef}
-          className="pointer-events-auto absolute top-1/2 left-[calc(100%+12px)] z-[100] max-h-[calc(100%-24px)] w-[340px] cursor-default select-text overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-2 shadow-md animate-[minimap-preview-in_160ms_ease_both] [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
+          className="pointer-events-auto absolute top-1/2 left-[calc(100%+12px)] z-[100] max-h-[calc(100%-24px)] w-[340px] cursor-default select-text overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-2 shadow-md animate-[minimap-preview-in_160ms_ease_both] scrollbar-thin"
           data-minimap-preview-box=""
           onMouseEnter={showPreview}
           onMouseDown={(event) => event.stopPropagation()}
