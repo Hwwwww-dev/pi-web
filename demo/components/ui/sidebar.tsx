@@ -4,17 +4,18 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
 import { PanelLeftIcon } from "lucide-react"
-import { Slot } from "radix-ui"
-
+import { Dialog as SheetPrimitive, Slot } from "radix-ui"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+
 import {
   Sheet,
-  SheetContent,
   SheetDescription,
   SheetHeader,
+  SheetOverlay,
+  SheetPortal,
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -169,6 +170,37 @@ function Sidebar({
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
+  // 手机抽屉常挂载：Radix Sheet 关闭即卸载内容，会话侧栏的列表、展开状态
+  // 会随每次打开重置重载（骨架屏重现）。改为 forceMount + 退场动画（300ms）
+  // 播完后再整体 display:none。
+  const [drawerVisible, setDrawerVisible] = React.useState(openMobile)
+  const drawerHideTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 常挂载层在关闭时也监听「外点」：打开抽屉的那次点击（pointerdown 发生在
+  // open 提交之前）会被 Radix 延迟派发成外点关闭，刚开的抽屉随即被关掉。
+  // 打开提交时记下时间，早于它的原始点击不算外点。
+  const drawerOpenCommittedAtRef = React.useRef(0)
+  React.useLayoutEffect(() => {
+    if (openMobile) {
+      if (drawerHideTimerRef.current !== null) {
+        clearTimeout(drawerHideTimerRef.current)
+        drawerHideTimerRef.current = null
+      }
+      drawerOpenCommittedAtRef.current = performance.now()
+      setDrawerVisible(true)
+      return
+    }
+    drawerHideTimerRef.current = setTimeout(() => {
+      drawerHideTimerRef.current = null
+      setDrawerVisible(false)
+    }, 340)
+    return () => {
+      if (drawerHideTimerRef.current !== null) {
+        clearTimeout(drawerHideTimerRef.current)
+        drawerHideTimerRef.current = null
+      }
+    }
+  }, [openMobile])
+
   if (collapsible === "none") {
     return (
       <div
@@ -187,24 +219,42 @@ function Sidebar({
   if (isMobile) {
     return (
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-        <SheetContent
-          data-sidebar="sidebar"
-          data-slot="sidebar"
-          data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-          style={
-            {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-            } as React.CSSProperties
-          }
-          side={side}
-        >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
-          </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
-        </SheetContent>
+        <SheetPortal forceMount>
+          <SheetOverlay forceMount style={{ display: drawerVisible ? undefined : "none" }} />
+          <SheetPrimitive.Content
+            forceMount
+            data-sidebar="sidebar"
+            data-slot="sidebar"
+            data-mobile="true"
+            onPointerDownOutside={(event) => {
+              const originalEvent = event.detail.originalEvent
+              if (originalEvent && originalEvent.timeStamp <= drawerOpenCommittedAtRef.current) {
+                event.preventDefault()
+              }
+            }}
+            className={cn(
+              "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:animate-in data-[state=open]:duration-500",
+              side === "left" &&
+                "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
+              side === "right" &&
+                "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
+              "w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground",
+              className
+            )}
+            style={
+              {
+                "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+                display: drawerVisible ? undefined : "none",
+              } as React.CSSProperties
+            }
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>Sidebar</SheetTitle>
+              <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+            </SheetHeader>
+            <div className="flex h-full w-full flex-col">{children}</div>
+          </SheetPrimitive.Content>
+        </SheetPortal>
       </Sheet>
     )
   }

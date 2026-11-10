@@ -2078,9 +2078,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         "m-0 border-0 bg-transparent p-0",
         compact
           ? "shrink-0"
-          // Composer gutter and bottom inset from the visual draft (§4.3); the
-          // horizontal padding matches the message column's (ChatWindow).
-          : "chat-input-shell flex min-h-0 flex-col px-7 pb-3.5 pt-1.5 max-sm:px-2.5 max-sm:pb-[max(12px,env(safe-area-inset-bottom))]",
+        // Composer gutter and bottom inset from the visual draft (§4.3); the
+        // horizontal padding matches the message column's (ChatWindow). The
+        // home-indicator inset is reserved once, by .chat-content (the bar
+        // under the input sits below it) — not here again, or the phone's
+        // bottom gap doubles.
+        : "chat-input-shell flex min-h-0 flex-col px-7 pb-3.5 pt-1.5 max-sm:px-2.5 max-sm:pb-3",
         builtinCommandPending && "opacity-50 transition-opacity duration-150",
       )}
     >

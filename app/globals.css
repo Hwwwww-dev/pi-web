@@ -461,6 +461,7 @@ html.dark {
     animation-range: 0px var(--scroll-fade-size), calc(100% - var(--scroll-fade-size)) 100%;
     mask-repeat: no-repeat;
   }
+
   /* Vertical lists. The classic scrollbar's strip stays unmasked, so the thumb
      never fades near the ends (--session-tree-scrollbar is its measured
      width; 0 for an overlay scrollbar). */
@@ -482,6 +483,17 @@ html.dark {
     animation-timeline: scroll(self inline);
     mask-image: linear-gradient(to right, transparent, #000 var(--scroll-fade-start), #000 calc(100% - var(--scroll-fade-end)), transparent);
   }
+}
+
+/* The sidebar's scrollbars hug the card's right edge: .session-sidebar keeps
+   its p-2.5 for the rows, the tab strip and the footer, while the two scroll
+   containers stretch over that right padding (the compensating padding keeps
+   every row where it was), so the thumb no longer floats a gutter away from
+   the edge. */
+.session-sidebar .session-tree-scroll,
+.session-sidebar .sidebar-files-scroll {
+  margin-right: -10px; /* the root's p-2.5 */
+  padding-right: 10px;
 }
 
 /* The terminal has its own light/dark choice (lib/terminal-theme.ts), apart

@@ -1573,7 +1573,30 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} onDismiss={dismissNotice} />
       </div>
 
-      <div ref={setChatPaneElement} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+      {/* A fresh composer's brand (logo, "Pi Web", versions). Desktop keeps it
+          right above the composer's cluster (order-2 between the pane and the
+          wrapper, the pane and the spacer still balance the leftover around
+          it); on the phone it pins under the header (order-1) while the
+          composer hugs the bottom edge, so the empty middle takes the
+          leftover instead of splitting it around a centred cluster. */}
+      {isEmptyNew && (
+        <div className="new-session-hero order-2 max-sm:order-1 max-md:px-4 md:px-4">
+          <div className="new-session-brand mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] items-center gap-3 mb-5 max-[640px]:mb-4">
+            <Image src={demoAssetPath("/icons/apple-touch-icon.png")} width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
+            <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
+              <span className="new-session-brand-name text-[22px] font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
+              <span className="new-session-meta flex min-w-0 items-center gap-1.5 text-xs leading-[1.4] whitespace-nowrap text-muted-foreground [&>*]:flex-none">
+                <span>web v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
+                <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
+                <span aria-hidden="true">·</span>
+                <span className="new-session-meta-pi min-w-0 overflow-hidden text-ellipsis">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div ref={setChatPaneElement} className="relative order-1 flex min-h-0 min-w-0 flex-1 overflow-hidden max-sm:order-2">
         {extensionDialog && (
           <ExtensionDialog
             key={extensionDialog.id}
@@ -1738,7 +1761,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         document.body,
       )}
 
-      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding}px` }}>
+      <div className="relative order-3 flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding}px` }}>
         {/* Floats centered over the composer's 700px card; z-30 also keeps it
             clear of the rail's zIndex 25. */}
         {!isEmptyNew && (
@@ -1769,27 +1792,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </div>
           </div>
         )}
-        {/* The brand (the logo, "Pi Web" and its versions line), then the
-            project/worktree row right above the composer, all on the
-            composer's left edge. */}
+        {/* The project/worktree row right above the composer, on the
+            composer's left edge (the brand block above the pane is the other
+            half of the old hero cluster). */}
         {isEmptyNew && (
-          <div className="new-session-hero max-md:px-4 md:px-4">
-            <div className="new-session-hero-inner mx-auto flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-start">
-              <div className="new-session-brand flex min-w-0 items-center gap-3 mb-5 max-[640px]:mb-4">
-                <Image src={demoAssetPath("/icons/apple-touch-icon.png")} width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
-                <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
-                  <span className="new-session-brand-name text-[22px] font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
-                  <span className="new-session-meta flex min-w-0 items-center gap-1.5 text-xs leading-[1.4] whitespace-nowrap text-muted-foreground [&>*]:flex-none">
-                    <span>web v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
-                    <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
-                    <span aria-hidden="true">·</span>
-                    <span className="new-session-meta-pi min-w-0 overflow-hidden text-ellipsis">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
-                  </span>
-                </div>
-              </div>
-              <div className="flex w-full justify-start">{newSessionContextBar}</div>
-            </div>
-          </div>
+          <div className="mx-auto flex w-full max-w-[min(var(--chat-content-max-width,820px),700px)] justify-start">{newSessionContextBar}</div>
         )}
         {chatInputElement}
         <ExtensionStatusBar
@@ -1799,7 +1806,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           commandsDisabled={sessionBusy}
         />
       </div>
-      {isEmptyNew && <div className="min-h-0 flex-1" />}
+      {isEmptyNew && <div className="order-4 min-h-0 flex-1 max-sm:hidden" />}
     </div>
   );
 });
