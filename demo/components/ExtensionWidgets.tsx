@@ -150,7 +150,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
           closing={!panelOpen}
         />
       )}
-      <div className="flex min-w-0 flex-1 items-center gap-1 px-1.5 py-1">
+      <div className="flex min-w-0 flex-1 items-center gap-1 px-1.5">
       <div className="flex shrink-0 items-center gap-0.5" aria-label={t("chat.extensionWidgets")}>
         {widgets.map((widget, index) => {
           const expandable = widget.lines.length > 0;
