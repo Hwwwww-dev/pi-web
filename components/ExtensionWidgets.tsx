@@ -5,6 +5,7 @@ import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
 import { AnsiText } from "@/components/AnsiText";
+import { stripAnsi } from "@/lib/ansi";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { ExtensionWidgetItem } from "@/lib/types";
@@ -37,10 +38,18 @@ export function getUpdatedExtensionWidgetKeys(
   }).filter((key): key is string => key !== null);
 }
 
+/** A widget whose every line is blank has nothing to show. Extensions pad
+ *  their TUI output with blank spacer rows, and expanding such a widget would
+ *  render a full-width empty card above the composer. */
+function hasVisibleWidgetLines(lines: string[]): boolean {
+  return lines.some((line) => stripAnsi(line).trim().length > 0);
+}
+
 function getDefaultExpandedWidgetKey(widgets: ExtensionWidgetItem[]): string | null {
   return widgets.find((widget) => {
     const lineCount = widget.lines.length;
-    return lineCount > 1 && lineCount <= DEFAULT_EXPANDED_WIDGET_LINES;
+    return lineCount > 1 && lineCount <= DEFAULT_EXPANDED_WIDGET_LINES
+      && hasVisibleWidgetLines(widget.lines);
   })?.key ?? null;
 }
 
@@ -153,7 +162,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
       <div className="flex min-w-0 flex-1 items-center gap-1 px-1.5">
       <div className="flex shrink-0 items-center gap-0.5" aria-label={t("chat.extensionWidgets")}>
         {widgets.map((widget, index) => {
-          const expandable = widget.lines.length > 0;
+          const expandable = hasVisibleWidgetLines(widget.lines);
           const expanded = expandable && widget.key === expandedWidget?.key;
           const updating = updatingWidgetKeys.has(widget.key);
           const lineCountLabel = t(

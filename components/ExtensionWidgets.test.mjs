@@ -158,3 +158,13 @@ test("keeps empty widgets non-interactive", () => {
   assert.doesNotMatch(html, /title="[^"]*"/);
   assert.match(html, /aria-label="Above editor widget: empty-widget/);
 });
+
+test("keeps blank-padding widgets non-interactive — an empty panel is worse than none", () => {
+  const html = renderWidgets({
+    widgets: [{ key: "blank-widget", lines: ["", "  ", "\u001b[0m"], placement: "aboveEditor" }],
+  });
+
+  assert.match(html, /<span[^>]*inline-flex h-6[^>]*>/);
+  assert.doesNotMatch(html, /<button/);
+  assert.doesNotMatch(html, /<section/);
+});
