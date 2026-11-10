@@ -6,6 +6,16 @@ import renderSyntaxNode from "react-syntax-highlighter/dist/esm/create-element";
 import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
 import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { CheckIcon, CopyIcon, Maximize, Minus, Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  CodeBlock as CodeBlockFrame,
+  CodeBlockActions,
+  CodeBlockContent,
+  CodeBlockHeader,
+  CodeBlockTitle,
+} from "@/components/ui/code-block";
+import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/hooks/useTheme";
 import { useI18n } from "@/hooks/useI18n";
 import { usePrismLanguages } from "@/hooks/usePrismLanguages";
@@ -103,16 +113,17 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
   }
 
   const body = renderState?.key === currentKey && renderState.status === "error" ? (
-      <div className="mermaid-block mermaid-block-error">{t("i18n.invalidMermaid")}</div>
+      <div className="mermaid-block mermaid-block-error p-3 overflow-x-auto bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] text-muted-foreground font-mono text-xs">{t("i18n.invalidMermaid")}</div>
     ) : renderState?.key !== currentKey || renderState.status !== "ready" ? (
-      <div className="mermaid-block mermaid-block-loading" aria-label={t("i18n.renderingMermaid")} />
+      <div className="mermaid-block mermaid-block-loading p-3 overflow-x-auto bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] min-h-[120px]" aria-label={t("i18n.renderingMermaid")} />
     ) : (
       <>
         {!zoomOpen && (
-          <button
+          <Button
             ref={previewRef}
             type="button"
-            className="mermaid-block mermaid-preview-button"
+            variant="ghost"
+            className="block h-auto max-h-[min(600px,60dvh)] w-full overflow-auto rounded-none border-0 text-left font-normal text-inherit cursor-zoom-in hover:opacity-85"
             title={t("i18n.openMermaidViewer")}
             aria-label={t("i18n.openMermaidViewer")}
             onClick={() => setZoomOpen(true)}
@@ -152,6 +163,7 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
 // What a previewed fence (mermaid here, svg in components/SvgBlock.tsx) shares:
 // the header with its toggle and download button, and the zoom viewer.
 
+/** Header tool buttons: the ghost xs Button, active = accent. */
 export function PreviewToggleButton({ isStreaming, previewVisible, onToggle, title }: {
   isStreaming?: boolean;
   previewVisible: boolean;
@@ -161,42 +173,46 @@ export function PreviewToggleButton({ isStreaming, previewVisible, onToggle, tit
 }) {
   const { t } = useI18n();
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="xs"
       onClick={onToggle}
       disabled={isStreaming}
       title={isStreaming ? t("i18n.previewAfterStreaming") : title}
-      className={["markdown-code-action", previewVisible ? "is-active" : ""].filter(Boolean).join(" ")}
+      aria-pressed={previewVisible}
+      className={previewVisible ? "bg-accent text-foreground" : undefined}
     >
       {previewVisible ? t("i18n.source") : t("i18n.preview")}
-    </button>
+    </Button>
   );
 }
 
 export function SvgDownloadButton({ onClick }: { onClick: () => void }) {
   const { t } = useI18n();
   return (
-    <button
+    <Button
       type="button"
-      className="markdown-code-action"
+      variant="ghost"
+      size="xs"
       title={`${t("i18n.downloadFile")} (SVG)`}
       aria-label={`${t("i18n.downloadFile")} (SVG)`}
       onClick={onClick}
     >
       SVG
-    </button>
+    </Button>
   );
 }
 
 export function PreviewFrame({ lang, actions, children }: { lang: string; actions: ReactNode; children: ReactNode }) {
   return (
-    <div className="markdown-code-block">
-      <div className="markdown-code-header">
-        <span className="markdown-code-lang">{lang}</span>
-        <div className="markdown-code-actions">{actions}</div>
-      </div>
+    <CodeBlockFrame className="w-full min-w-0 max-w-full">
+      <CodeBlockHeader className="border-b px-2.5 py-1">
+        <CodeBlockTitle className="font-mono text-xs font-medium text-muted-foreground">{lang}</CodeBlockTitle>
+        <CodeBlockActions className="gap-1">{actions}</CodeBlockActions>
+      </CodeBlockHeader>
       {children}
-    </div>
+    </CodeBlockFrame>
   );
 }
 
@@ -227,7 +243,7 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
   return (
     <dialog
       ref={dialogRef}
-      className="mermaid-zoom-dialog"
+      className="mermaid-zoom-dialog w-screen max-w-none h-dvh max-h-none m-0 border-0 bg-background p-0 text-foreground backdrop:bg-black/35"
       aria-label={label}
       onCancel={(event) => {
         event.preventDefault();
@@ -239,66 +255,70 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
         onClose();
       }}
     >
-      <div className="mermaid-zoom-layout">
-        <div className="mermaid-zoom-toolbar">
-          <span className="mermaid-zoom-title">{title}</span>
-          <div className="mermaid-zoom-actions">
-            <div className="mermaid-zoom-stepper">
-              <button
+      <div className="mermaid-zoom-layout grid grid-rows-[auto_minmax(0,1fr)] h-full">
+        <div className="mermaid-zoom-toolbar flex min-h-10 items-center gap-2.5 border-b border-border bg-sidebar px-2.5 py-[7px] max-[480px]:px-2">
+          <span className="mermaid-zoom-title min-w-0 overflow-hidden font-mono text-xs font-semibold text-ellipsis whitespace-nowrap text-muted-foreground max-[480px]:text-[10px]">{title}</span>
+          <div className="mermaid-zoom-actions ml-auto flex items-center gap-1.5">
+            <div className="flex h-6 items-center overflow-hidden rounded-md border border-border bg-background">
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="size-[22px] rounded-none"
                 onClick={() => setZoom((value) => Math.max(ZOOM_MIN, value - ZOOM_STEP))}
                 disabled={zoom <= ZOOM_MIN}
                 title={t("i18n.zoomOut")}
                 aria-label={t("i18n.zoomOut")}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                  <path d="M5 12h14" />
-                </svg>
-              </button>
-              <span className="mermaid-zoom-value">{Math.round(zoom * 100)}%</span>
-              <button
+                <Minus strokeWidth={1.8} />
+              </Button>
+              <Separator orientation="vertical" className="h-[22px]" />
+              <span className="min-w-12 text-center font-mono text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
+              <Separator orientation="vertical" className="h-[22px]" />
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="size-[22px] rounded-none"
                 onClick={() => setZoom((value) => Math.min(ZOOM_MAX, value + ZOOM_STEP))}
                 disabled={zoom >= ZOOM_MAX}
                 title={t("i18n.zoomIn")}
                 aria-label={t("i18n.zoomIn")}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </button>
+                <Plus strokeWidth={1.8} />
+              </Button>
             </div>
-            <button
+            <Button
               type="button"
-              className="mermaid-zoom-icon-button"
+              variant="outline"
+              size="icon-xs"
               onClick={() => setZoom(1)}
               title={t("i18n.fitToWidth")}
               aria-label={t("i18n.fitToWidth")}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
-              </svg>
-            </button>
-            <button
+              <Maximize strokeWidth={1.8} />
+            </Button>
+            <Button
               type="button"
-              className="mermaid-zoom-icon-button"
+              variant="outline"
+              size="icon-xs"
               onClick={onClose}
               title={t("i18n.close")}
               aria-label={t("i18n.close")}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
-            </button>
+              <X strokeWidth={1.8} />
+            </Button>
           </div>
         </div>
         <div
-          className="mermaid-zoom-viewport"
+          className="mermaid-zoom-viewport min-h-0 min-w-0 overflow-auto bg-background p-6 [-webkit-overflow-scrolling:touch] max-[480px]:p-3"
           onClick={(event) => {
             if (event.target === event.currentTarget) onClose();
           }}
         >
-          <div className="mermaid-zoom-canvas" style={{ width: `${zoom * 100}%` }}>
+          {/* The zoom factor is a computed width, not a static presentation.
+              mermaid 生成的 svg 的块级铺满规则留在 globals（.mermaid-zoom-canvas svg）。 */}
+          <div className="mermaid-zoom-canvas mx-auto border border-border rounded-(--radius-sm) bg-sidebar p-3 transition-[width] duration-150 ease-[ease]" style={{ width: `${zoom * 100}%` }}>
             {children}
           </div>
         </div>
@@ -328,11 +348,12 @@ delete codeBlockDarkTheme['pre[class*="language-"]'].background;
 type CodeLinesProps = Parameters<NonNullable<SyntaxHighlighterProps["renderer"]>>[0];
 
 /**
- * A fence's lines, each a row of its number and its text (`.markdown-code-line`
- * in app/globals.css): long lines wrap, as in pi's TUI, and a wrapped line goes
- * on under its own text, never under the number. The text keeps the row's own
- * classes, which color the later lines of a token that spans several (a block
- * comment).
+ * A fence's lines, each a row of its number and its text: long lines wrap, as
+ * in pi's TUI, and a wrapped line goes on under its own text, never under the
+ * number. The text keeps the row's own classes, which color the later lines of
+ * a token that spans several (a block comment). While an extension dialog
+ * measures its fences unwrapped (ChatWindow toggles body's
+ * .extension-dialog-measuring), the text stops wrapping.
  */
 function renderCodeLines({ rows, stylesheet, useInlineStyles }: CodeLinesProps) {
   return rows.map((row, index) => {
@@ -340,11 +361,18 @@ function renderCodeLines({ rows, stylesheet, useInlineStyles }: CodeLinesProps) 
     const number = children[0]?.properties?.className.includes("react-syntax-highlighter-line-number") ? children[0] : null;
     const text = {
       ...row,
-      properties: { ...row.properties, className: [...(row.properties?.className ?? []), "markdown-code-line-text"] },
+      properties: {
+        ...row.properties,
+        className: [
+          ...(row.properties?.className ?? []),
+          "markdown-code-line-text",
+          "min-w-0 flex-1 basis-0 whitespace-pre-wrap [overflow-wrap:anywhere] in-[.extension-dialog-measuring]:whitespace-pre",
+        ],
+      },
       children: number ? children.slice(1) : children,
     };
     return (
-      <span key={index} className="markdown-code-line">
+      <span key={index} className="markdown-code-line flex">
         {number && renderSyntaxNode({ node: number, stylesheet, useInlineStyles, key: "number" })}
         {renderSyntaxNode({ node: text, stylesheet, useInlineStyles, key: "text" })}
       </span>
@@ -383,47 +411,49 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
   }, [isStreaming, highlighted, languagesReady]);
 
   const copy = () => {
-    copyText(code).then(() => {
+    copyText(code).then((copied) => {
+      if (!copied) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
   };
 
   return (
-    <div className="markdown-code-block">
-      <div className="markdown-code-header">
-        <span className="markdown-code-lang">{lang || "text"}</span>
-        <div className="markdown-code-actions">
+    <CodeBlockFrame className="w-full min-w-0 max-w-full">
+      <CodeBlockHeader className="border-b px-2.5 py-1">
+        <CodeBlockTitle className="font-mono text-xs font-medium text-muted-foreground">{lang || "text"}</CodeBlockTitle>
+        <CodeBlockActions className="gap-1">
           {headerAction}
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
             onClick={copy}
-            className="markdown-code-action"
+            title={copied ? t("i18n.copied") : t("i18n.copy")}
+            aria-label={copied ? t("i18n.copied") : t("i18n.copy")}
+            className={copied ? "text-primary" : "text-muted-foreground"}
           >
-            {copied ? t("i18n.copied") : t("i18n.copy")}
-          </button>
-        </div>
-      </div>
+            {copied ? <CheckIcon strokeWidth={1.8} /> : <CopyIcon strokeWidth={1.8} />}
+          </Button>
+        </CodeBlockActions>
+      </CodeBlockHeader>
       {isStreaming ? (
-        <pre
-          style={{
-            margin: 0,
-            padding: "11px 13px",
-            fontSize: "calc(12.5px + var(--chat-font-size-offset, 0px))",
-            lineHeight: 1.62,
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-            backgroundColor: "color-mix(in srgb, var(--bg) 92%, var(--bg-panel))",
-          }}
+        <CodeBlockContent
+          wrap
+          className="bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] px-[13px] py-[11px] text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] leading-[1.62]"
         >
-          <code style={{ fontFamily: "var(--font-mono)" }}>{code}</code>
-        </pre>
+          {code}
+        </CodeBlockContent>
       ) : (
         <SyntaxHighlighter
           language={highlighted ? lang || "text" : "text"}
           style={isDark ? codeBlockDarkTheme : vs}
           showLineNumbers
-          lineNumberStyle={{ color: "var(--text-dim)", fontStyle: "normal", flexShrink: 0 }}
+          lineNumberStyle={{ color: "var(--muted-foreground)", fontStyle: "normal", flexShrink: 0 }}
           renderer={renderCodeLines}
+          // Style object by API: the highlighter applies it as inline style on
+          // the <pre> it renders, and its theme's own inline styles can only
+          // be overridden in kind, so this cannot become a utility class.
           customStyle={{
             margin: 0,
             padding: "11px 13px",
@@ -431,16 +461,16 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
             lineHeight: 1.62,
             fontWeight: "var(--font-mono-weight)",
             // The light `vs` theme puts its own 1px #ddd border on <pre>; the
-            // block's wrapper already draws the frame.
+            // ui CodeBlock frame is the only border.
             border: "none",
             borderRadius: 0,
-            backgroundColor: "color-mix(in srgb, var(--bg) 92%, var(--bg-panel))",
+            backgroundColor: "color-mix(in srgb, var(--background) 92%, var(--sidebar))",
           }}
           codeTagProps={{ style: { fontFamily: "var(--font-mono)", fontWeight: "var(--font-mono-weight)" } }}
         >
           {code}
         </SyntaxHighlighter>
       )}
-    </div>
+    </CodeBlockFrame>
   );
 });

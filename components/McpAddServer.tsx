@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { useId, useMemo, type ComponentProps, type ReactNode } from "react";
 import type { McpServerConfig } from "@earendil-works/pi-coding-agent";
 import type { McpResponse, McpScope } from "@/lib/api-types";
 import { useI18n } from "@/hooks/useI18n";
@@ -8,16 +8,22 @@ import { shortenPath } from "@/lib/display-path";
 import type { McpImportField, McpImportNote } from "@/lib/mcp-import";
 import { isReferenceOnly } from "@/lib/mcp-secrets";
 import { mcpFieldLabel, mcpVariableChips, revealHiddenCharacters } from "@/lib/mcp-server-display";
+import { cn } from "@/lib/utils";
 import {
   ConfigAddSourcePanel,
-  ConfigButton,
   type ConfigAddSourceCatalog,
+  ConfigCard,
   ConfigDetailGrid,
   ConfigDetailGridRow,
   ConfigField,
   ConfigSaveTarget,
-  ConfigSectionTitle,
 } from "./SettingsUi";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "./ui/field";
+import { Input } from "./ui/input";
+import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import {
   MCP_ADD_BREADTH_KEYS,
   MCP_ADD_EXAMPLES,
@@ -43,6 +49,48 @@ import type { McpActionFailure, McpActionRequest } from "./mcp-config-helpers";
 
 type Translate = ReturnType<typeof useI18n>["t"];
 export type McpAddActionRequest = Extract<McpActionRequest, { action: "add" }>;
+
+/** A line of the pane: 12px in the interface font; secondary lines only dimmer, never smaller. */
+function Line({ tone, className, children, ...props }: { tone?: "dim" | "warning" | "error" } & ComponentProps<"span">) {
+  return (
+    <span
+      {...props}
+      className={cn(
+        "min-w-0 text-xs leading-normal text-muted-foreground [overflow-wrap:anywhere]",
+        tone === "dim" && "text-muted-foreground",
+        tone === "warning" && "text-warning",
+        tone === "error" && "text-destructive",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** The pane's lines, each on its own, so no locale has to join two sentences. A span: labels wrap these. */
+function Lines({ children }: { children: ReactNode }) {
+  return <span className="flex min-w-0 flex-col gap-1">{children}</span>;
+}
+
+/** Literal text (a field name, a variable, an error) as code: hidden characters shown escaped by the caller. */
+function McpCode({ children }: { children: ReactNode }) {
+  return (
+    <code className="max-w-full rounded-sm border border-border bg-background px-1 font-mono text-xs text-foreground [overflow-wrap:anywhere]">
+      {children}
+    </code>
+  );
+}
+
+/** The add pane's boxes: the settings density (32px) in mono 12px, as the paste box above them. */
+const ADD_INPUT_CLASS = "h-8 px-2.5 font-mono text-xs";
+
+/** The add pane's selects: the settings density (32px) in mono 12px, as the paste box above them. */
+const ADD_SELECT_CLASS =
+  "h-8 w-full min-w-0 rounded-md border-input px-2.5 font-mono text-xs shadow-none dark:bg-transparent dark:hover:bg-transparent";
+
+/** Radix SelectItem values cannot be empty, so the "choose one" state travels as this sentinel. */
+const ADD_SELECT_NONE = "__none__";
 
 function displayPath(path: string): string {
   return revealHiddenCharacters(shortenPath(path));
@@ -70,10 +118,12 @@ function McpImportNotes({ notes, fields = [] }: { notes: readonly McpImportNote[
   if (notes.length === 0) return null;
   const order = { error: 0, warning: 1, info: 2 } as const;
   const sorted = [...notes].sort((a, b) => order[mcpImportNoteSeverity(a)] - order[mcpImportNoteSeverity(b)]);
+  const toneClass = (note: McpImportNote): string =>
+    mcpImportNoteSeverity(note) === "error" ? "text-destructive" : mcpImportNoteSeverity(note) === "warning" ? "text-warning" : "text-muted-foreground";
   return (
-    <ul className="mcp-add-notes">
+    <ul className="flex min-w-0 flex-col gap-1 pl-[18px] text-xs leading-normal">
       {sorted.map((note, index) => (
-        <li key={`${index}\0${note.code}`} className={`mcp-add-note is-${mcpImportNoteSeverity(note)}`}>
+        <li key={`${index}\0${note.code}`} className={`min-w-0 [overflow-wrap:anywhere] ${toneClass(note)}`}>
           {mcpImportNoteText(note, t, fields)}
         </li>
       ))}
@@ -220,12 +270,12 @@ export function McpAddServer({
           onChange={(scope) => change({ scope })}
         >
           {trustable && (
-            <span className="mcp-config-line">
-              <ConfigButton size="small" onClick={onTrustProject}>{t("mcp.trust.trustButton")}</ConfigButton>
-            </span>
+            <Line>
+              <Button type="button" size="sm" variant="secondary" onClick={onTrustProject}>{t("mcp.trust.trustButton")}</Button>
+            </Line>
           )}
           {analysis.trustFolder && analysis.projectMode.kind === "trust-and-write" && (
-            <p className="mcp-config-line is-warning">{t("mcp.add.trustExplain", { path: displayPath(analysis.projectMode.folder) })}</p>
+            <Line tone="warning">{t("mcp.add.trustExplain", { path: displayPath(analysis.projectMode.folder) })}</Line>
           )}
         </ConfigSaveTarget>
       }
@@ -242,12 +292,16 @@ export function McpAddServer({
       multiline
     >
       {offersRawPi && (
-        <label className="mcp-add-toggle">
-          <input type="checkbox" checked={draft.rawPi} onChange={(event) => onDraftChange(mcpAddDraftWithPaste(draft, { rawPi: event.target.checked }))} />
-          <span className="mcp-config-lines">
-            <span className="mcp-config-line">{t("mcp.add.rawPi")}</span>
-            {draft.rawPi && <span className="mcp-config-line is-dim">{t("mcp.add.rawPiOn")}</span>}
-          </span>
+        <label className="flex min-w-0 cursor-pointer items-start gap-2">
+          <Checkbox
+            className="mt-0.5"
+            checked={draft.rawPi}
+            onCheckedChange={(checked) => onDraftChange(mcpAddDraftWithPaste(draft, { rawPi: checked === true }))}
+          />
+          <Lines>
+            <Line>{t("mcp.add.rawPi")}</Line>
+            {draft.rawPi && <Line tone="dim">{t("mcp.add.rawPiOn")}</Line>}
+          </Lines>
         </label>
       )}
 
@@ -255,17 +309,20 @@ export function McpAddServer({
 
       {parsed.ok && parsed.servers.length > 1 && (
         <ConfigField label={t("mcp.add.serverLabel")}>
-          <select
-            className="mcp-add-input"
-            aria-label={t("mcp.add.serverLabel")}
+          <UiSelect
             value={String(parsed.servers.indexOf(server ?? parsed.servers[0]))}
-            onChange={(event) => change({ server: Number(event.target.value), name: undefined, values: {}, references: {}, secretReferences: {} })}
+            onValueChange={(value) => change({ server: Number(value), name: undefined, values: {}, references: {}, secretReferences: {} })}
           >
-            {parsed.servers.map((item, index) => (
-              <option key={`${index}\0${item.name}`} value={index}>{revealHiddenCharacters(item.name)}</option>
-            ))}
-          </select>
-          <span className="mcp-config-line is-dim">{t("mcp.add.serverCount", { count: parsed.servers.length })}</span>
+            <SelectTrigger className={ADD_SELECT_CLASS} aria-label={t("mcp.add.serverLabel")}>
+              <SelectValue>{revealHiddenCharacters((server ?? parsed.servers[0]).name)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent position="popper" align="start" className="z-[1100]">
+              {parsed.servers.map((item, index) => (
+                <SelectItem key={`${index}\0${item.name}`} value={String(index)}>{revealHiddenCharacters(item.name)}</SelectItem>
+              ))}
+            </SelectContent>
+          </UiSelect>
+          <Line tone="dim">{t("mcp.add.serverCount", { count: parsed.servers.length })}</Line>
         </ConfigField>
       )}
 
@@ -273,9 +330,9 @@ export function McpAddServer({
       {server && (
         <>
           <ConfigField label={t("config.name")}>
-            <input
+            <Input
               id={nameId}
-              className="mcp-add-input"
+              className={ADD_INPUT_CLASS}
               aria-label={t("config.name")}
               value={analysis.name}
               spellCheck={false}
@@ -286,156 +343,164 @@ export function McpAddServer({
           </ConfigField>
           <McpImportNotes notes={nameNotes} fields={server.fields} />
           {submitBlock?.kind === "name-taken" && (
-            <span className="mcp-config-line">
-              <ConfigButton size="small" onClick={() => change({ name: submitBlock.suggestedName })}>
+            <Line>
+              <Button type="button" size="sm" variant="secondary" onClick={() => change({ name: submitBlock.suggestedName })}>
                 {t("mcp.add.useName", { name: revealHiddenCharacters(submitBlock.suggestedName) })}
-              </ConfigButton>
-            </span>
+              </Button>
+            </Line>
           )}
         </>
       )}
 
       {server && preview && (
         <>
-          <ConfigSectionTitle>{t("mcp.add.preview")}</ConfigSectionTitle>
-          <ConfigDetailGrid>
-            <ConfigDetailGridRow label={t("mcp.add.readAs")}>{t(MCP_IMPORT_SOURCE_KEYS[preview.source])}</ConfigDetailGridRow>
-            <ConfigDetailGridRow label={t("mcp.detail.transport")}>{t(`mcp.transport.${preview.transport}`)}</ConfigDetailGridRow>
-            <ConfigDetailGridRow label={preview.transport === "http" ? t("mcp.detail.url") : t("mcp.detail.command")} tone="plain" mono>
-              {preview.target}
-            </ConfigDetailGridRow>
-            {preview.transport === "stdio" && preview.cwd !== undefined && (
-              <ConfigDetailGridRow label={t("mcp.detail.cwd")} mono>{preview.cwd}</ConfigDetailGridRow>
-            )}
-            {names.length > 0 && (
-              <ConfigDetailGridRow label={preview.transport === "http" ? t("mcp.detail.headers") : t("mcp.detail.env")}>
-                <McpAddNames names={names} />
-              </ConfigDetailGridRow>
-            )}
-            {preview.commandFields.length > 0 && (
-              <ConfigDetailGridRow label={t("mcp.detail.shellCommands")} tone="plain">
-                <span className="mcp-config-lines">
-                  <span className="mcp-config-line is-warning">{t("mcp.server.commandFields")}</span>
-                  <span className="mcp-config-chips">
-                    {preview.commandFields.map((field) => {
-                      const label = mcpFieldLabel(field);
-                      return <code key={`${field.kind}\0${field.name ?? ""}`} className="mcp-config-chip">{t(label.key, label.params)}</code>;
-                    })}
-                  </span>
-                </span>
-              </ConfigDetailGridRow>
-            )}
-            {preview.variableReferences.length > 0 && (
-              <ConfigDetailGridRow label={t("mcp.detail.variables")} tone="plain">
-                <span className="mcp-config-lines">
-                  <span className="mcp-config-line is-warning">
-                    {t(preview.transport === "http" ? "mcp.server.sendsVariables" : "mcp.server.passesVariables")}
-                  </span>
-                  <span className="mcp-config-chips">
-                    {mcpVariableChips(preview.variableReferences).map(({ variable, field }) => {
-                      const label = mcpFieldLabel(field);
-                      return (
-                        <code key={`${variable}\0${field.kind}\0${field.name ?? ""}`} className="mcp-config-chip">
-                          {t("mcp.server.variableIn", { variable: revealHiddenCharacters(variable), field: t(label.key, label.params) })}
-                        </code>
-                      );
-                    })}
-                  </span>
-                </span>
-              </ConfigDetailGridRow>
-            )}
-          </ConfigDetailGrid>
-          <div className="mcp-config-lines">
-            {preview.unfilled && <span className="mcp-config-line is-dim">{t("mcp.add.previewUnfilled")}</span>}
-            {preview.masked && <span className="mcp-config-line is-dim">{t("mcp.server.masked")}</span>}
-          </div>
-          <McpImportNotes notes={notes} fields={server.fields} />
+          <ConfigCard title={t("mcp.add.preview")}>
+            <div className="flex flex-col gap-4">
+              <ConfigDetailGrid>
+                <ConfigDetailGridRow label={t("mcp.add.readAs")}>{t(MCP_IMPORT_SOURCE_KEYS[preview.source])}</ConfigDetailGridRow>
+                <ConfigDetailGridRow label={t("mcp.detail.transport")}>{t(`mcp.transport.${preview.transport}`)}</ConfigDetailGridRow>
+                <ConfigDetailGridRow label={preview.transport === "http" ? t("mcp.detail.url") : t("mcp.detail.command")} tone="plain" mono>
+                  {preview.target}
+                </ConfigDetailGridRow>
+                {preview.transport === "stdio" && preview.cwd !== undefined && (
+                  <ConfigDetailGridRow label={t("mcp.detail.cwd")} mono>{preview.cwd}</ConfigDetailGridRow>
+                )}
+                {names.length > 0 && (
+                  <ConfigDetailGridRow label={preview.transport === "http" ? t("mcp.detail.headers") : t("mcp.detail.env")}>
+                    <McpAddNames names={names} />
+                  </ConfigDetailGridRow>
+                )}
+                {preview.commandFields.length > 0 && (
+                  <ConfigDetailGridRow label={t("mcp.detail.shellCommands")} tone="plain">
+                    <Lines>
+                      <Line tone="warning">{t("mcp.server.commandFields")}</Line>
+                      <span className="flex min-w-0 flex-wrap gap-1">
+                        {preview.commandFields.map((field) => {
+                          const label = mcpFieldLabel(field);
+                          return <McpCode key={`${field.kind}\0${field.name ?? ""}`}>{t(label.key, label.params)}</McpCode>;
+                        })}
+                      </span>
+                    </Lines>
+                  </ConfigDetailGridRow>
+                )}
+                {preview.variableReferences.length > 0 && (
+                  <ConfigDetailGridRow label={t("mcp.detail.variables")} tone="plain">
+                    <Lines>
+                      <Line tone="warning">
+                        {t(preview.transport === "http" ? "mcp.server.sendsVariables" : "mcp.server.passesVariables")}
+                      </Line>
+                      <span className="flex min-w-0 flex-wrap gap-1">
+                        {mcpVariableChips(preview.variableReferences).map(({ variable, field }) => {
+                          const label = mcpFieldLabel(field);
+                          return (
+                            <McpCode key={`${variable}\0${field.kind}\0${field.name ?? ""}`}>
+                              {t("mcp.server.variableIn", { variable: revealHiddenCharacters(variable), field: t(label.key, label.params) })}
+                            </McpCode>
+                          );
+                        })}
+                      </span>
+                    </Lines>
+                  </ConfigDetailGridRow>
+                )}
+              </ConfigDetailGrid>
+              <Lines>
+                {preview.unfilled && <Line tone="dim">{t("mcp.add.previewUnfilled")}</Line>}
+                {preview.masked && <Line tone="dim">{t("mcp.server.masked")}</Line>}
+              </Lines>
+              <McpImportNotes notes={notes} fields={server.fields} />
+            </div>
+          </ConfigCard>
 
           {server.fields.length > 0 && (
-            <>
-              <ConfigSectionTitle>{t("mcp.add.fields")}</ConfigSectionTitle>
-              {server.fields.map((field) => (
-                <McpAddFieldInput
-                  key={field.id}
-                  field={field}
-                  fields={server.fields}
-                  draft={draft}
-                  suggestedName={mcpFieldSuggestedVariableName(field, analysis.name)}
-                  problem={analysis.fieldProblems[field.id]}
-                  onDraftChange={onDraftChange}
-                />
-              ))}
-            </>
+            <ConfigCard title={t("mcp.add.fields")}>
+              <FieldGroup className="gap-4">
+                {server.fields.map((field) => (
+                  <McpAddFieldInput
+                    key={field.id}
+                    field={field}
+                    fields={server.fields}
+                    draft={draft}
+                    suggestedName={mcpFieldSuggestedVariableName(field, analysis.name)}
+                    problem={analysis.fieldProblems[field.id]}
+                    onDraftChange={onDraftChange}
+                  />
+                ))}
+              </FieldGroup>
+            </ConfigCard>
           )}
 
           {analysis.pasteSecrets.length > 0 && (
-            <>
-              <ConfigSectionTitle>{t("mcp.add.secrets")}</ConfigSectionTitle>
-              {analysis.pasteSecrets.map((label) => (
-                <McpAddSecretInput
-                  key={label}
-                  label={label}
-                  draft={draft}
-                  suggestedName={mcpSuggestedVariableName(label, analysis.name)}
-                  stored={analysis.fill?.ok ? storedValue(analysis.fill.config, label) : undefined}
-                  problem={analysis.fieldProblems[label]}
-                  onDraftChange={onDraftChange}
-                />
-              ))}
-            </>
+            <ConfigCard title={t("mcp.add.secrets")}>
+              <div className="flex flex-col gap-4">
+                {analysis.pasteSecrets.map((label) => (
+                  <McpAddSecretInput
+                    key={label}
+                    label={label}
+                    draft={draft}
+                    suggestedName={mcpSuggestedVariableName(label, analysis.name)}
+                    stored={analysis.fill?.ok ? storedValue(analysis.fill.config, label) : undefined}
+                    problem={analysis.fieldProblems[label]}
+                    onDraftChange={onDraftChange}
+                  />
+                ))}
+              </div>
+            </ConfigCard>
           )}
         </>
       )}
 
-      <ConfigButton
-        variant="primary"
-        className="is-pushed-right"
+      <Button
+        type="button"
+        className="ml-auto"
         disabled={!canSubmit}
         aria-busy={busy || undefined}
         aria-describedby={ownBlockLine ? blockId : undefined}
         onClick={submit}
       >
         {busy ? t("mcp.add.adding") : analysis.trustFolder ? t("mcp.add.buttonTrust") : t("mcp.add.button")}
-      </ConfigButton>
+      </Button>
       {ownBlockLine && (
-        <p id={blockId} className={`mcp-config-line ${submitBlock?.kind === "scope" ? "is-warning" : "is-dim"}`}>{ownBlockLine}</p>
+        <Line id={blockId} tone={submitBlock?.kind === "scope" ? "warning" : "dim"}>{ownBlockLine}</Line>
       )}
-      {server && !submitBlock && <p className="mcp-config-line is-dim">{t("mcp.add.afterAdd")}</p>}
+      {server && !submitBlock && <Line tone="dim">{t("mcp.add.afterAdd")}</Line>}
 
       {failure && (
-        <div role="alert" className="mcp-add-failure">
-          <span className="mcp-config-line is-error">{t("mcp.add.failed")} {failureText(failure, t)}</span>
-          {failure.trustKept && (
-            <span className="mcp-config-line is-warning">
-              {t("mcp.add.trustKept", { folder: displayPath(failure.trust?.decisionPath ?? cwd ?? "") })}
-            </span>
-          )}
-          {failure.notes && failure.notes.length > 0 && <McpImportNotes notes={failure.notes} fields={server?.fields} />}
-          {failure.reason === "name-taken" && failure.suggestedName && submitBlock?.kind !== "name-taken" && (
-            <span className="mcp-config-line">
-              <ConfigButton size="small" onClick={() => change({ name: failure.suggestedName })}>
-                {t("mcp.add.useName", { name: revealHiddenCharacters(failure.suggestedName) })}
-              </ConfigButton>
-            </span>
-          )}
-          {failure.reason === "host-env-confirm" && failure.names && failure.names.length > 0 && (
-            <>
-              <span className="mcp-config-line is-warning">
-                {t("mcp.add.hostEnv.body", { names: failure.names.map(revealHiddenCharacters).join(", ") })}
-              </span>
-              <span className="mcp-config-line">
-                <ConfigButton
-                  variant="danger"
-                  size="small"
-                  disabled={busy || controlsBusy || submitBlock !== undefined}
-                  onClick={() => onSubmit(mcpAddRequest(draft, analysis, failure.names))}
-                >
-                  {t("mcp.add.hostEnv.confirm")}
-                </ConfigButton>
-              </span>
-            </>
-          )}
-        </div>
+        <Alert variant="destructive" className="min-w-0">
+          <AlertDescription className="col-start-2 flex min-w-0 flex-col gap-1.5">
+            <Line tone="error">{t("mcp.add.failed")} {failureText(failure, t)}</Line>
+            {failure.trustKept && (
+              <Line tone="warning">
+                {t("mcp.add.trustKept", { folder: displayPath(failure.trust?.decisionPath ?? cwd ?? "") })}
+              </Line>
+            )}
+            {failure.notes && failure.notes.length > 0 && <McpImportNotes notes={failure.notes} fields={server?.fields} />}
+            {failure.reason === "name-taken" && failure.suggestedName && submitBlock?.kind !== "name-taken" && (
+              <Line>
+                <Button type="button" size="sm" variant="secondary" onClick={() => change({ name: failure.suggestedName })}>
+                  {t("mcp.add.useName", { name: revealHiddenCharacters(failure.suggestedName) })}
+                </Button>
+              </Line>
+            )}
+            {failure.reason === "host-env-confirm" && failure.names && failure.names.length > 0 && (
+              <>
+                <Line tone="warning">
+                  {t("mcp.add.hostEnv.body", { names: failure.names.map(revealHiddenCharacters).join(", ") })}
+                </Line>
+                <Line>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    disabled={busy || controlsBusy || submitBlock !== undefined}
+                    onClick={() => onSubmit(mcpAddRequest(draft, analysis, failure.names))}
+                  >
+                    {t("mcp.add.hostEnv.confirm")}
+                  </Button>
+                </Line>
+              </>
+            )}
+          </AlertDescription>
+        </Alert>
       )}
     </ConfigAddSourcePanel>
   );
@@ -445,12 +510,12 @@ export function McpAddServer({
 function McpAddNames({ names }: { names: readonly string[] }) {
   const { t } = useI18n();
   return (
-    <span className="mcp-config-lines">
-      <span className="mcp-config-chips">
-        {names.map((name) => <code key={name} className="mcp-config-chip">{revealHiddenCharacters(name)}</code>)}
+    <Lines>
+      <span className="flex min-w-0 flex-wrap gap-1">
+        {names.map((name) => <McpCode key={name}>{revealHiddenCharacters(name)}</McpCode>)}
       </span>
-      <span className="mcp-config-line is-dim">{t("mcp.detail.valuesHidden")}</span>
-    </span>
+      <Line tone="dim">{t("mcp.detail.valuesHidden")}</Line>
+    </Lines>
   );
 }
 
@@ -503,54 +568,61 @@ function McpAddFieldInput({
     onDraftChange({ ...draft, references });
   };
   return (
-    <div className="mcp-add-field">
-      <ConfigField label={label}>
+    <Field className="min-w-0 gap-1.5">
+      <FieldLabel className="text-[13px] font-medium text-muted-foreground">{label}</FieldLabel>
+      {usesVariable ? (
+        <Input
+          className={ADD_INPUT_CLASS}
+          aria-label={t("mcp.add.field.variableName", { field: label })}
+          value={reference}
+          placeholder={suggestedName ?? "GITHUB_TOKEN"}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          {...invalid}
+          onChange={(event) => setReference(event.target.value)}
+        />
+      ) : field.kind === "select" ? (
+        <UiSelect
+          value={value === "" ? ADD_SELECT_NONE : value}
+          onValueChange={(next) => setValue(next === ADD_SELECT_NONE ? "" : next)}
+        >
+          <SelectTrigger className={ADD_SELECT_CLASS} aria-label={label} {...invalid}>
+            <SelectValue>{value === "" ? t("mcp.add.field.choose") : revealHiddenCharacters(value)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent position="popper" align="start" className="z-[1100]">
+            {!field.options?.includes(value) && <SelectItem value={ADD_SELECT_NONE}>{t("mcp.add.field.choose")}</SelectItem>}
+            {(field.options ?? []).map((option) => <SelectItem key={option} value={option}>{revealHiddenCharacters(option)}</SelectItem>)}
+          </SelectContent>
+        </UiSelect>
+      ) : (
+        <Input
+          className={ADD_INPUT_CLASS}
+          type={field.kind === "password" ? "password" : "text"}
+          aria-label={label}
+          value={value}
+          autoComplete="off"
+          placeholder={field.placeholder ? revealHiddenCharacters(field.placeholder) : undefined}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          {...invalid}
+          onChange={(event) => setValue(event.target.value)}
+        />
+      )}
+      {problem && <FieldError id={problemId} className="text-xs">{mcpImportNoteText(problem, t, [field])}</FieldError>}
+      <FieldDescription className="flex min-w-0 flex-col gap-1 text-xs">
+        {field.description && <span className="[overflow-wrap:anywhere]">{revealHiddenCharacters(field.description)}</span>}
+        {reasonKey && <span>{t(reasonKey)}</span>}
         {usesVariable ? (
-          <input
-            className="mcp-add-input"
-            aria-label={t("mcp.add.field.variableName", { field: label })}
-            value={reference}
-            placeholder={suggestedName ?? "GITHUB_TOKEN"}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            {...invalid}
-            onChange={(event) => setReference(event.target.value)}
-          />
-        ) : field.kind === "select" ? (
-          <select className="mcp-add-input" aria-label={label} value={value} {...invalid} onChange={(event) => setValue(event.target.value)}>
-            {!field.options?.includes(value) && <option value="">{t("mcp.add.field.choose")}</option>}
-            {(field.options ?? []).map((option) => <option key={option} value={option}>{revealHiddenCharacters(option)}</option>)}
-          </select>
-        ) : (
-          <input
-            className="mcp-add-input"
-            type={field.kind === "password" ? "password" : "text"}
-            aria-label={label}
-            value={value}
-            autoComplete="off"
-            placeholder={field.placeholder ? revealHiddenCharacters(field.placeholder) : undefined}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            {...invalid}
-            onChange={(event) => setValue(event.target.value)}
-          />
-        )}
-      </ConfigField>
-      {problem && <span id={problemId} className="mcp-config-line is-error">{mcpImportNoteText(problem, t, [field])}</span>}
-      <span className="mcp-config-lines">
-        {field.description && <span className="mcp-config-line is-dim">{revealHiddenCharacters(field.description)}</span>}
-        {reasonKey && <span className="mcp-config-line is-dim">{t(reasonKey)}</span>}
-        {usesVariable ? (
-          <span className="mcp-config-line is-dim">
+          <span>
             {storedAs ? t("mcp.add.field.storedAsVariable", { value: storedAs }) : t("mcp.add.field.variableHint")}
           </span>
         ) : (
           <>
-            {storedAs && <span className="mcp-config-line is-dim">{t("mcp.add.field.storedAs", { value: storedAs })}</span>}
+            {storedAs && <span>{t("mcp.add.field.storedAs", { value: storedAs })}</span>}
             {field.optional && (
-              <span className="mcp-config-line is-dim">
+              <span>
                 {optionalHeader
                   ? t("mcp.add.field.optionalHeader", { name: revealHiddenCharacters(optionalHeader) })
                   : t("mcp.add.field.optional")}
@@ -558,14 +630,18 @@ function McpAddFieldInput({
             )}
           </>
         )}
-      </span>
+      </FieldDescription>
       {takesVariable && (
-        <label className="mcp-add-toggle">
-          <input type="checkbox" checked={usesVariable} onChange={(event) => setReference(event.target.checked ? suggestedName ?? "" : undefined)} />
-          <span className="mcp-config-line">{t("mcp.add.field.useVariable")}</span>
+        <label className="flex min-w-0 cursor-pointer items-start gap-2">
+          <Checkbox
+            className="mt-0.5"
+            checked={usesVariable}
+            onCheckedChange={(checked) => setReference(checked === true ? suggestedName ?? "" : undefined)}
+          />
+          <Line>{t("mcp.add.field.useVariable")}</Line>
         </label>
       )}
-    </div>
+    </Field>
   );
 }
 
@@ -618,20 +694,22 @@ function McpAddSecretInput({
     onDraftChange({ ...draft, secretReferences });
   };
   return (
-    <div className="mcp-add-field">
-      <span className="mcp-config-lines">
-        <span className="mcp-config-line">
-          <code className="mcp-config-chip">{shown}</code> {t("mcp.add.secret.holds")}
-        </span>
-      </span>
-      <label className="mcp-add-toggle">
-        <input type="checkbox" checked={usesVariable} onChange={(event) => setReference(event.target.checked ? suggestedName ?? "" : undefined)} />
-        <span className="mcp-config-line">{t("mcp.add.field.useVariable")}</span>
+    <div className="flex min-w-0 flex-col gap-1">
+      <Line>
+        <McpCode>{shown}</McpCode> {t("mcp.add.secret.holds")}
+      </Line>
+      <label className="flex min-w-0 cursor-pointer items-start gap-2">
+        <Checkbox
+          className="mt-0.5"
+          checked={usesVariable}
+          onCheckedChange={(checked) => setReference(checked === true ? suggestedName ?? "" : undefined)}
+        />
+        <Line>{t("mcp.add.field.useVariable")}</Line>
       </label>
       {usesVariable && (
         <ConfigField label={t("mcp.add.field.variableName", { field: shown })}>
-          <input
-            className="mcp-add-input"
+          <Input
+            className={ADD_INPUT_CLASS}
             aria-label={t("mcp.add.field.variableName", { field: shown })}
             value={reference}
             placeholder={suggestedName ?? "API_TOKEN"}
@@ -643,14 +721,14 @@ function McpAddSecretInput({
           />
         </ConfigField>
       )}
-      {problem && <span id={problemId} className="mcp-config-line is-error">{mcpImportNoteText(problem, t)}</span>}
-      <span className="mcp-config-line is-dim">
+      {problem && <FieldError id={problemId} className="text-xs">{mcpImportNoteText(problem, t)}</FieldError>}
+      <Line tone="dim">
         {usesVariable
           ? stored !== undefined
             ? t("mcp.add.secret.storedAs", { value: revealHiddenCharacters(stored) })
             : t("mcp.add.field.variableHint")
           : t("mcp.add.secret.asPasted")}
-      </span>
+      </Line>
     </div>
   );
 }

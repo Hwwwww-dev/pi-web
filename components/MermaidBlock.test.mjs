@@ -71,7 +71,7 @@ function renderCode(props) {
 
 /** Each line's number, read off the row that pairs it with its text. */
 function lineRows(html) {
-  return [...html.matchAll(/<span class="markdown-code-line"><span class="linenumber react-syntax-highlighter-line-number"[^>]*>(\d+)<\/span><span class="(?:token )?markdown-code-line-text"/g)]
+  return [...html.matchAll(/<span class="markdown-code-line[^"]*"><span class="linenumber react-syntax-highlighter-line-number"[^>]*>(\d+)<\/span><span class="(?:token )?markdown-code-line-text[^"]*"/g)]
     .map((match) => match[1]);
 }
 
@@ -120,7 +120,7 @@ test("CodeBlock keeps a block comment's color on every line it spans", () => {
 
   // The comment's middle line is a row of its own, styled by the row's classes.
   const first = html.match(/<span class="token" style="([^"]*)">\/\* one\n<\/span>/)?.[1];
-  const middle = html.match(/<span class="token markdown-code-line-text" style="([^"]*)">   two\n<\/span>/)?.[1];
+  const middle = html.match(/<span class="token markdown-code-line-text[^"]*" style="([^"]*)">   two\n<\/span>/)?.[1];
   assert.ok(first);
   assert.equal(middle, first);
   assert.deepEqual(lineRows(html), ["1", "2", "3", "4"]);
@@ -131,8 +131,15 @@ test("CodeBlock owns the pre background without a competing shorthand", () => {
     const html = renderCode({ code: "const x = 1;", lang: "javascript", isStreaming });
     const pre = html.match(/<pre\b[^>]*>/)?.[0];
     assert.ok(pre);
-    assert.match(pre, /background-color:color-mix/);
-    assert.doesNotMatch(pre, /(?:[;\"]|^)background:/);
+    if (isStreaming) {
+      // The streamed pre carries the block background as a utility class and
+      // keeps no inline background of its own.
+      assert.match(pre, /bg-\[color-mix\(in_srgb,var\(--background\)_92%,var\(--sidebar\)\)\]/);
+      assert.doesNotMatch(pre, /background(?:-color)?:/);
+    } else {
+      assert.match(pre, /background-color:color-mix/);
+      assert.doesNotMatch(pre, /(?:[;\"]|^)background:/);
+    }
   }
 });
 
@@ -141,10 +148,12 @@ test("CodeBlock renders plain text without tokenization while streaming", () => 
 
   assert.doesNotMatch(html, /class="token/);
   assert.match(html, /const x = 1;/);
-  // A streamed block wraps its long lines too, instead of scrolling sideways.
+  // A streamed block wraps its long lines too, instead of scrolling sideways
+  // (the ui CodeBlockContent's data-wrap variant).
   const pre = html.match(/<pre\b[^>]*>/)?.[0];
-  assert.match(pre, /white-space:pre-wrap/);
-  assert.match(pre, /overflow-wrap:anywhere/);
+  assert.match(pre, /data-wrap="true"/);
+  assert.match(pre, /data-wrap:whitespace-pre-wrap/);
+  assert.match(pre, /data-wrap:wrap-break-word/);
   assert.doesNotMatch(pre, /overflow-x/);
 });
 

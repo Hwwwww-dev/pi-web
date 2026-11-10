@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import type { McpServerInfo, McpSignInFlowInfo } from "@/lib/api-types";
 import { useI18n } from "@/hooks/useI18n";
 import { revealHiddenCharacters } from "@/lib/mcp-server-display";
 import { focusIfLost } from "@/lib/stacked-dialog";
+import { cn } from "@/lib/utils";
+import { Button } from "./ui/button";
 import { OAuthPastePanel } from "./OAuthPastePanel";
-import { ConfigButton, ConfigDetailGridRow } from "./SettingsUi";
+import { ConfigDetailGridRow } from "./SettingsUi";
 import type { McpActionFailure, McpTestBlock } from "./mcp-config-helpers";
 import {
   MCP_SIGN_IN_BLOCK_KEYS,
@@ -21,6 +23,38 @@ import {
 } from "./mcp-sign-in-helpers";
 
 type Translate = ReturnType<typeof useI18n>["t"];
+
+/** A line of the row: 12px in the interface font; secondary lines only dimmer, never smaller. */
+function Line({ tone, className, children, ...props }: { tone?: "dim" | "warning" | "error" } & ComponentProps<"span">) {
+  return (
+    <span
+      {...props}
+      className={cn(
+        "min-w-0 text-xs leading-normal text-muted-foreground [overflow-wrap:anywhere]",
+        tone === "dim" && "text-muted-foreground",
+        tone === "warning" && "text-warning",
+        tone === "error" && "text-destructive",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** The row's lines, each on its own, so no locale has to join two sentences. */
+function Lines({ children }: { children: ReactNode }) {
+  return <div className="flex min-w-0 flex-col gap-1">{children}</div>;
+}
+
+/** Literal text (a URL, an error, a field name) as code: hidden characters shown escaped by the caller. */
+function McpCode({ children }: { children: ReactNode }) {
+  return (
+    <code className="max-w-full rounded-sm border border-border bg-background px-1 font-mono text-xs text-foreground [overflow-wrap:anywhere]">
+      {children}
+    </code>
+  );
+}
 
 /**
  * Why a sign-in request or Sign out failed, in sign-in words where the reason
@@ -115,16 +149,16 @@ export function McpSignInRow({
   const cancelLocked = flow?.phase === "finishing";
   return (
     <ConfigDetailGridRow label={t("mcp.detail.signIn")} tone="plain">
-      <div className="mcp-config-lines">
-        <span className="mcp-config-line">
+      <Lines>
+        <Line>
           {server.signedIn === true
             ? t("mcp.signIn.signedIn")
             : server.signedIn === false
               ? t(server.oauthStateStored ? "mcp.signIn.registrationOnly" : "mcp.signIn.notSignedIn")
               : t("mcp.signIn.unknown")}
-        </span>
+        </Line>
         {flow && active && shared && (
-          <span className="mcp-config-line is-dim">{t("mcp.signIn.shared", { name: revealHiddenCharacters(flow.name) })}</span>
+          <Line tone="dim">{t("mcp.signIn.shared", { name: revealHiddenCharacters(flow.name) })}</Line>
         )}
         {flow && active && (
           flow.phase === "authorize" ? (
@@ -136,81 +170,86 @@ export function McpSignInRow({
               onPaste={(value) => onPaste(server, flow.flowId, value)}
             />
           ) : (
-            <span role="status" className="mcp-config-line">{t(MCP_SIGN_IN_PHASE_KEYS[flow.phase] ?? "mcp.signIn.phase.connecting")}</span>
+            <Line>{t(MCP_SIGN_IN_PHASE_KEYS[flow.phase] ?? "mcp.signIn.phase.connecting")}</Line>
           )
         )}
         {flow && active && cancelLocked && (
-          <span id={noCancelId} className="mcp-config-line is-dim">{t("mcp.signIn.phase.noCancel")}</span>
+          <Line id={noCancelId} tone="dim">{t("mcp.signIn.phase.noCancel")}</Line>
         )}
         {flow && !active && !run?.gone && <McpSignInOutcome flow={flow} shared={shared} />}
-        {run?.gone && <span role="alert" className="mcp-config-line is-warning">{t("mcp.signIn.gone")}</span>}
+        {run?.gone && <Line role="alert" tone="warning">{t("mcp.signIn.gone")}</Line>}
         {run?.error && (
-          <span role="alert" className="mcp-config-line is-error">
+          <Line role="alert" tone="error">
             {t("mcp.signIn.requestFailed")} {signInFailureText(run.error, t)}
-          </span>
+          </Line>
         )}
         {/* Only while the flow runs: once it ended, how it ended is the answer. */}
         {active && run?.cancelError && (
-          <span role="alert" className="mcp-config-line is-error">
+          <Line role="alert" tone="error">
             {t("mcp.signIn.cancelFailed")} {signInFailureText(run.cancelError, t, "mcp.signIn.cancelTimedOut")}
-          </span>
+          </Line>
         )}
         {run?.signOutError && (
-          <span role="alert" className="mcp-config-line is-error">
+          <Line role="alert" tone="error">
             {t("mcp.signIn.signOutFailed")} {signInFailureText(run.signOutError, t, "mcp.actionTimedOut")}
-          </span>
+          </Line>
         )}
         {run?.signedOut && (
-          <span role="status" className="mcp-config-line">
+          <Line role="status">
             {t(run.signedOut.removed ? "mcp.signIn.signedOutDone" : "mcp.signIn.signedOutNothing")}
-          </span>
+          </Line>
         )}
-        {block && <span id={blockId} className="mcp-config-line is-dim">{t(MCP_SIGN_IN_BLOCK_KEYS[block])}</span>}
+        {block && <Line id={blockId} tone="dim">{t(MCP_SIGN_IN_BLOCK_KEYS[block])}</Line>}
         {!block && signOutBlock && offersSignOut && !active && (
-          <span id={signOutBlockId} className="mcp-config-line is-dim">{t(MCP_SIGN_IN_BLOCK_KEYS[signOutBlock])}</span>
+          <Line id={signOutBlockId} tone="dim">{t(MCP_SIGN_IN_BLOCK_KEYS[signOutBlock])}</Line>
         )}
-        <div className="mcp-sign-in-actions">
+        {/* Sign in / Cancel and Sign out wrap below each other in the narrow phone pane. */}
+        <div className="flex min-w-0 flex-wrap gap-1.5">
           {active && flow ? (
-            <ConfigButton
+            <Button
               ref={cancelRef}
-              size="small"
+              type="button"
+              size="sm"
+              variant="secondary"
               disabled={run?.cancelling === true || cancelLocked}
               aria-busy={run?.cancelling === true || undefined}
               aria-describedby={cancelLocked ? noCancelId : undefined}
               onClick={() => onCancel(server, flow.flowId)}
             >
               {run?.cancelling ? t("mcp.signIn.cancelling") : t("mcp.signIn.cancel")}
-            </ConfigButton>
+            </Button>
           ) : (
-            <ConfigButton
+            <Button
               ref={signInRef}
-              size="small"
-              variant="primary"
+              type="button"
+              size="sm"
               disabled={signInDisabled}
               aria-busy={starting || undefined}
               aria-describedby={block ? blockId : undefined}
               onClick={() => onSignIn(server)}
             >
               {starting ? t("mcp.signIn.starting") : t("mcp.signIn.button")}
-            </ConfigButton>
+            </Button>
           )}
           {offersSignOut && !active && (
-            <ConfigButton
-              size="small"
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
               disabled={signOutDisabled}
               aria-busy={signingOut || undefined}
               aria-describedby={signOutBlock ? (block ? blockId : signOutBlockId) : undefined}
               onClick={() => onSignOut(server)}
             >
               {signingOut ? t("mcp.signIn.signingOut") : t("mcp.signIn.signOut")}
-            </ConfigButton>
+            </Button>
           )}
         </div>
         {/* What the buttons change, while they are offered; each sentence on its own line, so no locale has to join two.
             Only while something is stored for the URL: with nothing stored there is nothing to replace. */}
-        {!block && !active && offersSignOut && <span className="mcp-config-line is-dim">{t("mcp.signIn.replaces")}</span>}
-        {offersSignOut && !signOutBlock && !active && <span className="mcp-config-line is-dim">{t("mcp.signIn.signOutExplain")}</span>}
-      </div>
+        {!block && !active && offersSignOut && <Line tone="dim">{t("mcp.signIn.replaces")}</Line>}
+        {offersSignOut && !signOutBlock && !active && <Line tone="dim">{t("mcp.signIn.signOutExplain")}</Line>}
+      </Lines>
     </ConfigDetailGridRow>
   );
 }
@@ -255,7 +294,7 @@ function McpSignInAuthorize({
         ) : (
           <>
             {t("mcp.signIn.authorize.notALink")}{" "}
-            <code className="mcp-config-chip">{revealHiddenCharacters(flow.authorizationUrl ?? "")}</code>
+            <McpCode>{revealHiddenCharacters(flow.authorizationUrl ?? "")}</McpCode>
           </>
         )}
         value={value}
@@ -269,20 +308,20 @@ function McpSignInAuthorize({
         onSubmit={() => onPaste(value)}
       />
       {pasteError && (
-        <span role="alert" className="mcp-config-line is-error">
+        <Line role="alert" tone="error">
           {t("mcp.signIn.paste.refused")} {signInFailureText(pasteError, t, "mcp.signIn.paste.timedOut")}
           {/* The authorization server's own words: what the pasted address carried as its error. */}
           {pasteError.reason === "redirect-denied" && pasteError.error && (
-            <> <code className="mcp-config-chip">{revealHiddenCharacters(pasteError.error)}</code></>
+            <> <McpCode>{revealHiddenCharacters(pasteError.error)}</McpCode></>
           )}
-        </span>
+        </Line>
       )}
       {flow.redirectUrl && (
-        <span className="mcp-config-line is-dim">
+        <Line tone="dim">
           {t("mcp.signIn.authorize.redirect", { url: revealHiddenCharacters(flow.redirectUrl) })}
-        </span>
+        </Line>
       )}
-      <span className="mcp-config-line is-dim">{t("mcp.signIn.authorize.wait")}</span>
+      <Line tone="dim">{t("mcp.signIn.authorize.wait")}</Line>
     </>
   );
 }
@@ -297,14 +336,13 @@ function McpSignInOutcome({ flow, shared }: { flow: McpSignInFlowInfo; shared: b
   const key = mcpSignInOutcomeKey(flow, shared);
   if (!key) return null;
   const tone = mcpSignInOutcomeTone(flow, shared);
-  const lineClass = tone === "error" ? "mcp-config-line is-error" : tone === "warning" ? "mcp-config-line is-warning" : "mcp-config-line";
   return (
     <>
-      <span role="status" className={lineClass}>{t(key, { name: revealHiddenCharacters(flow.name) })}</span>
+      <Line role="status" tone={tone === "error" ? "error" : tone === "warning" ? "warning" : undefined}>{t(key, { name: revealHiddenCharacters(flow.name) })}</Line>
       {flow.error && (
-        <span className="mcp-config-line is-error">
-          {t("mcp.test.error")} <code className="mcp-config-chip">{revealHiddenCharacters(flow.error)}</code>
-        </span>
+        <Line tone="error">
+          {t("mcp.test.error")} <McpCode>{revealHiddenCharacters(flow.error)}</McpCode>
+        </Line>
       )}
     </>
   );

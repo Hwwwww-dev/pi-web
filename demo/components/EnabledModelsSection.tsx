@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import type { EnabledModelsView } from "@/lib/enabled-models";
 import {
@@ -11,6 +11,8 @@ import {
   isLastEnabledModel,
 } from "./enabled-models-helpers";
 import { ConfigButton, ConfigSwitch } from "./SettingsUi";
+import { Input } from "@/components/ui/input";
+import { ModelContextWindow, type ModelContextSettings } from "./ModelContextWindow";
 
 /**
  * Model switches backed by pi's `enabledModels` setting.
@@ -191,18 +193,18 @@ export function EnabledModelsBanner({ controller }: { controller: EnabledModelsC
   if (!scoped && stale === 0) return null;
 
   return (
-    <div className="enabled-models-banner">
+    <div className="enabled-models-banner flex items-center gap-2.5 border-b bg-sidebar px-3 py-1.5">
       <span
-        className="enabled-models-banner-text"
+        className="flex min-w-0 flex-1 items-baseline gap-1 text-xs leading-[1.4] text-muted-foreground"
         {...(stale > 0 ? { title: t("models.enabledStaleHint") } : {})}
       >
         {/* Name the setting and the file that holds it: the count alone left
             the user guessing where the panel wrote, and both read the same in
             every language. A long path is what gets cut, never the numbers. */}
-        <code className="enabled-models-banner-key" title={view.settingsPath}>
+        <code className="min-w-0 overflow-hidden font-mono text-muted-foreground truncate" title={view.settingsPath}>
           {view.settingsPath}
         </code>
-        <code className="enabled-models-banner-facts">
+        <code className="shrink-0 font-mono whitespace-nowrap text-muted-foreground">
           {`· enabledModels ${view.enabledTotal}/${view.availableTotal}`}
           {stale > 0 && ` · ${t("models.enabledStale", { count: stale })}`}
         </code>
@@ -237,29 +239,34 @@ export function EnabledModelsBanner({ controller }: { controller: EnabledModelsC
  *
  * Such a provider has no rows of its own — the panel edits its models directly
  * — so this switch is the whole control, and it is checked only while every one
- * of those models is enabled. Why it cannot move is a tooltip, not a paragraph.
+ * of those models is enabled. Why it cannot move is the note under the detail
+ * header (`EnabledModelsProviderSwitchNote`), which the switch points at: a
+ * tooltip alone never shows on a touch screen.
  */
 export function EnabledModelsProviderSwitch({
   providerId,
   controller,
+  noteId,
 }: {
   providerId: string;
   controller: EnabledModelsController;
+  /** The id `EnabledModelsProviderSwitchNote` renders under the header. */
+  noteId: string;
 }) {
   const { t } = useI18n();
   const { view, loading, pending, failure } = controller;
   const provider = findProviderView(view, providerId);
   const message = failure ? (failure.messageKey ? t(failure.messageKey) : failure.message) : null;
+  const describedBy = providerSwitchBlockKey(controller, providerId) ? noteId : undefined;
 
   if (loading && !view) return null;
-  // Missing from the runtime: edits not saved yet, no models, or a key that
-  // does not work — never a sign-in, so do not send the user looking for one.
   if (!provider) {
     return (
       <ConfigSwitch
         checked={false}
         disabled
-        label={t("models.enabledCustomEmpty")}
+        label={t("models.enabledProviderToggle", { provider: providerId })}
+        describedBy={describedBy}
         onChange={() => {}}
       />
     );
@@ -268,18 +275,44 @@ export function EnabledModelsProviderSwitch({
   const toggle = enabledModelsProviderToggle(view, provider);
   return (
     <>
-      {message && <span className="enabled-models-switch-error">{message}</span>}
+      {message && <span className="text-xs text-destructive">{message}</span>}
       <ConfigSwitch
         checked={toggle.checked}
         loading={pending === `provider:${provider.id}`}
         disabled={pending !== null || toggle.blocked}
-        label={toggle.reason
-          ? t(FAILURE_KEYS[toggle.reason])
-          : t("models.enabledProviderToggle", { provider: provider.name })}
+        label={t("models.enabledProviderToggle", { provider: provider.name })}
+        describedBy={describedBy}
         onChange={(checked) => controller.setProvider(provider.id, checked)}
       />
     </>
   );
+}
+
+/** Why a models.json provider's switch cannot move, as a message key, or null while it can or is not shown. */
+function providerSwitchBlockKey(controller: EnabledModelsController, providerId: string): string | null {
+  const { view, loading } = controller;
+  if (loading && !view) return null;
+  const provider = findProviderView(view, providerId);
+  // Missing from the runtime: edits not saved yet, no models, or a key that
+  // does not work — never a sign-in, so do not send the user looking for one.
+  if (!provider) return "models.enabledCustomEmpty";
+  const { reason } = enabledModelsProviderToggle(view, provider);
+  return reason ? FAILURE_KEYS[reason] : null;
+}
+
+/** The note under a models.json provider's detail header saying why its switch cannot move. */
+export function EnabledModelsProviderSwitchNote({
+  providerId,
+  controller,
+  id,
+}: {
+  providerId: string;
+  controller: EnabledModelsController;
+  id: string;
+}) {
+  const { t } = useI18n();
+  const key = providerSwitchBlockKey(controller, providerId);
+  return key ? <div id={id} className="config-detail-heading-note text-right text-xs text-muted-foreground">{t(key)}</div> : null;
 }
 
 /** Per-model switches for a provider that owns its own model list. */
@@ -330,25 +363,28 @@ function useCatalogRefresh(providerId: string, onChanged: () => void) {
 export function EnabledModelsSection({
   providerId,
   controller,
+  contextSettings,
 }: {
   providerId: string;
   controller: EnabledModelsController;
+  contextSettings?: ModelContextSettings;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const { view, loading, pending, failure } = controller;
   const provider = findProviderView(view, providerId);
   const catalog = useCatalogRefresh(providerId, controller.refresh);
+  const noteId = useId();
 
   useEffect(() => setQuery(""), [providerId]);
 
   if (loading && !view) {
-    return <div className="enabled-models-empty">{t("agents.modelsLoading")}</div>;
+    return <div className="p-3 text-xs text-muted-foreground">{t("agents.modelsLoading")}</div>;
   }
   if (!provider) {
     return failure?.message
-      ? <div className="enabled-models-error">{failure.message}</div>
-      : <div className="enabled-models-empty">{t("models.enabledUnavailable")}</div>;
+      ? <div className="rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs leading-[1.4] text-destructive">{failure.message}</div>
+      : <div className="p-3 text-xs text-muted-foreground">{t("models.enabledUnavailable")}</div>;
   }
 
   const shown = filterEnabledModels(provider.models, query);
@@ -356,6 +392,13 @@ export function EnabledModelsSection({
   const filtered = shown.length !== provider.models.length;
   const busy = pending !== null;
   const bulkKey = `provider:${provider.id}`;
+  // Why switches cannot move is visible text they point at: a tooltip never shows on a touch screen.
+  const editable = view?.editable === true;
+  const scopeNoteId = `${noteId}-scope`;
+  const lastModelNoteId = `${noteId}-last`;
+  const contextNoteId = `${noteId}-context`;
+  const disableBlockedByLastModel = editable && !bulk.canDisable && bulk.disableRefs.length > 0;
+  const showLastModelNote = disableBlockedByLastModel || (editable && shown.some((model) => isLastEnabledModel(view, model)));
   // A provider-wide action is resolved server-side so models the browser has
   // not seen yet follow it too; a filtered action names its rows explicitly.
   const runBulk = (enabled: boolean, refs: string[]) => {
@@ -364,15 +407,16 @@ export function EnabledModelsSection({
   };
 
   return (
-    <div className="enabled-models-section">
-      <div className="enabled-models-header">
-        <span className="enabled-models-title">{t("models.enabledSection")}</span>
-        <span className="enabled-models-count">
+    <div className="flex flex-col gap-2 pt-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[13px] leading-[1.35] font-semibold text-foreground">{t("models.enabledSection")}</span>
+        <span className="mr-auto font-mono text-[10px] text-muted-foreground">
           {t("models.enabledCount", { enabled: provider.enabledCount, total: provider.models.length })}
         </span>
         <ConfigButton
           size="small"
           disabled={busy || !bulk.canEnable}
+          aria-describedby={editable ? undefined : scopeNoteId}
           onClick={() => runBulk(true, bulk.enableRefs)}
         >
           {filtered ? t("models.enableShown") : t("models.enableAll")}
@@ -380,7 +424,7 @@ export function EnabledModelsSection({
         <ConfigButton
           size="small"
           disabled={busy || !bulk.canDisable}
-          title={!bulk.canDisable && bulk.disableRefs.length > 0 ? t("models.enabledLastModel") : undefined}
+          aria-describedby={!editable ? scopeNoteId : disableBlockedByLastModel ? lastModelNoteId : undefined}
           onClick={() => runBulk(false, bulk.disableRefs)}
         >
           {filtered ? t("models.disableShown") : t("models.disableAll")}
@@ -395,47 +439,63 @@ export function EnabledModelsSection({
         </ConfigButton>
       </div>
 
-      {catalog.note && <div className="enabled-models-note">{t(catalog.note)}</div>}
+      {catalog.note && <div className="text-xs leading-[1.5] text-muted-foreground">{t(catalog.note)}</div>}
 
-      {!view?.editable && <div className="enabled-models-note">{t("models.enabledProjectScope")}</div>}
+      {!editable && <div id={scopeNoteId} className="text-xs leading-[1.5] text-muted-foreground">{t("models.enabledProjectScope")}</div>}
+      {showLastModelNote && <div id={lastModelNoteId} className="text-xs leading-[1.5] text-muted-foreground">{t("models.enabledLastModel")}</div>}
       {failure && (
-        <div className="enabled-models-error">
+        <div className="rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs leading-[1.4] text-destructive">
           {failure.messageKey ? t(failure.messageKey) : failure.message}
         </div>
       )}
 
       {provider.models.length > 8 && (
-        <input
+        <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t("models.enabledFilterPlaceholder", { count: provider.models.length })}
           aria-label={t("models.enabledFilter")}
-          className="enabled-models-filter"
         />
       )}
-      <div className="enabled-models-list">
+      {contextSettings && <div id={contextNoteId} className="text-xs leading-[1.5] text-muted-foreground">{t("models.contextOverrideHelp")}</div>}
+      <div className="max-h-[360px] overflow-y-auto rounded-md border border-border bg-sidebar">
         {shown.length === 0 ? (
-          <div className="enabled-models-empty">{t("models.enabledNoMatches")}</div>
+          <div className="p-3 text-xs text-muted-foreground">{t("models.enabledNoMatches")}</div>
         ) : shown.map((model) => {
           const lastOne = isLastEnabledModel(view, model);
+          const override = contextSettings?.overrides?.[model.id];
+          const contextValue = override && typeof override === "object" && !Array.isArray(override)
+            ? (override as Record<string, unknown>).contextWindow : undefined;
           return (
-            <div key={model.ref} className="enabled-models-row">
-              <span className="enabled-models-row-text">
-                <span className="enabled-models-row-name">{model.name}</span>
-                <code className="enabled-models-row-id">{model.id}</code>
+            <div key={model.ref} className="flex min-h-[36px] items-center gap-2 border-border px-2.5 py-1.5 [&:not(:first-child)]:border-t">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs text-foreground">{model.name}</span>
+                <code className="block truncate font-mono text-[10px] text-muted-foreground">{model.id}</code>
               </span>
               {model.thinkingPin && (
-                <span className="enabled-models-pin" title={t("models.enabledPinHint")}>
+                <span
+                  className="shrink-0 rounded-[3px] bg-[rgba(99,102,241,0.12)] px-1 py-px text-[10px] text-[rgba(99,102,241,0.8)]"
+                  title={t("models.enabledPinHint")}
+                >
                   {model.thinkingPin}
                 </span>
+              )}
+              {contextSettings && (
+                <ModelContextWindow
+                  modelName={model.name}
+                  effective={model.contextWindow}
+                  value={contextValue}
+                  disabled={contextSettings.disabled}
+                  describedBy={contextNoteId}
+                  onChange={(value) => contextSettings.onChange(model.id, value)}
+                />
               )}
               <ConfigSwitch
                 checked={model.enabled}
                 loading={pending === model.ref}
                 disabled={busy || !view?.editable || lastOne}
-                label={lastOne
-                  ? t("models.enabledLastModel")
-                  : t("models.enabledToggle", { model: model.name })}
+                label={t("models.enabledToggle", { model: model.name })}
+                describedBy={!editable ? scopeNoteId : lastOne ? lastModelNoteId : undefined}
                 onChange={(checked) => controller.setModels(model.ref, [model.ref], checked)}
               />
             </div>

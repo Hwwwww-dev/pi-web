@@ -94,8 +94,8 @@ test("opening System or Tools lazily starts a dormant session without sending a 
   assert.match(loaderEffectSource, /if \(background\) return;/);
   assert.match(loaderEffectSource, /onSystemInfoLoaderChange\?\.\(loadSystemInfo\)/);
   assert.match(loaderEffectSource, /onSystemInfoLoaderChange\?\.\(null\)/);
-  assert.match(appShellSource, /onClick=\{\(\) => handleSystemInfoToggle\("system", mobile\)\}/);
-  assert.match(appShellSource, /onClick=\{\(\) => handleSystemInfoToggle\("tools", mobile\)\}/);
+  assert.match(appShellSource, /onSelect=\{\(\) => handleSystemInfoToggle\("system"\)\}/);
+  assert.match(appShellSource, /onSelect=\{\(\) => handleSystemInfoToggle\("tools"\)\}/);
   assert.match(appShellSource, /systemInfoLoaderRef\.current/);
   assert.doesNotMatch(appShellSource, /systemPrompt !== null \|\| systemInfoLoading/);
   assert.match(appShellSource, /const loadId = \+\+systemInfoLoadIdRef\.current/);
@@ -231,7 +231,7 @@ test("forking stays available during a run while in-session branch switches wait
   // in-session edit still waits because pi refuses navigate_tree mid-run.
   assert.match(chatWindowSource, /onFork=\{bashRunning \|\| isNew \? undefined : handleFork\}/);
   assert.match(chatWindowSource, /onEditContent=\{sessionBusy \? undefined : handleEditContent\}/);
-  assert.match(chatWindowSource, /onAskInNewChat && \(\s*<button/);
+  assert.match(chatWindowSource, /onAskInNewChat && \(\s*<Button/);
   assert.match(chatWindowSource, /!quotedSelection\?\.sourceEntryId \|\| !sourceSessionId \|\| !onAskInNewChat/);
   assert.match(forkSource, /addNotice\(\{ type: "error", message:/);
 
@@ -239,7 +239,7 @@ test("forking stays available during a run while in-session branch switches wait
   assert.match(source, /const branchSwitchLocked = agentRunning \|\| bashRunning \|\| isCompacting;/);
   assert.match(source, /onBranchDataChange\(data\?\.tree \?\? \[\], activeLeafId, handleLeafChange, branchSwitchLocked\)/);
   assert.match(appShellSource, /setBranchSwitchLocked\(locked\)/);
-  assert.equal((appShellSource.match(/locked=\{branchSwitchLocked\}/g) ?? []).length, 2);
+  assert.equal((appShellSource.match(/locked=\{branchSwitchLocked\}/g) ?? []).length, 1);
 });
 
 test("first user messages expose both branch actions and edit before their own entry", () => {
@@ -748,7 +748,7 @@ test("restores an in-page session viewport without the default tail jump", () =>
   assert.match(chatWindowSource, /context\.oldestEntryId === position\.oldestEntryId/);
   assert.match(chatWindowSource, /if \(!context\) \{\s*scrollToBottom\("instant"\);\s*setPendingScrollRestore\(null\);/);
   assert.match(chatWindowSource, /scrollToMessage\(element, position\.anchorOffset\)/);
-  assert.match(chatWindowSource, /visibility: pendingScrollRestore \? "hidden" : undefined/);
+  assert.match(chatWindowSource, /pendingScrollRestore && "invisible"/);
 });
 
 test("keeps a newly sent user message at the top while its response starts", () => {
@@ -812,7 +812,9 @@ test("keeps prompt anchor measurement outside the React update cycle", () => {
   assert.match(anchorLifecycleEffectSource, /promptAnchorMeasureFrameRef\.current = requestAnimationFrame\(\(\) => \{\s*promptAnchorMeasureFrameRef\.current = null;\s*updatePromptAnchorSpacer\(\)/);
   assert.match(anchorLifecycleEffectSource, /disposed = true;[\s\S]*?promptAnchorUpdateRef\.current === updatePromptAnchorSpacer[\s\S]*?cancelAnimationFrame\(promptAnchorMeasureFrameRef\.current\)/);
   assert.match(anchorSyncEffectSource, /const updatePromptAnchor = useCallback\(\(\) => \{\s*promptAnchorUpdateRef\.current\?\.\(\);\s*\}, \[\]\);\s*useLayoutEffect\(updatePromptAnchor, \[isStreaming, hasStreamingContent, updatePromptAnchor\]\)/);
-  assert.match(chatWindowSource, /<div ref=\{messageContentRef\}[^>]*style=\{\{/);
+  // The measured element keeps a static width cap (a class, not a per-render
+  // style object) so the anchor measurement reads a stable layout.
+  assert.match(chatWindowSource, /<div\s+ref=\{messageContentRef\}[^>]*max-w-\[min\(var\(--chat-content-max-width,820px\),700px\)\]/);
 });
 
 test("uses the prompt anchor as the only trailing message spacer", () => {
@@ -960,19 +962,21 @@ test("empty queued texts never render, and expired records feed the image memory
 test("keeps the compaction control reachable while a turn is auto-compacting", () => {
   // Auto-compaction starts mid-turn, so `isStreaming` (sessionBusy) is already true. Hiding
   // the control behind `!isStreaming` left only the generic stop button, which aborts the
-  // whole prompt instead of the compaction.
+  // whole prompt instead of the compaction. Compact now lives in the tools
+  // icon menu as a trailing entry; the trigger stays visible while compacting.
   const controlBlock = chatInputSource.slice(
-    chatInputSource.indexOf("onClick={isCompacting ? onAbortCompaction : (e) => { if (!isStrayClick(e)) onCompact(); }}") - 200,
-    chatInputSource.indexOf('aria-label={isCompacting ? t("chat.stopCompaction")'),
+    chatInputSource.indexOf("{/* Tools + compact share one icon menu"),
+    chatInputSource.indexOf("</DropdownMenu>", chatInputSource.indexOf("chat.compactContext")),
   );
 
-  assert.match(controlBlock, /\{\(!isStreaming \|\| isCompacting\) && onCompact && \(/);
+  assert.match(controlBlock, /\(onCompact && \(!isStreaming \|\| isCompacting\)\)/);
   assert.doesNotMatch(controlBlock, /\{!isStreaming && onCompact && \(/);
   // The "streaming but not compacting" state is now unreachable, so its disabled styling
   // must be gone rather than left as dead branches.
   assert.doesNotMatch(controlBlock, /isStreaming && !isCompacting/);
-  // Upstream's touch-friendly restyle (v0.14.2) inlines the control styles: the
-  // pointer affordance and the compacting danger tint live in the style block.
-  assert.match(controlBlock, /cursor: "pointer"/);
-  assert.match(controlBlock, /isCompacting \? "#ef4444" : "var\(--text-muted\)"/);
+  // The compaction entry is a menu item whose onSelect flips between starting
+  // and aborting; the trigger turns into a destructive stop while compacting.
+  assert.match(controlBlock, /onSelect=\{isCompacting \? onAbortCompaction : \(\) => onCompact\(\)\}/);
+  assert.match(controlBlock, /<DropdownMenuTrigger asChild>/);
+  assert.match(controlBlock, /isCompacting\s*\?\s*"text-destructive hover:bg-destructive\/10 hover:text-destructive"/);
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import {
   currentWorktreeOf,
@@ -13,8 +14,8 @@ import {
 } from "@/lib/new-session-context";
 import { projectNameOf } from "@/lib/session-tree";
 import { ActivitySummary } from "./SessionTree";
-import { SidebarMenu, type SidebarMenuAnchor, type SidebarMenuItem } from "./SidebarMenu";
-import { BranchIcon, ChevronIcon, FolderIcon, FolderPlusIcon, PlusIcon, TrashIcon } from "./SidebarIcons";
+import { SidebarMenu, SIDEBAR_MENU_FOCUS_RING as FOCUS_RING, type SidebarMenuAnchor, type SidebarMenuItem } from "./SidebarMenu";
+import { GitBranchIcon, ChevronRightIcon, FolderIcon, FolderPlusIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { WorktreeCreateForm } from "./WorktreeCreateForm";
 
 /** The picker's two controls. A pick names the one it came from. */
@@ -125,24 +126,40 @@ export function WorktreeRemoveForm({
 }) {
   const { t } = useI18n();
   return (
-    <div className="sidebar-worktree-form">
-      {heading && <div className="sidebar-menu-header">{heading}</div>}
-      {dirty && <div className="sidebar-worktree-message">{t("sidebar.forceRemoveCheckout")}</div>}
+    // The sheet's look arrives as variants (the retired app/sidebar-menu.css,
+    // folded here); the body only ever shows in a sheet.
+    <div className="sidebar-worktree-form px-1 pt-0.5 pb-1 [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2.5 [.sidebar-sheet_&]:pb-1">
+      {heading && <div className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-2 pt-1.5 pb-1 text-[11px] [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs">{heading}</div>}
+      {dirty && <div className="sidebar-worktree-message pt-0.5 px-1 text-foreground text-xs leading-[1.4]">{t("sidebar.forceRemoveCheckout")}</div>}
       {(dirty || showCancel) && (
-        <div className="sidebar-worktree-form-buttons">
+        <div className="sidebar-worktree-form-buttons flex gap-1.5 mt-1.5">
           {dirty && (
-            <button type="button" className="sidebar-worktree-force" disabled={busy} onClick={onForce}>
+            <Button
+              type="button"
+              variant="destructive"
+              size="default"
+              className={["px-0 py-0 disabled:pointer-events-auto focus-visible:ring-0 focus-visible:border-transparent dark:bg-destructive", "sidebar-worktree-force", "flex-1 h-[26px] border border-destructive rounded-(--radius-sm) bg-destructive text-white text-xs font-semibold cursor-pointer", "disabled:cursor-not-allowed disabled:opacity-50", FOCUS_RING, "[.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"].join(" ")}
+              disabled={busy}
+              onClick={onForce}
+            >
               {t("sidebar.force")}
-            </button>
+            </Button>
           )}
           {showCancel && (
-            <button type="button" className="sidebar-worktree-cancel" data-sidebar-menu-autofocus="" onClick={onCancel}>
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              className={["px-0 py-0 focus-visible:ring-0 focus-visible:border-(--border)", "sidebar-worktree-cancel", "flex-1 h-[26px] border border-(--border) rounded-(--radius-sm) bg-background text-muted-foreground text-xs cursor-pointer hover:bg-accent", FOCUS_RING, "[.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"].join(" ")}
+              data-sidebar-menu-autofocus=""
+              onClick={onCancel}
+            >
               {t("sidebar.cancel")}
-            </button>
+            </Button>
           )}
         </div>
       )}
-      {error && <div className="sidebar-worktree-error" role="alert">{error}</div>}
+      {error && <div className="sidebar-worktree-error mt-1.5 text-destructive text-[11px] leading-[1.35] [overflow-wrap:anywhere]" role="alert">{error}</div>}
     </div>
   );
 }
@@ -157,33 +174,37 @@ function WorktreeConfirmRow({ busy, onForce, onCancel }: { busy: boolean; onForc
   const { t } = useI18n();
   const questionId = useId();
   return (
-    <div className="sidebar-worktree-confirm">
-      <span id={questionId} className="sidebar-worktree-confirm-text" title={t("sidebar.forceRemoveCheckout")}>
+    <div className="sidebar-worktree-confirm flex items-center gap-1.5 px-2.5 py-[7px] border-b border-(--border) bg-destructive/10">
+      <span id={questionId} className="sidebar-worktree-confirm-text flex-1 min-w-0 overflow-hidden text-foreground text-[11px] text-ellipsis whitespace-nowrap" title={t("sidebar.forceRemoveCheckout")}>
         {t("sidebar.forceRemoveCheckout")}
       </span>
-      <button
+      <Button
         type="button"
+        variant="destructive"
+        size="default"
         role="menuitem"
         tabIndex={-1}
         data-sidebar-menu-item=""
         aria-describedby={questionId}
         aria-disabled={busy ? true : undefined}
-        className="sidebar-worktree-force"
+        className={["focus-visible:ring-0 focus-visible:border-transparent dark:bg-destructive", "sidebar-worktree-force", "flex-none h-auto px-[9px] py-[3px] border border-destructive rounded-(--radius-sm) bg-destructive text-white text-[11px] font-semibold", "aria-disabled:cursor-not-allowed aria-disabled:opacity-50", FOCUS_RING].join(" ")}
         onClick={() => { if (!busy) onForce(); }}
       >
         {t("sidebar.force")}
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="outline"
+        size="default"
         role="menuitem"
         tabIndex={-1}
         data-sidebar-menu-item=""
         data-sidebar-menu-autofocus=""
-        className="sidebar-worktree-cancel"
+        className={["focus-visible:ring-0 focus-visible:border-(--border)", "sidebar-worktree-cancel", "flex-none h-auto px-[9px] py-[3px] border border-(--border) rounded-(--radius-sm) bg-secondary text-muted-foreground text-[11px] cursor-pointer", FOCUS_RING].join(" ")}
         onClick={onCancel}
       >
         {t("sidebar.cancel")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -505,7 +526,7 @@ export function ProjectWorktreePicker({
       checked: worktree.path === current?.path,
       secondary: onRemoveWorktree && !worktree.isMain ? {
         label: t("sidebar.removeWorktreeTitle", { path: worktree.path }),
-        icon: <TrashIcon size={12} />,
+        icon: <Trash2Icon size={12} />,
         danger: true,
         disabled: menu?.removing,
         onSelect: ({ keepOpen }) => {
@@ -548,30 +569,36 @@ export function ProjectWorktreePicker({
     menuTitle = t("sidebar.switchWorktree");
     menuItems = worktreeItems();
     if (body?.kind === "create") {
+      // Escape inside the form goes back to the list, like its Cancel.
       menuFooter = (
-        <WorktreeCreateForm
-          heading={null}
-          busy={body.busy}
-          error={body.error}
-          showCancel
-          onCreate={(branch) => { void createWorktree(branch); }}
-          onCancel={() => showBody(null)}
-        />
+        <div data-sidebar-menu-esc-to-body="" className="contents">
+          <WorktreeCreateForm
+            heading={null}
+            busy={body.busy}
+            error={body.error}
+            showCancel
+            onCreate={(branch) => { void createWorktree(branch); }}
+            onCancel={() => showBody(null)}
+          />
+        </div>
       );
     } else if (body?.kind === "remove" && body.error) {
-      menuFooter = <div className="sidebar-worktree-error" role="alert">{body.error}</div>;
+      menuFooter = <div className="sidebar-worktree-error mt-1.5 text-destructive text-[11px] leading-[1.35] [overflow-wrap:anywhere] [.is-classic_&]:m-0 [.is-classic_&]:px-2.5 [.is-classic_&]:pt-[5px] [.is-classic_&]:pb-2" role="alert">{body.error}</div>;
     }
   } else if (body?.kind === "create") {
     menuTitle = newWorktreeTitle;
+    // Escape inside the form goes back to the list, not out of the menu.
     menuBody = (
-      <WorktreeCreateForm
-        heading={mobile ? null : menuTitle}
-        busy={body.busy}
-        error={body.error}
-        showCancel={!mobile}
-        onCreate={(branch) => { void createWorktree(branch); }}
-        onCancel={closeMenu}
-      />
+      <div data-sidebar-menu-esc-to-body="" className="contents">
+        <WorktreeCreateForm
+          heading={mobile ? null : menuTitle}
+          busy={body.busy}
+          error={body.error}
+          showCancel={!mobile}
+          onCreate={(branch) => { void createWorktree(branch); }}
+          onCancel={closeMenu}
+        />
+      </div>
     );
   } else if (body?.kind === "remove") {
     menuTitle = t("sidebar.removeWorktreeHeading", { name: worktreeLabel(body.worktree) });
@@ -602,12 +629,51 @@ export function ProjectWorktreePicker({
     ([key, { running, unread }]) => key !== project?.key && (running > 0 || unread > 0),
   );
 
+  // 盒子与文字的样式批 4 自 app/globals.css 迁入。交互面对齐 shadcn：files 的
+  // 灰盒沿用 ghost 的 hover:bg-accent，inline 的页面文字按钮 hover 到 secondary；
+  // aria-expanded 与 hover 同面（菜单开着时保持高亮）；焦点环是 Button 自带的
+  // focus-visible ring。尾部类经 cn/twMerge 覆盖 ghost 的同名面。
+  const boxClass = inline
+    ? "inline-flex shrink min-w-0 items-center gap-1 h-[26px] px-1.5 rounded-(--radius-sm) text-left text-xs font-normal text-muted-foreground transition-colors hover:bg-secondary aria-expanded:bg-secondary dark:hover:bg-secondary dark:aria-expanded:bg-secondary pointer-coarse:min-h-9"
+    : "inline-flex shrink min-w-0 items-center gap-1.5 h-[29px] px-2.5 border border-border rounded-(--radius-sm) bg-secondary text-left text-[11px] font-normal text-muted-foreground transition-colors aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:aria-expanded:bg-accent pointer-coarse:min-h-9";
+  // 每个布局里盒子的伸缩：inline 的两个按钮只缩到自己的最小宽度（一个百万
+  // 倍的 shrink 系数让分支先让路），files 的行里路径/分支吃满剩下的空间。
+  const projectBoxFlex = inline ? "min-w-14" : layout === "row" ? "grow basis-0" : "w-full";
+  const worktreeBoxFlex = inline ? "min-w-18 shrink-[1000000]" : layout === "row" ? "max-w-[55%]" : "w-full";
+  // 路径/名字文本：files 的两种布局吃满盒子，inline 截到定长。
+  const pathFlex = stacked ? "flex-1" : "flex-[0_1_auto] max-w-[32ch]";
+  const labelFlex = stacked ? "flex-1" : "";
+
   return (
-    <div className={`project-picker is-${layout}`} role="group" aria-label={label}>
-      <button
+    <div
+      className={
+        inline
+          ? "project-picker is-inline flex min-w-0 items-center gap-0.5 text-xs leading-none font-normal"
+          : layout === "row"
+            ? "project-picker is-row flex flex-none flex-row min-w-0 items-center gap-1.5 text-[11px] leading-none font-normal"
+            : "project-picker is-stacked flex flex-none flex-col min-w-0 items-stretch gap-1.5 text-[11px] leading-none font-normal"
+      }
+      role="group"
+      aria-label={label}
+    >
+      <Button
         ref={projectRef}
         type="button"
-        className={project ? "project-picker-button is-project" : "project-picker-button is-project is-empty"}
+        variant="ghost"
+        size="default"
+        className={[
+          "project-picker-button is-project",
+          boxClass,
+          projectBoxFlex,
+          project
+            ? ""
+            : [
+                "is-empty font-mono",
+                inline
+                  ? ""
+                  : "border-primary/40 bg-primary/[0.06] hover:bg-primary/[0.06] hover:text-muted-foreground dark:hover:bg-primary/[0.06] dark:hover:text-muted-foreground",
+              ].join(" "),
+        ].join(" ")}
         title={project?.root ?? ""}
         aria-haspopup="menu"
         aria-expanded={menu?.kind === "project"}
@@ -618,52 +684,54 @@ export function ProjectWorktreePicker({
             left (the folder name at its end is what tells paths apart), no
             icon and no chevron: the path is the box. A project the user
             named shows that name; the tooltip keeps the path. */}
-        {inline && <FolderIcon size={12} className="project-picker-icon" />}
+        {inline && <FolderIcon size={12} className="project-picker-icon size-3 shrink-0 text-muted-foreground" />}
         {/* A twin's parent folder is cut before its name, the "/" never. */}
         {inline && project ? (
-          <span className="project-picker-name">
-            {project.alias === undefined && projectName?.note && <><span className="project-picker-parent">{projectName.note}</span>/</>}
-            <span className="project-picker-leaf">{project.alias ?? projectName?.name ?? projectNameOf(project.root)}</span>
+          <span className="project-picker-name inline-flex min-w-0 max-w-[28ch] overflow-hidden whitespace-nowrap font-mono text-muted-foreground leading-[normal]">
+            {project.alias === undefined && projectName?.note && <><span className="project-picker-parent min-w-0 flex-[0_1000000_auto] overflow-hidden text-ellipsis">{projectName.note}</span>/</>}
+            <span className="project-picker-leaf min-w-0 flex-[0_1_auto] overflow-hidden text-ellipsis text-foreground">{project.alias ?? projectName?.name ?? projectNameOf(project.root)}</span>
           </span>
         ) : project?.alias !== undefined ? (
-          <span className="project-picker-label is-alias">{project.alias}</span>
+          <span className={`project-picker-label is-alias min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-[normal] font-mono text-foreground ${labelFlex}`}>{project.alias}</span>
         ) : project ? (
-          <span className="project-picker-path"><span>{displayPath(project.root, homeDir)}</span></span>
+          <span className={`project-picker-path min-w-0 overflow-hidden text-left text-ellipsis whitespace-nowrap font-mono text-foreground leading-[normal] [direction:rtl] ${pathFlex}`}><span className="[unicode-bidi:plaintext]">{displayPath(project.root, homeDir)}</span></span>
         ) : (
-          <span className="project-picker-label">{placeholder}</span>
+          <span className={`project-picker-label min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-[normal] ${labelFlex}`}>{placeholder}</span>
         )}
         {otherActivity && (
-          <span className="project-picker-activity" role="img" title={t("sidebar.newActivity")} aria-label={t("sidebar.newActivity")} />
+          <span className="project-picker-activity size-2 flex-none rounded-full bg-primary" role="img" title={t("sidebar.newActivity")} aria-label={t("sidebar.newActivity")} />
         )}
-        {inline && <ChevronIcon size={9} className="project-picker-chevron sidebar-icon-down" />}
-      </button>
+        {inline && <ChevronRightIcon size={9} className="project-picker-chevron size-[9px] shrink-0 rotate-90 text-muted-foreground" />}
+      </Button>
       {worktrees && (
-        <button
+        <Button
           ref={worktreeRef}
           type="button"
-          className="project-picker-button"
+          variant="ghost"
+          size="default"
+          className={`project-picker-button ${boxClass} ${worktreeBoxFlex}`}
           title={current ? t("sidebar.worktreePath", { path: current.path }) : t("sidebar.switchWorktree")}
           aria-haspopup="menu"
           aria-expanded={menu?.kind === "worktree"}
           onClick={(event) => openMenu("worktree", event.currentTarget)}
         >
-          {/* A linked checkout's branch icon in the accent, as the main checkout's is not. */}
-          <BranchIcon size={11} className={current && !current.isMain ? "project-picker-icon is-linked" : "project-picker-icon"} />
-          <span className="project-picker-path"><span>{current ? current.branch ?? displayPath(current.path, homeDir) : "…"}</span></span>
+          {/* A linked checkout's branch icon in the primary, as the main checkout's is not. */}
+          <GitBranchIcon size={11} className={current && !current.isMain ? "project-picker-icon is-linked size-[11px] shrink-0 text-primary" : "project-picker-icon size-[11px] shrink-0 text-muted-foreground"} />
+          <span className={`project-picker-path min-w-0 overflow-hidden text-left text-ellipsis whitespace-nowrap font-mono text-foreground leading-[normal] [direction:rtl] ${pathFlex}`}><span className="[unicode-bidi:plaintext]">{current ? current.branch ?? displayPath(current.path, homeDir) : "…"}</span></span>
           {/* Only in the files tab: in the row the box is a share of a
               narrow sidebar and the branch needs the room; inline the
-              branch is text on the page. The icon (the accent only for a
+              branch is text on the page. The icon (the primary only for a
               linked checkout) still tells the main one. */}
-          {current?.isMain && layout === "stacked" && <span className="project-picker-note">{t("sidebar.main")}</span>}
-          {stacked && worktrees.length > 1 && <span className="project-picker-note">{worktrees.length}</span>}
-          <ChevronIcon size={9} className="project-picker-chevron sidebar-icon-down" />
-        </button>
+          {current?.isMain && layout === "stacked" && <span className="project-picker-note text-[10px] leading-none flex-none text-muted-foreground">{t("sidebar.main")}</span>}
+          {stacked && worktrees.length > 1 && <span className="project-picker-note text-[10px] leading-none flex-none text-muted-foreground">{worktrees.length}</span>}
+          <ChevronRightIcon size={9} className="project-picker-chevron size-[9px] shrink-0 rotate-90 text-muted-foreground" />
+        </Button>
       )}
       {!worktrees && stacked && worktreeHint && (
-        <button type="button" aria-disabled="true" tabIndex={-1} title={worktreeHint.title} className="project-picker-button is-inactive">
-          <BranchIcon size={11} className="project-picker-icon" />
-          <span className="project-picker-label">{worktreeHint.label}</span>
-        </button>
+        <Button type="button" variant="ghost" size="default" aria-disabled="true" tabIndex={-1} title={worktreeHint.title} className={`project-picker-button is-inactive ${boxClass} w-full cursor-default opacity-[0.82] hover:bg-secondary hover:text-muted-foreground dark:hover:bg-secondary dark:hover:text-muted-foreground`}>
+          <GitBranchIcon size={11} className="project-picker-icon size-[11px] shrink-0 text-muted-foreground" />
+          <span className={`project-picker-label min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-[normal] ${labelFlex}`}>{worktreeHint.label}</span>
+        </Button>
       )}
       <SidebarMenu
         open={menu !== null}
@@ -681,6 +749,7 @@ export function ProjectWorktreePicker({
         classic={classic}
         footer={menuFooter}
         focusKey={body ? `${body.kind}:${body.kind === "remove" && body.dirty}` : "list"}
+        onBodyEscape={() => showBody(null)}
       >
         {menuBody}
       </SidebarMenu>

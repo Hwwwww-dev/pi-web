@@ -223,7 +223,7 @@ test("renders write tool content as readable file text", () => {
 
     assert.ok(html.includes("src/example.ts"));
     assert.match(html, /first line\nsecond line\n/);
-    assert.ok(!html.includes("<table"));
+    assert.ok(!html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
     assert.doesNotMatch(textOf(html), /"content":/);
   } finally {
     clearExpandedToolCalls();
@@ -265,10 +265,10 @@ test("streaming input shows the rows pi's partial parse has so far, else its raw
     try {
       const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
       if (rows) {
-        assert.ok(html.includes("<table"), id);
+        assert.ok(html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'), id);
         for (const text of rows) assert.ok(textOf(html).includes(text), id);
       } else {
-        assert.ok(!html.includes("<table"), id);
+        assert.ok(!html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'), id);
         assert.ok(textOf(html).includes(getToolCallInputText(block)), id);
       }
     } finally {
@@ -288,7 +288,7 @@ test("a nested argument keeps the JSON body: a row cannot hold a subtree", () =>
   setToolCallExpanded(block.toolCallId, true);
   try {
     const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
-    assert.ok(!html.includes("<table"));
+    assert.ok(!html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
     assert.ok(textOf(html).includes('"filter"'));
     assert.ok(textOf(html).includes('"labels"'));
   } finally {
@@ -306,7 +306,7 @@ test("an edit call shows no table: its arguments are a list of patches", () => {
   setToolCallExpanded(block.toolCallId, true);
   try {
     const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
-    assert.ok(!html.includes("<table"));
+    assert.ok(!html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
   } finally {
     clearExpandedToolCalls();
   }
@@ -314,16 +314,16 @@ test("an edit call shows no table: its arguments are a list of patches", () => {
 
 test("a read, a subagent and a flat MCP call show one row per argument", (t) => {
   const cases = [
-    { id: "call-read-rows", toolName: "read", input: { path: "lib/tool-fields.ts", offset: 120, limit: 80 }, expect: [">path</td>", "lib/tool-fields.ts", ">120</td>"] },
-    { id: "call-agent-rows", toolName: "Agent", input: { subagent_type: "Explore", prompt: "Find the parser" }, expect: [">subagent_type</td>", "Find the parser"] },
-    { id: "call-mcp-flat-rows", toolName: "mcp__issues__search", input: { query: "open bugs", limit: 10 }, expect: [">query</td>", "open bugs", ">10</td>"] },
+    { id: "call-read-rows", toolName: "read", input: { path: "lib/tool-fields.ts", offset: 120, limit: 80 }, expect: [">path:</span>", "lib/tool-fields.ts", "120"] },
+    { id: "call-agent-rows", toolName: "Agent", input: { subagent_type: "Explore", prompt: "Find the parser" }, expect: [">subagent_type:</span>", "Find the parser"] },
+    { id: "call-mcp-flat-rows", toolName: "mcp__issues__search", input: { query: "open bugs", limit: 10 }, expect: [">query:</span>", "open bugs", "10"] },
   ];
   for (const { id, toolName, input, expect } of cases) {
     const block = { type: "toolCall", toolCallId: id, toolName, input };
     setToolCallExpanded(id, true);
     t.after(() => setToolCallExpanded(id, false));
     const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
-    assert.ok(html.includes("<table"), id);
+    assert.ok(html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'), id);
     for (const needle of expect) assert.ok(html.includes(needle), `${id}: ${needle}`);
   }
 });
@@ -340,11 +340,11 @@ test("a long or multi-line value stays inside the card", (t) => {
   t.after(() => setToolCallExpanded(block.toolCallId, false));
   const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
   // A single-line value wraps in its cell; a value with lines of its own scrolls in a block.
-  assert.ok(html.includes("<table"));
-  assert.match(html, /overflow-wrap:anywhere/);
-  assert.match(html, /calc\(12px \+ var\(--chat-font-size-offset, 0px\)\)/);
-  assert.match(html, /max-height:260px/);
-  assert.match(html, /overflow:auto/);
+  assert.ok(html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
+  assert.match(html, /wrap-anywhere/);
+  assert.match(html, /calc\(12px\+var\(--chat-font-size-offset,0px\)\)/);
+  assert.match(html, /max-h-\[260px\]/);
+  assert.match(html, /overflow-auto/);
   assert.ok(textOf(html).includes("line 39"));
 });
 
@@ -433,10 +433,10 @@ test("a reply's usage line reads like pi's TUI footer, then the turn's time", ()
     { role: "assistant", provider: "anthropic", model: "claude-test", content: [{ type: "text", text: "Done." }], stopReason: "stop", usage },
     { turnDurationMs: 10_000 },
   );
-  // The arrows and the clock are drawn as SVG; their characters and words stay
-  // as font-size 0 text, so a copied selection reads like the footer.
-  assert.equal(html.match(/<svg[^>]*aria-hidden="true"/g)?.length, 3);
-  const text = html.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<span style="font-size:0">([^<]*)<\/span>/g, "$1");
+  // The arrows and the clock are drawn as lucide SVG; their characters and
+  // words stay as font-size 0 text, so a copied selection reads like the footer.
+  assert.equal(html.match(/lucide-(arrow-up|arrow-down|clock) /g)?.length, 3);
+  const text = html.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<span class="text-\[0px\]">([^<]*)<\/span>/g, "$1");
   // Each count is its own span; the spaces between them stay in the text.
   assert.match(text, /<span>↑1\.2k<\/span> <span>↓567<\/span> <span>R85k<\/span> <span>W12<\/span> <span>\$0\.0036<\/span> <span>·<\/span> <span>took 10s<\/span>/);
   // Zero counts are left out, as in the footer.
@@ -444,7 +444,7 @@ test("a reply's usage line reads like pi's TUI footer, then the turn's time", ()
     role: "assistant", provider: "anthropic", model: "claude-test", content: [{ type: "text", text: "Done." }], stopReason: "stop",
     usage: { input: 12_000_000, output: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } },
   });
-  assert.match(bare.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<span style="font-size:0">([^<]*)<\/span>/g, "$1"), /<span>↑12M<\/span><\/div>/);
+  assert.match(bare.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<span class="text-\[0px\]">([^<]*)<\/span>/g, "$1"), /<span>↑12M<\/span><\/div>/);
 });
 
 test("renders a provider error when the assistant message has no content", () => {
@@ -650,9 +650,9 @@ test("marks apply_patch returned failures as errors even when isError is unset",
     content: [block],
   }, { toolResults: new Map([[block.toolCallId, failed]]) });
 
-  assert.match(html, /activity-row-error/);
+  assert.match(html, /data-status="error"/);
   assert.match(html, /data-activity-tool="apply_patch"/);
-  assert.doesNotMatch(html, /activity-row-error.*rgba\(34,197,94/s);
+  assert.doesNotMatch(html, /data-status="error"[\s\S]*text-success/);
 });
 
 test("collapses a displayed custom message from its header alone", () => {
@@ -855,7 +855,7 @@ test("a codemode call with no script or streaming input falls back to a plain bo
   const streamingText = textOf(renderCodemode(streaming));
   assert.match(streamingText, /Generating parameters/);
   // The script so far, through the partial parse, rather than its JSON.
-  assert.match(streamingText, /codeconst secret/);
+  assert.match(streamingText, /code:?\s*const secret/);
   assert.doesNotMatch(streamingText, /\{"code"/);
   assert.doesNotMatch(streamingText, /Tool calls/);
 
@@ -865,8 +865,8 @@ test("a codemode call with no script or streaming input falls back to a plain bo
   // An argument this view does not understand is still an argument: no script box,
   // but the flat row shows it.
   const otherHtml = renderCodemode(other);
-  assert.match(otherHtml, /<table/);
-  assert.match(otherHtml, />x<\/td>/);
+  assert.match(otherHtml, /flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere/);
+  assert.match(otherHtml, />x<\/span>/);
   assert.doesNotMatch(textOf(otherHtml), /"script": "x"/);
 });
 
@@ -934,7 +934,7 @@ test("collapses the compaction summary to its title and token count, as pi's TUI
   };
   const html = renderMessage(message);
 
-  assert.match(html, /<button type="button" class="activity-row-header" aria-expanded="false" title="Expand"/);
+  assert.match(html, /<button type="button" aria-expanded="false" data-state="closed"[^>]*title="Expand"/);
   assert.match(html, /Conversation compacted/);
   assert.ok(html.includes(`Compacted from ${(123456).toLocaleString()} tokens`));
   // The collapsed header also shows the dev file-context counts next to the tokens.
@@ -965,7 +965,7 @@ const EDIT_PATCH = `--- a/src/demo.ts
 done();
 `;
 
-const TWO_COLUMN_GRID = "grid-template-columns:minmax(0, 1fr) minmax(0, 1fr)";
+const TWO_COLUMN_GRID = "grid-cols-[minmax(0,1fr)_minmax(0,1fr)]";
 
 function renderPatchFiles(files, layout) {
   return renderToStaticMarkup(
@@ -1038,7 +1038,7 @@ test("an edit card draws the applied patch in two columns while there is room", 
 test("the same patch in one column: no line twice, the removed line above what replaces it", () => {
   const stacked = renderPatchFiles(parseUnifiedPatch(EDIT_PATCH), "stacked");
 
-  assert.ok(!stacked.includes("grid-template-columns"), "nothing stands beside anything");
+  assert.ok(!stacked.includes("grid-cols-[minmax"), "nothing stands beside anything");
   assert.equal(countIn(stacked, "const keep = true;"), 1);
   assert.equal(countIn(stacked, "const value = &quot;old&quot;;"), 1);
   assert.equal(countIn(stacked, "const value = &quot;new&quot;;"), 1);
@@ -1092,7 +1092,7 @@ test("one column numbers a removed line by the old file and every other line by 
 +LATE
 `), "stacked");
 
-  const gutter = [...stacked.matchAll(/width:42px[^>]*>(\d*)</g)].map((match) => match[1]);
+  const gutter = [...stacked.matchAll(/w-\[42px\][^>]*>(\d*)</g)].map((match) => match[1]);
   // done() is old line 12 but new line 13: the new file's number, as in the file viewer's gutter.
   assert.deepEqual(gutter, ["10", "11", "11", "12", "13", "30", "31"]);
   // The lines between the hunks stay marked, as in the two-column view.

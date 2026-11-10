@@ -1,39 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { extensionStatusEntryTone, extensionStatusTone, splitExtensionStatuses } from "@/lib/extension-status";
 import type { ExtensionStatusItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
 
 /** Permissive-mode marker (`yolo`). It is a marker, not a control, so it keeps
  *  its own red pill instead of the toolbar's flat chip look. The styling is
- *  inline on purpose: a CSS class here has twice rendered as a plain red word
- *  when the dev stylesheet was a generation behind the component. */
+ *  Tailwind utilities (not a CSS class) on purpose: a stylesheet class here has
+ *  twice rendered as a plain red word when the dev stylesheet was a generation
+ *  behind the component; utilities compile with the component itself. */
 export function PermissiveModeChip({ text }: { text: string }) {
   const { t } = useI18n();
   const label = t("chat.permissiveMode");
 
   return (
-    <span
+    <Badge
+      variant="outline"
       title={label}
       aria-label={label}
-      style={{
-        flex: "0 0 auto",
-        padding: "2px 6px",
-        border: "1px solid color-mix(in srgb, #dc2626 35%, transparent)",
-        borderRadius: 4,
-        background: "color-mix(in srgb, #dc2626 8%, transparent)",
-        color: "#dc2626",
-        fontFamily: "var(--font-mono)",
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: "0.6px",
-        cursor: "default",
-      }}
+      className="shrink-0 cursor-default border-destructive/35 bg-destructive/[0.06] px-1.5 py-0 font-mono text-[10px] font-semibold tracking-[0.6px] text-destructive"
     >
       {text.toUpperCase()}
-    </span>
+    </Badge>
   );
 }
 
@@ -41,74 +34,60 @@ export function PermissiveModeChip({ text }: { text: string }) {
  * Extension status texts (LSP state, goal mode, subagents, …) live behind this
  * umbrella chip: the shelf above the composer only carries widget triggers, and
  * one compact button is what lets the toolbar row fit every control. The dot
- * carries the worst tone, the popover lists every line in full.
+ * carries the worst tone, the popover lists every line in full. Radix owns the
+ * upward placement (right-aligned), the viewport collision and the dismissal.
  */
 export function ExtensionStatusButton({ statuses }: { statuses: ExtensionStatusItem[] }) {
   const { t } = useI18n();
-  const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  // The popover is right-anchored to the button, but the button often sits mid-row
-  // (更多/YOLO to its right): a width capped only by 100vw still hangs past the
-  // viewport's LEFT edge on phones. Clamp the width to the space left of the
-  // button's right edge (240px floor beats an unusably narrow panel).
-  const [popoverMaxWidth, setPopoverMaxWidth] = useState(420);
   const { statuses: entries } = splitExtensionStatuses(statuses);
   const label = t("chat.extensionStatus");
 
-  useEffect(() => {
-    if (!open) return;
-    const clampToViewport = () => {
-      const rect = rootRef.current?.getBoundingClientRect();
-      if (rect) setPopoverMaxWidth(Math.max(240, Math.min(420, Math.round(rect.right) - 12)));
-    };
-    clampToViewport();
-    window.addEventListener("resize", clampToViewport);
-    return () => window.removeEventListener("resize", clampToViewport);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [open]);
-
   const tone = extensionStatusTone(entries);
   if (!tone) return null;
-  const expanded = open && entries.length > 0;
   const summary = entries.length > 1 ? `${label} · ${entries.length}` : label;
 
+  // The status dot mirrors the umbrella tone; `data-tone` keeps the signal
+  // readable in the DOM while Tailwind variants map it to the palette.
+  const dotClass = "size-[7px] shrink-0 rounded-full data-[tone=ok]:bg-success data-[tone=warning]:bg-warning data-[tone=error]:bg-destructive";
+
   return (
-    <div ref={rootRef} className="extension-status-button-root">
-      <button
-        type="button"
-        className="composer-chip"
-        title={label}
-        aria-label={summary}
-        aria-expanded={expanded}
-        onClick={() => setOpen((current) => !current)}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          title={label}
+          aria-label={summary}
+          className="h-8 max-[640px]:h-[34px] gap-[5px] rounded-md px-2 text-xs leading-none text-muted-foreground hover:bg-secondary hover:text-foreground aria-expanded:bg-secondary aria-expanded:text-foreground"
+        >
+          <span className={dotClass} data-tone={tone} aria-hidden="true" />
+          {summary}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={6}
+        collisionPadding={12}
+        aria-label={label}
+        className="flex max-h-[min(320px,40dvh)] w-max max-w-(--radix-popover-content-available-width) flex-col gap-[7px] overflow-auto overscroll-contain p-2 px-2.5"
       >
-        <span className="extension-status-dot" data-tone={tone} aria-hidden="true" />
-        {summary}
-      </button>
-      {expanded && (
-        <div className="extension-status-popover" role="dialog" aria-label={label} style={{ maxWidth: popoverMaxWidth }}>
-          {entries.map((status) => (
-            <div key={status.key} className="extension-status-entry">
-              <span
-                className="extension-status-dot"
-                data-tone={extensionStatusEntryTone(status.text)}
-                aria-hidden="true"
-              />
-              <pre className="extension-status-entry-text">
-                <AnsiText text={status.text} />
-              </pre>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+        {entries.map((status) => (
+          <div key={status.key} className="flex min-w-0 items-start gap-2">
+            <span
+              className={`${dotClass} mt-[5px]`}
+              data-tone={extensionStatusEntryTone(status.text)}
+              aria-hidden="true"
+            />
+            {/* Status text is TUI output as well: it scrolls sideways instead of
+                wrapping a line into a broken row. */}
+            <pre className="m-0 min-w-0 overflow-x-auto overscroll-contain whitespace-pre-wrap">
+              <AnsiText text={status.text} />
+            </pre>
+          </div>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }

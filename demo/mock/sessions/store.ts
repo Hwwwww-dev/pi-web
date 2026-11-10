@@ -314,8 +314,22 @@ export function buildContext(session: MockSession, leafId: string | null | undef
     entryIds,
     oldestEntryId: sliced[0]?.id ?? null,
     hasMore: Boolean(tail > 0 && sliced[0]?.parentId),
+    turnsBefore: countTurnsBefore(session.entries, sliced[0]),
     ...sessionSettings(session.entries, effectiveLeaf),
   };
+}
+
+/** User turns on the branch before the oldest loaded entry — the minimap's numbering base. */
+function countTurnsBefore(entries: SessionEntry[], oldest: SessionEntry | undefined): number {
+  if (!oldest?.parentId) return 0;
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  let turns = 0;
+  let current = byId.get(oldest.parentId);
+  while (current) {
+    if (current.type === "message" && current.message.role === "user") turns++;
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+  return turns;
 }
 
 interface TreeNode {

@@ -5,6 +5,10 @@ import { parseUnifiedPatch } from "@/lib/patch";
 import { useI18n } from "@/hooks/useI18n";
 import { SOURCE_HIGHLIGHT_MAX_LINES } from "./SourceCodeView";
 
+// Style objects on purpose: SourceCodeView feeds them to react-syntax-
+// highlighter's customStyle/lineNumberStyle props (an inline-style API whose
+// own theme styles can only be overridden in kind) and FileViewer's rows reuse
+// them; classes cannot express that handoff. All values are token-based.
 export const FILE_CODE_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
   fontWeight: "var(--font-mono-weight)",
@@ -17,8 +21,8 @@ export const FILE_LINE_NUMBER_STYLE: CSSProperties = {
   minWidth: 48,
   padding: "0 10px",
   textAlign: "right",
-  color: "var(--text-dim)",
-  background: "var(--bg-panel)",
+  color: "var(--muted-foreground)",
+  background: "var(--sidebar)",
   borderRight: "1px solid var(--border)",
   fontFamily: "var(--font-mono)",
   fontWeight: "var(--font-mono-weight)",
@@ -92,7 +96,7 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
   const hasChanges = diff.some((l) => l.type !== "unchanged");
   if (!hasChanges) {
     return (
-      <div style={{ padding: "12px 16px", fontSize: 12, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
+      <div className="px-3 py-3 font-mono text-xs text-muted-foreground">
         {t("i18n.noChanges")}
       </div>
     );
@@ -133,89 +137,59 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
     : FILE_LINE_NUMBER_STYLE;
   return (
     <div
-      className="file-diff-view"
-      style={{
-        width: wrapLines ? "100%" : "max-content",
-        minWidth: "100%",
-        ...FILE_CODE_STYLE,
-      }}
+      // FILE_CODE_STYLE is the shared code typography (see its declaration);
+      // the wrap width is this view's own.
+      className={`file-diff-view min-w-full ${wrapLines ? "w-full" : "w-max"}`}
+      style={FILE_CODE_STYLE}
     >
       {segments.map((seg, si) => {
         if (seg.hidden) {
-          const result = (
-            <div
+          // Collapsed hunks take the CodeBlock highlighted row: muted band,
+          // sans-serif note, no gutter columns of its own.
+          return (
+            <span
               key={si}
-              style={{
-                padding: "2px 16px",
-                color: "var(--text-dim)",
-                background: "var(--bg-panel)",
-                fontSize: 11,
-                borderTop: "1px solid var(--border)",
-                borderBottom: "1px solid var(--border)",
-              }}
+              data-slot="code-block-line"
+              className="cn-code-block-line cn-code-block-line-variant-highlighted flex min-w-full items-center py-0.5 font-sans text-xs text-muted-foreground after:content-none"
             >
-              ... {seg.count} unchanged lines ...
-            </div>
+              <span aria-hidden="true" className="min-w-4 shrink-0 select-none px-1.5">⋯</span>
+              <span className="shrink-0 px-1.5">{seg.count} unchanged lines</span>
+            </span>
           );
-          return result;
         }
         const lines = seg.lines.map((line, li) => {
-          const bg =
-            line.type === "added"
-              ? "rgba(0,200,80,0.12)"
-              : line.type === "removed"
-              ? "rgba(240,60,60,0.14)"
-              : "transparent";
           const prefix =
             line.type === "added" ? "+" : line.type === "removed" ? "-" : " ";
-          const prefixColor =
-            line.type === "added" ? "#4ade80" : line.type === "removed" ? "#f87171" : "var(--text-dim)";
+          // The rows are the official CodeBlock line variants (vendored nova
+          // classes); the +/- marker stays an aligned column instead of the
+          // variant's absolute ::after so wrapped text keeps clearing it, and
+          // content-none drops that second marker.
+          const rowTone = line.type === "added"
+            ? "cn-code-block-line-variant-added"
+            : line.type === "removed"
+            ? "cn-code-block-line-variant-removed"
+            : "";
 
           return (
-            <div
+            <span
               key={li}
-              className="file-diff-line"
-              style={{
-                display: "flex",
-                minWidth: "100%",
-                background: bg,
-                borderLeft: line.type === "added"
-                  ? "3px solid #4ade80"
-                  : line.type === "removed"
-                  ? "3px solid #f87171"
-                  : "3px solid transparent",
-              }}
+              data-slot="code-block-line"
+              className={`cn-code-block-line file-diff-line flex min-w-full after:content-none ${rowTone}`}
             >
-              <span
-                style={lineNumberStyle}
-              >
+              <span style={lineNumberStyle}>
                 {line.type === "removed" ? line.oldLineNo : line.newLineNo}
               </span>
-              <span
-                style={{
-                  minWidth: 16,
-                  padding: "0 6px",
-                  color: prefixColor,
-                  userSelect: "none",
-                  flexShrink: 0,
-                  fontWeight: 600,
-                }}
-              >
+              <span className="min-w-4 shrink-0 select-none px-1.5 font-semibold">
                 {prefix}
               </span>
               <span
-                className="file-diff-line-content"
-                style={{
-                  padding: "0 8px 0 0",
-                  color: "var(--text)",
-                  ...(wrapLines
-                    ? { flex: "1 1 auto", minWidth: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }
-                    : { flexShrink: 0, whiteSpace: "pre" }),
-                }}
+                className={`file-diff-line-content min-w-0 pr-3 text-foreground ${
+                  wrapLines ? "shrink whitespace-pre-wrap [overflow-wrap:anywhere]" : "shrink-0 whitespace-pre"
+                }`}
               >
                 {line.text || "\u00a0"}
               </span>
-            </div>
+            </span>
           );
         });
         return <div key={si}>{lines}</div>;

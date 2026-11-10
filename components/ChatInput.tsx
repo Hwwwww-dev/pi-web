@@ -25,7 +25,6 @@ import {
 import { getMarkdownListContinuation } from "@/lib/markdown-list-continuation";
 import { quoteSeparator } from "@/lib/quoted-selection";
 import { isBareMcpCommand, isBuiltinMcpCommand } from "@/lib/mcp-command";
-import { FolderIcon, getFileIcon } from "./FileIcons";
 import { ImagePreview } from "./ImagePreview";
 import { DismissButton } from "./DismissButton";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -34,13 +33,48 @@ import { useI18n } from "@/hooks/useI18n";
 import { useChatAppearance } from "@/hooks/useChatAppearance";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import type { ToolPreset } from "@/lib/tool-presets";
-import { SelectorRow } from "./SelectorRow";
 import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
 import { ExtensionStatusButton, PermissiveModeChip } from "./ExtensionStatus";
 import { splitExtensionStatuses } from "@/lib/extension-status";
-import { canHover } from "@/lib/can-hover";
+import {
+  ArrowUpIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  FileIcon,
+  FolderClosedIcon,
+  HistoryIcon,
+  ImageIcon,
+  MessagesSquareIcon,
+  PencilIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  SquareIcon,
+  TriangleAlertIcon,
+  Volume2Icon,
+  VolumeXIcon,
+  WrenchIcon,
+  XIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-export { filterModelOptions } from "./ModelSelector";
 
 export interface AttachedImage {
   data: string;   // base64, no prefix
@@ -135,6 +169,15 @@ export interface ChatInputHandle {
 // "configured" sends no override, so the session follows settings.json defaultTools.
 const TOOL_PRESETS = ["configured", "chat-only", "read-only", "default", "full"] as const;
 type ToolPresetLabel = typeof TOOL_PRESETS[number];
+// Labels and one-line descriptions per preset, shared by the trigger chip and
+// both tool menus (desktop and phone render their own menu block).
+const TOOL_PRESET_TEXT: Record<ToolPresetLabel, { label: string; desc: string | null }> = {
+  configured: { label: "chat.toolPresetConfigured", desc: "chat.toolPresetConfiguredDesc" },
+  "chat-only": { label: "chat.chatOnly", desc: "chat.toolPresetChatOnlyDesc" },
+  "read-only": { label: "chat.toolPresetReadOnly", desc: "chat.toolPresetReadOnlyDesc" },
+  default: { label: "chat.toolPresetDefault", desc: "chat.toolPresetDefaultDesc" },
+  full: { label: "chat.toolPresetFull", desc: "chat.toolPresetFullDesc" },
+};
 const TOOL_PRESET_MAP: Record<ToolPresetLabel, ToolPreset> = {
   configured: "configured",
   "chat-only": "none",
@@ -146,15 +189,16 @@ const COMPOSITION_END_ENTER_GRACE_MS = 100;
 const TEXT_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 const ANCHORED_MENU_GAP = 8;
 
-// Auto-grow a textarea to fit its content, capped at 200px. The `auto` reset
-// expands the box to its full content height, which silently resets its
-// internal scrollTop — restore where the user actually was instead of
-// snapping to the bottom: a snap fights the browser's scroll-to-caret and
-// bounces while editing text above the fold once the scrollbar appears.
+// Auto-grow a textarea to fit its content, capped at 120px (the visual draft's
+// composer box). The `auto` reset expands the box to its full content height,
+// which silently resets its internal scrollTop — restore where the user
+// actually was instead of snapping to the bottom: a snap fights the browser's
+// scroll-to-caret and bounces while editing text above the fold once the
+// scrollbar appears.
 function autoresizeTextarea(ta: HTMLTextAreaElement) {
   const keepScroll = ta.scrollTop;
   ta.style.height = "auto";
-  ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+  ta.style.height = `${Math.min(ta.scrollHeight + 2, 120)}px`;
   ta.scrollTop = keepScroll;
 }
 
@@ -239,8 +283,9 @@ export function replaceLinksWithMarkdown(
 }
 
 /**
- * The composer's auto-grow step: fit the text to 200 px, then let a scrollbar
- * appear only when the text is still taller than the box.
+ * The composer's auto-grow step: fit the text to 120 px (the visual draft's
+ * composer box), then let a scrollbar appear only when the text is still
+ * taller than the box.
  *
  * The height comes from the value, not from scrollHeight: a wrapped
  * placeholder counts toward scrollHeight too, so an empty box would grow to
@@ -249,7 +294,7 @@ export function replaceLinksWithMarkdown(
  */
 export function autoGrowTextarea(ta: HTMLTextAreaElement): void {
   ta.style.height = "auto";
-  ta.style.height = `${ta.value ? Math.min(ta.scrollHeight, 200) : ta.clientHeight}px`;
+  ta.style.height = `${ta.value ? Math.min(ta.scrollHeight + 2, 120) : ta.clientHeight}px`;
   ta.style.overflowY = ta.value && ta.scrollHeight > ta.clientHeight ? "auto" : "hidden";
 }
 
@@ -580,38 +625,23 @@ function revokeImagePreview(image: AttachedImage): void {
   }
 }
 
-function QueueActionButton({ label, title, onClick, children }: {
-  label: string;
+function QueueActionButton({ title, onClick, children }: {
   title: string;
   onClick: () => void;
   children: React.ReactNode;
 }) {
-  const [hover, setHover] = useState(false);
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-xs"
       onClick={onClick}
       title={title}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "3px 10px",
-        fontSize: 11,
-        whiteSpace: "nowrap",
-        color: "var(--text)",
-        background: hover ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "color-mix(in srgb, var(--text-dim) 7%, transparent)",
-        border: `1px solid ${hover ? "color-mix(in srgb, var(--accent) 45%, transparent)" : "color-mix(in srgb, var(--border) 55%, transparent)"}`,
-        borderRadius: 999,
-        cursor: "pointer",
-        transition: "background 0.12s, border-color 0.12s",
-      }}
+      aria-label={title}
+      className="size-5 rounded-full"
     >
       {children}
-      {label}
-    </button>
+    </Button>
   );
 }
 
@@ -629,37 +659,22 @@ function QueuedMessageRow({
   const { t } = useI18n();
   const isSteer = item.behavior === "steer";
   const behaviorLabel = isSteer ? t("chat.queueBehaviorSteer") : t("chat.queueBehaviorFollowUp");
-  const behaviorChipStyle = {
-    flexShrink: 0,
-    fontSize: 10,
-    fontFamily: "var(--font-mono)",
-    padding: "1px 8px",
-    borderRadius: 999,
-    background: isSteer ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "color-mix(in srgb, var(--text-dim) 8%, transparent)",
-    border: `1px solid ${isSteer ? "color-mix(in srgb, var(--accent) 40%, transparent)" : "color-mix(in srgb, var(--border) 60%, transparent)"}`,
-    color: isSteer ? "var(--accent)" : "var(--text-dim)",
-  } as const;
+  const behaviorChipClass = cn(
+    "shrink-0 whitespace-nowrap px-[7px] py-px text-[10.5px] font-semibold leading-[1.4]",
+    !isSteer && "bg-muted text-muted-foreground",
+  );
   return (
     <div
       title={item.text}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "7px 12px 7px 14px",
-        fontSize: 12,
-        color: "color-mix(in srgb, var(--text) 88%, transparent)",
-        minWidth: 0,
-        borderRadius: 999,
-        background: "color-mix(in srgb, var(--bg-panel) 62%, transparent)",
-        backdropFilter: "blur(16px) saturate(1.6)",
-        WebkitBackdropFilter: "blur(16px) saturate(1.6)",
-        border: "1px solid color-mix(in srgb, var(--border) 65%, transparent)",
-        boxShadow: "0 1px 1px rgba(0,0,0,0.03), 0 3px 12px rgba(0,0,0,0.06)",
-      }}
+      className={cn(
+        "flex min-w-0 max-w-full items-center gap-2 self-start rounded-full py-[5px] pl-1.5 pr-2 text-[12.5px]",
+        isSteer
+          ? "border border-primary/45 bg-background text-foreground"
+          : "bg-secondary text-secondary-foreground",
+      )}
     >
       {item.images.length > 0 && (
-        <span style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+        <span className="flex shrink-0 gap-[3px]">
           {item.images.map((image, index) => {
             const src = draftImageDataUrl(image);
             return (
@@ -668,47 +683,46 @@ function QueuedMessageRow({
                 <img
                   src={src}
                   alt=""
-                  style={{ width: 22, height: 22, objectFit: "cover", borderRadius: "50%", border: "1px solid color-mix(in srgb, var(--border) 65%, transparent)", display: "block" }}
+                  className="block size-[22px] rounded-full border border-border/60 object-cover"
                 />
               </ImagePreview>
             );
           })}
         </span>
       )}
-      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.text}</span>
-      <span style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: "auto" }}>
-        {onAction ? (
-          <button
+      {onAction ? (
+        <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass} asChild>
+          <Button
             type="button"
+            variant="ghost"
             title={t("chat.queueBehaviorHint")}
             onClick={() => onAction(item.id, "toggle")}
-            style={{ ...behaviorChipStyle, background: "transparent", cursor: "pointer" }}
+            className={cn(
+              "h-auto cursor-pointer rounded-full transition-opacity hover:opacity-80",
+              isSteer ? "hover:bg-primary hover:text-primary-foreground" : "hover:bg-muted hover:text-muted-foreground",
+            )}
           >
             {behaviorLabel}
-          </button>
-        ) : (
-          <span style={behaviorChipStyle}>{behaviorLabel}</span>
-        )}
+          </Button>
+        </Badge>
+      ) : (
+        <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass}>{behaviorLabel}</Badge>
+      )}
+      <span className="min-w-0 truncate">{item.text}</span>
+      <span className="ml-auto flex shrink-0 items-center gap-0.5">
         {onAction && canMoveUp && (
-          <QueueActionButton label={t("chat.moveQueuedUp")} title={t("chat.moveQueuedUp")} onClick={() => onAction(item.id, "moveUp")}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m18 15-6-6-6 6" />
-            </svg>
+          <QueueActionButton title={t("chat.moveQueuedUp")} onClick={() => onAction(item.id, "moveUp")}>
+            <ChevronUpIcon strokeWidth={2} aria-hidden="true" />
           </QueueActionButton>
         )}
         {onAction && canMoveDown && (
-          <QueueActionButton label={t("chat.moveQueuedDown")} title={t("chat.moveQueuedDown")} onClick={() => onAction(item.id, "moveDown")}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
+          <QueueActionButton title={t("chat.moveQueuedDown")} onClick={() => onAction(item.id, "moveDown")}>
+            <ChevronDownIcon strokeWidth={2} aria-hidden="true" />
           </QueueActionButton>
         )}
         {onAction && (
-          <QueueActionButton label={t("chat.editQueued")} title={t("chat.editQueuedTitle")} onClick={() => onAction(item.id, "edit")}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-            </svg>
+          <QueueActionButton title={t("chat.editQueuedTitle")} onClick={() => onAction(item.id, "edit")}>
+            <PencilIcon strokeWidth={2} aria-hidden="true" />
           </QueueActionButton>
         )}
       </span>
@@ -718,67 +732,31 @@ function QueuedMessageRow({
 
 function ModelNoticeBanner({ tone, title, body, onClose }: { tone: "error" | "warning"; title: string; body: string; onClose?: () => void }) {
   const { t } = useI18n();
-  const color = tone === "error" ? "239,68,68" : "234,179,8";
   return (
-    <div
+    <Alert
       role="alert"
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 8,
-        maxHeight: 120,
-        marginBottom: 8,
-        padding: "7px 10px",
-        overflowY: "auto",
-        border: `1px solid rgba(${color},0.3)`,
-        borderRadius: 6,
-        background: `rgba(${color},0.07)`,
-        color: `rgb(${color})`,
-        fontSize: 11,
-        lineHeight: 1.45,
-      }}
+      variant={tone === "error" ? "destructive" : "warning"}
+      className={cn(
+        "max-h-[120px] items-start gap-x-2 overflow-y-auto rounded-md px-2.5 py-1.5 text-xs leading-[1.45]",
+        tone === "error" && "border-destructive/30 bg-destructive/[0.07]",
+      )}
     >
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ flexShrink: 0, marginTop: 1 }}
-        aria-hidden="true"
-      >
-        <path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z" />
-        <line x1="12" y1="9" x2="12" y2="13" />
-        <line x1="12" y1="17" x2="12.01" y2="17" />
-      </svg>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontWeight: 600 }}>{title}</div>
-        <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{body}</div>
-      </div>
+      <TriangleAlertIcon />
+      <AlertTitle className="min-h-0 font-semibold">{title}</AlertTitle>
+      <AlertDescription className="whitespace-pre-wrap text-xs wrap-anywhere">{body}</AlertDescription>
       {onClose && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={onClose}
           aria-label={t("sidebar.dismiss")}
-          style={{
-            flexShrink: 0,
-            background: "none",
-            border: "none",
-            padding: "0 2px",
-            cursor: "pointer",
-            color: "inherit",
-            opacity: 0.7,
-            fontSize: 13,
-            lineHeight: 1,
-          }}
+          className="absolute top-1 right-1 size-5 text-current opacity-70 hover:opacity-100 hover:bg-transparent"
         >
-          ×
-        </button>
+          <XIcon className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
+        </Button>
       )}
-    </div>
+    </Alert>
   );
 }
 
@@ -844,13 +822,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const { fontSize } = useChatAppearance();
   const { ui: uiFontFamily, uiWeight } = useFontPreferences();
   const isMobile = useIsMobile();
-  // The controls row under the composer: a finger's 44px on a phone.
-  const controlSize = isMobile ? 34 : 32;
   const enterSendMode = useEnterSendMode();
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
-  const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
-  const [thinkingDropdownOpen, setThinkingDropdownOpen] = useState(false);
-  const [controlsMenuOpen, setControlsMenuOpen] = useState(false);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>(() => (
     draftKey ? draftImagesToAttachedImages(getDraft(draftKey)?.images) : []
   ));
@@ -881,9 +854,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     : {};
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const toolDropdownRef = useRef<HTMLDivElement>(null);
-  const thinkingDropdownRef = useRef<HTMLDivElement>(null);
-  const controlsMenuRef = useRef<HTMLDivElement>(null);
   const historyMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isComposingRef = useRef(false);
@@ -1344,7 +1314,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     : t(slashQuery ? "chat.matches" : "chat.commands", { count: filteredSlashCommands.length });
   const hasInputText = Boolean(value.trim());
   const canSubmit = hasInputText || attachedImages.length > 0;
-  const stackedComposer = stacksComposerLayout(compact, isMobile, isStreaming);
   // Warn when images are attached but the selected model is known not to accept
   // image input (#584), including a resolved default. Unknown models stay silent.
   const showImageUnsupportedWarning = (
@@ -1946,20 +1915,86 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     return titleCaseLabel(thinkingLevelMap[lvl] ?? lvl);
   })();
   const rawToolPresetLabel = Object.entries(TOOL_PRESET_MAP).find(([, v]) => v === (toolPreset ?? "configured"))?.[0] ?? "configured";
-  const toolPresetLabel = rawToolPresetLabel === "chat-only" ? t("chat.chatOnly") : titleCaseLabel(rawToolPresetLabel);
+  const toolPresetLabel = t(TOOL_PRESET_TEXT[rawToolPresetLabel as ToolPresetLabel].label);
 
-  // Close dropdowns on outside click
+  // Thinking selects inside the model popover now (pi's /model keeps reasoning
+  // beside the model); the row shows no text pill. The model pill's CPU icon
+  // carries the state instead — a pinned level lights up in primary, off dims,
+  // auto stays muted — and the popover section below does the selecting.
+  const thinkingPinned = !isAutoThinkingSelection && resolvedThinkingLevel != null;
+  const thinkingIconTone = thinkingPinned ? "text-primary" : thinkingLevel === "off" ? "opacity-45" : undefined;
+  const thinkingSection = onThinkingLevelChange && (
+    <div role="radiogroup" aria-label={t("chat.changeReasoningLabel")} className="flex flex-col">
+      <div className="px-2 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t("chat.thinkingSection")}</div>
+      {THINKING_LEVELS.filter((lvl) => {
+        if (!availableThinkingLevels) return true;
+        if (lvl === "auto") return true;
+        return availableThinkingLevels.includes(lvl);
+      }).map((lvl) => {
+        const desc = t(THINKING_LEVEL_DESC_KEYS[lvl]);
+        const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
+        const displayLabel = titleCaseLabel((mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl);
+        const showOriginal = mappedVal != null && mappedVal !== lvl;
+        const selected = lvl === "auto" ? isAutoThinkingSelection : (!isAutoThinkingSelection && resolvedThinkingLevel === lvl);
+        return (
+          <Button
+            key={lvl}
+            type="button"
+            variant="ghost"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => {
+              if (lvl === "auto") {
+                if (!isAutoThinkingSelection) onThinkingLevelChange("auto");
+                return;
+              }
+              // Re-selecting the pinned level keeps the popover open, like the
+              // old menu's no-op onSelect guard.
+              if (!isAutoThinkingSelection && resolvedThinkingLevel === lvl) return;
+              onThinkingLevelChange(lvl as typeof THINKING_LEVELS[number]);
+            }}
+            className={cn(
+              "flex h-auto w-full cursor-pointer justify-start rounded-sm px-2 py-1 text-left text-xs font-normal",
+              selected ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
+            <CheckIcon className={cn("size-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")} strokeWidth={2.2} aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">
+              {displayLabel}
+              {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">({lvl})</span>}
+            </span>
+            <span className="whitespace-nowrap text-[11px] text-muted-foreground">{desc}</span>
+            {onSetDefaultThinkingLevel && lvl !== "auto" && (
+              <span
+                role={savedDefaultThinkingLevel === lvl ? "img" : "button"}
+                aria-label={savedDefaultThinkingLevel === lvl ? t("chat.defaultThinking") : t("chat.saveDefaultThinking")}
+                title={savedDefaultThinkingLevel === lvl ? t("chat.defaultThinking") : t("chat.saveDefaultThinking")}
+                aria-hidden={savedDefaultThinkingLevel === lvl ? undefined : "true"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSetDefaultThinkingLevel(lvl);
+                }}
+                className={cn(
+                  "pointer-events-auto flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground",
+                  savedDefaultThinkingLevel === lvl && "opacity-100",
+                )}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill={savedDefaultThinkingLevel === lvl ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true" className="size-3 shrink-0">
+                  <polygon points="12 2.5 14.9 8.6 21.5 9.4 16.6 13.9 17.9 20.5 12 17.2 6.1 20.5 7.4 13.9 2.5 9.4 9.1 8.6" />
+                </svg>
+              </span>
+            )}
+          </Button>
+        );
+      })}
+    </div>
+  );
+
+  // The history menu keeps its own anchor positioning (it is a typing-driven
+  // overlay, not a trigger menu), so it closes on outside click like the
+  // Radix popovers above do.
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (toolDropdownRef.current && !toolDropdownRef.current.contains(e.target as Node)) {
-        setToolDropdownOpen(false);
-      }
-      if (thinkingDropdownRef.current && !thinkingDropdownRef.current.contains(e.target as Node)) {
-        setThinkingDropdownOpen(false);
-      }
-      if (controlsMenuRef.current && !controlsMenuRef.current.contains(e.target as Node)) {
-        setControlsMenuOpen(false);
-      }
       if (historyMenuRef.current && !historyMenuRef.current.contains(e.target as Node) && !textareaRef.current?.contains(e.target as Node)) {
         setHistoryMenuOpen(false);
       }
@@ -1968,43 +2003,86 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  useEffect(() => {
-    if (!isStreaming) return;
-    setToolDropdownOpen(false);
-  }, [isStreaming]);
-
-  // Set in the commit that swaps Stop for Compact, before any click can reach it.
-  const runEndedAtRef = useRef(Number.NEGATIVE_INFINITY);
-  useLayoutEffect(() => {
-    if (!isStreaming) return;
-    return () => { runEndedAtRef.current = performance.now(); };
-  }, [isStreaming]);
-  const isStrayClick = (e: React.MouseEvent) => isRunEndStrayClick(e.detail, performance.now() - runEndedAtRef.current);
-
-  useEffect(() => {
-    if (!isMobile) setControlsMenuOpen(false);
-  }, [isMobile]);
-
-
+  // The run-end stray-click guard's pure helper (isRunEndStrayClick) stays
+  // exported for its tests; the composer currently has no consumer wiring.
 
   const permissiveStatus = compact ? null : splitExtensionStatuses(extensionStatuses ?? []).permissive;
+
+  // The composer's main button follows the input: a message waiting to be
+  // sent is always the primary action — while a turn runs that queues a
+  // follow-up, the same thing Enter does — and only an empty composer
+  // leaves it as stop. Idle stays muted; anything sendable or running is
+  // primary. It is a sibling of the pill row so it can never be squeezed out.
+  const sendCluster = isStreaming && !canSubmit ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="default"
+          size="icon"
+          onClick={onAbort}
+          aria-label={t("chat.stopAgent")}
+          className="size-9 shrink-0 rounded-full"
+        >
+          {/* While the run streams the circle stops it, until the user types
+              something to send. */}
+          <SquareIcon data-icon className="size-3.5 fill-current" aria-hidden="true" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{t("chat.stopAgent")}</TooltipContent>
+    </Tooltip>
+  ) : (
+    <div className="flex shrink-0 items-center gap-1">
+      {isStreaming && onSideChat && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={sendToSideChat}
+              disabled={!value.trim() || attachedImages.length > 0}
+              aria-label={t("chat.sideChat")}
+              className="size-9 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              <MessagesSquareIcon data-icon strokeWidth={1.8} aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("chat.sideChatHint")}</TooltipContent>
+        </Tooltip>
+      )}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            onClick={isStreaming ? () => queueFollowUp() : handleSend}
+            disabled={!canSubmit}
+            aria-label={t("chat.send")}
+            className={cn(
+              "size-9 shrink-0 rounded-full",
+              canSubmit || isStreaming
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                : "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
+            )}
+          >
+            <ArrowUpIcon data-icon strokeWidth={2.2} aria-hidden="true" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t("chat.send")}</TooltipContent>
+      </Tooltip>
+    </div>
+  );
 
   return (
     <fieldset
       disabled={builtinCommandPending}
       aria-busy={builtinCommandPending}
-      className={compact ? undefined : "chat-input-shell"}
-      style={{
-        // Never taller than the chat: a short window shrinks the queue first (#1428).
-        ...(compact ? { flexShrink: 0 } : { display: "flex", flexDirection: "column", minHeight: 0 }),
-        minWidth: 0,
-        margin: 0,
-        border: 0,
-        background: "transparent",
-        padding: compact ? 0 : "0 16px 8px",
-        opacity: builtinCommandPending ? 0.5 : 1,
-        transition: "opacity 0.15s",
-      }}
+      className={cn(
+        "m-0 border-0 bg-transparent p-0",
+        compact
+          ? "shrink-0"
+          // Composer gutter and bottom inset from the visual draft (§4.3); the
+          // horizontal padding matches the message column's (ChatWindow).
+          : "chat-input-shell flex min-h-0 flex-col px-7 pb-3.5 pt-1.5 max-sm:px-2.5 max-sm:pb-[max(12px,env(safe-area-inset-bottom))]",
+        builtinCommandPending && "opacity-50 transition-opacity duration-150",
+      )}
     >
       {/* Hidden file input. No `capture`: phones still offer the photo library and camera. */}
       {!compact && <input
@@ -2012,10 +2090,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         type="file"
         accept={onAttachFiles ? undefined : "image/*"}
         multiple
-        style={{ display: "none" }}
+        className="hidden"
         onChange={handleFilePick}
       />}
-      <div style={{ ...(compact ? undefined : { display: "flex", flexDirection: "column", minHeight: 0, width: "100%" }), maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
+      {/* Column width matches the message column: min(--chat-content-max-width, 700px). */}
+      <div className="mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col gap-2">
         <MissingCwdBanner cwd={missingCwd} />
         <ModelErrorBanner error={modelError} />
         <ModelScopeWarningBanner warnings={modelScopeWarnings} />
@@ -2030,36 +2109,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             />
           );
         })()}
-        {/* Pending messages: pi delivers them on upcoming turns */}
+        {/* Pending messages: pi delivers them on upcoming turns. The pills sit
+            on the composer's axis, one inner step (13px) in from the card. */}
         {queuedSubmissions && queuedSubmissions.length > 0 && (
-          <div style={{ marginBottom: 8, display: "flex", flexDirection: "column", gap: 5 }}>
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <span style={{
-                fontSize: 10,
-                fontFamily: "var(--font-mono)",
-                color: "var(--text-dim)",
-                textTransform: "uppercase",
-                letterSpacing: 0.4,
-                padding: "2px 10px",
-                borderRadius: 999,
-                background: "color-mix(in srgb, var(--bg-panel) 55%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
-              }}>
-                {t("chat.queued", { count: queuedSubmissions.length })}
-              </span>
-            </div>
+          <div className="flex flex-col gap-1.5 px-[13px] max-sm:px-[9px]">
             {/* Only the rows scroll: a long queue must not push the input and its buttons off screen (#1428). */}
-            <div style={{
-              maxHeight: "min(180px, calc(var(--app-viewport-height, 100dvh) * 0.25))",
-              overflowY: "auto",
-              overscrollBehavior: "contain",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "stretch",
-              gap: 5,
-              // Keep the capsules' soft shadows inside the scroller's clip.
-              padding: "2px 3px",
-            }}>
+            <div className="flex max-h-[min(180px,calc(var(--app-viewport-height,100dvh)*0.25))] flex-col items-stretch gap-1.5 overflow-y-auto overscroll-contain px-[3px] py-0.5">
               {queuedSubmissions.map((item, index) => (
                 <QueuedMessageRow
                   key={item.id}
@@ -2074,188 +2129,75 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         )}
         {/* Retry banner */}
         {retryInfo && (
-          <div style={{
-            marginBottom: 8, padding: "5px 10px",
-            background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.25)",
-            borderRadius: 6, fontSize: 12, color: "rgba(180,130,0,0.9)",
-            display: "flex", alignItems: "center", gap: 6,
-          }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-            </svg>
-             {t("chat.retrying", { attempt: retryInfo.attempt, max: retryInfo.maxAttempts })}{retryInfo.errorMessage && <span style={{ opacity: 0.7, marginLeft: 4 }}>— {retryInfo.errorMessage}</span>}
-          </div>
+          <Alert variant="warning" className="items-center gap-x-1.5 rounded-md px-2.5 py-1 text-xs leading-normal">
+            <RotateCcwIcon className="size-3.5 translate-y-0 shrink-0" />
+            <span className="col-start-2">
+              {t("chat.retrying", { attempt: retryInfo.attempt, max: retryInfo.maxAttempts })}
+              {retryInfo.errorMessage && <span className="ml-1 opacity-70">— {retryInfo.errorMessage}</span>}
+            </span>
+          </Alert>
         )}
         {compactResultText && (
-          <div style={{
-            marginBottom: 8, padding: "5px 10px",
-            background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.24)",
-            borderRadius: 6, fontSize: 12, color: "rgba(5,150,105,0.95)",
-            display: "flex", alignItems: "center", gap: 6,
-          }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            {compactResultText}
-          </div>
+          <Alert className="items-center gap-x-1.5 rounded-md border-success/25 bg-success/10 px-2.5 py-1 text-xs leading-normal text-success">
+            <CheckIcon className="size-3.5 translate-y-0 shrink-0" />
+            <span className="col-start-2">{compactResultText}</span>
+          </Alert>
         )}
         {compactError && (
-          <div
-            role="alert"
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 6,
-              marginBottom: 8,
-              padding: onDismissCompactError ? "3px 3px 3px 10px" : "7px 10px",
-              background: "rgba(239,68,68,0.07)",
-              border: "1px solid rgba(239,68,68,0.3)",
-              borderRadius: 6,
-              color: "#ef4444",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              lineHeight: 1.5,
-            }}
-          >
-            <span style={{ minWidth: 0, flex: 1, padding: onDismissCompactError ? "4px 0" : 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{compactError}</span>
+          <Alert variant="destructive" className="items-start rounded-md border-destructive/30 bg-destructive/[0.07] px-2.5 py-1 font-mono text-xs leading-normal">
+            <AlertDescription className="col-start-2 row-start-1 min-w-0 whitespace-pre-wrap wrap-anywhere text-destructive/90">
+              {compactError}
+            </AlertDescription>
             {onDismissCompactError && <DismissButton onClick={onDismissCompactError} title={t("chat.dismissCompactError")} />}
-          </div>
+          </Alert>
         )}
         {attachError && (
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 6,
-            padding: "4px 8px",
-            border: "1px solid rgba(239, 68, 68, 0.4)",
-            borderRadius: 6,
-            color: "#ef4444",
-            fontSize: 12,
-            lineHeight: 1.5,
-          }}>
-            <span style={{ minWidth: 0, flex: 1, overflowWrap: "anywhere" }}>{attachError}</span>
+          <Alert variant="destructive" className="items-center rounded-md border-destructive/40 bg-destructive/[0.06] px-2 py-1 text-xs leading-normal">
+            <span className="col-start-2 row-start-1 min-w-0 wrap-anywhere">{attachError}</span>
             <DismissButton onClick={() => setAttachError(null)} title={t("chat.dismiss")} />
-          </div>
+          </Alert>
         )}
-        {/* Image previews */}
-        {attachedImages.length > 0 && (
-          <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
-            {attachedImages.map((img, i) => (
-              <div key={i} style={{ position: "relative", flexShrink: 0 }}>
-                <ImagePreview key={img.previewUrl} src={img.previewUrl}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img.previewUrl}
-                    alt=""
-                    style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border)", display: "block" }}
-                  />
-                </ImagePreview>
-                <button
-                  type="button"
-                  onClick={() => removeImage(i)}
-                  style={{
-                    position: "absolute", top: -4, right: -4,
-                    width: 16, height: 16, borderRadius: "50%",
-                    background: "var(--bg-panel)", border: "1px solid var(--border)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: "pointer", padding: 0, color: "var(--text-muted)",
-                  }}
-                >
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                    <line x1="1" y1="1" x2="7" y2="7" /><line x1="7" y1="1" x2="1" y2="7" />
-                  </svg>
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Main input */}
-        <div style={{ position: "relative", minWidth: 0 }}>
+        <div className="relative min-w-0">
           {historyMenuOpen && inputHistory.length > 0 && (
             <div
               ref={historyMenuRef}
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: "calc(100% + 8px)",
-                zIndex: 120,
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
-                overflow: "hidden",
-                maxHeight: "min(44vh, 360px)",
-              }}
+              className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 max-h-[min(44vh,360px)] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
             >
               <div
                 title={t("chat.inputHistory")}
-                style={{
-                  height: 30,
-                  padding: "0 10px",
-                  borderBottom: "1px solid var(--border)",
-                  display: "flex",
-                  alignItems: "center",
-                  color: "var(--text-dim)",
-                }}
+                className="flex h-[30px] items-center border-b px-2.5 text-muted-foreground"
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3 12a9 9 0 1 0 3-6.7" />
-                  <path d="M3 4v5h5" />
-                  <path d="M12 7v5l3 2" />
-                </svg>
+                <HistoryIcon size={14} strokeWidth={1.8} aria-hidden="true" />
               </div>
-              <div style={{ maxHeight: "calc(min(44vh, 360px) - 31px)", overflowY: "auto", padding: 4 }}>
+              <div className="max-h-[calc(min(44vh,360px)-31px)] overflow-y-auto p-1">
                 {inputHistory.map((item, index) => {
                   const active = index === historyActiveIndex;
                   return (
-                    <button
+                    <Button
                       key={`${index}:${item}`}
                       ref={(node) => {
                         historyItemRefs.current[index] = node;
                       }}
                       type="button"
+                      variant="ghost"
                       onMouseDown={(e) => {
                         e.preventDefault();
                         applyHistoryInput(item);
                       }}
                       onMouseEnter={() => setHistoryActiveIndex(index)}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 8,
-                        padding: "7px 8px",
-                        border: "none",
-                        borderRadius: 6,
-                        background: active ? "var(--bg-selected)" : "none",
-                        color: "var(--text)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        fontSize: 12.5,
-                        lineHeight: 1.45,
-                      }}
+                      className={cn(
+                        "flex h-auto w-full items-start justify-start rounded-sm px-2 py-[7px] text-left text-[12.5px] leading-[1.45] font-normal whitespace-normal text-foreground transition-colors",
+                        active && "bg-accent",
+                      )}
                     >
-                      <span style={{ flexShrink: 0, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", paddingTop: 1 }}>
+                      <span className="shrink-0 pt-px font-mono text-xs text-muted-foreground">
                         {index + 1}
                       </span>
-                      <span style={{ minWidth: 0, display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", overflowWrap: "anywhere" }}>
+                      <span className="line-clamp-2 min-w-0 wrap-anywhere">
                         {item}
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -2264,145 +2206,68 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           {slashMenuOpen && slashQuery !== null && (
             <div
               ref={slashMenuRef}
+              className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 flex max-h-[min(72.8vh,598px)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
+              // Clamped by the measured free space above the composer.
               style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: "calc(100% + 8px)",
-                zIndex: 120,
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
-                overflow: "hidden",
-                boxSizing: "border-box",
-                display: "flex",
-                flexDirection: "column",
                 maxHeight: slashMenuMaxHeight === null
                   ? "min(72.8vh, 598px)"
                   : `min(72.8vh, 598px, ${slashMenuMaxHeight}px)`,
               }}
             >
-              <div
-                style={{
-                  padding: "8px 10px",
-                  borderBottom: "1px solid var(--border)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontSize: 11,
-                  color: "var(--text-dim)",
-                  flexShrink: 0,
-                }}
-              >
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2.5 py-2 text-xs text-muted-foreground">
                  <span>{slashCommandsLoading ? t("chat.loadingCommands") : t("chat.slashCommands", { label: slashCommandCountLabel })}</span>
-                 <span style={{ fontFamily: "var(--font-mono)" }}>{t("chat.tabEnter")}</span>
+                 <span className="font-mono">{t("chat.tabEnter")}</span>
               </div>
-              <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: 10 }}>
+              <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
                 {!slashCommandsLoading && filteredSlashCommands.length === 0 ? (
-                  <div style={{ padding: "2px 2px 4px", fontSize: 12, color: "var(--text-dim)" }}>
+                  <div className="px-0.5 pb-1 pt-0.5 text-xs text-muted-foreground">
                      {t("chat.noCommands")}
                   </div>
                 ) : (
                   groupedSlashCommands.map((group) => (
-                    <section key={group.source} style={{ marginBottom: 12 }}>
-                      <div
-                        style={{
-                          position: "sticky",
-                          top: -10,
-                          zIndex: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 8,
-                          padding: "4px 0 6px",
-                          background: "var(--bg)",
-                          color: "var(--text-dim)",
-                          fontSize: 10,
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                        }}
-                      >
+                    <section key={group.source} className="mb-3">
+                      <div className="sticky -top-2.5 z-[1] flex items-center justify-between gap-2 bg-popover pb-1.5 pt-1 text-[10px] font-semibold uppercase text-muted-foreground">
                            <span>{t(SLASH_SOURCE_GROUP_LABEL_KEYS[group.source])}</span>
-                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{group.items.length}</span>
+                        <span className="font-mono font-medium">{group.items.length}</span>
                       </div>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                          gap: 8,
-                        }}
-                      >
+                      <div className="grid gap-2 grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
                         {group.items.map(({ command, index }) => {
                           const active = index === slashActiveIndex;
                           const dormant = isDormantSkillCommand(command, skillDormancy);
                           return (
-                            <button
+                            <Button
                               key={`${command.source}:${command.name}`}
                               ref={(node) => {
                                 slashItemRefs.current[index] = node;
                               }}
                               type="button"
+                              variant="ghost"
                               onMouseDown={(e) => {
                                 e.preventDefault();
                                 applySlashCommand(command);
                               }}
                               onMouseEnter={() => setSlashActiveIndex(index)}
-                              style={{
-                                width: "100%",
-                                minWidth: 0,
-                                minHeight: 58,
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 4,
-                                justifyContent: "center",
-                                padding: "9px 10px",
-                                border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-                                borderRadius: 7,
-                                background: active ? "var(--bg-selected)" : "var(--bg-panel)",
-                                color: "var(--text)",
-                                cursor: "pointer",
-                                textAlign: "left",
-                                boxShadow: active ? "0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)" : "none",
-                              }}
+                              className={cn(
+                                "flex h-auto min-h-[58px] w-full min-w-0 flex-col items-stretch justify-center gap-1 rounded-md border px-2.5 py-[9px] text-left font-normal whitespace-normal transition-colors",
+                                active
+                                  ? "border-ring bg-accent"
+                                  : "border-border bg-card",
+                              )}
                             >
-                              <span style={{
-                                fontSize: 13,
-                                fontFamily: "var(--font-mono)",
-                                overflowWrap: "anywhere",
-                                wordBreak: "break-word",
-                                color: dormant ? "var(--text-dim)" : undefined,
-                              }}>
+                              <span className={cn("font-mono text-sm wrap-anywhere", dormant && "text-muted-foreground")}>
                                 /{command.name}
                                 {dormant && (
-                                  <span style={{
-                                    marginLeft: 6,
-                                    padding: "0 4px",
-                                    border: "1px solid var(--border)",
-                                    borderRadius: 3,
-                                    fontSize: 9,
-                                    color: "var(--text-dim)",
-                                    whiteSpace: "nowrap",
-                                  }}>
+                                  <span className="ml-1.5 whitespace-nowrap rounded-sm border border-border px-1 text-[10px] text-muted-foreground">
                                     {t("chat.dormant")}
                                   </span>
                                 )}
                               </span>
                                {command.description && (
-                                <span style={{
-                                  display: "-webkit-box",
-                                  WebkitBoxOrient: "vertical",
-                                  WebkitLineClamp: 2,
-                                  overflow: "hidden",
-                                  fontSize: 11,
-                                  lineHeight: 1.35,
-                                  color: "var(--text-dim)",
-                                }}>
+                                <span className="line-clamp-2 text-xs leading-[1.35] text-muted-foreground">
                                    {getSlashDescription(command, t)}
                                 </span>
                               )}
-                            </button>
+                            </Button>
                           );
                         })}
                       </div>
@@ -2423,48 +2288,25 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             return (
               <div
                 ref={atMenuRef}
+                className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 flex max-h-[min(48vh,400px)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
+                // Clamped by the measured free space above the composer.
                 style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: "calc(100% + 8px)",
-                  zIndex: 120,
-                  background: "var(--bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
-                  overflow: "hidden",
-                  boxSizing: "border-box",
-                  display: "flex",
-                  flexDirection: "column",
                   maxHeight: atMenuMaxHeight === null
                     ? "min(48vh, 400px)"
                     : `min(48vh, 400px, ${atMenuMaxHeight}px)`,
                 }}
               >
-                <div
-                  style={{
-                    padding: "8px 10px",
-                    borderBottom: "1px solid var(--border)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    fontSize: 11,
-                    color: "var(--text-dim)",
-                    flexShrink: 0,
-                  }}
-                >
+                <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2.5 py-2 text-xs text-muted-foreground">
                   <span>
                     {indexLoading
                        ? t("chat.loadingFiles")
                        : t("chat.files", { label: matchCountLabel, hint: truncatedHint })}
                   </span>
-                   <span style={{ fontFamily: "var(--font-mono)" }}>{t("chat.tabEnter")}</span>
+                   <span className="font-mono">{t("chat.tabEnter")}</span>
                 </div>
-                <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: 4 }}>
+                <div className="min-h-0 flex-1 overflow-y-auto p-1">
                   {!indexLoading && atMatches.length === 0 ? (
-                    <div style={{ padding: "6px 8px", fontSize: 12, color: "var(--text-dim)" }}>
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
                        {needsServerSearch && !serverResultInUse ? t("chat.searching") : t("chat.noMatchingFiles")}
                     </div>
                   ) : (
@@ -2473,42 +2315,34 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       const name = entry.path.split("/").pop() ?? entry.path;
                       const dirPrefix = entry.path.slice(0, entry.path.length - name.length);
                       return (
-                        <button
+                        <Button
                           key={`${entry.isDir ? "d" : "f"}:${entry.path}`}
                           ref={(node) => {
                             atItemRefs.current[index] = node;
                           }}
                           type="button"
+                          variant="ghost"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             applyAtCompletion(entry);
                           }}
                           onMouseEnter={() => setAtActiveIndex(index)}
-                          style={{
-                            width: "100%",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px 8px",
-                            border: "none",
-                            borderRadius: 6,
-                            background: active ? "var(--bg-selected)" : "none",
-                            color: "var(--text)",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontSize: 12.5,
-                            fontFamily: "var(--font-mono)",
-                          }}
+                          className={cn(
+                            "flex h-auto w-full justify-start rounded-sm px-2 py-1.5 text-left font-mono text-[12.5px] font-normal text-foreground transition-colors",
+                            active && "bg-accent",
+                          )}
                         >
-                          <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
-                            {entry.isDir ? <FolderIcon size={14} /> : getFileIcon(name, 14)}
+                          <span className="flex shrink-0 items-center">
+                            {entry.isDir
+                              ? <FolderClosedIcon size={14} strokeWidth={1.8} className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                              : <FileIcon size={14} strokeWidth={1.8} className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
                           </span>
-                          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {dirPrefix && <span style={{ color: "var(--text-dim)" }}>{dirPrefix}</span>}
+                          <span className="min-w-0 truncate">
+                            {dirPrefix && <span className="text-muted-foreground">{dirPrefix}</span>}
                             {name}
-                            {entry.isDir && <span style={{ color: "var(--text-dim)" }}>/</span>}
+                            {entry.isDir && <span className="text-muted-foreground">/</span>}
                           </span>
-                        </button>
+                        </Button>
                       );
                     })
                   )}
@@ -2516,27 +2350,68 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </div>
             );
           })()}
-          <div
-            className={stackedComposer ? undefined : "chat-composer-row"}
-            style={{
-              minWidth: 0,
-              display: "flex",
-              flexDirection: stackedComposer ? "column" : "row",
-              gap: 8,
-              alignItems: stackedComposer ? "stretch" : "center",
-              background: "var(--bg)",
-              border: compact ? "none" : `1px solid ${bashMode ? "var(--tool-bg)" : isStreaming && onFollowUp
-                ? "rgba(234,179,8,0.4)"
-                : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
-              borderRadius: compact ? 12 : 14,
-              padding: compact ? 0 : isMobile ? "6px 6px 6px 12px" : "10px 10px 10px 14px",
-              boxShadow: compact ? "none" : "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
-              transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
-            } as React.CSSProperties}
+          {/* The drafted composer card: attachments, then the input, then one
+              pill row with the send button physically pinned to its right.
+              AI-element composer language: one large-radius card, borderless
+              textarea with headroom, tools bottom-left, circular submit
+              bottom-right, and a soft tinted focus ring (the border itself
+              stays put while typing). */}
+          <InputGroup
+            className={cn(
+              "chat-composer-row min-w-0 rounded-[24px] border-border bg-card shadow-sm has-[[data-slot=input-group-control]:focus-visible]:border-ring/40 has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot=input-group-control]:focus-visible]:ring-ring/15",
+              compact
+                ? "flex-row items-center gap-1 rounded-[18px] p-1.5"
+                : "flex-col items-stretch gap-0 p-2",
+            )}
           >
-          <textarea
+          {attachedImages.length > 0 && (
+            <InputGroupAddon align="block-start" className="flex-wrap px-0 pt-0">
+              {attachedImages.map((img, i) => (
+                <div key={i} className="relative shrink-0">
+                  <ImagePreview key={img.previewUrl} src={img.previewUrl}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img.previewUrl}
+                      alt=""
+                      className="block size-14 rounded-md border border-border object-cover"
+                    />
+                  </ImagePreview>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => removeImage(i)}
+                    title={t("chat.dismiss")}
+                    aria-label={t("chat.dismiss")}
+                    className="absolute -right-1 -top-1 size-4 rounded-full border border-border bg-card p-0 text-muted-foreground"
+                  >
+                    <XIcon className="size-2" strokeWidth={2.5} aria-hidden="true" />
+                  </Button>
+                </div>
+              ))}
+              {!compact && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => fileInputRef.current?.click()}
+                  title={t("chat.attachFiles")}
+                  aria-label={t("chat.attachFiles")}
+                  className="h-[26px] rounded-full border-dashed px-2.5 text-xs text-muted-foreground"
+                >
+                  <PlusIcon data-icon="inline-start" strokeWidth={2} aria-hidden="true" />
+                  {t("chat.attachFiles")}
+                </Button>
+              )}
+            </InputGroupAddon>
+          )}
+          <InputGroupTextarea
             ref={textareaRef}
-            className="chat-input-textarea"
+            className={cn(
+              "chat-input-textarea w-full min-w-0 px-2.5 py-2 text-foreground max-h-44 overflow-auto placeholder:text-muted-foreground",
+              "text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.55]",
+              compact ? "min-h-24" : "min-h-11",
+            )}
             data-chat-composer=""
             aria-label={compact ? t("chat.askInSideChat") : undefined}
             value={value}
@@ -2571,588 +2446,262 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 : t("chat.messagePlaceholder")
             }
             rows={1}
-            style={{
-              flex: stackedComposer ? "none" : 1,
-              minWidth: 0,
-              width: "100%",
-              background: "none",
-              border: "none",
-              outline: "none",
-              resize: "none",
-              color: "var(--text)",
-              fontSize: "var(--chat-content-font-size, 14px)",
-              lineHeight: 1.6,
-              fontFamily: "inherit",
-              minHeight: compact ? 96 : 24,
-              maxHeight: 200,
-              overflow: "auto",
-            }}
           />
 
-          {/* The composer's main button follows the input: a message waiting to be
-              sent is always the primary action — while a turn runs that queues a
-              follow-up, the same thing Enter does — and only an empty composer
-              leaves it as stop. */}
-          {isStreaming && !canSubmit ? (
-            <button
-              onClick={onAbort}
-              title={t("chat.stopAgent")}
-              aria-label={t("chat.stopAgent")}
-              style={{
-                flexShrink: 0,
-                alignSelf: "flex-end",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 36,
-                height: 36,
-                padding: 0,
-                borderRadius: "50%",
-                background: "rgba(239,68,68,0.1)",
-                border: "1px solid rgba(239,68,68,0.35)",
-                color: "#ef4444",
-                cursor: "pointer",
-                transition: "background 0.15s, border-color 0.15s",
-              }}
-              onMouseEnter={(e) => { if (!canHover()) return; e.currentTarget.style.background = "rgba(239,68,68,0.18)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; }}
-            >
-              {/* While the run streams the circle stops it, until the user types
-                  something to send. */}
-              <svg width="12" height="12" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
-              </svg>
-            </button>
-          ) : (
-            <div style={{ display: "flex", alignItems: "stretch", gap: 6, flexShrink: 0, alignSelf: "flex-end" }}>
-              {isStreaming && onSideChat && (
-                <button
-                  type="button"
-                  onClick={sendToSideChat}
-                  disabled={!value.trim() || attachedImages.length > 0}
-                  title={t("chat.sideChatHint")}
-                  aria-label={t("chat.sideChat")}
-                  className={`bg-transparent ${value.trim() && !attachedImages.length ? "cursor-pointer text-text-muted hover:bg-bg-hover hover:text-text" : "cursor-not-allowed text-text-dim"}`}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    display: "grid", placeItems: "center",
-                    padding: 0,
-                    alignSelf: "flex-end",
-                    background: "transparent",
-                    border: "none",
-                    borderRadius: "50%",
-                    transition: "background 0.12s",
-                  }}
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z" /><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" />
-                  </svg>
-                </button>
-              )}
-          <button
-            onClick={isStreaming ? () => queueFollowUp() : handleSend}
-            disabled={!canSubmit}
-            title={t("chat.send")}
-            aria-label={t("chat.send")}
-            style={{
-              flexShrink: 0,
-              alignSelf: "flex-end",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 36,
-              height: 36,
-              padding: 0,
-              borderRadius: "50%",
-              background: !canSubmit ? "var(--bg-panel)" : "var(--accent)",
-              border: "none",
-              color: !canSubmit ? "var(--text-dim)" : "var(--accent-contrast)",
-              cursor: canSubmit ? "pointer" : "not-allowed",
-              boxShadow: canSubmit ? "0 1px 3px color-mix(in srgb, var(--accent) 25%, transparent)" : "none",
-              transition: "background 0.15s, box-shadow 0.15s, color 0.15s",
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="20" x2="12" y2="5" />
-              <polyline points="6 11 12 5 18 11" />
-            </svg>
-          </button>
-            </div>
+          {compact ? sendCluster : (
+            <InputGroupAddon align="block-end" className="min-w-0 items-center gap-2 px-1 pb-0.5">
+              {/* One pill row: the pills scroll horizontally instead of wrapping,
+                  and the send button is a sibling so it can never be squeezed
+                  out. chat-input-controls keeps the keyboard-open collapse. */}
+              <div className="chat-input-controls flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      aria-label={t("chat.attachFiles")}
+                      className={cn(
+                        "rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        attachedImages.length > 0 && "text-primary",
+                      )}
+                    >
+                      <ImageIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("chat.attachFiles")}</TooltipContent>
+                </Tooltip>
+                {/* Model selector - visible always, busy while a switch is pending; a switch
+                    during a run applies from its next request.
+                    flex-shrink 8: the model pill gives up width first; the other pills only truncate. */}
+                {(modelOptions.length > 0 || model || modelError) && onModelChange && (
+                  <div className="flex min-w-0 overflow-hidden [flex-shrink:8]">
+                    <ModelSelector
+                      options={modelOptions}
+                      value={model}
+                      onChange={onModelChange}
+                      onReselect={onModelChange}
+                      busy={modelSwitching}
+                      isAutoSelection={isAutoModelSelection}
+                      defaultValue={defaultModel}
+                      onSetDefault={onSetDefaultModel}
+                      allOptions={allModelList?.map((m) => ({ provider: m.provider, providerName: m.providerName, modelId: m.id, name: m.name }))}
+                      onShowAll={onLoadAllModels}
+                      headerSlot={!isMobile && onThinkingLevelChange ? thinkingSection : undefined}
+                      iconClassName={!isMobile && onThinkingLevelChange ? thinkingIconTone : undefined}
+                      titleHint={!isMobile && onThinkingLevelChange ? thinkingDisplayLabel : undefined}
+                    />
+                  </div>
+                )}
+            {/* Tools share one icon menu: the row keeps no text pills. The
+                wrench tint says which preset is active (full bright, chat-only
+                dim, others muted), and compacting flips the icon to a
+                destructive stop (the menu then carries only stop-compaction).
+                The menu's onSelect fires on a deliberate click, so the run-end
+                stray-click guard the old direct button needed does not apply
+                here. */}
+            {!isMobile && ((onToolPresetChange && !isStreaming) || (onCompact && isCompacting)) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title={isCompacting ? t("chat.stopCompaction") : `${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
+                    aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.changeToolPreset")}
+                    className={cn(
+                      "rounded-full",
+                      isCompacting
+                        ? "text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        : onToolPresetChange && !isStreaming && rawToolPresetLabel === "full"
+                          ? "text-primary hover:bg-accent hover:text-accent-foreground"
+                          : onToolPresetChange && !isStreaming && rawToolPresetLabel === "chat-only"
+                            ? "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    )}
+                  >
+                    {isCompacting
+                      ? <SquareIcon className="size-4 fill-current" aria-hidden="true" />
+                      : <WrenchIcon strokeWidth={1.8} aria-hidden="true" />}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="end" sideOffset={6} className="min-w-[120px]">
+                  {onToolPresetChange && !isStreaming && (
+                    <DropdownMenuRadioGroup
+                      value={toolPreset ?? "configured"}
+                      onValueChange={(next) => {
+                        const preset = TOOL_PRESET_MAP[next as ToolPresetLabel];
+                        if ((toolPreset ?? "configured") !== preset) onToolPresetChange(preset);
+                      }}
+                    >
+                      {TOOL_PRESETS.map((lvl) => {
+                        const text = TOOL_PRESET_TEXT[lvl];
+                        return (
+                          <DropdownMenuRadioItem key={lvl} value={lvl}>
+                            <span className="flex-1 whitespace-nowrap">{t(text.label)}</span>
+                            {text.desc && <span className="min-w-0 text-xs text-muted-foreground">{t(text.desc)}</span>}
+                          </DropdownMenuRadioItem>
+                        );
+                      })}
+                    </DropdownMenuRadioGroup>
+                  )}
+                  {onCompact && isCompacting && (
+                    <>
+                      {onToolPresetChange && !isStreaming && <DropdownMenuSeparator />}
+                      <DropdownMenuItem
+                        onSelect={onAbortCompaction}
+                        className="text-destructive"
+                      >
+                        <SquareIcon className="size-4 fill-current" aria-hidden="true" />
+                        {t("chat.stopCompaction")}
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {onSoundToggle !== undefined && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={onSoundToggle}
+                    aria-label={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}
+                    className={cn(
+                      "rounded-full hover:bg-accent",
+                      soundEnabled ? "text-muted-foreground hover:text-accent-foreground" : "text-muted-foreground/55 hover:text-accent-foreground",
+                    )}
+                  >
+                    {soundEnabled
+                      ? <Volume2Icon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
+                      : <VolumeXIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}</TooltipContent>
+              </Tooltip>
+            )}
+
+            {isMobile && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={t("chat.moreControls")}
+                    className="gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  >
+                    {t("chat.moreControls")}
+                    <ChevronUpIcon data-icon="inline-end" className="shrink-0 opacity-60" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="end" sideOffset={6} className="max-w-[calc(100vw-16px)]">
+                  {onThinkingLevelChange && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <span className="flex-1">{t("chat.changeReasoningLabel")}</span>
+                        <span className="text-xs text-muted-foreground">{thinkingDisplayLabel}</span>
+                      </DropdownMenuSubTrigger>
+                     <DropdownMenuSubContent collisionPadding={8} className="min-w-[140px] max-w-(--radix-dropdown-menu-content-available-width) max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto scrollbar-thin">
+                        <DropdownMenuRadioGroup
+                          value={isAutoThinkingSelection ? "auto" : (resolvedThinkingLevel ?? "")}
+                          onValueChange={(next) => {
+                            if (next === "auto") {
+                              if (!isAutoThinkingSelection) onThinkingLevelChange("auto");
+                              return;
+                            }
+                            onThinkingLevelChange(next as typeof THINKING_LEVELS[number]);
+                          }}
+                        >
+                          {THINKING_LEVELS.filter((lvl) => {
+                            if (!availableThinkingLevels) return true;
+                            if (lvl === "auto") return true;
+                            return availableThinkingLevels.includes(lvl);
+                          }).map((lvl) => {
+                            const desc = t(THINKING_LEVEL_DESC_KEYS[lvl]);
+                            const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
+                            const displayLabel = titleCaseLabel((mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl);
+                            const showOriginal = mappedVal != null && mappedVal !== lvl;
+                            return (
+                              <DropdownMenuRadioItem key={lvl} value={lvl}>
+                                <span className="min-w-0 flex-1">
+                                  {displayLabel}
+                                  {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">({lvl})</span>}
+                                </span>
+                                <span className="text-xs text-muted-foreground">{desc}</span>
+                              </DropdownMenuRadioItem>
+                            );
+                          })}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  )}
+                  {!isStreaming && onToolPresetChange && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <span className="flex-1">{t("chat.changeToolPreset")}</span>
+                        <span className="text-xs text-muted-foreground">{toolPresetLabel}</span>
+                      </DropdownMenuSubTrigger>
+                     <DropdownMenuSubContent collisionPadding={8} className="min-w-[140px] max-w-(--radix-dropdown-menu-content-available-width) max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto scrollbar-thin">
+                        <DropdownMenuRadioGroup
+                          value={toolPreset ?? "configured"}
+                          onValueChange={(next) => {
+                            const preset = TOOL_PRESET_MAP[next as ToolPresetLabel];
+                            if ((toolPreset ?? "configured") !== preset) onToolPresetChange(preset);
+                          }}
+                        >
+                          {TOOL_PRESETS.map((lvl) => {
+                            const text = TOOL_PRESET_TEXT[lvl];
+                            return (
+                              <DropdownMenuRadioItem key={lvl} value={lvl}>
+                                <span className="flex-1 whitespace-nowrap">{t(text.label)}</span>
+                                {text.desc && <span className="min-w-0 text-xs text-muted-foreground">{t(text.desc)}</span>}
+                              </DropdownMenuRadioItem>
+                            );
+                          })}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  )}
+                  {isCompacting && onCompact && (
+                    <DropdownMenuItem onSelect={onAbortCompaction} className="text-destructive">
+                      <SquareIcon className="size-4 fill-current" aria-hidden="true" />
+                      {t("chat.stopCompaction")}
+                    </DropdownMenuItem>
+                  )}
+                  {onSoundToggle !== undefined && (
+                    <DropdownMenuItem
+                      onSelect={onSoundToggle}
+                      className="text-muted-foreground"
+                    >
+                      {soundEnabled
+                        ? <><Volume2Icon className="size-4" aria-hidden="true" />{t("chat.disableSound")}</>
+                        : <><VolumeXIcon className="size-4" aria-hidden="true" />{t("chat.enableSound")}</>}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+                <ExtensionStatusButton statuses={extensionStatuses ?? []} />
+                {/* YOLO is a marker, not a control: it carries no box, and it closes
+                    the row at the far right. */}
+                {permissiveStatus && <PermissiveModeChip text={permissiveStatus} />}
+              </div>
+
+              {sendCluster}
+            </InputGroupAddon>
           )}
-          </div>
+          </InputGroup>
         </div>
 
         {/* Bash mode status label */}
         {bashMode && (
-          <div className="text-xs px-2 py-1" style={{ color: bashExcluded ? "var(--text-muted)" : "var(--accent)", marginTop: 4 }}>
+          <div className={cn("mt-1 px-1 text-xs", bashExcluded ? "text-muted-foreground" : "text-primary")}>
              {t("chat.shell")} · {bashExcluded ? t("chat.outputLocal") : t("chat.outputModel")}
           </div>
         )}
-
-        {/* Bottom bar: left | center (context) | right */}
-        {!compact && <div className="chat-input-controls" style={{
-          marginTop: isMobile ? 4 : 8,
-          display: isMobile ? "grid" : "flex",
-          gridTemplateColumns: isMobile ? "minmax(0, 1fr) auto" : undefined,
-          alignItems: "center",
-          gap: 4,
-        }}>
-
-          {/* LEFT: attach + model selector */}
-          <div style={{ flex: isMobile ? "1 1 auto" : "0 0 auto", minWidth: 0, display: "flex", alignItems: "center", gap: 4 }}>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              title={t("chat.attachFiles")}
-              style={{
-                flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                width: controlSize, height: controlSize, padding: 0,
-                background: "none", border: "none",
-                borderRadius: 8,
-                color: attachedImages.length ? "var(--accent)" : "var(--text-muted)",
-                cursor: "pointer",
-                opacity: 1,
-                transition: "background 0.12s, color 0.12s",
-              }}
-              onMouseEnter={(e) => {
-                if (!canHover()) return;
-                e.currentTarget.style.background = "var(--bg-hover)";
-                e.currentTarget.style.color = attachedImages.length ? "var(--accent)" : "var(--text)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "none";
-                e.currentTarget.style.color = attachedImages.length ? "var(--accent)" : "var(--text-muted)";
-              }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-            </button>
-            {/* Model selector - visible always, busy while a switch is pending; a switch during a run applies from its next request */}
-            {(modelOptions.length > 0 || model || modelError) && onModelChange && (
-              <ModelSelector
-                options={modelOptions}
-                value={model}
-                onChange={onModelChange}
-                onReselect={onModelChange}
-                busy={modelSwitching}
-                isAutoSelection={isAutoModelSelection}
-                defaultValue={defaultModel}
-                onSetDefault={onSetDefaultModel}
-                allOptions={allModelList?.map((m) => ({ provider: m.provider, providerName: m.providerName, modelId: m.id, name: m.name }))}
-                onShowAll={onLoadAllModels}
-              />
-            )}
-          </div>
-
-          {/* spacer */}
-          {!isMobile && <div style={{ flex: 1 }} />}
-
-          {/* RIGHT: thinking + tools preset + compact + sound (idle) | Stop + sound (streaming) */}
-          <div ref={controlsMenuRef} style={{
-            flex: "0 0 auto",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: 4,
-            position: "relative",
-            marginLeft: isMobile ? 0 : "auto",
-          }}>
-            {isMobile && (
-              <button
-                type="button"
-                title={controlsMenuOpen ? undefined : t("chat.moreControls")}
-                aria-label={t("chat.moreControls")}
-                aria-expanded={controlsMenuOpen}
-                aria-hidden={controlsMenuOpen || undefined}
-                tabIndex={controlsMenuOpen ? -1 : undefined}
-                onClick={() => {
-                  setControlsMenuOpen(true);
-                }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: controlSize,
-                  padding: "0 8px",
-                  background: "none",
-                  border: "none",
-                  borderRadius: 8,
-                  color: "var(--text-muted)",
-                  cursor: controlsMenuOpen ? "default" : "pointer",
-                  fontSize: 11,
-                  visibility: controlsMenuOpen ? "hidden" : "visible",
-                  pointerEvents: controlsMenuOpen ? "none" : "auto",
-                  transition: "background 0.12s, color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!canHover()) return;
-                  if (controlsMenuOpen) return;
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text)";
-                }}
-                onMouseLeave={(e) => {
-                  if (controlsMenuOpen) return;
-                  e.currentTarget.style.background = "none";
-                  e.currentTarget.style.color = "var(--text-muted)";
-                }}
-              >
-                {t("chat.moreControls")}
-              </button>
-            )}
-            <div style={{
-              display: isMobile ? (controlsMenuOpen ? "flex" : "none") : "flex",
-              alignItems: "center",
-              gap: 4,
-              ...(isMobile ? {
-                position: "absolute",
-                right: 0,
-                bottom: 0,
-                zIndex: 60,
-                padding: 1,
-                width: "max-content",
-                maxWidth: "calc(100vw - 32px)",
-                flexWrap: "nowrap",
-                justifyContent: "flex-end",
-                border: "1px solid color-mix(in srgb, var(--border) 72%, transparent)",
-                borderRadius: 10,
-                background: "color-mix(in srgb, var(--bg-panel) 92%, var(--bg))",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
-                backdropFilter: "blur(10px)",
-              } : null),
-            }}>
-            {onThinkingLevelChange && (
-              <div ref={thinkingDropdownRef} style={{ position: "relative" }}>
-                <button
-                  onClick={() => setThinkingDropdownOpen((v) => !v)}
-                  title={isStreaming
-                    ? t("chat.currentReasoning", { level: thinkingDisplayLabel })
-                    : t("chat.changeReasoning", { level: thinkingDisplayLabel })}
-                  aria-label={t("chat.changeReasoningLabel")}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    padding: "0 8px",
-                    width: isMobile ? "auto" : undefined,
-                    height: controlSize,
-                    background: thinkingDropdownOpen ? "var(--bg-hover)" : "none",
-                    border: "none",
-                    borderRadius: 8,
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    fontSize: 11,
-                    transition: "background 0.12s, color 0.12s",
-                  }}
-                  aria-expanded={thinkingDropdownOpen}
-                  onMouseEnter={(e) => {
-                    if (!canHover()) return;
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                    e.currentTarget.style.color = "var(--text)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = thinkingDropdownOpen ? "var(--bg-hover)" : "none";
-                    e.currentTarget.style.color = "var(--text-muted)";
-                  }}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.7.78 3.21 2 4.21V14a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-2.29c1.22-1 2-2.51 2-4.21A5.5 5.5 0 0 0 9.5 2z" />
-                    <line x1="7" y1="18" x2="12" y2="18" />
-                    <line x1="8" y1="21" x2="11" y2="21" />
-                  </svg>
-                  {(!isMobile || controlsMenuOpen) && <span>{thinkingDisplayLabel}</span>}
-                </button>
-                {thinkingDropdownOpen && (
-                  <div style={{
-                    position: "absolute", bottom: "calc(100% + 6px)",
-                    ...(isMobile ? { left: 0 } : { right: 0 }),
-                    zIndex: 100, background: "var(--bg)", border: "1px solid var(--border)",
-                    borderRadius: 8, boxShadow: "0 -4px 16px rgba(0,0,0,0.10)",
-                    overflow: "hidden", minWidth: 180,
-                  }}>
-                    {THINKING_LEVELS.filter((lvl) => {
-                      if (!availableThinkingLevels) return true;
-                      if (lvl === "auto") return true;
-                      return availableThinkingLevels.includes(lvl);
-                    }).map((lvl) => {
-                      const isActive = lvl === "auto"
-                        ? isAutoThinkingSelection
-                        : !isAutoThinkingSelection && resolvedThinkingLevel === lvl;
-                      const desc = t(THINKING_LEVEL_DESC_KEYS[lvl]);
-                      const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
-                      const displayLabel = titleCaseLabel((mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl);
-                      const showOriginal = mappedVal != null && mappedVal !== lvl;
-                      return (
-                        <SelectorRow
-                          key={lvl}
-                          active={isActive}
-                          onSelect={() => {
-                            setThinkingDropdownOpen(false);
-                            if (lvl === "auto") {
-                              if (!isAutoThinkingSelection) onThinkingLevelChange("auto");
-                              return;
-                            }
-                            if (!isActive || isAutoThinkingSelection) onThinkingLevelChange(lvl);
-                          }}
-                          gutter={Boolean(onSetDefaultThinkingLevel)}
-                          star={onSetDefaultThinkingLevel && lvl !== "auto"
-                            ? {
-                                isDefault: savedDefaultThinkingLevel === lvl,
-                                saveLabel: t("chat.saveDefaultThinking"),
-                                defaultLabel: t("chat.defaultThinking"),
-                                onSave: () => {
-                                  setThinkingDropdownOpen(false);
-                                  onSetDefaultThinkingLevel(lvl);
-                                },
-                              }
-                            : undefined}
-                        >
-                          <span style={{ flex: 1 }}>
-                            {displayLabel}
-                            {showOriginal && <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", marginLeft: 5 }}>({lvl})</span>}
-                          </span>
-                          <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: 8 }}>{desc}</span>
-                        </SelectorRow>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-            {!isStreaming && onToolPresetChange && (
-              <div ref={toolDropdownRef} style={{
-                // On a phone the menu opens from the strip's right edge, not
-                // the button's: its preset descriptions are wider than the room
-                // right of the button, so it ran off the screen.
-                position: isMobile ? "static" : "relative",
-              }}>
-                <button
-                  onClick={(e) => { if (!isStreaming && !isStrayClick(e)) setToolDropdownOpen((v) => !v); }}
-                  disabled={isStreaming}
-                  title={isStreaming
-                    ? t("chat.currentToolPreset", { preset: toolPresetLabel })
-                    : t("chat.changeToolPreset") + `: ${toolPresetLabel}`}
-                  aria-label={t("chat.changeToolPreset")}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    padding: "0 8px",
-                    width: isMobile ? "auto" : undefined,
-                    height: controlSize,
-                    background: toolDropdownOpen ? "var(--bg-hover)" : "none",
-                    border: "none",
-                    borderRadius: 8,
-                    color: "var(--text-muted)",
-                    cursor: isStreaming ? "not-allowed" : "pointer",
-                    fontSize: 11,
-                    opacity: isStreaming ? 0.5 : 1,
-                    transition: "background 0.12s, color 0.12s",
-                  }}
-                  aria-expanded={toolDropdownOpen}
-                  onMouseEnter={(e) => {
-                    if (!canHover()) return;
-                    if (isStreaming) return;
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                    e.currentTarget.style.color = "var(--text)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = toolDropdownOpen ? "var(--bg-hover)" : "none";
-                    e.currentTarget.style.color = "var(--text-muted)";
-                  }}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                  </svg>
-                  {(!isMobile || controlsMenuOpen) && <span>{toolPresetLabel}</span>}
-                </button>
-                {toolDropdownOpen && (
-                  <div style={{
-                    position: "absolute",
-                    bottom: "calc(100% + 6px)",
-                    right: 0,
-                    maxWidth: isMobile ? "calc(100vw - 16px)" : undefined,
-                    zIndex: 100, background: "var(--bg)", border: "1px solid var(--border)",
-                    borderRadius: 8, boxShadow: "0 -4px 16px rgba(0,0,0,0.10)",
-                    overflow: "hidden", minWidth: 120,
-                  }}>
-                    {TOOL_PRESETS.map((lvl) => {
-                      const preset = TOOL_PRESET_MAP[lvl];
-                      const isActive = (toolPreset ?? "configured") === preset;
-                      let desc: string | null;
-                      if (lvl === "configured") desc = t("chat.configuredTools");
-                      else if (lvl === "chat-only") desc = null;
-                      else if (lvl === "read-only") desc = t("chat.readOnlyTools", { count: 4 });
-                      else if (lvl === "default") desc = t("chat.builtInTools", { count: 4 });
-                      else desc = t("chat.allBuiltInTools");
-                      return (
-                        <button
-                          key={lvl}
-                          onClick={() => { setToolDropdownOpen(false); if (!isActive) onToolPresetChange(preset); }}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 8,
-                            width: "100%", padding: "7px 12px",
-                            background: isActive ? "var(--bg-selected)" : "none",
-                            border: "none",
-                            color: isActive ? "var(--text)" : "var(--text-muted)",
-                            cursor: "pointer", fontSize: 12, textAlign: "left",
-                            fontWeight: isActive ? 600 : 400,
-                            whiteSpace: "nowrap",
-                          }}
-                          onMouseEnter={(e) => { if (!canHover()) return; if (!isActive) e.currentTarget.style.background = "var(--bg-hover)"; }}
-                          onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "none"; }}
-                        >
-                          {isActive
-                            ? <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>
-                            : <span style={{ width: 10, flexShrink: 0 }} />}
-                          <span style={{ flex: 1 }}>{lvl === "chat-only" ? t("chat.chatOnly") : titleCaseLabel(lvl)}</span>
-                          {desc && <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: 8 }}>{desc}</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {(!isStreaming || isCompacting) && onCompact && (
-
-              <div>
-                <button
-                  onClick={isCompacting ? onAbortCompaction : (e) => { if (!isStrayClick(e)) onCompact(); }}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    padding: "0 8px",
-                    width: isMobile ? "auto" : undefined,
-                    height: controlSize,
-                    background: isCompacting ? "rgba(239,68,68,0.08)" : "none",
-                    border: "none",
-                    borderRadius: 8,
-                    color: isCompacting ? "#ef4444" : "var(--text-muted)",
-                    cursor: "pointer",
-                    fontSize: 11,
-                    transition: "background 0.12s, color 0.12s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!canHover()) return;
-                    e.currentTarget.style.background = isCompacting ? "rgba(239,68,68,0.16)" : "var(--bg-hover)";
-                    e.currentTarget.style.color = isCompacting ? "#ef4444" : "var(--text)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = isCompacting ? "rgba(239,68,68,0.08)" : "none";
-                    e.currentTarget.style.color = isCompacting ? "#ef4444" : "var(--text-muted)";
-                  }}
-                   title={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
-                   aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.compactContext")}
-                >
-                  {isCompacting ? (
-                    <><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" fill="currentColor" /></svg>{(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{t("chat.compacting")}</span>}</>
-                  ) : (
-                    <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
-                      <line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" />
-                    </svg>{(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{t("chat.compact")}</span>}</>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {onSoundToggle !== undefined && (
-              <button
-                onClick={onSoundToggle}
-                 title={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}
-                 aria-label={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  width: controlSize,
-                  height: controlSize,
-                  padding: 0,
-                  background: "none",
-                  border: "none",
-                  borderRadius: 8,
-                  color: soundEnabled ? "var(--text-muted)" : "var(--text-dim)",
-                  cursor: "pointer",
-                  opacity: soundEnabled ? 1 : 0.55,
-                  transition: "background 0.12s, color 0.12s, opacity 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!canHover()) return;
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text)";
-                  e.currentTarget.style.opacity = "1";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "none";
-                  e.currentTarget.style.color = soundEnabled ? "var(--text-muted)" : "var(--text-dim)";
-                  e.currentTarget.style.opacity = soundEnabled ? "1" : "0.55";
-                }}
-              >
-                {soundEnabled ? (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                  </svg>
-                ) : (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                    <line x1="23" y1="9" x2="17" y2="15" />
-                    <line x1="17" y1="9" x2="23" y2="15" />
-                  </svg>
-                )}
-              </button>
-            )}
-
-            {isMobile && controlsMenuOpen && (
-              <button
-                type="button"
-                className="composer-chip"
-                 title={t("chat.collapseControls")}
-                 aria-label={t("chat.collapseControls")}
-                aria-expanded={true}
-                onClick={() => {
-                  setToolDropdownOpen(false);
-                  setThinkingDropdownOpen(false);
-                  setControlsMenuOpen(false);
-                }}
-
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: isMobile ? controlSize : 36,
-                  height: controlSize,
-                  padding: 0,
-                  marginLeft: 0,
-                  background: "var(--bg-hover)",
-                  border: "none",
-                  borderLeft: "1px solid color-mix(in srgb, var(--border) 72%, transparent)",
-                  borderRadius: "0 8px 8px 0",
-                  color: "var(--text)",
-                  cursor: "pointer",
-                  transition: "background 0.12s, color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!canHover()) return;
-                  e.currentTarget.style.background = "var(--bg-selected)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                }}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            )}
-            </div>
-
-            <ExtensionStatusButton statuses={extensionStatuses ?? []} />
-            {/* YOLO is a marker, not a control: it carries no box, and it closes
-                the row at the far right. */}
-            {permissiveStatus && <PermissiveModeChip text={permissiveStatus} />}
-          </div>
-
-        </div>}
       </div>
     </fieldset>
   );

@@ -15,13 +15,9 @@ function renderTabBar(count, onReorderTab) {
     React.createElement(TabBar, { tabs, activeTabId: "t0", onSelectTab() {}, onCloseTab() {}, onReorderTab })));
 }
 
-/** The inline style of every element with that role, as property maps. */
-function styles(html, role) {
-  return [...html.matchAll(new RegExp(`<div role="${role}"[^>]* style="([^"]*)"`, "g"))].map(([, style]) =>
-    Object.fromEntries(style.split(";").filter(Boolean).map((declaration) => {
-      const colon = declaration.indexOf(":");
-      return [declaration.slice(0, colon), declaration.slice(colon + 1)];
-    })));
+/** The class string of every element with that role. */
+function classes(html, role) {
+  return [...html.matchAll(new RegExp(`<div role="${role}"[^>]* class="([^"]*)"`, "g"))].map(([, cls]) => cls);
 }
 
 test("right-panel tabs can be dragged when a reorder handler is provided", () => {
@@ -30,23 +26,26 @@ test("right-panel tabs can be dragged when a reorder handler is provided", () =>
 });
 
 test("overflowing tabs keep the whole bar: the strip has no scrollbar", () => {
-  // The app's 10px (6px on touch) scrollbar took its height out of the 36px
-  // bar: 36px tabs were clipped (#1225), stretched ones squeezed to 26px.
+  // The app's 10px (6px on touch) scrollbar took its height out of the bar:
+  // full-height tabs were clipped (#1225), stretched ones squeezed.
   const html = renderTabBar(12);
-  assert.match(html, /<div role="tablist" class="tabbar-scroll"/);
+  assert.match(html, /<div role="tablist" class="tabbar-scroll/);
   const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(css, /\.tabbar-scroll \{\s*scrollbar-width: none;\s*\}/);
   assert.match(css, /\.tabbar-scroll::-webkit-scrollbar \{\s*display: none;\s*\}/);
-  const [list] = styles(html, "tablist");
-  // The bar's height (36px, 44px on a phone or touch screen).
-  assert.equal(list.height, "var(--top-bar-height)");
-  assert.equal(list["overflow-x"], "auto");
-  assert.equal(list["overflow-y"], "hidden");
-  assert.equal(list["align-items"], "stretch");
-  const tabs = styles(html, "tab");
+  const [list] = classes(html, "tablist");
+  // The pill bar's fixed height (R2-1: the panel bar is 46px).
+  assert.match(list, /h-\[46px\]/);
+  assert.match(list, /overflow-x-auto/);
+  assert.match(list, /overflow-y-hidden/);
+  assert.match(list, /items-center/);
+  const tabs = classes(html, "tab");
   assert.equal(tabs.length, 12);
   for (const tab of tabs) {
-    assert.equal(tab.height, undefined);
-    assert.equal(tab["align-items"], "center");
+    // One segment per tab: a fixed segment height on every row (the shadcn
+    // Tabs shape — the raised background segment, not a floating pill).
+    assert.match(tab, /h-7/);
+    assert.match(tab, /items-center/);
+    assert.match(tab, /rounded-md/);
   }
 });

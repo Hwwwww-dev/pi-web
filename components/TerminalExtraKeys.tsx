@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useSyncExternalStore, type PointerEvent } from "react";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import {
   TERMINAL_EXTRA_KEY_ROWS,
@@ -84,15 +85,23 @@ export function TerminalExtraKeys({ modifiers, onKey, onToggleModifier }: Props)
   };
 
   return (
-    <div className="terminal-extra-keys" role="toolbar" aria-label={t("terminal.extraKeys")}>
+    // 面板的末行网格（批 4 自 app/globals.css 迁入）：键盘打开时由该文件的
+    // html[data-keyboard-open] 覆写收起安全区内边距。
+    <div
+      className="terminal-extra-keys grid [grid-row:4] grid-cols-7 auto-rows-[36px] border-t border-(--terminal-border) bg-(--terminal-header-bg) pb-[env(safe-area-inset-bottom)]"
+      role="toolbar"
+      aria-label={t("terminal.extraKeys")}
+    >
       {TERMINAL_EXTRA_KEY_ROWS.flat().map((key) => {
         const modifier = key === "ctrl" || key === "alt";
         return (
-          <button
+          <Button
             key={key}
             type="button"
+            variant="ghost"
+            size="default"
             tabIndex={-1}
-            className={modifier && modifiers[key] ? "is-active" : undefined}
+            className={`min-w-0 rounded-none border-0 px-0 py-0 font-mono text-xs font-normal text-(--terminal-key) hover:bg-transparent hover:text-(--terminal-key) active:bg-(--terminal-hover-bg) active:text-(--terminal-key) dark:hover:bg-transparent dark:hover:text-(--terminal-key) touch-manipulation select-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]${modifier && modifiers[key] ? " text-(--terminal-accent)" : ""}`}
             aria-pressed={modifier ? modifiers[key] : undefined}
             aria-label={modifier ? undefined : KEY_NAMES[key]}
             onPointerDown={(event) => press(event, key)}
@@ -102,8 +111,8 @@ export function TerminalExtraKeys({ modifiers, onKey, onToggleModifier }: Props)
             onMouseDown={(event) => event.preventDefault()}
             onContextMenu={(event) => event.preventDefault()}
           >
-            {key === "ArrowLeft" || key === "ArrowRight" ? <span className="is-rotated">{KEY_LABELS[key]}</span> : KEY_LABELS[key]}
-          </button>
+            {key === "ArrowLeft" || key === "ArrowRight" ? <span className="inline-block rotate-90">{KEY_LABELS[key]}</span> : KEY_LABELS[key]}
+          </Button>
         );
       })}
     </div>

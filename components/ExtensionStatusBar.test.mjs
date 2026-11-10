@@ -56,12 +56,10 @@ test("renders each status as its own cell without identifier keys", () => {
   });
 
   assert.match(html, /aria-label="ponytail memory"/);
-  assert.match(html, /extension-status-shelf/);
-  assert.match(html, /extension-status-line/);
-  assert.match(html, /extension-status-text/);
-  assert.equal(html.match(/class="extension-status-item"/g)?.length, 2);
-  assert.match(html, /extension-status-item"><span>ponytail<\/span><\/span>/);
-  assert.match(html, /<span class="ansi-green-fg">memory<\/span>/);
+  assert.match(html, /role="status"/);
+  assert.equal(html.match(/whitespace-pre rounded-md bg-muted\/60 px-2/g)?.length, 2);
+  assert.match(html, /text-muted-foreground"><span>ponytail<\/span><\/span>/);
+  assert.match(html, /<span style="[^"]*">memory<\/span>/);
   assert.doesNotMatch(html, /05-ponytail|20-memory/);
   assert.doesNotMatch(html, /<button/);
 });
@@ -75,7 +73,7 @@ test("a status with nothing visible to show gets no cell", () => {
     ],
   });
 
-  assert.equal(html.match(/class="extension-status-item"/g)?.length, 1);
+  assert.equal(html.match(/whitespace-pre rounded-md bg-muted\/60 px-2/g)?.length, 1);
   assert.match(html, /aria-label="shown"/);
   assert.equal(renderStatusBar({ statuses: [{ key: "a", text: "" }] }), "");
 });
@@ -90,8 +88,8 @@ test("renders widgets and status text in one footer", () => {
     }],
   });
 
-  assert.match(html, /extension-status-shelf has-widgets has-status/);
-  assert.match(html, /extension-widget-triggers/);
+  assert.match(html, /extension-status-bar/);
+  assert.match(html, /aria-label="Extension widgets"/);
   assert.match(html, /usage/);
   assert.match(html, /connected/);
 });
@@ -122,9 +120,9 @@ test("renders a command status as a button cell between the text cells around it
   assert.match(html, /aria-label="first 🔨 Build last"/);
   assert.match(
     html,
-    /first<\/span><\/span><button[^>]*class="extension-status-item extension-status-command"[^>]*aria-label="🔨 Build \(\/mode toggle\)"[^>]*>🔨 Build<\/button><span class="extension-status-item"><span>last/,
+    /<button[^>]*aria-label="🔨 Build \(\/mode toggle\)"[^>]*>🔨 Build<\/button>/,
   );
-  assert.doesNotMatch(html, /disabled/);
+  assert.doesNotMatch(html, / disabled(?=[\s=>])/);
   // The key is not shown as text.
   assert.doesNotMatch(html, />command:/);
 });
@@ -163,14 +161,15 @@ test("falls back to the command when the status text is empty", () => {
 test("command buttons are disabled while commands are blocked or nothing can send them", () => {
   const statuses = [{ key: "command:/mode toggle", text: "Plan" }];
 
-  assert.match(renderStatusBar({ statuses, onCommand: () => {}, commandsDisabled: true }), /<button[^>]*disabled/);
-  assert.match(renderStatusBar({ statuses }), /<button[^>]*disabled/);
-  assert.doesNotMatch(renderStatusBar({ statuses, onCommand: () => {} }), /<button[^>]*disabled/);
+  assert.match(renderStatusBar({ statuses, onCommand: () => {}, commandsDisabled: true }), /<button[^>]* disabled(?=[\s=>])/);
+  assert.match(renderStatusBar({ statuses }), /<button[^>]* disabled(?=[\s=>])/);
+  assert.doesNotMatch(renderStatusBar({ statuses, onCommand: () => {} }), /<button[^>]* disabled(?=[\s=>])/);
 });
 
 test("clicking a command button sends its command", () => {
   const sent = [];
-  // The component has no hooks, so calling it returns the element tree.
+  // The component has no hooks, so calling it returns the element tree; the
+  // cell is the shadcn Button component, so match by props, not tag name.
   const tree = ExtensionStatusBar({
     statuses: [{ key: "command:/mode toggle", text: "Plan" }],
     onCommand: (command) => sent.push(command),
@@ -179,7 +178,9 @@ test("clicking a command button sends its command", () => {
   const walk = (node) => {
     if (!node || typeof node !== "object") return;
     if (Array.isArray(node)) return node.forEach(walk);
-    if (node.type === "button") buttons.push(node);
+    if (node.props?.onClick && node.props["aria-label"] === "Plan (/mode toggle)") {
+      buttons.push(node);
+    }
     walk(node.props?.children);
   };
   walk(tree);
@@ -189,15 +190,15 @@ test("clicking a command button sends its command", () => {
   assert.deepEqual(sent, ["/mode toggle"]);
 });
 
-test("marks the shelf only when it has a command button", () => {
+test("only a command: status renders a button", () => {
   const plain = renderStatusBar({ statuses: [{ key: "status", text: "connected" }], onCommand: () => {} });
   const withCommand = renderStatusBar({
     statuses: [{ key: "command:/mode toggle", text: "Plan" }],
     onCommand: () => {},
   });
 
-  assert.doesNotMatch(plain, /has-commands/);
-  assert.match(withCommand, /class="extension-status-shelf has-status has-commands"/);
+  assert.doesNotMatch(plain, /<button/);
+  assert.match(withCommand, /<button/);
 });
 
 test("with widgets, the triggers and the status line share one scrolling row below the panel", () => {
@@ -205,27 +206,27 @@ test("with widgets, the triggers and the status line share one scrolling row bel
     statuses: [{ key: "status", text: "connected" }],
     widgets: [{ key: "usage", lines: ["a", "b"], placement: "aboveEditor" }],
   });
-  const panel = html.indexOf("extension-widget-panels");
-  const row = html.indexOf('class="extension-status-row"');
-  const triggers = html.indexOf("extension-widget-triggers");
-  const line = html.indexOf("extension-status-line");
+  const panel = html.indexOf("<section");
+  const row = html.indexOf('class="flex min-w-0 flex-1 items-center gap-1 pl-0.5 pr-1.5"');
+  const triggers = html.indexOf('aria-label="Extension widgets"');
+  const line = html.indexOf('role="status"');
 
   // The expanded panel stays outside the row, so it does not scroll sideways with it.
   assert.ok(panel !== -1 && panel < row, "panel comes before the row");
   assert.ok(row < triggers && triggers < line, "row holds the triggers, then the status line");
-  assert.equal(html.match(/class="extension-status-row"/g)?.length, 1);
+  assert.equal(html.match(/class="flex min-w-0 flex-1 items-center gap-1 pl-0.5 pr-1.5"/g)?.length, 1);
 });
 
 test("without widgets there is no shared row, and without status the row holds only the triggers", () => {
   assert.doesNotMatch(
     renderStatusBar({ statuses: [{ key: "status", text: "connected" }] }),
-    /extension-status-row/,
+    /aria-label="Extension widgets"/,
   );
 
   const html = renderStatusBar({
     statuses: [],
     widgets: [{ key: "usage", lines: ["a"], placement: "aboveEditor" }],
   });
-  assert.match(html, /extension-status-row/);
-  assert.doesNotMatch(html, /extension-status-line/);
+  assert.match(html, /aria-label="Extension widgets"/);
+  assert.doesNotMatch(html, /role="status"/);
 });

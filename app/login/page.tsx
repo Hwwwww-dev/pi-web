@@ -2,6 +2,10 @@
 
 import Image from "next/image";
 import { useState, type FormEvent } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { I18nProvider, useI18n } from "@/hooks/useI18n";
 import { safeLoginDestination } from "@/lib/login-destination";
 
@@ -45,41 +49,48 @@ function LoginForm() {
     }
   };
 
+  // shadcn 登录页：Card 原语承载品牌与表单，安全区内边距留给独立模式（PWA）。
   return (
-    <main className="web-login-page">
-      <div className="web-login-shell">
-        <header className="web-login-brand">
-          <Image src="/icons/apple-touch-icon.png" width={52} height={52} alt="" priority />
-          <div>
-            <h1>Pi Web</h1>
-            <p>{t("auth.prompt")}</p>
+    <main className="grid min-h-dvh place-items-center bg-background p-[max(24px,env(safe-area-inset-top))_max(24px,env(safe-area-inset-right))_max(24px,env(safe-area-inset-bottom))_max(24px,env(safe-area-inset-left))]">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Image src="/icons/apple-touch-icon.png" width={48} height={48} alt="" priority className="shrink-0 rounded-lg" />
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <CardTitle>Pi Web</CardTitle>
+              <CardDescription>{t("auth.prompt")}</CardDescription>
+            </div>
           </div>
-        </header>
-        <form className="web-login-form" onSubmit={submit}>
-          <div className="web-login-composer">
-            <label className="web-login-label" htmlFor="web-login-password">{t("auth.password")}</label>
-            <input
-              id="web-login-password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder={t("auth.password")}
-              autoComplete="current-password"
-              autoFocus
-              required
-              disabled={busy}
-            />
-            <button type="submit" disabled={busy || !password}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        </CardHeader>
+        <CardContent>
+          <form className="flex flex-col gap-3" onSubmit={submit}>
+            <div className="flex flex-col gap-2">
+              <Label className="sr-only" htmlFor="web-login-password">{t("auth.password")}</Label>
+              <Input
+                id="web-login-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder={t("auth.password")}
+                autoComplete="current-password"
+                autoFocus
+                required
+                disabled={busy}
+              />
+            </div>
+            {error && (
+              <p className="text-sm text-destructive" role="alert" aria-live="polite">{error}</p>
+            )}
+            <Button type="submit" className="w-full" disabled={busy || !password}>
+              <svg className="size-4" width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="2" y1="7" x2="11" y2="7" />
                 <polyline points="7.5 3 12 7 7.5 11" />
               </svg>
               {busy ? t("auth.loggingIn") : t("auth.logIn")}
-            </button>
-          </div>
-          <p className="web-login-error" role="alert" aria-live="polite">{error}</p>
-        </form>
-      </div>
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </main>
   );
 }

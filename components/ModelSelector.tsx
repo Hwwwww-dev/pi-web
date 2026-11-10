@@ -1,9 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDownIcon, CircleIcon, CpuIcon, LoaderCircleIcon, StarIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
-import { useIsMobile } from "@/hooks/useIsMobile";
-import { SelectorRow } from "./SelectorRow";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 import { isProviderUsageId } from "@/lib/provider-usage-ids";
 import { primaryUsagePercent, readProviderUsageSnapshot, writeProviderUsageSnapshot, type ProviderUsageSnapshot } from "./ProviderUsageSummary";
 
@@ -47,19 +59,12 @@ interface ModelSelectorProps {
   allOptions?: ModelSelectorOption[] | null;
   /** Set only while `enabledModels` narrows `options`: shows pi's `/model` "scoped | all" row and loads `allOptions`. */
   onShowAll?: () => void;
-}
-
-const MODEL_FILTER_THRESHOLD = 8;
-
-export function filterModelOptions(options: ModelSelectorOption[], query: string): ModelSelectorOption[] {
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  if (!normalizedQuery) return options;
-
-  return options.filter((option) => (
-    `${option.name} ${option.providerName ?? ""} ${option.modelId} ${option.provider}/${option.modelId}`
-      .toLocaleLowerCase()
-      .includes(normalizedQuery)
-  ));
+  /** Extra settings section rendered above the scope row (e.g. thinking level). */
+  headerSlot?: React.ReactNode;
+  /** Extra class for the trigger's leading icon (e.g. a thinking-state tint). */
+  iconClassName?: string;
+  /** Appended to the trigger tooltip after the default text. */
+  titleHint?: string;
 }
 
 /** Groups in first-appearance order; never re-sorts, so a models.json provider keeps its file's order (#783). */
@@ -101,22 +106,16 @@ export function ModelSelector({
   onSetDefault,
   allOptions,
   onShowAll,
+  headerSlot,
+  iconClassName,
+  titleHint,
 }: ModelSelectorProps) {
   const { t } = useI18n();
-  const isMobile = useIsMobile();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [anchorRect, setAnchorRect] = useState<{ top: number; right: number; bottom: number; left: number; width: number } | null>(null);
-  const [filter, setFilter] = useState("");
-  // pi's /model starts on the scope; Tab on the filter or a tap switches.
+  // pi's /model starts on the scope; the segmented row switches.
   const [showAll, setShowAll] = useState(false);
   const locked = disabled || busy;
   const listed = showAll ? allOptions : options;
-  // Options arrive in pi's /model order (orderSelectorModels()); never re-sort
-  // them, or a models.json provider loses the order its file gives (#783).
-  const filteredOptions = filterModelOptions(listed ?? [], filter);
-  const showFilter = Boolean(onShowAll) || options.length > MODEL_FILTER_THRESHOLD;
   const isListed = (list: ModelSelectorOption[] | null | undefined, ref: { provider: string; modelId: string }) => (
     list?.find((option) => option.modelId === ref.modelId && option.provider === ref.provider)
   );
@@ -124,55 +123,27 @@ export function ModelSelector({
     if (!showAll) onShowAll?.();
     setShowAll(!showAll);
   };
-  const modelsByProvider = groupModelOptions(filteredOptions);
+  const modelsByProvider = groupModelOptions(listed ?? []);
 
   const currentName = selectedLabel ?? (value
     ? (isListed(options, value) ?? isListed(allOptions, value))?.name ?? value.modelId
     : emptyLabel ?? (options.length > 0 ? t("chat.selectModel") : t("chat.noModels")));
+  const triggerTitle = (busy
+    ? t("chat.switchingModel")
+    : locked
+      ? currentName
+      : options.length > 0 || onClear
+        ? t("chat.changeModel")
+        : t("chat.noAvailableModels")) + (titleHint ? ` · ${titleHint}` : "");
 
-  useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (
-        rootRef.current && !rootRef.current.contains(event.target as Node)
-        && panelRef.current && !panelRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-        setFilter("");
-      }
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, []);
-
-  // While the picker is open, a phone keyboard shrinks the app height
-  // (useViewportHeight writes the root's style, sometimes with no viewport
-  // event) and moves the trigger; follow it instead of the rect from the tap.
-  useEffect(() => {
-    if (!open) return;
-    const remeasure = () => {
-      const rect = rootRef.current?.querySelector("button")?.getBoundingClientRect();
-      // A new object even for an unmoved trigger: the panel also reads the
-      // visual viewport, which may have changed alone.
-      if (rect?.height) setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
-    };
-    const viewport = window.visualViewport;
-    const rootObserver = new MutationObserver(remeasure);
-    rootObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "data-keyboard-open"] });
-    window.addEventListener("resize", remeasure);
-    viewport?.addEventListener("resize", remeasure);
-    viewport?.addEventListener("scroll", remeasure);
-    return () => {
-      rootObserver.disconnect();
-      window.removeEventListener("resize", remeasure);
-      viewport?.removeEventListener("resize", remeasure);
-      viewport?.removeEventListener("scroll", remeasure);
-    };
-  }, [open]);
+  const handleOpenChange = (next: boolean) => {
+    if (next) setShowAll(false);
+    setOpen(next);
+  };
 
   useEffect(() => {
     if (!locked) return;
     setOpen(false);
-    setFilter("");
   }, [locked]);
 
   // Provider usage badges: the selector shows each provider's headline quota
@@ -221,272 +192,193 @@ export function ModelSelector({
     return () => { cancelled = true; };
   }, [open]);
 
-  const buttonStyle: CSSProperties = variant === "field"
-    ? {
-        display: "flex",
-        alignItems: "center",
-        gap: 7,
-        width: "100%",
-        minWidth: 0,
-        height: 34,
-        padding: "0 9px",
-        overflow: "hidden",
-        border: "1px solid var(--border)",
-        borderRadius: 5,
-        background: locked ? "var(--bg-panel)" : "var(--bg)",
-        color: locked ? "var(--text-dim)" : "var(--text)",
-        cursor: locked ? "default" : "pointer",
-        fontSize: 12,
-        textAlign: "left",
-      }
-    : {
-        justifyContent: isMobile ? "flex-start" : undefined,
-        // Height, padding, radius and type size come from the composer-chip
-        // class: one box recipe shared with every other control in the row.
-        width: isMobile ? "100%" : undefined,
-        maxWidth: isMobile ? "100%" : 260,
-        overflow: "hidden",
-        cursor: locked ? "not-allowed" : "pointer",
-        opacity: locked ? 0.5 : 1,
-      };
-
   const choose = (option: ModelSelectorOption) => {
     const active = option.modelId === value?.modelId && option.provider === value?.provider;
-    setOpen(false);
-    setFilter("");
     if (!active || isAutoSelection) onChange(option.provider, option.modelId);
     else onReselect?.(option.provider, option.modelId);
   };
 
   const saveDefault = (option: ModelSelectorOption) => {
     setOpen(false);
-    setFilter("");
     onSetDefault?.(option.provider, option.modelId);
   };
 
-  return (
-    <div
-      ref={rootRef}
-      className={`model-selector is-${variant}${locked ? " is-disabled" : ""}`}
-      style={{ position: "relative", width: variant === "field" ? "100%" : undefined, minWidth: 0, flex: variant === "toolbar" && isMobile ? "1 1 auto" : undefined }}
-      onKeyDown={(event) => {
-        if (event.key !== "Escape" || !open) return;
-        event.preventDefault();
-        event.stopPropagation();
-        setFilter("");
-        setOpen(false);
-      }}
+  // A star button nested in a menu item must not count as choosing the model:
+  // Radix activates the item from the pointer events bubbling out of it.
+  const holdStarPointer = (event: React.SyntheticEvent) => {
+    event.stopPropagation();
+  };
+
+  const trigger = variant === "toolbar" ? (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      aria-label={ariaLabel}
+      aria-haspopup="menu"
+      aria-busy={busy || undefined}
+      disabled={locked}
+      title={triggerTitle}
+      className="max-w-[260px] gap-1.5 overflow-hidden px-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground max-md:max-w-full disabled:pointer-events-auto disabled:cursor-not-allowed"
     >
-      <button
-        type="button"
-        className={variant === "toolbar" ? "composer-chip" : undefined}
-        aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-busy={busy || undefined}
-        disabled={locked}
-        title={busy ? t("chat.switchingModel") : locked ? currentName : options.length > 0 || onClear ? t("chat.changeModel") : t("chat.noAvailableModels")}
-        style={buttonStyle}
-        onClick={(event) => {
-          const rect = event.currentTarget.getBoundingClientRect();
-          setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
-          setOpen((current) => {
-            if (current) setFilter("");
-            else setShowAll(false);
-            return !current;
-          });
-        }}
-        onMouseEnter={variant === "field" ? (event) => {
-          if (locked) return;
-          event.currentTarget.style.background = "var(--bg-hover)";
-          event.currentTarget.style.color = "var(--text)";
-        } : undefined}
-        onMouseLeave={variant === "field" ? (event) => {
-          if (locked) {
-            event.currentTarget.style.background = "var(--bg-panel)";
-            event.currentTarget.style.color = "var(--text-dim)";
-            return;
-          }
-          event.currentTarget.style.background = open ? "var(--bg-hover)" : "var(--bg)";
-          event.currentTarget.style.color = "var(--text)";
-        } : undefined}
-      >
-        {busy ? (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" style={{ animation: "spin 0.8s linear infinite", flexShrink: 0 }} aria-hidden="true">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-          </svg>
-        ) : (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-            <rect x="4" y="4" width="16" height="16" rx="2" />
-            <rect x="9" y="9" width="6" height="6" />
-            <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
-            <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
-            <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
-            <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
-          </svg>
-        )}
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentName}</span>
-        {variant === "field" && (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, color: "var(--text-dim)" }}>
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        )}
-      </button>
+      {busy
+        ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
+        : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
+      <span className="min-w-0 flex-1 truncate">{currentName}</span>
+      <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden="true" />
+    </Button>
+  ) : (
+    <Button
+      type="button"
+      variant="outline"
+      aria-label={ariaLabel}
+      aria-haspopup="menu"
+      aria-busy={busy || undefined}
+      disabled={locked}
+      title={triggerTitle}
+      className={cn(
+        "h-[34px] w-full min-w-0 justify-between gap-[7px] overflow-hidden px-[9px] text-left text-xs font-normal",
+        locked ? "bg-card text-muted-foreground" : "text-foreground hover:bg-secondary",
+      )}
+    >
+      {busy
+        ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
+        : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
+      <span className="min-w-0 flex-1 truncate">{currentName}</span>
+      <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden="true" />
+    </Button>
+  );
 
-      {open && anchorRect && (() => {
-        // Fixed coordinates belong to the layout viewport, which a phone
-        // keyboard does not shrink: measure from the visible part's top and
-        // hang an upward panel from `top` rather than from `bottom`.
-        const viewportTop = window.visualViewport?.offsetTop ?? 0;
-        const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-        const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
-        // A trigger the keyboard covers (a Settings field) still gets a
-        // panel ending above the keyboard.
-        const aboveEnd = Math.min(anchorRect.top - 6, viewportTop + viewportHeight - 8);
-        const spaceAbove = aboveEnd - viewportTop - 8;
-        const spaceBelow = viewportTop + viewportHeight - anchorRect.bottom - 6 - 8;
-        const openAbove = placement === "up" || spaceAbove > spaceBelow;
-        const maxHeight = Math.max(120, Math.min(openAbove ? spaceAbove : spaceBelow, viewportHeight * 0.6));
-        const verticalPosition: CSSProperties = openAbove
-          ? { top: aboveEnd, transform: "translateY(-100%)" }
-          : { top: anchorRect.bottom + 6 };
-        const horizontalPosition: CSSProperties = isMobile
-          ? { left: 8, right: 8, maxWidth: "calc(100vw - 16px)" }
-          : { left: anchorRect.left, width: "max-content", minWidth: anchorRect.width, maxWidth: Math.max(anchorRect.width, viewportWidth - anchorRect.left - 8) };
-
-        return (
-          <div
-            ref={panelRef}
-            role="listbox"
-            aria-label={ariaLabel}
-            style={{
-              position: "fixed",
-              ...verticalPosition,
-              ...horizontalPosition,
-              zIndex: 500,
-              display: "flex",
-              flexDirection: "column",
-              maxHeight,
-              overflow: "hidden",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              background: "var(--bg)",
-              boxShadow: openAbove ? "0 -4px 16px rgba(0,0,0,0.10)" : "0 4px 16px rgba(0,0,0,0.10)",
-            }}
-          >
-            {onShowAll && (
-              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 8px 0", fontSize: 11 }}>
-                {[false, true].map((all) => (
-                  <button
-                    key={String(all)}
-                    type="button"
-                    aria-pressed={showAll === all}
-                    onClick={() => { if (showAll !== all) switchScope(); }}
-                    style={{
-                      padding: "2px 7px",
-                      border: "1px solid",
-                      borderColor: showAll === all ? "var(--border)" : "transparent",
-                      borderRadius: 4,
-                      background: showAll === all ? "var(--bg-hover)" : "none",
-                      color: showAll === all ? "var(--text)" : "var(--text-muted)",
-                      cursor: "pointer",
-                      fontSize: 11,
-                    }}
-                  >
-                    {t(all ? "chat.modelScopeAll" : "chat.modelScopeScoped")}
-                  </button>
-                ))}
-                {!isMobile && <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 10 }}>Tab</span>}
-              </div>
-            )}
-            {showFilter && (
-              <div style={{ flexShrink: 0, padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>
-                <input
-                  value={filter}
-                  onChange={(event) => setFilter(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (!onShowAll || event.key !== "Tab") return;
-                    event.preventDefault();
-                    switchScope();
-                  }}
-                  placeholder={t("chat.filterModels")}
-                  aria-label={t("chat.filterModels")}
-                  // On phones, focusing the filter opens the on-screen keyboard,
-                  // which shrinks the viewport and pushes the list off-screen
-                  // before the user has decided to filter. Tap to filter instead.
-                  autoFocus={!isMobile}
-                  autoComplete="off"
-                  spellCheck={false}
-                  style={{
-                    boxSizing: "border-box",
-                    width: "100%",
-                    minWidth: isMobile ? 0 : 220,
-                    padding: "5px 8px",
-                    border: "1px solid var(--border)",
-                    borderRadius: 5,
-                    outline: "none",
-                    background: "var(--bg)",
-                    color: "var(--text)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
-                  }}
-                />
-              </div>
-            )}
-            <div style={{ minHeight: 0, overflowY: "auto" }}>
-              {onClear && !filter.trim() && (
-                <SelectorRow active={!value} gutter={Boolean(onSetDefault)} onSelect={() => {
-                  setOpen(false);
-                  setFilter("");
-                  onClear();
-                }}>
-                  <OptionLabel label={emptyLabel ?? t("i18n.default")} />
-                </SelectorRow>
+  return (
+    <div className={cn(
+      "model-selector min-w-0",
+      variant === "field" ? "w-full" : "max-md:flex-[1_1_auto]",
+    )}>
+      <DropdownMenu open={open} onOpenChange={handleOpenChange}>
+        <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+        <DropdownMenuContent
+          side={placement === "up" ? "top" : "bottom"}
+          sideOffset={6}
+          align="start"
+          collisionPadding={8}
+          aria-label={ariaLabel}
+          className="max-h-(--radix-dropdown-menu-content-available-height) min-w-(--radix-dropdown-menu-trigger-width) max-w-(--radix-dropdown-menu-content-available-width) overflow-y-auto scrollbar-thin"
+        >
+          {headerSlot && (
+            <div className="sticky top-0 z-10 border-b bg-popover px-1.5 pb-1.5 pt-1">{headerSlot}</div>
+          )}
+          {onShowAll && (
+            <div className="flex items-center gap-1 px-2 pb-0 pt-1.5 text-xs">
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                spacing={0}
+                value={showAll ? "all" : "scoped"}
+                onValueChange={(next) => { if (next && next !== (showAll ? "all" : "scoped")) switchScope(); }}
+              >
+                <ToggleGroupItem value="scoped" className="h-6 px-[7px] py-0.5 text-xs">
+                  {t("chat.modelScopeScoped")}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="all" className="h-6 px-[7px] py-0.5 text-xs">
+                  {t("chat.modelScopeAll")}
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          )}
+          {onClear && (
+            <DropdownMenuItem
+              onSelect={() => {
+                setOpen(false);
+                onClear();
+              }}
+              className={cn(
+                "gap-2 whitespace-nowrap py-[7px] text-xs",
+                onSetDefault && "pr-9",
+                !value ? "font-semibold text-foreground" : "font-normal text-muted-foreground",
               )}
-              {modelsByProvider.length === 0 ? (
-                <div style={{ padding: "8px 12px", color: "var(--text-dim)", fontSize: 12, whiteSpace: "nowrap" }}>
-                  {!listed ? t("agents.modelsLoading") : filter.trim() ? t("chat.noMatchingModels") : t("chat.noAvailableModels")}
-                </div>
-              ) : modelsByProvider.map((group, index) => (
-                <div key={group.provider}>
-                  {(modelsByProvider.length > 1 || usagePercent[group.provider] !== undefined) && (
-                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "6px 12px 4px", borderTop: index > 0 || onClear ? "1px solid var(--border)" : "none", color: "var(--text-dim)", fontSize: 10, fontWeight: 600, letterSpacing: 0, textTransform: "uppercase" }}>
-                      {modelsByProvider.length > 1 && <span title={group.providerName === group.provider ? undefined : group.provider} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textTransform: group.providerName === group.provider ? "uppercase" : "none" }}>{group.providerName}</span>}
-                      {usagePercent[group.provider] !== undefined && (
-                        <span title={t("providerUsage.usage")} style={{ flexShrink: 0, fontWeight: 500, textTransform: "none", letterSpacing: 0, color: usagePercent[group.provider] > 90 ? "#f87171" : usagePercent[group.provider] > 70 ? "#fbbf24" : "var(--text-dim)" }}>
-                          {usagePercent[group.provider]}%
+            >
+              {!value ? <CircleIcon className="size-2 fill-current" /> : <span className="size-2.5 shrink-0" />}
+              <span title={emptyLabel ?? t("i18n.default")} className="min-w-0 truncate">{emptyLabel ?? t("i18n.default")}</span>
+            </DropdownMenuItem>
+          )}
+          {modelsByProvider.length === 0 && (
+            <div className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
+              {!listed ? t("agents.modelsLoading") : t("chat.noAvailableModels")}
+            </div>
+          )}
+          {modelsByProvider.map((group) => (
+            <DropdownMenuGroup key={group.provider}>
+              <DropdownMenuLabel className="flex w-full items-baseline justify-between gap-2 py-1 font-medium">
+                {modelsByProvider.length > 1 && (
+                  <span title={group.providerName === group.provider ? undefined : group.provider} className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">{group.providerName}</span>
+                )}
+                {usagePercent[group.provider] !== undefined && (
+                  <span
+                    title={t("providerUsage.usage")}
+                    className={cn(
+                      "shrink-0 font-medium tracking-normal",
+                      usagePercent[group.provider] > 90 ? "text-destructive" : usagePercent[group.provider] > 70 ? "text-warning" : "text-muted-foreground",
+                    )}
+                  >
+                    {usagePercent[group.provider]}%
+                  </span>
+                )}
+              </DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={value ? `${value.provider}:${value.modelId}` : undefined}>
+                {group.options.map((option) => {
+                  // The default is saved only from the scope: PUT /api/models/default refuses others.
+                  const star = onSetDefault && (!showAll || isListed(options, option)) ? {
+                    isDefault: option.modelId === defaultValue?.modelId && option.provider === defaultValue?.provider,
+                  } : null;
+                  return (
+                    <DropdownMenuRadioItem
+                      key={`${option.provider}:${option.modelId}`}
+                      value={`${option.provider}:${option.modelId}`}
+                      onSelect={() => choose(option)}
+                      className={cn(
+                        "group/item gap-2 whitespace-nowrap py-[7px] text-xs",
+                        onSetDefault && "pr-9",
+                        star?.isDefault ? "font-semibold text-foreground" : "font-normal text-muted-foreground",
+                      )}
+                    >
+                      <span title={option.name} className="min-w-0 truncate">{option.name}</span>
+                      {star?.isDefault && (
+                        <span
+                          role="img"
+                          aria-label={t("chat.defaultModel")}
+                          title={t("chat.defaultModel")}
+                          className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center text-muted-foreground"
+                        >
+                          <StarIcon size={10} fill="currentColor" />
                         </span>
                       )}
-                    </div>
-                  )}
-                  {group.options.map((option) => {
-                    return (
-                      <SelectorRow
-                        key={`${option.provider}:${option.modelId}`}
-                        active={option.modelId === value?.modelId && option.provider === value?.provider}
-                        onSelect={() => choose(option)}
-                        // The default is saved only from the scope: PUT /api/models/default refuses others.
-                        star={onSetDefault && (!showAll || isListed(options, option)) ? {
-                          isDefault: option.modelId === defaultValue?.modelId && option.provider === defaultValue?.provider,
-                          saveLabel: t("chat.saveDefaultModel"),
-                          defaultLabel: t("chat.defaultModel"),
-                          onSave: () => saveDefault(option),
-                        } : undefined}
-                      >
-                        <OptionLabel label={option.name} />
-                      </SelectorRow>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+                      {star && !star.isDefault && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon-xs"
+                          title={t("chat.saveDefaultModel")}
+                          aria-label={t("chat.saveDefaultModel")}
+                          onPointerDown={holdStarPointer}
+                          onPointerUp={holdStarPointer}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            saveDefault(option);
+                          }}
+                          className="absolute top-1/2 right-1.5 size-6 -translate-y-1/2 p-0 text-muted-foreground opacity-0 transition-opacity group-hover/item:opacity-100 group-focus-within/item:opacity-100 focus-visible:opacity-100 hover:border-primary/35 hover:bg-accent hover:text-primary max-md:opacity-100"
+                        >
+                          <StarIcon className="size-3" />
+                        </Button>
+                      )}
+                    </DropdownMenuRadioItem>
+                  );
+                })}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuGroup>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
-}
-
-function OptionLabel({ label }: { label: string }) {
-  return <span title={label} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>;
 }

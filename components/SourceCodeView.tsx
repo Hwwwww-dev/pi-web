@@ -30,10 +30,9 @@ function SourceCodeRenderer({ rows, stylesheet, useInlineStyles, wrapLines }: So
 
     return (
       <span
-        className="file-source-line"
+        className="file-source-line flex min-w-full"
         data-line-number={lineIndex + 1}
         key={`source-line-${lineIndex}`}
-        style={{ display: "flex", minWidth: "100%" }}
       >
         {lineNumberNode && renderSyntaxNode({
           node: lineNumberNode,
@@ -42,13 +41,7 @@ function SourceCodeRenderer({ rows, stylesheet, useInlineStyles, wrapLines }: So
           key: `source-line-number-${lineIndex}`,
         })}
         <span
-          className="file-source-line-content"
-          style={{
-            flex: "1 1 auto",
-            minWidth: 0,
-            overflowWrap: wrapLines ? "anywhere" : "normal",
-            whiteSpace: wrapLines ? "pre-wrap" : "pre",
-          }}
+          className={`file-source-line-content min-w-0 flex-auto ${wrapLines ? "wrap-anywhere whitespace-pre-wrap" : "whitespace-pre"}`}
         >
           {contentNodes.map((node, tokenIndex) => renderSyntaxNode({
             node,
@@ -91,6 +84,8 @@ export function SourceCodeView({ content, language, wrapLines }: {
         language={language === "text" ? "plaintext" : language}
         style={isDark ? vscDarkPlus : vs}
         showLineNumbers
+        // react-syntax-highlighter configures its elements through inline-style
+        // props (lineNumberStyle/customStyle/codeTagProps) — that API stays.
         lineNumberStyle={{
           ...FILE_PINNED_LINE_NUMBER_STYLE,
         }}
@@ -98,7 +93,7 @@ export function SourceCodeView({ content, language, wrapLines }: {
           margin: 0,
           padding: 0,
           border: 0,
-          background: "var(--bg)",
+          background: "var(--background)",
           ...FILE_CODE_STYLE,
           width: wrapLines ? "100%" : "max-content",
           minWidth: "100%",
@@ -124,22 +119,17 @@ export function SourceCodeView({ content, language, wrapLines }: {
   const lightweightSourceLines = useMemo(
     () => useLightweightSource ? sourceLines.map((line, lineIndex) => (
       <span
-        className="file-source-line"
+        className="file-source-line flex min-w-full"
         data-line-number={lineIndex + 1}
         key={`source-line-${lineIndex}`}
-        style={{ display: "flex", minWidth: "100%" }}
       >
+        {/* The gutter style is the shared DiffView constant (FileViewer's test
+            reads it off this element as a literal style). */}
         <span aria-hidden="true" style={FILE_LINE_NUMBER_STYLE}>
           {lineIndex + 1}
         </span>
         <span
-          className="file-source-line-content"
-          style={{
-            flex: "1 1 auto",
-            minWidth: 0,
-            overflowWrap: wrapLines ? "anywhere" : "normal",
-            whiteSpace: wrapLines ? "pre-wrap" : "pre",
-          }}
+          className={`file-source-line-content min-w-0 flex-auto ${wrapLines ? "wrap-anywhere whitespace-pre-wrap" : "whitespace-pre"}`}
         >
           {line}
         </span>
@@ -151,15 +141,11 @@ export function SourceCodeView({ content, language, wrapLines }: {
   if (!useLightweightSource) return highlightedSource;
   if (!deferredHighlightReady) {
     return (
+      // FILE_CODE_STYLE is the shared code typography (DiffView constant);
+      // the sizing wraps it as plain utilities.
       <div
-        className="file-source-view is-lightweight"
-        style={{
-          width: wrapLines ? "100%" : "max-content",
-          minWidth: "100%",
-          minHeight: "100%",
-          background: "var(--bg)",
-          ...FILE_CODE_STYLE,
-        }}
+        className={`file-source-view is-lightweight min-h-full min-w-full bg-background ${wrapLines ? "w-full" : "w-max"}`}
+        style={FILE_CODE_STYLE}
       >
         {lightweightSourceLines}
       </div>

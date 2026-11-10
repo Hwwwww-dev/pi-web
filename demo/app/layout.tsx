@@ -1,14 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
+import { CHUNK_RECOVERY_SCRIPT } from "@/lib/chunk-recovery";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import { demoAssetPath } from "@/mock/base-path";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import "./settings.css";
+import "./sidebar.css";
 
-const notoSansMono = Noto_Sans_Mono({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-noto-mono",
+const geistSans = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist-sans",
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
@@ -34,7 +42,12 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    // No status-bar style on purpose: iOS 27 draws an unconditional Liquid
+    // Glass progressive blur over the top edge of installed PWAs when a
+    // status-bar-style meta is present (the iOS 26 "black" bar workaround
+    // no longer suppresses it). Apple's guidance (WebKit #317153): omit the
+    // key entirely — the bar then matches the page color; viewport-fit=cover
+    // stays so env(safe-area-inset-*) keeps its values.
     title: "Pi Web",
   },
   formatDetection: {
@@ -59,12 +72,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" translate="no" className={`${notoSansMono.variable} notranslate`} suppressHydrationWarning>
+    <html lang="en" translate="no" className={`${geistSans.variable} ${geistMono.variable} notranslate`} suppressHydrationWarning>
       <head>
         <meta name="google" content="notranslate" />
         <script
           dangerouslySetInnerHTML={{
             __html: THEME_INIT_SCRIPT,
+          }}
+        />
+        {/* Inline so a page bundle that this deployment already replaced can
+            still be recovered: reload with the new chunk map instead of
+            staying stuck on ChunkLoadError. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: CHUNK_RECOVERY_SCRIPT,
           }}
         />
       </head>

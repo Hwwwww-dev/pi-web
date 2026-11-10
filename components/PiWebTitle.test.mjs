@@ -22,13 +22,6 @@ const { getLocalePlugin } = await jiti.import("@/lib/i18n/registry.ts");
 const css = await readFile(new URL("../app/sidebar.css", import.meta.url), "utf8");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
-/** A rule's declarations (its first rule for the selector). */
-function rule(selector) {
-  const start = css.indexOf(`\n${selector} {`);
-  assert.notEqual(start, -1, `${selector} not found`);
-  return css.slice(css.indexOf("{", start) + 1, css.indexOf("}", start));
-}
-
 /** A fixed sequence for Math.random's place. */
 function sequence(...values) {
   let index = 0;
@@ -70,8 +63,11 @@ test("the brand is a button named for what its click shows, with the brand's tex
   const html = renderToStaticMarkup(React.createElement(I18nProvider, null, React.createElement(PiWebTitle)));
   const app = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0";
   const pi = process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0";
-  assert.equal(html, `<button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web ${app}, pi ${pi}">Pi Web</button>`);
-  assert.doesNotMatch(html, /style=/, "no inline styles: its look is app/sidebar.css's");
+  assert.match(
+    html,
+    new RegExp(`<button [^>]*class="[^"]*sidebar-brand[^"]*"[^>]*aria-label="Pi Web, versions: web ${app}, pi ${pi}"[^>]*>Pi Web</button>`),
+  );
+  assert.doesNotMatch(html, /style=/, "no inline styles: its look is its own classes");
   // In every language, with the visible name in it.
   for (const locale of ["en", "zh-CN", "zh-TW"]) {
     const label = getLocalePlugin(locale).messages["sidebar.brandLabel"];
@@ -81,20 +77,25 @@ test("the brand is a button named for what its click shows, with the brand's tex
 });
 
 test("the brand's text sits in the chevron column and is never cut at the sidebar's minimum", async () => {
-  const brand = rule(".sidebar-brand");
-  // Its text in the chevron column: the tree's 6px inset and a toggle's 5px.
-  const [marginLeft] = brand.match(/margin: 0 0 0 (\d+)px;/).slice(1).map(Number);
-  const [paddingLeft] = brand.match(/padding: \d+px (\d+)px;/).slice(1).map(Number);
-  assert.equal(marginLeft + paddingLeft, 6 + 5);
+  // The brand's look is its own classes; app/sidebar.css keeps the fit
+  // states only.
+  const source = await readFile(new URL("./PiWebTitle.tsx", import.meta.url), "utf8");
+  const brand = source.match(/className=\{`sidebar-brand ([^`]+)`\}/)?.[1] ?? "";
+  assert.ok(brand, "the brand's classes are in the component");
+  // Its text in the chevron column: the tree's 6px inset and a toggle's 5px
+  // (the 7px margin, the 4px padding).
+  assert.match(brand, /(?:^|\s)ml-\[7px\](?:\s|$)/);
+  assert.match(brand, /(?:^|\s)px-1(?:\s|$)/);
+  assert.match(brand, /(?:^|\s)py-0\.5(?:\s|$)/);
 
   // At the sidebar's minimum (its line off), beside New's + and the search
   // (36px cells each), "Pi Web" fits in its 15px code type (0.6em a
   // character), and the versions in the 11px of data-fit 2.
-  assert.match(brand, /(?:^|\s)font-family: var\(--font-mono\);/);
-  assert.match(brand, /(?:^|\s)font-size: 15px;/);
+  assert.match(brand, /(?:^|\s)font-mono(?:\s|$)/);
+  assert.match(brand, /(?:^|\s)text-\[15px\](?:\s|$)/);
   assert.match(css, /\.sidebar-header\[data-fit="2"\] \.sidebar-brand \{\s*font-size: 11px;\s*\}/);
   const room = SIDEBAR_MIN_WIDTH - 1 - 36 - 36;
-  const box = (text, fontSize) => marginLeft + 2 * paddingLeft + text.length * 0.6 * fontSize;
+  const box = (text, fontSize) => 7 + 2 * 4 + text.length * 0.6 * fontSize;
   assert.ok(box(BRAND_TEXT, 15) <= room, "the brand at 15px");
   const piPackage = JSON.parse(await readFile(new URL("../node_modules/@earendil-works/pi-coding-agent/package.json", import.meta.url), "utf8"));
   // Today's versions, with room for a longer one.

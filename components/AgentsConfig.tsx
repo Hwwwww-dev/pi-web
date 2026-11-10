@@ -1,14 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
-import { useIsMobile } from "@/hooks/useIsMobile";
+import { Badge } from "@/components/ui/badge";
 import type { ProjectTrustStatus, SubagentProfilesResponse, SubagentSettingsResponse } from "@/lib/api-types";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { displayPathWithin, shortenPath } from "@/lib/display-path";
 import type { ModelsData } from "@/lib/models-cache";
 import { isSubagentProfileOverridden } from "@/lib/subagent-profile-precedence";
 import { PathLabel } from "./PathLabel";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
+import { Checkbox } from "./ui/checkbox";
+import { Input } from "./ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Textarea } from "./ui/textarea";
 import type { SubagentProfile, SubagentScope, SubagentWritableScope } from "@/lib/subagents";
 import {
   getLastSettingsSelection,
@@ -16,6 +36,7 @@ import {
 } from "@/lib/settings-navigation";
 import {
   ConfigButton,
+  ConfigCard,
   ConfigDetail,
   ConfigDetailActions,
   ConfigDetailHeader,
@@ -34,7 +55,6 @@ import {
   ConfigSidebarList,
   ConfigSidebarText,
   ConfigSplitView,
-  ConfigStatusDot,
   ConfigSwitch,
 } from "./SettingsUi";
 import { ModelSelector } from "./ModelSelector";
@@ -42,6 +62,8 @@ import { projectTrustReloadKey } from "./settings-ui-helpers";
 
 const TOOL_OPTIONS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 const THINKING_OPTIONS = ["", "off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+// Radix Select 的 Item 不接受空字符串，「未设置」以 sentinel 承载。
+const THINKING_NONE = "__none__";
 
 type EditableProfile = Omit<SubagentProfile, "scope" | "filePath">;
 type EditorMode = "view" | "edit" | "create";
@@ -62,24 +84,13 @@ const EMPTY_PROFILE: EditableProfile = {
   enabled: true,
 };
 
-const inputStyle: CSSProperties = {
-  width: "100%",
-  minWidth: 0,
-  height: 34,
-  padding: "0 9px",
-  border: "1px solid var(--border)",
-  borderRadius: 5,
-  background: "var(--bg)",
-  color: "var(--text)",
-  fontSize: 12,
-  outline: "none",
-};
-
-const disabledInputStyle: CSSProperties = {
-  background: "var(--bg-panel)",
-  color: "var(--text-dim)",
-  cursor: "default",
-};
+/**
+ * 各控件共享的观感：禁用时退到面板底色并弱化文字；高度由每个控件自带
+ * （字段 34px，提示词 textarea 更高）。边框、焦点环、禁用手势交给 ui/
+ * 原语，这里只留需要与现状对齐的项（含 dark 与 md 断点压过原语的默认值）。
+ */
+const controlClassName =
+  "min-w-0 rounded-md border border-border bg-background dark:bg-background px-[9px] text-xs md:text-xs text-foreground disabled:bg-card disabled:text-muted-foreground disabled:cursor-default";
 
 function editableProfile(profile: SubagentProfile): EditableProfile {
   return {
@@ -159,8 +170,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Toggle({ checked, disabled, label, onChange }: { checked: boolean; disabled: boolean; label: string; onChange: (checked: boolean) => void }) {
   return (
-    <label style={{ display: "flex", alignItems: "center", gap: 7, color: disabled ? "var(--text-dim)" : "var(--text-muted)", fontSize: 12, cursor: disabled ? "default" : "pointer" }}>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
+    // label 包裹 Checkbox：点击文字仍转发为一次切换。
+    <label className={disabled
+      ? "flex cursor-default items-center gap-[7px] text-xs text-muted-foreground"
+      : "flex cursor-pointer items-center gap-[7px] text-xs text-muted-foreground"}
+    >
+      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(next) => onChange(next === true)} />
       {label}
     </label>
   );
@@ -182,7 +197,6 @@ export function AgentsConfig({
   /** The page's trust status for `cwd`; a new decision loads the model list again. */
   trust?: ProjectTrustStatus | null;
 }) {
-  const isMobile = useIsMobile();
   const { t } = useI18n();
   const [profiles, setProfiles] = useState<SubagentProfile[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelsData["modelList"]>([]);
@@ -204,6 +218,7 @@ export function AgentsConfig({
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [reloadNeeded, setReloadNeeded] = useState(false);
   const [reloading, setReloading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const selected = useMemo(
     () => profiles.find((profile) => profileKey(profile) === selectedKey) ?? null,
@@ -362,7 +377,7 @@ export function AgentsConfig({
 
   const remove = async () => {
     if (!selected || !isWritableScope(selected.scope)) return;
-    if (!window.confirm(t("agents.deleteConfirm", { name: selected.displayName }))) return;
+    setDeleteConfirmOpen(false);
     setSaving(true);
     setError(null);
     try {
@@ -403,7 +418,6 @@ export function AgentsConfig({
       ? { provider: "", modelId: draftModelBase }
       : { provider: draftModelBase.slice(0, separator), modelId: draftModelBase.slice(separator + 1) };
   })();
-  const controlStyle = disabled ? { ...inputStyle, ...disabledInputStyle } : inputStyle;
   const switchDisabled = creating
     ? disabled
     : !selected || !isTogglableScope(selected.scope) || saving || toggling;
@@ -495,50 +509,56 @@ export function AgentsConfig({
 
   return (
     <ConfigPanelShell embedded={embedded} title={t("common.agents")} subtitle={shortenPath(cwd)} closeLabel={t("agents.close")} onClose={onClose}>
-      <div className="agents-feature-setting">
-        <div className="agents-feature-copy">
-          <strong>{t("agents.builtInTitle")}</strong>
-          <span>{t("agents.builtInDescription")}</span>
-          {reloadNeeded && <span role="status" className="agents-feature-reload-notice">{t("agents.reloadRequired")}</span>}
-        </div>
-        <div className="agents-feature-actions">
-          {reloadNeeded && sessionId && (
-            <ConfigButton size="small" onClick={() => void reloadSession()} disabled={reloading || settingsSaving}>
-              {reloading ? t("agents.reloading") : t("agents.reloadSession")}
-            </ConfigButton>
-          )}
-          <label className="agents-concurrency-control" title={t("agents.maxConcurrentDescription")}>
-            <span>{t("agents.maxConcurrent")}</span>
-            <input
-              aria-label={t("agents.maxConcurrent")}
-              type="number"
-              min={1}
-              max={32}
-              value={maxConcurrent}
-              disabled={settingsLoading || settingsSaving}
-              onChange={(event) => setMaxConcurrent(Number(event.target.value))}
-              onBlur={() => void updateMaxConcurrent(maxConcurrent)}
+      {/* The built-in switch group as a card (§7.3); the class stays the hook
+          the phone-level hide rule targets. */}
+      <ConfigCard
+        className="agents-feature-setting mx-4 mt-4"
+        title={t("agents.builtInTitle")}
+        description={t("agents.builtInDescription")}
+        actions={
+          <>
+            {reloadNeeded && sessionId && (
+              <ConfigButton size="small" onClick={() => void reloadSession()} disabled={reloading || settingsSaving}>
+                {reloading ? t("agents.reloading") : t("agents.reloadSession")}
+              </ConfigButton>
+            )}
+            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground" title={t("agents.maxConcurrentDescription")}>
+              <span>{t("agents.maxConcurrent")}</span>
+              <Input
+                aria-label={t("agents.maxConcurrent")}
+                type="number"
+                min={1}
+                max={32}
+                value={maxConcurrent}
+                disabled={settingsLoading || settingsSaving}
+                onChange={(event) => setMaxConcurrent(Number(event.target.value))}
+                onBlur={() => void updateMaxConcurrent(maxConcurrent)}
+                className="h-7 w-[52px] px-1.5 text-center"
+              />
+            </label>
+            <ConfigSwitch
+              checked={builtInEnabled}
+              disabled={settingsLoading || reloading}
+              loading={settingsSaving}
+              label={t("agents.builtInTitle")}
+              onChange={(enabled) => void toggleBuiltInSubagents(enabled)}
             />
-          </label>
-          <ConfigSwitch
-            checked={builtInEnabled}
-            disabled={settingsLoading || reloading}
-            loading={settingsSaving}
-            label={t("agents.builtInTitle")}
-            onChange={(enabled) => void toggleBuiltInSubagents(enabled)}
-          />
-        </div>
-      </div>
+          </>
+        }
+        footer={reloadNeeded ? (
+          <span role="status" className="text-warning">{t("agents.reloadRequired")}</span>
+        ) : undefined}
+      />
       <ConfigSplitView>
         <ConfigSidebar>
           <ConfigSidebarList>
               {loading ? (
-                <div style={{ padding: 10, color: "var(--text-dim)", fontSize: 12 }}>{t("agents.loading")}</div>
+                <div className="p-2.5 text-xs text-muted-foreground">{t("agents.loading")}</div>
               ) : (["project", "global", "workspace", "builtin"] as const).map((scope) => {
                 const scopedProfiles = profiles.filter((profile) => profile.scope === scope);
                 if (scopedProfiles.length === 0) return null;
                 return (
-                  <div key={scope} className="config-sidebar-group">
+                  <div key={scope} className="flex flex-col gap-1 pb-1.5">
                     <ConfigSidebarGroupLabel>{t(`agents.scope.${scope}`)}</ConfigSidebarGroupLabel>
                     {scopedProfiles.map((profile) => {
                       const overridden = isSubagentProfileOverridden(profile, profiles);
@@ -548,9 +568,13 @@ export function AgentsConfig({
                           active={selectedKey === profileKey(profile) && !creating}
                           onClick={() => selectProfile(profile)}
                         >
-                          <ConfigStatusDot active={profile.enabled} />
-                          <ConfigSidebarText className={`is-grow${profile.enabled ? "" : " is-muted"}`}>{profile.displayName}</ConfigSidebarText>
-                          {overridden && <span className="agents-overridden-label">{t("agents.overridden")}</span>}
+                          <ConfigSidebarText className={`flex-1${profile.enabled ? "" : " text-muted-foreground"}`}>{profile.displayName}</ConfigSidebarText>
+                          {!profile.enabled && (
+                            <Badge variant="secondary" className="shrink-0 px-1.5 text-[10px] font-normal text-muted-foreground">
+                              {t("agents.codemode.off")}
+                            </Badge>
+                          )}
+                          {overridden && <span className="shrink-0 text-[10px] leading-none whitespace-nowrap text-muted-foreground">{t("agents.overridden")}</span>}
                         </ConfigSidebarItem>
                       );
                     })}
@@ -567,7 +591,7 @@ export function AgentsConfig({
         </ConfigSidebar>
 
         <ConfigDetail>
-          <ConfigDetailStack className="is-fill">
+          <ConfigDetailStack className="min-h-full">
               {!selected && !creating ? (
                 <ConfigEmptyState>{t("agents.empty")}</ConfigEmptyState>
               ) : (
@@ -592,40 +616,43 @@ export function AgentsConfig({
                           {displayedScope && (
                             <ConfigScopeTag scope={displayedScope}>{t(`agents.scope.${displayedScope}`)}</ConfigScopeTag>
                           )}
-                          <PathLabel className="config-detail-path" text={displayedPath} title={fullPath} />
+                          <PathLabel className="min-w-0 flex-1 overflow-hidden font-mono text-xs text-muted-foreground" text={displayedPath} title={fullPath} />
                         </>
                       )}
                     </ConfigDetailHeaderInfo>
                     <ConfigDetailActions>
                       {selected && (mode === "view" || mode === "edit") && <ConfigButton size="small" onClick={beginDuplicate} disabled={saving || toggling}>{t("agents.duplicate")}</ConfigButton>}
-                      {selected && isWritableScope(selected.scope) && mode === "edit" && <ConfigButton variant="danger" size="small" onClick={() => void remove()} disabled={saving || toggling}>{t("agents.delete")}</ConfigButton>}
+                      {selected && isWritableScope(selected.scope) && mode === "edit" && <ConfigButton variant="danger" size="small" onClick={() => setDeleteConfirmOpen(true)} disabled={saving || toggling}>{t("agents.delete")}</ConfigButton>}
                       <ConfigSwitch checked={draft.enabled} disabled={switchDisabled} label={draft.enabled ? t("agents.disable") : t("agents.enable")} onChange={(checked) => void toggleEnabled(checked)} />
                     </ConfigDetailActions>
                   </ConfigDetailHeader>
 
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 12 }}>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <Field label={t("agents.name")}>
                       {creating ? (
-                        <input aria-label={t("agents.name")} value={draft.name} disabled={disabled} onChange={(event) => update("name", event.target.value)} style={inputStyle} />
+                        <Input aria-label={t("agents.name")} value={draft.name} disabled={disabled} onChange={(event) => update("name", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
                       ) : (
-                        <code style={{ minHeight: 34, display: "flex", alignItems: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)", fontSize: 12 }}>
+                        <code className="flex min-h-[34px] items-center overflow-hidden text-ellipsis whitespace-nowrap text-xs text-foreground">
                           {draft.name}
                         </code>
                       )}
                     </Field>
                     <Field label={t("agents.displayName")}>
-                      <input aria-label={t("agents.displayName")} value={draft.displayName} disabled={disabled} onChange={(event) => update("displayName", event.target.value)} style={controlStyle} />
+                      <Input aria-label={t("agents.displayName")} value={draft.displayName} disabled={disabled} onChange={(event) => update("displayName", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
                     </Field>
                   </div>
                   <Field label={t("agents.description")}>
-                    <input aria-label={t("agents.description")} value={draft.description} disabled={disabled} onChange={(event) => update("description", event.target.value)} style={controlStyle} />
+                    <Input aria-label={t("agents.description")} value={draft.description} disabled={disabled} onChange={(event) => update("description", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
                   </Field>
                   <Field label={t("agents.prompt")}>
-                    <textarea className="agents-system-prompt" aria-label={t("agents.prompt")} value={draft.systemPrompt} disabled={disabled} onChange={(event) => update("systemPrompt", event.target.value)} style={{ ...controlStyle, height: 195, minHeight: 195, maxHeight: "60vh", padding: 9, overflow: "auto", resize: disabled ? "none" : "vertical", lineHeight: 1.5 }} />
+                    {/* Keep the native resize corner usable when the global scrollbar is present. */}
+                    <Textarea
+                      className={`${controlClassName} h-[195px] min-h-[195px] max-h-[60vh] w-full py-[9px] overflow-auto leading-normal resize-y disabled:resize-none [scrollbar-width:auto] [&::-webkit-scrollbar]:w-3.5 [&::-webkit-scrollbar]:h-3.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb]:border-[5px] [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:bg-clip-padding`}
+                      aria-label={t("agents.prompt")} value={draft.systemPrompt} disabled={disabled} onChange={(event) => update("systemPrompt", event.target.value)} />
                   </Field>
 
                   <Field label={t("agents.tools")}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2">
                       {TOOL_OPTIONS.map((tool) => (
                         <Toggle key={tool} label={tool} disabled={disabled} checked={draft.tools.includes(tool)} onChange={(checked) => update("tools", checked ? [...draft.tools, tool] : draft.tools.filter((item) => item !== tool))} />
                       ))}
@@ -633,7 +660,7 @@ export function AgentsConfig({
                   </Field>
 
                   <Field label={t("agents.resources")}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px" }}>
+                    <div className="flex flex-wrap gap-x-5 gap-y-2">
                       <Toggle label={t("agents.loadSkills")} disabled={disabled} checked={draft.loadSkills} onChange={(checked) => update("loadSkills", checked)} />
                       <Toggle label={t("agents.loadExtensions")} disabled={disabled} checked={draft.loadExtensions} onChange={(checked) => update("loadExtensions", checked)} />
                       {/* A chat-only child cannot start with MCP on; the switch still turns it off. */}
@@ -641,52 +668,59 @@ export function AgentsConfig({
                     </div>
                     {/* `skills:` and `extensions:` lists are edited in the profile file; show what they load. */}
                     {draft.loadSkills && draft.skills !== undefined && (
-                      <span style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4, overflowWrap: "anywhere" }}>
+                      <span className="[overflow-wrap:anywhere] text-xs leading-[1.4] text-muted-foreground">
                         {draft.skills.length > 0
                           ? t("agents.skillsOnly", { skills: draft.skills.join(", ") })
                           : t("agents.skillsNone")}
                       </span>
                     )}
                     {draft.loadExtensions && draft.extensions !== undefined && (
-                      <span style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4, overflowWrap: "anywhere" }}>
+                      <span className="[overflow-wrap:anywhere] text-xs leading-[1.4] text-muted-foreground">
                         {draft.extensions.length > 0
                           ? t("agents.extensionsOnly", { extensions: draft.extensions.join(", ") })
                           : t("agents.extensionsNone")}
                       </span>
                     )}
                     {!disabled && chatOnlyDraft ? (
-                      <span style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4 }}>
+                      <span className="text-xs leading-[1.4] text-muted-foreground">
                         {t("agents.mcpChatOnly")}
                       </span>
                     ) : draft.mcp === "on" && (
-                      <span style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4 }}>
+                      <span className="text-xs leading-[1.4] text-muted-foreground">
                         {t("agents.mcpHint")}
                       </span>
                     )}
                   </Field>
 
                   <Field label={t("agents.codemode")}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <select
-                        aria-label={t("agents.codemode")}
+                    <div className="flex flex-col gap-1.5">
+                      {/* 弹层挂 body，z 必须压过设置对话框的 z-[1000]。 */}
+                      <Select
                         value={draft.codemode ?? "off"}
+                        onValueChange={(value) => update("codemode", value as EditableProfile["codemode"])}
                         disabled={disabled}
-                        onChange={(event) => update("codemode", event.target.value as EditableProfile["codemode"])}
-                        style={{ ...controlStyle, width: "auto", minWidth: 180, alignSelf: "flex-start" }}
                       >
-                        <option value="inherit">{t("agents.codemode.inherit")}</option>
-                        <option value="on">{t("agents.codemode.on")}</option>
-                        <option value="off">{t("agents.codemode.off")}</option>
-                      </select>
-                      <span style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.4 }}>
+                        <SelectTrigger
+                          aria-label={t("agents.codemode")}
+                          className={`${controlClassName} h-[34px] w-auto min-w-[180px] self-start data-[size=default]:h-[34px]`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent position="popper" align="start" className="z-[1100]">
+                          <SelectItem value="inherit">{t("agents.codemode.inherit")}</SelectItem>
+                          <SelectItem value="on">{t("agents.codemode.on")}</SelectItem>
+                          <SelectItem value="off">{t("agents.codemode.off")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs leading-[1.4] text-muted-foreground">
                         {t("agents.codemodeHint")}
                       </span>
                     </div>
                   </Field>
 
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1.5fr) minmax(120px, 0.75fr) minmax(100px, 0.5fr)", gap: 12 }}>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(120px,0.75fr)_minmax(100px,0.5fr)]">
                     <Field label={t("agents.model")}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div className="flex flex-col gap-1">
                         <ModelSelector
                           options={modelSelectorOptions}
                           value={selectedModel}
@@ -701,20 +735,33 @@ export function AgentsConfig({
                           variant="field"
                           placement="auto"
                         />
-                        {modelsError && <span style={{ color: "#ef4444", fontSize: 10 }}>{modelsError}</span>}
+                        {modelsError && <span className="text-[10px] text-destructive">{modelsError}</span>}
                       </div>
                     </Field>
                     <Field label={t("agents.thinking")}>
-                      <select aria-label={t("agents.thinking")} value={draft.thinking ?? ""} disabled={disabled} onChange={(event) => update("thinking", (event.target.value || undefined) as EditableProfile["thinking"])} style={controlStyle}>
-                        {THINKING_OPTIONS.map((value) => <option key={value || "default"} value={value}>{value || t("agents.inherit")}</option>)}
-                      </select>
+                      <Select
+                        value={draft.thinking ?? THINKING_NONE}
+                        onValueChange={(value) => update("thinking", (value === THINKING_NONE ? undefined : value) as EditableProfile["thinking"])}
+                        disabled={disabled}
+                      >
+                        <SelectTrigger aria-label={t("agents.thinking")} className={`${controlClassName} h-[34px] w-full data-[size=default]:h-[34px]`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent position="popper" align="start" className="z-[1100]">
+                          {THINKING_OPTIONS.map((value) => (
+                            <SelectItem key={value || "default"} value={value || THINKING_NONE}>
+                              {value || t("agents.inherit")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </Field>
                     <Field label={t("agents.maxTurns")}>
-                      <input aria-label={t("agents.maxTurns")} type="number" min={1} value={draft.maxTurns ?? ""} disabled={disabled} onChange={(event) => update("maxTurns", event.target.value ? Number(event.target.value) : undefined)} style={controlStyle} />
+                      <Input aria-label={t("agents.maxTurns")} type="number" min={1} value={draft.maxTurns ?? ""} disabled={disabled} onChange={(event) => update("maxTurns", event.target.value ? Number(event.target.value) : undefined)} className={`${controlClassName} h-[34px] w-full`} />
                     </Field>
                   </div>
 
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 20px" }}>
+                  <div className="flex flex-wrap gap-x-5 gap-y-2.5">
                     <Toggle label={t("agents.inheritContext")} disabled={disabled} checked={draft.inheritContext} onChange={(checked) => update("inheritContext", checked)} />
                     <Toggle label={t("agents.background")} disabled={disabled} checked={draft.runInBackground} onChange={(checked) => update("runInBackground", checked)} />
                   </div>
@@ -723,23 +770,34 @@ export function AgentsConfig({
           </ConfigDetailStack>
         </ConfigDetail>
       </ConfigSplitView>
-      <ConfigFooter status={(settingsError || error) && <span role="alert" style={{ color: "#ef4444" }}>{settingsError || error}</span>}>
+      <ConfigFooter status={(settingsError || error) && <span role="alert" className="text-destructive">{settingsError || error}</span>}>
         {editing && (
           <ConfigButton
             variant="primary"
             onClick={() => void save()}
             disabled={saving || savedOk || toggling || !draft.name.trim()}
-            className={savedOk ? "is-success" : undefined}
+            className={savedOk ? "border-success bg-success animate-[saved-pop_0.45s_ease] motion-reduce:animate-none" : undefined}
           >
             {savedOk && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="config-button-success-icon">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              <CheckIcon size={14} strokeWidth={3} className="shrink-0 [stroke-dasharray:18] animate-[saved-check-draw_0.35s_ease_forwards] motion-reduce:animate-none" />
             )}
             <span>{savedOk ? t("i18n.saved") : saving ? t("agents.saving") : t("agents.save")}</span>
           </ConfigButton>
         )}
       </ConfigFooter>
+      {deleteConfirmOpen && selected && (
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("agents.deleteConfirm", { name: selected.displayName })}</AlertDialogTitle>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("i18n.cancel")}</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={() => void remove()}>{t("agents.delete")}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </ConfigPanelShell>
   );
 }

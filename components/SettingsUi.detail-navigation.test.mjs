@@ -23,11 +23,12 @@ const splitView = (navigation) => renderToStaticMarkup(navigation
 const navigation = (detailOpen) => ({ detailOpen, openDetail: noop, closeDetail: noop, reportDetailTitle: noop });
 
 test("inside Settings a split view says which pane a phone shows; elsewhere it stacks as before", () => {
-  assert.equal(splitView(null), '<div class="config-split-view">rows</div>');
-  assert.equal(splitView(navigation(false)), '<div class="config-split-view" data-pane="list">rows</div>');
-  assert.equal(splitView(navigation(true)), '<div class="config-split-view" data-pane="detail">rows</div>');
-  const phone = cssSource.match(/\.config-split-view\[data-pane="list"\] > \.config-detail,\s*\.config-split-view\[data-pane="detail"\] > \.config-sidebar \{\s*display: none;/);
-  assert.ok(phone, "a phone hides the other pane");
+  assert.equal(splitView(null), '<div class="config-split-view flex min-h-0 flex-1 flex-row overflow-hidden max-[640px]:flex-col">rows</div>');
+  assert.equal(splitView(navigation(false)), '<div class="config-split-view flex min-h-0 flex-1 flex-row overflow-hidden max-[640px]:flex-col" data-pane="list">rows</div>');
+  assert.equal(splitView(navigation(true)), '<div class="config-split-view flex min-h-0 flex-1 flex-row overflow-hidden max-[640px]:flex-col" data-pane="detail">rows</div>');
+  // A phone hides the other pane inside the components (ConfigSidebar /
+  // ConfigDetail read the pane themselves); the stylesheet carries none of it.
+  assert.doesNotMatch(cssSource, /data-pane/);
 });
 
 test("a row or the add button opens the detail unless its handler prevented that", () => {

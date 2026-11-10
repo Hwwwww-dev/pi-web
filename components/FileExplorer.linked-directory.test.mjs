@@ -44,7 +44,7 @@ const linkedNode = {
 test("an expanded link that leaves the project names its target and offers to allow it", () => {
   const html = renderNode(linkedNode);
   assert.match(html, /Links to \/elsewhere\/project, outside this project/);
-  assert.match(html, /<button type="button" title="Browse \/elsewhere\/project until Pi Web restarts[^"]*"[^>]*>Allow browsing<\/button>/);
+  assert.match(html, /<button data-slot="button"[^>]*title="Browse \/elsewhere\/project until Pi Web restarts[^"]*"[^>]*>Allow browsing<\/button>/);
   assert.doesNotMatch(html, />empty</);
 });
 
@@ -78,5 +78,10 @@ test("a link that encloses the project or home folder warns and confirms before 
   const html = renderNode({ ...linkedNode, outsideLinkTarget: "/", outsideLinkEncloses: true });
   assert.match(html, /That folder contains this project or your home folder\./);
   assert.doesNotMatch(renderNode(linkedNode), /contains this project/);
-  assert.match(source, /if \(node\.outsideLinkEncloses && !window\.confirm\(t\("files\.allowEnclosingLinkConfirm"/);
+  // The enclosing link's Allow asks first: an AlertDialog carrying the
+  // files.allowEnclosingLinkConfirm text, whose action runs the same allow
+  // flow a plain link's Allow does.
+  assert.match(source, /if \(node\.outsideLinkEncloses\) \{\s*setLinkConfirmOpen\(true\);\s*return;\s*\}/);
+  assert.match(source, /AlertDialogTitle>\{t\("files\.allowEnclosingLinkConfirm", \{ target: pendingLinkTarget \}\)\}<\/AlertDialogTitle>/);
+  assert.match(source, /<AlertDialogAction onClick=\{\(\) => void allowLink\(\)\}>\{t\("files\.allowOutsideLink"\)\}<\/AlertDialogAction>/);
 });

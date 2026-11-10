@@ -48,7 +48,7 @@ test("lightweight source rows are skipped for highlighted, diff, and preview vie
     assert.equal(rows[0].props["data-line-number"], 1);
     assert.equal(rows[0].props.children[1].props.children, "line");
   }
-  assert.equal(render(large, "source", false, false, true)[0].props.children[1].props.style.whiteSpace, "pre-wrap");
+  assert.match(render(large, "source", false, false, true)[0].props.children[1].props.className, /whitespace-pre-wrap/);
 });
 
 test("the diff view wraps when the viewer wraps, and the key reaches the diff", () => {
@@ -57,13 +57,11 @@ test("the diff view wraps when the viewer wraps, and the key reaches the diff", 
 
   // Wrapped: the box stops being the widest line's width and the row's text
   // column gives way instead of pushing a horizontal scrollbar.
-  assert.match(diffView, /width: wrapLines \? "100%" : "max-content"/);
-  assert.match(diffView, /whiteSpace: wrapLines \? "pre-wrap" : "pre"/);
-  assert.match(diffView, /overflowWrap: wrapLines \? "anywhere" : "normal"/);
-  assert.match(diffView, /flexShrink: wrapLines \? 1 : 0/);
+  assert.match(diffView, /wrapLines \? "w-full" : "w-max"/);
+  assert.match(diffView, /wrapLines \? "shrink whitespace-pre-wrap \[overflow-wrap:anywhere\]" : "shrink-0 whitespace-pre"/);
   // Unwrapped stays exactly as before: one line per row, sideways scroll. The
   // +/- marker column never shrinks either way.
-  assert.match(diffView, /padding: "0 6px",[\s\S]{0,160}flexShrink: 0/);
+  assert.match(diffView, /className="min-w-4 shrink-0 select-none px-1\.5 font-semibold"/);
   assert.match(source, /<DiffView patch=\{gitDiff\.patch!\} wrapLines=\{wrapLines\} \/>/);
 
   // The wrap control is offered for the diff as well as the source, never for a

@@ -1,9 +1,10 @@
 "use client";
 
+import { FileIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import { getFileName } from "@/lib/file-paths";
 import type { WrittenFile } from "@/lib/turn-written-files";
-import { getFileIcon } from "./FileIcons";
 
 /**
  * Lists the files a turn actually wrote, as buttons that open each one in the
@@ -18,33 +19,23 @@ export function TurnWrittenFiles({ files, onOpenFile }: {
   if (files.length === 0) return null;
 
   return (
-    <div aria-label={t("chat.filesWritten")} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 6 }}>
+    <div aria-label={t("chat.filesWritten")} className="mt-1.5 flex flex-wrap items-center gap-1.5">
       {files.map(({ filePath }) => {
         const name = getFileName(filePath);
         return (
-          <button
+          <Button
             key={filePath}
             type="button"
+            variant="outline"
+            size="default"
             title={filePath}
             aria-label={t("chat.openWrittenFile", { name })}
             onClick={() => onOpenFile?.(filePath)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              padding: "2px 8px",
-              fontSize: 12,
-              fontFamily: "var(--font-mono)",
-              color: "var(--text)",
-              background: "var(--bg-subtle)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
+            className="inline-flex h-auto cursor-pointer items-center gap-1 rounded-sm border border-border bg-muted px-2 py-0.5 font-mono text-xs font-normal text-foreground shadow-none hover:bg-muted hover:text-foreground dark:border-border dark:bg-muted dark:hover:bg-muted focus-visible:border-border focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           >
-            {getFileIcon(name, 12)}
+            <FileIcon size={12} strokeWidth={1.8} className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span>{name}</span>
-          </button>
+          </Button>
         );
       })}
     </div>

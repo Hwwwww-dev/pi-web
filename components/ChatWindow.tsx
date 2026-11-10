@@ -1,7 +1,7 @@
 "use client";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { isHiddenRelation } from "@/lib/session-family";
-import { SideChatsIcon } from "./SidebarIcons";
+import { ArrowDownIcon, ChevronRightIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -23,6 +23,15 @@ import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
 import { phaseLabel } from "@/lib/chat-phase-label";
@@ -108,7 +117,13 @@ interface Props {
   holdAudio?: () => () => void;
 }
 
-const CHAT_COLUMN_PADDING = 16;
+// The message column's page gutter and width, from the visual draft (§4.2):
+// 28px around a 700px column on desktop, half the gutter on phones. The
+// column's cap is min(--chat-content-max-width, 700px) — Settings' width
+// slider narrows it below 700 and never widens past the cap; messages, the
+// quote composer, the composer and the new-session hero all read one var.
+const CHAT_COLUMN_PADDING = 28;
+const CHAT_COLUMN_PADDING_MOBILE = 14;
 
 // One update check per page. Every fresh composer mounts the header again
 // (each move of the new-session bar does), and a link that turned up late
@@ -157,11 +172,13 @@ function NewSessionUpdateLink({
   const accessibleLabel = label(update.latestVersion);
 
   // In the versions line, after the version in use: "→ v<latest> ↗".
+  // The box's padding is offset by equal negative margins, so hover and focus
+  // never move the line; on a coarse pointer they grow the tap target instead.
   return (
     <>
-      <span className="new-session-meta-arrow" aria-hidden="true">→</span>
+      <span aria-hidden="true">→</span>
       <a
-        className="new-session-update"
+        className="new-session-update inline-flex items-center gap-[3px] -mx-1 -my-[3px] px-1 py-[3px] rounded-(--radius-sm) font-semibold no-underline text-primary transition-colors duration-100 hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:flex-none pointer-coarse:-my-2 pointer-coarse:py-2"
         href={update.releaseUrl}
         target="_blank"
         rel="noopener noreferrer"
@@ -216,42 +233,32 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
   }, [reveal]);
 
   return (
-    <div style={{ marginBottom: 12 }}>
-      <button
-        type="button"
-        aria-expanded={expanded || reveal}
-        aria-label={summary}
-        onClick={() => setExpanded((v) => !v)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          width: "auto",
-          maxWidth: "100%",
-          minHeight: 24,
-          padding: "2px 0",
-          border: "none",
-          background: "transparent",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          fontSize: 12,
-          textAlign: "left",
-        }}
+    <Collapsible
+      open={expanded || reveal}
+      onOpenChange={(open) => {
+        if (!reveal) setExpanded(open);
+      }}
+      className="mb-5"
+    >
+      <CollapsibleTrigger
+        className="flex max-w-full min-h-6 cursor-pointer items-center gap-2 border-0 bg-transparent px-0 py-0.5 text-left text-xs text-muted-foreground"
         title={expanded ? t("chat.collapseProcess") : t("chat.expandProcess")}
+        aria-label={summary}
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>
-          <polyline points="4 2.5 7.5 6 4 9.5" />
-        </svg>
-        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <ChevronRightIcon
+          size={12}
+          strokeWidth={1.6}
+          className={cn("shrink-0 transition-transform", (expanded || reveal) && "rotate-90")}
+          aria-hidden="true"
+        />
+        <span className="min-w-0 truncate">
           {summary}
         </span>
-      </button>
-      {(expanded || reveal) && (
-        <div style={{ marginTop: 8 }}>
-          {children}
-        </div>
-      )}
-    </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -259,6 +266,7 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
 export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, panel = false, onSideSession, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onDebugSnapshotReaderChange, background = false, dormant = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
+  const columnPadding = isMobile ? CHAT_COLUMN_PADDING_MOBILE : CHAT_COLUMN_PADDING;
   const completionNotificationsEnabled = !isHiddenRelation(session?.relation);
 
   // Wrap onAgentEnd to play the completion sound. This is more reliable than
@@ -303,7 +311,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     lastUserMsgRef, promptAnchorActive,
     handleSend, handleAbort, startSideChat, handleFork, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
-    handleQueuedAction, handleEditContent, dismissCompactError,
+    handleQueuedAction, handleEditContent, dismissCompactError, editEntryId, cancelEdit,
     handleBuiltinSlashCommand,
     handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadSlashCommands, loadAllModels, scrollUserMsgToTop,
     loadContext, activeLeafId, scrollToBottom, scrollToMessage,
@@ -565,13 +573,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // loaded still show their preview there and page in when clicked. Absent
   // (fetch failed or still loading), the minimap falls back to loaded turns.
   const [minimapTurnIndex, setMinimapTurnIndex] = useState<MinimapTurnDescriptor[]>([]);
-  // The chat pane's width decides whether the minimap shows at all — the
-  // message column reserves the rail strip at any width, so overlap is never
-  // the question. Callback ref + element state: the component first renders a
-  // loading branch without the pane, so the observer must start when the pane
-  // actually mounts. State holds only the visibility decision: dragging the
-  // panel divider fires per pixel, and a boolean keeps every non-crossing
-  // frame a no-op instead of re-rendering the whole chat window.
+  // The chat pane's width decides whether the minimap shows at all: the rail
+  // floats in the pane's left margin (MINIMAP_MIN_PANE_WIDTH = the 700px
+  // column + one rail strip each side), so the message column stays
+  // symmetrically centered and overlap is never the question. Callback ref +
+  // element state: the component first renders a loading branch without the
+  // pane, so the observer must start when the pane actually mounts. State
+  // holds only the visibility decision: dragging the panel divider fires per
+  // pixel, and a boolean keeps every non-crossing frame a no-op instead of
+  // re-rendering the whole chat window.
   const [chatPaneElement, setChatPaneElement] = useState<HTMLDivElement | null>(null);
   const [minimapPaneWide, setMinimapPaneWide] = useState(false);
   useLayoutEffect(() => {
@@ -840,7 +850,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (element) {
       scrollToMessage(element);
       element.animate([
-        { backgroundColor: "var(--bg-selected)" },
+        { backgroundColor: "var(--accent)" },
         { backgroundColor: "transparent" },
       ], { duration: 2500 });
     }
@@ -1247,6 +1257,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             onFork={bashRunning || isNew ? undefined : handleFork}
             forking={forkingEntryId === entryIds[idx]}
             onEditContent={sessionBusy ? undefined : handleEditContent}
+            isEditing={entryIds[idx] !== undefined && editEntryId === entryIds[idx]}
+            onCancelEdit={cancelEdit}
             showTimestamp={showTimestamp}
             prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
             sessionId={session?.id ?? sessionIdRef.current ?? undefined}
@@ -1257,7 +1269,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         );
         if (!isVisible || currentRefIdx === undefined) return view;
         return (
-          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} className="cv-block" ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
+          // 性能: 离屏消息块跳过布局与绘制；contain-intrinsic-size 的 auto 关键字
+          // 让浏览器记住渲染过的真实高度，占位估算随访问收敛。
+          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} className="[content-visibility:auto] [contain-intrinsic-size:auto_160px]" ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
             {view}
           </div>
         );
@@ -1418,7 +1432,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           rendered.push(
             <div
               key={`process-group-${entryIds[userIdx] ?? userIdx}`}
-              className="cv-block"
+              className="[content-visibility:auto] [contain-intrinsic-size:auto_160px]"
               ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
             >
               <ProcessDetailsGroup key={finalAnswerMessage ? "answered" : "unanswered"} summary={processSummary} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
@@ -1485,22 +1499,28 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [messages, entryIds, toolResultsMap, hasEarlierMessages, streamState.isStreaming, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
      sessionIdRef, handleFork, handleEditContent, onOpenFile, onOpenSubagent,
-     isNew, messageRefs, lastUserMsgRef, bashRunning]);
+     isNew, messageRefs, lastUserMsgRef, bashRunning, editEntryId, cancelEdit]);
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
   const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
   const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-text-muted">
-         {t("chat.loadingSession")}
+      <div className="flex h-full flex-col justify-center gap-3 px-10">
+        <Skeleton className="h-4 w-2/5" />
+        <Skeleton className="h-4 w-3/5" />
+        <Skeleton className="h-4 w-1/2" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center text-red-400">
-        {error}
+      <div className="flex h-full items-center justify-center p-6">
+        <Alert variant="destructive" className="max-w-[560px]">
+          <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
+            {error}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -1508,35 +1528,30 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
   return (
     <div
-      className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden"
-      // Half the home-indicator inset: the full 34pt left a dead white strip
-      // under the widget shelf on the iOS PWA, while the 35px trigger row
-      // still keeps its tap target clear of the indicator.
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) / 2)" }}
+      className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden [padding-bottom:env(safe-area-inset-bottom,0px)]"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {isDragOver && (
-        <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] items-center justify-center bg-[rgba(37,99,235,0.06)] backdrop-blur-[1px]">
+        <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] motion-reduce:animate-none items-center justify-center bg-primary/[0.06] backdrop-blur-[1px]">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             {[0, 0.8, 1.6].map((delay) => (
               <div
                 key={delay}
-                className="absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid border-[rgba(37,99,235,0.5)] animate-[drop-ripple_2.4s_ease-out_infinite_backwards]"
+                className="absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid border-primary/50 animate-[drop-ripple_2.4s_ease-out_infinite_backwards] motion-reduce:animate-none"
                 style={{ transformOrigin: "center", animationDelay: `${delay}s` }}
               />
             ))}
           </div>
           <svg
             width="280" height="280" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg"
-            className="drop-shadow-[0_6px_18px_rgba(37,99,235,0.18)]"
           >
-            <rect x="28" y="44" width="84" height="60" rx="8" fill="rgba(37,99,235,0.08)" stroke="rgba(37,99,235,0.50)" strokeWidth="1.8"/>
-            <path d="M36 100 L54 72 L68 88 L80 74 L104 100Z" fill="rgba(37,99,235,0.16)" stroke="rgba(37,99,235,0.40)" strokeWidth="1.4" strokeLinejoin="round"/>
-            <circle cx="96" cy="58" r="8" fill="rgba(37,99,235,0.22)" stroke="rgba(37,99,235,0.55)" strokeWidth="1.6"/>
-            <g stroke="rgba(37,99,235,0.45)" strokeWidth="1.4" strokeLinecap="round">
+            <rect x="28" y="44" width="84" height="60" rx="8" fill="var(--accent)" fill-opacity="0.08" stroke="var(--accent)" stroke-opacity="0.5" strokeWidth="1.8"/>
+            <path d="M36 100 L54 72 L68 88 L80 74 L104 100Z" fill="var(--accent)" fill-opacity="0.16" stroke="var(--accent)" stroke-opacity="0.4" strokeWidth="1.4" strokeLinejoin="round"/>
+            <circle cx="96" cy="58" r="8" fill="var(--accent)" fill-opacity="0.22" stroke="var(--accent)" stroke-opacity="0.55" strokeWidth="1.6"/>
+            <g stroke="var(--accent)" stroke-opacity="0.45" strokeWidth="1.4" strokeLinecap="round">
               <line x1="96" y1="46" x2="96" y2="43"/>
               <line x1="96" y1="70" x2="96" y2="73"/>
               <line x1="84" y1="58" x2="81" y2="58"/>
@@ -1551,18 +1566,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       )}
 
       <div
-        style={{
-          position: "absolute",
-          top: 12,
-          left: 0,
-          right: 0,
-          zIndex: 40,
-          display: "flex",
-          // Toasts live in the top-right corner
-          justifyContent: "flex-end",
-          padding: `0 ${CHAT_COLUMN_PADDING}px`,
-          pointerEvents: "none",
-        }}
+        className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-end"
+        style={{ padding: `0 ${columnPadding}px` }}
       >
         <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} onDismiss={dismissNotice} />
       </div>
@@ -1588,13 +1593,19 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           // so it shows its scrollbar instead of hiding it behind an overlay (#788).
           // A stable gutter keeps the centred column from shifting when a short
           // session grows past one screen.
-          className="scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-gutter:stable]"
-          style={{ visibility: pendingScrollRestore ? "hidden" : undefined }}
+          className={cn(
+            "scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-[22px] pb-2 max-sm:pt-4 [scrollbar-gutter:stable]",
+            pendingScrollRestore && "invisible",
+          )}
         >
-          <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
-            <div ref={messageContentRef} onPointerUp={captureQuotedSelection} style={{ width: "100%", minWidth: 0, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
+          <div style={{ minWidth: 0, padding: `0 ${columnPadding}px` }}>
+            <div
+              ref={messageContentRef}
+              onPointerUp={captureQuotedSelection}
+              className="mx-auto w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] max-sm:text-[length:calc(14px+var(--chat-font-size-offset,0px))]"
+            >
             {hasMoreRendered && (
-              <div ref={setSentinel} className="py-3 text-center text-xs text-text-muted">
+              <div ref={setSentinel} className="py-3 text-center text-xs text-muted-foreground">
                 {t("chat.loadEarlier")}
               </div>
             )}
@@ -1604,14 +1615,14 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             )}
 
             {(agentRunning || isCompacting) && !hasStreamingContent && (agentPhase || isCompacting) && !liveActivityRendered && (
-              <div className="break-words py-2 text-[13px] text-text-muted">
-                <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t, isCompacting, queuedSubmissions.length)}</span>
+              <div className="break-words py-2 text-[13px] text-muted-foreground">
+                <span className="animate-[pulse_1.5s_infinite] motion-reduce:animate-none">{phaseLabel(agentPhase, t, isCompacting, queuedSubmissions.length)}</span>
               </div>
             )}
 
             {bashRunning && !pendingBash && (
-              <div className="py-2 text-[13px] text-text-muted">
-                 <span className="animate-[pulse_1.5s_infinite]">{t("chat.runningCommand")}</span>
+              <div className="py-2 text-[13px] text-muted-foreground">
+                 <span className="animate-[pulse_1.5s_infinite] motion-reduce:animate-none">{t("chat.runningCommand")}</span>
               </div>
             )}
 
@@ -1650,36 +1661,26 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           ref={quotePopoverRef}
           role={quoteInputOpen ? "dialog" : "toolbar"}
           aria-label={t(quoteInputOpen ? "chat.newQuoteChat" : "chat.selectionActions")}
+          className={cn(
+            "fixed z-[260] flex flex-wrap items-start gap-[3px] max-w-[calc(100vw-16px)] max-h-[calc(var(--app-viewport-height,100dvh)-16px)] overflow-y-auto rounded-md border border-border bg-popover shadow-md",
+            quoteInputOpen ? "w-[min(420px,calc(100vw-16px))] p-3" : "p-[3px]",
+          )}
           style={{
-            position: "fixed",
             top: quotedSelection.top,
             left: quotedSelection.left,
-            zIndex: 260,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 3,
-            width: quoteInputOpen ? "min(420px, calc(100vw - 16px))" : undefined,
-            maxWidth: "calc(100vw - 16px)",
-            maxHeight: "calc(var(--app-viewport-height, 100dvh) - 16px)",
-            overflowY: "auto",
-            padding: quoteInputOpen ? 12 : 3,
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "var(--bg)",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
           }}
         >
           {quoteInputOpen ? (
             <fieldset
               disabled={quoteSubmitting}
               aria-busy={quoteSubmitting}
-              style={{ width: "100%", minWidth: 0, margin: 0, padding: 0, border: "none", display: "flex", flexDirection: "column", gap: 10 }}
+              className="m-0 flex w-full min-w-0 flex-col gap-2.5 border-0 p-0"
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600 }}>{t(quoteAskTarget === "side" ? "chat.askInSideChat" : "chat.askInNewChat")}</span>
-                <button type="button" className="file-viewer-icon-button" title={t("i18n.close")} aria-label={t("i18n.close")} disabled={quoteSubmitting} onClick={closeQuotedSelection} style={{ border: "none" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-                </button>
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 text-xs font-semibold">{t(quoteAskTarget === "side" ? "chat.askInSideChat" : "chat.askInNewChat")}</span>
+                <Button type="button" variant="ghost" size="icon-sm" title={t("i18n.close")} aria-label={t("i18n.close")} disabled={quoteSubmitting} onClick={closeQuotedSelection}>
+                  <XIcon aria-hidden="true" />
+                </Button>
               </div>
               <ChatInput
                 ref={quoteChatInputRef}
@@ -1688,108 +1689,104 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 onAbort={closeQuotedSelection}
                 isStreaming={false}
               />
-              {quoteError && <div role="alert" style={{ color: "#dc2626", fontSize: 12, overflowWrap: "anywhere" }}>{quoteError}</div>}
+              {quoteError && <div role="alert" className="text-xs text-destructive wrap-anywhere">{quoteError}</div>}
             </fieldset>
           ) : <>
-          <button
+          <Button
             type="button"
-            className="file-viewer-icon-button"
+            variant="ghost"
             title={t("chat.quoteSelection")}
             aria-label={t("chat.quoteSelection")}
             onPointerDown={(event) => event.preventDefault()}
             onClick={quoteSelectionHere}
-            style={{ width: "auto", height: 35, flex: "0 0 auto", gap: 5, padding: "0 10px", border: "none", fontSize: 12, fontWeight: 500 }}
+            className="h-[35px] gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z" />
-              <path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z" />
-            </svg>
+            <QuoteIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
             <span>{t("chat.quoteSelection")}</span>
-          </button>
+          </Button>
           {onSideSession && !isHiddenRelation(session?.relation) && (
-            <button
+            <Button
               type="button"
-              className="file-viewer-icon-button"
+              variant="ghost"
               title={t("chat.askInSideChat")}
               aria-label={t("chat.askInSideChat")}
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => { setQuoteAskTarget("side"); setQuoteInputOpen(true); window.getSelection()?.removeAllRanges(); }}
-              style={{ width: "auto", height: 35, flex: "0 0 auto", gap: 5, padding: "0 10px", border: "none", fontSize: 12, fontWeight: 500 }}
+              className="h-[35px] gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
             >
-              <SideChatsIcon strokeWidth={1.8} />
+              <MessagesSquareIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
               <span>{t("chat.askInSideChat")}</span>
-            </button>
+            </Button>
           )}
           {onAskInNewChat && (
-            <button
+            <Button
               type="button"
-              className="file-viewer-icon-button"
+              variant="ghost"
               title={t("chat.askInNewChat")}
               aria-label={t("chat.askInNewChat")}
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => { setQuoteAskTarget("new"); setQuoteInputOpen(true); window.getSelection()?.removeAllRanges(); }}
-              style={{ width: "auto", height: 35, flex: "0 0 auto", gap: 5, padding: "0 10px", border: "none", fontSize: 12, fontWeight: 500 }}
+              className="h-[35px] gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M6 3v12M18 9a9 9 0 0 1-9 9" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" />
-              </svg>
+              <GitForkIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
               <span>{t("chat.askInNewChat")}</span>
-            </button>
+            </Button>
           )}
           </>}
         </div>,
         document.body,
       )}
 
-      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `12px ${CHAT_COLUMN_PADDING}px 0 ${CHAT_COLUMN_PADDING}px` }}>
+      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding}px` }}>
+        {/* Floats centered over the composer's 700px card; z-30 also keeps it
+            clear of the rail's zIndex 25. */}
         {!isEmptyNew && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "100%",
-              left: 0,
-              right: 0,
-              display: "flex",
-              justifyContent: "center",
-              paddingBottom: 10,
-              pointerEvents: "none",
-              zIndex: 20,
-            }}
-          >
-            <button
-              type="button"
-              className={`chat-scroll-to-bottom${showScrollToBottom && !pendingScrollRestore ? " is-visible" : ""}`}
-              title={t("chat.scrollToLatest")}
-              aria-label={t("chat.scrollToLatest")}
-              onClick={() => scrollToBottom("smooth")}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
-            </button>
+          // Centered over the composer's 700px card (the same mx-auto column as
+          // the messages); z-30 also keeps it clear of the rail's zIndex 25.
+          <div className="pointer-events-none absolute inset-x-0 bottom-full z-30">
+            <div className="relative mx-auto w-full max-w-[min(var(--chat-content-max-width,820px),700px)]">
+              <Button
+                type="button"
+                variant="ghost"
+                className={cn(
+                  // The ghost Button's transition-all fades opacity and flips
+                  // visibility discretely, which is exactly the reveal/hide curve.
+                  "absolute left-1/2 -translate-x-1/2 bottom-[14px] max-sm:bottom-[10px]",
+                  "size-[34px] cursor-pointer rounded-full border border-border bg-card p-0 text-muted-foreground shadow-sm duration-[160ms]",
+                  // Reduced motion keeps the fade but drops the slide/scale.
+                  "motion-reduce:translate-y-0 motion-reduce:scale-100",
+                  showScrollToBottom && !pendingScrollRestore
+                    ? "pointer-events-auto visible translate-y-0 scale-100 opacity-[0.28] hover:opacity-100 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 focus-visible:bg-secondary focus-visible:text-foreground"
+                    : "pointer-events-none invisible translate-y-1 scale-[0.96] opacity-0",
+                )}
+                title={t("chat.scrollToLatest")}
+                aria-label={t("chat.scrollToLatest")}
+                onClick={() => scrollToBottom("smooth")}
+              >
+              <ArrowDownIcon size={16} strokeWidth={2} className="size-4" aria-hidden="true" />
+              </Button>
+            </div>
           </div>
         )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the
-            composer's left edge (.new-session-brand, .new-session-meta and
-            .new-session-context in app/globals.css; the side padding and
-            width are inline here). */}
+            composer's left edge. */}
         {isEmptyNew && (
-          <div className="new-session-hero" style={{ paddingLeft: 16, paddingRight: 16 }}>
-            <div className="new-session-hero-inner" style={{ maxWidth: "var(--chat-content-max-width, 820px)" }}>
-              <div className="new-session-brand">
-                <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo" />
-                <div className="new-session-brand-text">
-                  <span className="new-session-brand-name">Pi Web</span>
-                  <span className="new-session-meta">
+          <div className="new-session-hero max-md:px-4 md:px-4">
+            <div className="new-session-hero-inner mx-auto flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-start">
+              <div className="new-session-brand flex min-w-0 items-center gap-3 mb-5 max-[640px]:mb-4">
+                <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
+                <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
+                  <span className="new-session-brand-name text-[22px] font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
+                  <span className="new-session-meta flex min-w-0 items-center gap-1.5 text-xs leading-[1.4] whitespace-nowrap text-muted-foreground [&>*]:flex-none">
                     <span>web v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
                     <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
                     <span aria-hidden="true">·</span>
-                    <span className="new-session-meta-pi">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
+                    <span className="new-session-meta-pi min-w-0 overflow-hidden text-ellipsis">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
                   </span>
                 </div>
               </div>
-              {newSessionContextBar}
+              <div className="flex w-full justify-start">{newSessionContextBar}</div>
             </div>
           </div>
         )}
@@ -1822,27 +1819,12 @@ const NOTICE_TEXT_MAX_HEIGHT_PX = NOTICE_MAX_HEIGHT_PX - 2;
 function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { notices: NoticeItem[]; floating?: boolean; onPauseChange?: (id: string | null) => void; onDismiss?: (id: string) => void }) {
   if (notices.length === 0) return null;
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        // Right-anchored: every toast's right edge aligns here, widths extend leftward
-        alignItems: "flex-end",
-        marginBottom: floating ? 0 : 10,
-      }}
-    >
+    <div className={cn("flex flex-col items-end", floating ? "mb-0" : "mb-2.5")}>
       {notices.map((notice, index) => {
-        const color = notice.type === "error"
-          ? "#ef4444"
-          : notice.type === "warning"
-            ? "#d97706"
-            : notice.type === "success"
-              ? "#10b981"
-              : "var(--accent)";
         return (
           <div
             key={notice.id}
-            className="notice-shelf-item"
+            className="notice-shelf-item pointer-events-auto flex items-start gap-2.5 overflow-hidden rounded-xl border border-border/70 bg-background w-fit max-w-[min(100%,620px)] px-3 text-sm leading-normal text-muted-foreground origin-top-right shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.10)] motion-reduce:[animation-duration:0.001ms]!"
             onMouseEnter={() => onPauseChange?.(notice.id)}
             onMouseLeave={(event) => {
               if (!event.currentTarget.contains(document.activeElement)) onPauseChange?.(null);
@@ -1852,48 +1834,28 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
               if (!event.currentTarget.matches(":hover")) onPauseChange?.(null);
             }}
             style={{
-              display: "flex",
-              // Top-align children so the type dot sits by the first line on multi-line toasts
-              alignItems: "flex-start",
-              gap: 10,
               minHeight: NOTICE_MIN_HEIGHT_PX,
-              height: "auto",
               // 整体高度上限：超出后由文本区内部滚动承担（见下方 span 的 overflowY），
               // 容器自身保持 hidden，小圆点固定在顶部不随文本滚动
               maxHeight: NOTICE_MAX_HEIGHT_PX,
-              // The floating wrapper is pointerEvents:"none" (click-through by design),
-              // so the toast itself must opt back into interactivity or hover events never reach it
-              pointerEvents: "auto",
               marginBottom: index === notices.length - 1 ? 0 : 6,
-              overflow: "hidden",
-              borderRadius: 14,
-              border: "1px solid color-mix(in srgb, var(--border) 70%, transparent)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
-              width: "fit-content",
-              maxWidth: "min(100%, 620px)",
               boxShadow: floating
                 ? "0 1px 2px rgba(15,23,42,0.05), 0 10px 28px -14px rgba(15,23,42,0.24)"
-                : "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
-              fontSize: 14,
-              lineHeight: 1.5,
-              transformOrigin: "top right",
+                : undefined,
               // Use backwards fill for the entrance animation so height styles return to
               // inline styles once it finishes; otherwise the keyframe's fixed 60px would
               // stick around in fill mode and permanently clamp the expanded toast
               animation: notice.exiting
                 ? "notice-shelf-out 0.18s ease-in forwards"
                 : "notice-shelf-in 0.18s ease-out backwards",
-              padding: "0 12px",
             }}
           >
             <span
+              className={cn(
+                "size-[7px] shrink-0 rounded-full",
+                notice.type === "error" ? "bg-destructive" : notice.type === "warning" ? "bg-warning" : notice.type === "success" ? "bg-success" : "bg-primary",
+              )}
               style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: color,
-                flexShrink: 0,
                 // Align with the optical center of the first text line: the text's
                 // vertical padding + (21px line box - 7px dot) / 2
                 marginTop: NOTICE_TEXT_PADDING_Y_PX + 7,
@@ -1906,12 +1868,14 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
               <TuiText
                 tabIndex={0}
                 text={notice.message}
-                style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, minWidth: 0, maxWidth: "100%", maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
+                className="min-w-0 max-w-full"
+                style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
               />
             ) : (
               <span
                 tabIndex={0}
-                style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, minWidth: 0, maxWidth: "100%", maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX, overflowY: "auto", scrollbarWidth: "thin", whiteSpace: "pre-line", wordBreak: "break-word" }}
+                className="min-w-0 max-w-full overflow-y-auto scrollbar-thin whitespace-pre-line break-words"
+                style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
               >
                 {splitNoticeText(notice.message).map((part, partIndex) => part.kind === "art" ? (
                   // A terminal QR code or bar (#755): every space kept, rows touching, and a
@@ -1919,16 +1883,7 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
                   // has none, so spaces and blocks would come from fonts of different widths).
                   <span
                     key={partIndex}
-                    style={{
-                      display: "inline-block",
-                      verticalAlign: "top",
-                      maxWidth: "100%",
-                      overflowX: "auto",
-                      whiteSpace: "pre",
-                      fontFamily: "Menlo, Consolas, 'DejaVu Sans Mono', monospace",
-                      lineHeight: 1,
-                      color: "var(--text)",
-                    }}
+                    className="inline-block max-w-full overflow-x-auto whitespace-pre align-top font-mono leading-none text-foreground"
                   >
                     {part.text}
                   </span>
@@ -1936,19 +1891,16 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
               </span>
             )}
             {onDismiss && (
-              <button
+              <Button
                 type="button"
-                className="notice-shelf-close"
+                variant="ghost"
+                className="ml-0.5 mt-3.5 size-6 shrink-0 rounded-sm p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 aria-label="Dismiss notification"
                 title="Dismiss notification"
                 onClick={() => onDismiss(notice.id)}
-                // Align with the first text line's optical center (see the dot above)
-                style={{ marginTop: 14, flexShrink: 0 }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
+                <XIcon size={12} strokeWidth={2} className="size-3" aria-hidden="true" />
+              </Button>
             )}
           </div>
         );
@@ -2010,15 +1962,15 @@ function parseDialogTitleSegments(title: string): DialogTitleSegment[] {
 
 function DialogTitlePlainText({ text }: { text: string }) {
   const [heading, ...rest] = text.split("\n");
-  const headingStyle = { color: "var(--text)", fontSize: 14, fontWeight: 650, lineHeight: 1.45 } as const;
+  const headingClass = "text-sm font-semibold leading-[1.45] text-foreground";
   // Terminal text is laid out for a fixed width: render it verbatim so box
   // drawing, tables and progress bars keep their shape (see TuiText).
   const body = rest.join("\n").replace(/^\n+|\n+$/g, "");
   if (isTuiText(body)) {
     return (
-      <div style={{ minWidth: 0 }}>
-        <div style={headingStyle}>{heading}</div>
-        <TuiText text={body} style={{ marginTop: 4, fontSize: 12, lineHeight: 1.45, color: "var(--text-muted)" }} />
+      <div className="min-w-0">
+        <div className={headingClass}>{heading}</div>
+        <TuiText text={body} className="mt-1 text-xs leading-[1.45] text-muted-foreground" />
       </div>
     );
   }
@@ -2031,22 +1983,25 @@ function DialogTitlePlainText({ text }: { text: string }) {
   }
   if (rows.length === 0) {
     return (
-      <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-        <div style={headingStyle}>{heading}</div>
+      <div className="whitespace-pre-wrap wrap-anywhere">
+        <div className={headingClass}>{heading}</div>
         {plain.map((line, index) => (
-          <div key={index} style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{line}</div>
+          <div key={index} className="mt-0.5 text-xs text-muted-foreground">{line}</div>
         ))}
       </div>
     );
   }
   return (
     <div>
-      <div style={headingStyle}>{heading}</div>
-      <div className="extension-kv-table">
+      <div className={headingClass}>{heading}</div>
+      {/* Flex rows, not a table: WebKit's auto table layout gives the value column
+          only its min-content when overflow-wrap: anywhere is set, crushing values
+          like "external_directory" into one character per line on narrow screens. */}
+      <div className="mt-1.5 text-xs leading-[1.5]">
         {rows.map((row) => (
-          <div key={row.label + row.value} className="extension-kv-row">
-            <div className="extension-kv-label">{row.label}</div>
-            <div className="extension-kv-value">{row.value}</div>
+          <div key={row.label + row.value} className="flex items-baseline gap-3.5 py-[3px]">
+            <div className="shrink-0 whitespace-nowrap text-muted-foreground">{row.label}</div>
+            <div className="min-w-0 flex-1 font-mono text-foreground wrap-anywhere">{row.value}</div>
           </div>
         ))}
       </div>
@@ -2057,17 +2012,17 @@ function DialogTitlePlainText({ text }: { text: string }) {
 function ExtensionDialogTitle({ title }: { title: string }) {
   const segments = parseDialogTitleSegments(title);
   return (
-    <div style={{ minWidth: 0 }}>
+    <div className="min-w-0">
       {segments.map((segment, index) =>
         segment.kind === "preview" ? (
-          <div key={index} style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 650, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>
+          <div key={index} className="mt-2.5">
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.4px] text-muted-foreground">
               {segment.heading}
             </div>
             {isTuiText(segment.markdown) ? (
               <TuiText
                 text={segment.markdown}
-                style={{ fontSize: 11, lineHeight: 1.4, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", color: "var(--text-muted)" }}
+                className="rounded-sm border border-border bg-card px-2 py-1.5 text-[11px] leading-[1.4] text-muted-foreground"
               />
             ) : (
               <MarkdownBody>{segment.markdown}</MarkdownBody>
@@ -2113,16 +2068,16 @@ function ExtensionWaitingCount({ count }: { count: number }) {
   const { t } = useI18n();
   if (count <= 0) return null;
   return (
-    <span style={{ fontSize: 11, fontWeight: 650, color: "var(--accent)", whiteSpace: "nowrap", flexShrink: 0 }}>
+    <Badge variant="ghost" className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-primary">
       {t("chat.extensionMoreWaiting", { count })}
-    </span>
+    </Badge>
   );
 }
 
 /** Corner brackets pointing outward; when expanded they point inward (restore). */
 function ExtensionSizeIcon({ expanded }: { expanded: boolean }) {
   return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {expanded
         ? <path d="M3.5 1v2.5H1M6.5 1v2.5H9M6.5 9v-2.5H9M3.5 9v-2.5H1" />
         : <path d="M1 3.5V1h2.5M6.5 1H9v2.5M9 6.5V9H6.5M3.5 9H1V6.5" />}
@@ -2186,7 +2141,8 @@ function ExtensionDialog({
   const [full, setFull] = useState(false);
   const toggleFull = useCallback(() => setFull((prev) => !prev), []);
   const [now, setNow] = useState(() => Date.now());
-  const focusFirstOption = useCallback((element: HTMLDivElement | null) => element?.focus(), []);
+  const focusFirstOption = useCallback((element: HTMLElement | null) => element?.focus(), []);
+
   const summary = getExtensionDialogSummary(request);
   const remainingSeconds = request.expiresAt === undefined
     ? null
@@ -2232,7 +2188,7 @@ function ExtensionDialog({
   }, [request.expiresAt]);
 
   const countdown = remainingSeconds !== null && (
-    <span style={{ fontSize: 11, color: "var(--text-dim)", whiteSpace: "nowrap", flexShrink: 0 }}>
+    <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
       {t("chat.extensionExpiresIn", { seconds: remainingSeconds })}
     </span>
   );
@@ -2267,192 +2223,142 @@ function ExtensionDialog({
         }
         onRespond(request, { cancelled: true });
       }}
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 90,
-        display: "flex",
-        alignItems: collapsed ? "flex-start" : "flex-end",
-        justifyContent: "center",
-        padding: 20,
-        pointerEvents: "none",
-      }}
+      className={cn("absolute inset-0 z-[90] flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-end")}
     >
       {collapsed ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          style={{
-            pointerEvents: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            maxWidth: "min(560px, 100%)",
-            width: "100%",
-            padding: "10px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg)",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-            color: "var(--text)",
-            cursor: "pointer",
-            textAlign: "left",
-          }}
+          className="pointer-events-auto flex h-auto w-full max-w-[min(560px,100%)] cursor-pointer items-center justify-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left font-normal text-foreground shadow-lg hover:bg-background hover:text-foreground"
         >
-          <span style={{ fontSize: 11, fontWeight: 650, color: "var(--accent)", flexShrink: 0 }}>
+          <span className="shrink-0 text-xs font-[650] text-primary">
             {t("chat.extensionPending")}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
             {stripAnsi(request.title)}
           </span>
           {summary && (
-            <span style={{ fontSize: 12, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "34%", flexShrink: 1 }}>
+            <span className="max-w-[34%] shrink truncate text-xs text-muted-foreground">
               {summary}
             </span>
           )}
           <ExtensionWaitingCount count={waitingCount} />
           {countdown}
-          <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+          <span className="shrink-0 text-xs text-muted-foreground">
             {t("chat.extensionExpand")}
           </span>
-        </button>
+        </Button>
       ) : (
       <div
         ref={dialogRef}
         role="dialog"
         aria-label={stripAnsi(request.title)}
-        className="extension-drawer-in"
+        className="pointer-events-auto relative mx-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl animate-[extension-drawer-in_0.22s_ease-out] motion-reduce:animate-none"
         style={{
-          pointerEvents: "auto",
-          position: "relative",
           // "Full" fills the content region above the composer: the overlay is inset:0 with
           // 20px padding, so 100% keeps that breathing room without covering the input.
           width: full ? "100%" : `min(${fitWidth ?? EXTENSION_DIALOG_BASE_WIDTH}px, 100%)`,
           // Bounded by the panel that holds it, so a tall option preview cannot
           // push the drawer past the chat area and clip its header.
           maxHeight: full ? "100%" : dialogMaxHeight,
-          margin: "0 auto",
-          display: "flex",
-          flexDirection: "column",
-          border: "1px solid var(--border)",
-          borderRadius: 12,
-          background: "var(--bg)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
-          overflow: "hidden",
         }}
       >
-        <div style={{ flexShrink: 1, minHeight: 0, display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border)", maxHeight: 180, overflowY: "auto" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="flex shrink min-h-0 items-start gap-2 border-b border-border px-3.5 py-3 max-h-[180px] overflow-y-auto">
+          <div className="min-w-0 flex-1">
             {/* Pi's TUI shows the title verbatim, newlines included; select/input have no
                 separate message field, so extensions put multi-line text here. */}
-            <ExtensionDialogTitle title={multiSelect ? multiSelect.question || request.title : request.title} />
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", alignItems: "center" }}>
+            <ExtensionDialogTitle title={multiSelect ? stripAnsi(multiSelect.question || request.title) : stripAnsi(request.title)} />
+            <div className="mt-[3px] flex flex-wrap items-center gap-2 text-xs font-mono text-muted-foreground">
               <span>{t("chat.extensionRequest")}</span>
               {totalQuestions > 1 && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <button
+                <span className="inline-flex items-center gap-1">
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="icon-xs"
                     onClick={stepToPrevious}
                     disabled={!answered?.length || reviewIndex === 0}
                     aria-label={t("chat.question.previous")}
                     title={t("chat.question.previous")}
-                    style={{ display: "grid", placeItems: "center", width: 18, height: 18, padding: 0, border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-panel)", color: "var(--text-muted)", cursor: "pointer" }}
+                    className="size-[18px] rounded-[4px] p-0"
                   >
-                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <svg className="size-2 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polyline points="6.5 2 3 5 6.5 8" />
                     </svg>
-                  </button>
-                  <span style={{ color: reviewIndex !== null ? "var(--text)" : "var(--accent)", fontVariantNumeric: "tabular-nums" }}>
+                  </Button>
+                  <span className={cn("tabular-nums", reviewIndex !== null ? "text-foreground" : "text-primary")}>
                     {t("chat.question.pager", { index: reviewIndex !== null ? reviewIndex + 1 : currentQuestionIndex, total: totalQuestions })}
                   </span>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="icon-xs"
                     onClick={stepToNext}
                     disabled={reviewIndex === null}
                     aria-label={t("chat.question.next")}
                     title={t("chat.question.next")}
-                    style={{ display: "grid", placeItems: "center", width: 18, height: 18, padding: 0, border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-panel)", color: "var(--text-muted)", cursor: "pointer" }}
+                    className="size-[18px] rounded-[4px] p-0"
                   >
-                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <svg className="size-2 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polyline points="3.5 2 7 5 3.5 8" />
                     </svg>
-                  </button>
+                  </Button>
                 </span>
               )}
               <ExtensionWaitingCount count={waitingCount} />
               {countdown}
             </div>
           </div>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon-xs"
             onClick={toggleFull}
             title={full ? t("chat.extensionRestoreSize") : t("chat.extensionMaximize")}
             aria-label={full ? t("chat.extensionRestoreSize") : t("chat.extensionMaximize")}
-            style={{
-              display: "grid",
-              placeItems: "center",
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg-panel)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
+            className="size-7 shrink-0 rounded-sm"
           >
             <ExtensionSizeIcon expanded={full} />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
+            size="icon-xs"
             onClick={() => setCollapsed(true)}
             aria-expanded={true}
             title={t("chat.extensionCollapse")}
             aria-label={t("chat.extensionCollapse")}
-            style={{
-              display: "grid",
-              placeItems: "center",
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg-panel)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
+            className="size-7 shrink-0 rounded-sm"
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="2 3.5 5 6.5 8 3.5" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         <div
           ref={bodyRef}
-          style={{
-            padding: 14,
-            flex: "1 1 auto", minHeight: 0, overflowY: "auto",
-          }}
+          className="min-h-0 flex-[1_1_auto] overflow-y-auto p-3.5"
         >
           {reviewed ? (
-            <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", lineHeight: 1.55, overflowWrap: "anywhere" }}>
+            <div className="grid gap-2.5">
+              <div className="text-[13.5px] font-semibold leading-[1.55] text-foreground wrap-anywhere">
                 {`${(reviewIndex ?? 0) + 1}. ${reviewed.question}`}
               </div>
-              <div style={{ padding: "9px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg-panel)", color: "var(--text)", fontSize: 13, lineHeight: 1.6, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
-                <span style={{ display: "block", marginBottom: 4, color: "var(--text-dim)", fontSize: 11 }}>
+              <div className="rounded-sm border border-border bg-card px-2.5 py-[9px] text-[13px] leading-[1.6] text-foreground wrap-anywhere whitespace-pre-wrap">
+                <span className="mb-1 block text-xs text-muted-foreground">
                   {reviewed.cancelled ? t("chat.question.answeredCancelled") : t("chat.question.answerLabel")}
                 </span>
                 {reviewed.answer}
               </div>
-              <div style={{ color: "var(--text-dim)", fontSize: 11 }}>{t("chat.question.reviewHint")}</div>
+              <div className="text-xs text-muted-foreground">{t("chat.question.reviewHint")}</div>
             </div>
           ) : (
           <>
           {request.method === "confirm" && (
-            <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+            <div className="text-[13px] leading-[1.6]">
               <MarkdownBody>{stripAnsi(request.message)}</MarkdownBody>
             </div>
           )}
@@ -2470,15 +2376,10 @@ function ExtensionDialog({
                 buttons[next].focus({ preventScroll: true });
                 buttons[next].scrollIntoView({ block: "nearest" });
               }}
-              style={{ display: "grid", gap: 6 }}
+              className="grid gap-1.5"
             >
               {request.options.map((option, index) => {
                 const tone = extensionOptionTone(option);
-                const toneStyle = tone === "affirmative"
-                  ? { color: "#16a34a" }
-                  : tone === "negative"
-                    ? { color: "#ef4444" }
-                    : undefined;
                 const selected = selectedOption === option;
                 return (
                 <div
@@ -2486,7 +2387,22 @@ function ExtensionDialog({
                   role="button"
                   tabIndex={0}
                   data-extension-option
-                  className={`extension-option${tone === "neutral" ? "" : ` tone-${tone}`}${selected ? " selected" : ""}`}
+                  className={cn(
+                    "extension-option w-full cursor-pointer rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere",
+                    // Match the scroller's padding so keyboard navigation never parks the
+                    // option flush against the edge, where whole-pixel scroll snapping and
+                    // overflow clipping cut off its focus ring.
+                    "scroll-m-[14px]",
+                    selected ? "border-ring bg-accent" : cn(
+                      "border-border",
+                      // Permission-style tints stay readable through hover; the
+                      // selected option keeps its accent surface instead.
+                      tone === "affirmative" ? "bg-success/[0.12] hover:bg-success/[0.22] text-success"
+                        : tone === "negative" ? "bg-destructive/10 hover:bg-destructive/20 text-destructive"
+                          : "bg-sidebar hover:bg-secondary text-foreground",
+                    ),
+                    tone !== "neutral" && "font-semibold",
+                  )}
                   aria-label={stripAnsi(option)}
                   aria-pressed={selected}
                   ref={index === 0 ? focusFirstOption : undefined}
@@ -2500,24 +2416,6 @@ function ExtensionDialog({
                     event.preventDefault();
                     setSelectedOption((current) => current === option ? null : option);
                   }}
-                  style={{
-                    width: "100%",
-                    padding: "7px 10px",
-                    borderRadius: 8,
-                    border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`,
-                    background: selected ? "var(--bg-selected)" : undefined,
-                    color: "var(--text)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 12.5,
-                    fontWeight: tone === "neutral" ? undefined : 600,
-                    overflowWrap: "anywhere",
-                    // Match the scroller's padding so keyboard navigation never parks the
-                    // option flush against the edge, where whole-pixel scroll snapping and
-                    // overflow clipping cut off its focus ring.
-                    scrollMargin: 14,
-                    ...toneStyle,
-                  }}
                 >
                   <div inert>
                     <MarkdownBody>{stripAnsi(option)}</MarkdownBody>
@@ -2528,87 +2426,46 @@ function ExtensionDialog({
             </div>
           )}
           {request.method === "input" && (multiSelect ? (
-            <div style={{ display: "grid", gap: 6 }}>
+            <div className="grid gap-1.5">
               {multiSelect.options.map((option, index) => {
                 const checked = checkedIds.includes(option.id);
                 return (
-                  <div
+                  // The official Checkbox carries the semantics and the Space
+                  // key; the palette card stays the label wrapping it.
+                  <label
                     key={option.id}
-                    role="checkbox"
-                    aria-checked={checked}
-                    tabIndex={0}
-                    className="extension-multi-option"
-                    aria-label={option.label}
-                    ref={index === 0 ? focusFirstOption : undefined}
-                    onClick={() => toggleMultiOption(option.id)}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
-                      toggleMultiOption(option.id);
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 8,
-                      padding: "7px 10px",
-                      borderRadius: 8,
-                      border: `1px solid ${checked ? "var(--accent)" : "var(--border)"}`,
-                      background: checked ? "var(--bg-selected)" : undefined,
-                      color: "var(--text)",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      fontSize: 12.5,
-                      overflowWrap: "anywhere",
-                      scrollMargin: 14,
-                    }}
+                    className={cn(
+                      "flex cursor-pointer select-none items-start gap-2 rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere scroll-m-[14px]",
+                      "border-border hover:bg-secondary has-[[data-state=checked]]:border-ring has-[[data-state=checked]]:bg-accent",
+                      "has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/40",
+                    )}
                   >
-                    <span
-                      aria-hidden
-                      style={{
-                        flexShrink: 0,
-                        display: "grid",
-                        placeItems: "center",
-                        width: 15,
-                        height: 15,
-                        marginTop: 1,
-                        borderRadius: 4,
-                        border: `1px solid ${checked ? "var(--accent)" : "var(--border)"}`,
-                        background: checked ? "var(--accent)" : "transparent",
-                        color: "var(--accent-contrast)",
-                        fontSize: 10,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {checked ? "✓" : ""}
-                    </span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontWeight: 600, marginRight: 6 }}>{option.id}.</span>
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggleMultiOption(option.id)}
+                      aria-label={option.label}
+                      ref={index === 0 ? focusFirstOption : undefined}
+                      className="mt-[1px] size-[15px] shrink-0 rounded-[4px]"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="mr-1.5 font-semibold">{option.id}.</span>
                       {option.label}
                     </span>
-                  </div>
+                  </label>
                 );
               })}
-              <input
+              <Input
                 value={customAnswer}
                 placeholder={t("chat.extensionCustomAnswer")}
                 onChange={(e) => setCustomAnswer(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
                 }}
-                style={{
-                  width: "100%",
-                  padding: "9px 10px",
-                  borderRadius: 7,
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-panel)",
-                  color: "var(--text)",
-                  outline: "none",
-                  fontSize: 13,
-                }}
+                className="rounded-sm border-border bg-card px-2.5 text-[13px]"
               />
             </div>
           ) : (
-            <input
+            <Input
               autoFocus
               value={value}
               placeholder={request.placeholder}
@@ -2616,40 +2473,18 @@ function ExtensionDialog({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              style={{
-                width: "100%",
-                padding: "9px 10px",
-                borderRadius: 7,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text)",
-                outline: "none",
-                fontSize: 13,
-              }}
+              className="rounded-sm border-border bg-card px-2.5 text-[13px]"
             />
           ))}
           {request.method === "editor" && (
-            <textarea
+            <Textarea
               autoFocus
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              style={{
-                width: "100%",
-                minHeight: 220,
-                padding: 10,
-                borderRadius: 7,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text)",
-                outline: "none",
-                resize: "vertical",
-                fontSize: 13,
-                lineHeight: 1.55,
-                fontFamily: "var(--font-mono)",
-              }}
+              className="min-h-[220px] rounded-sm border-border bg-card p-2.5 text-[13px] leading-[1.55] font-mono"
             />
           )}
           </>
@@ -2657,86 +2492,39 @@ function ExtensionDialog({
         </div>
 
         {reviewed ? (
-          <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--bg-panel)" }}>
-            <button
-              onClick={() => setReviewIndex(null)}
-              style={{
-                padding: "8px 14px",
-                fontSize: 13,
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "var(--accent-contrast)",
-                cursor: "pointer",
-              }}
-            >
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-card px-3.5 py-2.5">
+            <Button type="button" onClick={() => setReviewIndex(null)}>
               {t("chat.question.backToCurrent")}
-            </button>
+            </Button>
           </div>
         ) : (
-        <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--bg-panel)" }}>
-          <button
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-card px-3.5 py-2.5">
+          <Button
+            type="button"
+            variant="outline"
             autoFocus={request.method === "confirm" || (request.method === "select" && request.options.length === 0)}
             onClick={() => onRespond(request, { cancelled: true })}
-            style={{
-              padding: "8px 14px",
-              fontSize: 13,
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-            }}
+            className="text-muted-foreground"
           >
              {t("chat.cancel")}
-          </button>
+          </Button>
           {request.method === "confirm" ? (
-            <button
-              onClick={submitValue}
-              style={{
-                padding: "8px 14px",
-                fontSize: 13,
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "var(--accent-contrast)",
-                cursor: "pointer",
-              }}
-            >
+            <Button type="button" onClick={submitValue}>
                {t("chat.confirm")}
-            </button>
+            </Button>
           ) : request.method === "select" ? (
-            <button
+            <Button
+              type="button"
               onClick={submitValue}
               disabled={selectedOption === null}
               autoFocus={request.options.length === 0}
-              style={{
-                padding: "8px 14px",
-                fontSize: 13,
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: selectedOption === null ? "transparent" : "var(--accent)",
-                color: selectedOption === null ? "var(--text-dim)" : "var(--accent-contrast)",
-                cursor: selectedOption === null ? "default" : "pointer",
-              }}
             >
                {t("chat.confirm")}
-            </button>
+            </Button>
           ) : (
-            <button
-              onClick={submitValue}
-              style={{
-                padding: "8px 14px",
-                fontSize: 13,
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "var(--accent-contrast)",
-                cursor: "pointer",
-              }}
-            >
+            <Button type="button" onClick={submitValue}>
                {t("chat.submit")}
-            </button>
+            </Button>
           )}
         </div>
         )}
@@ -2774,83 +2562,48 @@ function ExtensionCustomPanel({
   return (
     <div
       ref={wrapperRef}
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 95,
-        display: "flex",
-        alignItems: collapsed ? "flex-start" : "center",
-        justifyContent: "center",
-        padding: 20,
-        pointerEvents: "none",
-      }}
+      className={cn("absolute inset-0 z-[95] flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-center")}
     >
       {collapsed ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          style={{
-            pointerEvents: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            maxWidth: "min(920px, 100%)",
-            width: "100%",
-            padding: "10px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg)",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-            color: "var(--text)",
-            cursor: "pointer",
-            textAlign: "left",
-          }}
+          className="pointer-events-auto flex h-auto w-full max-w-[min(920px,100%)] cursor-pointer items-center justify-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left font-normal text-foreground shadow-lg hover:bg-background hover:text-foreground"
         >
-          <span style={{ fontSize: 11, fontWeight: 650, color: "var(--accent)", flexShrink: 0 }}>
+          <span className="shrink-0 text-xs font-[650] text-primary">
             {t("chat.extensionPending")}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
             {t("chat.extensionPanel")}
           </span>
           {summary && (
-            <span style={{ fontSize: 12, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "34%", flexShrink: 1 }}>
+            <span className="max-w-[34%] shrink truncate text-xs text-muted-foreground">
               {summary}
             </span>
           )}
           <ExtensionWaitingCount count={waitingCount} />
-          <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+          <span className="shrink-0 text-xs text-muted-foreground">
             {t("chat.extensionExpand")}
           </span>
-        </button>
+        </Button>
       ) : (
       <div
         role="dialog"
         onClick={(event) => {
           if (!(event.target as HTMLElement).closest("button")) inputRef.current?.focus();
         }}
+        // The extension already wrapped its lines to the width it asked for; show them
+        // whole when that is wider than the usual 920px instead of scrolling sideways.
+        className="pointer-events-auto relative flex w-max min-w-[min(920px,100%)] max-w-full flex-col overflow-hidden rounded-md border border-border bg-background shadow-2xl outline-none"
         style={{
-          pointerEvents: "auto",
-          position: "relative",
-          // The extension already wrapped its lines to the width it asked for; show them
-          // whole when that is wider than the usual 920px instead of scrolling sideways.
-          width: "max-content",
-          minWidth: "min(920px, 100%)",
-          maxWidth: "100%",
           // Bounded by the panel that holds it, so a tall editor cannot push the
           // drawer past the chat area and clip its header.
           maxHeight: dialogMaxHeight,
-          display: "flex",
-          flexDirection: "column",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          background: "var(--bg)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
-          overflow: "hidden",
-          outline: "none",
         }}
       >
-        <textarea
+        <Textarea
           ref={inputRef}
            aria-label={t("chat.extensionInput")}
           autoCapitalize="off"
@@ -2888,73 +2641,38 @@ function ExtensionCustomPanel({
             const text = event.clipboardData.getData("text");
             if (text) onInput(request, asBracketedPaste(text));
           }}
-          style={{
-            position: "absolute",
-            width: 1,
-            height: 1,
-            padding: 0,
-            border: 0,
-            opacity: 0,
-            pointerEvents: "none",
-          }}
+          className="absolute h-px min-h-0 w-px border-0 p-0 opacity-0 shadow-none pointer-events-none"
         />
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
-           <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 650 }}>{t("chat.extensionPanel")}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2.5">
+           <div className="text-[13px] font-[650] text-foreground">{t("chat.extensionPanel")}</div>
+          <div className="flex items-center gap-2">
             <ExtensionWaitingCount count={waitingCount} />
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="icon-xs"
               onClick={() => setCollapsed(true)}
               aria-expanded={true}
               title={t("chat.extensionCollapse")}
               aria-label={t("chat.extensionCollapse")}
-              style={{
-                display: "grid",
-                placeItems: "center",
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
+              className="size-7 shrink-0 rounded-sm"
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="2 3.5 5 6.5 8 3.5" />
               </svg>
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               onClick={() => onInput(request, "\x03")}
-              style={{
-                padding: "5px 9px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                fontSize: 12,
-              }}
+              className="text-muted-foreground"
             >
                {t("chat.close")}
-            </button>
+            </Button>
           </div>
         </div>
-        <pre
-          style={{
-            margin: 0,
-            padding: 14,
-            minHeight: 0,
-            overflow: "auto",
-            background: "var(--bg-panel)",
-            color: "var(--text)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 13,
-            lineHeight: 1.45,
-            whiteSpace: "pre",
-          }}
-        >
+        <pre className="m-0 min-h-0 overflow-auto bg-card p-3.5 text-[13px] leading-[1.45] text-foreground font-mono whitespace-pre">
           <AnsiText text={displayLines.join("\n")} />
         </pre>
       </div>

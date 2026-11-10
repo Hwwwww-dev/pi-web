@@ -23,7 +23,9 @@ export function restoreTerminalTabs(raw: string | null): { tabs: TerminalTab[]; 
         tabs.push({ id: tab.id, cwd: tab.cwd, restored: true });
       }
     }
-    return { tabs, activeId: tabs.some((tab) => tab.id === saved.activeId) ? saved.activeId : null, open: saved?.open === true };
+    // activeId is returned verbatim: the caller owns its namespace (terminal ids,
+    // "git", "file:...") and decides what is restorable.
+    return { tabs, activeId: typeof saved?.activeId === "string" ? saved.activeId : null, open: saved?.open === true };
   } catch {
     return { tabs: [], activeId: null, open: false };
   }

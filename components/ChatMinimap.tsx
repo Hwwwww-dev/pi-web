@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo, memo, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, type RefObject } from "react";
 import { isMessageGroupAnchor } from "@/lib/message-display";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { AgentMessage, AssistantMessage, CustomMessage, MinimapTurnDescriptor, TextContent, UserMessage } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
-import styles from "./ChatMinimap.module.css";
 
 interface Props {
   messages: AgentMessage[];
@@ -20,10 +21,6 @@ interface Props {
   /** Whole-branch turn index, oldest first: turns before the loaded window
    *  list from it and page their messages in on click. */
   turnIndex?: MinimapTurnDescriptor[];
-  /** The rail's own visibility decision (the scroll handler and the measure
-   *  path both set it), reported up so the host can reserve the strip for the
-   *  same fact. */
-  onVisibleChange?: (visible: boolean) => void;
 }
 
 const MINIMAP_WIDTH = 36;
@@ -37,10 +34,14 @@ const MINIMAP_PADDING = 12;
 // folds turns into buckets regardless of height, so a long session stays at a
 // readable handful of nodes instead of one dash per turn.
 export const MAX_VISIBLE_SLOTS = 20;
-// The chat pane hides the rail below this floor — the floor just avoids a
-// pane too narrow to read next to the rail. Mobile hides the rail
-// unconditionally already.
-export const MINIMAP_MIN_PANE_WIDTH = 440;
+// Rail width + its left offset + breathing gap: the pane margin the rail needs.
+const MINIMAP_RAIL_STRIP = MINIMAP_WIDTH + 14 + 8;
+// The chat pane hides the rail below this floor: the rail floats in the pane's
+// left margin instead of the message column reserving a strip for it, so the
+// pane must fit the 700px column plus one rail strip on each side. The column
+// stays symmetrically centered and the rail never overlaps it. Mobile hides
+// the rail unconditionally already.
+export const MINIMAP_MIN_PANE_WIDTH = 700 + 2 * MINIMAP_RAIL_STRIP;
 const PREVIEW_SHOW_DELAY = 200;
 const PREVIEW_HIDE_DELAY = 250;
 const NAVIGATION_ACTIVE_LOCK_MS = 1600;
@@ -192,7 +193,6 @@ export const ChatMinimap = memo(function ChatMinimap({
   scrollContainer,
   messageRefs,
   onRevealTurn,
-  onVisibleChange,
   turnsBefore = 0,
   turnIndex = EMPTY_TURN_INDEX,
 }: Props) {
@@ -227,6 +227,17 @@ export const ChatMinimap = memo(function ChatMinimap({
     () => layoutSlots(allNodes, minimapHeight),
     [allNodes, minimapHeight],
   );
+  // The slot geometry centers on the rail's height; the measure path only
+  // runs on scroll and message changes, so a resize would leave the block
+  // centered on a stale height (visibly off-center). Watch the element.
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setMinimapHeight(el.clientHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [visible]);
   const { slots: positionedSlots, gap: slotGap } = slotLayout;
   slotLayoutRef.current = slotLayout;
   const activeSlot =
@@ -270,9 +281,8 @@ export const ChatMinimap = memo(function ChatMinimap({
     const scrollable = scrollEl.scrollHeight - scrollEl.clientHeight;
     const currentNodes = allNodesRef.current;
     setVisible(scrollable > 20);
-    onVisibleChange?.(scrollable > 20);
     syncActiveNode(scrollEl, currentNodes);
-  }, [scrollContainer, syncActiveNode, onVisibleChange]);
+  }, [scrollContainer, syncActiveNode]);
 
   const measureThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const measureNodes = useCallback(() => {
@@ -362,7 +372,6 @@ export const ChatMinimap = memo(function ChatMinimap({
       setAllNodes(nextNodes);
       const nextVisible = scrollEl.scrollHeight - scrollEl.clientHeight > 20;
       setVisible(nextVisible);
-      onVisibleChange?.(nextVisible);
       syncActiveNode(scrollEl, nextNodes);
 
       const pendingNavigation = pendingNavigationRef.current;
@@ -378,7 +387,7 @@ export const ChatMinimap = memo(function ChatMinimap({
         scrollEl.scrollTo({ top: Math.max(0, targetTop - targetOffset), behavior: "smooth" });
       }
     }, 150);
-  }, [getStreamingMessage, lockActiveNode, messageRefs, onVisibleChange, scrollContainer, syncActiveNode, turnIndex, turnsBefore]);
+  }, [getStreamingMessage, lockActiveNode, messageRefs, scrollContainer, syncActiveNode, turnIndex, turnsBefore]);
 
   useEffect(() => {
     const el = scrollContainer.current;
@@ -515,7 +524,7 @@ export const ChatMinimap = memo(function ChatMinimap({
     window.addEventListener("mouseup", onUp);
   }, [findNearestSlot, scrollToNode, showPreview, visible]);
 
-  // The overlay covers the chat's right edge, so wheel events over it would be
+  // The overlay covers the chat's left edge, so wheel events over it would be
   // swallowed; forward them so scrolling keeps working under the trigger zone.
   // The preview card scrolls itself, and forwarding its wheel events on top of
   // that scrolled the chat at the same time.
@@ -557,19 +566,17 @@ export const ChatMinimap = memo(function ChatMinimap({
         if (findNearestSlot(ratio)) showPreview();
         else if (!draggingRef.current) schedulePreviewHide();
       }}
+      // Canvas anchoring: the rail hugs the chat pane's LEFT edge at the shared
+      // MINIMAP_WIDTH layout constant — measured positioning, kept as a style.
       style={{
         position: "absolute",
         top: 0,
         bottom: 0,
-        // Inside the chat pane's right edge, clear of its scrollbar — flush
-        // right: 0 sat on top of the scrollbar and read as "outside" the pane.
-        right: 14,
+        left: 14,
         width: MINIMAP_WIDTH,
         zIndex: 25,
-        cursor: "pointer",
-        userSelect: "none",
-        overflow: "visible",
       }}
+      className="cursor-pointer select-none overflow-visible"
     >
       {positionedSlots.map((slot) => {
         const isNearest = minimapHovered && nearestSlot === slot;
@@ -577,14 +584,7 @@ export const ChatMinimap = memo(function ChatMinimap({
         const slotHasCompaction = slot.indexes.some((i) => allNodes[i]?.targetTurn.afterCompaction);
         // The dashes are the minimap when nothing is hovered: without them the
         // trigger zone is invisible, so there is nothing to aim for.
-        const width = isNearest ? 18 : minimapHovered || isActive ? 12 : 8;
-        const background = isActive
-          ? "var(--accent)"
-          : isNearest
-            ? "color-mix(in srgb, var(--accent) 55%, transparent)"
-            : minimapHovered
-              ? "color-mix(in srgb, var(--text-muted) 38%, transparent)"
-              : "color-mix(in srgb, var(--text-muted) 24%, transparent)";
+        const widthClass = isNearest ? "w-[18px]" : minimapHovered || isActive ? "w-3" : "w-2";
 
         return (
           <div
@@ -592,54 +592,47 @@ export const ChatMinimap = memo(function ChatMinimap({
             data-minimap-node-index={slot.indexes[0]}
             data-minimap-node-span={slot.indexes.length > 1 ? slot.indexes.length : undefined}
             data-minimap-node-active={isActive ? "" : undefined}
+            // Tick placement: top/height come from the slot layout's measured pitch.
             style={{
               position: "absolute",
               top: `${slot.topRatio * 100}%`,
               transform: "translateY(-50%)",
-              left: 0,
-              right: 0,
               height: Math.max(1, slotGap),
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              paddingRight: 9,
-              pointerEvents: "none",
               zIndex: 2,
             }}
+            className="pointer-events-none inset-x-0 flex items-center justify-end pr-[9px]"
           >
             {slotHasCompaction && (
               <div
                 aria-hidden="true"
                 title={t("chatMinimap.compactionBoundary")}
-                style={{
-                  width: 5,
-                  height: 5,
-                  marginRight: 5,
-                  transform: "rotate(45deg)",
-                  borderRadius: 1,
-                  background: "var(--accent)",
-                  opacity: minimapHovered ? 0.9 : 0.55,
-                  transition: "opacity 0.12s ease",
-                }}
+                className={`mr-[5px] h-[5px] w-[5px] rotate-45 rounded-[1px] bg-primary transition-opacity duration-[120ms] ${
+                  minimapHovered ? "opacity-90" : "opacity-55"
+                }`}
               />
             )}
             <div
-              style={{
-                width,
-                height: 3,
-                borderRadius: 999,
-                background,
-                transition: "width 0.12s ease, background 0.12s ease",
-              }}
+              className={`h-[3px] rounded-full transition-[width,background-color] duration-[120ms] ${widthClass} ${
+                isActive
+                  ? "bg-primary"
+                  : isNearest
+                    ? "bg-primary/55"
+                    : minimapHovered
+                      ? "bg-muted-foreground/38"
+                      : "bg-muted-foreground/24"
+              }`}
             />
           </div>
         );
       })}
 
       {minimapHovered && nearestSlot !== null && allNodes.length > 0 && (
+        // Centered by the animation's fill-both end frame (translateY(-50%));
+        // a -translate-y-1/2 class here would compose with it in Tailwind v4
+        // (translate property + transform) and shift the card a full height.
         <div
           ref={previewBoxRef}
-          className={styles.preview}
+          className="pointer-events-auto absolute top-1/2 left-[calc(100%+12px)] z-[100] max-h-[calc(100%-24px)] w-[340px] cursor-default select-text overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/75 bg-background p-2 shadow-md animate-[minimap-preview-in_160ms_ease_both] scrollbar-thin"
           data-minimap-preview-box=""
           onMouseEnter={showPreview}
           onMouseDown={(event) => event.stopPropagation()}
@@ -648,6 +641,7 @@ export const ChatMinimap = memo(function ChatMinimap({
           {allNodes.map((node) => {
             const isLocated = nearestNodeIndex === node.index;
             const turn = node.targetTurn;
+            const isUnloaded = turn.scrollTop === null;
             const metaParts: string[] = [];
             if (turn.afterCompaction) metaParts.push(t("chatMinimap.compactionBoundary"));
             if (turn.scrollTop === null) {
@@ -672,30 +666,57 @@ export const ChatMinimap = memo(function ChatMinimap({
                   if (element) previewItemRefs.current.set(node.index, element);
                   else previewItemRefs.current.delete(node.index);
                 }}
-                className={styles.turn}
+                className={cn(
+                  // One hairline between turns keeps the card scannable without
+                  // boxing every row.
+                  "grid grid-cols-[22px_minmax(0,1fr)] gap-x-1 rounded-[10px] px-1.5 pt-[5px] pb-[3px] transition-colors duration-[120ms]",
+                  "[&:not(:first-child)]:border-t [&:not(:first-child)]:rounded-t-none [&:not(:first-child)]:border-border/55",
+                  isLocated && "bg-accent/10",
+                )}
                 data-minimap-preview-index={node.index}
                 data-located={isLocated ? "true" : undefined}
-                data-unloaded={turn.scrollTop === null ? "" : undefined}
+                data-unloaded={isUnloaded ? "" : undefined}
               >
-                <span className={styles.number} aria-hidden="true">
+                <span
+                  className={cn(
+                    "pt-1.5 text-center font-mono text-[10px] leading-[18px] tabular-nums",
+                    isLocated ? "text-primary" : "text-muted-foreground",
+                  )}
+                  aria-hidden="true"
+                >
                   {String(node.index + 1 + (turnIndex.length > 0 ? 0 : turnsBefore)).padStart(2, "0")}
                 </span>
-                <div className={styles.content}>
-                  <button
+                <div className="min-w-0">
+                  <Button
                     type="button"
-                    className={styles.user}
+                    variant="ghost"
+                    className={cn(
+                      "block h-auto w-full overflow-hidden rounded-lg px-2 pt-[5px] pb-[3px] text-left text-[13px] font-semibold leading-[18px] tracking-normal transition-colors duration-100",
+                      isLocated ? "bg-foreground/[0.06] text-primary" : "bg-transparent text-foreground hover:bg-foreground/[0.06]",
+                      "focus-visible:bg-foreground/[0.06] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-ring/60",
+                    )}
                     data-minimap-preview-user={node.index}
                     onClick={() => {
                       scrollToNode(node, "smooth");
                     }}
                   >
-                      <span className={styles.userText}>
+                    <span className={cn("line-clamp-2 whitespace-pre-wrap [overflow-wrap:anywhere]", isUnloaded && "opacity-60")}>
                       {getUserPreview(node.targetTurn.userMessage)}
                     </span>
-                  </button>
+                  </Button>
 
                   {metaParts.length > 0 && (
-                    <div className={styles.meta}>{metaParts.join(" · ")}</div>
+                    <div
+                      className={cn(
+                        "ml-2 mt-px mb-[3px] truncate font-mono text-[10.5px] leading-[15px] tabular-nums",
+                        isLocated
+                          ? "text-[color-mix(in_srgb,var(--primary)_65%,var(--muted-foreground))]"
+                          : "text-muted-foreground",
+                        isUnloaded && "italic",
+                      )}
+                    >
+                      {metaParts.join(" · ")}
+                    </div>
                   )}
                 </div>
               </div>

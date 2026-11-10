@@ -36,7 +36,7 @@ test("renders short extension widgets without a truncation marker", () => {
   assert.match(html, /first\nsecond/);
   assert.doesNotMatch(html, /widget truncated/);
   assert.match(html, /aria-expanded="true"/);
-  assert.match(html, /data-direction="up"/);
+  assert.match(html, /lucide-chevron-up/);
   assert.doesNotMatch(html, /[\u2191\u2193]/);
 });
 
@@ -51,7 +51,7 @@ test("collapses long widgets by default", () => {
 
   assert.ok(lines.length > DEFAULT_EXPANDED_WIDGET_LINES);
   assert.match(html, /aria-expanded="false"/);
-  assert.match(html, /data-direction="down"/);
+  assert.match(html, /lucide-chevron-down/);
   assert.doesNotMatch(html, /<pre/);
   assert.doesNotMatch(html, /line-1/);
   assert.doesNotMatch(html, /line-10/);
@@ -131,16 +131,16 @@ test("keeps one-line widgets compact but expandable", () => {
     widgets: [{ key: "single-line-widget", lines: ["ready"], placement: "belowEditor" }],
   });
 
-  assert.match(html, /extension-widget-triggers/);
-  assert.match(html, /<svg[^>]*extension-widget-placement-icon/);
-  assert.match(html, /data-direction="down"/);
+  assert.match(html, /aria-label="Extension widgets"/);
+  assert.match(html, /lucide-chevron-down/);
   assert.doesNotMatch(html, /[\u2191\u2193]/);
   assert.match(html, /Below editor widget/);
-  assert.match(html, /<button[^>]*class="extension-widget-trigger/);
-  assert.match(html, /aria-expanded="false"/);
-  assert.match(html, /title="single-line-widget - Below editor widget - Expand"/);
-  assert.match(html, /extension-widget-key/);
-  assert.match(html, /extension-widget-update-pulse/);
+  assert.match(html, /<button[^>]*aria-expanded="false"/);
+  // The native title that rendered as a black browser blob is gone; the
+  // placement lives in the accessible name (the styled tooltip is portal
+  // content, absent from static markup).
+  assert.doesNotMatch(html, /title="[^"]*"/);
+  assert.match(html, /aria-label="Below editor widget: single-line-widget/);
   assert.doesNotMatch(html, /extension-widget-preview/);
   assert.doesNotMatch(html, /extension-widget-line-count/);
   assert.doesNotMatch(html, />ready</);
@@ -152,8 +152,19 @@ test("keeps empty widgets non-interactive", () => {
     widgets: [{ key: "empty-widget", lines: [], placement: "aboveEditor" }],
   });
 
-  assert.match(html, /<div class="extension-widget-trigger/);
+  assert.match(html, /<span[^>]*inline-flex h-6[^>]*>/);
   assert.doesNotMatch(html, /<button/);
   assert.doesNotMatch(html, /aria-expanded/);
-  assert.match(html, /title="empty-widget - Above editor widget"/);
+  assert.doesNotMatch(html, /title="[^"]*"/);
+  assert.match(html, /aria-label="Above editor widget: empty-widget/);
+});
+
+test("keeps blank-padding widgets non-interactive — an empty panel is worse than none", () => {
+  const html = renderWidgets({
+    widgets: [{ key: "blank-widget", lines: ["", "  ", "\u001b[0m"], placement: "aboveEditor" }],
+  });
+
+  assert.match(html, /<span[^>]*inline-flex h-6[^>]*>/);
+  assert.doesNotMatch(html, /<button/);
+  assert.doesNotMatch(html, /<section/);
 });

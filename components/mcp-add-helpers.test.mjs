@@ -539,5 +539,7 @@ test("the helpers and the pane only use words from the locale files", () => {
   assert.ok(keys.length > 40);
   for (const key of keys) assert.equal(typeof messages.en[key], "string", `${key} is missing from en.ts`);
   assert.doesNotMatch(paneSource, />\s*[A-Z][a-z]+(?: [a-z]+){2,}[.:]?\s*</, "no English sentence in the markup");
-  assert.doesNotMatch(paneSource, /\btitle=\{(?!t\("mcp\.add\.title"\))/, "no reason hides in a tooltip");
+  // A `title` may name the pane or a section card with a locale key; it never
+  // carries a reason a touch screen could not show.
+  assert.doesNotMatch(paneSource, /\btitle=\{(?!t\("mcp\.add\.)/, "no reason hides in a tooltip");
 });

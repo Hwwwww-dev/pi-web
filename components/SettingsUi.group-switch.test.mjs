@@ -26,14 +26,14 @@ test("a group switch is on only while every row of the group is", () => {
   assert.match(renderSwitch(3, 3), /aria-checked="true"/);
   assert.match(renderSwitch(2, 3), /aria-checked="false"/);
   assert.match(renderSwitch(0, 3), /aria-checked="false"/);
-  assert.match(renderSwitch(2, 3), /<span class="config-sidebar-group-count">2\/3<\/span>/);
+  assert.match(renderSwitch(2, 3), /<span class="font-mono text-\[11px\] text-muted-foreground">2\/3<\/span>/);
 });
 
 test("the group switch shares the heading row and uses the regular switch", () => {
   const html = renderSwitch(1, 2);
-  assert.match(html, /^<div class="config-sidebar-group-label"><span class="config-sidebar-group-label-text">global<\/span><span class="config-sidebar-group-switch">/);
-  assert.match(html, /class="config-switch"/);
-  assert.doesNotMatch(html, /class="config-switch is-small"/);
+  assert.match(html, /^<div class="config-sidebar-group-label[^"]*"><span class="min-w-0 truncate">global<\/span><span class="inline-flex shrink-0 items-center gap-1.5">/);
+  assert.match(html, /data-slot="switch" data-size="default"/);
+  assert.doesNotMatch(html, /data-size="sm"/);
   assert.match(html, /aria-label="Switch the group"/);
 });
 
@@ -43,6 +43,6 @@ test("a group's status shows only what the last switch left undone", () => {
     note: "1 filtered package stayed on",
     error: "Could not change 1 of 2 packages",
   }));
-  assert.match(html, /role="status" class="config-sidebar-group-note">1 filtered package stayed on/);
-  assert.match(html, /role="alert" class="config-sidebar-group-error">Could not change 1 of 2 packages/);
+  assert.match(html, /role="status" class="text-muted-foreground">1 filtered package stayed on/);
+  assert.match(html, /role="alert" class="text-destructive">Could not change 1 of 2 packages/);
 });

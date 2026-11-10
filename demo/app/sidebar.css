@@ -1,0 +1,154 @@
+/* Session sidebar: only the rules that cannot live on the components' own
+   classes (components/SessionSidebar.tsx, components/SessionTree.tsx carry
+   everything else as Tailwind utilities). These are the virtualizer's row
+   geometry, the scrollbar-aware insets and gutter, the header-fit states
+   useHeaderFit reports, the fold's and the archive view's motion, and the
+   awaiting dot the Debug panel renders outside the tree too. */
+
+/* The tree's rows: absolutely positioned by the virtualizer, which also
+   sets each row's top and height inline from SIDEBAR_ROW_HEIGHTS
+   (lib/session-tree.ts). The row's box and look are its own classes. */
+.session-tree-row {
+  position: absolute;
+}
+
+/* Rows sit 6px in from the left edge in every browser: the grid the brand,
+   the files section's header, the picker and the file tree keep too
+   (chevron column 11px in, text column 26px). A classic scrollbar takes
+   its width from the right only (--session-tree-scrollbar, measured in
+   SessionTree), so the right inset shrinks by it: the rows end 6px in, or
+   on the gutter's edge where that is further in. The scrollbar's room is
+   kept while the list fits too, so rows do not narrow when it starts to
+   scroll; an overlay scrollbar reserves nothing. */
+.session-tree-scroll {
+  --session-tree-inset-left: 6px;
+  --session-tree-inset-right: max(0px, calc(6px - var(--session-tree-scrollbar, 0px)));
+  scrollbar-gutter: stable;
+}
+
+/* Safari before 18.2 has no scrollbar-gutter: an always-present scrollbar
+   keeps the same room. Its track is transparent, and a subtle thumb shows
+   only while the list is active and overflows (globals.css). */
+@supports not (scrollbar-gutter: stable) {
+  .session-tree-scroll {
+    overflow-y: scroll;
+  }
+}
+
+/* Below the sessions, the files' right edge is the session times': a
+   session row ends 6px in, or on the tree's classic scrollbar's gutter
+   where that is further in, and its time 4px inside the row. The header
+   row's keys and the picker's boxes end there. */
+.session-sidebar.is-files-below {
+  --sidebar-files-inset-right: max(10px, calc(var(--session-tree-scrollbar, 0px) + 4px));
+}
+
+/* Where the header's labels do not fit (useHeaderFit measures them: their
+   widths change with the language): New keeps its + (fit 1), then the
+   brand's text takes the sidebar's meta size (fit 2, which only the
+   versions reach), and a hidden label leaves the layout for good. */
+.sidebar-header[data-fit="1"] .sidebar-new-button,
+.sidebar-header[data-fit="2"] .sidebar-new-button {
+  width: var(--top-bar-height);
+  padding: 0;
+}
+
+.sidebar-header[data-fit="2"] .sidebar-brand {
+  font-size: 11px;
+}
+
+.sidebar-header[data-fit="1"] .sidebar-new-label,
+.sidebar-header[data-fit="2"] .sidebar-new-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* A fold or an unfold (only those: .is-files-folding is on the root while
+   one runs, never for a drag, keys, a window resize or a layout switch)
+   moves the files' height between the separator's and the header row's,
+   the sessions growing or shrinking to match. */
+.session-sidebar.is-files-below.is-files-folding .sidebar-files-panel {
+  transition: height 180ms ease-out;
+}
+
+/* The archive view slides in from the right over the tree and away to the
+   right again (useSidebarMotion's phases); nothing in a view on its way
+   out takes a click (it is inert too). */
+.sidebar-archive-view.is-entering {
+  animation: sidebar-archive-in 180ms ease-out;
+}
+
+.sidebar-archive-view.is-leaving {
+  animation: sidebar-archive-out 180ms ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes sidebar-archive-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+@keyframes sidebar-archive-out {
+  to {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The fold and the archive view change at once (no phase starts either:
+     useSidebarMotion). */
+  .session-sidebar.is-files-below.is-files-folding .sidebar-files-panel {
+    transition: none;
+  }
+
+  .sidebar-archive-view.is-entering,
+  .sidebar-archive-view.is-leaving {
+    animation: none;
+  }
+
+  .session-tree-awaiting::after {
+    animation: none;
+  }
+}
+
+/* A group drag turns the whole tree's cursor; the class goes on the tree's
+   root while a drag is under way (useGroupDrag). */
+.session-tree.is-group-dragging,
+.session-tree.is-group-dragging * {
+  cursor: grabbing;
+}
+
+/* An agent awaiting input: a warning dot with a breathing ring. The Debug
+   panel's sessions list (components/DebugPanel.tsx) renders the same span
+   outside the tree, so the rule stays here. */
+.session-tree-awaiting {
+  position: relative;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+
+.session-tree-awaiting::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1.4px solid var(--warning);
+  border-radius: 50%;
+  opacity: 0.35;
+  animation: session-tree-status-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes session-tree-status-pulse {
+  50% {
+    transform: scale(1.6);
+  }
+}

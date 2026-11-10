@@ -1,43 +1,62 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ArrowUpIcon } from "lucide-react";
+import { Badge } from "./ui/badge";
+import { Separator } from "./ui/separator";
 import { sendAgentCommand } from "@/lib/agent-client";
-import type { PluginPackageInfo, PluginStandaloneExtensionInfo, PluginUpdateResult, PluginsResponse } from "@/lib/api-types";
+import type {
+  PluginPackageInfo,
+  PluginStandaloneExtensionInfo,
+  PluginUpdateResult,
+  PluginsBulkResponse,
+  PluginsResponse,
+  ProjectTrustStatus,
+} from "@/lib/api-types";
 import { useI18n } from "@/hooks/useI18n";
+import { shortenPath } from "@/lib/display-path";
 import {
   getLastSettingsSelection,
   setLastSettingsSelection,
 } from "@/lib/settings-navigation";
 import {
+  ConfigAddSourcePanel,
   ConfigButton,
+  ConfigCard,
   ConfigDetail,
   ConfigDetailActions,
+  ConfigDetailGrid,
+  ConfigDetailGridRow,
   ConfigDetailHeader,
   ConfigDetailHeaderInfo,
   ConfigDetailStack,
   ConfigDetailTitle,
   ConfigEmptyState,
-  ConfigField,
   ConfigFooter,
+  ConfigFooterStatus,
   ConfigListAction,
   ConfigPanelShell,
+  ConfigSaveTarget,
+  ConfigScopeTag,
   ConfigSidebar,
   ConfigSidebarGroupLabel,
+  ConfigSidebarGroupStatus,
+  ConfigSidebarGroupSwitch,
   ConfigSidebarItem,
   ConfigSidebarList,
   ConfigSidebarText,
-  ConfigSectionTitle,
   ConfigSplitView,
   ConfigStatusDot,
   ConfigSwitch,
+  ConfigTrustNotice,
 } from "./SettingsUi";
+import { itemsToSwitch, projectTrustReloadKey } from "./settings-ui-helpers";
 
 type PluginScope = PluginPackageInfo["scope"];
 type PluginAction = "install" | "remove" | "update" | "disable" | "enable";
+type Translate = ReturnType<typeof useI18n>["t"];
 
-function shortenPath(path: string): string {
-  return path.replace(/^\/(?:Users|home)\/[^/]+/, "~");
-}
+const PLUGIN_SOURCE_EXAMPLES = ["npm:@scope/pi-plugin", "git:https://github.com/user/repo", "/absolute/path/to/plugin"];
 
 function normalizePluginSourceInput(value: string): string {
   const match = value.trim().match(/^\$?\s*pi\s+install\s+(\S+)\s*$/);
@@ -48,11 +67,55 @@ function packageKey(pkg: Pick<PluginPackageInfo, "source" | "scope">): string {
   return `${pkg.scope}\0${pkg.source}`;
 }
 
+/**
+ * The packages a scope's group switch would change: those not already in the
+ * requested state. Standalone extensions have no switch here, so they are
+ * never included. Switching a group off also leaves out a filtered package:
+ * disabling empties its resource lists and nothing keeps the filters, so that
+ * stays a decision for its own switch.
+ */
+export function packagesToSwitch<T extends Pick<PluginPackageInfo, "disabled" | "filtered">>(
+  packages: T[],
+  enabled: boolean,
+): T[] {
+  return itemsToSwitch(packages, enabled, (pkg) => !pkg.disabled, (pkg) => pkg.filtered);
+}
+
+/** Enabled filtered packages, which switching their group off leaves on. */
+export function filteredPackagesKeptOn<T extends Pick<PluginPackageInfo, "disabled" | "filtered">>(
+  packages: T[],
+): T[] {
+  return packages.filter((pkg) => !pkg.disabled && pkg.filtered);
+}
+
 function extensionKey(extension: PluginStandaloneExtensionInfo): string {
   return `extension\0${extension.path}`;
 }
 
-function resourceSummary(pkg: PluginPackageInfo, t: ReturnType<typeof useI18n>["t"]): string {
+function scopeLabel(scope: PluginScope, t: Translate): string {
+  return scope === "project" ? t("skills.scope.project") : t("skills.scope.global");
+}
+
+/** A package status as shown; English keeps the lower-case API value. */
+function statusLabel(status: PluginPackageInfo["status"], t: Translate): string {
+  return t(`plugins.status.${status}`);
+}
+
+/** The footer's resource totals, in the order of a package's resource summary. */
+function totalsSummary(totals: PluginsResponse["totals"], t: Translate): string {
+  return [
+    t("i18n.resourceCount", { count: totals.extensions, label: t("i18n.extensionShort") }),
+    t("i18n.resourceCount", { count: totals.skills, label: t("i18n.skillShort") }),
+    t("i18n.resourceCount", { count: totals.prompts, label: t("i18n.promptShort") }),
+    t("i18n.resourceCount", { count: totals.themes, label: t("i18n.themeShort") }),
+  ].join(" · ");
+}
+
+function diagnosticText(diagnostic: PluginsResponse["diagnostics"][number]): string {
+  return `${diagnostic.type}: ${diagnostic.source ? `${diagnostic.source}: ` : ""}${diagnostic.message}`;
+}
+
+function resourceSummary(pkg: PluginPackageInfo, t: Translate): string {
   if (pkg.disabled) return t("i18n.disabled");
   const parts = [
     pkg.counts.extensions ? t("i18n.resourceCount", { count: pkg.counts.extensions, label: t("i18n.extensionShort") }) : "",
@@ -63,16 +126,17 @@ function resourceSummary(pkg: PluginPackageInfo, t: ReturnType<typeof useI18n>["
   return parts.length ? parts.join(" · ") : t("i18n.noResources");
 }
 
-function versionSummary(pkg: PluginPackageInfo, t: ReturnType<typeof useI18n>["t"]): string {
+function versionSummary(pkg: PluginPackageInfo, t: Translate): string {
   const parts = [];
   if (pkg.version) parts.push(t("i18n.installedVersion", { version: pkg.version }));
   if (pkg.configuredVersion) parts.push(t("i18n.configuredVersion", { version: pkg.configuredVersion }));
   return parts.length ? parts.join(" · ") : t("i18n.unknown");
 }
 
+/** Where pi installs a package of this scope (`DefaultPackageManager`'s npm and git roots). */
 function installLocation(scope: PluginScope, cwd: string): string {
   return scope === "project"
-    ? `${shortenPath(cwd)}/.pi/agent/{npm,git}`
+    ? `${shortenPath(cwd)}/.pi/{npm,git}`
     : "~/.pi/agent/{npm,git}";
 }
 
@@ -88,11 +152,20 @@ function findInstalledPackage(
     ?? packages.find((pkg) => pkg.scope === scope && pkg.source.endsWith(trimmed));
 }
 
+/** The sidebar dot's fill: raw vars, since ConfigStatusDot takes a color. */
 function statusColor(status: PluginPackageInfo["status"]): string {
   if (status === "loaded") return "var(--accent)";
-  if (status === "installed") return "#f59e0b";
-  if (status === "disabled") return "var(--text-dim)";
-  return "#ef4444";
+  if (status === "installed") return "var(--warning)";
+  if (status === "disabled") return "var(--muted-foreground)";
+  return "var(--destructive)";
+}
+
+/** The detail status row's tone: the same states as token utilities. */
+function statusClassName(status: PluginPackageInfo["status"]): string {
+  if (status === "loaded") return "text-primary";
+  if (status === "installed") return "text-warning";
+  if (status === "disabled") return "text-muted-foreground";
+  return "text-destructive";
 }
 
 function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
@@ -112,141 +185,36 @@ function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
 
   if (groups.length === 0) {
     return (
-      <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+      <div className="text-xs text-muted-foreground">
         {pkg.disabled ? t("i18n.packageDisabled") : t("i18n.noResolvedResources")}
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
+    <div className="flex flex-col gap-3">
       {groups.map((group, groupIndex) => (
-        <div
-          key={group.kind}
-          style={{
-            borderTop: groupIndex === 0 ? "none" : "1px solid var(--border)",
-            paddingTop: groupIndex === 0 ? 0 : 12,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: "var(--text-dim)",
-              textTransform: "uppercase",
-              marginBottom: 6,
-            }}
-          >
-            {group.label}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {group.resources.map((resource) => (
-              <div key={`${resource.kind}:${resource.path}`} style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text)",
-                    fontFamily: "var(--font-mono)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                  title={resource.path}
-                >
-                  {resource.name}
+        <Fragment key={group.kind}>
+          {groupIndex > 0 && <Separator />}
+          <div>
+            <div className="mb-1.5 text-[10px] font-bold uppercase text-muted-foreground">
+              {group.label}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {group.resources.map((resource) => (
+                <div key={`${resource.kind}:${resource.path}`} className="min-w-0">
+                  <div className="truncate font-mono text-xs text-foreground" title={resource.path}>
+                    {resource.name}
+                  </div>
+                  <div className="mt-px truncate font-mono text-[10px] text-muted-foreground" title={resource.path}>
+                    {resource.relativePath}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "var(--text-dim)",
-                    fontFamily: "var(--font-mono)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    marginTop: 1,
-                  }}
-                  title={resource.path}
-                >
-                  {resource.relativePath}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        </Fragment>
       ))}
-    </div>
-  );
-}
-
-function ScopeTag({ scope }: { scope: PluginScope }) {
-  return (
-    <span
-      style={{
-        fontSize: 10,
-        padding: "1px 5px",
-        borderRadius: 3,
-        flexShrink: 0,
-        background: scope === "project" ? "rgba(99,102,241,0.12)" : "rgba(120,120,120,0.12)",
-        color: scope === "project" ? "rgba(99,102,241,0.85)" : "var(--text-dim)",
-      }}
-    >
-      {scope}
-    </span>
-  );
-}
-
-function SegmentedScope({
-  value,
-  projectResourcesLoaded,
-  onChange,
-}: {
-  value: PluginScope;
-  projectResourcesLoaded: boolean;
-  onChange: (scope: PluginScope) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div
-      style={{
-        display: "inline-flex",
-        border: "1px solid var(--border)",
-        borderRadius: 7,
-        overflow: "hidden",
-        height: 30,
-      }}
-    >
-      {(["global", "project"] as PluginScope[]).map((scope) => {
-        const active = value === scope;
-        const disabled = scope === "project" && !projectResourcesLoaded;
-        return (
-          <button
-            key={scope}
-            onClick={() => {
-              if (!disabled) onChange(scope);
-            }}
-            disabled={disabled}
-            title={disabled ? t("trust.projectScopeUnavailable") : undefined}
-            style={{
-              width: 76,
-              border: "none",
-              borderRight: scope === "global" ? "1px solid var(--border)" : "none",
-              background: active ? "var(--bg-selected)" : "none",
-              color: active ? "var(--text)" : "var(--text-muted)",
-              cursor: disabled ? "not-allowed" : "pointer",
-              opacity: disabled ? 0.45 : 1,
-              fontSize: 12,
-            }}
-          >
-            {scope}
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -273,141 +241,60 @@ function AddPluginPanel({
   onInstall: () => void;
 }) {
   const { t } = useI18n();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const examples = ["npm:@scope/pi-plugin", "git:https://github.com/user/repo", "/absolute/path/to/plugin"];
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
 
   return (
-    <ConfigDetailStack className="is-fill">
-      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <ConfigDetailTitle>{t("i18n.addPlugin")}</ConfigDetailTitle>
-          <a
-            href="https://pi.dev/packages"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-              color: "var(--accent)",
-              fontSize: 12,
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <svg width="28" height="28" viewBox="0 0 800 800" aria-hidden="true" focusable="false" style={{ flexShrink: 0 }}>
-              <path
-                fill="#000"
-                fillRule="evenodd"
-                d="M165.29 165.29H517.36V400H400V517.36H282.65V634.72H165.29ZM282.65 282.65V400H400V282.65Z"
-              />
-              <path fill="#000" d="M517.36 400H634.72V634.72H517.36Z" />
-            </svg>
-            pi.dev/packages
-          </a>
-        </div>
-        <div style={{ fontSize: 12, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
-          {installLocation(scope, cwd)}
-        </div>
-      </div>
-
-      <ConfigField label="Source">
-        <input
-          id="plugin-source"
-          ref={inputRef}
-          value={source}
-          onChange={(e) => onSourceChange(e.target.value)}
-          onPaste={(e) => {
-            const pasted = e.clipboardData.getData("text");
-            const normalized = normalizePluginSourceInput(pasted);
-            if (normalized === pasted) return;
-            e.preventDefault();
-            onSourceChange(normalized);
-          }}
-          onBlur={(e) => onSourceChange(normalizePluginSourceInput(e.currentTarget.value))}
-          placeholder="npm:@scope/package"
-          style={{
-            width: "100%",
-            height: 36,
-            padding: "0 11px",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "var(--bg-panel)",
-            color: "var(--text)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            outline: "none",
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && source.trim() && !busy) onInstall();
-          }}
-        />
-      </ConfigField>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <SegmentedScope
+    <ConfigAddSourcePanel
+      title={t("i18n.addPlugin")}
+      catalogs={[{
+        href: "https://pi.dev/packages",
+        label: "pi.dev/packages",
+        icon: (
+          <svg width="28" height="28" viewBox="0 0 800 800" aria-hidden="true" focusable="false">
+            {/* Brand mark, not a UI glyph: no lucide equivalent; currentColor
+                keeps it visible on dark themes (#000 was invisible there). */}
+            <path
+              fill="currentColor"
+              fillRule="evenodd"
+              d="M165.29 165.29H517.36V400H400V517.36H282.65V634.72H165.29ZM282.65 282.65V400H400V282.65Z"
+            />
+            <path fill="currentColor" d="M517.36 400H634.72V634.72H517.36Z" />
+          </svg>
+        ),
+      }]}
+      target={
+        <ConfigSaveTarget
           value={scope}
-          projectResourcesLoaded={projectResourcesLoaded}
+          label={t("config.saveTo")}
+          options={[
+            { value: "global", label: scopeLabel("global", t) },
+            { value: "project", label: scopeLabel("project", t), disabled: !projectResourcesLoaded },
+          ]}
+          path={installLocation(scope, cwd)}
+          disabledReason={t("trust.projectScopeUnavailable")}
           onChange={onScopeChange}
         />
-        <ConfigButton
-          variant="primary"
-          onClick={onInstall}
-          disabled={busy || !source.trim()}
-          className="is-pushed-right"
-        >
-          {busy ? t("i18n.installing") : t("i18n.install")}
-        </ConfigButton>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>
-          Examples
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {examples.map((example) => (
-            <button
-              key={example}
-              type="button"
-              onClick={() => onSourceChange(example)}
-              style={{
-                width: "100%",
-                minHeight: 30,
-                textAlign: "left",
-                padding: "6px 9px",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                background: "var(--bg-panel)",
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--bg-hover)";
-                e.currentTarget.style.color = "var(--text-muted)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--bg-panel)";
-                e.currentTarget.style.color = "var(--text-dim)";
-              }}
-            >
-              {example}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {actionError && (
-        <div style={{ fontSize: 12, color: "#ef4444", whiteSpace: "pre-wrap" }}>
-          {actionError}
-        </div>
-      )}
-    </ConfigDetailStack>
+      }
+      inputLabel={t("config.source")}
+      inputId="plugin-source"
+      placeholder="npm:@scope/package"
+      value={source}
+      canSubmit={!busy && Boolean(source.trim())}
+      normalizeValue={normalizePluginSourceInput}
+      onValueChange={onSourceChange}
+      onSubmit={onInstall}
+      examplesLabel={t("config.examples")}
+      examples={PLUGIN_SOURCE_EXAMPLES}
+      error={actionError}
+    >
+      <ConfigButton
+        variant="primary"
+        onClick={onInstall}
+        disabled={busy || !source.trim()}
+        className="ml-auto"
+      >
+        {busy ? t("i18n.installing") : t("i18n.install")}
+      </ConfigButton>
+    </ConfigAddSourcePanel>
   );
 }
 
@@ -440,137 +327,125 @@ function PackageDetail({
 }) {
   const { t } = useI18n();
   const key = packageKey(pkg);
-  const busy = busyKey?.endsWith(key) ?? false;
+  const busy = (busyKey?.endsWith(key) || busyKey?.startsWith("bulk:")) ?? false;
   const reloadBusy = busyKey === "reload";
   const enabled = !pkg.disabled;
   const canCheckForUpdates = pkg.canCheckForUpdates;
   const updateAvailable = updateStatus?.state === "update-available";
   const description = pkg.description?.trim();
+  const reloadReasonId = useId();
 
   return (
     <ConfigDetailStack>
-      <ConfigDetailHeader className="is-top-aligned">
-        <ConfigDetailHeaderInfo>
-          <ScopeTag scope={pkg.scope} />
-          {pkg.disabled ? (
-            <span
-              style={{
-                fontSize: 10,
-                padding: "1px 5px",
-                borderRadius: 3,
-                background: "rgba(120,120,120,0.12)",
-                color: "var(--text-dim)",
-              }}
-            >
-              {t("i18n.disabled")}
-            </span>
-          ) : pkg.filtered && (
-            <span
-              style={{
-                fontSize: 10,
-                padding: "1px 5px",
-                borderRadius: 3,
-                background: "rgba(245,158,11,0.12)",
-                color: "#d97706",
-              }}
-            >
-              {t("i18n.filtered")}
-            </span>
-          )}
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              color: "var(--text)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {pkg.source}
-          </span>
-        </ConfigDetailHeaderInfo>
-
-        <ConfigDetailActions>
-          <ConfigButton
-            size="small"
-            variant={updateAvailable ? "primary" : undefined}
-            onClick={updateAvailable || !canCheckForUpdates
-              ? () => onAction("update", pkg)
-              : onCheckUpdate}
-            disabled={busy || reloadBusy || checkingUpdate}
-            title={updateAvailable ? t("i18n.updateAvailable") : undefined}
-          >
-             {busyKey === `update:${key}`
-               ? t("i18n.updating")
-               : checkingUpdate
-                 ? t("i18n.checking")
-                 : updateAvailable || !canCheckForUpdates
-                   ? t("i18n.update")
-                   : t("i18n.check")}
-          </ConfigButton>
-          <ConfigButton
-            size="small"
-            onClick={onReloadSession}
-            disabled={!sessionId || reloadBusy || busy}
-             title={sessionId ? t("i18n.reloadSession") : t("i18n.openSessionToReload")}
-          >
-             {reloadBusy ? t("i18n.reloading") : t("i18n.reloadSession")}
-          </ConfigButton>
-          <ConfigButton
-            variant="danger"
-            size="small"
-            onClick={() => onAction("remove", pkg)}
-            disabled={busy || reloadBusy}
-          >
-             {busyKey === `remove:${key}` ? t("i18n.removing") : t("i18n.remove")}
-          </ConfigButton>
-          <ConfigSwitch
-            checked={enabled}
-            loading={busy || reloadBusy}
-            onChange={() => onAction(pkg.disabled ? "enable" : "disable", pkg)}
-            label={pkg.disabled ? t("i18n.enablePackage") : t("i18n.disablePackage")}
-          />
-        </ConfigDetailActions>
-      </ConfigDetailHeader>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(96px, 130px) minmax(0, 1fr)",
-          gap: "9px 14px",
-          fontSize: 12,
-          lineHeight: 1.45,
-        }}
-      >
-        {description && (
-          <>
-            <div style={{ color: "var(--text-dim)" }}>{t("i18n.description")}</div>
-            <div style={{ color: "var(--text-muted)", overflowWrap: "anywhere" }}>
-              {description}
+      <div className="flex flex-col gap-1">
+        <ConfigDetailHeader className="items-start">
+          <ConfigDetailHeaderInfo>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <ConfigDetailTitle className="truncate">{pkg.source}</ConfigDetailTitle>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <ConfigScopeTag scope={pkg.scope}>{scopeLabel(pkg.scope, t)}</ConfigScopeTag>
+                {pkg.disabled ? (
+                  <Badge variant="secondary" className="rounded-[3px] px-1.5 py-px text-[10px] font-normal text-muted-foreground">
+                    {t("i18n.disabled")}
+                  </Badge>
+                ) : pkg.filtered && (
+                  <Badge variant="secondary" className="rounded-[3px] bg-warning/10 px-1.5 py-px text-[10px] font-normal text-warning">
+                    {t("i18n.filtered")}
+                  </Badge>
+                )}
+              </div>
             </div>
-          </>
+          </ConfigDetailHeaderInfo>
+
+          <ConfigDetailActions>
+            <ConfigButton
+              size="small"
+              variant={updateAvailable ? "primary" : undefined}
+              onClick={updateAvailable || !canCheckForUpdates
+                ? () => onAction("update", pkg)
+                : onCheckUpdate}
+              disabled={busy || reloadBusy || checkingUpdate}
+              title={updateAvailable ? t("i18n.updateAvailable") : undefined}
+            >
+               {busyKey === `update:${key}`
+                 ? t("i18n.updating")
+                 : checkingUpdate
+                   ? t("i18n.checking")
+                   : updateAvailable || !canCheckForUpdates
+                     ? t("i18n.update")
+                     : t("i18n.check")}
+            </ConfigButton>
+            <ConfigButton
+              size="small"
+              onClick={onReloadSession}
+              disabled={!sessionId || reloadBusy || busy}
+              aria-describedby={sessionId ? undefined : reloadReasonId}
+            >
+               {reloadBusy ? t("i18n.reloading") : t("i18n.reloadSession")}
+            </ConfigButton>
+            <ConfigButton
+              variant="danger"
+              size="small"
+              onClick={() => onAction("remove", pkg)}
+              disabled={busy || reloadBusy}
+            >
+               {busyKey === `remove:${key}` ? t("i18n.removing") : t("i18n.remove")}
+            </ConfigButton>
+            <ConfigSwitch
+              checked={enabled}
+              loading={busy || reloadBusy}
+              onChange={() => onAction(pkg.disabled ? "enable" : "disable", pkg)}
+              label={pkg.disabled ? t("i18n.enablePackage") : t("i18n.disablePackage")}
+            />
+          </ConfigDetailActions>
+        </ConfigDetailHeader>
+        {!sessionId && (
+          <div id={reloadReasonId} className="text-right text-xs text-muted-foreground">
+            {t("i18n.openSessionToReload")}
+          </div>
         )}
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.status")}</div>
-        <div style={{ color: statusColor(pkg.status), textTransform: "capitalize" }}>{pkg.status}</div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.version")}</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-          <div className="skill-version-row">
-            <span className="skill-version-value">{versionSummary(pkg, t)}</span>
+      </div>
+
+      {/* The description reads as prose under the header, not as a grid value:
+          a wall of text wrapped into a narrow label column is what made the
+          old detail pane feel broken. */}
+      {description && (
+        <p className="max-w-prose text-[13px] leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+      )}
+
+      {/* The package's properties as one card (§7.3). */}
+      <ConfigCard>
+        <ConfigDetailGrid>
+        <ConfigDetailGridRow
+          label={t("i18n.status")}
+          tone="plain"
+          className={`${statusClassName(pkg.status)} capitalize`}
+        >
+          {statusLabel(pkg.status, t)}
+        </ConfigDetailGridRow>
+        <ConfigDetailGridRow
+          label={t("i18n.version")}
+          tone="plain"
+          className="flex flex-col gap-1"
+        >
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="font-mono text-xs text-muted-foreground">{versionSummary(pkg, t)}</span>
             {updateAvailable && (
-              <span className="skill-version-value is-update" title={updateStatus.displayName}>
+              <span className="font-mono text-xs text-warning" title={updateStatus.displayName}>
                 {t("i18n.updateAvailable")}
               </span>
             )}
             {canCheckForUpdates && (checkingUpdate || (updateStatus && !updateAvailable)) && (
               <span
-                className={`skill-update-status ${checkingUpdate
-                  ? "is-checking"
+                className={checkingUpdate
+                  ? "text-xs text-muted-foreground"
                   : updateStatus?.state === "up-to-date"
-                    ? "is-success"
+                    ? "text-xs text-success"
                     : updateStatus?.state === "error"
-                      ? "is-error"
-                      : "is-muted"}`}
+                      ? "text-xs text-destructive"
+                      : "text-xs text-muted-foreground"}
               >
                 {checkingUpdate
                   ? t("i18n.checking")
@@ -583,43 +458,36 @@ function PackageDetail({
             )}
           </div>
           {updateError && (
-            <span style={{ fontSize: 12, color: "#ef4444" }}>{updateError}</span>
+            <span className="text-xs text-destructive">{updateError}</span>
           )}
-        </div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.package")}</div>
-        <div style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>
+        </ConfigDetailGridRow>
+        <ConfigDetailGridRow label={t("i18n.package")} mono>
           {pkg.packageName ?? t("i18n.unknown")}
-        </div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.resources")}</div>
-         <div style={{ color: "var(--text-muted)" }}>{resourceSummary(pkg, t)}</div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.installedPath")}</div>
-        <div
-          style={{
-            color: pkg.installedPath ? "var(--text-muted)" : "#ef4444",
-            fontFamily: "var(--font-mono)",
-            overflowWrap: "anywhere",
-          }}
-        >
-          {pkg.installedPath ? shortenPath(pkg.installedPath) : t("i18n.notFound")}
-        </div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.cwd")}</div>
-        <div style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>
-          {shortenPath(cwd)}
-        </div>
-      </div>
+        </ConfigDetailGridRow>
+        <ConfigDetailGridRow label={t("i18n.resources")}>
+          {resourceSummary(pkg, t)}
+        </ConfigDetailGridRow>
+          <ConfigDetailGridRow label={t("i18n.installedPath")} tone={pkg.installedPath ? "muted" : "error"} mono>
+            {pkg.installedPath ? shortenPath(pkg.installedPath) : t("i18n.notFound")}
+          </ConfigDetailGridRow>
+          <ConfigDetailGridRow label={t("i18n.cwd")} tone="dim" mono>
+            {shortenPath(cwd)}
+          </ConfigDetailGridRow>
+        </ConfigDetailGrid>
+      </ConfigCard>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <ConfigSectionTitle>{t("i18n.resolvedResources")}</ConfigSectionTitle>
+      {/* Resolved resources as their own card (§7.3). */}
+      <ConfigCard title={t("i18n.resolvedResources")}>
         <ResourceList pkg={pkg} />
-      </div>
+      </ConfigCard>
 
       {actionMessage && (
-        <div style={{ fontSize: 12, color: "#16a34a" }}>
+        <div className="text-xs text-success">
           {actionMessage}
         </div>
       )}
       {actionError && (
-        <div style={{ fontSize: 12, color: "#ef4444", whiteSpace: "pre-wrap" }}>
+        <div className="whitespace-pre-wrap text-xs text-destructive">
           {actionError}
         </div>
       )}
@@ -635,26 +503,22 @@ function StandaloneExtensionDetail({ extension }: { extension: PluginStandaloneE
     <ConfigDetailStack>
       <ConfigDetailHeader>
         <ConfigDetailHeaderInfo>
-          <ScopeTag scope={extension.scope} />
+          <ConfigScopeTag scope={extension.scope}>{scopeLabel(extension.scope, t)}</ConfigScopeTag>
           <ConfigDetailTitle>{extension.name}</ConfigDetailTitle>
         </ConfigDetailHeaderInfo>
       </ConfigDetailHeader>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(96px, 130px) minmax(0, 1fr)",
-          gap: "9px 14px",
-          fontSize: 12,
-          lineHeight: 1.45,
-        }}
-      >
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.status")}</div>
-        <div style={{ color: extension.enabled ? "var(--accent)" : "var(--text-dim)" }}>{status}</div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.installedPath")}</div>
-        <div style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>
+      <ConfigDetailGrid>
+        <ConfigDetailGridRow
+          label={t("i18n.status")}
+          tone="plain"
+          className={extension.enabled ? "text-primary" : "text-muted-foreground"}
+        >
+          {statusLabel(status, t)}
+        </ConfigDetailGridRow>
+        <ConfigDetailGridRow label={t("i18n.installedPath")} mono>
           {shortenPath(extension.path)}
-        </div>
-      </div>
+        </ConfigDetailGridRow>
+      </ConfigDetailGrid>
     </ConfigDetailStack>
   );
 }
@@ -665,12 +529,15 @@ export function PluginsConfig({
   onClose,
   onReloaded,
   embedded = false,
+  trust,
 }: {
   cwd: string;
   sessionId: string | null;
   onClose: () => void;
   onReloaded?: () => void;
   embedded?: boolean;
+  /** The page's trust status for `cwd`; a new decision loads the list again. */
+  trust?: ProjectTrustStatus | null;
 }) {
   const { t } = useI18n();
   const [data, setData] = useState<PluginsResponse | null>(null);
@@ -683,6 +550,8 @@ export function PluginsConfig({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  // What the last group switch left undone, shown under that scope's heading.
+  const [groupStatus, setGroupStatus] = useState<{ scope: PluginScope; error?: string; note?: string } | null>(null);
   const [updateStatuses, setUpdateStatuses] = useState<Record<string, PluginUpdateResult>>({});
   const [checkingUpdates, setCheckingUpdates] = useState<Set<string>>(new Set());
   const [checkingAll, setCheckingAll] = useState(false);
@@ -704,6 +573,7 @@ export function PluginsConfig({
   const loadPlugins = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setGroupStatus(null);
     try {
       const res = await fetch(`/api/plugins?cwd=${encodeURIComponent(cwd)}`);
       const next = (await res.json()) as PluginsResponse & { error?: string };
@@ -733,6 +603,19 @@ export function PluginsConfig({
     setUpdateError(null);
     void loadPlugins();
   }, [cwd]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Whether project packages load, and the Project scope can be chosen, follows
+  // the folder's trust, which can change while this section stays mounted
+  // (hidden) in Settings: trusting from Settings › MCP. A new decision loads the
+  // list again in place, keeping the selection and any update checks; the first
+  // load is the effect above.
+  const trustKey = projectTrustReloadKey(trust);
+  const loadedTrustKeyRef = useRef(trustKey);
+  useEffect(() => {
+    if (loadedTrustKeyRef.current === trustKey) return;
+    loadedTrustKeyRef.current = trustKey;
+    void loadPlugins();
+  }, [trustKey, loadPlugins]);
 
   useEffect(() => {
     if (selected) setLastSettingsSelection("plugins", selected, cwd);
@@ -811,6 +694,7 @@ export function PluginsConfig({
     setBusyKey(`${action}:${key}`);
     setActionError(null);
     setActionMessage(null);
+    setGroupStatus(null);
     try {
       const res = await fetch("/api/plugins", {
         method: "POST",
@@ -827,7 +711,7 @@ export function PluginsConfig({
             ? extensionKey(next.standaloneExtensions[0])
             : null);
         if (next.packages.length === 0 && next.standaloneExtensions.length === 0) setAddMode(true);
-        setActionMessage("Package removed.");
+        setActionMessage(t("i18n.packageRemoved"));
         setUpdateStatuses((current) => {
           const nextStatuses = { ...current };
           delete nextStatuses[key];
@@ -835,10 +719,10 @@ export function PluginsConfig({
         });
       } else {
         const messages: Record<Exclude<PluginAction, "remove">, string> = {
-          install: "Package installed.",
-          update: "Package updated.",
-          disable: "Package disabled.",
-          enable: "Package enabled.",
+          install: t("i18n.packageInstalled"),
+          update: t("i18n.packageUpdated"),
+          disable: t("i18n.packageDisabled"),
+          enable: t("i18n.packageEnabled"),
         };
         setActionMessage(messages[action]);
         if (action === "update") {
@@ -854,7 +738,61 @@ export function PluginsConfig({
     } finally {
       setBusyKey(null);
     }
-  }, [cwd]);
+  }, [cwd, t]);
+
+  // Behaves like the package switch, for every package of one scope: the
+  // confirmation appears in the package detail and the session is reloaded by
+  // hand. Packages the route refuses keep their state and are named under the
+  // scope's heading, and so are the filtered packages switching off leaves on.
+  const setGroupPackages = useCallback(async (
+    scope: PluginScope,
+    groupPackages: PluginPackageInfo[],
+    enabled: boolean,
+  ) => {
+    const targets = packagesToSwitch(groupPackages, enabled);
+    const keptOn = enabled ? 0 : filteredPackagesKeptOn(groupPackages).length;
+    const note = keptOn > 0 ? t("plugins.bulkKeptFiltered", { count: keptOn }) : undefined;
+    setActionError(null);
+    setActionMessage(null);
+    setGroupStatus(note ? { scope, note } : null);
+    if (targets.length === 0) return;
+    const action = enabled ? "enable" : "disable";
+    setBusyKey(`bulk:${scope}`);
+    try {
+      const res = await fetch("/api/plugins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          cwd,
+          packages: targets.map(({ source }) => ({ source, scope })),
+        }),
+      });
+      const next = (await res.json()) as Partial<PluginsBulkResponse> & { error?: string };
+      if (!res.ok || next.error || !next.results) throw new Error(next.error ?? `HTTP ${res.status}`);
+      const { results, ...plugins } = next as PluginsBulkResponse;
+      setData(plugins);
+      const failures = results.filter((result) => result.error);
+      if (failures.length < results.length) {
+        const message = enabled ? t("plugins.bulkEnabled") : t("plugins.bulkDisabled");
+        setActionMessage(sessionId ? `${message} ${t("agents.reloadRequired")}` : message);
+      }
+      if (failures.length > 0) {
+        setGroupStatus({
+          scope,
+          note,
+          error: [
+            t("plugins.bulkFailed", { count: failures.length, total: results.length }),
+            ...failures.map((failure) => `${failure.source}: ${failure.error}`),
+          ].join("\n"),
+        });
+      }
+    } catch (err) {
+      setGroupStatus({ scope, note, error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setBusyKey(null);
+    }
+  }, [cwd, sessionId, t]);
 
   const installPlugin = useCallback(async () => {
     const source = normalizePluginSourceInput(installSource).trim();
@@ -864,6 +802,7 @@ export function PluginsConfig({
     setBusyKey(`install:${key}`);
     setActionError(null);
     setActionMessage(null);
+    setGroupStatus(null);
     try {
       const res = await fetch("/api/plugins", {
         method: "POST",
@@ -877,30 +816,31 @@ export function PluginsConfig({
       setSelected(installed ? packageKey(installed) : key);
       setAddMode(false);
       setInstallSource("");
-      setActionMessage("Package installed.");
+      setActionMessage(t("i18n.packageInstalled"));
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusyKey(null);
     }
-  }, [cwd, installScope, installSource]);
+  }, [cwd, installScope, installSource, t]);
 
   const reloadSession = useCallback(async () => {
     if (!sessionId) return;
     setBusyKey("reload");
     setActionError(null);
     setActionMessage(null);
+    setGroupStatus(null);
     try {
       await sendAgentCommand(sessionId, { type: "reload" });
       onReloaded?.();
       await loadPlugins();
-      setActionMessage("Session reloaded.");
+      setActionMessage(t("i18n.sessionReloaded"));
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusyKey(null);
     }
-  }, [loadPlugins, onReloaded, sessionId]);
+  }, [loadPlugins, onReloaded, sessionId, t]);
 
   const addBusy = busyKey?.startsWith("install:") ?? false;
   const availableUpdateCount = Object.values(updateStatuses).filter(
@@ -912,31 +852,27 @@ export function PluginsConfig({
   return (
     <ConfigPanelShell embedded={embedded} title={t("common.plugins")} subtitle={shortenPath(cwd)} closeLabel={t("i18n.close")} onClose={onClose}>
 
-        {!projectResourcesLoaded && (
-          <div role="status" className="config-trust-notice">
-            {t("trust.pluginsNotLoaded")}
-          </div>
-        )}
+        {!projectResourcesLoaded && <ConfigTrustNotice message={t("trust.pluginsNotLoaded")} />}
 
         <ConfigSplitView>
           <ConfigSidebar>
             <ConfigSidebarList>
               {loading ? (
-                <div className="config-sidebar-message">
-                  Loading...
+                <div className="px-2 py-2.5 text-xs text-muted-foreground">
+                  {t("i18n.loading")}
                 </div>
               ) : error ? (
-                <div className="config-sidebar-message is-error">
+                <div className="px-2 py-2.5 text-xs text-destructive">
                   {error}
                 </div>
               ) : packages.length === 0 && standaloneExtensions.length === 0 ? (
-                <div className="config-sidebar-message is-empty">
-                  No plugins configured
+                <div className="px-2 py-2.5 text-xs text-muted-foreground/60">
+                  {t("i18n.noPlugins")}
                 </div>
               ) : (
                 <>
                   {standaloneExtensions.length > 0 && (
-                    <div className="config-sidebar-group">
+                    <div className="flex flex-col gap-1 pb-1.5">
                       <ConfigSidebarGroupLabel>{t("i18n.extensions")}</ConfigSidebarGroupLabel>
                       {standaloneExtensions.map((extension) => {
                         const key = extensionKey(extension);
@@ -953,7 +889,7 @@ export function PluginsConfig({
                             }}
                           >
                             <ConfigStatusDot active={extension.enabled} />
-                            <ConfigSidebarText className={`is-grow${extension.enabled ? "" : " is-muted"}`}>
+                            <ConfigSidebarText className={`flex-1${extension.enabled ? "" : " text-muted-foreground"}`}>
                               {extension.name}
                             </ConfigSidebarText>
                           </ConfigSidebarItem>
@@ -961,40 +897,58 @@ export function PluginsConfig({
                       })}
                     </div>
                   )}
-                  {groupedPackages.map((group) => (
-                    <div key={group.scope} className="config-sidebar-group">
-                      <ConfigSidebarGroupLabel>
-                        {group.scope}
-                      </ConfigSidebarGroupLabel>
-                      {group.packages.map((pkg) => {
-                        const key = packageKey(pkg);
-                        const isSelected = !addMode && selected === key;
-                        return (
-                          <ConfigSidebarItem
-                            key={key}
-                            active={isSelected}
-                            title={pkg.description ?? pkg.source}
-                            onClick={() => {
-                              setSelected(key);
-                              setAddMode(false);
-                              setActionError(null);
-                              setActionMessage(null);
-                            }}
-                          >
-                            <ConfigStatusDot active={!pkg.disabled} color={statusColor(pkg.status)} />
-                            <ConfigSidebarText className={`is-grow${pkg.disabled ? " is-muted" : ""}`}>
-                              {pkg.source}
-                            </ConfigSidebarText>
-                            {updateStatuses[packageKey(pkg)]?.state === "update-available" && (
-                              <span title={t("i18n.updateAvailable")} className="skill-update-indicator">
-                                ↑
-                              </span>
-                            )}
-                          </ConfigSidebarItem>
-                        );
-                      })}
-                    </div>
-                  ))}
+                  {groupedPackages.map((group) => {
+                    const enabledCount = group.packages.filter((pkg) => !pkg.disabled).length;
+                    const allEnabled = enabledCount === group.packages.length;
+                    return (
+                      <div key={group.scope} className="flex flex-col gap-1 pb-1.5">
+                        <ConfigSidebarGroupLabel
+                          aside={
+                            <ConfigSidebarGroupSwitch
+                              enabled={enabledCount}
+                              total={group.packages.length}
+                              disabled={footerBusy}
+                              loading={busyKey === `bulk:${group.scope}`}
+                              label={t(allEnabled ? "plugins.groupSwitchOn" : "plugins.groupSwitchOff", { group: scopeLabel(group.scope, t) })}
+                              onChange={(enabled) => void setGroupPackages(group.scope, group.packages, enabled)}
+                            />
+                          }
+                        >
+                          {scopeLabel(group.scope, t)}
+                        </ConfigSidebarGroupLabel>
+                        {groupStatus?.scope === group.scope && (
+                          <ConfigSidebarGroupStatus error={groupStatus.error} note={groupStatus.note} />
+                        )}
+                        {group.packages.map((pkg) => {
+                          const key = packageKey(pkg);
+                          const isSelected = !addMode && selected === key;
+                          return (
+                            <ConfigSidebarItem
+                              key={key}
+                              active={isSelected}
+                              title={pkg.description ?? pkg.source}
+                              onClick={() => {
+                                setSelected(key);
+                                setAddMode(false);
+                                setActionError(null);
+                                setActionMessage(null);
+                              }}
+                            >
+                              <ConfigStatusDot active={!pkg.disabled} color={statusColor(pkg.status)} />
+                              <ConfigSidebarText className={`flex-1${pkg.disabled ? " text-muted-foreground" : ""}`}>
+                                {pkg.source}
+                              </ConfigSidebarText>
+                              {updateStatuses[packageKey(pkg)]?.state === "update-available" && (
+                                <span title={t("i18n.updateAvailable")} className="inline-flex shrink-0 text-warning">
+                                  <ArrowUpIcon size={13} strokeWidth={1.8} />
+                                </span>
+                              )}
+                            </ConfigSidebarItem>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </>
               )}
             </ConfigSidebarList>
@@ -1011,7 +965,7 @@ export function PluginsConfig({
           </ConfigSidebar>
 
           <ConfigDetail>
-            <ConfigDetailStack className="is-fill">
+            <ConfigDetailStack className="min-h-full">
               {addMode ? (
               <AddPluginPanel
                 cwd={cwd}
@@ -1051,21 +1005,20 @@ export function PluginsConfig({
 
         <ConfigFooter status={
             availableUpdateCount > 0 ? (
-              <span style={{ fontSize: 12, color: "var(--accent)" }}>
+              <span className="text-xs text-primary">
                 {availableUpdateCount}{" "}
                 {availableUpdateCount === 1 ? t("i18n.update") : t("i18n.updates")}
               </span>
             ) : data?.diagnostics.length ? (
-              <span
-                title={data.diagnostics.map((d) => `${d.type}: ${d.source ? `${d.source}: ` : ""}${d.message}`).join("\n")}
-                style={{ color: data.diagnostics.some((d) => d.type === "error") ? "#ef4444" : "#d97706" }}
-              >
-                {data.diagnostics.length} diagnostic{data.diagnostics.length === 1 ? "" : "s"}
-              </span>
+              <ConfigFooterStatus
+                tone={data.diagnostics.some((d) => d.type === "error") ? "error" : "warning"}
+                summary={data.diagnostics.length === 1
+                  ? t("plugins.diagnostic")
+                  : t("plugins.diagnostics", { count: data.diagnostics.length })}
+                details={data.diagnostics.map(diagnosticText)}
+              />
             ) : (
-              <span>
-                {data ? `${data.totals.extensions} ext · ${data.totals.skills} skills · ${data.totals.prompts} prompts · ${data.totals.themes} themes` : ""}
-              </span>
+              <ConfigFooterStatus summary={data ? totalsSummary(data.totals, t) : ""} />
             )}
         >
           {!embedded && <ConfigButton onClick={onClose}>{t("i18n.close")}</ConfigButton>}

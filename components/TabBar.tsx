@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getFileIcon } from "./FileIcons";
-import { SideChatsIcon } from "./SidebarIcons";
+import { BotIcon, GitBranchIcon, MessagesSquareIcon, TerminalIcon, XIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
+import { cn } from "@/lib/utils";
 import type { FileViewerDisplayMode, FileViewerState } from "@/lib/file-viewer-state";
 
 export interface Tab {
@@ -30,7 +32,6 @@ interface Props {
 
 export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onReorderTab }: Props) {
   const { t } = useI18n();
-  const [hoveredClose, setHoveredClose] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const draggedId = useRef<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; after: boolean } | null>(null);
@@ -61,22 +62,15 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onReorderTa
     else if (right > strip.right) list.scrollLeft += right - strip.right;
   }, [activeTabId, tabs.length]);
 
+  // The shadcn Tabs shape: one muted track, the active tab is a raised
+  // background segment — no floating per-tab pills. The scrollbar is hidden
+  // (globals.css .tabbar-scroll): it would squeeze the tabs or clip their
+  // tops (#1225).
   return (
     <div
       ref={listRef}
       role="tablist"
-      className="tabbar-scroll"
-      style={{
-        // The scrollbar is hidden (globals.css): it would take its height out
-        // of the bar (--top-bar-height), squeezing the tabs or clipping their tops (#1225).
-        display: "flex",
-        alignItems: "stretch",
-        background: "var(--bg-panel)",
-        overflowX: "auto",
-        overflowY: "hidden",
-        flexShrink: 0,
-        height: "var(--top-bar-height)",
-      }}
+      className="tabbar-scroll flex h-[46px] shrink-0 items-center gap-0.5 overflow-x-auto overflow-y-hidden px-2"
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
@@ -140,84 +134,48 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onReorderTa
               e.stopPropagation();
               if (!tab.closing) onCloseTab(tab.id);
             }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              paddingLeft: 12,
-              paddingRight: 6,
-              borderRight: "1px solid var(--border)",
-              background: isActive ? "var(--bg)" : "var(--bg-panel)",
-              cursor: "pointer",
-              fontSize: 12,
-              color: isActive ? "var(--text)" : "var(--text-muted)",
-              whiteSpace: "nowrap",
-              maxWidth: 180,
-              minWidth: 80,
-              flexShrink: 0,
-              userSelect: "none",
-              transition: "background 0.1s, color 0.1s",
-              boxShadow: dropTarget?.id === tab.id ? `inset ${dropTarget.after ? "-2px" : "2px"} 0 var(--accent)` : undefined,
-            }}
+            className={cn(
+              "flex h-7 min-w-20 max-w-[180px] shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md py-0 pr-1 pl-2.5 whitespace-nowrap text-xs transition-colors",
+              isActive
+                ? "bg-background font-medium text-foreground shadow-xs"
+                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+              // Drop line on the half the dragged tab is over.
+              dropTarget?.id === tab.id && (dropTarget.after
+                ? "shadow-[inset_-2px_0_0_var(--accent)]"
+                : "shadow-[inset_2px_0_0_var(--accent)]"),
+            )}
           >
-            <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7, display: "flex", alignItems: "center" }}>
+            <span className={cn("flex shrink-0 items-center", isActive ? "opacity-100" : "opacity-70")}>
               {tab.kind === "terminal" ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
-                </svg>
+                <TerminalIcon className="size-[13px]" strokeWidth={2} />
               ) : tab.kind === "git" ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <line x1="6" y1="3" x2="6" y2="15" />
-                  <circle cx="18" cy="6" r="3" />
-                  <circle cx="6" cy="18" r="3" />
-                  <path d="M18 9a9 9 0 0 1-9 9" />
-                </svg>
+                <GitBranchIcon className="size-[13px]" strokeWidth={2} />
               ) : tab.kind === "agent" ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" />
-                </svg>
+                <BotIcon className="size-[13px]" strokeWidth={2} />
               ) : tab.kind === "side" ? (
-                <SideChatsIcon strokeWidth={2} />
+                <MessagesSquareIcon className="size-[13px]" strokeWidth={2} />
               ) : getFileIcon(tab.label, 13)}
             </span>
             <span
-              style={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                flex: 1,
-                fontWeight: isActive ? 500 : 400,
-              }}
+              className={cn("min-w-0 flex-1 truncate font-mono text-[11.5px]", isActive ? "font-medium" : "font-normal")}
               title={tab.filePath}
             >
               {tab.kind === "git" ? t("gitPanel.title") : tab.label}
             </span>
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
               draggable={false}
               onDragStart={(event) => event.stopPropagation()}
               disabled={tab.closing}
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
-              onMouseEnter={() => setHoveredClose(tab.id)}
-              onMouseLeave={() => setHoveredClose(null)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 24, height: 24,
-                background: hoveredClose === tab.id ? "var(--bg-hover)" : "transparent",
-                border: "none",
-                borderRadius: 4,
-                color: hoveredClose === tab.id ? "var(--text)" : "var(--text-dim)",
-                cursor: "pointer",
-                padding: 0,
-                flexShrink: 0,
-                transition: "background 0.1s, color 0.1s",
-              }}
+              className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent p-0 text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
               title={t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")}
               aria-label={`${t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")} ${tab.kind === "git" ? t("gitPanel.title") : tab.label}`}
             >
-              <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                <line x1="2" y1="2" x2="8" y2="8" />
-                <line x1="8" y1="2" x2="2" y2="8" />
-              </svg>
-            </button>
+              <XIcon className="size-[11px]" strokeWidth={1.8} />
+            </Button>
           </div>
         );
       })}

@@ -22,5 +22,8 @@ test("notifications, dialog titles and option previews fall back to terminal ren
 
 test("tool results stop reflowing when they are terminal output", () => {
   assert.match(activityRows, /const tui = isTuiText\(text\);/);
-  assert.match(activityRows, /whiteSpace: tui \? "pre" : "pre-wrap"/);
+  // The ui CodeBlockContent owns the wrap classes; `wrap={!tui}` keeps
+  // terminal output unwrapped and every other result wrapped.
+  assert.match(activityRows, /wrap=\{!tui\}/);
+  assert.match(activityRows, /!tui && "\[overflow-wrap:anywhere\]"/);
 });

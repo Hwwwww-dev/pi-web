@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
 import { AnsiText } from "@/components/AnsiText";
+import { stripAnsi } from "@/lib/ansi";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import type { ExtensionWidgetItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export const DEFAULT_EXPANDED_WIDGET_LINES = 3;
 export const WIDGET_UPDATE_IDLE_MS = 1100;
@@ -32,10 +38,18 @@ export function getUpdatedExtensionWidgetKeys(
   }).filter((key): key is string => key !== null);
 }
 
+/** A widget whose every line is blank has nothing to show. Extensions pad
+ *  their TUI output with blank spacer rows, and expanding such a widget would
+ *  render a full-width empty card above the composer. */
+function hasVisibleWidgetLines(lines: string[]): boolean {
+  return lines.some((line) => stripAnsi(line).trim().length > 0);
+}
+
 function getDefaultExpandedWidgetKey(widgets: ExtensionWidgetItem[]): string | null {
   return widgets.find((widget) => {
     const lineCount = widget.lines.length;
-    return lineCount > 1 && lineCount <= DEFAULT_EXPANDED_WIDGET_LINES;
+    return lineCount > 1 && lineCount <= DEFAULT_EXPANDED_WIDGET_LINES
+      && hasVisibleWidgetLines(widget.lines);
   })?.key ?? null;
 }
 
@@ -106,110 +120,142 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
     updateClearTimersRef.current.clear();
   }, []);
 
+  // The expanded panel plays tw-animate-css's animate-out on close: it stays
+  // mounted for the animation (useDelayedUnmount) and keeps the last expanded
+  // widget's content while it plays.
+  const panelOpen = expandedWidgetKey !== null;
+  const panelMounted = useDelayedUnmount(panelOpen);
+  const lastExpandedKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (expandedWidgetKey) lastExpandedKeyRef.current = expandedWidgetKey;
+  }, [expandedWidgetKey]);
+
   if (widgets.length === 0) return null;
 
   const expandedWidget = widgets.find((widget) => (
     widget.key === expandedWidgetKey
     && widget.lines.length > 0
   ));
+  const panelWidget: ExtensionWidgetItem | null = expandedWidget
+    ?? (panelMounted ? widgets.find((widget) => widget.key === lastExpandedKeyRef.current) ?? null : null);
 
   const toggleWidget = (widget: ExtensionWidgetItem) => {
     setExpandedWidgetKey((current) => getNextExpandedWidgetKey(current, widget.key));
   };
 
+  const renderPlacementIcon = (widget: ExtensionWidgetItem) => (
+    widget.placement === "belowEditor"
+      ? <ChevronDownIcon className="size-3 shrink-0 opacity-50" aria-hidden="true" />
+      : <ChevronUpIcon className="size-3 shrink-0 opacity-50" aria-hidden="true" />
+  );
+
   return (
     <>
-      {expandedWidget && (
-        <div className="extension-widget-panels">
-          {(() => {
-            const widget = expandedWidget;
-            const index = widgets.indexOf(widget);
-            const triggerId = `${idPrefix}-trigger-${index}`;
-            const panelId = `${idPrefix}-panel-${index}`;
-            return (
-              <section
-                key={widget.key}
-                id={panelId}
-                className="extension-widget-panel"
-                aria-labelledby={triggerId}
-              >
-                <div className="extension-widget-panel-heading">{widget.key}</div>
-                <pre className="extension-widget-content">
-                  <AnsiText text={formatExtensionWidgetContent(widget.lines)} />
-                </pre>
-              </section>
-            );
-          })()}
-        </div>
+      {(panelOpen || panelMounted) && panelWidget && (
+        <ExtensionWidgetPanel
+          widget={panelWidget}
+          triggerId={`${idPrefix}-trigger-${widgets.indexOf(panelWidget)}`}
+          panelId={`${idPrefix}-panel-${widgets.indexOf(panelWidget)}`}
+          closing={!panelOpen}
+        />
       )}
-      <div className="extension-status-row">
-        <div className="extension-widget-triggers" aria-label={t("chat.extensionWidgets")}>
-          {widgets.map((widget, index) => {
-            const expandable = widget.lines.length > 0;
-            const expanded = expandable && widget.key === expandedWidget?.key;
-            const updating = updatingWidgetKeys.has(widget.key);
-            const lineCountLabel = t(
-              widget.lines.length === 1 ? "chat.extensionWidgetLine" : "chat.extensionWidgetLines",
-              { count: widget.lines.length },
-            );
-            const placementLabel = t(
-              widget.placement === "belowEditor"
-                ? "chat.extensionWidgetBelow"
-                : "chat.extensionWidgetAbove",
-            );
-            const triggerId = `${idPrefix}-trigger-${index}`;
-            const panelId = `${idPrefix}-panel-${index}`;
-            const content = (
-              <>
-                <span className="extension-widget-update-pulse" aria-hidden="true" />
-                <span className="extension-widget-placement" aria-hidden="true">
-                  <svg
-                    className="extension-widget-placement-icon"
-                    viewBox="0 0 8 6"
-                    width="8"
-                    height="6"
-                    data-direction={widget.placement === "belowEditor" ? "down" : "up"}
-                    focusable="false"
-                  >
-                    <path
-                      d={widget.placement === "belowEditor"
-                        ? "M0 0h8L4 6z"
-                        : "M4 0l4 6H0z"}
-                    />
-                  </svg>
-                </span>
-                <span className="extension-widget-key">{widget.key}</span>
-              </>
-            );
+      <div className="flex min-w-0 flex-1 items-center gap-1 pl-0.5 pr-1.5">
+      <div className="flex shrink-0 items-center gap-0.5" aria-label={t("chat.extensionWidgets")}>
+        {widgets.map((widget, index) => {
+          const expandable = hasVisibleWidgetLines(widget.lines);
+          const expanded = expandable && widget.key === expandedWidget?.key;
+          const updating = updatingWidgetKeys.has(widget.key);
+          const lineCountLabel = t(
+            widget.lines.length === 1 ? "chat.extensionWidgetLine" : "chat.extensionWidgetLines",
+            { count: widget.lines.length },
+          );
+          const placementLabel = t(
+            widget.placement === "belowEditor"
+              ? "chat.extensionWidgetBelow"
+              : "chat.extensionWidgetAbove",
+          );
+          const triggerId = `${idPrefix}-trigger-${index}`;
+          const panelId = `${idPrefix}-panel-${index}`;
+          const triggerClass = cn(
+            "shrink-0 gap-1.5 rounded-md px-2 font-mono text-[11.5px] text-muted-foreground",
+            "data-[expanded=true]:bg-accent data-[expanded=true]:text-accent-foreground",
+          );
+          const content = (
+            <>
+              {updating && (
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 shrink-0 rounded-full bg-warning motion-safe:animate-pulse"
+                />
+              )}
+              {renderPlacementIcon(widget)}
+              <span className="min-w-0 truncate">{widget.key}</span>
+            </>
+          );
 
-            return expandable ? (
-              <button
-                key={widget.key}
-                id={triggerId}
-                type="button"
-                className={`extension-widget-trigger${expanded ? " is-expanded" : ""}${updating ? " is-updating" : ""}`}
-                aria-controls={panelId}
-                aria-expanded={expanded}
-                aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-                title={`${widget.key} - ${placementLabel} - ${expanded ? t("i18n.collapse") : t("i18n.expand")}`}
-                onClick={() => toggleWidget(widget)}
-              >
-                {content}
-              </button>
-            ) : (
-              <div
-                key={widget.key}
-                className={`extension-widget-trigger${updating ? " is-updating" : ""}`}
-                aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-                title={`${widget.key} - ${placementLabel}`}
-              >
-                {content}
-              </div>
-            );
-          })}
-        </div>
-        {children}
+          // No tooltip: the key is already the trigger's whole text, and the
+          // placement/expand line only repeated it in jargon.
+          return expandable ? (
+            <Button
+              key={widget.key}
+              id={triggerId}
+              type="button"
+              variant="ghost"
+              size="xs"
+              data-expanded={expanded || undefined}
+              className={triggerClass}
+              aria-controls={panelId}
+              aria-expanded={expanded}
+              aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
+              onClick={() => toggleWidget(widget)}
+            >
+              {content}
+            </Button>
+          ) : (
+            <span
+              key={widget.key}
+              className="inline-flex h-6 shrink-0 items-center rounded-md px-2 font-mono text-[11.5px] text-muted-foreground"
+              aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
+            >
+              {content}
+            </span>
+          );
+        })}
+      </div>
+      {children != null && <Separator orientation="vertical" className="h-5 shrink-0 self-center" />}
+      {children}
       </div>
     </>
+  );
+}
+
+/**
+ * Expanded widget content: a small popover-style card above the trigger row.
+ */
+export function ExtensionWidgetPanel({ widget, triggerId, panelId, closing = false }: {
+  widget: ExtensionWidgetItem;
+  triggerId: string;
+  panelId: string;
+  /** True while the exit animation plays; the panel is already logically closed. */
+  closing?: boolean;
+}) {
+  return (
+    // Floats above the shelf bar (the bar root is its positioned ancestor): the
+    // official popover look — bg-popover, its own border, shadow — detached from
+    // the pill row, never nested inside it.
+    <section
+      id={panelId}
+      aria-labelledby={triggerId}
+      data-state={closing ? "closed" : "open"}
+      className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+    >
+      <div className="border-b px-3 py-1.5 font-mono text-[11px] text-muted-foreground">{widget.key}</div>
+      {/* Extension widgets render TUI output: tables, progress bars and box drawing
+          only line up while the monospace grid survives, so the panel scrolls
+          sideways rather than wrapping a line into a broken row. */}
+      <pre className="max-h-40 overflow-auto px-3 py-2 font-mono text-xs/relaxed [font-size:calc(12px+var(--chat-font-size-offset,0px))] scrollbar-thin [overflow-wrap:normal] whitespace-pre">
+        <AnsiText text={formatExtensionWidgetContent(widget.lines)} />
+      </pre>
+    </section>
   );
 }

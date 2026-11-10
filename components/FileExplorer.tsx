@@ -1,8 +1,42 @@
 "use client";
 
 import { forwardRef, useState, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
-import { getFileIcon, FolderIcon } from "./FileIcons";
+import {
+  AtSignIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  CircleAlertIcon,
+  CircleMinusIcon,
+  DownloadIcon,
+  ExternalLinkIcon,
+  FolderTreeIcon,
+  ListIcon,
+  LoaderCircleIcon,
+  LoaderIcon,
+  SearchIcon,
+  TriangleAlertIcon,
+  UploadIcon,
+  XIcon,
+} from "lucide-react";
+import { getFileIcon, TreeFolderIcon } from "./FileIcons";
 import { DismissButton } from "./DismissButton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
+import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import {
   encodeFilePathForApi,
   getFileDirectory,
@@ -144,60 +178,36 @@ const GIT_STATUS_KEYS: Record<GitFileStatusKind, string> = {
   conflict: "files.conflict",
 };
 
-const GIT_STATUS_COLORS: Record<GitFileStatusKind, string> = {
-  modified: "#d6a84b",
-  added: "#4ade80",
-  deleted: "#f87171",
-  renamed: "#60a5fa",
-  untracked: "#4ade80",
-  conflict: "#f87171",
+// Git 状态取色走 token 工具类（modified/amber→warning、added/untracked-green→success、
+// deleted/red→destructive、renamed/blue→primary），由状态键查类名，保持单一来源。
+// 徽标形态：10.5px/600 胶囊，底色 = 同色 15%（删除 10%），对齐草稿 .pm-git。
+const GIT_STATUS_BADGE_CLASSES: Record<GitFileStatusKind, string> = {
+  modified: "text-warning bg-warning/15",
+  added: "text-success bg-success/15",
+  deleted: "text-destructive bg-destructive/10",
+  renamed: "text-primary bg-primary/15",
+  untracked: "text-success bg-success/15",
+  conflict: "text-destructive bg-destructive/10",
 };
 
 function GitStatusBadge({ status, t }: { status: GitFileStatus; t: Translate }) {
   return (
-    <span
+    <Badge
+      variant="outline"
       title={t(GIT_STATUS_KEYS[status.status])}
       aria-label={t(GIT_STATUS_KEYS[status.status])}
-      style={{
-        width: 14,
-        height: 14,
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: GIT_STATUS_COLORS[status.status],
-        fontFamily: "var(--font-mono)",
-        fontSize: 11,
-        fontWeight: 600,
-      }}
+      className={cn(
+        "h-4 border-transparent rounded-full px-1.5 text-[10.5px] font-semibold leading-none",
+        GIT_STATUS_BADGE_CLASSES[status.status],
+      )}
     >
       {status.code}
-    </span>
-  );
-}
-
-function MentionIcon({ size = 11 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
-    </svg>
-  );
-}
-
-function OutsideLinkIcon({ size = 11 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M15 3h6v6" />
-      <path d="M10 14 21 3" />
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    </svg>
+    </Badge>
   );
 }
 
 // Listed only while the explorer shows ignored files: dimmed like VS Code's
 // ignored entries, the reason in the name's tooltip.
-const HIDDEN_ENTRY_OPACITY = 0.55;
 const HIDDEN_REASON_KEYS = {
   ignored: "files.hiddenIgnored",
   excluded: "files.hiddenExcluded",
@@ -258,6 +268,7 @@ export function TreeNode({
   const [allowedLinkTarget, setAllowedLinkTarget] = useState<string | null>(null);
   const [allowingLink, setAllowingLink] = useState(false);
   const [allowLinkError, setAllowLinkError] = useState<string | null>(null);
+  const [linkConfirmOpen, setLinkConfirmOpen] = useState(false);
   // A link leading outside the project is refused until the operator allows
   // its target, so it asks for that instead of listing (#748).
   const pendingLinkTarget = node.outsideLinkTarget && node.outsideLinkTarget !== allowedLinkTarget
@@ -325,14 +336,8 @@ export function TreeNode({
     }
   }, [node.isDir, node.fullPath, node.name, loaded, open, pendingLinkTarget, loadChildren, onOpenFile, onToggleExpanded]);
 
-  const handleAllowLink = useCallback(async (event: React.MouseEvent) => {
-    event.stopPropagation();
+  const allowLink = useCallback(async () => {
     if (!pendingLinkTarget) return;
-    // A link to `/`, `~` or a parent of the project opens far more than a
-    // sibling folder, and a cloned repository can contain one.
-    if (node.outsideLinkEncloses && !window.confirm(t("files.allowEnclosingLinkConfirm", { target: pendingLinkTarget }))) {
-      return;
-    }
     setAllowingLink(true);
     setAllowLinkError(null);
     try {
@@ -344,7 +349,19 @@ export function TreeNode({
     } finally {
       setAllowingLink(false);
     }
-  }, [node.fullPath, node.outsideLinkEncloses, pendingLinkTarget, loadChildren, t]);
+  }, [node.fullPath, pendingLinkTarget, loadChildren]);
+
+  const handleAllowLink = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!pendingLinkTarget) return;
+    // A link to `/`, `~` or a parent of the project opens far more than a
+    // sibling folder, and a cloned repository can contain one.
+    if (node.outsideLinkEncloses) {
+      setLinkConfirmOpen(true);
+      return;
+    }
+    void allowLink();
+  }, [node.outsideLinkEncloses, pendingLinkTarget, allowLink]);
 
   return (
     <div>
@@ -366,50 +383,42 @@ export function TreeNode({
           onDropTargetChange?.(null);
           onDropFiles?.(node.fullPath, droppedItems(event.dataTransfer));
         } : undefined}
-        style={{
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          paddingLeft: 8 + depth * 14,
-          paddingRight: 8,
-          height: "var(--file-row-height)",
-          cursor: "pointer",
-          background: isDropTarget
-            ? "color-mix(in srgb, var(--accent) 16%, transparent)"
-            : hovered
-              ? "var(--bg-hover)"
-              : "transparent",
-          outline: isDropTarget ? "1px dashed var(--accent)" : "none",
-          outlineOffset: -1,
-          borderRadius: 4,
-          userSelect: "none",
-        }}
-      >
-        {node.isDir && (
-          <svg
-            width="10" height="10" viewBox="0 0 10 10" fill="none"
-            stroke="var(--text-dim)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-            style={{ flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.1s" }}
-          >
-            <polyline points="3 2 7 5 3 8" />
-          </svg>
+        className={cn(
+          "relative flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg pr-2 text-[12.5px] text-foreground",
+          // 拖拽目标虚线框优先于行悬停底色（hovered 态不触发于拖拽中，二者不冲突）
+          isDropTarget &&
+            "bg-[color-mix(in_srgb,var(--accent)_16%,transparent)] outline-1 outline-dashed outline-primary -outline-offset-1",
+          !isDropTarget && hovered && "bg-sidebar-accent",
         )}
-        {!node.isDir && <span style={{ width: 10, flexShrink: 0 }} />}
-        <span style={{ flexShrink: 0, display: "flex", alignItems: "center", opacity: hidden ? HIDDEN_ENTRY_OPACITY : 1 }}>
-          {node.isDir ? <FolderIcon size={14} open={open} /> : getFileIcon(node.name, 14)}
+        style={{ paddingLeft: 4 + depth * 14 }} /* 树深度缩进为逐行计算值 */
+      >
+        {/* 缩进线：每级一条 border-l，位置与行内缩进同一套树深度计算值 */}
+        {Array.from({ length: depth }, (_, level) => (
+          <span
+            key={level}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-[5px] w-px bg-sidebar-border/70"
+            style={{ left: 10 + level * 14 }}
+          />
+        ))}
+        {node.isDir ? (
+          <ChevronRightIcon
+            size={13}
+            strokeWidth={1.8}
+            className={cn("shrink-0 text-muted-foreground transition-transform duration-100", open && "rotate-90")}
+          />
+        ) : (
+          <span className="w-[13px] shrink-0" />
+        )}
+        <span className={cn("flex shrink-0 items-center", hidden && "opacity-55")}>
+          {node.isDir ? <TreeFolderIcon open={open} /> : getFileIcon(node.name)}
         </span>
         <span
           data-hidden-reason={hidden}
-          style={{
-            fontSize: 12,
-            color: hidden ? "var(--text-muted)" : "var(--text)",
-            opacity: hidden ? HIDDEN_ENTRY_OPACITY : 1,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            flex: 1,
-          }}
+          className={cn(
+            "min-w-0 flex-1 truncate",
+            hidden ? "text-muted-foreground opacity-55" : "text-foreground",
+          )}
           title={hidden ? `${node.fullPath}\n${t(HIDDEN_REASON_KEYS[hidden])}` : node.fullPath}
         >
           {node.name}
@@ -418,18 +427,18 @@ export function TreeNode({
           <span
             title={t("files.outsideLink", { target: pendingLinkTarget })}
             aria-label={t("files.outsideLink", { target: pendingLinkTarget })}
-            style={{ width: 14, height: 14, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)" }}
+            className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground"
           >
-            <OutsideLinkIcon />
+            <ExternalLinkIcon size={13} strokeWidth={1.8} />
           </span>
         )}
         {highlighted && (
           <span
             title={t("files.newlyUploaded")}
             aria-label={t("files.newlyUploaded")}
-            style={{ width: 14, height: 14, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+            className="flex size-3.5 shrink-0 items-center justify-center"
           >
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3b82f6" }} />
+            <span className="size-1.5 rounded-full bg-primary" />
           </span>
         )}
         {!hovered && !node.isDir && gitStatus && (
@@ -439,133 +448,85 @@ export function TreeNode({
           <span
             title={t("files.containsChangedFiles")}
             aria-label={t("files.containsChangedFiles")}
-            style={{
-              width: 14,
-              height: 14,
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className="flex size-3.5 shrink-0 items-center justify-center"
           >
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#d6a84b" }} />
+            <span className="size-1.5 rounded-full bg-warning" />
           </span>
         )}
         {loading && (
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" />
-          </svg>
+          <LoaderIcon size={13} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
         )}
         {onAtMention && hovered && (
-          <button
+          <Button
+            variant="outline"
+            size="xs"
+            className={cn(
+              "absolute top-1/2 h-7 -translate-y-1/2 text-primary",
+              node.isDir ? "right-1" : "right-7",
+            )}
             onClick={(e) => {
               e.stopPropagation();
               onAtMention(getRelativeFilePath(node.fullPath, cwd), node.isDir);
             }}
             title={t("files.insertPath")}
-            style={{
-              position: "absolute",
-              right: !node.isDir ? 28 : 4,
-              top: "50%",
-              transform: "translateY(-50%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-              padding: "0 8px",
-              height: "calc(var(--file-row-height) - 4px)",
-              background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              color: "var(--accent)",
-              cursor: "pointer",
-              fontSize: 11,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-            }}
           >
-            <MentionIcon />
+            <AtSignIcon strokeWidth={1.8} />
             {t("files.mention")}
-          </button>
+          </Button>
         )}
         {hovered && !node.isDir && (
-          <a
-            href={`/api/files/${encodeFilePathForApi(node.fullPath)}?type=download`}
-            download
-            onClick={(e) => e.stopPropagation()}
+          <Button
+            asChild
+            variant="outline"
+            size="icon-xs"
+            className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
             title={t("files.download")}
-            style={{
-              position: "absolute",
-              right: 4,
-              top: "50%",
-              transform: "translateY(-50%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-              padding: "0 5px",
-              height: "calc(var(--file-row-height) - 4px)",
-              background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              fontSize: 11,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-              textDecoration: "none",
-            }}
           >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-          </a>
+            <a
+              href={`/api/files/${encodeFilePathForApi(node.fullPath)}?type=download`}
+              download
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DownloadIcon strokeWidth={1.8} />
+            </a>
+          </Button>
         )}
       </div>
       {node.isDir && open && pendingLinkTarget && (
         <div
-          style={{
-            paddingLeft: 8 + (depth + 1) * 14,
-            paddingRight: 8,
-            paddingTop: 3,
-            paddingBottom: 5,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: 4,
-            fontSize: 11,
-            color: "var(--text-dim)",
-          }}
+          className="flex flex-col items-start gap-1 pb-[5px] pr-2 pt-[3px] text-xs text-muted-foreground"
+          style={{ paddingLeft: 4 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
         >
-          <span style={{ wordBreak: "break-all" }}>{t("files.outsideLink", { target: pendingLinkTarget })}</span>
+          <span className="break-all">{t("files.outsideLink", { target: pendingLinkTarget })}</span>
           {node.outsideLinkEncloses && (
-            <span style={{ color: "#f59e0b" }}>{t("files.outsideLinkEncloses")}</span>
+            <span className="text-warning">{t("files.outsideLinkEncloses")}</span>
           )}
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
+            className="h-7 text-primary"
+            title={t("files.allowOutsideLinkTitle", { target: pendingLinkTarget })}
             onClick={handleAllowLink}
             disabled={allowingLink}
-            title={t("files.allowOutsideLinkTitle", { target: pendingLinkTarget })}
-            style={{
-              height: "calc(var(--file-row-height) - 4px)",
-              padding: "0 8px",
-              background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              color: "var(--accent)",
-              cursor: allowingLink ? "default" : "pointer",
-              opacity: allowingLink ? 0.6 : 1,
-              fontSize: 11,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-            }}
           >
             {t("files.allowOutsideLink")}
-          </button>
+          </Button>
           {allowLinkError && (
-            <span role="alert" style={{ color: "#f87171", wordBreak: "break-word" }}>{allowLinkError}</span>
+            <span role="alert" className="break-words text-destructive">{allowLinkError}</span>
+          )}
+          {linkConfirmOpen && (
+            <AlertDialog open={linkConfirmOpen} onOpenChange={setLinkConfirmOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("files.allowEnclosingLinkConfirm", { target: pendingLinkTarget })}</AlertDialogTitle>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t("files.cancel")}</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => void allowLink()}>{t("files.allowOutsideLink")}</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       )}
@@ -594,7 +555,10 @@ export function TreeNode({
             />
           ))}
           {children.length === 0 && loaded && !loadError && (
-            <div style={{ paddingLeft: 8 + (depth + 1) * 14, fontSize: 11, color: "var(--text-dim)", height: 22, display: "flex", alignItems: "center" }}>
+            <div
+              className="flex h-[22px] items-center text-xs text-muted-foreground"
+              style={{ paddingLeft: 4 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
+            >
               empty
             </div>
           )}
@@ -603,20 +567,11 @@ export function TreeNode({
               role="alert"
               onClick={(e) => { e.stopPropagation(); void loadChildren(true); }}
               title={`${loadError} — click to retry`}
-              style={{
-                paddingLeft: 8 + (depth + 1) * 14,
-                fontSize: 11,
-                color: "#f87171",
-                height: 22,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                cursor: "pointer",
-                minWidth: 0,
-              }}
+              className="flex h-[22px] min-w-0 cursor-pointer items-center gap-1 text-xs text-destructive"
+              style={{ paddingLeft: 4 + (depth + 1) * 14 }} /* 树深度缩进为逐行计算值 */
             >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loadError}</span>
-              <span style={{ flexShrink: 0 }}>↻</span>
+              <span className="truncate">{loadError}</span>
+              <span className="shrink-0">↻</span>
             </div>
           )}
         </div>
@@ -659,93 +614,48 @@ function ChangeRow({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={status.filePath}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: treeMode ? 4 : 6,
-        paddingLeft: treeMode ? 8 + depth * 14 : 10,
-        paddingRight: 8,
-        height: "var(--file-row-height)",
-        cursor: "pointer",
-        background: hovered ? "var(--bg-hover)" : "transparent",
-        borderRadius: 4,
-        userSelect: "none",
-        position: "relative",
-      }}
+      className={cn(
+        "relative flex h-8 cursor-pointer select-none items-center rounded-lg pr-2 text-[12.5px] text-foreground",
+        treeMode ? "gap-2" : "gap-1.5",
+        hovered && "bg-accent/50",
+      )}
+      style={{ paddingLeft: treeMode ? 4 + depth * 14 : 10 }} /* 树深度缩进为逐行计算值 */
     >
       <GitStatusBadge status={status} t={t} />
-      {treeMode && <span style={{ width: 10, flexShrink: 0 }} />}
-      <span style={{ flexShrink: 0, display: "flex", alignItems: "center", opacity: 0.85 }}>
-        {getFileIcon(name, 13)}
+      {treeMode && <span className="w-[13px] shrink-0" />}
+      <span className="flex shrink-0 items-center">
+        {getFileIcon(name)}
       </span>
       <span
         title={status.filePath}
-        style={{
-          fontSize: 12,
-          color: "var(--text)",
-          display: "flex",
-          alignItems: "center",
-          minWidth: 0,
-          flex: 1,
-        }}
+        className="flex min-w-0 flex-1 items-center"
       >
         {dirPart && (
-          <span
-            style={{
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              flex: "0 1 auto",
-              minWidth: 0,
-              color: "var(--text-dim)",
-            }}
-          >
+          <span className="min-w-0 flex-[0_1_auto] truncate text-muted-foreground">
             {dirPart}
           </span>
         )}
-        <span
-          style={{
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            flexShrink: treeMode ? 1 : 0,
-            maxWidth: "100%",
-          }}
-        >
+        <span className={cn("max-w-full truncate", treeMode ? "shrink" : "shrink-0")}>
           {baseName}
         </span>
       </span>
       {onAtMention && hovered && (
-        <button
+        <Button
+          variant="outline"
+          size="xs"
           onClick={(e) => {
             e.stopPropagation();
             onAtMention(rel, false);
           }}
           title={t("files.insertPath")}
-          style={{
-            position: "absolute",
-            right: 4,
-            top: "50%",
-            transform: "translateY(-50%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 4,
-            padding: "0 8px",
-            height: "calc(var(--file-row-height) - 4px)",
-            background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
-            color: "var(--accent)",
-            cursor: "pointer",
-            fontSize: 11,
-            fontWeight: 600,
-            whiteSpace: "nowrap",
-          }}
+          className={cn(
+            "has-[>svg]:px-2",
+            "absolute right-1 top-1/2 flex h-7 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+          )}
         >
-          <MentionIcon />
+          <AtSignIcon size={13} strokeWidth={1.8} className="size-[13px]" />
           {t("files.mention")}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -769,40 +679,19 @@ function ChangesFolderRow({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={node.path}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
-        paddingLeft: 8 + depth * 14,
-        paddingRight: 8,
-        height: "var(--file-row-height)",
-        cursor: "pointer",
-        background: hovered ? "var(--bg-hover)" : "transparent",
-        borderRadius: 4,
-        userSelect: "none",
-      }}
+      className={cn(
+        "flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg pr-2 text-[12.5px] text-foreground",
+        hovered && "bg-accent/50",
+      )}
+      style={{ paddingLeft: 4 + depth * 14 }} /* 树深度缩进为逐行计算值 */
     >
-      <svg
-        width="10" height="10" viewBox="0 0 10 10" fill="none"
-        stroke="var(--text-dim)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-        style={{ flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.1s" }}
-        aria-hidden="true"
-      >
-        <polyline points="3 2 7 5 3 8" />
-      </svg>
-      <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
-        <FolderIcon size={14} open={open} />
-      </span>
-      <span
-        style={{
-          fontSize: 12,
-          color: "var(--text)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          flex: 1,
-        }}
-      >
+      <ChevronRightIcon
+        size={13}
+        strokeWidth={1.8}
+        className={cn("shrink-0 text-muted-foreground transition-transform duration-100", open && "rotate-90")}
+      />
+      <TreeFolderIcon open={open} />
+      <span className="min-w-0 flex-1 truncate">
         {node.name}
       </span>
     </div>
@@ -881,22 +770,10 @@ function ChangesTreeRows({
 function ChangesViewToggleIcon({ mode }: { mode: ChangesViewMode }) {
   if (mode === "tree") {
     // List icon: switching back to the flat list
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" />
-        <path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" />
-      </svg>
-    );
+    return <ListIcon size={14} strokeWidth={1.8} />;
   }
   // Tree icon: switching to the folder tree
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 3v12" /><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-      <path d="M6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-      <path d="M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-      <path d="M9 12h6" /><path d="M12 12v3" />
-    </svg>
-  );
+  return <FolderTreeIcon size={14} strokeWidth={1.8} />;
 }
 
 export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileExplorer({
@@ -1308,7 +1185,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
 
   return (
     <div
-      style={{ minHeight: "100%" }}
+      className="min-h-full"
       onDragEnter={handleExplorerDragEnter}
       onDragOver={handleExplorerDragOver}
       onDragLeave={handleExplorerDragLeave}
@@ -1316,116 +1193,100 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
     >
       <input ref={uploadInputRef} type="file" multiple hidden onChange={handleUploadInput} />
       {showUploadFeedback && (
-        <div style={{ padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>
+        <div className="border-b border-border px-2 py-1.5">
         {uploadBusy && (
           <div role="status" aria-live="polite" aria-label={uploadPhase === "checking" ? t("files.checking") : t("files.uploading", { progress: uploadProgress })}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 14, color: "var(--text-muted)" }}>
+            <div className="flex min-h-[14px] items-center justify-between gap-2 text-muted-foreground">
               {uploadPhase === "checking" ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" style={{ animation: "spin 0.8s linear infinite" }} aria-hidden="true">
-                  <path d="M21 12a9 9 0 1 1-5.7-8.4" />
-                </svg>
+                <LoaderCircleIcon size={13} strokeWidth={1.8} className="animate-spin" />
               ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 16V4" />
-                  <path d="m7 9 5-5 5 5" />
-                  <path d="M5 20h14" />
-                </svg>
+                <UploadIcon size={13} strokeWidth={1.8} />
               )}
-              {uploadPhase === "uploading" && <span style={{ fontSize: 10 }}>{uploadProgress}%</span>}
+              {uploadPhase === "uploading" && <span className="text-[10px]">{uploadProgress}%</span>}
             </div>
             {uploadPhase === "uploading" && (
-              <div style={{ height: 3, marginTop: 4, overflow: "hidden", borderRadius: 2, background: "var(--border)" }}>
-                <div style={{ width: `${uploadProgress}%`, height: "100%", background: "var(--text-muted)", transition: "width 120ms ease" }} />
-              </div>
+              <Progress value={uploadProgress} className="mt-1 h-[3px] rounded-[2px] bg-border" />
             )}
           </div>
         )}
 
         {pendingConflict && (
-          <div role="alert" style={{ padding: 7, border: "1px solid color-mix(in srgb, #f59e0b 55%, var(--border))", borderRadius: 4, background: "color-mix(in srgb, #f59e0b 9%, var(--bg-panel))" }}>
-            <div style={{ fontSize: 11, color: "var(--text)", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+          <Alert variant="warning" className="gap-y-0 p-2">
+            <AlertDescription className="text-xs leading-[1.35] text-foreground [overflow-wrap:anywhere]">
               {t("files.conflictSummary", { count: pendingConflict.conflicts.length, countSuffix: pendingConflict.conflicts.length === 1 ? "" : "s", files: pendingConflict.conflicts.join(", ") })}
-            </div>
+            </AlertDescription>
             {pendingConflict.nonReplaceable.length > 0 && (
-              <div style={{ marginTop: 3, fontSize: 10, color: "#f59e0b", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+              <div className="mt-[3px] text-[10px] leading-[1.35] text-warning [overflow-wrap:anywhere]">
                 {t("files.cannotReplace", { files: pendingConflict.nonReplaceable.join(", ") })}
               </div>
             )}
-            <div style={{ display: "flex", gap: 5, marginTop: 7 }}>
-              <button type="button" onClick={() => void performUpload(pendingConflict.files, "overwrite", pendingConflict.directory)} style={{ height: 22, padding: "0 7px", border: "1px solid #ef4444", borderRadius: 4, background: "transparent", color: "#ef4444", cursor: "pointer", fontSize: 10 }}>
+            <div className="mt-2 flex gap-1.5">
+              <Button type="button" variant="outline" size="xs" className="h-7 border-destructive/40 text-destructive hover:bg-destructive/10" onClick={() => void performUpload(pendingConflict.files, "overwrite", pendingConflict.directory)}>
                 {t("files.replace")}
-              </button>
-              <button type="button" onClick={() => void performUpload(pendingConflict.files, "skip", pendingConflict.directory)} style={{ height: 22, padding: "0 7px", border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontSize: 10 }}>
+              </Button>
+              <Button type="button" variant="outline" size="xs" className="h-7" onClick={() => void performUpload(pendingConflict.files, "skip", pendingConflict.directory)}>
                 {t("files.skipExisting")}
-              </button>
-              <button type="button" onClick={() => setPendingConflict(null)} style={{ height: 22, padding: "0 7px", border: "none", borderRadius: 4, background: "transparent", color: "var(--text-muted)", cursor: "pointer", fontSize: 10 }}>
+              </Button>
+              <Button type="button" variant="ghost" size="xs" className="h-7 text-muted-foreground" onClick={() => setPendingConflict(null)}>
                 {t("files.cancel")}
-              </button>
+              </Button>
             </div>
-          </div>
+          </Alert>
         )}
 
         {uploadError && (
-          <div role="alert" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11, lineHeight: 1.35, color: "#f87171" }}>
-            <span style={{ minWidth: 0, flex: 1, overflowWrap: "anywhere" }}>{uploadError}</span>
+          <div role="alert" className="flex items-start gap-1.5 text-xs leading-[1.35] text-destructive">
+            <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{uploadError}</span>
             <DismissButton onClick={() => setUploadError(null)} title={t("files.dismissError")} />
           </div>
         )}
 
         {uploadSummary && (
           <div aria-live="polite">
-            <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 22, fontSize: 11 }}>
-              <div style={{ minWidth: 0, flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="flex min-h-[22px] items-center gap-2 text-xs">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 {uploadSummary.uploaded.length > 0 && (
-                  <span title={t("files.uploadedCount", { count: uploadSummary.uploaded.length })} aria-label={t("files.uploadedCount", { count: uploadSummary.uploaded.length })} style={{ display: "flex", alignItems: "center", gap: 3, color: "#22c55e" }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="m5 12 4 4L19 6" />
-                    </svg>
+                  <span title={t("files.uploadedCount", { count: uploadSummary.uploaded.length })} aria-label={t("files.uploadedCount", { count: uploadSummary.uploaded.length })} className="flex items-center gap-[3px] text-success">
+                    <CheckIcon size={13} strokeWidth={1.8} />
                     <span>{uploadSummary.uploaded.length}</span>
                   </span>
                 )}
                 {uploadSummary.skipped.length > 0 && (
-                  <span title={t("files.skippedCount", { count: uploadSummary.skipped.length })} aria-label={t("files.skippedCount", { count: uploadSummary.skipped.length })} style={{ display: "flex", alignItems: "center", gap: 3, color: "var(--text-dim)" }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                      <circle cx="12" cy="12" r="9" />
-                      <path d="M8 12h8" />
-                    </svg>
+                  <span title={t("files.skippedCount", { count: uploadSummary.skipped.length })} aria-label={t("files.skippedCount", { count: uploadSummary.skipped.length })} className="flex items-center gap-[3px] text-muted-foreground">
+                    <CircleMinusIcon size={13} strokeWidth={1.8} />
                     <span>{uploadSummary.skipped.length}</span>
                   </span>
                 )}
                 {uploadSummary.errors.length > 0 && (
-                  <span title={t("files.failedCount", { count: uploadSummary.errors.length })} aria-label={t("files.failedCount", { count: uploadSummary.errors.length })} style={{ display: "flex", alignItems: "center", gap: 3, color: "#f87171" }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M12 3 2.5 20h19L12 3Z" />
-                      <path d="M12 9v4" />
-                      <path d="M12 17h.01" />
-                    </svg>
+                  <span title={t("files.failedCount", { count: uploadSummary.errors.length })} aria-label={t("files.failedCount", { count: uploadSummary.errors.length })} className="flex items-center gap-[3px] text-destructive">
+                    <TriangleAlertIcon size={13} strokeWidth={1.8} />
                     <span>{uploadSummary.errors.length}</span>
                   </span>
                 )}
               </div>
               {uploadSummary.uploaded.length > 0 && onAtMentions && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="xs"
                   onClick={addUploadedFilesToChat}
                   title={uploadSummary.uploaded.length === 1 ? t("files.addUploadedFile") : t("files.addAllUploadedFiles")}
                   aria-label={uploadSummary.uploaded.length === 1 ? t("files.addUploadedFile") : t("files.addAllUploadedFiles")}
-                  style={{ height: 22, padding: "0 7px", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, flexShrink: 0, border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-panel)", color: "var(--accent)", cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}
+                  className={cn(
+                    "has-[>svg]:px-2",
+                    "flex h-7 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-0 text-xs font-medium whitespace-nowrap text-primary shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  )}
                 >
-                  <MentionIcon />
+                  <AtSignIcon size={13} strokeWidth={1.8} className="size-[13px]" />
                   {t("files.mention")}
-                </button>
+                </Button>
               )}
               <DismissButton onClick={() => setUploadSummary(null)} title={t("files.dismissUploadResults")} />
             </div>
             {uploadSummary.errors.map((item) => (
-              <div key={item.name} title={item.error} style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3, minWidth: 0, fontSize: 10, color: "#f87171" }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 8v5" />
-                  <path d="M12 17h.01" />
-                </svg>
-                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+              <div key={item.name} title={item.error} className="mt-[3px] flex min-w-0 items-center gap-1 text-[10px] text-destructive">
+                <CircleAlertIcon size={13} strokeWidth={1.8} className="shrink-0" />
+                <span className="min-w-0 truncate">{item.name}</span>
               </div>
             ))}
           </div>
@@ -1434,12 +1295,9 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
       )}
 
       {fileSearchOpen && (
-      <div style={{ padding: "2px 8px 6px" }}>
-        <div style={{ position: "relative" }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", pointerEvents: "none" }}>
-            <circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" />
-          </svg>
-          <input
+      <div className="px-2 pb-1.5 pt-0.5">
+        <InputGroup className="h-8 rounded-full bg-muted">
+          <InputGroupInput
             ref={searchInputRef}
             id="file-search-input"
             value={searchQuery}
@@ -1452,29 +1310,28 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
             }}
             placeholder={t("sidebar.searchFilesPlaceholder")}
             aria-label={t("sidebar.searchFiles")}
-            style={{ width: "100%", boxSizing: "border-box", padding: "6px 24px", border: "1px solid var(--border)", borderRadius: 8, outline: "none", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-mono)", fontSize: 11 }}
           />
+          <InputGroupAddon>
+            <SearchIcon size={13} strokeWidth={1.8} className="text-muted-foreground" />
+          </InputGroupAddon>
           {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              title={t("sidebar.clearSearch")}
-              aria-label={t("sidebar.clearSearch")}
-              style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, padding: 0, border: "none", borderRadius: 4, background: "none", color: "var(--text-dim)", cursor: "pointer" }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text-dim)"; }}
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-              </svg>
-            </button>
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                size="icon-xs"
+                onClick={() => setSearchQuery("")}
+                title={t("sidebar.clearSearch")}
+                aria-label={t("sidebar.clearSearch")}
+              >
+                <XIcon size={13} strokeWidth={1.8} />
+              </InputGroupButton>
+            </InputGroupAddon>
           )}
-        </div>
+        </InputGroup>
         {hasSearchQuery && (
-          <div style={{ paddingTop: 3 }}>
-            {searchLoading && <div role="status" style={{ padding: "6px 2px", fontSize: 10, color: "var(--text-dim)" }}>{t("sidebar.searchingFiles")}</div>}
-            {!searchLoading && searchError && <div role="alert" style={{ padding: "6px 2px", fontSize: 10, color: "#f87171" }}>{t("i18n.networkError")}</div>}
-            {!searchLoading && !searchError && searchPaths.length === 0 && <div style={{ padding: "6px 2px", fontSize: 10, color: "var(--text-dim)" }}>{t("sidebar.noMatchingFiles")}</div>}
+          <div className="pt-[3px]">
+            {searchLoading && <div role="status" className="px-[2px] py-1.5 text-[10px] text-muted-foreground">{t("sidebar.searchingFiles")}</div>}
+            {!searchLoading && searchError && <div role="alert" className="px-[2px] py-1.5 text-[10px] text-destructive">{t("i18n.networkError")}</div>}
+            {!searchLoading && !searchError && searchPaths.length === 0 && <div className="px-[2px] py-1.5 text-[10px] text-muted-foreground">{t("sidebar.noMatchingFiles")}</div>}
             {!searchLoading && !searchError && searchPaths.length > 0 && (
               <div>
                 {searchRoots.map((node) => (
@@ -1510,46 +1367,33 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
       )}
 
       {!changesCollapsed && gitFiles.length > 0 && (
-        <div style={{ padding: "0 4px 2px" }}>
+        <div className="px-1 pb-0.5">
           <div
             aria-label={t("files.changeStats", {
               count: gitFiles.length,
               additions: gitLineStats.additions,
               deletions: gitLineStats.deletions,
             })}
-            style={{ display: "flex", alignItems: "center", gap: 6, height: 24, padding: "0 6px 0 10px", fontSize: 12 }}
+            className="flex h-6 items-center gap-1.5 pl-2.5 pr-1.5 text-xs"
           >
-            <span style={{ color: "var(--text-dim)" }}>
+            <span className="text-muted-foreground">
               {t("files.changedCount", { count: gitFiles.length })}
             </span>
-            <span style={{ color: GIT_STATUS_COLORS.added, fontFamily: "var(--font-mono)" }}>+{gitLineStats.additions}</span>
-            <span style={{ color: GIT_STATUS_COLORS.deleted, fontFamily: "var(--font-mono)" }}>-{gitLineStats.deletions}</span>
-            <span style={{ flex: 1 }} />
-            <button
+            <span className="font-mono text-success">+{gitLineStats.additions}</span>
+            <span className="font-mono text-destructive">-{gitLineStats.deletions}</span>
+            <span className="flex-1" />
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground"
               onClick={handleChangesViewModeToggle}
               title={changesViewMode === "list" ? t("files.viewAsTree") : t("files.viewAsList")}
               aria-label={changesViewMode === "list" ? t("files.viewAsTree") : t("files.viewAsList")}
               aria-pressed={changesViewMode === "tree"}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 22,
-                height: 22,
-                padding: 0,
-                border: "none",
-                borderRadius: 4,
-                background: "transparent",
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-dim)"; }}
             >
               <ChangesViewToggleIcon mode={changesViewMode} />
-            </button>
+            </Button>
           </div>
           {changesViewMode === "tree" ? (
             <ChangesTreeRows
@@ -1579,11 +1423,16 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
       )}
 
       {(changesCollapsed || gitFiles.length === 0) && (!fileSearchOpen || !hasSearchQuery) && (
-        <div style={{ padding: "2px 4px" }}>
+        <div className="px-1 py-[2px]">
           {loading ? (
-            <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-dim)" }}>{t("files.loading")}</div>
+            <div aria-busy="true" className="flex flex-col gap-1.5 px-3 py-2">
+              <span className="sr-only">{t("files.loading")}</span>
+              {[0, 1, 2].map((row) => (
+                <Skeleton key={row} className="h-4 rounded-sm" style={{ width: `${72 - row * 16}%` }} /* 三行递减宽度示意树形 */ />
+              ))}
+            </div>
           ) : error ? (
-            <div style={{ padding: "8px 12px", fontSize: 11, color: "#f87171" }}>{error}</div>
+            <div className="px-3 py-2 text-xs text-destructive">{error}</div>
           ) : (
             roots.map((node) => (
               <TreeNode
@@ -1608,9 +1457,11 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
             ))
           )}
           {!loading && !error && roots.length === 0 && (
-            <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-dim)" }}>
-              {t("files.noFiles")}
-            </div>
+            <Empty className="flex-none items-start gap-0 rounded-none border-0 px-3 py-2 text-left md:px-3 md:py-2">
+              <EmptyHeader className="items-start text-left">
+                <EmptyTitle className="text-xs font-normal text-muted-foreground">{t("files.noFiles")}</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           )}
         </div>
       )}
@@ -1621,27 +1472,9 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         <div
           role="status"
           aria-live="polite"
-          style={{
-            position: "sticky",
-            bottom: 0,
-            zIndex: 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "6px 8px",
-            borderTop: "1px solid var(--border)",
-            background: "var(--bg-panel)",
-            fontSize: 11,
-            color: "var(--accent)",
-            userSelect: "none",
-            pointerEvents: "none",
-          }}
+          className="pointer-events-none sticky bottom-0 z-[1] flex select-none items-center gap-1.5 border-t border-border bg-card px-2 py-1.5 text-xs text-primary"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-            <path d="M12 16V4" />
-            <path d="m7 9 5-5 5 5" />
-            <path d="M5 20h14" />
-          </svg>
+          <UploadIcon size={13} strokeWidth={1.8} className="shrink-0" />
           {t("files.dropToUpload", {
             directory: dropTargetPath
               ? (getRelativeFilePath(dropTargetPath, cwd) || dropTargetPath)

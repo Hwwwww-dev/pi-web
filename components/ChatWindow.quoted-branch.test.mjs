@@ -22,8 +22,10 @@ test("keeps the selection toolbar above the session sidebar", async () => {
   const chatSource = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
   const shellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 
-  const toolbar = chatSource.match(/role=\{quoteInputOpen \? "dialog" : "toolbar"\}[\s\S]*?zIndex:\s*(\d+)/);
-  const sidebar = shellSource.match(/id="session-sidebar"[\s\S]*?zIndex:\s*(\d+)/);
+  const toolbar = chatSource.match(/role=\{quoteInputOpen \? "dialog" : "toolbar"\}[\s\S]*?z-\[(\d+)\]/);
+  // The ui Sidebar primitive's fixed container z utility (z-10), read out of
+  // the vendored component the shell mounts with id="session-sidebar".
+  const sidebar = shellSource.match(/id="session-sidebar"[\s\S]{0,600}?z-(\d+)/);
 
   assert.ok(toolbar, "expected quote toolbar z-index");
   assert.ok(sidebar, "expected session sidebar z-index");

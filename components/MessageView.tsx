@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, memo, useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
+import { Fragment, memo, useState, useRef, useEffect, useMemo } from "react";
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, ClockIcon, CopyIcon, CornerDownRightIcon, GitBranchIcon, XIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Badge } from "./ui/badge";
+import { Bubble, BubbleContent } from "./ui/bubble";
+import { Button } from "./ui/button";
+import { Message, MessageContent } from "./ui/message";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import {
@@ -9,16 +16,12 @@ import {
   SafeMarkdownBody,
   ThinkingRow,
   ToolRow,
-  loadThinkingContent,
 } from "./ActivityRows";
 import { formatNoticeTokens } from "@/lib/transcript-notices";
-import { ThinkingIcon } from "./ThinkingIcon";
-import ReactMarkdown from "react-markdown";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
-import { getAssistantErrorMessage, getThinkingPreview, hasAssistantAnswer, isAssistantTruncated, isEmptyThinkingBlock, splitThinkingPieces } from "@/lib/message-display";
+import { getAssistantErrorMessage, hasAssistantAnswer, isAssistantTruncated, isEmptyThinkingBlock } from "@/lib/message-display";
 import { formatTurnDuration } from "@/lib/turn-duration";
-import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
 import { skillExpansionContent, skillExpansionToCommand } from "@/lib/slash-display";
@@ -90,10 +93,6 @@ function estimateUpdatedTokens(previous: TokenEstimateCacheEntry | undefined, te
 
 // Messages larger than this skip markdown rendering entirely (guard now lives
 // in ActivityRows.SafeMarkdownBody and is shared with activity prose).
-
-// Cap the user "sent" bubble's height so an abnormally long message does not
-// push the conversation off screen; overflow scrolls inside the bubble.
-const USER_BUBBLE_MAX_HEIGHT = 300;
 
 interface Props {
   message: AgentMessage;
@@ -215,7 +214,7 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
     // spacing of their own; inside grouped activity bodies the rows are spaced
     // by the activity container.
     return (
-      <div style={{ marginBottom: 12 }}>
+      <div className="mb-5">
         {(message as CustomMessage).customType === "compaction"
           ? <CompactionRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} />
           : <CustomRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />}
@@ -264,7 +263,6 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   isEditing?: boolean;
 }) {
   const { t } = useI18n();
-  const [hovered, setHovered] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -300,7 +298,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   const editTarget = commandText ? replaceUserMessageText(message, commandText) : message;
 
   const imageBlocksNode = imageBlocks.length > 0 && (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: content ? 8 : 0 }}>
+    <div className={cn("flex flex-wrap gap-1.5", content && "mb-2")}>
       {imageBlocks.map((img, i) => {
         // SAFETY: pi-ai's on-disk format stores images flat ({data, mimeType}) while
         // lib/types.ts ImageContent nests them under {source:{type,data,media_type,url}};
@@ -321,7 +319,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               alt=""
               loading="lazy"
               decoding="async"
-              style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid var(--user-border)" }}
+              className="block max-h-60 max-w-60 rounded-md border border-border object-contain"
             />
           </ImagePreview>
         );
@@ -330,89 +328,51 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   );
   const canEdit = !!entryId && !!onEditContent;
   const canCancelEdit = !!isEditing && !!onCancelEdit;
+  // Edit-in-progress and its cancel stay visible without hover; the rest reveal
+  // on the row's hover (touch screens keep them always on via pointer-coarse).
+  const pinnedActions = forking || canCancelEdit;
 
   const copyContent = () => {
-    copyText(copyTarget).then(() => {
+    copyText(copyTarget).then((copied) => {
+      if (!copied) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
   };
 
   return (
-    <div
-      style={{ marginBottom: 12, display: "flex", flexDirection: "column", alignItems: "flex-end" }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, maxWidth: "85%" }}>
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            background: isEditing ? "color-mix(in srgb, var(--accent) 14%, var(--user-bg))" : "var(--user-bg)",
-            border: isEditing ? "1px solid color-mix(in srgb, var(--accent) 62%, var(--user-bg))" : "1px solid var(--user-border)",
-            boxShadow: isEditing ? "0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent)" : undefined,
-            borderRadius: 12,
-            padding: "8px 12px",
-            fontSize: "calc(14px + var(--chat-font-size-offset, 0px))",
-            lineHeight: 1.6,
-            color: "var(--text)",
-            wordBreak: "break-word",
-            maxHeight: USER_BUBBLE_MAX_HEIGHT,
-            overflowY: "auto",
-          }}
+    <Message align="end" className="group mb-5 flex flex-col! items-end gap-1">
+      <Bubble variant="secondary" align="end" className="max-w-[82%] max-sm:max-w-[86%]">
+        {/* Cap the height so an abnormally long message does not push the
+            conversation off screen; overflow scrolls inside the bubble. */}
+        <BubbleContent
+          className={cn(
+            "max-h-[300px] overflow-y-auto text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
+            isEditing && "ring-2 ring-[color-mix(in_srgb,var(--accent)_16%,transparent)]",
+          )}
         >
           {commandText ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+            <div className="flex min-w-0 flex-col gap-1.5">
               {imageBlocksNode}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
-                <button
+              <div className="flex flex-wrap items-start gap-2">
+                <Button
+                  variant="ghost"
                   onClick={() => setExpanded((prev) => !prev)}
                   title={expanded ? t("i18n.collapse") : t("i18n.expand")}
                   aria-expanded={expanded}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    flexShrink: 0,
-                    padding: 0,
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--accent)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "calc(13px + var(--chat-font-size-offset, 0px))",
-                    textAlign: "left",
-                  }}
+                  className="flex h-auto shrink-0 cursor-pointer items-center gap-1.5 rounded-none border-none bg-transparent p-0 text-left font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] font-normal text-primary hover:bg-transparent hover:text-primary"
                 >
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span className="truncate">
                     {commandName}
                   </span>
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ flexShrink: 0, opacity: 0.75, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
+                  <ChevronDownIcon
                     aria-hidden="true"
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
+                    strokeWidth={2}
+                    className={cn("size-[11px] shrink-0 opacity-75 transition-transform", expanded && "rotate-180")}
+                  />
+                </Button>
                 {commandArgs && (
-                  <span style={{
-                    color: "var(--text)",
-                    fontSize: "calc(14px + var(--chat-font-size-offset, 0px))",
-                    lineHeight: 1.6,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    minWidth: 0,
-                    flex: 1,
-                  }}>
+                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground">
                     {commandArgs}
                   </span>
                 )}
@@ -427,160 +387,110 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
           {content && <SafeMarkdownBody className="markdown-user-message" keepLineBreaks cwd={cwd} onOpenFile={onOpenFile}>{content}</SafeMarkdownBody>}
           </>
           )}
-        </div>
-
-      </div>
+        </BubbleContent>
+      </Bubble>
 
       {/* Bottom row: action buttons + timestamp */}
       {(
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "flex-end",
-          gap: 6, marginTop: 3,
-        }}>
-          <div className="touch-hover-actions" style={{
-            display: "flex", gap: 3,
-            opacity: hovered ? 1 : 0,
-            pointerEvents: hovered ? "auto" : "none",
-            transition: "opacity 0.12s",
-          }}>
-            <button
-              onClick={copyContent}
-              title={t("i18n.copyMessage")}
-              aria-label={t("i18n.copyMessage")}
-              style={{
-                display: "flex", alignItems: "center",
-                padding: "3px 6px", height: 22,
-                background: "none", border: "none",
-                borderRadius: 5,
-                color: copied ? "var(--accent)" : "var(--text-dim)",
-                cursor: "pointer",
-                transition: "color 0.12s",
-              }}
-              onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
-              onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = "var(--text-dim)"; }}
+        <div className={cn(
+          "flex items-center justify-end gap-1 transition-opacity",
+          pinnedActions
+            ? "opacity-100"
+            : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
+        )}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={copyContent}
+            title={t("i18n.copyMessage")}
+            aria-label={t("i18n.copyMessage")}
+            className={cn("text-muted-foreground", copied && "text-primary")}
+          >
+            {copied ? <CheckIcon strokeWidth={1.8} /> : <CopyIcon strokeWidth={1.8} />}
+          </Button>
+          {canEdit && !canCancelEdit && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => onEditContent!(editTarget, entryId!)}
+              title={t("i18n.editFromHereTitle")}
+              aria-label={t("i18n.editFromHere")}
+              className="text-muted-foreground"
             >
-              {copied ? (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              ) : (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-              )}
-            </button>
-          </div>
-          {(canFork || canEdit || canCancelEdit) && (
-            <div className="touch-hover-actions" style={{
-              display: "flex", gap: 3,
-              opacity: (hovered || forking || canCancelEdit) ? 1 : 0,
-              pointerEvents: (hovered || forking || canCancelEdit) ? "auto" : "none",
-              transition: "opacity 0.12s",
-            }}>
-              {canEdit && !canCancelEdit && (
-                <button
-                  onClick={() => onEditContent!(editTarget, entryId!)}
-                   title={t("i18n.editFromHereTitle")}
-                  aria-label={t("i18n.editFromHere")}
-                  style={{
-                    display: "flex", alignItems: "center",
-                    padding: "3px 6px", height: 22,
-                    background: "none", border: "none",
-                    borderRadius: 5,
-                    color: "var(--text-dim)",
-                    cursor: "pointer",
-                    transition: "color 0.12s",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 10 20 15 15 20" />
-                    <path d="M4 4v7a4 4 0 0 0 4 4h12" />
-                  </svg>
-                </button>
-              )}
-              {canCancelEdit && (
-                <button
-                  type="button"
-                  onClick={onCancelEdit}
-                  title={t("i18n.cancel")}
-                  aria-label={t("i18n.cancel")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 4,
-                    padding: "3px 8px", height: 22,
-                    background: "none", border: "none",
-                    borderRadius: 5,
-                    color: "var(--accent)",
-                    cursor: "pointer",
-                    fontSize: 11, fontWeight: 500,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                    <path d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
-              )}
-              {canFork && (
-                <button
-                  onClick={() => { onFork!(entryId!); }}
-                  disabled={forking}
-                   title={forking ? t("i18n.creatingSession") : t("i18n.newSessionTitle")}
-                  aria-label={t("i18n.newSession")}
-                  style={{
-                    display: "flex", alignItems: "center",
-                    padding: "3px 6px", height: 22,
-                    background: "none", border: "none",
-                    borderRadius: 5,
-                    color: forking ? "var(--accent)" : "var(--text-dim)",
-                    cursor: forking ? "not-allowed" : "pointer",
-                    transition: "color 0.12s",
-                  }}
-                  onMouseEnter={(e) => { if (!forking) e.currentTarget.style.color = "var(--accent)"; }}
-                  onMouseLeave={(e) => { if (!forking) e.currentTarget.style.color = "var(--text-dim)"; }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="6" y1="3" x2="6" y2="15" />
-                    <circle cx="18" cy="6" r="3" />
-                    <circle cx="6" cy="18" r="3" />
-                    <path d="M18 9a9 9 0 0 1-9 9" />
-                  </svg>
-                </button>
-              )}
-            </div>
+              <CornerDownRightIcon strokeWidth={1.8} />
+            </Button>
           )}
-          {time && <span style={{ fontSize: 10, color: "var(--text-dim)" }}>{time}</span>}
+          {canCancelEdit && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={onCancelEdit}
+              title={t("i18n.cancel")}
+              aria-label={t("i18n.cancel")}
+              className="text-primary"
+            >
+              <XIcon strokeWidth={2} />
+            </Button>
+          )}
+          {canFork && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => { onFork!(entryId!); }}
+              disabled={forking}
+              title={forking ? t("i18n.creatingSession") : t("i18n.newSessionTitle")}
+              aria-label={t("i18n.newSession")}
+              className={cn("text-muted-foreground", forking && "text-primary")}
+            >
+              <GitBranchIcon strokeWidth={1.8} />
+            </Button>
+          )}
+          {time && <span className="text-[10px] text-muted-foreground">{time}</span>}
         </div>
       )}
-    </div>
+    </Message>
   );
 }
 
-export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = null }: {
+export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = null, className }: {
   modelName?: string;
   estimatedTokens?: number;
   tps?: number | null;
+  className?: string;
 }) {
   const { t } = useI18n();
-  const bg = tps !== null ? (tps >= 50 ? "#53b3cb" : tps >= 30 ? "#9bc53d" : tps >= 15 ? "#f9c22e" : "#e01a4f") : undefined;
   return (
-    <div style={{ fontSize: 11, lineHeight: 1.5, minHeight: "calc(1.5em + 2px)", color: "var(--text-dim)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6, fontVariantNumeric: "tabular-nums" }}>
-      {modelName && <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{modelName}</span>}
+    // Fixed row height, tabular numerals and minimum widths keep the streaming
+    // token count and the speed badge from jittering while they count up.
+    <div className={cn(
+      "flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-[11px] leading-[1.5] text-muted-foreground [font-variant-numeric:tabular-nums]",
+      className,
+    )}>
+      {modelName && <span className="min-w-0 truncate">{modelName}</span>}
       {estimatedTokens > 0 && (
-        <span style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, whiteSpace: "nowrap", color: "var(--text)" }} title={t("i18n.estimatedTokens")}>
-          <span style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 11, fontWeight: 400 }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="5" y1="1.5" x2="5" y2="8.5" /><polyline points="2 6 5 8.5 8 6" />
-            </svg>
+        <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground" title={t("i18n.estimatedTokens")}>
+          <span className="flex items-center gap-0.5 text-[11px] font-normal">
+            <ArrowDownIcon aria-hidden className="size-2.5" strokeWidth={1.5} />
             {/* Both minimum widths leave a pixel for per-glyph rounding at the widest value. */}
-            <span style={{ minWidth: "calc(6ch + 1px)" }}>{estimatedTokens}</span>
+            <span className="min-w-[calc(6ch+1px)]">{estimatedTokens}</span>
           </span>
           {tps !== null && (
-            <span style={{ marginLeft: 6, padding: "1px 6px", minWidth: "calc(9ch + 1px)", boxSizing: "content-box", textAlign: "center", borderRadius: 4, background: bg, color: "#fff", fontSize: 11, fontWeight: 400 }}>
+            <Badge
+              variant="ghost"
+              className={cn(
+                "ml-1.5 box-content min-w-[calc(9ch+1px)] justify-center text-center",
+                tps >= 50 ? "bg-primary/15 text-primary"
+                  : tps >= 30 ? "bg-success/15 text-success"
+                  : tps >= 15 ? "bg-warning/15 text-warning"
+                  : "bg-destructive/15 text-destructive",
+              )}
+            >
               {tps.toFixed(1)} t/s
-            </span>
+            </Badge>
           )}
         </span>
       )}
@@ -638,7 +548,6 @@ function AssistantMessageView({
   const providerError = getAssistantErrorMessage(message, { isStreaming });
   const truncated = isAssistantTruncated(message, { isStreaming });
   const unansweredTruncation = truncated && !hasAssistantAnswer(message);
-  const [hovered, setHovered] = useState(false);
   const [copied, setCopied] = useState(false);
   const streamStartRef = useRef<StreamRateStart | null>(null);
   const rateKey = streamRateKey(message);
@@ -710,7 +619,8 @@ function AssistantMessageView({
   }
 
   const copyContent = () => {
-    copyText(textContent).then(() => {
+    copyText(textContent).then((copied) => {
+      if (!copied) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
@@ -770,104 +680,61 @@ function AssistantMessageView({
   if (blocks.length === 0 && !isStreaming && !providerError && !truncated) return null;
 
   return (
-    <div
+    <Message
       data-message-role="assistant"
       data-entry-id={entryId}
-      style={{ marginBottom: 12 }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className="group mb-5"
     >
+      <MessageContent>
       {/* Streaming status (estimated tokens + throughput); the model name lives
           in the turn meta line / the per-message label for standalone messages. */}
       {(showModelLabel || isStreaming) && (
-        <div
-          style={{
-            // The live-tail streaming message renders next to the activity
-            // rows: line its tokens/rate up with the rows' icon column, and
-            // keep it clear of the tool row above.
-            paddingLeft: isStreaming && !showModelLabel ? 4 : undefined,
-            marginTop: isStreaming && !showModelLabel ? 6 : undefined,
-          }}
-        >
-          <AssistantMessageHeader
-            modelName={showModelLabel && message.provider ? getModelDisplayName(message.provider, message.model, modelNames) : undefined}
-            estimatedTokens={isStreaming ? Math.round(estimatedTokens) : 0}
-            tps={isStreaming ? tps : null}
-          />
-        </div>
+        <AssistantMessageHeader
+          modelName={showModelLabel && message.provider ? getModelDisplayName(message.provider, message.model, modelNames) : undefined}
+          estimatedTokens={isStreaming ? Math.round(estimatedTokens) : 0}
+          tps={isStreaming ? tps : null}
+          // The live-tail streaming message renders next to the activity rows:
+          // line its tokens/rate up with the rows' icon column, and keep it
+          // clear of the tool row above.
+          className={cn(isStreaming && !showModelLabel && "mt-1.5 pl-1")}
+        />
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {/* Not keyed by the entry id: a message of this run gets one when the file is
-            read again, and its blocks keep their state across that read (#1184). */}
-        {blockItems.map(({ block, originalIndex }) => (
-          <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
-        ))}
-      </div>
+      {/* Not keyed by the entry id: a message of this run gets one when the file is
+          read again, and its blocks keep their state across that read (#1184). */}
+      {blockItems.map(({ block, originalIndex }) => (
+        <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
+      ))}
 
       {providerError && (
-        <div
-          role="alert"
-          style={{
-            marginTop: blocks.length > 0 ? 8 : 0,
-            padding: "7px 10px",
-            border: "1px solid var(--danger-border)",
-            borderRadius: 6,
-            background: "var(--danger-bg)",
-            color: "var(--danger)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
-        >
-          Error: {providerError}
-        </div>
+        <Alert variant="destructive" className={cn("font-mono text-xs leading-normal", blocks.length > 0 ? "mt-2" : "mt-0")}>
+          <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
+            Error: {providerError}
+          </AlertDescription>
+        </Alert>
       )}
 
       {truncated && (
-        <div
-          role="alert"
-          style={{
-            marginTop: blocks.length > 0 || providerError ? 8 : 0,
-            padding: "7px 10px",
-            border: "1px solid var(--warning-border)",
-            borderRadius: 6,
-            background: "var(--warning-bg)",
-            color: "var(--warning)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
-        >
-          {t(unansweredTruncation ? "chat.truncatedWithoutAnswer" : "chat.truncatedByOutputLimit")}
-          {unansweredTruncation && onCompact && (
-            <button
-              type="button"
-              onClick={onCompact}
-              disabled={isCompacting}
-              style={{
-                display: "block",
-                marginTop: 8,
-                padding: "3px 8px",
-                border: "1px solid currentColor",
-                borderRadius: 5,
-                background: "transparent",
-                color: "inherit",
-                cursor: isCompacting ? "default" : "pointer",
-                font: "inherit",
-              }}
-            >
-              {t(isCompacting ? "chat.compacting" : "chat.compactContext")}
-            </button>
-          )}
-          {unansweredTruncation && compactError && (
-            <div style={{ marginTop: 8, color: "#ef4444", whiteSpace: "pre-wrap" }}>{compactError}</div>
-          )}
-        </div>
+        <Alert variant="warning" className={cn("font-mono text-xs leading-normal", blocks.length > 0 || providerError ? "mt-2" : "mt-0")}>
+          <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
+            {t(unansweredTruncation ? "chat.truncatedWithoutAnswer" : "chat.truncatedByOutputLimit")}
+            {unansweredTruncation && onCompact && (
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={onCompact}
+                disabled={isCompacting}
+                className="mt-2 w-fit border-current bg-transparent text-current hover:bg-warning/15"
+              >
+                {t(isCompacting ? "chat.compacting" : "chat.compactContext")}
+              </Button>
+            )}
+            {unansweredTruncation && compactError && (
+              <div className="mt-2 whitespace-pre-wrap text-destructive">{compactError}</div>
+            )}
+          </AlertDescription>
+        </Alert>
       )}
 
       {writtenFiles && writtenFiles.length > 0 && (
@@ -875,56 +742,39 @@ function AssistantMessageView({
       )}
 
       {((message.usage && !isStreaming) || (turnDurationMs !== undefined && !isStreaming) || (textContent && !isStreaming && !hideCopy) || (time && !isStreaming)) && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8, marginTop: 4,
-        }}>
+        <div className="mt-1.5 flex items-center gap-2">
           {(message.usage || turnDurationMs !== undefined) && !isStreaming && (
             // One item per count: a single space at 11px ran them together. The
             // spaces stay in the text for copying; the flex gap draws the room.
-            <div style={{ display: "flex", flexWrap: "wrap", columnGap: 7, fontSize: 11, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>
+            <div className="flex flex-wrap gap-x-[7px] font-mono text-[11px] text-muted-foreground tabular-nums">
               {stats.map((part, index) => (
                 <Fragment key={index}>{index > 0 && " "}<UsagePart part={part} /></Fragment>
               ))}
             </div>
           )}
           {textContent && !isStreaming && !hideCopy && (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
             onClick={copyContent}
             title={t("i18n.copyMessage")}
             aria-label={t("i18n.copyMessage")}
-            className="touch-hover-actions"
-            style={{
-              display: "flex", alignItems: "center",
-              padding: "3px 6px", height: 22,
-              background: "none", border: "none",
-              borderRadius: 5,
-              color: copied ? "var(--accent)" : "var(--text-dim)",
-              cursor: "pointer",
-              opacity: hovered ? 1 : 0,
-              pointerEvents: hovered ? "auto" : "none",
-              transition: "opacity 0.12s, color 0.12s",
-            }}
-            onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
-            onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = "var(--text-dim)"; }}
-          >
-            {copied ? (
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            ) : (
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
+            className={cn(
+              "pointer-events-none shrink-0 text-muted-foreground opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
+              copied && "text-primary",
             )}
-          </button>
+          >
+            {copied ? <CheckIcon strokeWidth={1.8} /> : <CopyIcon strokeWidth={1.8} />}
+          </Button>
           )}
           {time && !isStreaming && (
-            <span style={{ fontSize: 10, color: "var(--text-dim)", marginLeft: "auto", whiteSpace: "nowrap" }}>{time}</span>
+            <span className="ml-auto whitespace-nowrap text-[10px] text-muted-foreground">{time}</span>
           )}
         </div>
       )}
-    </div>
+      </MessageContent>
+    </Message>
   );
 }
 
@@ -946,144 +796,6 @@ function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDur
 
 function TextBlock({ block, isStreaming, cwd, onOpenFile }: { block: TextContent; isStreaming?: boolean; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void }) {
   return <SafeMarkdownBody isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile}>{block.text}</SafeMarkdownBody>;
-}
-
-// A model looping in its thinking can write megabytes. As one text node, every
-// streamed chunk laid all of it out again (the prompt anchor reads layout after
-// each commit). As pieces, only the last one changes. Thinking that fits one
-// piece stays one text node.
-function ThinkingText({ text }: { text: string }) {
-  const pieces = useMemo(() => splitThinkingPieces(text), [text]);
-  if (pieces.length === 1) return text;
-  // No memo: React already skips a div whose text is unchanged, and a memo
-  // bailout keeps the old props, each a slice pinning the whole thinking of
-  // its chunk (995 MB retained streaming 2M Chinese characters).
-  return pieces.map((piece, index) => <div key={index}>{piece.text}</div>);
-}
-
-export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
-  block: ThinkingContent;
-  duration?: number;
-  sessionId?: string;
-  entryId?: string;
-  blockIndex: number;
-}) {
-  const { t } = useI18n();
-  const [expanded, setExpanded] = useState(isThinkingExpandedByDefault);
-  const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // The block outlives a change of entry id (a message of this run gets its id
-  // when the file is read again, #1184): what was loaded for another entry goes.
-  const loadKey = `${sessionId}:${entryId}:${blockIndex}`;
-  const [loadedKey, setLoadedKey] = useState(loadKey);
-  if (loadedKey !== loadKey) {
-    setLoadedKey(loadKey);
-    setContent(null);
-    setLoading(false);
-    setError(null);
-  }
-  const tRef = useRef(t);
-  tRef.current = t;
-  const preview = getThinkingPreview(block.thinking);
-
-  // Keep already-mounted blocks in sync when the preference changes.
-  useEffect(() => {
-    const onChange = () => setExpanded(isThinkingExpandedByDefault());
-    window.addEventListener(THINKING_EXPANDED_EVENT, onChange);
-    return () => window.removeEventListener(THINKING_EXPANDED_EVENT, onChange);
-  }, []);
-
-  // Load deferred history content whenever the block is expanded.
-  // loadThinkingContent() memoizes in-flight promises and drops failed ones
-  // from its cache, so re-running this effect is cheap and a failed load can
-  // be retried by collapsing and expanding the block again.
-  useEffect(() => {
-    if (!expanded || !block.deferred || content !== null) return;
-    if (!sessionId || !entryId) {
-      setError(tRef.current("i18n.thinkingUnavailable"));
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    loadThinkingContent(sessionId, entryId, blockIndex)
-      .then((value) => {
-        if (!cancelled) {
-          setContent(value);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [expanded, block.deferred, content, sessionId, entryId, blockIndex]);
-
-  return (
-    <div style={{
-      display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0,
-      border: "1px solid var(--border)",
-      borderRadius: 7,
-      padding: "6px 10px",
-      background: "var(--bg)",
-      fontFamily: "var(--font-mono)",
-      fontSize: "calc(11px + var(--chat-font-size-offset, 0px))",
-      lineHeight: 1.5,
-    }}>
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
-        title={t("i18n.thinking")}
-        onClick={() => setExpanded((v) => !v)}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          width: expanded ? 14 : "100%",
-          flexShrink: expanded ? 0 : 1,
-          minWidth: 0,
-          minHeight: "1.5em",
-          padding: 0,
-          background: "transparent",
-          border: "none",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          font: "inherit",
-          textAlign: "left",
-        }}
-      >
-        <ThinkingIcon active={expanded} />
-        {!expanded && (
-          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {preview ? <ReactMarkdown allowedElements={[]} unwrapDisallowed skipHtml>{preview}</ReactMarkdown> : "..."}
-          </span>
-        )}
-      </button>
-      {expanded && (
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            color: error ? "#f87171" : "var(--text-muted)",
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
-        >
-           {loading ? t("i18n.loadingThinking") : error ?? <ThinkingText text={(block.deferred ? content : block.thinking) ?? ""} />}
-        </div>
-      )}
-      {duration !== undefined && (
-        <span style={{ flexShrink: 0, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>{duration}s</span>
-      )}
-    </div>
-  );
 }
 
 
@@ -1132,15 +844,9 @@ interface StatPart {
   after?: string;
 }
 
-const STAT_ICON_PATHS = {
-  up: "M6 10.5V1.5M2.5 5 6 1.5 9.5 5",
-  down: "M6 1.5v9M2.5 7 6 10.5 9.5 7",
-  clock: "M6 1.25a4.75 4.75 0 1 0 0 9.5 4.75 4.75 0 1 0 0-9.5M6 3.5V6l1.75 1",
-};
-
 // Unseen but still text: font-size 0 stays in a copied selection, where a
 // zero-width overflow box drops it and sr-only's absolute box adds a line break.
-const HIDDEN_STAT_TEXT: CSSProperties = { fontSize: 0 };
+const HIDDEN_STAT_TEXT = "text-[0px]";
 
 // ↑ and ↓ come from whatever font has them: Segoe UI or a CJK fallback on
 // Windows draws them small, heavy or off the baseline. The icons are drawn
@@ -1149,25 +855,20 @@ const HIDDEN_STAT_TEXT: CSSProperties = { fontSize: 0 };
 // between the icon and its count.
 function UsagePart({ part }: { part: StatPart }) {
   if (!part.icon) return <span>{part.text}</span>;
+  const Icon = part.icon === "clock" ? ClockIcon : part.icon === "up" ? ArrowUpIcon : ArrowDownIcon;
   return (
     <span>
-      {part.before && <span style={HIDDEN_STAT_TEXT}>{part.before}</span>}
-      <svg
-        width={part.icon === "clock" ? 10 : 9}
-        height={part.icon === "clock" ? 10 : 9}
-        viewBox="0 0 12 12"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
+      {part.before && <span className={HIDDEN_STAT_TEXT}>{part.before}</span>}
+      <Icon
         aria-hidden
-        style={{ display: "inline", verticalAlign: part.icon === "clock" ? "-0.1em" : "-0.05em", marginRight: part.icon === "clock" ? 3 : 1 }}
-      >
-        <path d={STAT_ICON_PATHS[part.icon]} />
-      </svg>
+        strokeWidth={2}
+        className={cn(
+          "inline",
+          part.icon === "clock" ? "mr-[3px] size-[10px] align-[-0.1em]" : "mr-px size-[9px] align-[-0.05em]",
+        )}
+      />
       {part.text}
-      {part.after && <span style={HIDDEN_STAT_TEXT}>{part.after}</span>}
+      {part.after && <span className={HIDDEN_STAT_TEXT}>{part.after}</span>}
     </span>
   );
 }
@@ -1227,26 +928,28 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
       };
 
   return (
-    <div style={{ margin: "6px 0" }}>
+    <div className="mb-5">
       <ToolRow block={block} result={result} isStreaming={isPending} />
       {message.truncated && fullOutputUrl && (
-        <div style={{ padding: "4px 10px", fontSize: 11, marginTop: -1 }}>
+        <div className="-mt-px px-1 py-1 text-xs">
           {showFullButton && (
-            <button
+            <Button
+              type="button"
+              variant="link"
               onClick={loadFullOutput}
               disabled={loadingFull}
-              style={{ background: "none", border: "none", color: "var(--accent)", cursor: loadingFull ? "default" : "pointer", fontSize: 11, padding: 0, textDecoration: "underline" }}
+              className="h-auto p-0 text-xs underline"
             >
               {loadingFull ? t("chat.loadingFullOutput") : t("chat.viewFullOutput")}
-            </button>
+            </Button>
           )}
           <a
             href={`${fullOutputUrl}&download=1`}
-            style={{ marginLeft: showFullButton ? 10 : 0, color: "var(--accent)", fontSize: 11, textDecoration: "underline" }}
+            className={cn("text-xs text-primary underline", showFullButton && "ml-2.5")}
           >
             {t("chat.downloadFullOutput")}
           </a>
-          {fullError && <span style={{ marginLeft: 6, color: "var(--text-dim)", fontSize: 11 }}>({fullError})</span>}
+          {fullError && <span className="ml-1.5 text-xs text-muted-foreground">({fullError})</span>}
         </div>
       )}
     </div>

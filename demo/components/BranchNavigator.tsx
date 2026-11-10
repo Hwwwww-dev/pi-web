@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { ChevronDownIcon, GitBranchIcon } from "lucide-react";
 import type { BranchPreview, SessionEntry, SessionTreeNode } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface Props {
   tree: SessionTreeNode[];
@@ -10,18 +14,20 @@ interface Props {
   onLeafChange: (leafId: string | null) => void;
   /** When true, renders as a compact inline button for embedding in a top bar */
   inline?: boolean;
-  /** When inline, use this ref's bounding rect to size/position the dropdown */
+  /** Anchor for the popover when the trigger button is hidden (e.g. the top bar) */
   containerRef?: React.RefObject<HTMLElement | null>;
-  /** Controlled open state for inline mode */
+  /** Controlled open state */
   open?: boolean;
-  /** Called when the button is clicked in inline mode */
+  /** Called when the open state should flip (trigger click or dismiss) */
   onToggle?: () => void;
   /** Whether a session is currently active (used to show appropriate empty reason) */
   hasSession?: boolean;
   /** When inline, render icon-only (no text label) to save horizontal space */
   compact?: boolean;
-  /** Keep the inline dropdown mounted while another control supplies its trigger */
+  /** Hide the inline button while another control supplies the trigger */
   hideInlineButton?: boolean;
+  /** The session is running: the tree stays readable but branches cannot be switched */
+  locked?: boolean;
 }
 
 // Find the visible entry IDs on the path from root to activeLeafId.
@@ -122,7 +128,8 @@ interface TreeNodeProps {
   depth: number;
   isLast: boolean;
   parentLines: boolean[]; // whether ancestor at each depth has more siblings after
-  onSelect: (id: string) => void;
+  /** Absent while switching is locked */
+  onSelect?: (id: string) => void;
 }
 
 function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelect }: TreeNodeProps) {
@@ -140,100 +147,62 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
     <div>
       {/* This node row */}
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          height: 24,
-          cursor: "pointer",
-        }}
-        onClick={() => onSelect(rep.entry.id)}
+        className={cn("flex h-6 items-center", onSelect ? "cursor-pointer" : "cursor-default")}
+        onClick={onSelect ? () => onSelect(rep.entry.id) : undefined}
       >
         {/* Indent guide lines */}
         {parentLines.map((hasLine, i) => (
-          <div key={i} style={{ width: 16, flexShrink: 0, position: "relative", height: "100%", alignSelf: "stretch" }}>
+          <div key={i} className="relative h-full w-4 shrink-0 self-stretch">
             {hasLine && (
-              <div style={{
-                position: "absolute",
-                left: 7,
-                top: 0,
-                bottom: 0,
-                width: 1,
-                background: "var(--border)",
-              }} />
+              <div className="absolute top-0 bottom-0 left-[7px] w-px bg-border" />
             )}
           </div>
         ))}
 
         {/* Branch connector */}
-        <div style={{ width: 16, flexShrink: 0, position: "relative", height: "100%", alignSelf: "stretch" }}>
+        <div className="relative h-full w-4 shrink-0 self-stretch">
           {/* vertical line up (to parent) */}
-          <div style={{
-            position: "absolute",
-            left: 7,
-            top: 0,
-            bottom: isLast ? "50%" : 0,
-            width: 1,
-            background: "var(--border)",
-          }} />
+          <div className={cn("absolute top-0 left-[7px] w-px bg-border", isLast ? "bottom-1/2" : "bottom-0")} />
           {/* horizontal line to node */}
-          <div style={{
-            position: "absolute",
-            left: 7,
-            top: "50%",
-            width: 9,
-            height: 1,
-            background: "var(--border)",
-          }} />
+          <div className="absolute top-1/2 left-[7px] h-px w-[9px] bg-border" />
         </div>
 
         {/* Node dot */}
-        <div style={{
-          width: 7,
-          height: 7,
-          borderRadius: "50%",
-          flexShrink: 0,
-          background: isActive ? "var(--accent)" : isOnPath ? "var(--text-muted)" : "var(--border)",
-          border: isActive ? "none" : "1px solid var(--text-dim)",
-          marginRight: 6,
-          transition: "background 0.12s",
-        }} />
+        <div
+          className={cn(
+            "mr-1.5 size-[7px] shrink-0 rounded-full transition-colors duration-100",
+            isActive ? "border-0 bg-primary" : isOnPath ? "border border-muted-foreground/50 bg-muted-foreground" : "border border-muted-foreground/50 bg-border",
+          )}
+        />
 
         {/* Role badge */}
         {role && (
-          <span style={{
-            fontSize: 9,
-            fontFamily: "var(--font-mono)",
-            color: role === "user" ? "var(--accent)" : "var(--text-dim)",
-            background: role === "user" ? "rgba(37,99,235,0.08)" : "var(--bg-hover)",
-            border: `1px solid ${role === "user" ? "rgba(37,99,235,0.2)" : "var(--border)"}`,
-            borderRadius: 3,
-            padding: "0 4px",
-            marginRight: 5,
-            flexShrink: 0,
-            lineHeight: "16px",
-          }}>
+          <span
+            className={cn(
+              "mr-[5px] shrink-0 rounded-[3px] border px-1 font-mono text-[10px] leading-4",
+              role === "user"
+                ? "border-primary/20 bg-primary/8 text-primary"
+                : "border-border bg-secondary text-muted-foreground",
+            )}
+          >
             {role === "user" ? "U" : "A"}
           </span>
         )}
 
         {/* Skipped indicator */}
         {skipped > 0 && (
-          <span style={{ fontSize: 10, color: "var(--text-dim)", marginRight: 5, flexShrink: 0 }}>
+          <span className="mr-[5px] shrink-0 text-[10px] text-muted-foreground">
             +{skipped}
           </span>
         )}
 
         {/* Label */}
-        <span style={{
-          fontSize: 11,
-          color: isActive ? "var(--text)" : isOnPath ? "var(--text-muted)" : "var(--text-dim)",
-          fontWeight: isActive ? 500 : 400,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          flex: 1,
-          minWidth: 0,
-        }}>
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-xs",
+            isActive ? "font-medium text-foreground" : isOnPath ? "font-normal text-muted-foreground" : "font-normal text-muted-foreground/70",
+          )}
+        >
           {label}
         </span>
       </div>
@@ -254,26 +223,58 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
   );
 }
 
-export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, containerRef, open: openProp, onToggle, hasSession, compact, hideInlineButton }: Props) {
+// The branch tree panel: the tree when there is something to switch to, the
+// reason there is not otherwise. Exported for tests (Radix portals render
+// nothing under renderToStaticMarkup).
+export function BranchPanel({ topLevel, activePathIds, selectBranch, locked = false, noBranchReason }: {
+  topLevel: SessionTreeNode[];
+  activePathIds: Set<string>;
+  /** Absent while switching is locked */
+  selectBranch?: (id: string) => void;
+  locked?: boolean;
+  noBranchReason?: string | null;
+}) {
+  const { t } = useI18n();
+  if (topLevel.length === 0 && !locked) {
+    return (
+      <div className="px-3 py-2.5 text-xs italic text-muted-foreground">
+        {noBranchReason ?? t("i18n.noBranches")}
+      </div>
+    );
+  }
+  return (
+    <div className="max-h-[260px] min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-2">
+      {locked && (
+        <div className="pt-0.5 pb-1 text-xs italic text-muted-foreground">
+          {t("i18n.branchesLockedWhileRunning")}
+        </div>
+      )}
+      {topLevel.map((child, idx) => (
+        <TreeNodeView
+          key={child.entry.id}
+          node={child}
+          activePathIds={activePathIds}
+          depth={0}
+          isLast={idx === topLevel.length - 1}
+          parentLines={[]}
+          onSelect={selectBranch}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, containerRef, open: openProp, onToggle, hasSession, compact, hideInlineButton, locked = false }: Props) {
   const { t } = useI18n();
   const [openInternal, setOpenInternal] = useState(false);
   const open = openProp !== undefined ? openProp : openInternal;
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
-  useEffect(() => {
-    if (!open || !inline) return;
-    const anchor = containerRef?.current ?? btnRef.current;
-    if (!anchor) return;
-    const update = () => {
-      const rect = anchor.getBoundingClientRect();
-      setDropdownPos({ top: rect.bottom, left: rect.left, width: rect.width });
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(anchor);
-    return () => ro.disconnect();
-  }, [open, inline, containerRef]);
+  // 受控（AppShell 的面板状态机）时开合都是对当前面板的一次 toggle；
+  // 非受控时直接落到新值。
+  const handleOpenChange = useCallback((next: boolean) => {
+    if (openProp !== undefined) onToggle?.();
+    else setOpenInternal(next);
+  }, [openProp, onToggle]);
 
   const activePathIds = useMemo(
     () => buildActivePath(tree, activeLeafId),
@@ -283,6 +284,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   const handleSelect = useCallback((id: string) => {
     onLeafChange(id);
   }, [onLeafChange]);
+  const selectBranch = locked ? undefined : handleSelect;
 
   const noBranchReason = !hasSession
     ? t("i18n.noActiveSession")
@@ -294,144 +296,97 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   const hasContent = !noBranchReason && topLevel.length > 0;
 
   const branchIcon = (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: hasContent ? "var(--accent)" : "var(--text-dim)", flexShrink: 0 }}>
-      <line x1="6" y1="3" x2="6" y2="15" />
-      <circle cx="18" cy="6" r="3" />
-      <circle cx="6" cy="18" r="3" />
-      <path d="M18 9a9 9 0 0 1-9 9" />
-    </svg>
+    <GitBranchIcon size={12} strokeWidth={2} className={cn("shrink-0", hasContent ? "text-primary" : "text-muted-foreground")} />
   );
 
   const chevron = (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--text-dim)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 2, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
-      <polyline points="2 3.5 5 6.5 8 3.5" />
-    </svg>
+    <ChevronDownIcon
+      size={10}
+      strokeWidth={1.8}
+      className={cn("ml-auto text-muted-foreground transition-transform duration-150", open && "rotate-180")}
+    />
   );
 
+  const panel = (
+    <BranchPanel
+      topLevel={topLevel}
+      activePathIds={activePathIds}
+      selectBranch={selectBranch}
+      locked={locked}
+      noBranchReason={noBranchReason}
+    />
+  );
+
+  const contentClassName = cn(
+    "flex max-h-(--radix-popover-content-available-height) flex-col overflow-hidden p-0",
+    inline
+      ? "w-max min-w-56 max-w-(--radix-popover-content-available-width)"
+      : "w-(--radix-popover-trigger-width)",
+  );
 
   if (inline) {
     return (
-      <div style={{ height: "100%", display: "flex", alignItems: "stretch" }}>
-        <button
-          ref={btnRef}
-          onClick={() => onToggle ? onToggle() : setOpenInternal((v) => !v)}
-          style={{
-            display: hideInlineButton ? "none" : "flex",
-            alignItems: "center",
-            gap: 6,
-            height: "100%",
-            padding: "0 12px",
-            background: open ? "var(--bg-selected)" : "none",
-            border: "none",
-            borderTop: open ? "2px solid var(--accent)" : "2px solid transparent",
-            borderRight: "1px solid var(--border)",
-            cursor: "pointer",
-            color: open ? "var(--text)" : "var(--text-muted)",
-            fontSize: 11,
-            whiteSpace: "nowrap",
-            transition: "color 0.1s, background 0.1s",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = open ? "var(--text)" : "var(--text-muted)"; }}
-           title={t("i18n.branches")}
-           aria-label={t("i18n.branches")}
-          aria-pressed={open}
-        >
-          {branchIcon}
-           {!compact && <span>{t("i18n.branches")}</span>}
-        </button>
-        {open && dropdownPos && (
-          <div style={{
-            position: "fixed",
-            top: dropdownPos.top,
-            left: dropdownPos.left,
-            width: dropdownPos.width,
-            background: "var(--bg-panel)",
-            borderBottom: "1px solid var(--border)",
-            zIndex: 500,
-          }}>
-            {hasContent ? (
-              <div style={{ padding: "4px 12px 8px 12px", maxHeight: 260, overflowY: "auto" }}>
-                {topLevel.map((child, idx) => (
-                  <TreeNodeView
-                    key={child.entry.id}
-                    node={child}
-                    activePathIds={activePathIds}
-                    depth={0}
-                    isLast={idx === topLevel.length - 1}
-                    parentLines={[]}
-                    onSelect={handleSelect}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
-                {noBranchReason}
-              </div>
-            )}
-          </div>
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        {hideInlineButton ? (
+          // 触发钮在别处（顶栏 ⋯ 菜单），弹层锚定 AppShell 给的容器。
+          <PopoverAnchor virtualRef={containerRef} />
+        ) : (
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              title={t("i18n.branches")}
+              aria-label={t("i18n.branches")}
+              aria-pressed={open}
+              className={cn(
+                "h-full rounded-none border-y-0 border-l-0 border-r border-r-border border-t-2 px-3 py-0 text-xs font-normal",
+                open ? "border-t-primary bg-accent text-foreground" : "border-t-transparent text-muted-foreground",
+              )}
+            >
+              {branchIcon}
+              {!compact && <span>{t("i18n.branches")}</span>}
+            </Button>
+          </PopoverTrigger>
         )}
-      </div>
+        <PopoverContent
+          side="bottom"
+          align="end"
+          sideOffset={6}
+          collisionPadding={8}
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          // 从 ⋯ 菜单打开时，菜单关闭的焦点归还会落在弹层之外；
+          // 面板沿用旧语义：只有外部 pointerdown 或 Escape 才关闭。
+          onFocusOutside={(event) => event.preventDefault()}
+          className={contentClassName}
+        >
+          {panel}
+        </PopoverContent>
+      </Popover>
     );
   }
 
   return (
-    <div style={{ borderBottom: "1px solid var(--border)", background: "var(--bg)", flexShrink: 0, position: "relative" }}>
-      {/* Header toggle */}
-      <button
-        onClick={() => setOpenInternal((v) => !v)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          width: "100%",
-          padding: "5px 12px",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: "var(--text-muted)",
-          fontSize: 11,
-          textAlign: "left",
-        }}
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          className="h-8 w-full justify-start rounded-none px-3 text-xs font-normal text-muted-foreground"
+        >
+          {branchIcon}
+          <span>{t("i18n.branches")}</span>
+          {chevron}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="end"
+        sideOffset={6}
+        collisionPadding={8}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onFocusOutside={(event) => event.preventDefault()}
+        className={contentClassName}
       >
-        {branchIcon}
-         <span style={{ color: "var(--text-muted)" }}>{t("i18n.branches")}</span>
-        {chevron}
-      </button>
-
-      {/* Tree panel - overlay */}
-      {open && (
-        <div style={{
-          position: "absolute",
-          top: "100%",
-          left: 0,
-          right: 0,
-          background: "var(--bg)",
-          borderBottom: "1px solid var(--border)",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-          zIndex: 100,
-        }}>
-          {hasContent ? (
-            <div style={{ padding: "4px 12px 8px 12px", maxHeight: 260, overflowY: "auto" }}>
-              {topLevel.map((child, idx) => (
-                <TreeNodeView
-                  key={child.entry.id}
-                  node={child}
-                  activePathIds={activePathIds}
-                  depth={0}
-                  isLast={idx === topLevel.length - 1}
-                  parentLines={[]}
-                  onSelect={handleSelect}
-                />
-              ))}
-            </div>
-          ) : (
-            <div style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
-              {noBranchReason ?? t("i18n.noBranches")}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        {panel}
+      </PopoverContent>
+    </Popover>
   );
 }

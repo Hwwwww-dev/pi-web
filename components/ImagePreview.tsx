@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
+import { Button } from "@/components/ui/button";
 
 interface ImagePreviewProps {
   src: string;
@@ -47,19 +49,12 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
 
   return (
     <>
-      <button
+      <Button
         ref={triggerRef}
         type="button"
-        className={className}
-        style={{
-          display: "block",
-          padding: 0,
-          border: "none",
-          background: "none",
-          color: "inherit",
-          cursor: "zoom-in",
-          ...style,
-        }}
+        variant="ghost"
+        className={cn("block h-auto cursor-zoom-in border-none bg-transparent p-0 text-inherit hover:bg-transparent", className)}
+        style={style}
         onClick={() => setOpen(true)}
         aria-label={triggerLabel}
         aria-haspopup="dialog"
@@ -67,11 +62,11 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
         title={previewLabel}
       >
         {children}
-      </button>
+      </Button>
       {open && (
         <dialog
           ref={dialogRef}
-          className="image-preview-dialog"
+          className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden border-0 bg-transparent text-foreground open:flex open:items-center open:justify-center pt-[max(16px,env(safe-area-inset-top))] pr-[max(16px,env(safe-area-inset-right))] pb-[max(16px,env(safe-area-inset-bottom))] pl-[max(16px,env(safe-area-inset-left))] [&::backdrop]:bg-black/72"
           aria-label={t("chat.previewImage")}
           onCancel={(event) => {
             event.preventDefault();
@@ -89,11 +84,13 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="image-preview-image" src={src} alt={alt} />
-          <button
+          <img className="block max-h-full max-w-full rounded-md object-contain shadow-2xl" src={src} alt={alt} />
+          <Button
             ref={closeButtonRef}
             type="button"
-            className="image-preview-close"
+            variant="outline"
+            size="icon-lg"
+            className="absolute top-[max(12px,env(safe-area-inset-top))] right-[max(12px,env(safe-area-inset-right))] z-[1] size-9 bg-card text-muted-foreground shadow-[0_2px_10px_rgba(0,0,0,0.28)] hover:bg-secondary hover:text-foreground pointer-coarse:size-11"
             onClick={closePreview}
             aria-label={t("chat.close")}
             title={t("chat.close")}
@@ -101,7 +98,7 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M6 6l12 12M18 6 6 18" />
             </svg>
-          </button>
+          </Button>
         </dialog>
       )}
     </>

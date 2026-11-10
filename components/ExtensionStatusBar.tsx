@@ -4,6 +4,7 @@ import { stripAnsi } from "@/lib/ansi";
 import type { ExtensionStatusItem, ExtensionWidgetItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
 import { ExtensionWidgets } from "./ExtensionWidgets";
+import { Button } from "@/components/ui/button";
 
 /**
  * `ctx.ui.setStatus("command:/mode toggle", "Build")` shows "Build" as a button
@@ -74,7 +75,6 @@ export function ExtensionStatusBar({
   const cells = buildExtensionStatusCells(statuses);
   if (cells.length === 0 && widgets.length === 0) return null;
 
-  const hasCommands = cells.some((cell) => cell.kind === "command");
   const plainStatusLine = cells
     .map((cell) => (cell.kind === "text" ? stripAnsi(cell.text) : cell.label))
     .join(" ");
@@ -82,36 +82,40 @@ export function ExtensionStatusBar({
   const statusLine = cells.length > 0 ? (
     <div
       role="status"
-      className="extension-status-line"
+      className="flex min-w-0 flex-1 items-center gap-1 overflow-auto pl-0.5 pr-1.5 scrollbar-thin"
       aria-label={plainStatusLine}
       title={plainStatusLine}
     >
-      <span className="extension-status-text">
-        {cells.map((cell, index) => cell.kind === "text" ? (
-          <span key={index} className="extension-status-item">
-            <AnsiText text={cell.text} />
-          </span>
-        ) : (
-          <button
-            key={index}
-            type="button"
-            className="extension-status-item extension-status-command"
-            disabled={!onCommand || commandsDisabled}
-            title={`${cell.label} · ${cell.command}`}
-            aria-label={`${cell.label} (${cell.command})`}
-            onClick={() => onCommand?.(cell.command)}
-          >
-            {cell.label}
-          </button>
-        ))}
-      </span>
+      {cells.map((cell, index) => cell.kind === "text" ? (
+        <span
+          key={index}
+          className="inline-flex max-w-full items-center whitespace-pre rounded-md bg-muted/60 px-2 py-1 font-mono text-[11.5px] leading-4 text-muted-foreground"
+        >
+          <AnsiText text={cell.text} />
+        </span>
+      ) : (
+        <Button
+          key={index}
+          type="button"
+          variant="ghost"
+          size="xs"
+          disabled={!onCommand || commandsDisabled}
+          title={`${cell.label} · ${cell.command}`}
+          aria-label={`${cell.label} (${cell.command})`}
+          onClick={() => onCommand?.(cell.command)}
+          className="shrink-0 bg-muted/60 px-2 font-mono text-[11.5px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        >
+          {cell.label}
+        </Button>
+      ))}
     </div>
   ) : null;
 
   return (
-    <div
-      className={`extension-status-shelf${widgets.length > 0 ? " has-widgets" : ""}${cells.length > 0 ? " has-status" : ""}${hasCommands ? " has-commands" : ""}`}
-    >
+    // `extension-status-bar` is a layout hook (keyboard-open collapse below); the
+    // styling itself is shadcn utilities on the row's pills. `relative` anchors
+    // an expanded widget's floating panel above the row.
+    <div className="extension-status-bar relative -mt-3 mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] shrink-0 items-stretch pt-1 pb-1">
       {widgets.length > 0 ? <ExtensionWidgets widgets={widgets}>{statusLine}</ExtensionWidgets> : statusLine}
     </div>
   );

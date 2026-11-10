@@ -68,10 +68,13 @@ test("renders the permissive marker as a small uppercase chip", async () => {
   const source = await readFile(new URL("./ExtensionStatus.tsx", import.meta.url), "utf8");
 
   assert.match(html, />YOLO</);
-  // The pill is styled inline: a CSS rule here once lagged the component and the
-  // marker fell back to plain red text.
-  assert.match(source, /color: "#dc2626"/);
-  assert.match(source, /borderRadius: 4/);
+  // The pill is styled with Tailwind utilities that compile with the component:
+  // a stylesheet rule here once lagged the component and the marker fell back
+  // to plain red text. Utilities keep that failure mode impossible.
+  assert.match(source, /text-destructive/);
+  assert.match(source, /variant="outline"/);
+  assert.match(source, /border-destructive\/35/);
+  assert.match(source, /bg-destructive\/\[0\.06\]/);
 });
 
 test("tones the status dot after the LSP state pi-lens reports", () => {
@@ -115,21 +118,24 @@ test("hides the status button while every extension status is empty", () => {
 test("renders one umbrella label with the tone dot, popover closed", () => {
   const html = renderStatusButton("LSP Active: typescript");
 
-  assert.match(html, /class="extension-status-button-root"/);
-  assert.match(html, /class="composer-chip"/);
-  assert.match(html, /<span class="extension-status-dot" data-tone="ok" aria-hidden="true"><\/span>/);
+  assert.match(html, /data-slot="popover-trigger"/);
+  assert.match(html, /class="[^"]*h-8[^"]*text-muted-foreground/);
+  // One line, never an ellipsis: the label is a single generic word.
+  assert.match(html, /whitespace-nowrap/);
+  assert.doesNotMatch(html, /text-ellipsis/);
+  assert.match(html, /<span class="[^"]*data-\[tone=ok\]:bg-success[^"]*" data-tone="ok" aria-hidden="true"><\/span>/);
   assert.match(html, /aria-expanded="false"/);
   assert.doesNotMatch(html, /extension-status-popover/);
-  assert.doesNotMatch(html, /<svg/);
+  assert.doesNotMatch(html, /data-state="open"/);
   // The label is one generic word, never the extension's own status text.
   assert.doesNotMatch(html, /LSP Active/);
 });
 
 test("marks a broken status line with the dot", () => {
-  assert.match(renderStatusButton("LSP Inactive"), /class="extension-status-dot" data-tone="error"/);
+  assert.match(renderStatusButton("LSP Inactive"), /data-\[tone=error\]:bg-destructive[^"]*" data-tone="error"/);
   assert.match(
     renderStatusButton("LSP Active: typescript · LSP Failed: pyright"),
-    /class="extension-status-dot" data-tone="warning"/,
+    /data-\[tone=warning\]:bg-warning[^"]*" data-tone="warning"/,
   );
 });
 
@@ -141,9 +147,10 @@ test("counts the reporting extensions on the label", () => {
 test("lists every status text in the popover without extension names", async () => {
   const source = await readFile(new URL("./ExtensionStatus.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /className="extension-status-popover"/);
-  assert.match(source, /className="extension-status-entry"/);
-  assert.match(source, /<pre className="extension-status-entry-text">/);
+  // The panel is a Radix popover now; the entries are utility-styled rows.
+  assert.match(source, /<PopoverContent/);
+  assert.match(source, /"flex min-w-0 items-start gap-2"/);
+  assert.match(source, /<pre className="m-0 min-w-0 overflow-x-auto overscroll-contain whitespace-pre-wrap">/);
   assert.match(source, /<AnsiText text=\{status\.text\} \/>/);
   // The popover carries the status text and nothing else — no extension key,
   // no name column, no right-aligned label.
@@ -158,7 +165,7 @@ test("keeps the status label and the permissive chip in the composer's controls 
 
   // The sidebar's duplicate in-row More button was removed (dedup): the top
   // bar's ⋯ owns overflow, and the row keeps upstream's controls toggle.
-  const controlsIndex = chatInput.indexOf('title={controlsMenuOpen ? undefined : t("chat.moreControls")}');
+  const controlsIndex = chatInput.indexOf('aria-label={t("chat.moreControls")}');
   const statusIndex = chatInput.indexOf("<ExtensionStatusButton statuses=");
   const chipIndex = chatInput.indexOf("{permissiveStatus && <PermissiveModeChip");
 
@@ -171,55 +178,43 @@ test("keeps the status label and the permissive chip in the composer's controls 
 });
 
 test("shelf carries widget triggers and the status line side by side", async () => {
-  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  const shelfRule = css.match(/^\.extension-status-shelf\s*\{([^}]*)\}/m)?.[1] ?? "";
-  const triggersRule = css.match(/^\.extension-widget-triggers\s*\{([^}]*)\}/m)?.[1] ?? "";
+  const widgetsSource = await readFile(new URL("./ExtensionWidgets.tsx", import.meta.url), "utf8");
+  const barSource = await readFile(new URL("./ExtensionStatusBar.tsx", import.meta.url), "utf8");
 
-  // The shelf carries both halves now: widget triggers keep their own compact
-  // row and the status cells sit beside them, split by a hairline border.
-  assert.match(shelfRule, /flex-wrap:\s*wrap/);
-  assert.match(triggersRule, /flex:\s*0 0 auto/);
-  assert.match(css, /\.extension-status-shelf\.has-widgets\.has-status \.extension-widget-triggers/);
-  assert.match(css, /^\.extension-status-line\s*\{/m);
+  // The shelf carries both halves now: the widgets row embeds the status line
+  // as its children, split by a vertical Separator.
+  assert.match(barSource, /<ExtensionWidgets widgets=\{widgets\}>\{statusLine\}<\/ExtensionWidgets>/);
+  assert.match(widgetsSource, /<Separator orientation="vertical"/);
 });
 
 test("scrolls status text sideways instead of wrapping it", async () => {
-  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  const popoverRule = css.match(/^\.extension-status-popover\s*\{([^}]*)\}/m)?.[1] ?? "";
-  const textRule = css.match(/^\.extension-status-entry-text\s*\{([^}]*)\}/m)?.[1] ?? "";
   const chipSource = await readFile(new URL("./ExtensionStatus.tsx", import.meta.url), "utf8");
 
-  assert.match(popoverRule, /max-height:/);
-  assert.match(popoverRule, /overflow:\s*auto/);
-  assert.match(popoverRule, /bottom:\s*calc\(100% \+ 6px\)/);
+  // The panel's scroll budget lives on the Radix popover content now.
+  assert.match(chipSource, /max-h-\[min\(320px,40dvh\)\]/);
+  assert.match(chipSource, /overflow-auto overscroll-contain/);
+  assert.match(chipSource, /side="top"/);
+  assert.match(chipSource, /align="end"/);
   // The shelf's status text wraps (pre-wrap); only a popover entry scrolls sideways.
-  assert.match(textRule, /white-space:\s*pre-wrap/);
-  assert.match(textRule, /overflow-x:\s*auto/);
-  assert.doesNotMatch(textRule, /overflow-wrap:\s*anywhere/);
-  // YOLO is a marker, not a control: its own red pill, styled inline so a stale
-  // stylesheet cannot turn it back into plain text or a button.
-  assert.match(chipSource, /color: "#dc2626"/);
-  assert.match(chipSource, /fontFamily: "var\(--font-mono\)"/);
-  assert.match(chipSource, /border: "1px solid color-mix\(in srgb, #dc2626 35%, transparent\)"/);
-  assert.match(chipSource, /cursor: "default"/);
+  assert.match(chipSource, /<pre className="m-0 min-w-0 overflow-x-auto overscroll-contain whitespace-pre-wrap">/);
+  assert.doesNotMatch(chipSource, /wrap-anywhere/);
+  // YOLO is a marker, not a control: its own red pill, styled with utilities
+  // compiled with the component so a stale stylesheet cannot turn it back into
+  // plain text or a button.
+  assert.match(chipSource, /text-destructive/);
+  assert.match(chipSource, /font-mono/);
+  assert.match(chipSource, /border-destructive\/35/);
+  assert.match(chipSource, /cursor-default/);
 });
 
 test("keeps the status button a compact single-line chip", async () => {
-  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const source = await readFile(new URL("./ExtensionStatus.tsx", import.meta.url), "utf8");
-  const chipRule = css.match(/^\.composer-chip\s*\{([^}]*)\}/m)?.[1] ?? "";
-  const dotRule = css.match(/^\.extension-status-dot\s*\{([^}]*)\}/m)?.[1] ?? "";
 
-  // The status chip is the same box as every other control in the row.
-  assert.match(source, /className="composer-chip"/);
-  assert.match(chipRule, /height:\s*32px/);
-  assert.match(chipRule, /white-space:\s*nowrap/);
-  assert.match(chipRule, /border-radius:\s*8px/);
-  // Flat by design: a box per control is what made the row look like a wall of
-  // buttons; hover supplies the only background.
-  assert.match(chipRule, /background:\s*none/);
-  assert.match(chipRule, /border:\s*0/);
-  assert.doesNotMatch(chipRule, /text-overflow/);
-  assert.match(dotRule, /border-radius:\s*50%/);
-  assert.match(css, /\.extension-status-dot\[data-tone="error"\]\s*\{\s*background:\s*#dc2626;\s*\}/);
+  // The status chip is the same box as every other control in the row: one
+  // height, radius and type size, flat until hover supplies a background.
+  assert.match(source, /h-8 max-\[640px\]:h-\[34px\] gap-\[5px\] rounded-md px-2 text-xs leading-none text-muted-foreground/);
+  assert.match(source, /hover:bg-secondary hover:text-foreground/);
+  assert.match(source, /aria-expanded:bg-secondary aria-expanded:text-foreground/);
+  assert.doesNotMatch(source, /text-ellipsis/);
+  assert.match(source, /"size-\[7px\] shrink-0 rounded-full data-\[tone=ok\]:bg-success data-\[tone=warning\]:bg-warning data-\[tone=error\]:bg-destructive"/);
 });

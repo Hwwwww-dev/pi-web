@@ -1,4 +1,6 @@
-import { normalize, parse, sep } from "path";
+import { realpathSync } from "fs";
+import { homedir } from "os";
+import { dirname, join, normalize, parse, relative, resolve, sep } from "path";
 
 // ============================================================================
 // Path primitives.
@@ -30,10 +32,26 @@ export function isWindowsAbsolutePath(filePath: string): boolean {
 /** Rebuild an absolute filesystem path from Next.js catch-all route segments. */
 export function filePathFromApiSegments(segments: string[]): string {
   const joined = segments.join("/");
+  // A verbatim `~` home-relative path round-trips through the segments
+  // untouched; the file API expands it right after decoding.
+  if (joined === "~" || joined.startsWith("~/")) return joined;
   const slashJoined = toSlashPath(joined);
   if (/^[a-zA-Z]:$/.test(slashJoined)) return `${slashJoined}/`;
   if (isWindowsAbsolutePath(slashJoined)) return slashJoined;
   return "/" + joined.replace(/^\/+/, "");
+}
+
+/**
+ * Expand a leading `~` to the server user's home directory. Paths written in
+ * transcripts (`~/.pi/...`) are home-relative by intent, but the browser
+ * cannot know the home path, so the client sends them verbatim and the file
+ * API expands them before the allow-list check. Only a bare `~` prefix is
+ * expanded; `~user/...` stays literal.
+ */
+export function expandHomePath(p: string): string {
+  if (p === "~") return homedir();
+  if (p.startsWith("~/")) return join(homedir(), p.slice(2));
+  return p;
 }
 
 /**
@@ -77,4 +95,26 @@ export function samePath(a: string, b: string): boolean {
     return normalizedA.toLowerCase() === normalizedB.toLowerCase();
   }
   return normalizedA === normalizedB;
+}
+
+/**
+ * One path with every symlink in it that exists resolved, the missing remainder kept
+ * as written. `samePath()` compares lexically and leaves symlinks to the caller, and
+ * this is what that means in practice: `/tmp` and `/var/folders/…` are links on
+ * macOS, so a folder reached through one is not the same *string* as what the
+ * filesystem and git name it, though it is the same place. A deleted file has nothing
+ * of its own to resolve, so its nearest existing ancestor is what gets resolved.
+ */
+export function resolveExistingPath(target: string): string {
+  const absolute = resolve(target);
+  let candidate = absolute;
+  for (;;) {
+    try {
+      return join(realpathSync(candidate), relative(candidate, absolute));
+    } catch {
+      const parent = dirname(candidate);
+      if (parent === candidate) return absolute;
+      candidate = parent;
+    }
+  }
 }

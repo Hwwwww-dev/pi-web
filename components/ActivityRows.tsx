@@ -1,6 +1,24 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { BookOpenIcon, BotIcon, CheckIcon, CircleXIcon, CopyIcon, ExternalLinkIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareTerminalIcon, TriangleAlertIcon, WrenchIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { CodeBlock, CodeBlockContent } from "./ui/code-block";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import { Skeleton } from "./ui/skeleton";
+import { Spinner } from "./ui/spinner";
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "./ui/trace";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
@@ -45,106 +63,40 @@ import type { CustomMessage, ImageContent, TextContent, ThinkingContent, ToolCal
 // Shared row primitives
 // ─────────────────────────────────────────────────────────────────────────────
 
-function RowChevron({ expanded }: { expanded: boolean }) {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, opacity: 0.7, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
-      <polyline points="2 3.5 5 6.5 8 3.5" />
-    </svg>
-  );
+function RowSpinner({ className }: { className?: string }) {
+  return <Spinner aria-hidden="true" className={cn("size-3.5 shrink-0 text-muted-foreground", className)} />;
 }
 
-function RowSpinner() {
-  return <span className="activity-spinner" aria-hidden="true" />;
-}
-
-function ToolCategoryIcon({ category, isError }: { category: ToolCategory; isError?: boolean }) {
-  const common = {
-    width: 13,
-    height: 13,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: isError ? "var(--danger)" : "currentColor",
-    strokeWidth: 1.8,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    "aria-hidden": true as const,
-    style: { flexShrink: 0 as const },
-  };
+function ToolCategoryIcon({ category }: { category: ToolCategory }) {
+  const className = "size-[14px] shrink-0";
   switch (category) {
     case "view":
-      return (
-        <svg {...common}>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-        </svg>
-      );
+      return <BookOpenIcon className={className} strokeWidth={1.8} />;
     case "search":
-      return (
-        <svg {...common}>
-          <circle cx="11" cy="11" r="7" />
-          <line x1="21" y1="21" x2="16.5" y2="16.5" />
-        </svg>
-      );
+      return <SearchIcon className={className} strokeWidth={1.8} />;
     case "edit":
-      return (
-        <svg {...common}>
-          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-        </svg>
-      );
+      return <PenIcon className={className} strokeWidth={1.8} />;
     case "terminal":
-      return (
-        <svg {...common}>
-          <rect x="2" y="3" width="20" height="18" rx="2" />
-          <polyline points="6 8 10 12 6 16" />
-          <line x1="12" y1="16" x2="17" y2="16" />
-        </svg>
-      );
+      return <SquareTerminalIcon className={className} strokeWidth={1.8} />;
     case "subagent":
-      return (
-        <svg {...common}>
-          <rect x="4" y="8" width="16" height="12" rx="2" />
-          <line x1="12" y1="4" x2="12" y2="8" />
-          <circle cx="12" cy="3" r="1" />
-          <circle cx="9" cy="13" r="0.6" fill="currentColor" />
-          <circle cx="15" cy="13" r="0.6" fill="currentColor" />
-        </svg>
-      );
+      return <BotIcon className={className} strokeWidth={1.8} />;
     case "plan":
-      return (
-        <svg {...common}>
-          <line x1="9" y1="6" x2="21" y2="6" />
-          <line x1="9" y1="12" x2="21" y2="12" />
-          <line x1="9" y1="18" x2="21" y2="18" />
-          <polyline points="3.5 5.5 4.5 6.5 6.5 4.5" />
-          <polyline points="3.5 11.5 4.5 12.5 6.5 10.5" />
-          <polyline points="3.5 17.5 4.5 18.5 6.5 16.5" />
-        </svg>
-      );
+      return <ListChecksIcon className={className} strokeWidth={1.8} />;
     case "compact":
-      return (
-        <svg {...common}>
-          <polyline points="4 9 8 5 12 9" />
-          <line x1="8" y1="5" x2="8" y2="13" />
-          <polyline points="20 15 16 19 12 15" />
-          <line x1="16" y1="19" x2="16" y2="11" />
-        </svg>
-      );
+      return <ShrinkIcon className={className} strokeWidth={1.8} />;
     case "web":
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="9" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <path d="M12 3a13.5 13.5 0 0 1 0 18a13.5 13.5 0 0 1 0-18z" />
-        </svg>
-      );
+      return <GlobeIcon className={className} strokeWidth={1.8} />;
     default:
-      return (
-        <svg {...common}>
-          <rect x="3" y="3" width="18" height="18" rx="3" />
-          <line x1="8" y1="12" x2="16" y2="12" />
-        </svg>
-      );
+      return <WrenchIcon className={className} strokeWidth={1.8} />;
   }
+}
+
+/** A row's leading icon: spinner while running, the error glyph on failure. */
+function RowStatusIcon({ category, isError, active }: { category?: ToolCategory; isError?: boolean; active?: boolean }) {
+  if (active) return <RowSpinner className="text-warning" />;
+  if (isError) return <CircleXIcon className="size-[14px] shrink-0 text-destructive" strokeWidth={1.8} />;
+  if (category) return <ToolCategoryIcon category={category} />;
+  return null;
 }
 
 /** A clickable file reference inside a tool row, opening the file viewer.
@@ -163,7 +115,10 @@ function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; o
   const activate = () => onOpenFile!(resolved!);
   return (
     <span
-      className="tool-file-chip"
+      className={cn(
+        "inline-flex max-w-full items-center gap-1 overflow-hidden rounded-sm px-1.5 py-px font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))] whitespace-nowrap",
+        clickable && "cursor-pointer hover:bg-accent hover:text-accent-foreground",
+      )}
       title={resolved ?? path}
       aria-label={name}
       role={clickable ? "button" : undefined}
@@ -175,11 +130,10 @@ function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; o
         event.preventDefault();
         activate();
       } : undefined}
-      style={clickable ? undefined : { cursor: "default" }}
     >
       {getFileIcon(name, 12)}
-      <span className="tool-file-chip-name">{name}</span>
-      {dir && <span className="tool-file-chip-dir">{dir}/</span>}
+      <span className="overflow-hidden text-ellipsis">{name}</span>
+      {dir && <span className="overflow-hidden text-ellipsis text-muted-foreground/60">{dir}/</span>}
     </span>
   );
 }
@@ -235,9 +189,9 @@ function ToolRowPreview({ block, result, cwd, onOpenFile }: {
 
   if (paths.length > 0 && onOpenFile) {
     return (
-      <span className="tool-row-chips">
+      <span>
         {paths.slice(0, 4).map((path) => <ToolFileChip key={path} path={path} cwd={cwd} onOpenFile={onOpenFile} />)}
-        {paths.length > 4 && <span className="tool-row-more">+{paths.length - 4}</span>}
+        {paths.length > 4 && <span>+{paths.length - 4}</span>}
       </span>
     );
   }
@@ -326,108 +280,113 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   const patchLabel = getToolFilePaths(block.input).length === 0 ? singlePatchPath(resultDiff?.text) : null;
 
   return (
-    <div className={`activity-row${isError ? " activity-row-error" : ""}${active ? " activity-row-active" : ""}`} data-activity-tool={block.toolName}>
-      <div className="activity-row-line">
-        <button
-          type="button"
-          className="activity-row-header"
-          aria-expanded={expanded}
-          onClick={toggleExpanded}
+    <Trace data-activity-tool={block.toolName}>
+      <div className="flex max-w-full min-w-0 items-center gap-1">
+        <TraceCollapsible
+          open={expanded}
+          onOpenChange={toggleExpanded}
+          className="w-auto min-w-0 flex-[0_1_auto]"
         >
-          <span className="activity-row-icon"><ToolCategoryIcon category={category} isError={isError} /></span>
-          <span className="activity-row-label" title={mcpLabel || patchLabel ? block.toolName : undefined}>
-            {mcpLabel ? `${mcpLabel.server}/${mcpLabel.tool}` : patchLabel ?? label}
-          </span>
-          <span className="activity-row-preview">
-            {isStreamingInput
-              ? t("chat.generatingToolInput")
-              : codemode
-                ? codemodeScriptPreview(codemode.code)
-                : patchLabel
-                  ? null
-                  : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
-          </span>
-          {codemodeCallCount > 0 && (
-            <span className="activity-row-meta">
-              {codemodeCallCount === 1 ? t("codemode.callCountOne") : t("codemode.callCount", { count: codemodeCallCount })}
-            </span>
-          )}
-          {diffStat && (
-            <span className="diff-stat" aria-hidden="true">
-              <span className="diff-stat-added">+{diffStat.added}</span>
-              <span className="diff-stat-removed">−{diffStat.removed}</span>
-            </span>
-          )}
-          {active ? <RowSpinner /> : duration !== undefined && <span className="activity-row-meta">{formatToolDuration(duration)}</span>}
-          {!active && isError && result && (
-            <span className="activity-row-meta activity-row-failed">{t("chat.activity.failed")}</span>
-          )}
-          <RowChevron expanded={expanded} />
-        </button>
+          <TraceCollapsibleTrigger title={mcpLabel || patchLabel ? block.toolName : undefined}>
+            <TraceLine status={active ? "running" : isError ? "error" : undefined}>
+              <TraceIcon><RowStatusIcon category={category} isError={isError} active={active} /></TraceIcon>
+              <TraceTitle className="font-medium">
+                {mcpLabel ? `${mcpLabel.server}/${mcpLabel.tool}` : patchLabel ?? label}
+              </TraceTitle>
+              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+                {isStreamingInput
+                  ? t("chat.generatingToolInput")
+                  : codemode
+                    ? codemodeScriptPreview(codemode.code)
+                    : patchLabel
+                      ? null
+                      : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
+              </TraceDescription>
+              {codemodeCallCount > 0 && (
+                <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                  {codemodeCallCount === 1 ? t("codemode.callCountOne") : t("codemode.callCount", { count: codemodeCallCount })}
+                </TraceDescription>
+              )}
+              {diffStat && (
+                <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] font-medium" aria-hidden="true">
+                  <Badge variant="ghost" className="bg-success/15 text-success">+{diffStat.added}</Badge>
+                  <Badge variant="ghost" className="bg-destructive/10 text-destructive">−{diffStat.removed}</Badge>
+                </span>
+              )}
+              {!active && duration !== undefined && (
+                <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                  {formatToolDuration(duration)}
+                </TraceDescription>
+              )}
+              {!active && isError && result && (
+                <TraceDescription className="shrink-0 font-medium text-destructive [font-variant-numeric:normal]">
+                  {t("chat.activity.failed")}
+                </TraceDescription>
+              )}
+            </TraceLine>
+          </TraceCollapsibleTrigger>
+          <TraceCollapsibleContent>
+            <div className="flex flex-col gap-2">
+              {usage && (
+                <div className="text-[length:calc(11px+var(--chat-font-size-offset,0px))]">
+                  <UsageBar
+                    usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
+                    ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
+                  />
+                </div>
+              )}
+              {codemode ? (
+                <>
+                  <CodeBlock size="sm"><CodeBlockContent wrap>{codemode.code.replace(/\r/g, "").trimEnd()}</CodeBlockContent></CodeBlock>
+                  <CodemodeCallList calls={codemode.calls} omitted={codemode.omitted} isError={isError} />
+                  {result && (resultText !== null && !resultIsEmpty || resultImages.length > 0) && (
+                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                  )}
+                </>
+              ) : combinedTerminalText !== null ? (
+                <CodeBlock size="sm" variant={isError ? "destructive" : "default"}>
+                  <CodeBlockContent wrap={false}>{combinedTerminalText}</CodeBlockContent>
+                </CodeBlock>
+              ) : (
+                <>
+                  {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
+                    toolFields ? (
+                      <ToolFieldRows fields={toolFields} />
+                    ) : (
+                      <CodeBlock size="sm"><CodeBlockContent wrap>{writtenFileText ?? inputStr}</CodeBlockContent></CodeBlock>
+                    )
+                  )}
+                  {patchFiles && <SplitFilesView files={patchFiles} />}
+                  {result && patchFiles && isError && (
+                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                  )}
+                  {result && !patchFiles && combinedTerminalText === null && (
+                    resultDiff ? <SplitPatchView text={resultDiff.text} /> : (!resultIsEmpty || resultImages.length === 0) && (
+                      <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                    )
+                  )}
+                </>
+              )}
+            </div>
+          </TraceCollapsibleContent>
+        </TraceCollapsible>
         {subagent && onOpenSubagent && (
-          <button
+          <Button
             type="button"
-            className="activity-row-action"
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0 text-muted-foreground"
             onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
             title={t("subagent.openTab")}
             aria-label={t("subagent.openTab")}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
-          </button>
+            <ExternalLinkIcon strokeWidth={2} />
+          </Button>
         )}
       </div>
 
       {resultImages.length > 0 && <ResultImages images={resultImages} />}
-
-      {expanded && (
-        <div className="activity-row-detail">
-          {usage && (
-            <div className="activity-usage-line">
-              <UsageBar
-                usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
-                ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
-              />
-            </div>
-          )}
-          <div className="activity-detail-card">
-            {codemode ? (
-              <>
-                <pre className="activity-detail-pre">{codemode.code.replace(/\r/g, "").trimEnd()}</pre>
-                <CodemodeCallList calls={codemode.calls} omitted={codemode.omitted} isError={isError} />
-                {result && (resultText !== null && !resultIsEmpty || resultImages.length > 0) && (
-                  <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
-                )}
-              </>
-            ) : combinedTerminalText !== null ? (
-              <PairedResult
-                text={combinedTerminalText}
-                isEmpty={false}
-                isError={isError}
-              />
-            ) : (
-              <>
-                {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
-                  toolFields ? (
-                    <ToolFieldRows fields={toolFields} />
-                  ) : (
-                    <pre className="activity-detail-pre">{writtenFileText ?? inputStr}</pre>
-                  )
-                )}
-                {patchFiles && <SplitFilesView files={patchFiles} />}
-                {result && patchFiles && isError && (
-                  <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
-                )}
-                {result && !patchFiles && combinedTerminalText === null && (
-                  resultDiff ? <SplitPatchView text={resultDiff.text} /> : (!resultIsEmpty || resultImages.length === 0) && (
-                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
-                  )
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+    </Trace>
   );
 }
 
@@ -466,38 +425,46 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
     || (isApplyPatchToolName(call.block.toolName) && applyPatchResultHasFailures(call.result?.details)));
 
   return (
-    <div className={`activity-row${isError ? " activity-row-error" : ""}`} data-activity-group={category}>
-      <button
-        type="button"
-        className="activity-row-header"
-        aria-expanded={expanded}
-        onClick={toggleExpanded}
+    <Trace data-activity-group={category}>
+      <TraceCollapsible
+        open={expanded}
+        onOpenChange={toggleExpanded}
+        className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <span className="activity-row-icon"><ToolCategoryIcon category={category} isError={isError} /></span>
-        <span className="activity-row-label">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</span>
-        <span className="activity-row-preview">{summaryCount}</span>
-        {hasPending ? <RowSpinner /> : totalDuration > 0 && <span className="activity-row-meta">{formatToolDuration(totalDuration)}</span>}
-        <RowChevron expanded={expanded} />
-      </button>
-      {expanded && (
-        <div className="activity-row-children">
-          {calls.map((call, index) => (
-            <ToolRow
-              key={call.block.toolCallId ?? index}
-              block={call.block}
-              result={call.result}
-              duration={call.duration}
-              usage={call.usage}
-              ctxTokens={call.ctxTokens}
-              ctxWindow={ctxWindow}
-              cwd={cwd}
-              onOpenFile={onOpenFile}
-              onOpenSubagent={onOpenSubagent}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+        <TraceCollapsibleTrigger>
+          <TraceLine status={hasPending ? "running" : isError ? "error" : undefined}>
+            <TraceIcon><RowStatusIcon category={category} isError={isError} active={hasPending} /></TraceIcon>
+            <TraceTitle className="font-medium">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</TraceTitle>
+            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+              {summaryCount}
+            </TraceDescription>
+            {!hasPending && totalDuration > 0 && (
+              <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                {formatToolDuration(totalDuration)}
+              </TraceDescription>
+            )}
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
+          <div className="flex flex-col gap-0.5 py-0.5">
+            {calls.map((call, index) => (
+              <ToolRow
+                key={call.block.toolCallId ?? index}
+                block={call.block}
+                result={call.result}
+                duration={call.duration}
+                usage={call.usage}
+                ctxTokens={call.ctxTokens}
+                ctxWindow={ctxWindow}
+                cwd={cwd}
+                onOpenFile={onOpenFile}
+                onOpenSubagent={onOpenSubagent}
+              />
+            ))}
+          </div>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }
 
@@ -618,14 +585,10 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
   }, []);
 
   return (
-    <div className="activity-row" data-activity="thinking">
-      <button
-        type="button"
-        className="activity-row-header"
-        aria-expanded={expanded}
-        aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
-        title={t("i18n.thinking")}
-        onClick={() => {
+    <Trace data-activity="thinking">
+      <TraceCollapsible
+        open={expanded}
+        onOpenChange={() => {
           const next = !expanded;
           // Expanding mid-stream means "show me the live tail"; expanding a
           // finished block opens from the top for reading.
@@ -634,24 +597,41 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
           setExpanded(next);
           if (next) window.dispatchEvent(new Event(COLLAPSIBLE_EXPANDED_EVENT));
         }}
+        className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <span className="activity-row-icon" style={{ color: active ? "var(--warning)" : undefined }}><ThinkingIcon active={expanded || Boolean(active)} /></span>
-        <span className="activity-row-label">{t("i18n.thinking")}</span>
-        <span className="activity-row-preview">{preview}</span>
-        {active ? <RowSpinner /> : duration !== undefined && <span className="activity-row-meta">{duration}s</span>}
-        <RowChevron expanded={expanded} />
-      </button>
-      {expanded && (
-        <div
-          ref={detailRef}
-          className="activity-detail-card"
-          style={{ maxHeight: 380, overflowY: "auto", overscrollBehavior: "contain", whiteSpace: "pre-wrap", overflowWrap: "anywhere", ...(error ? { color: "var(--danger)" } : undefined) }}
-          onScroll={handleDetailScroll}
+        <TraceCollapsibleTrigger
+          aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
+          title={t("i18n.thinking")}
         >
-          {loading ? t("i18n.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
-        </div>
-      )}
-    </div>
+          <TraceLine status={active ? "running" : undefined}>
+            <TraceIcon className={cn(active && "text-warning")}><ThinkingIcon active={expanded || Boolean(active)} /></TraceIcon>
+            <TraceTitle className="font-medium">{t("i18n.thinking")}</TraceTitle>
+            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+              {preview}
+            </TraceDescription>
+            {!active && duration !== undefined && (
+              <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                {duration}s
+              </TraceDescription>
+            )}
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
+          <div
+            ref={detailRef}
+            className={cn(
+              "max-h-[380px] min-w-0 overflow-y-auto overscroll-contain whitespace-pre-wrap wrap-anywhere",
+              error && "text-destructive",
+            )}
+            onScroll={handleDetailScroll}
+          >
+            {loading ? (
+              <Skeleton className="h-3 w-1/2" />
+            ) : error ?? (block.deferred ? content : block.thinking)}
+          </div>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }
 
@@ -730,86 +710,96 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
   const preview = previewText(text, 120);
 
   const copyContent = () => {
-    copyText(text || detailsText).then(() => {
+    copyText(text || detailsText).then((copied) => {
+      if (!copied) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
   };
 
   return (
-    <div className={`activity-row${isHiddenDisplay ? " activity-row-dim" : ""}`} data-activity-custom={message.customType}>
-      <div className="activity-row-line">
-        <button
-          type="button"
-          className="activity-row-header"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((v) => !v)}
+    <Trace data-activity-custom={message.customType} className={isHiddenDisplay ? "opacity-75" : undefined}>
+      <div className="flex max-w-full min-w-0 items-center gap-1">
+        <TraceCollapsible
+          open={expanded}
+          onOpenChange={() => setExpanded((v) => !v)}
+          className="w-auto min-w-0 flex-[0_1_auto]"
         >
-          <span className="activity-row-icon"><ToolCategoryIcon category={subagent ? "subagent" : "other"} /></span>
-          <span className="activity-row-label" style={dim ? { color: "var(--text-dim)", fontWeight: 400 } : undefined}>{label}</span>
-          <span className="activity-row-preview">{preview || (isHiddenDisplay ? t("i18n.showExtensionMessage") : null)}</span>
-          <RowChevron expanded={expanded} />
-        </button>
+          <TraceCollapsibleTrigger>
+            <TraceLine>
+              <TraceIcon><ToolCategoryIcon category={subagent ? "subagent" : "other"} /></TraceIcon>
+              <TraceTitle className={cn("font-medium", dim && "font-normal")}>{label}</TraceTitle>
+              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+                {preview || (isHiddenDisplay ? t("i18n.showExtensionMessage") : null)}
+              </TraceDescription>
+            </TraceLine>
+          </TraceCollapsibleTrigger>
+          <TraceCollapsibleContent>
+            <div className="flex flex-col gap-2">
+              {images.length > 0 && (
+                <div className={cn("flex flex-wrap gap-1.5", text && "mb-2")}>
+                  {images.map((img, i) => {
+                    const src = imageSource(img);
+                    if (!src) return null;
+                    return (
+                      <ImagePreview key={i} src={src}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={src}
+                          alt=""
+                          className="block max-h-60 max-w-60 rounded-md border border-border object-contain"
+                        />
+                      </ImagePreview>
+                    );
+                  })}
+                </div>
+              )}
+              {text
+                ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody>
+                : <span className="text-xs text-muted-foreground">{t("i18n.noMessage")}</span>}
+              {hasDetails && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Button type="button" variant="ghost" size="xs" onClick={copyContent}>
+                    {copied ? t("i18n.copied") : t("i18n.copy")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => setDetailsExpanded((v) => !v)}
+                  >
+                    {detailsExpanded ? t("i18n.hideDetails") : t("i18n.showDetails")}
+                  </Button>
+                  {detailsExpanded && (
+                    <CodeBlock size="sm" className="mt-1.5"><CodeBlockContent wrap>{detailsText}</CodeBlockContent></CodeBlock>
+                  )}
+                </div>
+              )}
+              {!hasDetails && text && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Button type="button" variant="ghost" size="xs" onClick={copyContent}>
+                    {copied ? t("i18n.copied") : t("i18n.copy")}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </TraceCollapsibleContent>
+        </TraceCollapsible>
         {subagent && onOpenSubagent && (
-          <button
+          <Button
             type="button"
-            className="activity-row-action"
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0 text-muted-foreground"
             onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
             title={t("subagent.openTab")}
             aria-label={t("subagent.openTab")}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
-          </button>
+            <ExternalLinkIcon strokeWidth={2} />
+          </Button>
         )}
       </div>
-      {expanded && (
-        <div className="activity-detail-card">
-          {images.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: text ? 8 : 0 }}>
-              {images.map((img, i) => {
-                const src = imageSource(img);
-                if (!src) return null;
-                return (
-                  <ImagePreview key={i} src={src}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={src}
-                      alt=""
-                      style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid var(--border)" }}
-                    />
-                  </ImagePreview>
-                );
-              })}
-            </div>
-          )}
-          {text
-            ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody>
-            : <span style={{ color: "var(--text-dim)", fontSize: 12 }}>{t("i18n.noMessage")}</span>}
-          {hasDetails && (
-            <div className="activity-row-footnote">
-              <button type="button" onClick={copyContent} className="activity-row-footnote-button">
-                {copied ? t("i18n.copied") : t("i18n.copy")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailsExpanded((v) => !v)}
-                className="activity-row-footnote-button"
-              >
-                {detailsExpanded ? t("i18n.hideDetails") : t("i18n.showDetails")}
-              </button>
-              {detailsExpanded && <pre className="activity-detail-pre" style={{ marginTop: 6 }}>{detailsText}</pre>}
-            </div>
-          )}
-          {!hasDetails && text && (
-            <div className="activity-row-footnote">
-              <button type="button" onClick={copyContent} className="activity-row-footnote-button">
-                {copied ? t("i18n.copied") : t("i18n.copy")}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    </Trace>
   );
 }
 
@@ -833,32 +823,31 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
     : previewText(parsedSummary.body, 120);
 
   return (
-    <div className="activity-row" data-activity-custom="compaction">
-      <button
-        type="button"
-        className="activity-row-header"
-        aria-expanded={expanded}
-        title={expanded ? t("i18n.collapse") : t("i18n.expand")}
-        onClick={() => setExpanded((v) => !v)}
+    <Trace data-activity-custom="compaction">
+      <TraceCollapsible
+        open={expanded}
+        onOpenChange={() => setExpanded((v) => !v)}
+        className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <span className="activity-row-icon"><ToolCategoryIcon category="compact" /></span>
-        <span className="activity-row-label">{t("i18n.conversationCompacted")}</span>
-        <span className="activity-row-preview">
-          {preview}
-          {typeof tokensBefore === "number" && Number.isFinite(tokensBefore) && (
-            <>
-              {" · "}{t("i18n.compactedFromTokens", { tokens: tokensBefore.toLocaleString() })}
-            </>
-          )}
-        </span>
-        <RowChevron expanded={expanded} />
-      </button>
-      {expanded && (
-        <div className="activity-detail-card">
+        <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
+          <TraceLine>
+            <TraceIcon><ToolCategoryIcon category="compact" /></TraceIcon>
+            <TraceTitle className="font-medium">{t("i18n.conversationCompacted")}</TraceTitle>
+            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+              {preview}
+              {typeof tokensBefore === "number" && Number.isFinite(tokensBefore) && (
+                <>
+                  {" · "}{t("i18n.compactedFromTokens", { tokens: tokensBefore.toLocaleString() })}
+                </>
+              )}
+            </TraceDescription>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
           <CompactionSummaryDetails summary={summary} cwd={cwd} onOpenFile={onOpenFile} />
-        </div>
-      )}
-    </div>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }
 
@@ -872,13 +861,13 @@ export function CompactionSummaryDetails({ summary, cwd, onOpenFile }: {
 
   return (
     <>
-      <div style={{ color: "var(--text)", fontSize: "calc(14px + var(--chat-font-size-offset, 0px))", lineHeight: 1.5 }}>
+      <div className="text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground">
         {t("i18n.compactionDescription")}
       </div>
       {parsedSummary.body ? (
         <MarkdownBody className="markdown-compaction-message" cwd={cwd} onOpenFile={onOpenFile}>{parsedSummary.body}</MarkdownBody>
       ) : (
-        <span style={{ color: "var(--text-dim)", fontSize: 12 }}>{t("i18n.noSummary")}</span>
+        <span className="text-xs text-muted-foreground">{t("i18n.noSummary")}</span>
       )}
       <CompactionFileMetadata readFiles={parsedSummary.readFiles} modifiedFiles={parsedSummary.modifiedFiles} />
     </>
@@ -895,19 +884,25 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
   if (modifiedFiles.length > 0) parts.push(`${modifiedFiles.length} modified`);
 
   return (
-    <details className="compaction-file-details">
-      <summary>{t("i18n.fileContext", { details: parts.join(", ") })}</summary>
-      {modifiedFiles.length > 0 && <CompactionFileList title={t("i18n.modifiedFiles")} files={modifiedFiles} />}
-      {readFiles.length > 0 && <CompactionFileList title={t("i18n.readFiles")} files={readFiles} />}
-    </details>
+    <Collapsible className="mt-2.5 border-t border-border pt-2 text-xs text-muted-foreground">
+      <CollapsibleTrigger className="flex w-full cursor-pointer justify-start text-left font-semibold leading-[1.4]">
+        {t("i18n.fileContext", { details: parts.join(", ") })}
+      </CollapsibleTrigger>
+      {/* forceMount: the native <details> this replaces kept its lists in the
+          DOM while closed; the lists are tiny, so stay mounted and hidden. */}
+      <CollapsibleContent forceMount>
+        {modifiedFiles.length > 0 && <CompactionFileList title={t("i18n.modifiedFiles")} files={modifiedFiles} />}
+        {readFiles.length > 0 && <CompactionFileList title={t("i18n.readFiles")} files={readFiles} />}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
 function CompactionFileList({ title, files }: { title: string; files: string[] }) {
   return (
-    <div className="compaction-file-section">
-      <div className="compaction-file-title">{title}</div>
-      <ul className="compaction-file-list">
+    <div className="mt-2">
+      <div className="mb-1 text-xs font-semibold text-foreground">{title}</div>
+      <ul className="m-0 max-h-[180px] list-none overflow-auto p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[3px] [&_li+li]:border-t [&_li+li]:border-border">
         {files.map((file) => (
           <li key={file}>{file}</li>
         ))}
@@ -944,7 +939,13 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
   const hasCtx = Boolean(ctx && (ctx.tokens !== undefined || ctx.percent !== undefined || ctx.contextWindow));
   if (!hasUsage && !hasCtx && !model && !time && !copySource) return null;
   return (
-    <div className="turn-meta-line" title={usage ? formatUsage(usage) : undefined}>
+    // Room above the next turn's user message: the meta line is the visual
+    // boundary between turns, so it needs the same breathing room as the
+    // messages themselves (the assistant above contributes its own 12px).
+    <div
+      className="mt-1 mb-3 flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground/60 [font-variant-numeric:tabular-nums]"
+      title={usage ? formatUsage(usage) : undefined}
+    >
       {model && <span>{model}</span>}
       {(hasUsage || hasCtx) && (
         <UsageBar
@@ -954,37 +955,26 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
       )}
       {time && <span>{time}</span>}
       {copySource && (
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={() => {
-            copyText(copySource).then(() => {
+            copyText(copySource).then((copied) => {
+              if (!copied) return;
               setCopied(true);
               setTimeout(() => setCopied(false), 1500);
             });
           }}
           title={t("i18n.copyMessage")}
           aria-label={t("i18n.copyMessage")}
-          style={{
-            marginLeft: "auto",
-            display: "flex", alignItems: "center",
-            padding: 2,
-            background: "none", border: "none",
-            borderRadius: 4,
-            color: copied ? "var(--accent)" : "var(--text-dim)",
-            cursor: "pointer",
-            transition: "color 0.12s",
-          }}
-        >
-          {copied ? (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          ) : (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
+          className={cn(
+            "ml-auto size-4 rounded-sm p-0.5",
+            copied ? "text-primary" : "text-muted-foreground",
           )}
-        </button>
+        >
+          {copied ? <CheckIcon strokeWidth={1.8} /> : <CopyIcon strokeWidth={1.8} />}
+        </Button>
       )}
     </div>
   );
@@ -1008,38 +998,20 @@ export function SafeMarkdownBody({ children, className, ...props }: React.Compon
   }
   if (!showRaw) {
     return (
-      <button
+      <Button
+        type="button"
+        variant="outline"
         onClick={() => setShowRaw(true)}
-        style={{
-          display: "block",
-          width: "100%",
-          margin: "4px 0",
-          padding: "7px 10px",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-          background: "var(--bg-panel)",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          fontSize: 12,
-          textAlign: "left",
-        }}
+        className="my-1 h-auto w-full justify-start px-2.5 py-[7px] text-left text-xs font-normal text-muted-foreground"
       >
-        ⚠ {t("i18n.largeMessageReveal", { size: children.length >= 1_000_000 ? `${(children.length / 1_000_000).toFixed(1)} MB` : children.length >= 1_000 ? `${Math.round(children.length / 1_000)} KB` : `${children.length} B` })}
-      </button>
+        <TriangleAlertIcon aria-hidden className="mr-1.5 size-3.5 shrink-0" />
+        {t("i18n.largeMessageReveal", { size: children.length >= 1_000_000 ? `${(children.length / 1_000_000).toFixed(1)} MB` : children.length >= 1_000 ? `${Math.round(children.length / 1_000)} KB` : `${children.length} B` })}
+      </Button>
     );
   }
   return (
-    <div className={className} style={{ maxHeight: 420, overflow: "auto", fontSize: "calc(12px + var(--chat-font-size-offset, 0px))", lineHeight: 1.5 }}>
-      <pre
-        style={{
-          margin: 0,
-          padding: "8px 10px",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          fontFamily: "var(--font-mono)",
-          color: "var(--text-muted)",
-        }}
-      >
+    <div className={cn("max-h-[420px] overflow-auto text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.5]", className)}>
+      <pre className="m-0 whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-muted-foreground">
         {children}
       </pre>
     </div>
@@ -1161,7 +1133,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
     );
     index += 1;
   }
-  return <div className="activity-body">{nodes}</div>;
+  return <div className="flex min-w-0 flex-col gap-1.5 [&>[data-message-text]]:my-1">{nodes}</div>;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1200,30 +1172,17 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
   const showFileHeaders = files.length > 1;
 
   return (
-    <div style={{ maxHeight: 560, overflowY: "auto", overflowX: "hidden", background: "var(--bg)" }}>
+    <div className="max-h-[560px] overflow-x-hidden overflow-y-auto bg-background">
       {files.map((file, fileIndex) => (
         <div
           key={fileIndex}
-          style={{
-            minWidth: 0,
-            borderTop: fileIndex === 0 ? "none" : "1px solid var(--border)",
-            fontFamily: "var(--font-mono)",
-            fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
-            lineHeight: 1.55,
-          }}
+          className={cn(
+            "min-w-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]",
+            fileIndex > 0 && "border-t border-border",
+          )}
         >
           {showFileHeaders && layout === "split" && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                position: "sticky",
-                top: 0,
-                zIndex: 1,
-                background: "var(--bg-subtle)",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
+            <div className="sticky top-0 z-[1] grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] border-b border-border bg-muted">
               <SplitDiffHeader title={file.oldPath || t("i18n.before")} side="left" />
               <SplitDiffHeader title={file.newPath || t("i18n.after")} side="right" />
             </div>
@@ -1232,25 +1191,14 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
           {showFileHeaders && layout === "stacked" && stackedFilePath(file) && (
             <div
               title={stackedFilePath(file)}
-              style={{
-                position: "sticky",
-                top: 0,
-                zIndex: 1,
-                padding: "5px 10px",
-                color: "var(--text-dim)",
-                background: "var(--bg-subtle)",
-                borderBottom: "1px solid var(--border)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
+              className="sticky top-0 z-[1] truncate border-b border-border bg-muted px-2.5 py-[5px] text-muted-foreground"
             >
               {stackedFilePath(file)}
             </div>
           )}
 
           {layout === "split" && (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               {file.rows.map((row, rowIndex) => {
                 if (row.type === "hunk") {
                   return null;
@@ -1260,7 +1208,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
                 }
 
                 return (
-                  <div key={rowIndex} style={{ display: "contents" }}>
+                  <div key={rowIndex} className="contents">
                     <SplitDiffCellView cell={row.left} side="left" />
                     <SplitDiffCellView cell={row.right} side="right" />
                   </div>
@@ -1284,17 +1232,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
 function DiffGapRow({ gap }: { gap: SplitDiffGap }) {
   const { t } = useI18n();
   return (
-    <div
-      style={{
-        gridColumn: "1 / -1",
-        padding: "0 10px",
-        color: "var(--text-dim)",
-        background: "var(--bg-subtle)",
-        borderTop: "1px solid var(--border)",
-        borderBottom: "1px solid var(--border)",
-        userSelect: "none",
-      }}
-    >
+    <div className="col-span-full select-none border-y border-border bg-muted px-2.5 text-muted-foreground">
       {gap.count === null ? "⋯" : `⋯ ${diffGapLabel(gap.count, t)}`}
     </div>
   );
@@ -1324,14 +1262,7 @@ function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right
   return (
     <div
       title={title}
-      style={{
-        padding: "5px 10px",
-        color: "var(--text-dim)",
-        borderRight: side === "left" ? "1px solid var(--border)" : "none",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-      }}
+      className={cn("truncate px-2.5 py-[5px] text-muted-foreground", side === "left" && "border-r border-border")}
     >
       {title}
     </div>
@@ -1339,63 +1270,31 @@ function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right
 }
 
 function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" | "right" }) {
-  const bg =
-    cell.type === "added"
-      ? "var(--diff-add-bg)"
-      : cell.type === "removed"
-      ? "var(--diff-del-bg)"
-      : cell.type === "empty"
-      ? "var(--bg-subtle)"
-      : "transparent";
-  const marker =
-    cell.type === "added" ? "+" : cell.type === "removed" ? "-" : " ";
-  const markerColor =
-    cell.type === "added" ? "var(--diff-add)" : cell.type === "removed" ? "var(--diff-del)" : "var(--text-dim)";
-
+  const marker = cell.type === "added" ? "+" : cell.type === "removed" ? "-" : " ";
   return (
     <div
-      style={{
-        display: "flex",
-        minWidth: 0,
-        background: bg,
-        borderRight: side === "left" ? "1px solid var(--border)" : "none",
-      }}
+      className={cn(
+        "flex min-w-0",
+        cell.type === "added" ? "bg-diff-add-bg" : cell.type === "removed" ? "bg-diff-del-bg" : cell.type === "empty" && "bg-muted",
+        side === "left" && "border-r border-border",
+      )}
     >
-      <span
-        style={{
-          width: 42,
-          padding: "0 6px",
-          textAlign: "right",
-          color: "var(--text-dim)",
-          userSelect: "none",
-          background: "var(--bg-panel)",
-          borderRight: "1px solid var(--border)",
-          flexShrink: 0,
-        }}
-      >
+      <span className="w-[42px] shrink-0 select-none border-r border-border bg-card px-1.5 text-right text-muted-foreground">
         {cell.lineNo ?? ""}
       </span>
       <span
-        style={{
-          width: 18,
-          padding: "0 5px",
-          color: markerColor,
-          userSelect: "none",
-          fontWeight: cell.type === "context" || cell.type === "empty" ? 400 : 700,
-          flexShrink: 0,
-        }}
+        className={cn(
+          "w-[18px] shrink-0 select-none px-[5px]",
+          cell.type === "added" ? "font-bold text-diff-add" : cell.type === "removed" ? "font-bold text-diff-del" : "font-normal text-muted-foreground",
+        )}
       >
         {marker}
       </span>
       <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          padding: "0 10px 0 0",
-          color: cell.type === "empty" ? "var(--text-dim)" : "var(--text)",
-          whiteSpace: "pre-wrap",
-          overflowWrap: "anywhere",
-        }}
+        className={cn(
+          "min-w-0 flex-1 pr-2.5 whitespace-pre-wrap wrap-anywhere",
+          cell.type === "empty" ? "text-muted-foreground" : "text-foreground",
+        )}
       >
         {cell.text || "\u00a0"}
       </span>
@@ -1413,54 +1312,35 @@ function PatchTextView({ text }: { text: string }) {
   const lines = text.split(/\r?\n/);
 
   return (
-    <div style={{ maxHeight: 520, overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-mono)", fontSize: "calc(12px + var(--chat-font-size-offset, 0px))", lineHeight: 1.55, minWidth: 0 }}>
+    <div className="min-w-0 max-h-[520px] overflow-x-hidden overflow-y-auto font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]">
       {lines.map((line, i) => {
         const kind =
           line.startsWith("@@") ? "hunk" :
           line.startsWith("+") && !line.startsWith("+++") ? "added" :
           line.startsWith("-") && !line.startsWith("---") ? "removed" :
           "context";
-        const bg =
-          kind === "added" ? "var(--diff-add-bg)" :
-          kind === "removed" ? "var(--diff-del-bg)" :
-          kind === "hunk" ? "var(--diff-hunk-bg)" :
-          "transparent";
-        const color =
-          kind === "added" ? "var(--diff-add)" :
-          kind === "removed" ? "var(--diff-del)" :
-          kind === "hunk" ? "var(--accent)" :
-          "var(--text)";
+        const bgClass =
+          kind === "added" ? "bg-diff-add-bg" :
+          kind === "removed" ? "bg-diff-del-bg" :
+          kind === "hunk" ? "bg-diff-hunk-bg" :
+          "";
+        const colorClass =
+          kind === "added" ? "text-diff-add" :
+          kind === "removed" ? "text-diff-del" :
+          kind === "hunk" ? "text-primary" :
+          "text-foreground";
+        const borderClass =
+          kind === "added" ? "border-l-diff-add" :
+          kind === "removed" ? "border-l-diff-del" :
+          kind === "hunk" ? "border-l-primary" :
+          "border-l-transparent";
 
         return (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              background: bg,
-              borderLeft: kind === "added"
-                ? "3px solid var(--diff-add)"
-                : kind === "removed"
-                ? "3px solid var(--diff-del)"
-                : kind === "hunk"
-                ? "3px solid var(--accent)"
-                : "3px solid transparent",
-            }}
-          >
-            <span
-              style={{
-                width: 48,
-                padding: "0 8px",
-                color: "var(--text-dim)",
-                background: "var(--bg-panel)",
-                borderRight: "1px solid var(--border)",
-                textAlign: "right",
-                userSelect: "none",
-                flexShrink: 0,
-              }}
-            >
+          <div key={i} className={cn("flex border-l-[3px]", bgClass, colorClass, borderClass)}>
+            <span className="w-12 shrink-0 select-none border-r border-border bg-card px-2 text-right text-muted-foreground">
               {i + 1}
             </span>
-            <span style={{ padding: "0 10px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", color }}>
+            <span className={cn("whitespace-pre-wrap wrap-anywhere px-2.5", colorClass)}>
               {line || "\u00a0"}
             </span>
           </div>
@@ -1514,7 +1394,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function ResultImages({ images }: { images: ImageContent[] }) {
   return (
     <div
-      className="activity-row-images"
+      className="flex flex-wrap gap-1.5 py-1"
     >
       {images.map((image, index) => {
         const src = imageSource(image);
@@ -1523,21 +1403,14 @@ function ResultImages({ images }: { images: ImageContent[] }) {
           <ImagePreview
             key={`${src}-${index}`}
             src={src}
-            style={{ maxWidth: "100%" }}
+            className="max-w-full"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={src}
               alt=""
               loading="lazy"
-              style={{
-                display: "block",
-                maxWidth: "min(100%, 720px)",
-                maxHeight: 520,
-                borderRadius: 6,
-                objectFit: "contain",
-                border: "1px solid var(--border)",
-              }}
+              className="block max-h-[520px] max-w-[min(100%,720px)] rounded-sm border border-border object-contain"
             />
           </ImagePreview>
         );
@@ -1556,64 +1429,40 @@ function PairedResult({ text, isEmpty, isError }: {
   // must not reflow to the container width.
   const tui = isTuiText(text);
   return (
-    <pre
-      className="activity-detail-pre"
-      style={{
-        color: isError ? "#f87171" : (isEmpty ? "var(--text-dim)" : "var(--text-muted)"),
-        whiteSpace: tui ? "pre" : "pre-wrap",
-        wordBreak: tui ? "normal" : "break-all",
-        fontStyle: isEmpty ? "italic" : "normal",
-        opacity: isEmpty ? 0.6 : 1,
-      }}
-    >
-      {isEmpty ? t("i18n.noOutput") : text}
-    </pre>
+    <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-w-full">
+      <CodeBlockContent
+        wrap={!tui}
+        className={cn(
+          "max-h-[420px] px-2.5 py-2 text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]",
+          isError ? "text-destructive" : "text-muted-foreground",
+          isEmpty && "italic opacity-60",
+          !tui && "[overflow-wrap:anywhere]",
+        )}
+      >
+        {isEmpty ? t("i18n.noOutput") : text}
+      </CodeBlockContent>
+    </CodeBlock>
   );
 }
 
-const TOOL_FIELD_LABEL: CSSProperties = {
-  padding: "4px 12px 4px 0",
-  color: "var(--text-dim)",
-  fontSize: "calc(11px + var(--chat-font-size-offset, 0px))",
-  whiteSpace: "nowrap",
-  verticalAlign: "top",
-};
-
-const TOOL_FIELD_VALUE: CSSProperties = {
-  padding: "4px 0",
-  color: "var(--text-muted)",
-  fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
-  fontFamily: "var(--font-mono)",
-  overflowWrap: "anywhere",
-};
+const TOOL_FIELD_LABEL =
+  "shrink-0 text-muted-foreground/70 text-[length:calc(11px+var(--chat-font-size-offset,0px))] leading-[1.6]";
 
 // A value with newlines of its own keeps them, scrolled in place.
-const TOOL_FIELD_BLOCK: CSSProperties = {
-  margin: 0,
-  padding: "8px 10px",
-  maxHeight: 260,
-  overflow: "auto",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
-  background: "var(--bg)",
-  font: "inherit",
-  lineHeight: 1.5,
-  whiteSpace: "pre-wrap",
-};
+const TOOL_FIELD_BLOCK =
+  "m-0 mt-0.5 max-h-[260px] overflow-auto rounded-lg border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
 
+// One row per argument: `key: value` on a single line — the key muted, the
+// value in the row's mono face; multiline values keep their own block.
 function ToolFieldRows({ fields }: { fields: ToolField[] }) {
   return (
-    <table className="tool-field-table" style={{ borderCollapse: "collapse" }}>
-      <tbody>
-        {fields.map((field) => (
-          <tr key={field.key}>
-            <td style={TOOL_FIELD_LABEL}>{field.key}</td>
-            <td style={TOOL_FIELD_VALUE}>
-              {field.multiline ? <pre style={TOOL_FIELD_BLOCK}>{field.value}</pre> : field.value}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+      {fields.map((field) => (
+        <div key={field.key} className="min-w-0">
+          <span className={TOOL_FIELD_LABEL}>{field.key}:</span>{" "}
+          {field.multiline ? <pre className={TOOL_FIELD_BLOCK}>{field.value}</pre> : field.value}
+        </div>
+      ))}
+    </div>
   );
 }

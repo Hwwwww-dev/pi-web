@@ -11,7 +11,7 @@ const jiti = createJiti(import.meta.url, {
 });
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
-const { ChatInput, ModelErrorBanner, ModelScopeWarningBanner, RUN_END_CLICK_GUARD_MS, autoGrowTextarea, canClearBuiltinCommandInput, canRestoreUserMessage, canRunBuiltinSlashCommandWhileStreaming, cycleListIndex, filterModelOptions, getUpwardMenuMaxHeight, getUserMessageText, getUserMessageDraftImages, isExactSlashCommand, isRunEndStrayClick, modelSupportsImageInput, offersBuiltinSlashCommandWhileStreaming, replaceLinksWithMarkdown, readImageFile, replaceTextareaRange, stacksComposerLayout, submitsSlashCommandOnEnter } = await jiti.import("./ChatInput.tsx");
+const { ChatInput, ModelErrorBanner, ModelScopeWarningBanner, RUN_END_CLICK_GUARD_MS, autoGrowTextarea, canClearBuiltinCommandInput, canRestoreUserMessage, canRunBuiltinSlashCommandWhileStreaming, cycleListIndex, getUpwardMenuMaxHeight, getUserMessageText, getUserMessageDraftImages, isExactSlashCommand, isRunEndStrayClick, modelSupportsImageInput, offersBuiltinSlashCommandWhileStreaming, replaceLinksWithMarkdown, readImageFile, replaceTextareaRange, stacksComposerLayout, submitsSlashCommandOnEnter } = await jiti.import("./ChatInput.tsx");
 const { isBareMcpCommand } = await jiti.import("@/lib/mcp-command");
 const { ModelSelector } = await jiti.import("./ModelSelector.tsx");
 // As ChatInput.tsx imports it: on Windows jiti loads "@/lib/draft-store.ts"
@@ -364,11 +364,11 @@ test("a message waiting in the composer keeps the main button on send", () => {
   // send affordance (which queues a follow-up) instead of only stop.
   const source = readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8");
   assert.match(source, /const canSubmit = hasInputText \|\| attachedImages\.length > 0;/);
-  assert.match(source, /\{isStreaming && !canSubmit \? \(/);
+  assert.match(source, /\bisStreaming && !canSubmit \? \(/);
   assert.match(source, /onClick=\{isStreaming \? \(\) => queueFollowUp\(\) : handleSend\}/);
 });
 
-test("scrolls a long queue inside its own box, under the count and Recall (#1428)", () => {
+test("scrolls a long queue inside its own box, pills labeled by behavior (#1428)", () => {
   const html = renderToStaticMarkup(
     React.createElement(I18nProvider, null, React.createElement(ChatInput, {
       onSend() {}, onAbort() {}, onSteer() {}, onFollowUp() {}, onQueuedAction() {}, isStreaming: true,
@@ -378,11 +378,13 @@ test("scrolls a long queue inside its own box, under the count and Recall (#1428
       ],
     })),
   );
-  const rows = html.match(/<div style="max-height:min\(180px[^"]*overflow-y:auto[^"]*">(.*)$/s);
+  const rows = html.match(/<div class="[^"]*max-h-\[min\(180px[^"]*overflow-y-auto[^"]*">(.*)$/s);
   assert.ok(rows, "queued rows sit in a capped scroll box");
-  assert.match(html.slice(0, rows.index), /Queued · 20<\/span>/);
   assert.deepEqual([...rows[1].matchAll(/<div title="([^"]+)"/g)].map((match) => match[1]),
     [...Array.from({ length: 19 }, (_, i) => `steer-${i}`), "follow-up-0"]);
+  // steer pills: the primary tag on a ringed background; follow-up: the muted tag on secondary
+  assert.match(html, /border-primary\/45 bg-background/);
+  assert.match(html, /bg-secondary text-secondary-foreground/);
 });
 
 test("the composer stays editable while compacting and says messages queue", () => {
@@ -392,7 +394,9 @@ test("the composer stays editable while compacting and says messages queue", () 
     })),
   );
 
-  assert.doesNotMatch(html, /<textarea[^>]*\bdisabled\b/);
+  // The disabled ATTRIBUTE must be absent — `disabled:` utility classes in
+  // the serialized class list do not count.
+  assert.doesNotMatch(html, /<textarea[^>]*\sdisabled[= >]/);
   assert.match(html, /placeholder="Compacting… messages queue until it finishes"/);
 });
 
@@ -487,8 +491,11 @@ test("renders the read-only tool preset as the active selection", () => {
     ),
   );
 
+  // The row keeps no text pill: the preset name lives on the wrench button's
+  // tooltip, and the icon carries a tint instead.
   assert.match(html, /title="Change tool preset: Read Only"/);
-  assert.match(html, />Read Only<\/span>/);
+  assert.match(html, /aria-label="Change tool preset"/);
+  assert.doesNotMatch(html, />Read Only<\/span>/);
 });
 
 test("renders the empty tool preset as Chat only", () => {
@@ -507,7 +514,8 @@ test("renders the empty tool preset as Chat only", () => {
   );
 
   assert.match(html, /title="Change tool preset: Chat only"/);
-  assert.match(html, />Chat only<\/span>/);
+  assert.match(html, /aria-label="Change tool preset"/);
+  assert.doesNotMatch(html, />Chat only<\/span>/);
 });
 
 test("renders the compact composer with the standard Send button and no session controls", () => {
@@ -526,7 +534,7 @@ test("renders the compact composer with the standard Send button and no session 
 
   assert.match(html, /<textarea/);
   assert.match(html, /aria-label="Send"/);
-  assert.match(html, /border-radius:50%/);
+  assert.match(html, /rounded-full/);
   assert.equal((html.match(/<button\b/g) ?? []).length, 1);
   assert.doesNotMatch(html, /type="file"|Attach files|Change tool preset/);
 });
@@ -540,7 +548,7 @@ test("the attach button takes any file when the chat handles them, and images on
   const fileInput = (html) => html.match(/<input[^>]*type="file"[^>]*>/)?.[0] ?? "";
 
   const html = render({ onAttachFiles() {} });
-  assert.match(html, /title="Attach files"/);
+  assert.match(html, /aria-label="Attach files"/);
   assert.match(fileInput(html), /multiple=""/);
   // No accept list and no capture: phones offer files, the photo library and the camera.
   assert.doesNotMatch(fileInput(html), /accept=|capture=/);
@@ -589,7 +597,7 @@ test("shows and locks the optimistic model while a switch is pending", () => {
   assert.match(html, /aria-busy="true"/);
   assert.match(html, /disabled=""/);
   assert.match(html, />DeepSeek V4 Flash</);
-  assert.match(html, /animation:spin 0\.8s linear infinite/);
+  assert.match(html, /animate-spin/);
 });
 
 test("the live model selector can reapply its current model without changing draft-field selection behavior", () => {
@@ -611,33 +619,14 @@ test("the live model selector can reapply its current model without changing dra
     const calls = [];
     const choose = script.runInNewContext({
       value: active ? option : null, isAutoSelection: automatic,
-      setOpen: (value) => calls.push(["open", value]),
-      setFilter: (value) => calls.push(["filter", value]),
       onChange: (provider, id) => calls.push(["change", provider, id]),
       onReselect: live ? (provider, id) => calls.push(["reselect", provider, id]) : undefined,
     });
     choose(option);
-    assert.deepEqual(calls, [["open", false], ["filter", ""], ...(expected ? [[expected, option.provider, option.modelId]] : [])]);
+    // The Radix menu closes itself on select; choose only dispatches the model.
+    assert.deepEqual(calls, expected ? [[expected, option.provider, option.modelId]] : []);
   }
   assert.match(readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8"), /onReselect=\{onModelChange\}/);
-});
-
-test("filters model options by name, id, provider and provider/id", () => {
-  const options = [
-    { provider: "ollama", modelId: "qwen3:latest", name: "Qwen 3" },
-    { provider: "anthropic", modelId: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
-    { provider: "openai", modelId: "gpt-5.4", name: "GPT-5.4" },
-    { provider: "relay-a", modelId: "gpt-5.4", name: "GPT-5.4" },
-  ];
-
-  assert.deepEqual(filterModelOptions(options, "QWEN"), [options[0]]);
-  assert.deepEqual(filterModelOptions(options, "claude-sonnet"), [options[1]]);
-  assert.deepEqual(filterModelOptions(options, "OpenAI"), [options[2]]);
-  assert.deepEqual(filterModelOptions(options, " anthropic/claude "), [options[1]]);
-  assert.deepEqual(filterModelOptions(options, "Relay-A/GPT"), [options[3]]);
-  assert.deepEqual(filterModelOptions(options, "gpt-5.4"), [options[2], options[3]]);
-  assert.equal(filterModelOptions(options, "missing").length, 0);
-  assert.equal(filterModelOptions(options, "  "), options);
 });
 
 test("renders the shared field model selector as a disabled gray control", () => {
@@ -660,7 +649,7 @@ test("renders the shared field model selector as a disabled gray control", () =>
 
   assert.match(html, /aria-label="Model override"/);
   assert.match(html, /disabled=""/);
-  assert.match(html, /background:var\(--bg-panel\)/);
+  assert.match(html, /bg-card/);
   assert.match(html, />Parent default</);
 });
 
@@ -1059,7 +1048,7 @@ test("renders compact errors above the input as a wrapping alert", () => {
   assert.match(html, /role="alert"/);
   assert.match(html, /Compaction failed: OpenAI API error/);
   assert.match(html, /&lt;html&gt;request forbidden&lt;\/html&gt;/);
-  assert.match(html, /white-space:pre-wrap/);
+  assert.match(html, /whitespace-pre-wrap/);
   assert.ok(html.indexOf('role="alert"') < html.indexOf("<textarea"));
 });
 
@@ -1142,39 +1131,20 @@ test("renders image warnings for known text-only defaults without an explicit mo
   }
 });
 
-test("selector rows keep the default star and the floating save button in one gutter", async () => {
-  const { SelectorRow } = await jiti.import("./SelectorRow.tsx");
-  const star = (isDefault) => ({ isDefault, saveLabel: "Save as default", defaultLabel: "Default", onSave: () => {} });
-  const row = (props) => renderToStaticMarkup(React.createElement(SelectorRow, {
-    active: false,
-    onSelect: () => {},
-    ...props,
-  }, "Alpha"));
+test("model rows keep the default star and the floating save button in one gutter", async () => {
+  // The rows render inside the Radix popover portal, which SSR does not
+  // materialize, so these invariants are asserted on the component source.
+  const source = readFileSync(new URL("./ModelSelector.tsx", import.meta.url), "utf8");
 
-  const savable = row({ star: star(false) });
-  assert.match(savable, /role="option"/);
-  assert.match(savable, /aria-label="Save as default"/);
-  // Hidden until hover or focus, but kept out of the row's text by the gutter.
-  assert.match(savable, /opacity:0/);
-  assert.match(savable, /tabindex="-1"/);
-  assert.match(savable, /padding:7px 36px 7px 12px/);
-  assert.doesNotMatch(savable, /aria-label="Default"/);
-
-  // The default row shows a static marker in the same spot and no button.
-  const saved = row({ star: star(true) });
-  assert.match(saved, /role="img" aria-label="Default"/);
-  assert.match(saved, /fill="currentColor"/);
-  assert.doesNotMatch(saved, /Save as default/);
-
-  const plain = row({});
-  assert.doesNotMatch(plain, /Save as default|aria-label="Default"/);
-  assert.match(plain, /padding:7px 12px/);
-  // Rows without a star still line up with starred ones in the same menu.
-  assert.match(row({ gutter: true }), /padding:7px 36px 7px 12px/);
-
-  const active = row({ active: true });
-  assert.match(active, /aria-selected="true"/);
-  assert.doesNotMatch(active, /border-left/);
+  // Rows reserve the gutter whenever the star column can exist…
+  assert.match(source, /onSetDefault && "pr-9"/);
+  // …the save button hides until hover or focus and sits in that gutter.
+  assert.match(source, /aria-label=\{t\("chat\.saveDefaultModel"\)\}/);
+  assert.match(source, /opacity-0 transition-opacity group-hover\/item:opacity-100/);
+  assert.match(source, /absolute top-1\/2 right-1\.5 size-6 -translate-y-1\/2/);
+  // The default row shows a static filled marker instead of a button.
+  assert.match(source, /role="img"\s*\n\s*aria-label=\{t\("chat\.defaultModel"\)\}/);
+  assert.match(source, /<StarIcon size=\{10\} fill="currentColor" \/>/);
 });
 
 test("grows the composer to its text and hides the scrollbar until the text is taller than the box", () => {
@@ -1192,11 +1162,11 @@ test("grows the composer to its text and hides the scrollbar until the text is t
 
   const oneLine = fake("hi", 24, 24);
   autoGrowTextarea(oneLine);
-  assert.equal(oneLine.style.height, "24px");
+  assert.equal(oneLine.style.height, "26px");
   assert.equal(oneLine.style.overflowY, "hidden");
 
   const tall = fake("lots", 320, 24);
   autoGrowTextarea(tall);
-  assert.equal(tall.style.height, "200px", "the box caps at 200 px");
+  assert.equal(tall.style.height, "120px", "the box caps at 120 px");
   assert.equal(tall.style.overflowY, "auto", "capped text scrolls");
 });

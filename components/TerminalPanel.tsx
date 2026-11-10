@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
+import { LinkIcon, MoonIcon, RotateCwIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { terminalFontSize, useChatAppearance } from "@/hooks/useChatAppearance";
 import { useI18n } from "@/hooks/useI18n";
 import { setTerminalTheme, useTerminalTheme } from "@/hooks/useTerminalTheme";
@@ -278,47 +280,59 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
     return () => { cancelled = true; };
   }, [id, tab.closing]);
 
+  // The status dot reads the app theme's semantic tokens; only the xterm palette
+  // and the island chrome (buttons, error strip) stay on --terminal-*.
+  const statusDotClass = { connecting: "bg-warning", ready: "bg-success", exited: "bg-destructive", error: "bg-destructive" }[status];
   const nextTheme = theme === "dark" ? "light" : "dark";
   const themeLabel = nextTheme === "light" ? "terminal.lightTheme" : "terminal.darkTheme";
+  // The CodeBlock title names the shell; the server picks the real binary.
+  const shellLabel = typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent) ? "shell" : "zsh";
 
   return (
-    <section className="terminal-panel" data-terminal-theme={theme} aria-label={t("terminal.title")}>
-      <header className="terminal-panel-header">
-        <div className="terminal-panel-path">
-          <span className={`terminal-status-dot is-${status}`} title={t(`terminal.${status}`)} />
-          <PathLabel text={cwd} />
-        </div>
-        <div className="terminal-panel-actions">
+    // The CodeBlock sm container, kept on the section so the terminal grid,
+    // data-terminal-theme and its own xterm palette stay untouched.
+    <section
+      // 面板壳的网格布局（38px 头行 / 状态行 / 终端行）批 4 自 app/globals.css
+      // 迁入；--terminal-* 调色板仍由 globals 的 .terminal-panel 按主题注入。
+      className="terminal-panel cn-code-block group/code-block relative grid h-full min-h-0 w-full min-w-0 grid-rows-[38px_auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-input bg-(--terminal-bg) text-xs dark:bg-input/30"
+      data-terminal-theme={theme}
+      aria-label={t("terminal.title")}
+    >
+      <header className="flex min-w-0 shrink-0 items-center gap-2 px-2.5 text-muted-foreground">
+        <span
+          className={`size-[7px] shrink-0 rounded-full ${statusDotClass}`}
+          title={t(`terminal.${status}`)}
+          aria-label={t(`terminal.${status}`)}
+        />
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 font-sans text-xs font-medium text-foreground">
+          <SquareTerminalIcon aria-hidden="true" size={14} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
+          <span className="shrink-0">{shellLabel}</span>
+          <span aria-hidden="true" className="shrink-0 font-normal text-muted-foreground">·</span>
+          <PathLabel text={cwd} className="min-w-0 font-normal text-muted-foreground" />
+        </span>
+        <div className="pointer-coarse:opacity-100 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-focus-within/code-block:opacity-100 group-hover/code-block:opacity-100">
           {status === "error" && (
-            <button type="button" onClick={() => setReconnectKey((key) => key + 1)} disabled={Boolean(tab.closing)} title={t("terminal.reconnect")} aria-label={t("terminal.reconnect")}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2" />
-              </svg>
-            </button>
+            <Button type="button" variant="ghost" size="icon-xs" className="text-(--terminal-muted) hover:bg-(--terminal-hover-bg) hover:text-(--terminal-strong)" onClick={() => setReconnectKey((key) => key + 1)} disabled={Boolean(tab.closing)} title={t("terminal.reconnect")} aria-label={t("terminal.reconnect")}>
+              <LinkIcon strokeWidth={1.8} />
+            </Button>
           )}
-          <button type="button" onClick={() => setTerminalTheme(nextTheme)} title={t(themeLabel)} aria-label={t(themeLabel)}>
+          <Button type="button" variant="ghost" size="icon-xs" className="text-(--terminal-muted) hover:bg-(--terminal-hover-bg) hover:text-(--terminal-strong)" onClick={() => setTerminalTheme(nextTheme)} title={t(themeLabel)} aria-label={t(themeLabel)}>
             {nextTheme === "light" ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-              </svg>
+              <SunIcon strokeWidth={1.8} />
             ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
+              <MoonIcon strokeWidth={1.8} />
             )}
-          </button>
-          <button type="button" onClick={onRestart} disabled={Boolean(tab.closing)} title={t("terminal.restart")} aria-label={t("terminal.restart")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M20 11a8 8 0 1 0-2.34 5.66" /><polyline points="20 4 20 11 13 11" />
-            </svg>
-          </button>
+          </Button>
+          <Button type="button" variant="ghost" size="icon-xs" className="text-(--terminal-muted) hover:bg-(--terminal-hover-bg) hover:text-(--terminal-strong)" onClick={onRestart} disabled={Boolean(tab.closing)} title={t("terminal.restart")} aria-label={t("terminal.restart")}>
+            <RotateCwIcon strokeWidth={1.8} />
+          </Button>
         </div>
       </header>
       <div>
-        {error && <div className="terminal-panel-error" role="alert">{error}</div>}
-        {status === "exited" && <div className="terminal-panel-exit" role="status">{exitCode === null ? t("terminal.exited") : t("terminal.exitCode", { code: exitCode })}</div>}
+        {error && <div role="alert" className="border-b bg-(--terminal-error-bg) px-3 py-[7px] font-mono text-xs text-(--terminal-error-text) border-(--terminal-error-border)">{error}</div>}
+        {status === "exited" && <div role="status" className="px-3 py-[7px] font-mono text-xs text-(--terminal-muted)">{exitCode === null ? t("terminal.exited") : t("terminal.exitCode", { code: exitCode })}</div>}
       </div>
-      <div className="terminal-xterm"><div ref={containerRef} className="terminal-xterm-host" /></div>
+      <div className="terminal-xterm min-h-0 min-w-0 overflow-hidden pt-2.5 pr-2 pb-[22px] pl-3 [grid-row:-2/-1]"><div ref={containerRef} className="terminal-xterm-host size-full" /></div>
       {showExtraKeys && <TerminalExtraKeys modifiers={modifiers} onKey={sendExtraKey} onToggleModifier={toggleModifier} />}
     </section>
   );

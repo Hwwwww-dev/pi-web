@@ -1,7 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { AtSign, WrapText } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PathLabel } from "./PathLabel";
 
 export interface FileToolbarMode<Mode extends string = string> {
@@ -24,20 +27,18 @@ export function FileMentionButton({ onClick, title, disabled }: { onClick: () =>
   const { t } = useI18n();
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="icon-xs"
       onPointerDown={(event) => event.preventDefault()}
       onClick={onClick}
       title={title}
       aria-label={t("files.mention")}
       disabled={disabled}
-      className="file-viewer-icon-button"
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="4" />
-        <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
-      </svg>
-    </button>
+      <AtSign strokeWidth={1.8} />
+    </Button>
   );
 }
 
@@ -69,82 +70,56 @@ export function FileToolbar<Mode extends string = string>({
   const { t } = useI18n();
 
   return (
-    <div
-      className="file-viewer-toolbar"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "5px 12px",
-        borderBottom: "1px solid var(--border)",
-        fontSize: 11,
-        color: "var(--text-dim)",
-        background: "var(--bg)",
-        flexShrink: 0,
-      }}
-    >
-      <PathLabel className="file-viewer-path" text={pathLabel} title={pathTitle ?? pathLabel} style={{ fontFamily: "var(--font-mono)" }} />
+    <div className="flex min-h-[35px] min-w-0 shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-[5px] text-xs text-muted-foreground max-[380px]:gap-1.5 max-[380px]:px-2">
+      <PathLabel className="min-w-12 flex-[1_1_auto] overflow-hidden font-mono" text={pathLabel} title={pathTitle ?? pathLabel} />
 
-      <span className="file-viewer-meta" title={metaTitle ?? meta}>{meta}</span>
+      <span className="min-w-0 truncate [flex:0_1_auto] max-[640px]:hidden" title={metaTitle ?? meta}>{meta}</span>
       {live !== undefined && (
         <span
           title={live ? t("i18n.liveSync") : t("i18n.notWatching")}
           aria-label={live ? t("i18n.liveSync") : t("i18n.notWatching")}
-          className="file-viewer-live-indicator"
-          style={{
-            background: live ? "#4ade80" : "var(--border)",
-            boxShadow: live ? "0 0 4px #4ade80" : "none",
-          }}
+          className={`size-[7px] shrink-0 rounded-full ${live ? "bg-success shadow-[0_0_4px_var(--color-success)]" : "bg-border"}`}
         />
       )}
 
-      <div className="file-viewer-controls">
+      <div className="flex shrink-0 items-center gap-1.5">
         {modes.length > 1 && activeMode !== undefined && onSelectMode && (
-          <div className="file-viewer-mode-switch" aria-label={t("i18n.fileViewMode")}>
-            {modes.map(({ mode, label, title }) => {
-              const active = activeMode === mode;
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => onSelectMode(mode)}
-                  title={title}
-                  aria-pressed={active}
-                  className="file-viewer-mode-button"
-                  style={{
-                    background: active ? "var(--bg-selected)" : "transparent",
-                    color: active ? "var(--text)" : "var(--text-muted)",
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            value={activeMode}
+            // Radix hands back "" when the active item is clicked again; keep the mode.
+            onValueChange={(value) => { if (value) onSelectMode(value as Mode); }}
+            aria-label={t("i18n.fileViewMode")}
+          >
+            {modes.map(({ mode, label, title }) => (
+              <ToggleGroupItem
+                key={mode}
+                value={mode}
+                title={title}
+                className="h-6 border-border px-2 text-xs font-medium max-[380px]:px-1.5"
+              >
+                {label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         )}
 
-        <div className="file-viewer-actions">
+        <div className="order-first flex h-6 shrink-0 items-center gap-1">
           {actions}
           {onToggleWrapLines && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="icon-xs"
               onClick={onToggleWrapLines}
               title={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
               aria-label={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
               aria-pressed={wrapLines}
-              className="file-viewer-icon-button"
-              style={{
-                background: wrapLines ? "var(--bg-selected)" : "transparent",
-                color: wrapLines ? "var(--text)" : "var(--text-muted)",
-              }}
+              className={wrapLines ? "bg-accent text-foreground" : undefined}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 6h18" />
-                <path d="M3 12h15a3 3 0 1 1 0 6h-4" />
-                <path d="m16 16-2 2 2 2" />
-                <path d="M3 18h7" />
-              </svg>
-            </button>
+              <WrapText strokeWidth={1.8} />
+            </Button>
           )}
         </div>
       </div>

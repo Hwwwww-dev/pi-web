@@ -2,6 +2,7 @@
 
 import { createContext, memo, useContext, useMemo, useState, type ComponentProps, type MouseEvent, type ReactNode } from "react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import { copyText } from "@/lib/clipboard";
 import { parseFileOpenOptions, resolveLocalFileHref, resolveLocalFilePath, shouldOpenLocalFileInApp } from "@/lib/file-links";
@@ -72,7 +73,8 @@ function MathDisplay({ source, children }: { source: string; children: ReactNode
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const copy = () => {
-    copyText(source).then(() => {
+    copyText(source).then((copied) => {
+      if (!copied) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
@@ -80,9 +82,16 @@ function MathDisplay({ source, children }: { source: string; children: ReactNode
   return (
     <div className="markdown-math-display">
       {children}
-      <button type="button" onClick={copy} className="markdown-code-action markdown-math-copy">
+      {/* `markdown-math-copy` is the hover-reveal positioning hook (app/globals.css). */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        onClick={copy}
+        className="markdown-math-copy"
+      >
         {copied ? t("i18n.copied") : t("i18n.copy")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -148,7 +157,8 @@ export const MarkdownBody = memo(function MarkdownBody({ children, className, is
           const openFile = () => onOpenFile(filePath, lineSuffix ? { line: lineSuffix.line } : undefined);
           return (
             <code
-              className="markdown-inline-code markdown-inline-file"
+              // Inline code that holds a filesystem path opens the file viewer.
+              className="markdown-inline-code cursor-pointer underline decoration-dotted decoration-muted-foreground underline-offset-2 hover:text-primary hover:decoration-primary"
               title={filePath}
               role="button"
               tabIndex={0}

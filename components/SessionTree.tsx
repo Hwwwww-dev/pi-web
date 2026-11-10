@@ -38,16 +38,20 @@ import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import type { SidebarMenuAnchor } from "./SidebarMenu";
 import {
   ArchiveIcon,
-  BranchIcon,
-  ChevronIcon,
+  GitBranchIcon,
+  ChevronRightIcon,
   FolderPlusIcon,
-  MoreIcon,
+  MoreHorizontalIcon,
   PinIcon,
   PlusIcon,
-  RestoreIcon,
-  SpinnerIcon,
-  TrashIcon,
-} from "./SidebarIcons";
+  ArchiveRestoreIcon,
+  Trash2Icon,
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * The sessions tab's tree: the pinned section, every project as a group of
@@ -149,6 +153,16 @@ const OVERSCAN_PX = 240;
 /** How often relative times ("5m") move on while nothing else re-renders. */
 const CLOCK_TICK_MS = 60_000;
 const DELETE_TITLE_MAX = 22;
+
+/**
+ * The rows' two alignment lines (docs/agents/sessions.md): the tree's 6px
+ * left inset, plus a header toggle's 5px chevron column, and the text column
+ * 20px in from the inset (26px), where project names, section labels,
+ * session titles, "show more" and the footer's labels all start. The inset
+ * vars live on the scroll box (app/sidebar.css, measured scrollbar room).
+ */
+const ROW_INSETS = "left-(--session-tree-inset-left) right-(--session-tree-inset-right)";
+const TEXT_COLUMN = "pl-[26px]";
 
 /**
  * A session's display title: its stored name, else its first message (an
@@ -407,13 +421,29 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
     : null;
 
   return (
-    <div ref={treeRef} className={`session-tree${layout === "mobile" ? " is-mobile" : ""}${ghostProject ? " is-group-dragging" : ""}`}>
-      {loading && <div className="session-tree-message">{t("sidebar.loading")}</div>}
-      {error && <div className="session-tree-message is-error">{error}</div>}
-      {showEmpty && <div className="session-tree-message">{emptyLabel}</div>}
+    <div ref={treeRef} className={`session-tree relative flex min-h-0 min-w-0 flex-1 flex-col${layout === "mobile" ? " is-mobile" : ""}${ghostProject ? " is-group-dragging" : ""}`}>
+      {loading && (
+        <div role="status" aria-label={t("sidebar.loading")} className="flex-none flex flex-col gap-2.5 p-4 px-3.5">
+          <Skeleton className="h-4 w-3/5" />
+          <Skeleton className="h-4 w-4/5" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
+      )}
+      {error && (
+        <Alert variant="destructive" className="session-tree-error flex-none border-0 bg-transparent px-3.5 py-3 text-xs">
+          <AlertDescription className="text-xs leading-normal text-destructive">{error}</AlertDescription>
+        </Alert>
+      )}
+      {showEmpty && (
+        <Empty className="session-tree-empty flex-none items-start gap-1 border-0 p-4 px-3.5 text-left md:p-4 md:px-3.5">
+          <EmptyHeader className="items-start text-left">
+            <EmptyDescription className="text-xs">{emptyLabel}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
       <div
         ref={scrollRef}
-        className="session-tree-scroll scrollbar-subtle"
+        className="session-tree-scroll scrollbar-subtle relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-1.5"
         onScroll={handleScroll}
         onFocus={handleFocus}
         onBlur={handleBlur}
@@ -421,7 +451,8 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
         onClickCapture={groupDrag.onClickCapture}
       >
         {!loading && (
-          <div ref={innerRef} className="session-tree-inner" style={{ height: offsets[rows.length] }}>
+          // Virtualized canvas height: the measured sum of all row offsets.
+          <div ref={innerRef} className="session-tree-inner relative" style={{ height: offsets[rows.length] }}>
             {visibleIndices.map((index) => {
               const row = rows[index];
               if (row.kind === "spacer") return null;
@@ -445,7 +476,7 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
                 );
               }
               if (row.kind === "archive-group") {
-                return <ArchiveGroupRowView key={row.key} row={row} top={top} height={height} menuOpen={menuOpen} handlers={handlersRef} />;
+                return <ArchiveGroupRowView key={row.key} row={row} layout={layout} top={top} height={height} menuOpen={menuOpen} handlers={handlersRef} />;
               }
               if (row.kind === "group") {
                 const renaming = row.project.key === renamingProjectKey;
@@ -453,6 +484,7 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
                   <GroupRowView
                     key={row.key}
                     row={row}
+                    layout={layout}
                     top={top}
                     height={height}
                     menuOpen={menuOpen}
@@ -468,19 +500,34 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
               return <PlainRowView key={row.key} row={row} top={top} height={height} handlers={handlersRef} onMoreAction={handleMoreAction} />;
             })}
             {dragSource && (
+              // Ghost highlight over the measured row band being dragged.
               <div
-                className="session-tree-drag-source"
+                className="session-tree-drag-source absolute pointer-events-none rounded-md bg-sidebar/55 left-(--session-tree-inset-left) right-(--session-tree-inset-right)"
                 aria-hidden="true"
                 style={{ top: dragSource.top, height: dragSource.bottom - dragSource.top }}
               />
             )}
-            {dropLineY !== null && <div className="session-tree-drop-line" aria-hidden="true" style={{ top: dropLineY }} />}
+            {/* Drop indicator between rows: the measured Y of the insertion point. */}
+            {dropLineY !== null && (
+              <div
+                className="session-tree-drop-line absolute -mt-px h-[2px] rounded-[1px] bg-accent left-(--session-tree-inset-left) right-(--session-tree-inset-right) before:absolute before:-top-0.5 before:left-0 before:size-1.5 before:rounded-full before:bg-accent before:content-['']"
+                aria-hidden="true"
+                style={{ top: dropLineY }}
+              />
+            )}
           </div>
         )}
       </div>
       {ghostProject && (
-        <div ref={ghostRef} className="session-tree-drag-ghost" aria-hidden="true">
-          <span className="session-tree-group-name">{ghostProject.name}</span>
+        // A one-line pill, shorter than a header, so it fits above or below
+        // the pointer and the drop line without covering either. Outside the
+        // scroll box (useGroupDrag places it by its measured height).
+        <div
+          ref={ghostRef}
+          className="session-tree-drag-ghost pointer-events-none absolute z-[2] flex h-[22px] max-w-[70%] min-w-0 items-center rounded-full border border-border bg-sidebar px-2.5 text-xs font-semibold whitespace-nowrap text-foreground opacity-90 shadow-sm"
+          aria-hidden="true"
+        >
+          <span className="session-tree-group-name min-w-0 truncate">{ghostProject.name}</span>
         </div>
       )}
     </div>
@@ -519,14 +566,36 @@ const SessionRowView = memo(function SessionRowView({
   const root = family.root;
   const title = sessionRowTitle(root);
   const nowDate = new Date(now);
+  const isMobile = layout === "mobile";
+  // Hover and selection are a rounded box inset from the sidebar's edges,
+  // never a full-width band: the rows end 6px in, or on the tree's classic
+  // scrollbar's gutter where that is further in (the scroll box's vars).
   const className = [
-    "session-tree-row session-tree-session",
-    status.selected ? "is-selected" : "",
+    "session-tree-row session-tree-session group/tree-row",
+    ROW_INSETS,
+    "flex min-w-0 items-center overflow-hidden rounded-md",
+    // A delete confirmation's row is not clickable, and its red frame stands
+    // alone (the selected row's accent bar yields to it).
+    confirming
+      ? "is-confirming cursor-default gap-1.5 bg-destructive/10 ring-1 ring-destructive/30 ring-inset"
+      : "cursor-pointer hover:bg-accent",
+    // A family's child (in its group, or the archive) sits a step lower and
+    // deeper than a pinned row, under its group's name.
+    context === "pinned" ? "pl-5" : "is-child pl-8",
+    "pr-1",
+    status.selected ? "is-selected bg-accent" : "",
     status.running ? "is-running" : "",
     context === "archive" ? "is-archived" : "",
     menuOpen ? "is-menu-open" : "",
-    confirming ? "is-confirming" : "",
     renaming ? "is-renaming" : "",
+    // The selected row's mark: a 3px accent bar on the box's left edge,
+    // before the chevron column, inset from the row's rounded corners (7px
+    // of a 34px row, 12px of a phone's 40px).
+    status.selected && !confirming
+      ? isMobile
+        ? "before:absolute before:bottom-3 before:left-0 before:top-3 before:w-[3px] before:rounded-r-[2px] before:bg-accent before:content-['']"
+        : "before:absolute before:bottom-[7px] before:left-0 before:top-[7px] before:w-[3px] before:rounded-r-[2px] before:bg-accent before:content-['']"
+      : "",
   ].filter(Boolean).join(" ");
 
   if (confirming) {
@@ -566,6 +635,7 @@ const SessionRowView = memo(function SessionRowView({
         <RenameInput
           initialValue={title}
           label={t("sidebar.rename")}
+          mobile={isMobile}
           onCommit={(value) => handlers.current.onRenameCommit(family, value)}
           onCancel={() => handlers.current.onRenameCancel()}
         />
@@ -586,25 +656,38 @@ const SessionRowView = memo(function SessionRowView({
   // time: an old session archived today read as "just now" (#1351).
   // Nothing sits before the title, so it gets the room.
   let meta: ReactNode;
-  let metaState = "";
   let metaTitle: string | undefined;
   if (status.awaiting) {
     // The run is parked on a dialog only the user can answer: the same slot as
-    // the spinner, in the unread dot's shape, in warning amber. The tooltip says
-    // which of the two it is, since the row keeps its running actions.
+    // the spinner, in the unread dot's shape, in warning amber (the rule lives
+    // in app/sidebar.css: the Debug panel renders the same span outside the
+    // tree). The tooltip says which of the two it is, since the row keeps its
+    // running actions.
     meta = <span className="session-tree-awaiting" role="img" aria-label={t("sidebar.agentAwaitingInput")} />;
-    metaState = " is-awaiting";
     metaTitle = t("sidebar.agentAwaitingInput");
   } else if (status.running) {
-    meta = <SpinnerIcon size={12} label={t("sidebar.agentRunning")} />;
-    metaState = " is-running";
+    // The draft's green breathing dot in the time's slot, the same ring
+    // pattern as unread.
+    meta = (
+      <span
+        className="relative size-1.5 shrink-0 rounded-full bg-success after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-success after:opacity-35 motion-reduce:after:animate-none"
+        role="img"
+        aria-label={t("sidebar.agentRunning")}
+        aria-hidden={false}
+      />
+    );
     metaTitle = t("sidebar.agentRunning");
   } else if (status.unread) {
-    meta = <span className="session-tree-unread" role="img" aria-label={t("sidebar.newSessionActivity")} />;
-    metaState = " is-unread";
+    meta = (
+      <span
+        className="relative size-1.5 shrink-0 rounded-full bg-accent after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-accent after:opacity-35 motion-reduce:after:animate-none"
+        role="img"
+        aria-label={t("sidebar.newSessionActivity")}
+      />
+    );
     metaTitle = t("sidebar.newActivity");
   } else if (context === "pinned") {
-    meta = <span className="session-tree-project">{row.project.name}</span>;
+    meta = <span className="inline-block max-w-[70px] truncate align-bottom">{row.project.name}</span>;
   } else {
     meta = formatShortRelativeTime(family.latestModified, locale, nowDate);
   }
@@ -612,24 +695,61 @@ const SessionRowView = memo(function SessionRowView({
   // Archive (or restore) one click away: desktop only, never for a running
   // family, which would come straight back.
   const quickAction = layout === "desktop" && (context === "archive" || !status.running);
+  // The actions take the time's place while they show (a phone keeps both;
+  // the running row keeps its dot beside ⋯), and the keyboard brings them
+  // up with :focus-visible on anything in the row.
+  const actionVisibility = isMobile
+    ? "flex"
+    : "hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex";
+  const moreVisibility = isMobile || menuOpen || status.selected
+    ? "flex"
+    : // Touch screens wider than a phone have no hover: keep ⋯ reachable.
+      "hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex [@media(hover:none)]:flex";
+  const metaVisibility = isMobile || status.running
+    ? ""
+    : "group-hover/tree-row:hidden group-has-[:focus-visible]/tree-row:hidden";
+
+  const titleClass = [
+    "session-tree-title min-w-0 flex-1 truncate",
+    "text-foreground",
+    // Titles are the content: the item's 13px, a family's child a step
+    // smaller (12.5px) and deeper.
+    context === "pinned" ? "text-[13px]" : "text-[12.5px]",
+    // The selected one a little heavier.
+    status.selected ? "font-medium" : "",
+    context === "archive" ? "text-muted-foreground" : "",
+  ].filter(Boolean).join(" ");
 
   const mainContent = (
     <>
       {forkTitle ? (
-        <span className="session-tree-title has-fork-suffix">
-          <span className="session-tree-title-base">{forkTitle.base}</span>
-          <span className="session-tree-title-suffix">{forkTitle.suffix}</span>
+        // A Fork's copy: the ellipsis cuts its title before the suffix that
+        // tells it from its source ("… · 3f9a"), never the suffix.
+        <span className={`${titleClass} has-fork-suffix flex`}>
+          <span className="min-w-0 truncate">{forkTitle.base}</span>
+          <span className="shrink-0 whitespace-pre">{forkTitle.suffix}</span>
         </span>
       ) : (
-        <span className="session-tree-title">{title}</span>
+        <span className={titleClass}>{title}</span>
       )}
       {branch && (
-        <span className="session-tree-branch">
-          <BranchIcon size={10} className="session-tree-branch-icon" />
-          {branch}
+        // A worktree's branch: icon only — the name crowded the row and the
+        // title's ellipsis; the tooltip (and title=) carries the branch name.
+        <span
+          className="shrink-0 text-muted-foreground"
+          title={branch}
+          role="img"
+          aria-label={t("sidebar.worktreeBranch", { branch })}
+        >
+          <GitBranchIcon size={10} className="inline-block -translate-y-px" />
         </span>
       )}
-      <span className={`session-tree-meta${metaState}`} title={metaTitle}>{meta}</span>
+      <span
+        className={`flex min-w-[26px] shrink-0 items-center justify-end text-right text-[11px] tabular-nums text-muted-foreground whitespace-nowrap${status.running ? " text-accent" : ""}${metaVisibility ? ` ${metaVisibility}` : ""}`}
+        title={metaTitle}
+      >
+        {meta}
+      </span>
     </>
   );
 
@@ -643,16 +763,22 @@ const SessionRowView = memo(function SessionRowView({
     >
       {status.transient ? (
         // No file yet: a link would open a session no other tab can load.
-        <button type="button" className="session-tree-main" title={tooltip} aria-current={status.selected ? "true" : undefined}>
+        <Button
+          type="button"
+          variant="ghost"
+          className="session-tree-main h-full min-w-0 grow basis-0 justify-start gap-1.5 rounded-md p-0 text-left font-normal hover:bg-transparent hover:text-inherit dark:hover:bg-transparent"
+          title={tooltip}
+          aria-current={status.selected ? "true" : undefined}
+        >
           {mainContent}
-        </button>
+        </Button>
       ) : (
         // A real link, so middle-click, Ctrl/Cmd-click and the browser's own
         // gestures open the session in another tab. A plain click (or Enter)
         // stays here and selects it as before; never `target`, which would
-        // send plain clicks away too.
+        // send plain clicks away too. It looks exactly like the button above.
         <a
-          className="session-tree-main"
+          className="session-tree-main flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md text-left no-underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           href={sessionDeepLink(root.id)}
           title={tooltip}
           aria-current={status.selected ? "true" : undefined}
@@ -668,11 +794,13 @@ const SessionRowView = memo(function SessionRowView({
         </a>
       )}
       {!status.transient && (
-        <span className="session-tree-actions">
+        <span className="session-tree-actions flex shrink-0 items-center">
           {quickAction && (context === "archive" ? (
-            <button
+            <Button
               type="button"
-              className="session-tree-action session-tree-quick-action"
+              variant="ghost"
+              size="icon-xs"
+              className={`session-tree-action session-tree-quick-action ml-0.5 ${actionVisibility}${isMobile ? " size-8" : ""}`}
               aria-label={t("sidebar.restore")}
               title={t("sidebar.restore")}
               onClick={(event) => {
@@ -680,12 +808,14 @@ const SessionRowView = memo(function SessionRowView({
                 handlers.current.onRestoreFamily(family);
               }}
             >
-              <RestoreIcon size={13} />
-            </button>
+              <ArchiveRestoreIcon size={13} className="size-[13px]" />
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
-              className="session-tree-action session-tree-quick-action"
+              variant="ghost"
+              size="icon-xs"
+              className={`session-tree-action session-tree-quick-action ml-0.5 ${actionVisibility}${isMobile ? " size-8" : ""}`}
               aria-label={t("sidebar.archive")}
               title={t("sidebar.archive")}
               onClick={(event) => {
@@ -693,12 +823,14 @@ const SessionRowView = memo(function SessionRowView({
                 handlers.current.onArchiveFamily(family);
               }}
             >
-              <ArchiveIcon size={13} />
-            </button>
+              <ArchiveIcon size={13} className="size-[13px]" />
+            </Button>
           ))}
-          <button
+          <Button
             type="button"
-            className={`session-tree-action session-tree-more-action${menuOpen ? " is-active" : ""}`}
+            variant="ghost"
+            size="icon-xs"
+            className={`session-tree-action session-tree-more-action ml-0.5 ${moreVisibility}${isMobile ? " size-8" : ""}${menuOpen ? " is-active bg-accent text-accent-foreground" : ""}`}
             aria-label={t("sidebar.moreActions")}
             title={t("sidebar.moreActions")}
             aria-haspopup="menu"
@@ -709,8 +841,8 @@ const SessionRowView = memo(function SessionRowView({
               handlers.current.onOpenRowMenu(row, anchorOf(button), button);
             }}
           >
-            <MoreIcon size={14} />
-          </button>
+            <MoreHorizontalIcon size={14} className="size-3.5" />
+          </Button>
         </span>
       )}
     </div>
@@ -721,12 +853,15 @@ function RenameInput({
   initialValue,
   label,
   maxLength,
+  mobile,
   onCommit,
   onCancel,
 }: {
   initialValue: string;
   label: string;
   maxLength?: number;
+  /** The phone's field is a step taller (its inputs are forced to 16px there). */
+  mobile?: boolean;
   onCommit: (value: string) => void;
   onCancel: () => void;
 }) {
@@ -750,9 +885,9 @@ function RenameInput({
   };
 
   return (
-    <input
+    <Input
       ref={inputRef}
-      className="session-tree-rename"
+      className={`session-tree-rename min-w-0 flex-1${mobile ? " h-8" : " h-7"} rounded-md border-accent bg-background px-2 text-xs md:text-xs [user-select:text] [-webkit-user-select:text]`}
       value={value}
       aria-label={label}
       maxLength={maxLength}
@@ -800,57 +935,59 @@ export function DeleteConfirm({
 
   return (
     <>
-      <span className="session-tree-confirm-text">{label}</span>
-      <button type="button" className="session-tree-confirm-delete" onClick={onConfirm}>
-        <TrashIcon size={12} />
+      <span className="session-tree-confirm-text min-w-0 flex-1 truncate text-xs text-foreground">{label}</span>
+      <Button type="button" variant="destructive" size="xs" className="session-tree-confirm-delete shrink-0" onClick={onConfirm}>
+        <Trash2Icon size={12} className="size-3" />
         {deleteLabel}
-      </button>
-      <button ref={cancelRef} type="button" className="session-tree-confirm-cancel" onClick={onCancel}>
+      </Button>
+      <Button ref={cancelRef} type="button" variant="outline" size="xs" className="session-tree-confirm-cancel shrink-0 shadow-none" onClick={onCancel}>
         {cancelLabel}
-      </button>
+      </Button>
     </>
   );
 }
 
 /**
- * Spinner + count, amber dot + count (awaiting input) and dot + count; the
+ * Running dot + count, amber dot + count (awaiting input) and dot + count; the
  * label carries the count for screen readers. Also a project's badge in the
- * project menus (ProjectWorktreePicker), which counts no awaiting.
+ * project menus (ProjectWorktreePicker), which counts no awaiting. `className`
+ * adds where it shows: a folded group header's hides it while the header's
+ * actions show (a phone keeps both).
  */
-export function ActivitySummary({ running, awaiting = 0, unread, t }: { running: number; awaiting?: number; unread: number; t: (key: string) => string }) {
+export function ActivitySummary({ running, awaiting = 0, unread, className, t }: { running: number; awaiting?: number; unread: number; className?: string; t: (key: string) => string }) {
   if (running === 0 && awaiting === 0 && unread === 0) return null;
   return (
-    <span className="session-tree-summary">
+    <span className={`session-tree-summary ml-auto flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground${className ? ` ${className}` : ""}`}>
       {running > 0 && (
         <span
-          className="session-tree-summary-running"
+          className="session-tree-summary-running inline-flex items-center gap-[3px]"
           role="img"
           title={t("sidebar.agentRunning")}
           aria-label={`${t("sidebar.agentRunning")} (${running})`}
         >
-          <SpinnerIcon size={10} />
+          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-success" />
           {running}
         </span>
       )}
       {awaiting > 0 && (
         <span
-          className="session-tree-summary-awaiting"
+          className="session-tree-summary-awaiting inline-flex items-center gap-[3px]"
           role="img"
           title={t("sidebar.agentAwaitingInput")}
           aria-label={`${t("sidebar.agentAwaitingInput")} (${awaiting})`}
         >
-          <span className="session-tree-summary-dot is-awaiting" />
+          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-warning" />
           {awaiting}
         </span>
       )}
       {unread > 0 && (
         <span
-          className="session-tree-summary-unread"
+          className="session-tree-summary-unread inline-flex items-center gap-[3px]"
           role="img"
           title={t("sidebar.newSessionActivity")}
           aria-label={`${t("sidebar.newSessionActivity")} (${unread})`}
         >
-          <span className="session-tree-summary-dot" />
+          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-accent" />
           {unread}
         </span>
       )}
@@ -860,6 +997,7 @@ export function ActivitySummary({ running, awaiting = 0, unread, t }: { running:
 
 const GroupRowView = memo(function GroupRowView({
   row,
+  layout,
   top,
   height,
   menuOpen,
@@ -870,6 +1008,7 @@ const GroupRowView = memo(function GroupRowView({
   handlers,
 }: {
   row: Extract<SidebarRow, { kind: "group" }>;
+  layout: SidebarLayout;
   top: number;
   height: number;
   /** The group's ⋯ menu is open. */
@@ -886,11 +1025,22 @@ const GroupRowView = memo(function GroupRowView({
   const { t } = useI18n();
   const { project, expanded } = row;
   const rowRef = useRef<HTMLDivElement>(null);
+  const isMobile = layout === "mobile";
+  // A section header over its rows, not one more row: the same inset box as
+  // the session rows, "+"/⋯ replacing the folded summary on hover. It can be
+  // dragged (hooks/useGroupDrag.ts): a long-press on a phone must not select
+  // its text or open the iOS callout. touch-action stays as it is, so a
+  // swipe that starts on a header still scrolls the list.
   const className = [
-    "session-tree-row session-tree-group",
+    "session-tree-row session-tree-group group/tree-row",
+    ROW_INSETS,
+    "flex min-w-0 select-none items-center gap-0.5 rounded-md pr-1 [-webkit-touch-callout:none] hover:bg-accent",
     project.current ? "is-current" : "",
     menuOpen ? "is-active" : "",
-    dragPhase === "armed" ? "is-drag-armed" : "",
+    // Picked up by a long-press, before the finger moves.
+    dragPhase === "armed" ? "is-drag-armed bg-accent shadow-sm" : "",
+    // The project's name field (its menu's Rename…) in place of the header.
+    renaming ? "is-renaming pl-1" : "",
   ].filter(Boolean).join(" ");
 
   // Once a long-press has picked the group up, the finger's moves must not
@@ -910,11 +1060,12 @@ const GroupRowView = memo(function GroupRowView({
   // code points: whatever fits the field, the server takes.
   if (renaming) {
     return (
-      <div ref={rowRef} className={`${className} is-renaming`} style={rowStyle(top, height)} data-row-key={row.key}>
+      <div ref={rowRef} className={className} style={rowStyle(top, height)} data-row-key={row.key}>
         <RenameInput
           initialValue={project.name}
           label={t("sidebar.projectName")}
           maxLength={MAX_PROJECT_NAME_LENGTH}
+          mobile={isMobile}
           onCommit={(value) => handlers.current.onRenameProjectCommit(project, value)}
           onCancel={() => handlers.current.onRenameProjectCancel()}
         />
@@ -930,9 +1081,10 @@ const GroupRowView = memo(function GroupRowView({
       data-row-key={row.key}
       onPointerDown={canDrag ? (event) => drag.onPointerDown(event, project.key) : undefined}
     >
-      <button
+      <Button
         type="button"
-        className="session-tree-group-toggle"
+        variant="ghost"
+        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-0 text-left text-[13px] font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
         aria-expanded={expanded}
         title={project.root}
         onClick={(event) => handlers.current.onToggleGroup(project.key, event.altKey)}
@@ -940,15 +1092,25 @@ const GroupRowView = memo(function GroupRowView({
         {/* A section header, not one more row: the chevron leads in a
             column of its own, so the name starts where the session titles
             below it do and every header's chevron lines up. */}
-        <ChevronIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
-        <span className="session-tree-group-name">{project.name}</span>
-        {project.pinned && <PinIcon size={10} className="session-tree-group-pin" label={t("sidebar.pinnedProject")} />}
-        {!expanded && <ActivitySummary running={row.running} awaiting={row.awaiting} unread={row.unread} t={t} />}
-      </button>
-      <span className="session-tree-group-actions">
-        <button
+        <ChevronRightIcon size={12} strokeWidth={3} className={`size-3 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${expanded ? " rotate-90" : ""}`} />
+        <span className="session-tree-group-name min-w-0 truncate">{project.name}</span>
+        {project.pinned && <PinIcon size={10} className="ml-0.5 size-2.5 shrink-0 text-muted-foreground" role="img" aria-label={t("sidebar.pinnedProject")} aria-hidden={false} />}
+        {!expanded && (
+          <ActivitySummary
+            running={row.running}
+            awaiting={row.awaiting}
+            unread={row.unread}
+            className={isMobile ? "" : "group-hover/tree-row:hidden group-has-[:focus-visible]/tree-row:hidden"}
+            t={t}
+          />
+        )}
+      </Button>
+      <span className={`session-tree-group-actions flex flex-none items-center gap-0.5${isMobile ? "" : " hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex"}`}>
+        <Button
           type="button"
-          className="session-tree-group-action"
+          variant="ghost"
+          size="icon-xs"
+          className={`session-tree-group-action cursor-pointer${isMobile ? " size-8" : " size-6"}`}
           aria-label={t("sidebar.newSessionInProject", { name: project.name })}
           title={t("sidebar.newSessionInProject", { name: project.name })}
           onClick={(event) => {
@@ -956,11 +1118,13 @@ const GroupRowView = memo(function GroupRowView({
             handlers.current.onGroupNew(project);
           }}
         >
-          <PlusIcon size={13} />
-        </button>
-        <button
+          <PlusIcon size={13} className="size-[13px]" />
+        </Button>
+        <Button
           type="button"
-          className={`session-tree-group-action${menuOpen ? " is-active" : ""}`}
+          variant="ghost"
+          size="icon-xs"
+          className={`session-tree-group-action cursor-pointer${isMobile ? " size-8" : " size-6"}${menuOpen ? " is-active bg-accent text-accent-foreground" : ""}`}
           aria-label={t("sidebar.projectActions", { name: project.name })}
           title={t("sidebar.projectActions", { name: project.name })}
           aria-haspopup="menu"
@@ -970,8 +1134,8 @@ const GroupRowView = memo(function GroupRowView({
             handlers.current.onGroupMenu(project, event.currentTarget);
           }}
         >
-          <MoreIcon size={13} />
-        </button>
+          <MoreHorizontalIcon size={13} className="size-[13px]" />
+        </Button>
       </span>
     </div>
   );
@@ -996,20 +1160,23 @@ const PlainRowView = memo(function PlainRowView({
 
   switch (row.kind) {
     case "pinned-header":
+      // A section label, not a project: its chevron in the groups' chevron
+      // column, the label where the session titles start, small capitals.
       return (
-        <div className="session-tree-row session-tree-pinned-header" style={style} data-row-key={row.key}>
-          <button
+        <div className="session-tree-row session-tree-pinned-header left-0 right-0 flex min-w-0 items-stretch" style={style} data-row-key={row.key}>
+          <Button
             type="button"
-            className="session-tree-pinned-toggle"
+            variant="ghost"
+            className="session-tree-pinned-toggle h-auto min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[11px] pr-2 text-left text-[11px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
             aria-expanded={!row.collapsed}
             onClick={() => handlers.current.onTogglePinned()}
           >
-            <ChevronIcon size={12} strokeWidth={3} className={`session-tree-chevron${row.collapsed ? "" : " is-open"}`} />
-            <span className="session-tree-pinned-label">{t("sidebar.pinned")}</span>
-            <span className="session-tree-pinned-count">· {row.count}</span>
+            <ChevronRightIcon size={12} strokeWidth={3} className={`size-3 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${row.collapsed ? "" : " rotate-90"}`} />
+            <span className="session-tree-pinned-label min-w-0 truncate font-semibold tracking-[0.05em] uppercase">{t("sidebar.pinned")}</span>
+            <span className="session-tree-pinned-count font-normal text-muted-foreground">· {row.count}</span>
             {row.collapsed && row.running > 0 && (
               <span
-                className="session-tree-pinned-dot is-running"
+                className="session-tree-pinned-dot is-running ml-0.5 size-1.5 shrink-0 rounded-full bg-success"
                 role="img"
                 title={t("sidebar.agentRunning")}
                 aria-label={`${t("sidebar.agentRunning")} (${row.running})`}
@@ -1017,7 +1184,7 @@ const PlainRowView = memo(function PlainRowView({
             )}
             {row.collapsed && row.awaiting > 0 && (
               <span
-                className="session-tree-pinned-dot is-awaiting"
+                className="session-tree-pinned-dot is-awaiting ml-0.5 size-1.5 shrink-0 rounded-full bg-warning"
                 role="img"
                 title={t("sidebar.agentAwaitingInput")}
                 aria-label={`${t("sidebar.agentAwaitingInput")} (${row.awaiting})`}
@@ -1025,79 +1192,100 @@ const PlainRowView = memo(function PlainRowView({
             )}
             {row.collapsed && row.unread > 0 && (
               <span
-                className="session-tree-pinned-dot is-unread"
+                className="session-tree-pinned-dot is-unread ml-0.5 size-1.5 shrink-0 rounded-full bg-accent"
                 role="img"
                 title={t("sidebar.newSessionActivity")}
                 aria-label={`${t("sidebar.newSessionActivity")} (${row.unread})`}
               />
             )}
-          </button>
+          </Button>
         </div>
       );
     case "pinned-more":
     case "group-more": {
       const moreKey = row.kind === "pinned-more" ? PINNED_MORE_KEY : row.projectKey;
+      // "Show more · N" and, once more is shown, "Show less" side by side. A
+      // lone button takes the whole row; on a narrow sidebar "show more"
+      // gives way so "Show less" is never clipped.
+      const lone = (row.hidden > 0 ? 1 : 0) + (row.canShowLess ? 1 : 0) === 1;
+      const toggleClass = (loneButton: boolean, marginLeft = false) => [
+        "session-tree-more-toggle h-full min-w-0 truncate rounded-md bg-transparent px-0 py-0 text-left text-[11px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground",
+        loneButton ? "flex-1" : "shrink",
+        marginLeft ? "ml-[14px]" : "",
+      ].filter(Boolean).join(" ");
       return (
-        <div className="session-tree-row session-tree-more" style={style} data-row-key={row.key}>
+        <div className={`session-tree-row session-tree-more left-0 right-0 flex min-w-0 items-center ${TEXT_COLUMN} pr-1`} style={style} data-row-key={row.key}>
           {row.hidden > 0 && (
-            <button
+            <Button
               type="button"
-              className="session-tree-more-toggle"
+              variant="ghost"
+              className={toggleClass(lone)}
               data-more-action="more"
               onClick={(event) => onMoreAction(row.key, moreKey, "more", event.currentTarget)}
             >
               {t("sidebar.showMore", { count: row.hidden })}
-            </button>
+            </Button>
           )}
           {row.canShowLess && (
-            <button
+            <Button
               type="button"
-              className="session-tree-more-toggle"
+              variant="ghost"
+              className={toggleClass(lone || row.hidden === 0, row.hidden > 0)}
               data-more-action="less"
               onClick={(event) => onMoreAction(row.key, moreKey, "less", event.currentTarget)}
             >
               {t("sidebar.showLess")}
-            </button>
+            </Button>
           )}
         </div>
       );
     }
     case "group-empty":
+      // "No sessions yet" and an unpinned group's "Pin to keep" side by side.
       return (
-        <div className="session-tree-row session-tree-group-empty" style={style} data-row-key={row.key}>
-          <span className="session-tree-group-empty-label">{t("sidebar.noLiveSessions")}</span>
+        <div className={`session-tree-row session-tree-group-empty left-0 right-0 flex min-w-0 items-center ${TEXT_COLUMN} pr-1`} style={style} data-row-key={row.key}>
+          <span className="session-tree-group-empty-label min-w-0 flex-[0_1_auto] truncate text-[11px] text-muted-foreground">{t("sidebar.noLiveSessions")}</span>
           {!row.project.pinned && (
-            <button
+            <Button
               type="button"
-              className="session-tree-more-toggle"
+              variant="ghost"
+              className="session-tree-more-toggle ml-[14px] h-full min-w-0 flex-none truncate rounded-md bg-transparent px-0 py-0 text-left text-[11px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
               onClick={() => handlers.current.onPinEmptyGroup(row.project)}
             >
               {t("sidebar.pinToKeep")}
-            </button>
+            </Button>
           )}
         </div>
       );
     case "footer-open":
+      // Footer links: open another project, the archive. Their 12px icons in
+      // the chevron column, their labels in the text column.
       return (
-        <div className="session-tree-row session-tree-footer" style={style} data-row-key={row.key}>
-          <button
+        <div className={`session-tree-row session-tree-footer flex min-w-0 items-stretch ${ROW_INSETS}`} style={style} data-row-key={row.key}>
+          <Button
             type="button"
-            className="session-tree-footer-button"
+            variant="ghost"
+            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-1 text-left text-[12px] text-muted-foreground hover:bg-accent hover:text-muted-foreground"
             onClick={(event) => handlers.current.onOpenOtherProject(event.currentTarget)}
           >
-            <FolderPlusIcon size={12} />
-            <span className="session-tree-footer-label">{t("sidebar.openOtherProject")}</span>
-          </button>
+            <FolderPlusIcon size={12} className="size-3 shrink-0" />
+            <span className="session-tree-footer-label min-w-0 flex-1 truncate whitespace-nowrap">{t("sidebar.openOtherProject")}</span>
+          </Button>
         </div>
       );
     case "footer-archived":
       return (
-        <div className="session-tree-row session-tree-footer" style={style} data-row-key={row.key}>
-          <button type="button" className="session-tree-footer-button" onClick={() => handlers.current.onOpenArchive()}>
-            <ArchiveIcon size={12} />
-            <span className="session-tree-footer-label">{t("sidebar.archivedCount", { count: row.count })}</span>
-            <ChevronIcon size={10} className="session-tree-footer-chevron" />
-          </button>
+        <div className={`session-tree-row session-tree-footer flex min-w-0 items-stretch ${ROW_INSETS}`} style={style} data-row-key={row.key}>
+          <Button
+            type="button"
+            variant="ghost"
+            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-1 text-left text-[12px] text-muted-foreground hover:bg-accent hover:text-muted-foreground"
+            onClick={() => handlers.current.onOpenArchive()}
+          >
+            <ArchiveIcon size={12} className="size-3 shrink-0" />
+            <span className="session-tree-footer-label min-w-0 flex-1 truncate whitespace-nowrap">{t("sidebar.archivedCount", { count: row.count })}</span>
+            <ChevronRightIcon size={10} className="session-tree-footer-chevron size-2.5 shrink-0" />
+          </Button>
         </div>
       );
   }
@@ -1110,12 +1298,14 @@ const PlainRowView = memo(function PlainRowView({
  */
 const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
   row,
+  layout,
   top,
   height,
   menuOpen,
   handlers,
 }: {
   row: Extract<SidebarRow, { kind: "archive-group" }>;
+  layout: SidebarLayout;
   top: number;
   height: number;
   menuOpen: boolean;
@@ -1124,27 +1314,32 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
   const { t } = useI18n();
   const { project, expanded } = row;
   const className = [
-    "session-tree-row session-tree-group session-tree-archive-group",
+    "session-tree-row session-tree-group session-tree-archive-group group/tree-row",
+    ROW_INSETS,
+    "flex min-w-0 select-none items-center gap-0.5 rounded-md pr-1 [-webkit-touch-callout:none] hover:bg-accent",
     project.current ? "is-current" : "",
     menuOpen ? "is-active" : "",
   ].filter(Boolean).join(" ");
   return (
     <div className={className} style={rowStyle(top, height)} data-row-key={row.key}>
-      <button
+      <Button
         type="button"
-        className="session-tree-group-toggle"
+        variant="ghost"
+        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-0 text-left text-[13px] font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
         aria-expanded={expanded}
         title={project.root}
         onClick={(event) => handlers.current.onToggleArchiveGroup?.(project.key, event.altKey)}
       >
-        <ChevronIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
-        <span className="session-tree-group-name">{project.name}</span>
-        <span className="session-tree-archive-group-count">· {row.count}</span>
-      </button>
-      <span className="session-tree-group-actions">
-        <button
+        <ChevronRightIcon size={12} strokeWidth={3} className={`size-3 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${expanded ? " rotate-90" : ""}`} />
+        <span className="session-tree-group-name min-w-0 truncate">{project.name}</span>
+        <span className="session-tree-archive-group-count ml-0.5 shrink-0 font-normal text-muted-foreground">· {row.count}</span>
+      </Button>
+      <span className={`session-tree-group-actions flex flex-none items-center gap-0.5${layout === "mobile" ? "" : " hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex"}`}>
+        <Button
           type="button"
-          className={`session-tree-group-action${menuOpen ? " is-active" : ""}`}
+          variant="ghost"
+          size="icon-xs"
+          className={`session-tree-group-action cursor-pointer${layout === "mobile" ? " size-8" : " size-6"}${menuOpen ? " is-active bg-accent text-accent-foreground" : ""}`}
           aria-label={t("sidebar.archivedProjectActions", { name: project.name })}
           title={t("sidebar.archivedProjectActions", { name: project.name })}
           aria-haspopup="menu"
@@ -1154,8 +1349,8 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
             handlers.current.onArchiveGroupMenu?.(project, event.currentTarget);
           }}
         >
-          <MoreIcon size={13} />
-        </button>
+          <MoreHorizontalIcon size={13} className="size-[13px]" />
+        </Button>
       </span>
     </div>
   );

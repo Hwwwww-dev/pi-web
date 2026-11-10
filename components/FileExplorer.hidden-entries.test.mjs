@@ -43,7 +43,7 @@ const file = (name, extra = {}) => ({
 test("an entry Git ignores is dimmed and says why", () => {
   const html = renderNode(file("debug.log", { hidden: "ignored" }));
   assert.match(html, /data-hidden-reason="ignored"/);
-  assert.match(html, /opacity:0\.55/);
+  assert.match(html, /opacity-55/);
   assert.match(html, /title="\/repo\/debug\.log\nIgnored by Git"/);
 });
 

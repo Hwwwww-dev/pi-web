@@ -1,11 +1,26 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { createJiti } from "jiti";
 import ts from "typescript";
 import vm from "node:vm";
 
-const jiti = createJiti(import.meta.url, { jsx: { runtime: "automatic" }, tsconfigPaths: true });
+// The files-below layout's markup (the desktop setting's one choice),
+// rendered: the hook is aliased to a fixture that answers "below", so these
+// tests keep their meaning whatever the default is (the tabs layout is
+// SessionSidebar.tabs.test.mjs's). The alias takes the module's absolute
+// path without its extension, in the form jiti compares it with (#1211).
+const placementHook = fileURLToPath(new URL("../hooks/useFilesPlacement", import.meta.url))
+  .replaceAll("\\", "/")
+  .replace(/^[a-z]:/, (drive) => drive.toUpperCase());
+const jiti = createJiti(import.meta.url, {
+  jsx: { runtime: "automatic" },
+  tsconfigPaths: true,
+  alias: {
+    [placementHook]: fileURLToPath(new URL("./__fixtures__/files-placement-below.mjs", import.meta.url)),
+  },
+});
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
@@ -20,6 +35,7 @@ const searchSource = await readFile(new URL("./SessionSearch.tsx", import.meta.u
 const globalStyles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const sidebarStyles = await readFile(new URL("../app/sidebar.css", import.meta.url), "utf8");
 const explorerSource = await readFile(new URL("./FileExplorer.tsx", import.meta.url), "utf8");
+const pickerSource = await readFile(new URL("./ProjectWorktreePicker.tsx", import.meta.url), "utf8");
 
 const h = React.createElement;
 const noop = () => {};
@@ -123,21 +139,27 @@ test("only Shift skips the session deletion confirmation", () => {
   );
 });
 
-test("on a desktop the files sit below the sessions by default, both in view", () => {
-  // The server renders the default placement on a desktop (useFilesPlacement
-  // and useIsMobile's server snapshots): the stacked layout.
+test("with the files below the sessions, both are in view under the track", () => {
+  // The fixture pins the below placement (the desktop setting's one choice;
+  // useIsMobile's server snapshot is a desktop): the stacked layout.
   const html = render({ selectedCwd: "/work/alpha", onOpenTerminal: noop });
-  assert.match(html, /^<div class="session-sidebar is-files-below" style="--sidebar-files-height:320px">/);
-  // No tabs: the brand (its name says the versions a click shows), then New
-  // and the sessions' search. No view options.
-  assert.match(html, /<div class="sidebar-header"><button type="button" class="sidebar-brand" aria-label="Pi Web, versions: web [^",]+, pi [^",]+">Pi Web<\/button><span class="sidebar-header-spacer"><\/span><button type="button" class="sidebar-new-button"/);
-  assert.doesNotMatch(html, /role="tablist"|role="tab"|role="tabpanel"|View options|sidebar-title/);
-  assert.match(html, /<span class="sidebar-new-label">New<\/span><\/button><button type="button" title="Search conversations" aria-label="Search conversations" aria-expanded="false" aria-controls="session-search-input" class="sidebar-search-toggle">/);
-  // Two regions, both shown: the sessions, the separator, the files.
+  assert.match(html, /^<div class="session-sidebar[^"]*is-files-below[^"]*" style="--sidebar-files-height:320px">/);
+  // The brand row (its name says the versions a click shows), then New and
+  // the search; under it the track, in every layout. No view options.
+  assert.match(html, /<div class="[^"]*sidebar-header[^"]*"><button [^>]*class="[^"]*sidebar-brand[^"]*"[^>]*aria-label="Pi Web, versions: web [^",]+, pi [^",]+"[^>]*>Pi Web<\/button><span class="[^"]*sidebar-header-spacer[^"]*"><\/span><button [^>]*class="[^"]*sidebar-new-button[^"]*"/);
+  assert.match(html, /<div dir="ltr" data-orientation="horizontal" data-slot="tabs" class="[^"]*"><div role="tablist" aria-orientation="horizontal" data-slot="tabs-list" data-variant="default" class="[^"]*sidebar-tabs-list[^"]*" aria-label="Sidebar view"/);
+  assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
+  // The chosen tab is active and owns its panel; the other is inactive.
+  assert.match(html, /<button type="button" role="tab" aria-selected="true" aria-controls="session-sidebar-panel-sessions" data-state="active" id="session-sidebar-tab-sessions"/);
+  assert.match(html, /<button type="button" role="tab" aria-selected="false" aria-controls="session-sidebar-panel-files" data-state="inactive" id="session-sidebar-tab-files"/);
+  assert.doesNotMatch(html, /View options|sidebar-title/);
+  assert.match(html, /<span class="sidebar-new-label">New<\/span><\/button><button [^>]*class="[^"]*sidebar-search-toggle[^"]*" type="button" title="Search conversations" aria-label="Search conversations" aria-expanded="false" aria-controls="session-search-input">/);
+  // Both tab panels shown: the sessions (its tab selected), the separator,
+  // the files section under the tree.
   const sessions = openingTag(html, "session-sidebar-panel-sessions");
   const files = openingTag(html, "session-sidebar-panel-files");
-  assert.equal(sessions, '<div id="session-sidebar-panel-sessions" role="region" aria-label="Sessions" class="sidebar-panel sidebar-sessions-panel">');
-  assert.equal(files, '<div id="session-sidebar-panel-files" role="region" aria-label="Files" class="sidebar-panel sidebar-files-panel">');
+  assert.match(sessions, /class="[^"]*sidebar-panel sidebar-sessions-panel[^"]*"/);
+  assert.match(files, /class="[^"]*sidebar-panel sidebar-files-panel[^"]*"/);
   const separator = html.slice(html.indexOf('role="separator"') - 200, html.indexOf(files));
   assert.ok(html.indexOf(sessions) < html.indexOf('role="separator"') && html.indexOf('role="separator"') < html.indexOf(files), "sessions, separator, files");
   assert.match(separator, /<div aria-label="Resize file browser" aria-orientation="horizontal" aria-valuemax="2000" aria-valuemin="220" aria-valuenow="320" aria-valuetext="320 px" role="separator" tabindex="0" aria-controls="session-sidebar-panel-files" class="panel-resize-handle sidebar-files-resize-handle" data-resize-handle="sidebar-files" title="Resize file browser: Drag to resize\. Double-click or press Enter to reset\."><\/div>$/);
@@ -146,15 +168,15 @@ test("on a desktop the files sit below the sessions by default, both in view", (
   // picker's one row and the tree. No row of keys under the picker; nothing
   // changed, so no count after the label.
   const filesPanel = html.slice(html.indexOf(files) + files.length);
-  assert.match(filesPanel, /^<div class="sidebar-files-section"><button type="button" class="sidebar-files-section-toggle" aria-expanded="true" aria-controls="session-sidebar-files-body"><svg width="12" height="12"[^>]*stroke-width="3"[^>]*class="session-tree-chevron is-open"[^>]*>[\s\S]*?<\/svg><span class="sidebar-files-section-label">Files<\/span><\/button><div class="sidebar-files-keys" role="group" aria-label="File actions"><button type="button" title="Open workspace terminal" aria-label="Open workspace terminal" class="sidebar-tool-button">/);
-  assert.match(filesPanel, /<div id="session-sidebar-files-body" class="sidebar-files-body"><div class="sidebar-files-head"><div class="project-picker is-row" role="group"/);
-  assert.match(filesPanel, /<div class="sidebar-files-scroll scrollbar-subtle">/);
+  assert.match(filesPanel, /^<div class="[^"]*sidebar-files-section[^"]*"><button [^>]*class="[^"]*sidebar-files-section-toggle[^"]*" type="button" aria-expanded="true" aria-controls="session-sidebar-files-body"><svg[^>]*width="12"[^>]*stroke-width="3"[^>]*class="lucide[^"]*rotate-90"[^>]*>[\s\S]*?<\/svg><span class="[^"]*sidebar-files-section-label[^"]*">Files<\/span><\/button><div class="[^"]*sidebar-files-keys[^"]*" role="group" aria-label="File actions"><button [^>]*class="[^"]*sidebar-tool-button[^"]*" type="button" title="Open workspace terminal" aria-label="Open workspace terminal">/);
+  assert.match(filesPanel, /<div id="session-sidebar-files-body" class="[^"]*sidebar-files-body[^"]*"><div class="[^"]*sidebar-files-head[^"]*"><div class="project-picker is-row[^"]*" role="group"/);
+  assert.match(filesPanel, /<div class="[^"]*sidebar-files-scroll[^"]*">/);
   assert.doesNotMatch(filesPanel, /sidebar-files-toolbar|sidebar-files-title|sidebar-files-actions|sidebar-files-section-search|sidebar-files-changes/);
   assert.doesNotMatch(filesPanel, /sidebar-files-section-count/);
   // Pins and archive not loaded yet: the tree waits instead of flashing archived rows.
-  assert.match(html, /<div class="session-tree-message">Loading\.\.\.<\/div>/);
+  assert.match(html, /<div role="status" aria-label="Loading..." class="[^"]*"><div data-slot="skeleton"/);
   // Without a folder the files' search has nothing to search.
-  assert.match(render(), /<button type="button" disabled="" title="Search files" aria-label="Search files" aria-expanded="false" aria-controls="file-search-input" class="sidebar-tool-button">/);
+  assert.match(render(), /<button [^>]*class="[^"]*sidebar-tool-button[^"]*" type="button" disabled="" title="Search files" aria-label="Search files" aria-expanded="false" aria-controls="file-search-input">/);
 });
 
 test("the fold's and the archive view's motions in the CSS last as long as the hook's phase", async () => {
@@ -164,7 +186,6 @@ test("the fold's and the archive view's motions in the CSS last as long as the h
   // lasts that long.
   for (const [selector, property] of [
     [".session-sidebar.is-files-below.is-files-folding .sidebar-files-panel", "transition"],
-    [".session-sidebar.is-files-below.is-files-folding .sidebar-toast-region", "transition"],
     [".sidebar-archive-view.is-entering", "animation"],
     [".sidebar-archive-view.is-leaving", "animation"],
   ]) {
@@ -175,20 +196,20 @@ test("the fold's and the archive view's motions in the CSS last as long as the h
 test("still, the sidebar renders as it did before it moved: nothing inert, no fold under way, no archive view", () => {
   const html = render({ selectedCwd: "/work/alpha" });
   assert.doesNotMatch(html, / inert[ =>]|is-files-folding|sidebar-archive-view|is-entering|is-leaving/);
-  assert.match(html, /<div class="sidebar-sessions-views"><div class="sidebar-sessions-view">/);
-  assert.equal(openingTag(html, "session-sidebar-files-body"), '<div id="session-sidebar-files-body" class="sidebar-files-body">');
+  assert.match(html, /<div class="[^"]*sidebar-sessions-views[^"]*"><div class="[^"]*sidebar-sessions-view[^"]*">/);
+  assert.match(openingTag(html, "session-sidebar-files-body"), /class="[^"]*sidebar-files-body[^"]*"/);
   assert.match(html, /role="separator"/, "the open section's separator");
 });
 
 /** The files section header row's keys group, as rendered below the sessions. */
 function sectionKeys(html) {
-  const row = html.slice(html.indexOf('<div class="sidebar-files-section">'), html.indexOf('<div id="session-sidebar-files-body"'));
-  return row.slice(row.indexOf('<div class="sidebar-files-keys"'));
+  const row = html.slice(html.indexOf('<div class="sidebar-files-section '), html.indexOf('<div id="session-sidebar-files-body"'));
+  return row.slice(row.indexOf('<div class="sidebar-files-keys '));
 }
 
 /** Each key's name and state, in order. */
 function keyLabels(markup) {
-  return [...markup.matchAll(/<button type="button"( disabled="")? title="([^"]+)" aria-label="\2"( aria-pressed="(true|false)")?( aria-expanded="(true|false)" aria-controls="[^"]+")? class="[^"]+"/g)]
+  return [...markup.matchAll(/<button [^>]*class="[^"]+" type="button"( disabled="")? title="([^"]+)" aria-label="\2"( aria-pressed="(true|false)")?( aria-expanded="(true|false)" aria-controls="[^"]+")?/g)]
     .map((match) => `${match[2]}${match[1] ? " (disabled)" : ""}${match[4] ? ` pressed=${match[4]}` : ""}${match[6] ? ` expanded=${match[6]}` : ""}`);
 }
 
@@ -224,7 +245,7 @@ test("below the sessions the section's header row holds the files' keys in the f
   // which the files tab leaves to the toolbar row. The search is the
   // files' (the toolbar row's is the sessions'), an expandable control,
   // not a toggle. Seven keys always there, so none ever moves.
-  assert.match(keys, /^<div class="sidebar-files-keys" role="group" aria-label="File actions">/);
+  assert.match(keys, /^<div class="[^"]*sidebar-files-keys[^"]*" role="group" aria-label="File actions">/);
   assert.deepEqual(keyLabels(keys), [
     "Open workspace terminal",
     "Open in file manager",
@@ -238,10 +259,10 @@ test("below the sessions the section's header row holds the files' keys in the f
   // Their icons are 13px, a size under the files tab's 14px, in the sidebar
   // icons' one stroke (the files tab's keys keep 14px:
   // SessionSidebar.tabs.test.mjs).
-  assert.deepEqual([...keys.matchAll(/<svg width="(\d+)" height="(\d+)"[^>]*stroke-width="(\d+)"/g)].map((match) => match.slice(1).join(",")), Array(7).fill("13,13,2"));
+  assert.deepEqual([...keys.matchAll(/<svg[^>]*width="(\d+)" height="(\d+)"[^>]*stroke-width="(\d+)"/g)].map((match) => match.slice(1).join(",")), Array(7).fill("13,13,2"));
   // The head under the row is the picker alone: no second row of keys, no
   // search in the toolbar row's place.
-  const head = html.slice(html.indexOf('<div class="sidebar-files-head">'), html.indexOf('<div class="sidebar-files-scroll'));
+  const head = html.slice(html.indexOf('<div class="sidebar-files-head '), html.indexOf('<div class="sidebar-files-scroll'));
   assert.doesNotMatch(head, /sidebar-tool-button|sidebar-files-actions/);
   // Without a folder they wait, disabled, in the same places; so does the
   // terminal without a handler, where the files tab leaves it out.
@@ -263,30 +284,46 @@ test("below the sessions the section's header row holds the files' keys in the f
   // The keys share their group's width alike, 18 to 26px each. The group
   // never shrinks under its seven keys' minimum nor grows past their
   // maximum, and its grow factor, far above the toggle's (1), gives it the
-  // room the toggle's content leaves before the toggle takes any.
-  const keyRule = sidebarRule(".sidebar-files-keys .sidebar-tool-button");
-  assert.match(keyRule, /(?:^|\s)flex: 1 1 0;/);
-  const [keyMin] = px(keyRule, "min-width");
-  const [keyMax] = px(keyRule, "max-width");
-  const keysGroup = sidebarRule(".sidebar-files-keys").match(/(?:^|\s)flex: (\d+) 0 calc\((\d+) \* (\d+)px\);[\s\S]*?max-width: calc\((\d+) \* (\d+)px\);/);
+  // room the toggle's content leaves before the toggle takes any. The keys'
+  // classes are the component's (fileKeyClass) now.
+  const keyClass = source.match(/const fileKeyClass = filesBelow\s*\n\s*\? "([^"]+)"/)?.[1] ?? "";
+  assert.ok(keyClass, "the keys' sizing classes are in the component");
+  assert.match(keyClass, /flex-\[1_1_0\]/);
+  const [, keyMinRaw] = keyClass.match(/min-w-\[(\d+)px\]/) ?? [];
+  const [, keyMaxRaw] = keyClass.match(/max-w-\[(\d+)px\]/) ?? [];
+  const keyMin = Number(keyMinRaw);
+  const keyMax = Number(keyMaxRaw);
+  const keysGroup = source.match(/sidebar-files-keys flex flex-\[(\d+)_0_calc\(7\*(\d+)px\)\] max-w-\[calc\(7\*(\d+)px\)\]/);
   assert.ok(keysGroup, "the keys' group: a grow factor, no shrink, its keys' minimum and maximum");
-  const [, groupGrow, minCount, groupKeyMin, maxCount, groupKeyMax] = keysGroup.map(Number);
+  const [, groupGrow, groupKeyMin, groupKeyMax] = keysGroup.map(Number);
   assert.ok(groupGrow >= 1000, "the toggle gets a fraction of a pixel until the keys are at their widest");
-  assert.deepEqual([minCount, groupKeyMin, maxCount, groupKeyMax], [7, keyMin, 7, keyMax]);
-  assert.match(sidebarRule(".sidebar-files-section-toggle"), /(?:^|\s)flex: 1 1 auto;/);
+  assert.deepEqual([groupKeyMin, groupKeyMax], [keyMin, keyMax]);
+  assert.match(keyClass, /\[@media\(pointer:coarse\)\]:flex-\[0_1_32px\]/);
+  // The toggle: its content is its basis, never under its chevron; a finger
+  // spreads it to the row.
+  assert.match(source, /sidebar-files-section-toggle flex h-full min-w-\[17px\] flex-\[1_1_auto\][^`]*\[@media\(pointer:coarse\)\]:flex-\[1_1_0\]/);
 
-  // The fit, added up from the CSS: the sidebar's width less its line, the
-  // row's padding (on the right the files' inset beside the session tree's
-  // classic scrollbar, Chromium's 10px) and the gap before the keys; the
-  // toggle's content in Chromium's 11px system font (its 5px on either
-  // side, the 12px chevron, a 3px gap, the label, then a 3px gap and the
-  // count): "Files" 34px, "文件" 24px, "· 123" 26px, "· 2" 14px.
+  // The fit, added up from the components' classes: the sidebar's width less
+  // its line, the row's padding (on the right the files' inset beside the
+  // session tree's classic scrollbar, Chromium's 10px) and the gap before
+  // the keys; the toggle's content in Chromium's 11px system font (its 5px
+  // on either side, the 12px chevron, a 3px gap, the label, then a 3px gap
+  // and the count): "Files" 34px, "文件" 24px, "· 123" 26px, "· 2" 14px.
   const [scrollbar] = px(globalStyles.slice(globalStyles.indexOf("::-webkit-scrollbar {")), "width");
   const right = filesInsetRight(scrollbar);
-  const [, , , left] = px(sidebarRule(".sidebar-files-section"), "padding");
-  const [gap] = px(sidebarRule(".sidebar-files-section"), "gap");
-  const [toggleMin] = px(sidebarRule(".sidebar-files-section-toggle"), "min-width");
-  const [, toggleInset] = px(sidebarRule(".sidebar-files-section-toggle"), "padding");
+  // The spacing scale's utilities carry their lengths: gap-0.5 is 2px,
+  // pl-1.5 is 6px (an arbitrary one is its own pixels).
+  const spacingPx = (utility) => {
+    const m = utility.match(/^(?:gap|pl)-\[?(\d+(?:\.\d+)?)(px)?\]?$/);
+    assert.ok(m, `${utility} is a known length`);
+    return Number(m[1]) * (m[2] ? 1 : 4);
+  };
+  const section = source.match(/sidebar-files-section flex h-7 flex-none items-center (gap-\S+) pr-\(--sidebar-files-inset-right\) (pl-\S+)/);
+  assert.ok(section, "the header row's gap and left padding are its own classes");
+  const gap = spacingPx(section[1]);
+  const left = spacingPx(section[2]);
+  const toggleMin = Number(source.match(/sidebar-files-section-toggle flex h-full min-w-\[(\d+)px\]/)?.[1]);
+  const toggleInset = Number(source.match(/sidebar-files-section-toggle flex h-full min-w-\[\d+px\] [^`]*px-\[(\d+)px\]/)?.[1]);
   assert.equal(toggleMin, toggleInset + 12, "the toggle keeps its chevron");
   const content = (label, count = 0) => 2 * toggleInset + 12 + 3 + label + (count ? 3 + count : 0);
   const fit = (width, toggleContent) => {
@@ -365,25 +402,39 @@ test("a key just disabled hands its focus on while the focus is still on it, or 
 });
 
 test("below the sessions the picker is one row under the header row, lined up with it and with the session rows", () => {
-  // The tree's first row 4px under the boxes: the head's 2px, none in the
-  // scroll box, the tree's own 2px (FileExplorer's list).
-  const belowHead = sidebarRule(".session-sidebar.is-files-below .sidebar-files-head");
-  const [, , headBottom, headLeft] = px(belowHead, "padding");
-  const [scrollTop] = px(sidebarRule(".session-sidebar.is-files-below .sidebar-files-scroll"), "padding-top");
-  const treeTop = Number(explorerSource.match(/\(changesCollapsed \|\| gitFiles\.length === 0\) && \(!fileSearchOpen \|\| !hasSearchQuery\) && \(\s*<div style=\{\{ padding: "(\d+)px \d+px" \}\}>/)[1]);
+  // The tree's first row 4px under the boxes: the head's 2px (pb-0.5, the
+  // spacing scale's 4px a step), none in the scroll box (the below branch
+  // adds no top padding), the tree's own 2px (FileExplorer's list). The
+  // head's and scroll's classes carry them now.
+  const belowHead = source.match(/sidebar-files-head flex flex-none flex-col\$\{filesBelow \? " ([^"]+)" : " ([^"]+)"\}/);
+  assert.ok(belowHead, "the head's below-sessions padding is its own class");
+  assert.match(belowHead[1], /(?:^|\s)pb-0\.5(?:\s|$)/, "the head gives 2px under the boxes");
+  const headBottom = 2;
+  const headLeft = Number(belowHead[1].match(/(?:^|\s)pl-\[(\d+)px\]/)?.[1]);
+  // The below branch adds no top padding to the scroll box: the ternary's
+  // below side is empty.
+  assert.match(source, /sidebar-files-scroll scrollbar-subtle[^`]*\$\{filesBelow \? "" : " pt-0\.5"\}/);
+  const scrollTop = 0;
+  const treeTop = Number(explorerSource.match(/\(changesCollapsed \|\| gitFiles\.length === 0\) && \(!fileSearchOpen \|\| !hasSearchQuery\) && \(\s*<div className="px-1 py-\[(\d+)px\]">/)[1]);
   assert.equal(headBottom + scrollTop + treeTop, 4, "the tree's first row 4px under the boxes");
   // The paths start in the text column (the chevron column's 6px + 5px, the
-  // 12px chevron, a 3px gap), after the box's 1px line and 10px padding.
-  const [boxLine] = px(globalStyles.slice(globalStyles.indexOf("\n.project-picker-button {")), "border");
-  const [, boxPadding] = px(globalStyles.slice(globalStyles.indexOf("\n.project-picker-button {")), "padding");
+  // 12px chevron, a 3px gap), after the box's 1px line and 10px padding —
+  // the picker's below-sessions box classes (ProjectWorktreePicker's
+  // non-inline box: `border border-border` is the 1px line, px-2.5 the 10px).
+  const belowBox = pickerSource.match(/px-([\d.]+) border border-border/);
+  assert.ok(belowBox, "the below-sessions box's line and padding are its own classes");
+  const boxLine = 1;
+  const boxPadding = Number(belowBox[1]) * 4;
   const textColumn = 6 + 5 + 12 + 3;
   assert.equal(headLeft + boxLine + boxPadding, textColumn, "the paths in the text column");
   // The boxes end where the keys end and where a session row's time does,
   // whatever room the session tree's scrollbar takes (none for an overlay
   // one, 6px on a coarse pointer, 10px in Chromium, more elsewhere): a row
-  // ends 6px in or on the scrollbar's gutter, its time 4px inside it.
+  // ends 6px in or on the scrollbar's gutter, its time 4px inside it (the
+  // rows' pr-1).
   const treeInset = Number(sidebarStyles.match(/--session-tree-inset-right: max\(0px, calc\((\d+)px - var\(--session-tree-scrollbar, 0px\)\)\);/)[1]);
-  const [, sessionRight] = px(sidebarRule(".session-tree-session"), "padding");
+  assert.match(treeSource, /"pr-1"/, "a session row's time sits 4px inside the row");
+  const sessionRight = 4;
   for (const scrollbar of [0, 6, 10, 17]) {
     assert.equal(filesInsetRight(scrollbar), Math.max(treeInset, scrollbar) + sessionRight, `beside a ${scrollbar}px scrollbar`);
   }
@@ -413,24 +464,27 @@ test("the layout, the tab and the fold chosen last never change the first render
   // The hydrating render must match the server's HTML: the files open below
   // the sessions, whatever the browser saved.
   assert.equal(clientHtml, serverHtml);
-  assert.match(clientHtml, /^<div class="session-sidebar is-files-below" style="--sidebar-files-height:320px">/);
-  assert.doesNotMatch(openingTag(clientHtml, "session-sidebar-panel-files"), /hidden/);
-  assert.equal(openingTag(clientHtml, "session-sidebar-files-body"), '<div id="session-sidebar-files-body" class="sidebar-files-body">');
-  assert.doesNotMatch(clientHtml, /role="tablist"/);
+  assert.match(clientHtml, /^<div class="session-sidebar[^"]*is-files-below[^"]*" style="--sidebar-files-height:320px">/);
+  // Not the hidden attribute (the panel is shown): the class list's own
+  // overflow-hidden is no fold.
+  assert.doesNotMatch(openingTag(clientHtml, "session-sidebar-panel-files"), /\shidden(?:=""|>[ ]|$)/);
+  assert.match(openingTag(clientHtml, "session-sidebar-files-body"), /class="[^"]*sidebar-files-body[^"]*"/);
+  assert.match(clientHtml, /role="tablist"/);
 });
 
 test("the files tab keeps FileExplorer mounted under an always-present scroll container", () => {
-  assert.match(source, /<div ref=\{explorerScrollRef\} className="sidebar-files-scroll scrollbar-subtle">\s*\{explorerCwd && \(\s*<FileExplorer/);
+  assert.match(source, /<div ref=\{explorerScrollRef\} className=\{`sidebar-files-scroll scrollbar-subtle min-h-0 flex-1 overflow-x-hidden overflow-y-auto\$\{filesBelow \? "" : " pt-0\.5"\}`\}>\s*\{explorerCwd && \(\s*<FileExplorer/);
   assert.match(source, /useScrollbarVisibility\(explorerScrollRef\);/);
   assert.match(source, /const explorerCwd = selectedCwd \?\? selectedCwdProp \?\? null;/);
   assert.match(source, /onOpenTerminal\?\.\(explorerCwd\)/);
-  assert.match(sidebarStyles, /\.sidebar-files-scroll \{[^}]*flex: 1 1 auto;[^}]*min-height: 0;/);
 });
 
 test("arrow keys move between the tabs and the search toggle opens the sessions tab", () => {
-  const keys = source.slice(source.indexOf("const handleTabKeyDown"), source.indexOf("// A session family's pin"));
-  assert.match(keys, /event\.key !== "ArrowLeft" && event\.key !== "ArrowRight" && event\.key !== "Home" && event\.key !== "End"/);
-  assert.match(keys, /switchTab\(next\);\s*\(next === "sessions" \? sessionsTabRef : filesTabRef\)\.current\?\.focus\(\);/);
+  // The track is Radix's Tabs: its roving focus moves between the two
+  // triggers on the arrows and Home/End and activates the one it lands on,
+  // reaching switchTab through onValueChange; the hand-written handler is gone.
+  assert.doesNotMatch(source, /handleTabKeyDown/);
+  assert.match(source, /<Tabs value=\{sidebarTab\} onValueChange=\{\(value\) => switchTab\(value as SidebarTab\)\}/);
   assert.match(source, /if \(!sessionsShown\) \{\s*switchTab\("sessions"\);\s*setSessionSearchOpen\(true\);\s*return;\s*\}/);
 });
 
@@ -545,7 +599,7 @@ test("does not expose disk-backed actions for transient sessions", () => {
   assert.match(callbackBody("startRename"), /if \(family\.root\.transient\) return;/);
   assert.match(callbackBody("performDelete"), /if \(session\.transient\) return;/);
   assert.match(callbackBody("archiveFamilies"), /families\.filter\(\(family\) => !family\.root\.transient\)/);
-  assert.match(treeSource, /\{!status\.transient && \(\s*<span className="session-tree-actions">/);
+  assert.match(treeSource, /\{!status\.transient && \(\s*<span className="session-tree-actions/);
 });
 
 test("row clicks go through the list selection, which moves the cwd to the session's worktree", () => {
@@ -664,7 +718,7 @@ test("archive keeps an undo snapshot and clears unread markers", () => {
   assert.match(body, /\.then\(\(ok\) => \{\s*\/\/[^\n]*\n\s*if \(ok \|\| unreadBefore\.length === 0\) return;\s*const partIds = new Set\(part\.flatMap\(\(family\) => familyIds\(family\)\)\);\s*restoreUnread\(unreadBefore\.filter\(\(id\) => partIds\.has\(id\)\)\);/);
   // The session open by then has been read: its marker stays off.
   assert.match(callbackBody("restoreUnread"), /if \(id !== selectedSessionIdRef\.current\) next\.add\(id\);/);
-  assert.match(body, /\{ id: "view", label: t\("sidebar\.viewArchive"\), onClick: \(\) => openArchiveView\(\) \},/);
+  assert.match(body, /\{ label: t\("sidebar\.viewArchive"\), onClick: \(\) => openArchiveView\(\) \},/);
   assert.match(callbackBody("archiveFamily"), /if \(familyIds\(family\)\.some\(\(id\) => runningSessionIds\.has\(id\)\)\) return;/);
   assert.match(callbackBody("restoreFamily"), /useCallback\(\(family: SessionFamily\) => restoreFamilies\(\[family\]\), \[restoreFamilies\]\)/);
   // A restore is batched the same way, and its Undo puts focus back in the tree.
@@ -701,7 +755,7 @@ test("the footer opens the project list in the files tab; the archive view repla
   assert.match(source, /onOpenOtherProject: handleOpenOtherProject,/);
   assert.match(source, /onOpenArchive: \(\) => openArchiveView\(\),/);
   assert.match(callbackBody("openArchiveView"), /setArchiveView\(true\);[\s\S]*?setSessionSearchOpen\(false\);\s*switchTab\("sessions"\);/);
-  assert.match(source, /<div className="sidebar-sessions-view" hidden=\{archiveMotion\.mainHidden\} inert=\{archiveMotion\.mainInert\}>\s*<SessionTree\s+\{\.\.\.treeProps\}\s+rows=\{model\.rows\}\s+emptyLabel=\{t\("sidebar\.noSessions"\)\}\s+reveal=\{treeReveal\}\s+onRevealHandled=\{handleRevealHandled\}\s+\/>/);
+  assert.match(source, /<div className="sidebar-sessions-view[^"]*" hidden=\{archiveMotion\.mainHidden\} inert=\{archiveMotion\.mainInert\}>\s*<SessionTree\s+\{\.\.\.treeProps\}\s+rows=\{model\.rows\}\s+emptyLabel=\{t\("sidebar\.noSessions"\)\}\s+reveal=\{treeReveal\}\s+onRevealHandled=\{handleRevealHandled\}\s+\/>/);
   assert.match(source, /<SessionTree\s+\{\.\.\.treeProps\}\s+rows=\{archiveRows\}\s+emptyLabel=\{t\("sidebar\.noArchived"\)\}\s+reveal=\{archiveReveal\}\s+onRevealHandled=\{handleArchiveRevealHandled\}\s+\/>/);
   assert.match(source, /const sessionMenuItems = \(row: SessionRow\): SidebarMenuItem\[\] => sessionMenuEntries\(row\.context, row\.status\)\.map\(\(entry, index\) => \{/);
   assert.match(callbackBody("handleTogglePinned"), /setPinnedCollapsed\(next\);\s*savePinnedCollapsed\(next\);/);
@@ -712,14 +766,14 @@ test("the files tab shows the composer bar's picker as two rows, with removal an
   // composer bar's, laid out side by side when there is room (row) and
   // stacked in the tab. Its worktree box carries removal and the project
   // menu carries activity badges.
-  const filesHead = source.slice(source.indexOf('className="sidebar-files-head"'), source.indexOf('className="sidebar-files-actions"'));
+  const filesHead = source.slice(source.indexOf('className={`sidebar-files-head'), source.indexOf('className="sidebar-files-actions'));
   assert.match(filesHead, /<ProjectWorktreePicker\n\s*handleRef=\{filesPickerRef\}/);
-  assert.match(filesHead, /layout=\{stacked \? "row" : "stacked"\}/);
+  assert.match(filesHead, /layout=\{filesBelow \? "row" : "stacked"\}/);
   assert.match(filesHead, /projectActivity=\{projectActivity\}/);
   assert.match(filesHead, /onRemoveWorktree=\{handleRemoveWorktree\}/);
   // The keys under the picker stay in place; the actions row only renders
   // beside the picker when the layout has room for it.
-  assert.match(source, /\{!stacked && explorerCwd && \(\n\s*<div className="sidebar-files-actions"/);
+  assert.match(source, /\{!filesBelow && explorerCwd && \(\n\s*<div className="sidebar-files-actions/);
 });
 
 test("the files show the composer bar's picker in the tab head, asking for a project until it has one", () => {

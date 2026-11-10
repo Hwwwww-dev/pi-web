@@ -62,9 +62,9 @@ function row(props = {}) {
   }))));
 }
 
-/** The buttons of the row: their attributes and labels. */
+/** The buttons of the row: their attributes and labels. Attribute values keep their quotes' `>` (the Button classes carry `has-[>svg]`). */
 function buttons(html) {
-  return [...html.matchAll(/<button([^>]*)>([^<]*)<\/button>/g)].map(([, attributes, label]) => ({ attributes, label }));
+  return [...html.matchAll(/<button((?:[^>"']|"[^"]*"|'[^']*')*)>([^<]*)<\/button>/g)].map(([, attributes, label]) => ({ attributes, label }));
 }
 
 test("a server with its own Authorization header has no Sign-in row: its Headers row lists the header", () => {
@@ -99,7 +99,7 @@ test("an OAuth server offers Sign in, says what it does and, once something is s
   assert.deepEqual(buttons(row({ server: { ...oauth, signedIn: false, oauthStateStored: false } })).map((button) => button.label), ["Sign in"]);
   // While a change runs, Sign out waits; Sign in, which writes no mcp.json, does not.
   const busy = buttons(row({ server: { ...oauth, signedIn: true }, controlsBusy: true }));
-  assert.doesNotMatch(busy[0].attributes, /disabled/);
+  assert.doesNotMatch(busy[0].attributes, /\sdisabled=/, "no disabled attribute (the Button classes carry disabled: variants)");
   assert.match(busy[1].attributes, /disabled=""/);
   assert.equal(buttons(row({ server: { ...oauth, signedIn: true }, controlsBusy: true, signingOut: true }))[1].label, "Signing out…");
   // A Sign out on its way would cancel a sign-in that reached the server first, so Sign in waits for it.
@@ -113,18 +113,18 @@ test("a blocked sign-in is disabled and points at the visible reason", () => {
     assert.match(button.attributes, /disabled=""/);
     const id = button.attributes.match(/aria-describedby="([^"]+)"/)?.[1];
     assert.ok(id, button.label);
-    assert.match(html, new RegExp(`<span id="${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" class="mcp-config-line is-dim">This project is not trusted, so Pi Web does not sign in to or out of its servers\\.</span>`));
+    assert.match(html, new RegExp(`<span id="${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" class="min-w-0 text-xs leading-normal \\[overflow-wrap:anywhere\\] text-muted-foreground">This project is not trusted, so Pi Web does not sign in to or out of its servers\\.</span>`));
   }
   assert.doesNotMatch(text(html), /may replace|Sign out deletes/, "no explanation of what cannot be done");
   // A PI_WEB_PASSWORD entry cannot sign in, but its tokens can still go.
   const password = buttons(row({ server: { ...oauth, signedIn: true }, block: "web-password" }));
   assert.match(password[0].attributes, /disabled=""/);
-  assert.doesNotMatch(password[1].attributes, /disabled/);
+  assert.doesNotMatch(password[1].attributes, /\sdisabled=/);
 });
 
 test("a sign-in under way says what it does, and offers Cancel instead", () => {
   const connecting = row({ run: { flow: flow("connecting") } });
-  assert.match(connecting, /<span role="status" class="mcp-config-line">Checking whether the server asks for a sign-in…<\/span>/);
+  assert.match(connecting, /<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">Checking whether the server asks for a sign-in…<\/span>/);
   assert.deepEqual(buttons(connecting).map((button) => button.label), ["Cancel sign-in"]);
   assert.match(row({ run: { flow: flow("starting") } }), /Preparing the sign-in with the server's authorization server…/);
   const finishing = row({ run: { flow: flow("finishing") } });
@@ -133,7 +133,7 @@ test("a sign-in under way says what it does, and offers Cancel instead", () => {
   // Why it cannot be cancelled is a visible line the disabled button points at.
   const noCancel = buttons(finishing)[0].attributes.match(/aria-describedby="([^"]+)"/)?.[1];
   assert.ok(noCancel);
-  assert.match(finishing, new RegExp(`<span id="${noCancel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" class="mcp-config-line is-dim">The authorization server has answered, so this step can no longer be cancelled\\.</span>`));
+  assert.match(finishing, new RegExp(`<span id="${noCancel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" class="min-w-0 text-xs leading-normal \\[overflow-wrap:anywhere\\] text-muted-foreground">The authorization server has answered, so this step can no longer be cancelled\\.</span>`));
   assert.doesNotMatch(buttons(connecting)[0].attributes, /aria-describedby/);
   assert.doesNotMatch(text(connecting), /can no longer be cancelled/);
   assert.equal(buttons(row({ run: { flow: flow("connecting"), cancelling: true } }))[0].label, "Cancelling…");
@@ -148,8 +148,8 @@ test("waiting for the browser shows the page as a link, the paste box, and where
   assert.match(html, /<p class="oauth-paste-message">Open the sign-in page and approve access\./);
   assert.match(html, new RegExp(`<p class="oauth-paste-hint">Sign-in page: <a href="${PAGE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" target="_blank" rel="noopener noreferrer">`));
   // The box is never focused by itself, has a name, and submits only a value.
-  assert.match(html, /<input class="oauth-paste-input" placeholder="http:\/\/127\.0\.0\.1:…\/callback\?code=…" aria-label="Address the browser landed on" value=""\/>/);
-  assert.match(html, /<button type="button" class="oauth-paste-submit" disabled="">Continue<\/button>/);
+  assert.match(html, /<input data-slot="input" class="[^"]*oauth-paste-input[^"]*" placeholder="http:\/\/127\.0\.0\.1:…\/callback\?code=…" aria-label="Address the browser landed on" value=""\/>/);
+  assert.match(html, /<button data-slot="button"[^>]*class="[^"]*oauth-paste-submit[^"]*"[^>]*disabled="">Continue<\/button>/);
   assert.match(text(html), /After you approve, the browser is sent to http:\/\/127\.0\.0\.1:53682\/callback, which only the computer running Pi Web can open\./);
   assert.match(text(html), /Pi Web waits up to 5 minutes from the start of the sign-in\./);
   assert.deepEqual(buttons(html).map((button) => button.label), ["Continue", "Cancel sign-in"]);
@@ -161,14 +161,14 @@ test("waiting for the browser shows the page as a link, the paste box, and where
 
   // A refused paste says why in the panel's words, and the box stays.
   const refused = row({ run: { flow: flow("authorize", { authorizationUrl: PAGE }), pasteError: { error: "x", reason: "redirect-state-mismatch" } } });
-  assert.match(refused, /<span role="alert" class="mcp-config-line is-error">That address does not finish this sign-in: That address belongs to another sign-in\./);
-  assert.match(refused, /class="oauth-paste-input"/);
+  assert.match(refused, /<span role="alert" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">That address does not finish this sign-in: That address belongs to another sign-in\./);
+  assert.match(refused, /class="[^"]*oauth-paste-input[^"]*"/);
   const denied = row({ run: { flow: flow("authorize", { authorizationUrl: PAGE }), pasteError: { error: "The user said no", reason: "redirect-denied" } } });
   assert.match(text(denied), /The authorization server did not grant access\. Open the sign-in page again, or cancel\. The user said no/);
   // While a paste is checked, the box and its button wait.
   const pasting = row({ run: { flow: flow("authorize", { authorizationUrl: PAGE }), pasting: true } });
-  assert.match(pasting, /<input class="oauth-paste-input"[^>]*disabled=""/);
-  assert.match(pasting, /<button type="button" class="oauth-paste-submit" disabled="">Checking…<\/button>/);
+  assert.match(pasting, /<input data-slot="input" class="[^"]*oauth-paste-input[^"]*"[^>]*disabled=""/);
+  assert.match(pasting, /<button data-slot="button"[^>]*class="[^"]*oauth-paste-submit[^"]*"[^>]*disabled="">Checking…<\/button>/);
 });
 
 test("how the sign-in ended stays under the row, with Sign in again", () => {
@@ -177,9 +177,9 @@ test("how the sign-in ended stays under the row, with Sign in again", () => {
   assert.match(text(row({ run: { flow: flow("done", { alreadySignedIn: true, result: result("connected") }) } })), /Already signed in: the server connected without a new sign-in\./);
   assert.match(text(row({ run: { flow: flow("done", { refreshed: true, result: result("connected") }) } })), /Signed in again with the stored refresh token, without the browser\./);
   const after = row({ run: { flow: flow("done", { result: result("failed", { error: "ECONNRESET" }) }) } });
-  assert.match(after, /<span role="status" class="mcp-config-line is-warning">Signed in, but the server did not connect afterwards\. Status above says why\.<\/span>/);
+  assert.match(after, /<span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-warning">Signed in, but the server did not connect afterwards\. Status above says why\.<\/span>/);
   const failed = row({ run: { flow: flow("failed", { failure: "sign-in-failed", error: "registration failed: •••" }) } });
-  assert.match(failed, /<span role="status" class="mcp-config-line is-error">The sign-in failed\.<\/span><span class="mcp-config-line is-error">Error: <code class="mcp-config-chip">registration failed: •••<\/code><\/span>/);
+  assert.match(failed, /<span role="status" class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">The sign-in failed\.<\/span><span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Error: <code class="max-w-full rounded-sm border border-border bg-background px-1 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">registration failed: •••<\/code><\/span>/);
   assert.match(text(row({ run: { flow: flow("expired") } })), /The sign-in was not finished within 5 minutes, so Pi Web stopped waiting\./);
   assert.match(text(row({ run: { flow: flow("cancelled") } })), /Sign-in cancelled\./);
   assert.deepEqual(buttons(row({ run: { flow: flow("cancelled") } })).map((button) => button.label), ["Sign in"]);

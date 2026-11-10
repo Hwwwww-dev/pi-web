@@ -11,6 +11,7 @@ import {
   isLastEnabledModel,
 } from "./enabled-models-helpers";
 import { ConfigButton, ConfigSwitch } from "./SettingsUi";
+import { Input } from "@/components/ui/input";
 import { ModelContextWindow, type ModelContextSettings } from "./ModelContextWindow";
 
 /**
@@ -192,18 +193,18 @@ export function EnabledModelsBanner({ controller }: { controller: EnabledModelsC
   if (!scoped && stale === 0) return null;
 
   return (
-    <div className="enabled-models-banner">
+    <div className="enabled-models-banner flex items-center gap-2.5 border-b bg-sidebar px-3 py-1.5">
       <span
-        className="enabled-models-banner-text"
+        className="flex min-w-0 flex-1 items-baseline gap-1 text-xs leading-[1.4] text-muted-foreground"
         {...(stale > 0 ? { title: t("models.enabledStaleHint") } : {})}
       >
         {/* Name the setting and the file that holds it: the count alone left
             the user guessing where the panel wrote, and both read the same in
             every language. A long path is what gets cut, never the numbers. */}
-        <code className="enabled-models-banner-key" title={view.settingsPath}>
+        <code className="min-w-0 overflow-hidden font-mono text-muted-foreground truncate" title={view.settingsPath}>
           {view.settingsPath}
         </code>
-        <code className="enabled-models-banner-facts">
+        <code className="shrink-0 font-mono whitespace-nowrap text-muted-foreground">
           {`· enabledModels ${view.enabledTotal}/${view.availableTotal}`}
           {stale > 0 && ` · ${t("models.enabledStale", { count: stale })}`}
         </code>
@@ -274,7 +275,7 @@ export function EnabledModelsProviderSwitch({
   const toggle = enabledModelsProviderToggle(view, provider);
   return (
     <>
-      {message && <span className="enabled-models-switch-error">{message}</span>}
+      {message && <span className="text-xs text-destructive">{message}</span>}
       <ConfigSwitch
         checked={toggle.checked}
         loading={pending === `provider:${provider.id}`}
@@ -311,7 +312,7 @@ export function EnabledModelsProviderSwitchNote({
 }) {
   const { t } = useI18n();
   const key = providerSwitchBlockKey(controller, providerId);
-  return key ? <div id={id} className="config-detail-heading-note">{t(key)}</div> : null;
+  return key ? <div id={id} className="config-detail-heading-note text-right text-xs text-muted-foreground">{t(key)}</div> : null;
 }
 
 /** Per-model switches for a provider that owns its own model list. */
@@ -378,12 +379,12 @@ export function EnabledModelsSection({
   useEffect(() => setQuery(""), [providerId]);
 
   if (loading && !view) {
-    return <div className="enabled-models-empty">{t("agents.modelsLoading")}</div>;
+    return <div className="p-3 text-xs text-muted-foreground">{t("agents.modelsLoading")}</div>;
   }
   if (!provider) {
     return failure?.message
-      ? <div className="enabled-models-error">{failure.message}</div>
-      : <div className="enabled-models-empty">{t("models.enabledUnavailable")}</div>;
+      ? <div className="rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs leading-[1.4] text-destructive">{failure.message}</div>
+      : <div className="p-3 text-xs text-muted-foreground">{t("models.enabledUnavailable")}</div>;
   }
 
   const shown = filterEnabledModels(provider.models, query);
@@ -406,10 +407,10 @@ export function EnabledModelsSection({
   };
 
   return (
-    <div className="enabled-models-section">
-      <div className="enabled-models-header">
-        <span className="enabled-models-title">{t("models.enabledSection")}</span>
-        <span className="enabled-models-count">
+    <div className="flex flex-col gap-2 pt-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[13px] leading-[1.35] font-semibold text-foreground">{t("models.enabledSection")}</span>
+        <span className="mr-auto font-mono text-[10px] text-muted-foreground">
           {t("models.enabledCount", { enabled: provider.enabledCount, total: provider.models.length })}
         </span>
         <ConfigButton
@@ -438,42 +439,44 @@ export function EnabledModelsSection({
         </ConfigButton>
       </div>
 
-      {catalog.note && <div className="enabled-models-note">{t(catalog.note)}</div>}
+      {catalog.note && <div className="text-xs leading-[1.5] text-muted-foreground">{t(catalog.note)}</div>}
 
-      {!editable && <div id={scopeNoteId} className="enabled-models-note">{t("models.enabledProjectScope")}</div>}
-      {showLastModelNote && <div id={lastModelNoteId} className="enabled-models-note">{t("models.enabledLastModel")}</div>}
+      {!editable && <div id={scopeNoteId} className="text-xs leading-[1.5] text-muted-foreground">{t("models.enabledProjectScope")}</div>}
+      {showLastModelNote && <div id={lastModelNoteId} className="text-xs leading-[1.5] text-muted-foreground">{t("models.enabledLastModel")}</div>}
       {failure && (
-        <div className="enabled-models-error">
+        <div className="rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs leading-[1.4] text-destructive">
           {failure.messageKey ? t(failure.messageKey) : failure.message}
         </div>
       )}
 
       {provider.models.length > 8 && (
-        <input
+        <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t("models.enabledFilterPlaceholder", { count: provider.models.length })}
           aria-label={t("models.enabledFilter")}
-          className="enabled-models-filter"
         />
       )}
-      {contextSettings && <div id={contextNoteId} className="enabled-models-note">{t("models.contextOverrideHelp")}</div>}
-      <div className="enabled-models-list">
+      {contextSettings && <div id={contextNoteId} className="text-xs leading-[1.5] text-muted-foreground">{t("models.contextOverrideHelp")}</div>}
+      <div className="max-h-[360px] overflow-y-auto rounded-md border border-border bg-sidebar">
         {shown.length === 0 ? (
-          <div className="enabled-models-empty">{t("models.enabledNoMatches")}</div>
+          <div className="p-3 text-xs text-muted-foreground">{t("models.enabledNoMatches")}</div>
         ) : shown.map((model) => {
           const lastOne = isLastEnabledModel(view, model);
           const override = contextSettings?.overrides?.[model.id];
           const contextValue = override && typeof override === "object" && !Array.isArray(override)
             ? (override as Record<string, unknown>).contextWindow : undefined;
           return (
-            <div key={model.ref} className="enabled-models-row">
-              <span className="enabled-models-row-text">
-                <span className="enabled-models-row-name">{model.name}</span>
-                <code className="enabled-models-row-id">{model.id}</code>
+            <div key={model.ref} className="flex min-h-[36px] items-center gap-2 border-border px-2.5 py-1.5 [&:not(:first-child)]:border-t">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs text-foreground">{model.name}</span>
+                <code className="block truncate font-mono text-[10px] text-muted-foreground">{model.id}</code>
               </span>
               {model.thinkingPin && (
-                <span className="enabled-models-pin" title={t("models.enabledPinHint")}>
+                <span
+                  className="shrink-0 rounded-[3px] bg-[rgba(99,102,241,0.12)] px-1 py-px text-[10px] text-[rgba(99,102,241,0.8)]"
+                  title={t("models.enabledPinHint")}
+                >
                   {model.thinkingPin}
                 </span>
               )}
