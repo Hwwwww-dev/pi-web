@@ -2068,8 +2068,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         className="hidden"
         onChange={handleFilePick}
       />}
-      {/* Column width matches the message column's drafted 700px. */}
-      <div className="mx-auto flex w-full min-w-0 max-w-[700px] flex-col gap-2">
+      {/* Column width matches the message column: min(--chat-content-max-width, 700px). */}
+      <div className="mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col gap-2">
         <MissingCwdBanner cwd={missingCwd} />
         <ModelErrorBanner error={modelError} />
         <ModelScopeWarningBanner warnings={modelScopeWarnings} />

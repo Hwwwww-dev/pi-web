@@ -119,7 +119,9 @@ interface Props {
 
 // The message column's page gutter and width, from the visual draft (§4.2):
 // 28px around a 700px column on desktop, half the gutter on phones. The
-// column's 700px cap lives in the message content's max-w-[700px].
+// column's cap is min(--chat-content-max-width, 700px) — Settings' width
+// slider narrows it below 700 and never widens past the cap; messages, the
+// quote composer, the composer and the new-session hero all read one var.
 const CHAT_COLUMN_PADDING = 28;
 const CHAT_COLUMN_PADDING_MOBILE = 14;
 
@@ -1600,7 +1602,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             <div
               ref={messageContentRef}
               onPointerUp={captureQuotedSelection}
-              className="mx-auto w-full min-w-0 max-w-[700px] text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] max-sm:text-[length:calc(14px+var(--chat-font-size-offset,0px))]"
+              className="mx-auto w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] max-sm:text-[length:calc(14px+var(--chat-font-size-offset,0px))]"
             >
             {hasMoreRendered && (
               <div ref={setSentinel} className="py-3 text-center text-xs text-muted-foreground">
@@ -1742,7 +1744,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           // Centered over the composer's 700px card (the same mx-auto column as
           // the messages); z-30 also keeps it clear of the rail's zIndex 25.
           <div className="pointer-events-none absolute inset-x-0 bottom-full z-30">
-            <div className="relative mx-auto w-full max-w-[700px]">
+            <div className="relative mx-auto w-full max-w-[min(var(--chat-content-max-width,820px),700px)]">
               <Button
                 type="button"
                 variant="ghost"

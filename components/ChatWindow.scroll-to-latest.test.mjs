@@ -31,13 +31,14 @@ test("floats the scroll-to-latest button centered over the composer's 700px card
   const block = elementBlock();
 
   // The wrapper spans the pane, but the button anchors to an inner mx-auto
-  // max-w-[700px] layer — the same column as the composer card — and centers
-  // itself on it, so a wide pane cannot strand it at the pane edge.
+  // layer — the same min(--chat-content-max-width, 700px) column as the
+  // composer card — and centers itself on it, so a wide pane cannot strand
+  // it at the pane edge.
   assert.match(
     container,
     /className="pointer-events-none absolute inset-x-0 bottom-full z-30"/,
   );
-  assert.match(container, /className="relative mx-auto w-full max-w-\[700px\]"/);
+  assert.match(container, /className="relative mx-auto w-full max-w-\[min\(var\(--chat-content-max-width,820px\),700px\)\]"/);
   assert.match(block, /absolute left-1\/2 -translate-x-1\/2 bottom-\[14px\] max-sm:bottom-\[10px\]/);
   // z-30 clears the minimap rail's zIndex 25, which otherwise covers the
   // button's whole strip and swallows its clicks.
