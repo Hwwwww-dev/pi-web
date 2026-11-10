@@ -11,7 +11,7 @@ const jiti = createJiti(import.meta.url, {
 });
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
-const { ChatInput, ModelErrorBanner, ModelScopeWarningBanner, RUN_END_CLICK_GUARD_MS, autoGrowTextarea, canClearBuiltinCommandInput, canRestoreUserMessage, canRunBuiltinSlashCommandWhileStreaming, cycleListIndex, filterModelOptions, getUpwardMenuMaxHeight, getUserMessageText, getUserMessageDraftImages, isExactSlashCommand, isRunEndStrayClick, modelSupportsImageInput, offersBuiltinSlashCommandWhileStreaming, replaceLinksWithMarkdown, readImageFile, replaceTextareaRange, stacksComposerLayout, submitsSlashCommandOnEnter } = await jiti.import("./ChatInput.tsx");
+const { ChatInput, ModelErrorBanner, ModelScopeWarningBanner, RUN_END_CLICK_GUARD_MS, autoGrowTextarea, canClearBuiltinCommandInput, canRestoreUserMessage, canRunBuiltinSlashCommandWhileStreaming, cycleListIndex, getUpwardMenuMaxHeight, getUserMessageText, getUserMessageDraftImages, isExactSlashCommand, isRunEndStrayClick, modelSupportsImageInput, offersBuiltinSlashCommandWhileStreaming, replaceLinksWithMarkdown, readImageFile, replaceTextareaRange, stacksComposerLayout, submitsSlashCommandOnEnter } = await jiti.import("./ChatInput.tsx");
 const { isBareMcpCommand } = await jiti.import("@/lib/mcp-command");
 const { ModelSelector } = await jiti.import("./ModelSelector.tsx");
 // As ChatInput.tsx imports it: on Windows jiti loads "@/lib/draft-store.ts"
@@ -559,33 +559,14 @@ test("the live model selector can reapply its current model without changing dra
     const calls = [];
     const choose = script.runInNewContext({
       value: active ? option : null, isAutoSelection: automatic,
-      setOpen: (value) => calls.push(["open", value]),
-      setFilter: (value) => calls.push(["filter", value]),
       onChange: (provider, id) => calls.push(["change", provider, id]),
       onReselect: live ? (provider, id) => calls.push(["reselect", provider, id]) : undefined,
     });
     choose(option);
-    assert.deepEqual(calls, [["open", false], ["filter", ""], ...(expected ? [[expected, option.provider, option.modelId]] : [])]);
+    // The Radix menu closes itself on select; choose only dispatches the model.
+    assert.deepEqual(calls, expected ? [[expected, option.provider, option.modelId]] : []);
   }
   assert.match(readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8"), /onReselect=\{onModelChange\}/);
-});
-
-test("filters model options by name, id, provider and provider/id", () => {
-  const options = [
-    { provider: "ollama", modelId: "qwen3:latest", name: "Qwen 3" },
-    { provider: "anthropic", modelId: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
-    { provider: "openai", modelId: "gpt-5.4", name: "GPT-5.4" },
-    { provider: "relay-a", modelId: "gpt-5.4", name: "GPT-5.4" },
-  ];
-
-  assert.deepEqual(filterModelOptions(options, "QWEN"), [options[0]]);
-  assert.deepEqual(filterModelOptions(options, "claude-sonnet"), [options[1]]);
-  assert.deepEqual(filterModelOptions(options, "OpenAI"), [options[2]]);
-  assert.deepEqual(filterModelOptions(options, " anthropic/claude "), [options[1]]);
-  assert.deepEqual(filterModelOptions(options, "Relay-A/GPT"), [options[3]]);
-  assert.deepEqual(filterModelOptions(options, "gpt-5.4"), [options[2], options[3]]);
-  assert.equal(filterModelOptions(options, "missing").length, 0);
-  assert.equal(filterModelOptions(options, "  "), options);
 });
 
 test("renders the shared field model selector as a disabled gray control", () => {
