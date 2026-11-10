@@ -2701,7 +2701,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
 
         {/* Bash mode status label */}
         {bashMode && (
-          <div className={cn("mt-1 px-1 text-xs", bashExcluded ? "text-muted-foreground" : "text-primary")}>
+          // pl-6：与卡片圆角切点（rounded-[24px]）对齐，不再贴着卡片外沿。
+          <div className={cn("mt-1 pl-6 pr-1 text-xs", bashExcluded ? "text-muted-foreground" : "text-primary")}>
              {t("chat.shell")} · {bashExcluded ? t("chat.outputLocal") : t("chat.outputModel")}
           </div>
         )}

@@ -665,8 +665,8 @@ export function AppShell() {
   // panel may stay open under it.
   const handleMobileToolbarMoreOpenChange = useCallback((open: boolean) => {
     if (isMobile && open) setSidebarOpen(false);
-    // 不在这里清 top panel：Debug/系统/工具定义的开关就在本菜单里，菜单打开
-    // 先杀面板、选中再 toggle，等于永远关不掉；互斥由 toggleTopPanel 保证。
+    // 不在这里清 top panel：菜单打开的外点已经把它关了（面板无豁免），
+    // 选中再 toggle 是从关闭态开——互斥由 toggleTopPanel 保证。
     setMobileToolbarMoreOpen(open);
   }, [isMobile]);
 

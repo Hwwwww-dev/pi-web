@@ -229,7 +229,9 @@ function Sidebar({
               "fixed inset-0 z-50 bg-black/50",
               openMobile
                 ? "animate-in fade-in-0"
-                : "animate-out fade-out-0 fill-mode-forwards"
+                // 关闭退场的 340ms 里遮罩仍在文档中（透明度已归零），不能拦
+                // 住页面上的点击——否则关抽屉后紧接着的那一下会落空。
+                : "animate-out fade-out-0 fill-mode-forwards pointer-events-none"
             )}
             style={{ display: drawerVisible ? undefined : "none" }}
           />
@@ -238,9 +240,24 @@ function Sidebar({
             data-sidebar="sidebar"
             data-slot="sidebar"
             data-mobile="true"
+            // ☰ 是普通 Button（头部不在 Sheet Root 内，无法注册成
+            // SheetTrigger），Radix 内建的触发钮豁免帮不上忙：pointerdown
+            // 先 dismiss(false)、click 再 toggle(→true)，抽屉就「关了又开」。
+            // 两条外点路径都豁免 ☰，交给 click 正常开合。
             onPointerDownOutside={(event) => {
               const originalEvent = event.detail.originalEvent
               if (originalEvent && originalEvent.timeStamp <= drawerOpenCommittedAtRef.current) {
+                event.preventDefault()
+                return
+              }
+              const target = originalEvent?.target
+              if (target instanceof Element && target.closest('[data-slot="sidebar-trigger"]')) {
+                event.preventDefault()
+              }
+            }}
+            onFocusOutside={(event) => {
+              const target = event.detail.originalEvent.target
+              if (target instanceof Element && target.closest('[data-slot="sidebar-trigger"]')) {
                 event.preventDefault()
               }
             }}
