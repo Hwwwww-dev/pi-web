@@ -170,6 +170,15 @@ export interface ChatInputHandle {
 // "configured" sends no override, so the session follows settings.json defaultTools.
 const TOOL_PRESETS = ["configured", "chat-only", "read-only", "default", "full"] as const;
 type ToolPresetLabel = typeof TOOL_PRESETS[number];
+// Labels and one-line descriptions per preset, shared by the trigger chip and
+// both tool menus (desktop and phone render their own menu block).
+const TOOL_PRESET_TEXT: Record<ToolPresetLabel, { label: string; desc: string | null }> = {
+  configured: { label: "chat.toolPresetConfigured", desc: "chat.toolPresetConfiguredDesc" },
+  "chat-only": { label: "chat.chatOnly", desc: "chat.toolPresetChatOnlyDesc" },
+  "read-only": { label: "chat.toolPresetReadOnly", desc: "chat.toolPresetReadOnlyDesc" },
+  default: { label: "chat.toolPresetDefault", desc: "chat.toolPresetDefaultDesc" },
+  full: { label: "chat.toolPresetFull", desc: "chat.toolPresetFullDesc" },
+};
 const TOOL_PRESET_MAP: Record<ToolPresetLabel, ToolPreset> = {
   configured: "configured",
   "chat-only": "none",
@@ -1889,7 +1898,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     return titleCaseLabel(thinkingLevelMap[lvl] ?? lvl);
   })();
   const rawToolPresetLabel = Object.entries(TOOL_PRESET_MAP).find(([, v]) => v === (toolPreset ?? "configured"))?.[0] ?? "configured";
-  const toolPresetLabel = rawToolPresetLabel === "chat-only" ? t("chat.chatOnly") : titleCaseLabel(rawToolPresetLabel);
+  const toolPresetLabel = t(TOOL_PRESET_TEXT[rawToolPresetLabel as ToolPresetLabel].label);
 
   // Thinking selects inside the model popover now (pi's /model keeps reasoning
   // beside the model); the row shows no text pill. The model pill's CPU icon
@@ -2516,16 +2525,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       }}
                     >
                       {TOOL_PRESETS.map((lvl) => {
-                        let desc: string | null;
-                        if (lvl === "configured") desc = t("chat.configuredTools");
-                        else if (lvl === "chat-only") desc = null;
-                        else if (lvl === "read-only") desc = t("chat.readOnlyTools", { count: 4 });
-                        else if (lvl === "default") desc = t("chat.builtInTools", { count: 4 });
-                        else desc = t("chat.allBuiltInTools");
+                        const text = TOOL_PRESET_TEXT[lvl];
                         return (
                           <DropdownMenuRadioItem key={lvl} value={lvl}>
-                            <span className="flex-1 whitespace-nowrap">{lvl === "chat-only" ? t("chat.chatOnly") : titleCaseLabel(lvl)}</span>
-                            {desc && <span className="whitespace-nowrap text-xs text-muted-foreground">{desc}</span>}
+                            <span className="flex-1 whitespace-nowrap">{t(text.label)}</span>
+                            {text.desc && <span className="whitespace-nowrap text-xs text-muted-foreground">{t(text.desc)}</span>}
                           </DropdownMenuRadioItem>
                         );
                       })}
@@ -2639,16 +2643,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                           }}
                         >
                           {TOOL_PRESETS.map((lvl) => {
-                            let desc: string | null;
-                            if (lvl === "configured") desc = t("chat.configuredTools");
-                            else if (lvl === "chat-only") desc = null;
-                            else if (lvl === "read-only") desc = t("chat.readOnlyTools", { count: 4 });
-                            else if (lvl === "default") desc = t("chat.builtInTools", { count: 4 });
-                            else desc = t("chat.allBuiltInTools");
+                            const text = TOOL_PRESET_TEXT[lvl];
                             return (
                               <DropdownMenuRadioItem key={lvl} value={lvl}>
-                                <span className="flex-1 whitespace-nowrap">{lvl === "chat-only" ? t("chat.chatOnly") : titleCaseLabel(lvl)}</span>
-                                {desc && <span className="whitespace-nowrap text-xs text-muted-foreground">{desc}</span>}
+                                <span className="flex-1 whitespace-nowrap">{t(text.label)}</span>
+                                {text.desc && <span className="whitespace-nowrap text-xs text-muted-foreground">{t(text.desc)}</span>}
                               </DropdownMenuRadioItem>
                             );
                           })}
