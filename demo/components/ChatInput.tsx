@@ -49,7 +49,6 @@ import {
   PencilIcon,
   PlusIcon,
   RotateCcwIcon,
-  ShrinkIcon,
   SquareIcon,
   TriangleAlertIcon,
   Volume2Icon,
@@ -2477,28 +2476,21 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     />
                   </div>
                 )}
-            {/* Tools + compact share one icon menu: the row keeps no text
-                pills. The wrench tint says which preset is active (full
-                bright, chat-only dim, others muted), and compacting flips the
-                icon to a destructive stop. The menu's onSelect fires on a
-                deliberate click, so the run-end stray-click guard the old
-                direct button needed does not apply here. */}
-            {!isMobile && ((onToolPresetChange && !isStreaming) || (onCompact && (!isStreaming || isCompacting))) && (
+            {/* Tools share one icon menu: the row keeps no text pills. The
+                wrench tint says which preset is active (full bright, chat-only
+                dim, others muted), and compacting flips the icon to a
+                destructive stop (the menu then carries only stop-compaction).
+                The menu's onSelect fires on a deliberate click, so the run-end
+                stray-click guard the old direct button needed does not apply
+                here. */}
+            {!isMobile && ((onToolPresetChange && !isStreaming) || (onCompact && isCompacting)) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    title={isCompacting
-                      ? t("chat.stopCompaction")
-                      : onToolPresetChange && !isStreaming
-                        ? t("chat.changeToolPreset") + `: ${toolPresetLabel}`
-                        : t("chat.compactContext")}
-                    aria-label={isCompacting
-                      ? t("chat.stopCompaction")
-                      : onToolPresetChange && !isStreaming
-                        ? t("chat.changeToolPreset")
-                        : t("chat.compactContext")}
+                    title={isCompacting ? t("chat.stopCompaction") : `${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
+                    aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.changeToolPreset")}
                     className={cn(
                       "rounded-full",
                       isCompacting
@@ -2529,22 +2521,21 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         return (
                           <DropdownMenuRadioItem key={lvl} value={lvl}>
                             <span className="flex-1 whitespace-nowrap">{t(text.label)}</span>
-                            {text.desc && <span className="whitespace-nowrap text-xs text-muted-foreground">{t(text.desc)}</span>}
+                            {text.desc && <span className="min-w-0 text-xs text-muted-foreground">{t(text.desc)}</span>}
                           </DropdownMenuRadioItem>
                         );
                       })}
                     </DropdownMenuRadioGroup>
                   )}
-                  {onCompact && (!isStreaming || isCompacting) && (
+                  {onCompact && isCompacting && (
                     <>
                       {onToolPresetChange && !isStreaming && <DropdownMenuSeparator />}
                       <DropdownMenuItem
-                        onSelect={isCompacting ? onAbortCompaction : () => onCompact()}
-                        className={cn("text-muted-foreground", isCompacting && "text-destructive")}
+                        onSelect={onAbortCompaction}
+                        className="text-destructive"
                       >
-                        {isCompacting
-                          ? <><SquareIcon className="size-4 fill-current" aria-hidden="true" />{t("chat.stopCompaction")}</>
-                          : <><ShrinkIcon className="size-4" aria-hidden="true" />{t("chat.compactContext")}</>}
+                        <SquareIcon className="size-4 fill-current" aria-hidden="true" />
+                        {t("chat.stopCompaction")}
                       </DropdownMenuItem>
                     </>
                   )}
@@ -2594,7 +2585,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         <span className="flex-1">{t("chat.changeReasoningLabel")}</span>
                         <span className="text-xs text-muted-foreground">{thinkingDisplayLabel}</span>
                       </DropdownMenuSubTrigger>
-                     <DropdownMenuSubContent className="min-w-[180px]">
+                     <DropdownMenuSubContent collisionPadding={8} className="min-w-[140px] max-w-(--radix-dropdown-menu-content-available-width) max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto scrollbar-thin">
                         <DropdownMenuRadioGroup
                           value={isAutoThinkingSelection ? "auto" : (resolvedThinkingLevel ?? "")}
                           onValueChange={(next) => {
@@ -2634,7 +2625,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         <span className="flex-1">{t("chat.changeToolPreset")}</span>
                         <span className="text-xs text-muted-foreground">{toolPresetLabel}</span>
                       </DropdownMenuSubTrigger>
-                     <DropdownMenuSubContent className="min-w-[120px]">
+                     <DropdownMenuSubContent collisionPadding={8} className="min-w-[140px] max-w-(--radix-dropdown-menu-content-available-width) max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto scrollbar-thin">
                         <DropdownMenuRadioGroup
                           value={toolPreset ?? "configured"}
                           onValueChange={(next) => {
@@ -2647,7 +2638,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                             return (
                               <DropdownMenuRadioItem key={lvl} value={lvl}>
                                 <span className="flex-1 whitespace-nowrap">{t(text.label)}</span>
-                                {text.desc && <span className="whitespace-nowrap text-xs text-muted-foreground">{t(text.desc)}</span>}
+                                {text.desc && <span className="min-w-0 text-xs text-muted-foreground">{t(text.desc)}</span>}
                               </DropdownMenuRadioItem>
                             );
                           })}
@@ -2655,16 +2646,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                   )}
-                  {(!isStreaming || isCompacting) && onCompact && (
-                    <DropdownMenuItem
-                      onSelect={isCompacting ? onAbortCompaction : () => onCompact()}
-                      className={cn("text-muted-foreground", isCompacting && "text-destructive")}
-                    >
-                      {isCompacting ? (
-                        <><SquareIcon className="size-4 fill-current" aria-hidden="true" />{t("chat.stopCompaction")}</>
-                      ) : (
-                        <><ShrinkIcon className="size-4" aria-hidden="true" />{t("chat.compact")}</>
-                      )}
+                  {isCompacting && onCompact && (
+                    <DropdownMenuItem onSelect={onAbortCompaction} className="text-destructive">
+                      <SquareIcon className="size-4 fill-current" aria-hidden="true" />
+                      {t("chat.stopCompaction")}
                     </DropdownMenuItem>
                   )}
                   {onSoundToggle !== undefined && (
