@@ -359,10 +359,12 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
   const ctx: Ctx = { t, now, clock, myHolder, titleOf };
 
   return (
-    // The sheet's content block: the sheet owns the frame, the section fills it.
+    // Same drawer block as the system/tools panels: a fixed height under the
+    // top bar, the popover shell owns the rounded bottom corners, the section
+    // fills it with its own header + scrolling body.
     <section
       ref={sectionRef}
-      className="debug-panel flex h-full min-h-0 flex-col bg-background text-foreground"
+      className="debug-panel flex h-[min(600px,50dvh)] min-h-0 flex-col bg-card text-foreground"
       aria-label={t("debug.panelLabel")}
     >
       <div className="debug-panel-header flex min-w-0 shrink-0 items-center gap-3 border-b border-border px-4 py-2 text-xs">

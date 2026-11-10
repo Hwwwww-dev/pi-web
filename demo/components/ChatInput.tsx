@@ -3,7 +3,7 @@
 import React, { useRef, useState, useCallback, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, memo, KeyboardEvent } from "react";
 import type { BuiltinSlashCommandResult, CompactResultInfo, QueuedSubmission, SlashCommandInfo } from "@/hooks/useAgentSession";
 import type { SkillsResponse } from "@/lib/api-types";
-import type { ExtensionStatusItem, TextContent, UserMessage } from "@/lib/types";
+import type { TextContent, UserMessage } from "@/lib/types";
 import {
   clearDraft,
   getDraft,
@@ -34,8 +34,6 @@ import { useChatAppearance } from "@/hooks/useChatAppearance";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import type { ToolPreset } from "@/lib/tool-presets";
 import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
-import { ExtensionStatusButton, PermissiveModeChip } from "./ExtensionStatus";
-import { splitExtensionStatuses } from "@/lib/extension-status";
 import {
   ArrowUpIcon,
   CheckIcon,
@@ -145,8 +143,6 @@ interface Props {
   draftKey?: string;
   /** Session working directory — enables the @ file autocomplete menu */
   cwd?: string | null;
-  /** Extension status texts; the permissive flag renders as its own chip. */
-  extensionStatuses?: ExtensionStatusItem[];
   /** Files picked with the attach button, handled like files dropped onto the chat. Without it the button takes images only. */
   onAttachFiles?: (files: File[]) => void;
 }
@@ -814,7 +810,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   onPromptWithStreamingBehavior,
   draftKey,
   cwd,
-  extensionStatuses,
   onAttachFiles,
   compact = false,
 }: Props, ref) {
@@ -2006,8 +2001,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   // The run-end stray-click guard's pure helper (isRunEndStrayClick) stays
   // exported for its tests; the composer currently has no consumer wiring.
 
-  const permissiveStatus = compact ? null : splitExtensionStatuses(extensionStatuses ?? []).permissive;
-
   // The composer's main button follows the input: a message waiting to be
   // sent is always the primary action — while a turn runs that queues a
   // follow-up, the same thing Enter does — and only an empty composer
@@ -2686,11 +2679,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-
-                <ExtensionStatusButton statuses={extensionStatuses ?? []} />
-                {/* YOLO is a marker, not a control: it carries no box, and it closes
-                    the row at the far right. */}
-                {permissiveStatus && <PermissiveModeChip text={permissiveStatus} />}
               </div>
 
               {sendCluster}

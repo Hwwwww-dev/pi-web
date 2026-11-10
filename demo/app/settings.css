@@ -38,6 +38,44 @@
   }
 }
 
+/* The settings dialog floats inset from a phone's edges — rounded like every
+   other drawer — instead of filling the screen flat: the safe areas move the
+   card's edges (insets), not pad its content (ProjectTrustDialog keeps the
+   inner-padding variant). iOS standalone's env() can report 0, so the
+   fallback insets with device sizes; +8px mirrors the edge margins. */
+@media (max-width: 640px) {
+  .settings-card-safe {
+    inset: calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px) 8px;
+    /* Stretch between the insets instead of the utilities' centered size, and
+       drop the Radix centering translate: plain rules beat the layered
+       utilities on every width this media query matches (including exactly
+       640px, where max-sm: does not). */
+    width: auto;
+    height: auto;
+    transform: none;
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) {
+    .settings-card-safe {
+      top: max(67px, calc(env(safe-area-inset-top) + 8px));
+      right: max(16px, calc(env(safe-area-inset-right) + 8px));
+      bottom: max(32px, calc(env(safe-area-inset-bottom) + 8px));
+      left: max(16px, calc(env(safe-area-inset-left) + 8px));
+    }
+  }
+
+  @media (display-mode: standalone) and (orientation: landscape) {
+    .settings-card-safe {
+      top: max(16px, calc(env(safe-area-inset-top) + 8px));
+      right: max(67px, calc(env(safe-area-inset-right) + 8px));
+      bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px));
+      left: max(67px, calc(env(safe-area-inset-left) + 8px));
+    }
+  }
+}
+
 [data-slot="alert-dialog-overlay"]:has(+ [data-slot="alert-dialog-content"].mcp-remove-confirm),
 [data-slot="alert-dialog-content"].mcp-remove-confirm {
   z-index: 1101;

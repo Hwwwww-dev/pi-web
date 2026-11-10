@@ -1164,7 +1164,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       onDismissCompactError={dismissCompactError}
       compactResult={compactResult}
       toolPreset={toolPreset}
-      extensionStatuses={extensionStatuses}
       onToolPresetChange={(session && !isHiddenRelation(session.relation)) || isNew ? handleToolPresetChange : undefined}
       thinkingLevel={thinkingLevel}
       isAutoThinkingSelection={isAutoThinkingSelection}

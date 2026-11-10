@@ -1,6 +1,7 @@
 "use client";
 
 import { stripAnsi } from "@/lib/ansi";
+import { isPermissiveStatusText } from "@/lib/extension-status";
 import type { ExtensionStatusItem, ExtensionWidgetItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
 import { ExtensionWidgets } from "./ExtensionWidgets";
@@ -86,12 +87,19 @@ export function ExtensionStatusBar({
       aria-label={plainStatusLine}
       title={plainStatusLine}
     >
-      {cells.map((cell, index) => cell.kind === "text" ? (
+      {cells.map((cell, index) => {
+        // The permissive marker ("yolo", pi-permission-system) renders as the red
+        // pill here — the composer's own pill row no longer repeats it, so this
+        // row is the marker's only surface.
+        const permissive = cell.kind === "text" && isPermissiveStatusText(cell.text);
+        return cell.kind === "text" ? (
         <span
           key={index}
-          className="inline-flex max-w-full items-center whitespace-pre rounded-md bg-muted/60 px-2 py-1 font-mono text-[11.5px] leading-4 text-muted-foreground"
+          className={permissive
+            ? "inline-flex max-w-full items-center whitespace-pre rounded-md border border-destructive/35 bg-destructive/[0.06] px-2 py-1 font-mono text-[11.5px] font-semibold leading-4 tracking-[0.6px] text-destructive"
+            : "inline-flex max-w-full items-center whitespace-pre rounded-md bg-muted/60 px-2 py-1 font-mono text-[11.5px] leading-4 text-muted-foreground"}
         >
-          <AnsiText text={cell.text} />
+          {permissive ? stripAnsi(cell.text).toUpperCase() : <AnsiText text={cell.text} />}
         </span>
       ) : (
         <Button
@@ -107,7 +115,8 @@ export function ExtensionStatusBar({
         >
           {cell.label}
         </Button>
-      ))}
+        );
+      })}
     </div>
   ) : null;
 

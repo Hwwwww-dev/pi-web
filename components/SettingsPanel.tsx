@@ -793,9 +793,11 @@ export function SettingsPanel({
         className={cn(
           // The overlay and surface sit above every in-page overlay (file panel,
           // minimap, widgets); the trust dialog mounts after and stacks above.
-          "settings-phone-safe z-[1000] flex flex-col gap-0 overflow-hidden p-0",
+          // A phone floats the card inset from the edges (.settings-card-safe's
+          // plain rules own the whole phone geometry) instead of filling the
+          // screen flat, so the rounded frame and border stay everywhere.
+          "settings-card-safe z-[1000] flex flex-col gap-0 overflow-hidden p-0",
           "h-[84vh] max-h-[calc(100dvh-16px)] w-[min(1080px,calc(100vw-16px))] max-w-none sm:max-w-none rounded-xl",
-          "max-sm:inset-0 max-sm:h-full max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
         )}
       >
         <DialogTitle className="sr-only">{t("settings.title")}</DialogTitle>
