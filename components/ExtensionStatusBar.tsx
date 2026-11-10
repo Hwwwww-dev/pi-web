@@ -82,7 +82,7 @@ export function ExtensionStatusBar({
   const statusLine = cells.length > 0 ? (
     <div
       role="status"
-      className="flex min-w-0 flex-1 items-center gap-1 overflow-auto px-1.5 [scrollbar-width:thin]"
+      className="flex min-w-0 flex-1 items-center gap-1 overflow-auto pl-0.5 pr-1.5 [scrollbar-width:thin]"
       aria-label={plainStatusLine}
       title={plainStatusLine}
     >
@@ -115,7 +115,7 @@ export function ExtensionStatusBar({
     // `extension-status-bar` is a layout hook (keyboard-open collapse below); the
     // styling itself is shadcn utilities on the row's pills. `relative` anchors
     // an expanded widget's floating panel above the row.
-    <div className="extension-status-bar relative mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] shrink-0 items-stretch pt-2 pb-1">
+    <div className="extension-status-bar relative mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] shrink-0 items-stretch pt-1 pb-1">
       {widgets.length > 0 ? <ExtensionWidgets widgets={widgets}>{statusLine}</ExtensionWidgets> : statusLine}
     </div>
   );
