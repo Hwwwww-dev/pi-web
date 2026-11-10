@@ -113,35 +113,35 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
       className="absolute left-0 z-30 max-[640px]:hidden -translate-y-1/2"
       style={{ top: `${topPct}%` }}
     >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverAnchor asChild>
-            <Button
-              ref={buttonRef}
-              type="button"
-              variant="ghost"
-              className={cn(
-                "h-9 gap-1 rounded-l-none rounded-r-lg border border-l-0 bg-sidebar px-[7px] text-muted-foreground shadow-sm select-none [touch-action:none]",
-                "hover:bg-secondary hover:text-foreground",
-                open && "bg-secondary text-foreground",
-              )}
-              aria-expanded={open}
-              aria-label={`${t("keepalive.title")} (${slots.length})`}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-            >
-              {hasRunning && <span className="inline-flex [&_svg]:size-[11px]"><RunningSessionIndicator /></span>}
-              {!hasRunning && hasUnread && <span className="inline-flex [&_svg]:size-[11px]"><UnreadSessionIndicator /></span>}
-              <LayersIcon className="size-[11px]" aria-hidden="true" />
-              <span className="text-xs font-bold tabular-nums">{slots.length}</span>
-            </Button>
-          </PopoverAnchor>
-        </TooltipTrigger>
-        <TooltipContent side="right">{t("keepalive.title")}</TooltipContent>
-      </Tooltip>
-
       <Popover open={open} onOpenChange={setOpen}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverAnchor asChild>
+              <Button
+                ref={buttonRef}
+                type="button"
+                variant="ghost"
+                className={cn(
+                  "h-9 gap-1 rounded-l-none rounded-r-lg border border-l-0 bg-sidebar px-[7px] text-muted-foreground shadow-sm select-none [touch-action:none]",
+                  "hover:bg-secondary hover:text-foreground",
+                  open && "bg-secondary text-foreground",
+                )}
+                aria-expanded={open}
+                aria-label={`${t("keepalive.title")} (${slots.length})`}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+              >
+                {hasRunning && <span className="inline-flex [&_svg]:size-[11px]"><RunningSessionIndicator /></span>}
+                {!hasRunning && hasUnread && <span className="inline-flex [&_svg]:size-[11px]"><UnreadSessionIndicator /></span>}
+                <LayersIcon className="size-[11px]" aria-hidden="true" />
+                <span className="text-xs font-bold tabular-nums">{slots.length}</span>
+              </Button>
+            </PopoverAnchor>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t("keepalive.title")}</TooltipContent>
+        </Tooltip>
+
         <PopoverContent
           // The dock button toggles on its own pointer-up (a drag ends without
           // a click), so a press on it must not count as an outside dismissal.

@@ -943,17 +943,18 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
     // boundary between turns, so it needs the same breathing room as the
     // messages themselves (the assistant above contributes its own 12px).
     <div
-      className="mt-1 mb-3 flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground/60 [font-variant-numeric:tabular-nums]"
+      className="mt-1 mb-3 flex flex-nowrap items-center gap-2.5 overflow-hidden text-xs text-muted-foreground/60 whitespace-nowrap [font-variant-numeric:tabular-nums]"
       title={usage ? formatUsage(usage) : undefined}
     >
-      {model && <span>{model}</span>}
+      {model && <span className="shrink-0">{model}</span>}
       {(hasUsage || hasCtx) && (
         <UsageBar
           usage={usage ? { input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total } : null}
           ctx={ctx}
+          className="min-w-0 flex-nowrap overflow-hidden"
         />
       )}
-      {time && <span>{time}</span>}
+      {time && <span className="shrink-0">{time}</span>}
       {copySource && (
         <Button
           type="button"
@@ -969,7 +970,7 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
           title={t("i18n.copyMessage")}
           aria-label={t("i18n.copyMessage")}
           className={cn(
-            "ml-auto size-4 rounded-sm p-0.5",
+            "ml-auto size-4 shrink-0 rounded-sm p-0.5",
             copied ? "text-primary" : "text-muted-foreground",
           )}
         >
