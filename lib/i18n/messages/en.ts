@@ -764,6 +764,8 @@ export const enLocale: LocalePlugin = {
     "chat.activity.failed": "failed",
     "chat.activity.parameters": "Parameters",
     "chat.activity.result": "Result",
+    "chat.trace.running": "Running {target}",
+    "chat.trace.failed": "Failed: {target}",
     "chat.trace.ran": "Ran {command}",
     "chat.trace.read": "Read {path}",
     "chat.trace.wrote": "Wrote {path}",

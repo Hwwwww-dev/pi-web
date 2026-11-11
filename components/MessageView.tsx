@@ -829,7 +829,7 @@ function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDur
     const tc = block as ToolCallContent;
     const result = toolResults?.get(tc.toolCallId);
     const duration = toolCallDurations?.get(tc.toolCallId);
-    return <ToolRow block={tc} result={result} duration={duration} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} isStreaming={isStreaming} />;
+    return <ToolRow block={tc} result={result} duration={duration} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} isStreaming={isStreaming} />;
   }
   return null;
 }

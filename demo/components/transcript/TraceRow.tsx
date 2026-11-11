@@ -62,6 +62,7 @@ export function TraceRow({
   icon,
   title,
   titleClassName,
+  chips,
   description,
   status = "done",
   foldKey,
@@ -78,6 +79,8 @@ export function TraceRow({
   icon: ReactNode;
   title: string;
   titleClassName?: string;
+  /** File chips the call named, right after the title (第 4.1 节). */
+  chips?: ReactNode;
   description?: string;
   status?: ToolViewStatus;
   /** Fold memory key (`toolCallId`, `groupKey`, …). */
@@ -104,6 +107,7 @@ export function TraceRow({
     <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="w-full min-w-0">
       <TraceIcon>{icon}</TraceIcon>
       <TraceTitle className={cn("min-w-0", titleClassName)}>{title}</TraceTitle>
+      {chips}
       {description && <TraceDescription>{description}</TraceDescription>}
       {trailing && <span className="ml-auto shrink-0">{trailing}</span>}
     </TraceLine>

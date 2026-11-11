@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/code-block";
 import { Spinner } from "@/components/ui/spinner";
 import { AnsiText } from "@/components/AnsiText";
+import { HighlightedCode } from "@/components/HighlightedCode";
 import { isTuiText } from "@/lib/ansi";
 import type { ToolView } from "@/lib/tool-view";
 import { TraceRow } from "./TraceRow";
@@ -55,8 +56,8 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, usage
               <CodeBlockCopyButton value={command} />
             </CodeBlockActions>
           </CodeBlockHeader>
-          <CodeBlockContent wrap className="max-h-[var(--card-max-height)]">
-            {isTuiText(output) ? <AnsiText text={output} /> : output}
+          <CodeBlockContent wrap={false} className="max-h-[var(--card-max-height)]">
+            {isTuiText(output) ? <AnsiText text={output} /> : <HighlightedCode code={output} />}
           </CodeBlockContent>
         </CodeBlock>
       )}

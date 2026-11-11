@@ -164,7 +164,9 @@ export interface ToolView {
   sections: ToolViewSection[];
   /** 该行自己的完整文本（shell 命令），进 `CodeBlockHeader` 与复制按钮。 */
   command?: string;
-  /** 可点击的文件 chip，最多显示 4 个。 */
+  /** 状态相关标题的目标（命令/文件名/路径/查询词）：进行中拼「正在运行 …」，失败拼「运行失败：…」。 */
+  target?: string;
+  /** 可点击的文件 chip，最多显示 4 个；相对路径按会话 cwd 解析（`resolveLocalFilePath`）。 */
   filePaths: string[];
   /** 结果里的图片（data URL），渲染在行外。 */
   images: string[];
@@ -624,7 +626,7 @@ const [error, ...frames] = stack.split("\n").map((line) => line.trim())
 **本项目实现** `components/transcript/SubagentTrace.tsx`
 
 - 标题 `运行子代理` / `运行子代理 <name>`；进行中 `status="running"` + `TraceDescription`（已运行时长）。
-- 内容：`<Trace>` 内是子代理做的事（来自 `result.details` 的运行记录），下面是报告正文（`MarkdownBody`）。
+- 内容：`<Trace>` 内是子代理做的事，下面是报告正文（`MarkdownBody`）。步骤取自 `view.sections` 的 `steps` 段，由 `subagentView` 从 `result.details` 的运行记录生成；当前内置 subagent 的 details 不带 step 记录，因此行内只渲染报告正文，等 producer 提供 steps 后自动出现。
 - 行尾动作保留：点击打开子代理 tab（`onOpenSubagent`），沿用 `SessionChatPanel`，不改。
 - 后台运行未完成：只有 `TraceLine`（`status="running"`），没有内容区。
 

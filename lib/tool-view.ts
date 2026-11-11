@@ -68,6 +68,8 @@ export interface ToolView {
   sections: ToolViewSection[];
   /** The call's own text when its detail shows it as a block (a shell command). */
   command?: string;
+  /** The command/path/pattern a running or failed title wraps (硬规则 6). */
+  target?: string;
   filePaths: string[];
   images: string[];
   /** A video or audio result: the browser's own player, never the bytes as text. */
@@ -320,8 +322,7 @@ function prepare({ block, result, t }: ToolViewInput): Prepared {
   const command = getToolCategory(block.toolName) === "terminal" && !streamingInput && typeof block.input.command === "string"
     ? block.input.command
     : null;
-  const isError = (result?.isError ?? false)
-    || (isApplyPatchToolName(block.toolName) && applyPatchResultHasFailures(result?.details));
+  const isError = isFailedResult(block.toolName, result);
   return {
     block,
     t,
@@ -368,8 +369,24 @@ function kindOf(p: Prepared): ToolViewKind {
   return "generic";
 }
 
+/** Whether a result counts as failed: pi's own flag, or an applied patch that reported failures. */
+export function isFailedResult(toolName: string, result: ToolResultMessage | undefined): boolean {
+  if (!result) return false;
+  return result.isError === true || (isApplyPatchToolName(toolName) && applyPatchResultHasFailures(result.details));
+}
+
 export function toToolView(input: ToolViewInput): ToolView {
   const p = prepare(input);
+  // A title keeps its tense (硬规则 6): running says so, a failure says what failed.
+  const view = createView(p);
+  if (view.target) {
+    if (view.status === "running") view.title = p.t("chat.trace.running", { target: view.target });
+    else if (view.status === "error") view.title = p.t("chat.trace.failed", { target: view.target });
+  }
+  return view;
+}
+
+function createView(p: Prepared): ToolView {
   switch (kindOf(p)) {
     case "mcp": return mcpView(p);
     case "subagent": return subagentView(p);
@@ -447,6 +464,7 @@ function terminalView(p: Prepared): ToolView {
   const view = baseView(p);
   view.kind = "terminal";
   view.title = p.t("chat.trace.ran", { command: firstLine(p.command ?? "") });
+  view.target = firstLine(p.command ?? "");
   view.sections = p.detail(isEmptyResult(p.text) ? [] : [{ kind: "code", text: p.text ?? "", language: "text" }]);
   return view;
 }
@@ -458,6 +476,7 @@ function writeView(p: Prepared): ToolView {
   view.title = p.filePaths[0]
     ? p.t("chat.trace.wrote", { path: baseName(p.filePaths[0]) })
     : p.t(TOOL_CATEGORY_LABEL_KEYS.edit);
+  view.target = p.filePaths[0] ? baseName(p.filePaths[0]) : undefined;
   view.description = p.writtenFileText === null ? p.preview || undefined : undefined;
   view.sections = p.detail([
     ...(p.writtenFileText === null
@@ -477,6 +496,7 @@ function editView(p: Prepared): ToolView {
     : names.length > 1
       ? p.t("chat.trace.editedFiles", { count: names.length })
       : p.t(TOOL_CATEGORY_LABEL_KEYS.edit);
+  view.target = names.length === 1 ? baseName(names[0] ?? "") : undefined;
   const patchText = p.patchFiles
     ? null
     : p.diffText ?? (isApplyPatchToolName(p.block.toolName) ? getApplyPatchInputText(p.block.input, p.block.rawInput) || null : null);
@@ -499,6 +519,7 @@ function readView(p: Prepared): ToolView {
   view.title = p.filePaths[0]
     ? p.t("chat.trace.read", { path: baseName(p.filePaths[0]) })
     : p.t(TOOL_CATEGORY_LABEL_KEYS.view);
+  view.target = p.filePaths[0] ? baseName(p.filePaths[0]) : undefined;
   view.description = p.filePaths[0] ? undefined : p.preview || undefined;
   view.sections = p.detail([
     ...(p.fields ? fieldsSection(p.fields) : jsonSection(p.inputStr, "json")),
@@ -514,6 +535,7 @@ function searchView(p: Prepared): ToolView {
     : typeof p.block.input.query === "string" ? p.block.input.query : "";
   view.kind = "search";
   view.title = p.t("chat.trace.searched", { pattern: query || p.preview || p.t(TOOL_CATEGORY_LABEL_KEYS.search) });
+  view.target = query || p.preview || undefined;
   view.sections = p.detail([...fieldsSection(p.fields), ...resultSections(p.text, "text")]);
   return view;
 }
@@ -525,6 +547,7 @@ function webView(p: Prepared): ToolView {
   view.title = sources.length > 0
     ? p.t("chat.trace.sources", { count: sources.length })
     : p.t("chat.trace.fetched", { target: p.preview || p.t(TOOL_CATEGORY_LABEL_KEYS.web) });
+  view.target = p.preview || undefined;
   if (sources.length > 0) view.sources = sources;
   view.sections = p.detail(sources.length > 0
     ? []

@@ -95,7 +95,7 @@ export interface ToolCallEntry {
 
 
 
-export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, onOpenFile, onOpenSubagent, isStreaming }: {
+export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, cwd, onOpenFile, onOpenSubagent, isStreaming }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
   /** Tool run time in milliseconds (pi 1.1's durationMs, else the timestamps' difference). */
@@ -105,6 +105,8 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   /** Prompt tokens of the next request — context occupancy after this call. */
   ctxTokens?: number;
   ctxWindow?: number;
+  /** The session directory a chip's relative path resolves against. */
+  cwd?: string;
   /** Opens one of the files the call named (its chips). */
   onOpenFile?: (filePath: string) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
@@ -147,7 +149,9 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
 
   // A failed call is its own shape (第 5.2 节): the X icon, and the whole error
   // repeated above whatever else the call holds.
-  if (view.status === "error" && view.error) {
+  // A terminal failure keeps its command header and copy button (第 12.1 节), so
+  // only the other kinds take the error shape.
+  if (view.status === "error" && view.error && view.kind !== "terminal") {
     const resultText = view.sections.find((section) => section.kind === "code" && section.label === "result")?.text;
     const rest = view.sections.filter((section) => section !== view.sections.find((s) => s.kind === "code" && s.label === "result"));
     return (
@@ -170,6 +174,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
       <SubagentTrace
         label={subagent?.description || subagent?.profile}
         status={view.status}
+        steps={view.sections.find((section) => section.kind === "steps")?.steps}
         report={view.sections.find((section) => section.kind === "markdown")?.text}
         foldKey={view.foldKey}
         action={subagent && onOpenSubagent ? (
@@ -219,14 +224,17 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
       trailing={trailing}
       usage={usageNode}
       below={mediaNode}
+      cwd={cwd}
       onOpenFile={onOpenFile}
     />
   );
 }
 
-export function ToolGroupRow({ calls, ctxWindow, onOpenFile, onOpenSubagent }: {
+export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent }: {
   calls: ToolCallEntry[];
   ctxWindow?: number;
+  /** The session directory a chip's relative path resolves against. */
+  cwd?: string;
   onOpenFile?: (filePath: string) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
 }) {
@@ -277,6 +285,7 @@ export function ToolGroupRow({ calls, ctxWindow, onOpenFile, onOpenSubagent }: {
             usage={call.usage}
             ctxTokens={call.ctxTokens}
             ctxWindow={ctxWindow}
+            cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
           />
@@ -676,6 +685,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
             usage={only.usage}
             ctxTokens={only.ctxTokens}
             ctxWindow={ctxWindow}
+            cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
             isStreaming={live && !only.result}

@@ -5,7 +5,8 @@ import test from "node:test";
 const component = await readFile(new URL("./TuiText.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const chatWindow = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
-const activityRows = await readFile(new URL("./ActivityRows.tsx", import.meta.url), "utf8");
+const terminalTrace = await readFile(new URL("./transcript/TerminalTrace.tsx", import.meta.url), "utf8");
+const toolTrace = await readFile(new URL("./transcript/ToolTrace.tsx", import.meta.url), "utf8");
 
 test("terminal text renders as an unwrapped, scrolled block", () => {
   assert.match(component, /"tui-text"/);
@@ -21,9 +22,8 @@ test("notifications, dialog titles and option previews fall back to terminal ren
 });
 
 test("tool results stop reflowing when they are terminal output", () => {
-  assert.match(activityRows, /const tui = isTuiText\(text\);/);
-  // The ui CodeBlockContent owns the wrap classes; `wrap={!tui}` keeps
-  // terminal output unwrapped and every other result wrapped.
-  assert.match(activityRows, /wrap=\{!tui\}/);
-  assert.match(activityRows, /!tui && "\[overflow-wrap:anywhere\]"/);
+  // 第 8 节第 8 条：终端输出不 reflow。终端行在 TerminalTrace，其它代码段在 ToolTrace。
+  assert.match(terminalTrace, /isTuiText\(output\)/);
+  assert.match(terminalTrace, /<CodeBlockContent wrap=\{false\}/);
+  assert.match(toolTrace, /<CodeBlockContent wrap=\{wrap\}/);
 });

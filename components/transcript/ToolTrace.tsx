@@ -16,15 +16,17 @@ import {
   WrenchIcon,
 } from "lucide-react";
 import { AnsiText } from "@/components/AnsiText";
-import { Button } from "@/components/ui/button";
+import { HighlightedCode } from "@/components/HighlightedCode";
 import { isTuiText } from "@/lib/ansi";
 import { CodeBlock, CodeBlockContent, CodeBlockLine } from "@/components/ui/code-block";
 import { Spinner } from "@/components/ui/spinner";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
+import { cn } from "@/lib/utils";
 import { PatchDiffFiles } from "@/components/PatchDiffFiles";
 import { SafeMarkdownBody } from "@/components/SafeMarkdownBody";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { resolveLocalFilePath } from "@/lib/file-links";
 import { baseName, type ToolView, type ToolViewKind, type ToolViewSection, type ToolViewStatus, type ToolViewStep } from "@/lib/tool-view";
 import { TraceRow } from "./TraceRow";
 
@@ -58,22 +60,25 @@ const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
 function CodeSection({ text, language, label, wrap = true }: {
   text: string;
   language?: string;
-  label?: string;
+  label?: ToolViewSection["label"];
   wrap?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <CodeBlock size="sm" data-language={language}>
-      {label && <CodeBlockLine className="text-muted-foreground">{label}</CodeBlockLine>}
+      {label && <CodeBlockLine className="text-muted-foreground">{t(`chat.activity.${label}`)}</CodeBlockLine>}
       <CodeBlockContent wrap={wrap} className="max-h-[var(--card-max-height)]" tabIndex={0}>
-        {text}
+        <HighlightedCode code={text} language={language} />
       </CodeBlockContent>
     </CodeBlock>
   );
 }
 
 function FieldsSection({ section }: { section: ToolViewSection }) {
+  const { t } = useI18n();
   return (
     <CodeBlock size="sm">
+      {section.label && <CodeBlockLine className="text-muted-foreground">{t(`chat.activity.${section.label}`)}</CodeBlockLine>}
       <CodeBlockContent wrap className="max-h-[var(--card-max-height)]">
         {(section.fields ?? []).map((field) => (
           <CodeBlockLine key={field.key}>
@@ -112,7 +117,7 @@ export function ToolSection({ section }: { section: ToolViewSection }) {
       // TUI 输出（ANSI 转义）只能按终端文本渲染，code block 会原样显示转义序列。
       return isTuiText(section.text ?? "")
         ? <AnsiText text={section.text ?? ""} />
-        : <CodeSection text={section.text ?? ""} language={section.language} label={section.label} />;
+        : <CodeSection text={section.text ?? ""} language={section.language} label={section.label} wrap={true} />;
     case "diff":
       return section.files
         ? <PatchDiffFiles files={section.files} layout={isMobile ? "stacked" : "split"} />
@@ -135,28 +140,46 @@ const MAX_FILE_CHIPS = 4;
  * The files a call named (第 4.1 节): one chip each, opening the viewer at that
  * file. Chips only appear when the viewer can take them.
  */
-function FileChips({ paths, onOpenFile }: { paths: string[]; onOpenFile: (path: string) => void }) {
+function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; onOpenFile: (path: string) => void }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {paths.slice(0, MAX_FILE_CHIPS).map((path) => (
-        <Button
-          key={path}
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-6 gap-1 px-2 font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))]"
-          onClick={() => onOpenFile(path)}
-          title={path}
-        >
-          <FileTextIcon className="size-3" />
-          {baseName(path)}
-        </Button>
-      ))}
-    </div>
+    <span className="flex min-w-0 shrink items-center gap-1.5">
+      {paths.slice(0, MAX_FILE_CHIPS).map((path) => {
+        // A call names files relative to the session cwd; the viewer needs the absolute path.
+        const resolved = resolveLocalFilePath(path, cwd);
+        const label = baseName(resolved ?? path);
+        return (
+          <span
+            key={path}
+            role={resolved ? "button" : undefined}
+            tabIndex={resolved ? 0 : undefined}
+            className={cn(
+              "inline-flex max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-sm border border-border px-1.5 py-px font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))] whitespace-nowrap hover:bg-accent hover:text-accent-foreground",
+              !resolved && "cursor-default",
+            )}
+            title={resolved ?? path}
+            aria-label={label}
+            onClick={(event) => {
+              // The row toggles on click; opening a file is not a toggle.
+              event.stopPropagation();
+              if (resolved) onOpenFile(resolved);
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.stopPropagation();
+              event.preventDefault();
+              if (resolved) onOpenFile(resolved);
+            }}
+          >
+            <FileTextIcon className="size-3 shrink-0" />
+            <span className="overflow-hidden text-ellipsis">{label}</span>
+          </span>
+        );
+      })}
+    </span>
   );
 }
 
-export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below, activityTool, onOpenFile }: {
+export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below, activityTool, cwd, onOpenFile }: {
   view: ToolView;
   /** Duration and usage belong to the turn, not the tool (第 8 节). */
   trailing?: ReactNode;
@@ -166,26 +189,24 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below,
   below?: ReactNode;
   /** The pi tool name, kept as `data-activity-tool`. */
   activityTool?: string;
+  /** The session directory a chip's relative path resolves against. */
+  cwd?: string;
   /** Opens a file the call named (its chips). */
   onOpenFile?: (path: string) => void;
 }) {
   const { t } = useI18n();
   const chips = onOpenFile && view.filePaths.length > 0
-    ? <FileChips paths={view.filePaths} onOpenFile={onOpenFile} />
+    ? <FileChips paths={view.filePaths} cwd={cwd} onOpenFile={onOpenFile} />
     : null;
-  const content = chips || view.sections.length > 0
-    ? (
-      <>
-        {chips}
-        {view.sections.map((section, index) => <ToolSection key={index} section={section} />)}
-      </>
-    )
+  const content = view.sections.length > 0
+    ? view.sections.map((section, index) => <ToolSection key={index} section={section} />)
     : undefined;
 
   return (
     <TraceRow
       icon={view.status === "running" ? <Spinner className="size-3.5" /> : KIND_ICONS[view.kind]}
       title={view.title}
+      chips={chips}
       description={view.streamingInput ? t("chat.generatingToolInput") : view.description}
       status={view.status}
       foldKey={view.foldKey}

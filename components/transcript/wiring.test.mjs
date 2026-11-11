@@ -15,6 +15,9 @@ const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const { ToolRow, TurnActivityBody } = await jiti.import("../ActivityRows.tsx");
 const { TurnTrace } = await jiti.import("./TurnTrace.tsx");
+const { SubagentTrace } = await jiti.import("./SubagentTrace.tsx");
+const { isFailedResult } = await jiti.import("@/lib/tool-view");
+const { resolveLocalFilePath } = await jiti.import("@/lib/file-links");
 const { UsageBar } = await jiti.import("../UsageBar.tsx");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 const { setToolCallExpanded, clearExpandedToolCalls } = await jiti.import("@/lib/tool-call-expansion");
@@ -74,14 +77,18 @@ test("a to-do snapshot splits into open and done segments", () => {
 });
 
 test("a failed call shows the X icon and repeats the whole error", () => {
-  const block = call("bash", { command: "npm test" });
+  clearExpandedToolCalls();
+  const block = call("edit", { file_path: "a.ts" });
+  setToolCallExpanded(block.toolCallId, true);
   const html = renderRow(block, {
-    ...result("bash", "Error: 3 tests failed\n    at run (/repo/test/a.test.mjs:12:3)"),
+    ...result("edit", "Error: 3 tests failed\n    at run (/repo/test/a.test.mjs:12:3)"),
     isError: true,
   });
 
   assert.match(html, /lucide-circle-x/);
   assert.match(html, /data-status="error"/);
+  assert.match(html, /Error: 3 tests failed/);
+  clearExpandedToolCalls();
 });
 
 test("images, video and audio a call produced render as media, not as text", () => {
@@ -154,5 +161,96 @@ test("the process body forwards the file opener to a grouped call's row", () => 
   }));
 
   assert.match(html, />a\.ts</);
+  clearExpandedToolCalls();
+});
+
+test("a failed command keeps its command header and copy button, and says what failed", () => {
+  clearExpandedToolCalls();
+  const block = call("bash", { command: "npm test" });
+  setToolCallExpanded(block.toolCallId, true);
+  const html = renderRow(block, { ...result("bash", "boom"), isError: true });
+
+  assert.match(html, /Failed: npm test/);
+  assert.match(html, /\$ npm test/);
+  assert.match(html, /aria-label="Copy"|Copy/);
+  assert.match(html, /data-activity-tool="bash"/);
+  clearExpandedToolCalls();
+});
+
+test("a running command says it is running", () => {
+  const block = call("bash", { command: "pnpm build" });
+  const html = renderRow(block, undefined, { isStreaming: true });
+
+  assert.match(html, /Running pnpm build/);
+  assert.match(html, /data-status="running"/);
+});
+
+test("a relative path chip resolves against the session cwd", () => {
+  clearExpandedToolCalls();
+  const block = call("read", { file_path: "lib/tool-view.ts" });
+  const html = renderRow(block, result("read", "x"), { cwd: "/repo/pi-web", onOpenFile: () => {} });
+
+  assert.match(html, /title="\/repo\/pi-web\/lib\/tool-view\.ts"/);
+  assert.equal(resolveLocalFilePath("lib/tool-view.ts", "/repo/pi-web"), "/repo/pi-web/lib/tool-view.ts");
+});
+
+test("section labels are translated, never the raw key", () => {
+  clearExpandedToolCalls();
+  const block = call("read", { file_path: "a.ts" });
+  setToolCallExpanded(block.toolCallId, true);
+  const html = renderRow(block, result("read", "export const a = 1;"));
+
+  assert.match(html, />Parameters</);
+  assert.match(html, />Result</);
+  assert.doesNotMatch(html, />parameters</);
+  assert.doesNotMatch(html, />result</);
+  clearExpandedToolCalls();
+});
+
+test("code bodies go through the Prism highlighter", () => {
+  clearExpandedToolCalls();
+  const block = call("read", { file_path: "a.ts" });
+  setToolCallExpanded(block.toolCallId, true);
+  const html = renderRow(block, result("read", "export const a = 1;"));
+
+  assert.match(html, /data-slot="highlighted-code"/);
+  clearExpandedToolCalls();
+});
+
+test("terminal output keeps its own line breaks", () => {
+  clearExpandedToolCalls();
+  const block = call("bash", { command: "npm test" });
+  setToolCallExpanded(block.toolCallId, true);
+  const html = renderRow(block, { ...result("bash", "line one\nline two"), isError: true });
+
+  // 第 8 节第 8 条：终端输出不 reflow，所以它的内容块没有 wrap 属性。
+  assert.equal((html.match(/data-wrap=""/g) ?? []).length, 0);
+  assert.match(html, /line one/);
+  clearExpandedToolCalls();
+});
+
+test("an applied patch that reported failures counts as a failed call", () => {
+  const applied = { role: "toolResult", toolCallId: "c", content: [{ type: "text", text: "applied" }], details: { result: { failures: [{ path: "a.ts" }] } } };
+
+  assert.equal(isFailedResult("apply_patch", applied), true);
+  assert.equal(isFailedResult("read", applied), false);
+  assert.equal(isFailedResult("read", { ...applied, isError: true }), true);
+});
+
+test("a sub-agent row lists the steps it recorded", () => {
+  setToolCallExpanded("sub:test", true);
+  const html = render(React.createElement(SubagentTrace, {
+    foldKey: "sub:test",
+    label: "explore",
+    status: "done",
+    report: "the cache is keyed on the commit SHA",
+    steps: [
+      { title: "Ran grep -rn cacheKey scripts", status: "done" },
+      { title: "Read lib/cache.ts", status: "done" },
+    ],
+  }));
+
+  assert.match(html, /Ran grep -rn cacheKey scripts/);
+  assert.match(html, /Read lib\/cache\.ts/);
   clearExpandedToolCalls();
 });
