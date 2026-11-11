@@ -971,7 +971,7 @@ function CompactionFileList({ title, files }: { title: string; files: string[] }
   return (
     <div className="mt-2">
       <div className="mb-1 text-xs font-semibold text-foreground">{title}</div>
-      <ul className="m-0 max-h-[180px] list-none overflow-auto p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[3px] [&_li+li]:border-t [&_li+li]:border-border">
+      <ul className="m-0 max-h-[var(--card-max-height)] list-none overflow-auto p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[3px] [&_li+li]:border-t [&_li+li]:border-border">
         {files.map((file) => (
           <li key={file}>{file}</li>
         ))}
@@ -1079,7 +1079,7 @@ export function SafeMarkdownBody({ children, className, ...props }: React.Compon
     );
   }
   return (
-    <div className={cn("max-h-[420px] overflow-auto text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.5]", className)}>
+    <div className={cn("max-h-[var(--card-max-height)] overflow-auto text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.5]", className)}>
       <pre className="m-0 whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-muted-foreground">
         {children}
       </pre>
@@ -1241,7 +1241,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
   const showFileHeaders = files.length > 1;
 
   return (
-    <div className="max-h-[560px] overflow-x-hidden overflow-y-auto bg-background">
+    <div className="max-h-[var(--card-max-height)] overflow-x-hidden overflow-y-auto bg-background">
       {files.map((file, fileIndex) => (
         <div
           key={fileIndex}
@@ -1381,7 +1381,7 @@ function PatchTextView({ text }: { text: string }) {
   const lines = text.split(/\r?\n/);
 
   return (
-    <div className="min-w-0 max-h-[520px] overflow-x-hidden overflow-y-auto font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]">
+    <div className="min-w-0 max-h-[var(--card-max-height)] overflow-x-hidden overflow-y-auto font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]">
       {lines.map((line, i) => {
         const kind =
           line.startsWith("@@") ? "hunk" :
@@ -1520,7 +1520,7 @@ const TOOL_FIELD_LABEL =
 
 // A value with newlines of its own keeps them, scrolled in place.
 const TOOL_FIELD_BLOCK =
-  "m-0 mt-0.5 max-h-[260px] overflow-auto rounded-lg border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
+  "m-0 mt-0.5 max-h-[var(--card-max-height)] overflow-auto rounded-lg border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
 
 // One row per argument: `key: value` on a single line — the key muted, the
 // value in the row's mono face; multiline values keep their own block.

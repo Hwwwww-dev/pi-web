@@ -736,14 +736,15 @@ html[data-keyboard-open] .terminal-extra-keys {
 /* One cap for every expanded card in the transcript — a tool call, a tool
    group, a thinking block, a turn's process list: past it the card scrolls
    inside itself, so a long script or a wide diff cannot push the rest of the
-   turn out of view. */
+   turn out of view. Two fifths of the viewport, capped at 480px: an expanded
+   card has to leave the conversation readable around it. */
 /* One size for every field the user types into. A touch screen keeps 16px:
    iOS zooms the page when a focused field is smaller than that, and no viewport
    setting suppresses it. Everything around the field keeps its own scale, the
    way iOS itself pairs a 17px field with 13px labels. */
 :root {
   --field-font-size: 14px;
-  --card-max-height: min(70vh, 640px);
+  --card-max-height: min(40vh, 480px);
 }
 
 @media (pointer: coarse) {

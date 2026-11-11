@@ -343,7 +343,7 @@ test("a long or multi-line value stays inside the card", (t) => {
   assert.ok(html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
   assert.match(html, /wrap-anywhere/);
   assert.match(html, /calc\(12px\+var\(--chat-font-size-offset,0px\)\)/);
-  assert.match(html, /max-h-\[260px\]/);
+  assert.match(html, /max-h-\[var\(--card-max-height\)\]/);
   assert.match(html, /overflow-auto/);
   assert.ok(textOf(html).includes("line 39"));
 });
