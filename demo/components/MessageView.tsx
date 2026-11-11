@@ -489,13 +489,22 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
                 // 小号、贴着 token 计数：宽距只由行内 gap-1 提供，徽章不再
                 // 自带 ml/最小宽度（那会在数字和徽章之间留出死空间）。
                 "px-1.5 py-0 text-[10px]",
-                tps >= 50 ? "bg-info/15 text-info"
+                tps >= 50 ? "bg-info/15"
                   : tps >= 30 ? "bg-success/15 text-success"
                   : tps >= 15 ? "bg-warning/15 text-warning"
                   : "bg-destructive/15 text-destructive",
               )}
             >
-              {tps.toFixed(1)} t/s
+              {/* >120：彩虹流动字。转一圈的时长随速度加快（300/tps 秒，
+                  0.4s 封底）：120 t/s → 2.5s，300 → 1s，再快只到 0.4s。 */}
+              {tps > 120 ? (
+                <span
+                  className="tps-rainbow whitespace-nowrap"
+                  style={{ animationDuration: `${Math.max(0.4, 300 / tps).toFixed(2)}s` }}
+                >
+                  {tps.toFixed(1)} t/s
+                </span>
+              ) : `${tps.toFixed(1)} t/s`}
             </Badge>
           )}
         </span>

@@ -1462,3 +1462,29 @@ span.token.table {
     display: none !important;
   }
 }
+
+/* t/s > 120 的徽章文字：彩虹渐变 + hue-rotate 循环，时长由组件按速度
+   内联（animation-duration），越快转得越快。渐变固有色相跨 0→250→360，
+   旋转一整圈即全彩循环；reduced-motion 下保持静态彩虹、不转动。 */
+@keyframes tps-rainbow-cycle {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+.tps-rainbow {
+  background-image: linear-gradient(90deg,
+    oklch(0.65 0.17 0),
+    oklch(0.65 0.17 70),
+    oklch(0.65 0.17 145),
+    oklch(0.65 0.17 215),
+    oklch(0.65 0.17 290),
+    oklch(0.65 0.17 360));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: tps-rainbow-cycle linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tps-rainbow {
+    animation: none;
+  }
+}
