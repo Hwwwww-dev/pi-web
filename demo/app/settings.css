@@ -49,10 +49,14 @@
     /* Stretch between the insets instead of the utilities' centered size, and
        drop the Radix centering translate: plain rules beat the layered
        utilities on every width this media query matches (including exactly
-       640px, where max-sm: does not). */
+       640px, where max-sm: does not). Tailwind v4 writes its
+       translate-x/y-[-50%] utilities to the standalone `translate` property,
+       not `transform`, so both have to be reset — clearing only `transform`
+       left the card shifted half its size off the top-left corner. */
     width: auto;
     height: auto;
     transform: none;
+    translate: none;
   }
 }
 
