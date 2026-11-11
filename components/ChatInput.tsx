@@ -1405,7 +1405,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     await pendingImageTailRef.current;
     const builtinAllowed = !isStreaming || offersBuiltinSlashCommandWhileStreaming(msg);
     if (builtinAllowed && await runBuiltinCommand(msg)) return;
-    if (isStreaming) return;
+    // A `!` command runs beside the run, as in pi's TUI; anything else queues.
+    if (isStreaming && !(msg.startsWith("!") && !attachedImages.length)) return;
     const images = attachedImagesRef.current.length ? attachedImagesRef.current : undefined;
     if (!msg && !images) return;
     clearInput();
@@ -1672,6 +1673,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     // by the API but never queued (verified against pi 1.5.0), so it would
     // silently vanish. Keep the composer instead.
     if (!msg && attachedImages.length) return;
+    if (msg.startsWith("!") && !attachedImages.length) {
+      // A shell command is never steered into the run as text.
+      void handleSend();
+      return;
+    }
     onAudioUnlock?.();
     // A paste still decoding must ride along, not pop back into the cleared
     // composer after the message left.
@@ -1704,7 +1710,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       return;
     }
     queue();
-  }, [value, attachedImages, onBuiltinCommand, onPromptWithStreamingBehavior, onSteer, onFollowUp, clearInput, onAudioUnlock, runBuiltinCommand]);
+  }, [value, attachedImages, onBuiltinCommand, onPromptWithStreamingBehavior, onSteer, onFollowUp, clearInput, onAudioUnlock, runBuiltinCommand, handleSend]);
 
   const getNextSlashIndex = useCallback((direction: "up" | "down" | "left" | "right") => {
     const lastIndex = displayedSlashCommands.length - 1;
