@@ -255,7 +255,11 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
           {summary}
         </span>
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-2 max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+      {/* The summary fold itself sets no height: a group of cards is as tall as
+          its cards, and only a single card's body scrolls (its own
+          --card-max-height). Two nested scroll areas inside one another made
+          the phone gesture fight itself. */}
+      <CollapsibleContent className="mt-2">
         {children}
       </CollapsibleContent>
     </Collapsible>

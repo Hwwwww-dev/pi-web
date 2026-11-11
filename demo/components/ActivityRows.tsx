@@ -20,6 +20,7 @@ import {
   TraceTitle,
 } from "./ui/trace";
 import { MarkdownBody } from "./MarkdownBody";
+import { HighlightedCode } from "./HighlightedCode";
 import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
 import { getFileIcon } from "./FileIcons";
@@ -28,6 +29,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { isTuiText } from "@/lib/ansi";
 import { getFileName, getRelativeFilePath } from "@/lib/file-paths";
+import { getLanguage } from "@/lib/file-types";
 import { resolveLocalFilePath } from "@/lib/file-links";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { SplitDiffCell, SplitDiffFile } from "@/lib/patch";
@@ -274,6 +276,18 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
         ? toolFieldsOfInput(parseStreamingJson(block.rawInput))
         : toolFieldsOfInput(block.input)
       : null;
+  // Syntax colors for whatever code the card shows: a terminal row reads as a
+  // shell session, a file the call names takes that file's language, and a
+  // call's own arguments are JSON. Nothing else guesses.
+  const toolPathLanguage = getLanguage(getToolFilePaths(block.input)[0] ?? "");
+  const bodyLanguage = combinedTerminalText !== null
+    ? "bash"
+    : writtenFileText !== null
+      ? toolPathLanguage
+      : /^\s*[[{]/.test(inputStr) ? "json" : "text";
+  const resultLanguage = combinedTerminalText !== null
+    ? "bash"
+    : getToolFilePaths(block.input).length > 0 ? toolPathLanguage : "text";
 
   const label = category === "other" ? block.toolName : t(TOOL_CATEGORY_LABEL_KEYS[category]);
   // The result's single-file patch names the call when its input has no file.
@@ -281,7 +295,9 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
 
   return (
     <Trace data-activity-tool={block.toolName}>
-      <div className="flex max-w-full min-w-0 items-center gap-1">
+      {/* sticky: the header row stays readable while the card's body scrolls past
+          it, and un-sticks as soon as the card itself leaves the viewport. */}
+      <div className="sticky top-0 z-10 flex max-w-full min-w-0 items-center gap-1 bg-background">
         <TraceCollapsible
           open={expanded}
           onOpenChange={toggleExpanded}
@@ -337,15 +353,15 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
               )}
               {codemode ? (
                 <>
-                  <CodeBlock size="sm"><CodeBlockContent wrap>{codemode.code.replace(/\r/g, "").trimEnd()}</CodeBlockContent></CodeBlock>
+                  <CodeBlock size="sm"><CodeBlockContent wrap><HighlightedCode code={codemode.code.replace(/\r/g, "").trimEnd()} language="typescript" /></CodeBlockContent></CodeBlock>
                   <CodemodeCallList calls={codemode.calls} omitted={codemode.omitted} isError={isError} />
                   {result && (resultText !== null && !resultIsEmpty || resultImages.length > 0) && (
-                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} language={resultLanguage} />
                   )}
                 </>
               ) : combinedTerminalText !== null ? (
                 <CodeBlock size="sm" variant={isError ? "destructive" : "default"}>
-                  <CodeBlockContent wrap={false}>{combinedTerminalText}</CodeBlockContent>
+                  <CodeBlockContent wrap={false}><HighlightedCode code={combinedTerminalText} language="bash" /></CodeBlockContent>
                 </CodeBlock>
               ) : (
                 <>
@@ -353,16 +369,16 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
                     toolFields ? (
                       <ToolFieldRows fields={toolFields} />
                     ) : (
-                      <CodeBlock size="sm"><CodeBlockContent wrap>{writtenFileText ?? inputStr}</CodeBlockContent></CodeBlock>
+                      <CodeBlock size="sm"><CodeBlockContent wrap><HighlightedCode code={writtenFileText ?? inputStr} language={bodyLanguage} /></CodeBlockContent></CodeBlock>
                     )
                   )}
                   {patchFiles && <SplitFilesView files={patchFiles} />}
                   {result && patchFiles && isError && (
-                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} language={resultLanguage} />
                   )}
                   {result && !patchFiles && combinedTerminalText === null && (
                     resultDiff ? <SplitPatchView text={resultDiff.text} /> : (!resultIsEmpty || resultImages.length === 0) && (
-                      <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} />
+                      <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} language={resultLanguage} />
                     )
                   )}
                 </>
@@ -440,21 +456,25 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
         onOpenChange={toggleExpanded}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <TraceCollapsibleTrigger>
-          <TraceLine status={hasPending ? "running" : isError ? "error" : undefined}>
-            <TraceIcon><RowStatusIcon category={category} isError={isError} active={hasPending} /></TraceIcon>
-            <TraceTitle className="font-medium">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</TraceTitle>
-            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
-              {summaryCount}
-            </TraceDescription>
-            {!hasPending && totalDuration > 0 && (
-              <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
-                {formatToolDuration(totalDuration)}
+        <div className="sticky top-0 z-10 w-full bg-background">
+          <TraceCollapsibleTrigger>
+            <TraceLine status={hasPending ? "running" : isError ? "error" : undefined}>
+              <TraceIcon><RowStatusIcon category={category} isError={isError} active={hasPending} /></TraceIcon>
+              <TraceTitle className="font-medium">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</TraceTitle>
+              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+                {summaryCount}
               </TraceDescription>
-            )}
-          </TraceLine>
-        </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent>
+              {!hasPending && totalDuration > 0 && (
+                <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                  {formatToolDuration(totalDuration)}
+                </TraceDescription>
+              )}
+            </TraceLine>
+          </TraceCollapsibleTrigger>
+        </div>
+        {/* A fold of same-category cards is as tall as the cards it holds: no
+            height of its own, so the only scroller is each single card's body. */}
+        <TraceCollapsibleContent className="max-h-none overflow-visible">
           <div className="flex flex-col gap-0.5 py-0.5">
             {calls.map((call, index) => (
               <ToolRow
@@ -608,10 +628,11 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
         }}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <TraceCollapsibleTrigger
-          aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
-          title={t("i18n.thinking")}
-        >
+        <div className="sticky top-0 z-10 w-full bg-background">
+          <TraceCollapsibleTrigger
+            aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
+            title={t("i18n.thinking")}
+          >
           <TraceLine status={active ? "running" : undefined}>
             <TraceIcon className={cn(active && "text-warning")}><ThinkingIcon active={expanded || Boolean(active)} /></TraceIcon>
             <TraceTitle className="font-medium">{t("i18n.thinking")}</TraceTitle>
@@ -624,12 +645,15 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
               </TraceDescription>
             )}
           </TraceLine>
-        </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent>
+          </TraceCollapsibleTrigger>
+        </div>
+        {/* The thinking body is its own scroller (it follows the streaming tail),
+            so the wrapper must not limit it as well. */}
+        <TraceCollapsibleContent className="max-h-none overflow-visible">
           <div
             ref={detailRef}
             className={cn(
-              "max-h-[380px] min-w-0 overflow-y-auto overscroll-contain whitespace-pre-wrap wrap-anywhere",
+              "max-h-[var(--card-max-height)] min-w-0 overflow-y-auto overscroll-contain whitespace-pre-wrap wrap-anywhere",
               error && "text-destructive",
             )}
             onScroll={handleDetailScroll}
@@ -728,7 +752,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
 
   return (
     <Trace data-activity-custom={message.customType} className={isHiddenDisplay ? "opacity-75" : undefined}>
-      <div className="flex max-w-full min-w-0 items-center gap-1">
+      <div className="sticky top-0 z-10 flex max-w-full min-w-0 items-center gap-1 bg-background">
         <TraceCollapsible
           open={expanded}
           onOpenChange={() => setExpanded((v) => !v)}
@@ -838,7 +862,8 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
         onOpenChange={() => setExpanded((v) => !v)}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
+        <div className="sticky top-0 z-10 w-full bg-background">
+          <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
           <TraceLine>
             <TraceIcon><ToolCategoryIcon category="compact" /></TraceIcon>
             <TraceTitle className="font-medium">{t("i18n.conversationCompacted")}</TraceTitle>
@@ -852,6 +877,7 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
             </TraceDescription>
           </TraceLine>
         </TraceCollapsibleTrigger>
+        </div>
         <TraceCollapsibleContent>
           <CompactionSummaryDetails summary={summary} cwd={cwd} onOpenFile={onOpenFile} />
         </TraceCollapsibleContent>
@@ -1428,10 +1454,11 @@ function ResultImages({ images }: { images: ImageContent[] }) {
   );
 }
 
-function PairedResult({ text, isEmpty, isError }: {
+function PairedResult({ text, isEmpty, isError, language }: {
   text: string;
   isEmpty: boolean;
   isError: boolean;
+  language: string;
 }) {
   const { t } = useI18n();
   // Terminal output keeps its own layout: box art, tables and progress bars
@@ -1442,13 +1469,13 @@ function PairedResult({ text, isEmpty, isError }: {
       <CodeBlockContent
         wrap={!tui}
         className={cn(
-          "max-h-[420px] px-2.5 py-2 text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]",
+          "px-2.5 py-2 text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]",
           isError ? "text-destructive" : "text-muted-foreground",
           isEmpty && "italic opacity-60",
           !tui && "[overflow-wrap:anywhere]",
         )}
       >
-        {isEmpty ? t("i18n.noOutput") : text}
+        {isEmpty ? t("i18n.noOutput") : <HighlightedCode code={text} language={language} />}
       </CodeBlockContent>
     </CodeBlock>
   );

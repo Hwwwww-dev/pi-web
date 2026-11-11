@@ -33,7 +33,9 @@ function TraceLine({
       data-slot="trace-line"
       data-status={status}
       className={cn(
-        "cn-trace-line flex w-fit max-w-full min-w-0 items-center text-muted-foreground transition-colors in-[a,button]:cursor-pointer in-[a:hover,button:hover]:text-foreground data-[status=error]:text-destructive data-[status=error]:in-[a:hover,button:hover]:text-destructive data-[status=pending]:opacity-60 data-[status=running]:*:data-[slot=trace-title]:shimmer",
+        // 一个字号基准：trace 的标题与摘要同一行、同一大小（正文档 13.5px+偏移），
+        // 摘要靠 muted/truncate 分层，不靠字号。等宽只留给真正的代码。
+        "cn-trace-line flex w-fit max-w-full min-w-0 items-center text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.55] text-muted-foreground transition-colors in-[a,button]:cursor-pointer in-[a:hover,button:hover]:text-foreground data-[status=error]:text-destructive data-[status=error]:in-[a:hover,button:hover]:text-destructive data-[status=pending]:opacity-60 data-[status=running]:*:data-[slot=trace-title]:shimmer",
         className
       )}
       {...props}
@@ -147,7 +149,7 @@ function TraceCollapsibleContent({
       <div
         data-slot="trace-collapsible-content-inner"
         className={cn(
-          "cn-trace-collapsible-content-inner max-h-[var(--card-max-height)] min-w-0 overflow-y-auto overscroll-contain wrap-break-word text-muted-foreground",
+          "cn-trace-collapsible-content-inner max-h-[var(--card-max-height)] min-w-0 overflow-y-auto overscroll-contain wrap-break-word text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-muted-foreground",
           className
         )}
       >

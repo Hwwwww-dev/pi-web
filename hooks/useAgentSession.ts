@@ -2494,17 +2494,22 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const handleAbort = useCallback(async () => {
     const sid = sessionIdRef.current;
     if (!sid) return;
-    if (bashRunningRef.current) {
-      try {
-        await sendAgentCommand(sid, { type: "abort_bash" });
-      } catch (e) {
-        console.error("Failed to abort bash:", e);
-      }
-      return;
-    }
+    // Stop always ends the run; the bash channel is an extra, never a
+    // substitute. A stale bash record (a missed settlement) used to swallow
+    // the click entirely, so the agent kept running.
+    const stopBash = bashRunningRef.current;
     try {
       // Prompts parked behind a compaction come back for the composer, as Recall's do.
-      restoreRecalledPrompts(await sendAgentCommand<RecalledPrompts | null>(sid, { type: "abort" }));
+      const [recalled] = await Promise.all([
+        sendAgentCommand<RecalledPrompts | null>(sid, { type: "abort" }),
+        stopBash ? sendAgentCommand(sid, { type: "abort_bash" }).catch(() => null) : Promise.resolve(null),
+      ]);
+      if (stopBash) {
+        bashRunningRef.current = false;
+        setBashRunning(false);
+        setPendingBash(null);
+      }
+      restoreRecalledPrompts(recalled);
     } catch (e) {
       console.error("Failed to abort:", e);
     }
