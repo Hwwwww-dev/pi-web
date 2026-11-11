@@ -25,6 +25,7 @@ import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
 import { TerminalTrace } from "./transcript/TerminalTrace";
 import { ToolTrace } from "./transcript/ToolTrace";
+import { SubagentTrace } from "./transcript/SubagentTrace";
 import { getFileIcon } from "./FileIcons";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
@@ -377,6 +378,53 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
               ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
             />
           </div>
+        ) : undefined}
+        below={resultImages.length > 0 ? <ResultImages images={resultImages} /> : undefined}
+      />
+    );
+  }
+
+  // 第 3 步 3b：脚本、子代理、MCP 各自走官方 pattern。
+  if (view.kind === "codemode" || view.kind === "mcp") {
+    return (
+      <ToolTrace
+        view={view}
+        activityTool={block.toolName}
+        trailing={!active && duration !== undefined ? (
+          <TraceDescription className="shrink-0 tabular-nums">{formatToolDuration(duration)}</TraceDescription>
+        ) : undefined}
+        usage={usage ? (
+          <div className="text-[length:calc(11px+var(--chat-font-size-offset,0px))]">
+            <UsageBar
+              usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
+              ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
+            />
+          </div>
+        ) : undefined}
+        below={resultImages.length > 0 ? <ResultImages images={resultImages} /> : undefined}
+      />
+    );
+  }
+
+  if (view.kind === "subagent") {
+    return (
+      <SubagentTrace
+        label={subagent?.description || subagent?.profile}
+        status={view.status}
+        report={view.sections.find((section) => section.kind === "markdown")?.text}
+        foldKey={view.foldKey}
+        action={subagent && onOpenSubagent ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0 text-muted-foreground"
+            onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
+            title={t("subagent.openTab")}
+            aria-label={t("subagent.openTab")}
+          >
+            <ExternalLinkIcon strokeWidth={2} />
+          </Button>
         ) : undefined}
         below={resultImages.length > 0 ? <ResultImages images={resultImages} /> : undefined}
       />

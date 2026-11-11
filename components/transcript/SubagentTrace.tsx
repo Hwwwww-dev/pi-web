@@ -21,7 +21,7 @@ const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
  * `<Trace>`, the report below them. A run still in the background is the line
  * alone — there is nothing to show yet.
  */
-export const SubagentTrace = memo(function SubagentTrace({ label, status, steps, report, foldKey, action }: {
+export const SubagentTrace = memo(function SubagentTrace({ label, status, steps, report, foldKey, action, below }: {
   /** The profile or agent name; omitted for the generic line. */
   label?: string;
   status: ToolViewStatus;
@@ -31,6 +31,8 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
   foldKey: string;
   /** Row-end action (opening the subagent's tab). */
   action?: ReactNode;
+  /** Media the run produced, below the line. */
+  below?: ReactNode;
 }) {
   const { t } = useI18n();
   const title = label ? `${t("chat.trace.subagent")} · ${label}` : t("chat.trace.subagent");
@@ -44,6 +46,7 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
       foldKey={foldKey}
       trailing={action}
       ariaLabel={title}
+      below={below}
       content={hasBody ? (
         <>
           {steps && steps.length > 0 && (
