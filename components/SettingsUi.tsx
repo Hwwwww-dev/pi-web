@@ -768,7 +768,7 @@ export function ConfigAddSourcePanel({
             ref={textareaRef}
             value={value}
             aria-label={inputLabel}
-            className="max-h-[40vh] min-h-24 resize-y whitespace-pre font-mono text-xs"
+            className="max-h-[40vh] min-h-24 resize-y whitespace-pre font-mono"
             placeholder={placeholder}
             rows={5}
             spellCheck={false}
@@ -791,7 +791,7 @@ export function ConfigAddSourcePanel({
             ref={inputRef}
             value={value}
             aria-label={inputLabel}
-            className="font-mono text-xs"
+            className="font-mono"
             placeholder={placeholder}
             onChange={(event) => onValueChange(event.target.value)}
             onPaste={onPaste}

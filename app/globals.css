@@ -88,7 +88,7 @@
     @apply duration-200;
   }
   .cn-trace-collapsible-content-inner {
-    @apply mt-2 mb-1 ml-[calc(--spacing(2)-1px)] border-l pr-1 pl-4 leading-relaxed;
+    @apply mt-2 mb-1 border-l pr-1 pl-4 leading-relaxed;
   }
 
   /* Code Block */
@@ -142,6 +142,12 @@
 @keyframes pi-shimmer {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 @utility scrollbar-thin {
   scrollbar-width: thin;
@@ -659,6 +665,25 @@ html[data-keyboard-open] .terminal-extra-keys {
 @media (max-width: 640px), (pointer: coarse) {
   :root {
     --top-bar-height: 44px;
+  }
+}
+
+/* Everything the user types into — the Input/Textarea primitives and the
+   composer — reads at this one size. The phone's step is 16px because iOS zooms
+   the whole page when a field below that takes focus; it is the platform's
+   floor, not a taste. */
+
+/* One cap for every expanded card in the transcript — a tool call, a tool
+   group, a thinking block, a turn's process list: past it the card scrolls
+   inside itself, so a long script or a wide diff cannot push the rest of the
+   turn out of view. */
+:root {
+  --field-font-size: 14px;
+  --card-max-height: min(70vh, 640px);
+}
+@media (max-width: 640px) {
+  :root {
+    --field-font-size: 16px;
   }
 }
 
@@ -1376,17 +1401,6 @@ span.token.table {
     flex-wrap: wrap;
     padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
   }
-  textarea,
-  input,
-  select {
-    font-size: 16px !important;
-  }
-  /* The composer opts out of the 16px floor above: 12.5px is the size of its
-     own menu options, the smallest the typed text may read against them, and
-     iOS's zoom-on-focus is the trade this line accepts. */
-  .chat-input-textarea {
-    font-size: max(12.5px, calc(12.5px + var(--chat-font-size-offset, 0px))) !important;
-  }
 }
 
 /* The composer's pill row scrolls (overflow-x-auto), which clips a focus ring
@@ -1399,7 +1413,7 @@ span.token.table {
 /* The composer textarea keeps its scroll but never draws a scrollbar: the
    pill is small and the bar rides over the send-button column on phones. */
 .chat-input-textarea {
-  font-size: calc(13.5px + var(--chat-font-size-offset, 0px));
+  font-size: var(--field-font-size);
   line-height: 1.6;
   scrollbar-width: none;
   -ms-overflow-style: none;

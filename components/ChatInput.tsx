@@ -67,9 +67,6 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -2448,10 +2445,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   onClick={() => fileInputRef.current?.click()}
                   title={t("chat.attachFiles")}
                   aria-label={t("chat.attachFiles")}
-                  className="h-[26px] rounded-full border-dashed px-2.5 text-xs text-muted-foreground"
+                  className="h-[26px] rounded-full border-dashed px-2 text-muted-foreground"
                 >
-                  <PlusIcon data-icon="inline-start" strokeWidth={2} aria-hidden="true" />
-                  {t("chat.attachFiles")}
+                  <PlusIcon strokeWidth={2} aria-hidden="true" />
                 </Button>
               )}
             </InputGroupAddon>
@@ -2459,8 +2455,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           <InputGroupTextarea
             ref={textareaRef}
             className={cn(
-              "chat-input-textarea w-full min-w-0 px-2.5 py-2 text-foreground max-h-44 overflow-auto placeholder:text-muted-foreground",
-              "text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.55]",
+              "chat-input-textarea w-full min-w-0 px-2.5 py-2 leading-[1.55] text-foreground max-h-44 overflow-auto placeholder:text-muted-foreground",
               compact ? "min-h-24" : "min-h-11",
             )}
             data-chat-composer=""

@@ -71,7 +71,7 @@ export function OAuthPastePanel({
         <Input
           ref={inputRef}
           value={value}
-          className="oauth-paste-input h-auto bg-background px-2.5 py-1.5 font-mono text-xs md:text-xs shadow-none disabled:opacity-100"
+          className="oauth-paste-input h-auto bg-background px-2.5 py-1.5 font-mono shadow-none disabled:opacity-100"
           placeholder={placeholder}
           aria-label={inputLabel}
           disabled={disabled || undefined}

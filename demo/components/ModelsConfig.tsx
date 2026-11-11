@@ -679,7 +679,7 @@ function ThinkingLevelMapEditor({
                 onFocus={() => { if (state !== "string") setLevel(level, strVal || level); }}
                 placeholder={level}
                 maxLength={10}
-                className="h-6 w-[12ch] rounded-r-md border-l-0 px-2 font-mono text-xs shadow-none md:text-xs"
+                className="h-6 w-[12ch] rounded-r-md border-l-0 px-2 font-mono shadow-none"
               />
             </ButtonGroup>
           </div>
@@ -1766,7 +1766,7 @@ function AddProviderPicker({
             onChange={(e) => setSearch(e.target.value)}
              placeholder={t("i18n.searchProviders")}
             aria-label={t("i18n.searchProviders")}
-            className="min-w-0 flex-1 border-0 bg-transparent p-0 h-auto text-[13px] text-foreground shadow-none focus-visible:ring-0 focus-visible:border-transparent"
+            className="min-w-0 flex-1 border-0 bg-transparent p-0 h-auto text-foreground shadow-none focus-visible:ring-0 focus-visible:border-transparent"
           />
         </div>
 

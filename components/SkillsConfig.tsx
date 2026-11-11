@@ -488,7 +488,7 @@ function AddSkillPanel({
               if (e.key === "Enter") search(query);
             }}
              placeholder={t("i18n.skillSearchPlaceholder")}
-            className="min-w-0 flex-1 h-auto rounded-md border-border bg-background px-2.5 py-[7px] text-xs text-foreground shadow-none focus-visible:border-border focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="min-w-0 flex-1 h-auto rounded-md border-border bg-background px-2.5 py-[7px] text-foreground shadow-none focus-visible:border-border focus-visible:ring-[3px] focus-visible:ring-ring/50"
           />
           <ConfigButton
             variant="primary"

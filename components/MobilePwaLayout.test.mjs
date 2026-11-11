@@ -17,6 +17,8 @@ const layoutSource = await readFile(new URL("../app/layout.tsx", import.meta.url
 const appShellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 const settingsPanelSource = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
 const settingsUiSource = await readFile(new URL("./SettingsUi.tsx", import.meta.url), "utf8");
+const inputPrimitiveSource = await readFile(new URL("./ui/input.tsx", import.meta.url), "utf8");
+const textareaPrimitiveSource = await readFile(new URL("./ui/textarea.tsx", import.meta.url), "utf8");
 
 test("configures iOS standalone mode to use the visible viewport below the status bar", () => {
   // iOS 27 draws an unconditional Liquid Glass blur over the top edge of
@@ -73,7 +75,15 @@ test("contains chat content and inputs within the mobile viewport", () => {
 });
 
 test("prevents iOS focus zoom from widening the layout", () => {
-  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?textarea,[\s\S]*?input,[\s\S]*?select \{\s*font-size: 16px !important;/);
+  // Every field the user types into takes --field-font-size, whose phone step is
+  // the 16px floor below which iOS zooms the page on focus. A rule that shrinks a
+  // single field under that floor is the regression this guards.
+  assert.match(cssSource, /--field-font-size: 14px;/);
+  assert.match(cssSource, /@media \(max-width: 640px\) \{\s*:root \{\s*--field-font-size: 16px;/);
+  for (const primitive of [inputPrimitiveSource, textareaPrimitiveSource]) {
+    assert.match(primitive, /text-\[length:var\(--field-font-size\)\]/);
+  }
+  assert.match(cssSource, /\.chat-input-textarea \{\s*font-size: var\(--field-font-size\);/);
 });
 
 test("keeps modal dialogs clear of the iOS status bar in standalone mode", () => {

@@ -43,7 +43,7 @@ export function WorktreeCreateForm({
       {heading && <div className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-2 pt-1.5 pb-1 text-[11px] [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs">{heading}</div>}
       <Field className="gap-0">
         <Input
-          className="sidebar-worktree-input h-7 px-2 rounded-(--radius-sm) bg-background border-(--accent) font-mono text-foreground text-[11.5px] md:text-[11.5px] shadow-none [user-select:text] [-webkit-user-select:text] [.is-classic_&]:h-auto [.is-classic_&]:py-[5px] [.is-classic_&]:text-[11px] [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"
+          className="sidebar-worktree-input h-7 px-2 rounded-(--radius-sm) bg-background border-(--accent) font-mono text-foreground shadow-none [user-select:text] [-webkit-user-select:text] [.is-classic_&]:h-auto [.is-classic_&]:py-[5px] [.sidebar-sheet_&]:h-10"
           data-sidebar-menu-autofocus=""
           aria-invalid={invalid || undefined}
           value={branch}

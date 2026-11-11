@@ -83,7 +83,7 @@ function McpCode({ children }: { children: ReactNode }) {
 }
 
 /** The add pane's boxes: the settings density (32px) in mono 12px, as the paste box above them. */
-const ADD_INPUT_CLASS = "h-8 px-2.5 font-mono text-xs";
+const ADD_INPUT_CLASS = "h-8 px-2.5 font-mono";
 
 /** The add pane's selects: the settings density (32px) in mono 12px, as the paste box above them. */
 const ADD_SELECT_CLASS =

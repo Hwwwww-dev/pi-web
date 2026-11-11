@@ -432,7 +432,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           min={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.min}
           max={KEEP_ALIVE_CONFIG_LIMITS.maxSessions.max}
           value={keepAliveConfig.maxSessions}
-          className="h-8 w-20 text-right text-[13px]"
+          className="h-8 w-20 text-right"
           onChange={(event) => {
             const value = Number(event.target.value);
             if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, maxSessions: value });
@@ -447,7 +447,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           min={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.min}
           max={KEEP_ALIVE_CONFIG_LIMITS.idleTimeoutMinutes.max}
           value={keepAliveConfig.idleTimeoutMinutes}
-          className="h-8 w-20 text-right text-[13px]"
+          className="h-8 w-20 text-right"
           onChange={(event) => {
             const value = Number(event.target.value);
             if (Number.isFinite(value)) onKeepAliveConfigChange({ ...keepAliveConfig, idleTimeoutMinutes: value });

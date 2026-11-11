@@ -30,7 +30,7 @@ export function ModelContextWindow({ modelName, effective, value, onChange, disa
       inputMode="numeric"
       // Eight digits wide (ch follows the phones' 16px form text), and no
       // taller than the name and id beside it, so the row keeps its height.
-      className="h-6 w-[calc(8ch+16px)] shrink-0 rounded-md border-input bg-background px-2 text-right font-mono text-xs md:text-xs"
+      className="h-6 w-[calc(8ch+16px)] shrink-0 rounded-md border-input bg-background px-2 text-right font-mono"
       value={value === undefined ? "" : String(value)}
       placeholder={effective === undefined ? undefined : String(effective)}
       title={t("models.contextWindow")}

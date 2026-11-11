@@ -255,7 +255,7 @@ function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false,
           {summary}
         </span>
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-2">
+      <CollapsibleContent className="mt-2 max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
         {children}
       </CollapsibleContent>
     </Collapsible>
@@ -2462,7 +2462,7 @@ function ExtensionDialog({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
                 }}
-                className="rounded-sm border-border bg-card px-2.5 text-[13px]"
+                className="rounded-sm border-border bg-card px-2.5"
               />
             </div>
           ) : (
@@ -2474,7 +2474,7 @@ function ExtensionDialog({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              className="rounded-sm border-border bg-card px-2.5 text-[13px]"
+              className="rounded-sm border-border bg-card px-2.5"
             />
           ))}
           {request.method === "editor" && (
@@ -2485,7 +2485,7 @@ function ExtensionDialog({
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              className="min-h-[220px] rounded-sm border-border bg-card p-2.5 text-[13px] leading-[1.55] font-mono"
+              className="min-h-[220px] rounded-sm border-border bg-card p-2.5 leading-[1.55] font-mono"
             />
           )}
           </>

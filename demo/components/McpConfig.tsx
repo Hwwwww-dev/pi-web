@@ -2365,7 +2365,7 @@ function McpCodemodeInlineBudgetRow({
         >
           <Input
             ref={inputRef}
-            className="h-8 w-24 shrink-0 px-2.5 font-mono text-xs"
+            className="h-8 w-24 shrink-0 px-2.5 font-mono"
             inputMode="numeric"
             aria-label={t("mcp.codemode.inlineBudget")}
             aria-describedby={hintId}

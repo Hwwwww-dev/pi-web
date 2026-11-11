@@ -887,7 +887,7 @@ function RenameInput({
   return (
     <Input
       ref={inputRef}
-      className={`session-tree-rename min-w-0 flex-1${mobile ? " h-8" : " h-7"} rounded-md border-accent bg-background px-2 text-xs md:text-xs [user-select:text] [-webkit-user-select:text]`}
+      className={`session-tree-rename min-w-0 flex-1${mobile ? " h-8" : " h-7"} rounded-md border-accent bg-background px-2 [user-select:text] [-webkit-user-select:text]`}
       value={value}
       aria-label={label}
       maxLength={maxLength}
