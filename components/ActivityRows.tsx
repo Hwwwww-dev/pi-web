@@ -380,7 +380,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
                   )}
                 </>
               ) : combinedTerminalText !== null ? (
-                <CodeBlock size="sm" variant={isError ? "destructive" : "default"}>
+                <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-h-[var(--card-max-height)]">
                   <CodeBlockContent wrap={false}><HighlightedCode code={combinedTerminalText} language="bash" /></CodeBlockContent>
                 </CodeBlock>
               ) : (
@@ -390,7 +390,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
                       {toolFields ? (
                         <ToolFieldRows fields={toolFields} />
                       ) : (
-                        <CodeBlock size="sm"><CodeBlockContent wrap><HighlightedCode code={writtenFileText ?? inputStr} language={bodyLanguage} /></CodeBlockContent></CodeBlock>
+                        <CodeBlock size="sm" className="max-h-[var(--card-max-height)]"><CodeBlockContent wrap><HighlightedCode code={writtenFileText ?? inputStr} language={bodyLanguage} /></CodeBlockContent></CodeBlock>
                       )}
                     </ToolSection>
                   )}
@@ -1499,7 +1499,7 @@ function PairedResult({ text, isEmpty, isError, language }: {
   // must not reflow to the container width.
   const tui = isTuiText(text);
   return (
-    <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-w-full">
+    <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-h-[var(--card-max-height)] max-w-full">
       <CodeBlockContent
         wrap={!tui}
         className={cn(

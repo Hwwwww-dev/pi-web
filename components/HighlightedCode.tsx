@@ -60,5 +60,5 @@ export const HighlightedCode = memo(function HighlightedCode({ code, language }:
     }
   }, [code, highlighted, isDark, language]);
 
-  return <>{tokens ?? code}</>;
+  return <span>{tokens ?? code}</span>;
 });
