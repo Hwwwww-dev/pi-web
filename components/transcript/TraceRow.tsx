@@ -127,7 +127,7 @@ export function TraceRow({
         <TraceCollapsibleTrigger aria-label={ariaLabel}>
           {line}
         </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent forceMount className="mt-1 flex flex-col gap-2">
+        <TraceCollapsibleContent className="mt-1 flex flex-col gap-2">
           {usage}
           {content}
         </TraceCollapsibleContent>

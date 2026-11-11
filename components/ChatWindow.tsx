@@ -1,7 +1,7 @@
 "use client";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { isHiddenRelation } from "@/lib/session-family";
-import { ArrowDownIcon, ChevronRightIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from "lucide-react";
+import { ArrowDownIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -23,7 +23,7 @@ import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { TurnTrace } from "./transcript/TurnTrace";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -226,45 +226,6 @@ function getUserInputText(message: AgentMessage): string | null {
   return text.length > 0 ? text : null;
 }
 
-function ProcessDetailsGroup({ summary, defaultExpanded = false, reveal = false, children, t }: { summary: string; defaultExpanded?: boolean; reveal?: boolean; children: ReactNode; t: (key: string, params?: Record<string, string | number>) => string }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  useLayoutEffect(() => {
-    if (reveal) setExpanded(true);
-  }, [reveal]);
-
-  return (
-    <Collapsible
-      open={expanded || reveal}
-      onOpenChange={(open) => {
-        if (!reveal) setExpanded(open);
-      }}
-      className="mb-5"
-    >
-      <CollapsibleTrigger
-        className="flex max-w-full min-h-6 cursor-pointer items-center gap-2 border-0 bg-transparent px-0 py-0.5 text-left text-xs text-muted-foreground"
-        title={expanded ? t("chat.collapseProcess") : t("chat.expandProcess")}
-        aria-label={summary}
-      >
-        <ChevronRightIcon
-          size={12}
-          strokeWidth={1.6}
-          className={cn("shrink-0 transition-transform", (expanded || reveal) && "rotate-90")}
-          aria-hidden="true"
-        />
-        <span className="min-w-0 truncate">
-          {summary}
-        </span>
-      </CollapsibleTrigger>
-      {/* The summary fold itself sets no height: a group of cards is as tall as
-          its cards, and only a single card's body scrolls (its own
-          --card-max-height). Two nested scroll areas inside one another made
-          the phone gesture fight itself. */}
-      <CollapsibleContent className="mt-2">
-        {children}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
 
 // memo：后台 dock 常驻渲染，非流式内容变更不应触发重渲
 export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, panel = false, onSideSession, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onDebugSnapshotReaderChange, background = false, dormant = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
@@ -1438,7 +1399,14 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               className="[content-visibility:auto] [contain-intrinsic-size:auto_160px]"
               ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
             >
-              <ProcessDetailsGroup key={finalAnswerMessage ? "answered" : "unanswered"} summary={processSummary} defaultExpanded={!finalAnswerMessage} reveal={revealProcess} t={t}>
+              <TurnTrace
+              key={finalAnswerMessage ? "answered" : "unanswered"}
+              summary={processSummary}
+              foldKey={`process:${entryIds[userIdx] ?? userIdx}`}
+              defaultOpen={!finalAnswerMessage}
+              reveal={revealProcess}
+              className="mb-5"
+            >
                 <TurnActivityBody
                   items={activityItems}
                   ctxWindow={ctxInfoRef.current?.contextWindow}
@@ -1447,7 +1415,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                   onOpenSubagent={onOpenSubagent}
                   sessionId={session?.id ?? sessionIdRef.current ?? undefined}
                 />
-              </ProcessDetailsGroup>
+              </TurnTrace>
             </div>,
           );
         }

@@ -15,10 +15,13 @@ import {
   SquareTerminalIcon,
   WrenchIcon,
 } from "lucide-react";
+import { AnsiText } from "@/components/AnsiText";
+import { isTuiText } from "@/lib/ansi";
 import { CodeBlock, CodeBlockContent, CodeBlockLine } from "@/components/ui/code-block";
 import { Spinner } from "@/components/ui/spinner";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { PatchDiffFiles, SafeMarkdownBody } from "@/components/ActivityRows";
+import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { ToolView, ToolViewKind, ToolViewSection, ToolViewStatus, ToolViewStep } from "@/lib/tool-view";
 import { TraceRow } from "./TraceRow";
@@ -104,7 +107,10 @@ export function ToolSection({ section }: { section: ToolViewSection }) {
   const isMobile = useIsMobile();
   switch (section.kind) {
     case "code":
-      return <CodeSection text={section.text ?? ""} language={section.language} label={section.label} />;
+      // TUI 输出（ANSI 转义）只能按终端文本渲染，code block 会原样显示转义序列。
+      return isTuiText(section.text ?? "")
+        ? <AnsiText text={section.text ?? ""} />
+        : <CodeSection text={section.text ?? ""} language={section.language} label={section.label} />;
     case "diff":
       return section.files
         ? <PatchDiffFiles files={section.files} layout={isMobile ? "stacked" : "split"} />
@@ -131,6 +137,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below,
   /** The pi tool name, kept as `data-activity-tool`. */
   activityTool?: string;
 }) {
+  const { t } = useI18n();
   const content = view.sections.length > 0
     ? view.sections.map((section, index) => <ToolSection key={index} section={section} />)
     : undefined;
@@ -139,7 +146,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below,
     <TraceRow
       icon={view.status === "running" ? <Spinner className="size-3.5" /> : KIND_ICONS[view.kind]}
       title={view.title}
-      description={view.description}
+      description={view.streamingInput ? t("chat.generatingToolInput") : view.description}
       status={view.status}
       foldKey={view.foldKey}
       trailing={trailing}
