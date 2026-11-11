@@ -273,14 +273,17 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
   const codemodeCallCount = codemode ? codemode.calls.length + codemode.omitted : 0;
   const active = Boolean(isStreaming) && !result;
-  // Terminal rows render command + output as one ZCode-style block ($ cmd, then
-  // the output) instead of the raw JSON args.
+  // Terminal rows render command + output instead of the raw JSON args: the
+  // command wraps (it is the call's input), the output keeps its own layout —
+  // box art, tables and progress bars must not reflow — and a rule separates
+  // the two, the way a shell session reads.
   const commandText = category === "terminal" && !isStreamingInput && typeof block.input?.command === "string"
     ? block.input.command
     : null;
-  const combinedTerminalText = commandText !== null
-    ? `$ ${commandText}${resultText && !resultIsEmpty ? `\n\n${resultText}` : ""}`
-    : null;
+  const terminalOutput = commandText !== null && resultText !== null && !resultIsEmpty ? resultText : null;
+  const combinedTerminalText = commandText === null
+    ? null
+    : `$ ${commandText}${terminalOutput === null ? "" : `\n\n${terminalOutput}`}`;
   // Flat arguments as rows instead of a JSON blob, unless the card has a view of
   // its own (a write's file text, codemode, an applied patch, a terminal pair).
   // Streamed input is incomplete JSON: pi's partial parse shows the fields it
@@ -381,7 +384,13 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
                 </>
               ) : combinedTerminalText !== null ? (
                 <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-h-[var(--card-max-height)]">
-                  <CodeBlockContent wrap={false}><HighlightedCode code={combinedTerminalText} language="bash" /></CodeBlockContent>
+                  <CodeBlockContent wrap className="shrink-0"><HighlightedCode code={`$ ${commandText}`} language="bash" /></CodeBlockContent>
+                  {terminalOutput !== null && (
+                    <>
+                      <div className="h-px shrink-0 bg-border" aria-hidden="true" />
+                      <CodeBlockContent wrap={false} className="min-h-0">{terminalOutput}</CodeBlockContent>
+                    </>
+                  )}
                 </CodeBlock>
               ) : (
                 <>
