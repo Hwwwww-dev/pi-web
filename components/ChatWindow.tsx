@@ -5,7 +5,7 @@ import { ArrowDownIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from
 import Image from "next/image";
 import { isValidElement, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage } from "@/lib/types";
+import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";
 import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
 import { splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
@@ -19,7 +19,7 @@ import { dropMentionText, splitDroppedItems, uploadFiles, type DroppedItem } fro
 import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
 import { TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { MarkdownBody } from "./MarkdownBody";
-import { ChatInput, type ChatInputHandle } from "./ChatInput";
+import { ChatInput, getUserMessageDraftImages, getUserMessageText, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
@@ -318,6 +318,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [streamCharacters]);
   const getStreamingMessage = useCallback(() => streamingStore.getState().streamingMessage, [streamingStore]);
   const sessionBusy = agentRunning || bashRunning;
+  // 新会话的输入框带上被 fork 的这条消息：可以直接重发或改。
+  const forkFromMessage = useCallback((entryId: string, message: UserMessage) => {
+    void handleFork(entryId, { value: getUserMessageText(message), images: getUserMessageDraftImages(message) });
+  }, [handleFork]);
   // Context window + live reading for usage lines: the polled reading when a
   // run is active, the session-stats fallback while just browsing. Held in a
   // ref so an update does not recompute the whole memoized message list.
@@ -1370,7 +1374,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             onOpenSubagent={onOpenSubagent}
             entryId={entryIds[idx]}
             searchBlock={entryIds[idx] === pendingSearchScroll?.entryId ? searchBlock : undefined}
-            onFork={bashRunning || isNew ? undefined : handleFork}
+            onFork={bashRunning || isNew ? undefined : forkFromMessage}
             forking={forkingEntryId === entryIds[idx]}
             onEditContent={sessionBusy ? undefined : handleEditContent}
             isEditing={entryIds[idx] !== undefined && editEntryId === entryIds[idx]}

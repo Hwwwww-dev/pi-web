@@ -40,10 +40,10 @@ export const BEAM_RISE_PER_SECOND = 400;
  * How many tokens/s it may lose per second. Deliberately small — a gap between
  * chunks is not a slowdown, and the beam must not look like it hit the brakes.
  */
-export const BEAM_FALL_PER_SECOND = 18;
+export const BEAM_FALL_PER_SECOND = 6;
 
 /** No single step may drop more than this share of the current rate, however long the step. */
-export const BEAM_FALL_CAP_SHARE = 0.06;
+export const BEAM_FALL_CAP_SHARE = 0.02;
 
 /**
  * What a pause asks for: this share of the current rate, not zero.
