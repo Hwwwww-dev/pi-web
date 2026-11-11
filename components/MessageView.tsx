@@ -496,15 +496,15 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
                   : "bg-destructive/15 text-destructive",
               )}
             >
-              {/* >120：文字恒白、只有背景变色。底色层用固定饱和度/亮度的
-                  纯 oklch（不走主题 token），hue-rotate 转一圈即全彩循环；
-                  L=0.55 保证白字在任何色相上都可读。转一圈的时长随速度
-                  加快（300/tps 秒，0.4s 封底）：120 t/s → 2.5s，300 → 1s。 */}
+              {/* >120：文字恒白、只有背景变色。底色层用高亮度的纯 oklch
+                  （不走主题 token），hue-rotate 转一圈即全彩循环。档位全序：
+                  <15 红 → 15–30 黄 → 30–50 绿 → 50–120 蓝 → >120 彩色，
+                  彩色的转速随速度加快（300/tps 秒，0.4s 封底）。 */}
               {tps > 120 ? (
                 <>
                   <span
                     aria-hidden
-                    className="tps-rainbow absolute inset-0 rounded-[inherit] bg-[oklch(0.55_0.2_260)]"
+                    className="tps-rainbow absolute inset-0 rounded-[inherit] bg-[oklch(0.7_0.19_260)]"
                     style={{ animationDuration: `${Math.max(0.4, 300 / tps).toFixed(2)}s` }}
                   />
                   <span className="relative whitespace-nowrap">{tps.toFixed(1)} t/s</span>
