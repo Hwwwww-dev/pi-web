@@ -317,9 +317,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
 
   return (
     <Trace data-activity-tool={block.toolName}>
-      {/* sticky: the header row stays readable while the card's body scrolls past
-          it, and un-sticks as soon as the card itself leaves the viewport. */}
-      <div className="sticky top-0 z-10 flex max-w-full min-w-0 items-center gap-1 bg-background">
+      <div className="flex max-w-full min-w-0 items-center gap-1 bg-background">
         <TraceCollapsible
           open={expanded}
           onOpenChange={toggleExpanded}
@@ -482,7 +480,7 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
         onOpenChange={toggleExpanded}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <div className="sticky top-0 z-10 w-full bg-background">
+        <div className="w-full bg-background">
           <TraceCollapsibleTrigger>
             <TraceLine status={hasPending ? "running" : isError ? "error" : undefined}>
               <TraceIcon><RowStatusIcon category={category} isError={isError} active={hasPending} /></TraceIcon>
@@ -664,7 +662,7 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
         }}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <div className="sticky top-0 z-10 w-full bg-background">
+        <div className="w-full bg-background">
           <TraceCollapsibleTrigger
             aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
             title={t("i18n.thinking")}
@@ -788,7 +786,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
 
   return (
     <Trace data-activity-custom={message.customType} className={isHiddenDisplay ? "opacity-75" : undefined}>
-      <div className="sticky top-0 z-10 flex max-w-full min-w-0 items-center gap-1 bg-background">
+      <div className="flex max-w-full min-w-0 items-center gap-1 bg-background">
         <TraceCollapsible
           open={expanded}
           onOpenChange={() => setExpanded((v) => !v)}
@@ -898,7 +896,7 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
         onOpenChange={() => setExpanded((v) => !v)}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <div className="sticky top-0 z-10 w-full bg-background">
+        <div className="w-full bg-background">
           <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
           <TraceLine>
             <TraceIcon><ToolCategoryIcon category="compact" /></TraceIcon>
@@ -1253,7 +1251,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
           )}
         >
           {showFileHeaders && layout === "split" && (
-            <div className="sticky top-0 z-[1] grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] border-b border-border bg-muted">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] border-b border-border bg-muted">
               <SplitDiffHeader title={file.oldPath || t("i18n.before")} side="left" />
               <SplitDiffHeader title={file.newPath || t("i18n.after")} side="right" />
             </div>
@@ -1262,7 +1260,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
           {showFileHeaders && layout === "stacked" && stackedFilePath(file) && (
             <div
               title={stackedFilePath(file)}
-              className="sticky top-0 z-[1] truncate border-b border-border bg-muted px-2.5 py-[5px] text-muted-foreground"
+              className="truncate border-b border-border bg-muted px-2.5 py-[5px] text-muted-foreground"
             >
               {stackedFilePath(file)}
             </div>

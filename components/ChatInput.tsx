@@ -2175,7 +2175,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         // home-indicator inset is reserved once, by .chat-content (the bar
         // under the input sits below it) — not here again, or the phone's
         // bottom gap doubles.
-        : "chat-input-shell flex min-h-0 flex-col px-7 pb-3.5 pt-1.5 max-sm:px-2.5 max-sm:pb-3",
+        // min-w-0: as a column flex item its `min-width: auto` resolves to
+        // min-content, so one long unbreakable queue row stretched the whole
+        // composer past the viewport instead of truncating inside it.
+        : "chat-input-shell flex min-h-0 min-w-0 flex-col px-7 pb-3.5 pt-1.5 max-sm:px-2.5 max-sm:pb-3",
         builtinCommandPending && "opacity-50 transition-opacity duration-150",
       )}
     >
