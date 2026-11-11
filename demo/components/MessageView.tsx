@@ -42,6 +42,9 @@ import type {
 
 // CJK chars ~1 token each (GLM/DeepSeek/GPT-o200k); other chars ~4 chars/token.
 const CJK_PATTERN = /[\u3000-\u30ff\u3400-\u9fff\uf900-\ufaff\u{20000}-\u{2fa1f}\uac00-\ud7af]/u;
+
+// 流束结束后，「token 数 + 速度」在消息上停留的时长。
+const RATE_HOLD_MS = 6000;
 function estimateTokens(text: string): number {
   let cjk = 0;
   let rest = 0;
@@ -496,16 +499,16 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
                   : "bg-destructive/15 text-destructive",
               )}
             >
-              {/* >120：文字恒白、背景是流动的彩虹渐变（.tps-rainbow 的
-                  多色高亮渐变整条滑动）。档位全序：<15 红 → 15–30 黄 →
-                  30–50 绿 → 50–120 蓝 → >120 彩虹，滑动速度随速度加快
-                  （300/tps 秒一个循环，0.4s 封底）。 */}
+              {/* >120：文字恒白、背景是流动的彩虹渐变（.tps-rainbow，参数为
+                  用户调参器定稿：70px 周期 / L0.70 / C0.25 / 8 色）。滑动
+                  速度随速度加快：50/tps 秒一个循环，0.3s 封底（≥166 t/s
+                  恒为定稿的 0.3s）。 */}
               {tps > 120 ? (
                 <>
                   <span
                     aria-hidden
                     className="tps-rainbow absolute inset-y-0 left-0 rounded-[inherit]"
-                    style={{ animationDuration: `${Math.max(0.4, 300 / tps).toFixed(2)}s` }}
+                    style={{ animationDuration: `${Math.max(0.3, 50 / tps).toFixed(2)}s` }}
                   />
                   <span className="relative whitespace-nowrap">{tps.toFixed(1)} t/s</span>
                 </>
@@ -574,6 +577,10 @@ function AssistantMessageView({
   const streamRateKeyRef = useRef(rateKey);
   streamRateKeyRef.current = rateKey;
   const [tps, setTps] = useState<number | null>(null);
+  // 流束结束后把最后一帧「token 数 + 速度」在消息上停留一会儿（RATE_HOLD_MS），
+  // 而不是随 isStreaming=false 瞬间消失；出现也提前：速率库 0.25s 即出首帧。
+  const lastRateRef = useRef<{ tokens: number; tps: number } | null>(null);
+  const [holdRate, setHoldRate] = useState(false);
   const blockItemsRef = useRef(blockItems);
   blockItemsRef.current = blockItems;
   const tokenEstimateCacheRef = useRef<Map<number, TokenEstimateCacheEntry>>(new Map());
@@ -596,6 +603,11 @@ function AssistantMessageView({
   }, [blockItems, isStreaming]);
   const estimatedTokensRef = useRef(estimatedTokens);
   estimatedTokensRef.current = estimatedTokens;
+  if (isStreaming && tps !== null) {
+    lastRateRef.current = { tokens: Math.round(estimatedTokens), tps };
+  }
+  // 结束后的停留期（holdRate）展示最后一帧读数。
+  const heldRate = !isStreaming && holdRate ? lastRateRef.current : null;
 
   // Streaming-based timing for thinking blocks
   const blockStartTimesRef = useRef<Map<number, number>>(new Map());
@@ -659,8 +671,15 @@ function AssistantMessageView({
       });
       streamStartRef.current = null;
       setTps(null);
+      // 结束后停留一帧的最终读数，到点再撤（撤时行随 estimatedTokens=0 收起）。
+      if (lastRateRef.current) {
+        setHoldRate(true);
+        const holdTimer = setTimeout(() => setHoldRate(false), RATE_HOLD_MS);
+        return () => clearTimeout(holdTimer);
+      }
       return;
     }
+    setHoldRate(false);
     const tick = () => {
       const items = blockItemsRef.current;
       const now = Date.now();
@@ -708,11 +727,11 @@ function AssistantMessageView({
       <MessageContent>
       {/* Streaming status (estimated tokens + throughput); the model name lives
           in the turn meta line / the per-message label for standalone messages. */}
-      {(showModelLabel || isStreaming) && (
+      {(showModelLabel || isStreaming || holdRate) && (
         <AssistantMessageHeader
           modelName={showModelLabel && message.provider ? getModelDisplayName(message.provider, message.model, modelNames) : undefined}
-          estimatedTokens={isStreaming ? Math.round(estimatedTokens) : 0}
-          tps={isStreaming ? tps : null}
+          estimatedTokens={isStreaming ? Math.round(estimatedTokens) : heldRate ? heldRate.tokens : 0}
+          tps={isStreaming ? tps : heldRate ? heldRate.tps : null}
           // The live-tail streaming message renders next to the activity rows:
           // line its tokens/rate up with the rows' icon column, and keep it
           // clear of the tool row above.

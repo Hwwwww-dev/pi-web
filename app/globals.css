@@ -1463,25 +1463,29 @@ span.token.table {
   }
 }
 
-/* t/s > 120 的徽章：文字恒白，背景是密排的流动彩虹渐变——repeating
-   光谱每 60px 一个周期（红→黄→绿→蓝→紫→红），图层比徽章宽出一个周期、
-   平移一个周期无缝循环，徽章内始终同时可见一整段彩色。动画只动
+/* t/s > 120 的徽章：文字恒白，背景是密排的流动彩虹渐变。参数来自用户的
+   调参器定稿：周期 70px · 亮度 0.70 · 饱和 0.25 · 每周期 8 色 · 基准
+   时长 0.30s。图层比徽章宽出一个周期、平移一个周期无缝循环，动画只动
    transform（GPU 合成、零重paint）：background-position 每帧重paint，
-   在真机上一顿一顿。高亮纯 oklch，不受主题 token 约束。时长由组件按
-   速度内联（animation-duration），越快滑得越快。reduced-motion 静态。 */
+   在真机上一顿一顿。纯 oklch，不受主题 token 约束。组件按速度内联
+   animation-duration：50/tps 秒、0.3s 封底（≥166 t/s 恒为 0.3s，再快
+   不再加速）。reduced-motion 下保持静态彩虹。 */
 @keyframes tps-rainbow-slide {
   from { transform: translateX(0); }
-  to { transform: translateX(-60px); }
+  to { transform: translateX(-70px); }
 }
 .tps-rainbow {
-  width: calc(100% + 60px);
+  width: calc(100% + 70px);
   background-image: repeating-linear-gradient(90deg,
-    oklch(0.7 0.19 0)   0px,
-    oklch(0.7 0.19 60)  12px,
-    oklch(0.7 0.19 140) 24px,
-    oklch(0.7 0.19 220) 36px,
-    oklch(0.7 0.19 300) 48px,
-    oklch(0.7 0.19 360) 60px);
+    oklch(0.70 0.25 0)   0px,
+    oklch(0.70 0.25 45)  8.8px,
+    oklch(0.70 0.25 90)  17.5px,
+    oklch(0.70 0.25 135) 26.3px,
+    oklch(0.70 0.25 180) 35px,
+    oklch(0.70 0.25 225) 43.8px,
+    oklch(0.70 0.25 270) 52.5px,
+    oklch(0.70 0.25 315) 61.3px,
+    oklch(0.70 0.25 360) 70px);
   animation: tps-rainbow-slide linear infinite;
   will-change: transform;
 }

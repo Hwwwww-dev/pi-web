@@ -35,5 +35,6 @@ export function streamRateStart(key: string | null, tokens: number, now: number)
 
 export function streamTokensPerSecond(start: StreamRateStart, tokens: number, now: number): number | null {
   const elapsedSeconds = (now - start.at) / 1000;
-  return elapsedSeconds > 0.5 ? (tokens - start.tokens) / elapsedSeconds : null;
+  // 0.25s 即出首帧：原来的 0.5s 门让速度徽章在回复开始后近一秒才露面。
+  return elapsedSeconds > 0.25 ? (tokens - start.tokens) / elapsedSeconds : null;
 }
