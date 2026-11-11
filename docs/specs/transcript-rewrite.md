@@ -237,6 +237,19 @@ export function toToolView(input: {
 
 每个 pattern 给出：官方骨架（逐字）→ 本项目实现（目标代码）→ 允许的差异 → 禁止。
 
+### 5.0 全部 pattern 共用的行规则
+
+官方组件不规定排版细节，以下是本项目必须一致的约束（每个 pattern 都适用）：
+
+| 约束 | 取值 | 理由 |
+| --- | --- | --- |
+| 行宽 | `max-w-[70%]`（`max-sm` 不加宽） | 一行到底读不动；70% 之上留白给时长/徽章 |
+| 换行 | 标题单行 `truncate`，描述同一行；参数/结果才换行 | 元素不能一个上一个下 |
+| 字号 | 行文字 `13.5px + var(--chat-font-size-offset)`；标题与描述同号 | 用户要求字体统一 |
+| 字体样式 | 不用斜体；时间、计数用 `tabular-nums` | 横平竖直 |
+| 图标列 | `TraceIcon` 固定 `size-4`，同一列对齐 | 行与行左边缘对齐 |
+| 缩进 | 子内容用 `TraceCollapsibleContent` 的官方内缩，不叠加自定义 padding | 层级只靠一层缩进 |
+
 ### 5.1 Turn（整轮）—— 官方 `trace` 文档「Whole Turn」
 
 **官方骨架**
