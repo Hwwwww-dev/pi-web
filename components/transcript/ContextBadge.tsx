@@ -1,36 +1,56 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Progress } from "@/components/ui/progress";
 import { useI18n } from "@/hooks/useI18n";
 import { formatCompactTokens } from "@/lib/turn-view";
 
 /**
- * Context used (官方 `pattern_context.md`): the turn-end percentage, the exact
- * tokens and the bar in a hover card. The numbers are the ones the turn already
- * has (`ctxTokens` / `ctxWindow`) — this component asks for nothing.
+ * Context used (官方 `pattern_context.md`): the same "ctx 12.3% / 200k" segment
+ * the usage line always showed, and — when the turn knows both numbers — a
+ * hover card with used / limit and the bar. It asks for no data of its own.
  */
-export function ContextBadge({ used, limit }: { used: number; limit: number }) {
+export function ContextBadge({ tokens, contextWindow, percent, color }: {
+  /** Prompt size of the next request. */
+  tokens?: number;
+  /** The model's window; without it the card has no limit to show. */
+  contextWindow?: number;
+  /** The percentage the segment prints. */
+  percent: number;
+  /** The caller's own highlight (warn/danger). */
+  color?: string;
+}) {
   const { t } = useI18n();
-  if (limit <= 0) return null;
-  const percent = Math.min(100, Math.round((used / limit) * 100));
+  const label = (
+    <>
+      <span className="opacity-75">ctx</span>
+      {/* ctxColor arrives as a token string from the caller — keep the injection. */}
+      <span style={color ? { color } : undefined}>
+        {`${percent.toFixed(1)}%${contextWindow ? ` / ${formatCompactTokens(contextWindow)}` : ""}`}
+      </span>
+    </>
+  );
+
+  if (tokens === undefined || !contextWindow) {
+    return <span className="inline-flex items-center gap-1">{label}</span>;
+  }
 
   return (
     <HoverCard>
       <HoverCardTrigger asChild>
-        <Button variant="outline" size="sm" className="tabular-nums">
-          {t("chat.trace.context", { percent })}
-        </Button>
+        <span className="inline-flex cursor-default items-center gap-1">{label}</span>
       </HoverCardTrigger>
-      <HoverCardContent className="flex w-64 flex-col gap-3">
+      <HoverCardContent className="flex w-56 flex-col gap-2">
         <div className="flex items-center justify-between gap-3 text-sm">
           <span className="font-medium">{t("chat.trace.contextLabel")}</span>
           <span className="tabular-nums text-muted-foreground">
-            {`${formatCompactTokens(used)} / ${formatCompactTokens(limit)}`}
+            {`${formatCompactTokens(tokens)} / ${formatCompactTokens(contextWindow)}`}
           </span>
         </div>
-        <Progress value={percent} aria-label={t("chat.trace.contextLabel")} />
+        <Progress
+          value={Math.min(100, Math.round((tokens / contextWindow) * 100))}
+          aria-label={t("chat.trace.contextLabel")}
+        />
       </HoverCardContent>
     </HoverCard>
   );

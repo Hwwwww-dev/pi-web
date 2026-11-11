@@ -14,9 +14,9 @@ import {
   CompactionRow,
   CustomRow,
   SafeMarkdownBody,
-  ThinkingRow,
   ToolRow,
 } from "./ActivityRows";
+import { ReasoningTrace } from "./transcript/ReasoningTrace";
 import { formatNoticeTokens } from "@/lib/transcript-notices";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
@@ -823,13 +823,13 @@ function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDur
     return <div data-message-text data-search-target={searchTarget || undefined}><TextBlock block={block as TextContent} isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile} /></div>;
   }
   if (block.type === "thinking") {
-    return <ThinkingRow block={block as ThinkingContent} duration={streamingDuration} sessionId={sessionId} entryId={entryId} blockIndex={blockIndex} active={isStreaming && streamingDuration === undefined} />;
+    return <ReasoningTrace block={block as ThinkingContent} duration={streamingDuration} sessionId={sessionId} entryId={entryId} blockIndex={blockIndex} active={isStreaming && streamingDuration === undefined} />;
   }
   if (block.type === "toolCall") {
     const tc = block as ToolCallContent;
     const result = toolResults?.get(tc.toolCallId);
     const duration = toolCallDurations?.get(tc.toolCallId);
-    return <ToolRow block={tc} result={result} duration={duration} onOpenSubagent={onOpenSubagent} isStreaming={isStreaming} />;
+    return <ToolRow block={tc} result={result} duration={duration} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} isStreaming={isStreaming} />;
   }
   return null;
 }
@@ -845,8 +845,9 @@ function recordedDurationMs(value: unknown): number | undefined {
 }
 
 /** Below this a tool card shows no time: it would read 0.0s on every quick read or search. */
-export { CompactionSummaryDetails, formatToolDuration, TOOL_DURATION_MIN_MS } from "./ActivityRows";
-import { TOOL_DURATION_MIN_MS } from "./ActivityRows";
+export { CompactionSummaryDetails } from "./ActivityRows";
+export { formatToolDuration, TOOL_DURATION_MIN_MS } from "@/lib/tool-duration";
+import { TOOL_DURATION_MIN_MS } from "@/lib/tool-duration";
 
 
 

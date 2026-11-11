@@ -70,6 +70,8 @@ export interface ToolView {
   command?: string;
   filePaths: string[];
   images: string[];
+  /** A video or audio result: the browser's own player, never the bytes as text. */
+  media?: { video?: string; audio?: string };
   sources?: ToolViewSource[];
   subagent?: { sessionId: string; label: string };
   diffStat?: { added: number; removed: number };
@@ -115,21 +117,32 @@ function resultDiffText(result: ToolResultMessage | undefined): string | null {
 
 /** An image content block as a URL, whichever of the two shapes pi used. */
 export function imageSource(image: ImageContent): string {
-  // SAFETY: pi's image blocks come flat (`data` + `mimeType`) or nested (`source`); both fields are optional and checked below.
-  const flat = image as unknown as { data?: string; mimeType?: string };
-  if (image.source) {
-    return image.source.type === "base64"
-      ? `data:${image.source.media_type};base64,${image.source.data}`
-      : image.source.url ?? "";
+  return srcOf(image);
+}
+
+/** Any media block (image, video, audio) as a URL: pi's flat or nested source shape. */
+function srcOf(block: unknown): string {
+  const content = block as { source?: { type?: string; media_type?: string; data?: string; url?: string }; data?: string; mimeType?: string };
+  if (content.source) {
+    return content.source.type === "base64"
+      ? `data:${content.source.media_type};base64,${content.source.data}`
+      : content.source.url ?? "";
   }
-  return flat.data ? `data:${flat.mimeType};base64,${flat.data}` : "";
+  return content.data ? `data:${content.mimeType};base64,${content.data}` : "";
+}
+
+/** The image blocks of a message's content (a tool result or a custom message). */
+export function getMessageImages(content: readonly { type: string }[] | string): ImageContent[] {
+  if (typeof content === "string") return [];
+  return content.filter((block): block is ImageContent => block.type === "image");
 }
 
 function resultText(result: ToolResultMessage | undefined, dropCodemodeHeader: boolean): {
   text: string | null;
   images: string[];
+  media: { video?: string; audio?: string } | null;
 } {
-  if (!result) return { text: null, images: [] };
+  if (!result) return { text: null, images: [], media: null };
   const content = dropCodemodeHeader ? stripCodemodeHeader(result.content) : result.content;
   const text = content
     .filter((block): block is { type: "text"; text: string } => block.type === "text")
@@ -139,7 +152,20 @@ function resultText(result: ToolResultMessage | undefined, dropCodemodeHeader: b
     .filter((block): block is ImageContent => block.type === "image")
     .map(imageSource)
     .filter((src) => src !== "");
-  return { text, images };
+  const media: { video?: string; audio?: string } = {};
+  // SAFETY: pi's content union names only text and image blocks; a provider or
+  // extension may still return media, so the block is read by its `type` field.
+  const blocks = content as unknown as { type: string }[];
+  for (const block of blocks) {
+    // A provider or extension may return media the SDK's content type does not
+    // name yet: read the block defensively instead of widening the union.
+    // A provider or extension may return media the SDK's content type does not
+    // name yet: read the block defensively instead of widening the union.
+    if (block.type !== "video" && block.type !== "audio") continue;
+    const src = srcOf(block);
+    if (src) media[block.type] = src;
+  }
+  return { text, images, media: media.video || media.audio ? media : null };
 }
 
 /** `(no output)` and an empty string are the two ways pi says "nothing". */
@@ -214,7 +240,7 @@ function codemodeSteps(calls: CodemodeCallView[]): ToolViewStep[] {
 }
 
 /** A patch's file sections, from its own text or the result's preview. */
-function applyPatchFiles(block: ToolCallContent, result?: ToolResultMessage): SplitDiffFile[] | null {
+export function getPatchFiles(block: ToolCallContent, result?: ToolResultMessage): SplitDiffFile[] | null {
   const fromInput = parseApplyPatchInput(getApplyPatchInputText(block.input, block.rawInput));
   if (fromInput) return fromInput;
   const details = result && !result.isError ? result.details : undefined;
@@ -240,7 +266,7 @@ function previewOf(block: ToolCallContent): string {
 }
 
 /** The last segment of a path, for a one-line title. */
-function baseName(path: string): string {
+export function baseName(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
   return parts[parts.length - 1] ?? path;
 }
@@ -268,6 +294,7 @@ interface Prepared {
   text: string | null;
   details: unknown;
   images: string[];
+  media: { video?: string; audio?: string } | null;
   fields: ToolField[] | null;
   preview: string;
   command: string | null;
@@ -287,8 +314,8 @@ function prepare({ block, result, t }: ToolViewInput): Prepared {
   const codemode = script === null ? null : { code: script, ...codemodeCalls(result?.details) };
   // A codemode result repeats the script as its leading text; the row shows the
   // calls instead, so the copy is dropped.
-  const { text: rawText, images } = resultText(result, codemode !== null);
-  const patchFiles = isApplyPatchToolName(block.toolName) ? applyPatchFiles(block, result) : null;
+  const { text: rawText, images, media } = resultText(result, codemode !== null);
+  const patchFiles = isApplyPatchToolName(block.toolName) ? getPatchFiles(block, result) : null;
   const writtenFileText = getWrittenFileText(block);
   const command = getToolCategory(block.toolName) === "terminal" && !streamingInput && typeof block.input.command === "string"
     ? block.input.command
@@ -306,6 +333,7 @@ function prepare({ block, result, t }: ToolViewInput): Prepared {
     text: mcp && rawText !== null ? prettyMcpResultText(rawText) : rawText,
     details: result?.details,
     images,
+    media,
     // Flat arguments as rows instead of a JSON blob, unless the row has a view
     // of its own (a write's file text, codemode, an applied patch, a terminal pair).
     fields: !streamingInput && command === null && codemode === null && patchFiles === null && writtenFileText === null
@@ -365,6 +393,7 @@ function baseView(p: Prepared): ToolView {
     sections: [],
     filePaths: p.filePaths,
     images: p.images,
+    ...(p.media ? { media: p.media } : {}),
     streamingInput: p.streamingInput,
     foldKey: p.block.toolCallId,
   };

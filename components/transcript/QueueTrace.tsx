@@ -11,10 +11,12 @@ import { TraceRow } from "./TraceRow";
  * A todo snapshot (官方 `pattern_queue.md`): two segments, open items and done
  * items. An empty segment is not rendered — "0 项已完成" is noise.
  */
-export const QueueTrace = memo(function QueueTrace({ open, done, foldKey }: {
+export const QueueTrace = memo(function QueueTrace({ open, done, foldKey, activityTool }: {
   open: ToolViewStep[];
   done: ToolViewStep[];
   foldKey: string;
+  /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
+  activityTool?: string;
 }) {
   const { t } = useI18n();
 
@@ -23,6 +25,7 @@ export const QueueTrace = memo(function QueueTrace({ open, done, foldKey }: {
       icon={icon}
       title={title}
       foldKey={`${foldKey}:${key}`}
+      activityTool={activityTool}
       defaultOpen
       ariaLabel={title}
       content={(

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { CircleXIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TraceRow } from "./TraceRow";
@@ -10,12 +10,18 @@ import { TraceRow } from "./TraceRow";
  * rest are frames. `node_modules` frames stay muted so the reader's own code
  * stands out.
  */
-export const StackTraceTrace = memo(function StackTraceTrace({ title, text, foldKey }: {
+export const StackTraceTrace = memo(function StackTraceTrace({ title, text, foldKey, trailing, below, activityTool, children }: {
   /** "运行失败：npm test" — built by the caller from the tool's own title. */
   title: string;
   /** The whole error output: first line = error, the rest = frames. */
   text: string;
   foldKey: string;
+  /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
+  activityTool?: string;
+  trailing?: ReactNode;
+  below?: ReactNode;
+  /** What the row holds besides the error (its arguments, its own result). */
+  children?: ReactNode;
 }) {
   const [error, ...frames] = text.split("\n").map((line) => line.trim()).filter((line, index) => line !== "" || index === 0);
 
@@ -25,6 +31,9 @@ export const StackTraceTrace = memo(function StackTraceTrace({ title, text, fold
       title={title}
       status="error"
       foldKey={foldKey}
+      trailing={trailing}
+      below={below}
+      activityTool={activityTool}
       ariaLabel={title}
       content={(
         <div className="flex flex-col gap-2 rounded-md bg-muted p-3 font-mono text-xs">
@@ -40,6 +49,8 @@ export const StackTraceTrace = memo(function StackTraceTrace({ title, text, fold
           )}
         </div>
       )}
-    />
+    >
+      {children}
+    </TraceRow>
   );
 });

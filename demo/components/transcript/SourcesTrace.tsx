@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { ArrowUpRightIcon, GlobeIcon } from "lucide-react";
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { useI18n } from "@/hooks/useI18n";
@@ -20,9 +20,13 @@ function hostOf(url: string): string {
  * What a web search read (官方 `pattern_sources.md`): one line per source, the
  * whole row a link, the arrow saying it leaves the app.
  */
-export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey }: {
+export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trailing, below, activityTool }: {
   sources: ToolViewSource[];
   foldKey: string;
+  /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
+  activityTool?: string;
+  trailing?: ReactNode;
+  below?: ReactNode;
 }) {
   const { t } = useI18n();
   const title = t("chat.trace.sources", { count: sources.length });
@@ -32,6 +36,9 @@ export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey }: {
       icon={<GlobeIcon />}
       title={title}
       foldKey={foldKey}
+      trailing={trailing}
+      below={below}
+      activityTool={activityTool}
       ariaLabel={title}
       content={(
         <Trace className="gap-1">

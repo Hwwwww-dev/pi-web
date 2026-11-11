@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { ArrowDown, ArrowUp, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCompactTokens, type UsageContextPart } from "@/lib/turn-view";
+import { ContextBadge } from "@/components/transcript/ContextBadge";
 
 // One shared usage rendering for the toolbar stats and the chat usage lines:
 // same icons, sizes, gaps and number formats everywhere.
@@ -49,14 +50,15 @@ export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8,
     if (percent !== null) {
       segments.push({
         id: "ctx",
+        // The segment stays the same text; the hover card carries the exact
+        // used / limit numbers (第 14.3 节).
         node: (
-          <>
-            <span className="opacity-75">ctx</span>
-            {/* ctxColor arrives as a token string from the caller — keep the injection. */}
-            <span style={ctxColor ? { color: ctxColor } : undefined}>
-              {`${percent.toFixed(1)}%${ctx.contextWindow ? ` / ${formatCompactTokens(ctx.contextWindow)}` : ""}`}
-            </span>
-          </>
+          <ContextBadge
+            tokens={ctx.tokens}
+            contextWindow={ctx.contextWindow}
+            percent={percent}
+            color={ctxColor}
+          />
         ),
       });
     }

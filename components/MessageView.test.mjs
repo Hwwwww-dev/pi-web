@@ -19,7 +19,8 @@ const {
   getToolCallInputText,
   replaceUserMessageText,
 } = await jiti.import("./MessageView.tsx");
-const { PatchDiffFiles, ThinkingRow } = await jiti.import("./ActivityRows.tsx");
+const { PatchDiffFiles } = await jiti.import("./ActivityRows.tsx");
+const { ReasoningTrace } = await jiti.import("./transcript/ReasoningTrace.tsx");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 const { splitFinalAssistantBlocks } = await jiti.import("@/lib/message-display");
 const { clearExpandedToolCalls, setToolCallExpanded } = await jiti.import("@/lib/tool-call-expansion");
@@ -90,7 +91,7 @@ test("previews the first thinking line and reveals the full text with the saved 
       const html = renderToStaticMarkup(React.createElement(
         I18nProvider,
         null,
-        React.createElement(ThinkingRow, {
+        React.createElement(ReasoningTrace, {
           block: { type: "thinking", thinking: "**Independent reasoning**\n\nDetailed second line." },
           blockIndex: 2,
           duration: 3,
@@ -98,7 +99,8 @@ test("previews the first thinking line and reveals the full text with the saved 
       ));
       assert.match(html, new RegExp(`aria-expanded="${expanded}"`));
       assert.match(html, /aria-label="Thinking: /);
-      assert.match(html, /3s/);
+      // The trace prints the same "3.0s" the tool rows do.
+      assert.match(html, /3\.0s/);
       if (expanded) {
         assert.ok(html.includes("Detailed second line."));
       } else {
@@ -112,23 +114,23 @@ test("previews the first thinking line and reveals the full text with the saved 
 });
 
 test("long thinking renders in pages instead of one DOM blob (#1196)", () => {
-  // dev renders thinking through ThinkingRow's deferred pagination
-  // (loadThinkingContent): a historical block's body loads page by page,
-  // so an expanded 2_000-line block never lands in the DOM at once.
+  // Thinking bodies load through ReasoningTrace's deferred pagination
+  // (loadThinkingContent): a historical block's body arrives page by page, so an
+  // expanded 2_000-line block never lands in the DOM at once.
   const source = ts.createSourceFile("ActivityRows.tsx", readFileSync(new URL("./ActivityRows.tsx", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const calls = [];
   (function visit(node) {
-    if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && node.tagName.getText(source) === "ThinkingRow") {
+    if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && node.tagName.getText(source) === "ReasoningTrace") {
       const props = node.attributes.properties.map((attribute) => (ts.isJsxAttribute(attribute) ? attribute.name.getText(source) : null));
       calls.push(props);
     }
     ts.forEachChild(node, visit);
   })(source);
-  assert.ok(calls.length >= 1, "ThinkingRow renders the thinking blocks");
+  assert.ok(calls.length >= 1, "ReasoningTrace renders the thinking blocks");
   for (const props of calls) {
     assert.ok(props.includes("sessionId") && props.includes("entryId"), "each row loads its body through the deferred pages");
   }
-  assert.match(readFileSync(new URL("./ActivityRows.tsx", import.meta.url), "utf8"), /loadThinkingContent/);
+  assert.match(readFileSync(new URL("./transcript/ReasoningTrace.tsx", import.meta.url), "utf8"), /loadThinkingContent/);
 });
 
 test("shows deferred thinking previews without loading the full content", () => {
@@ -689,7 +691,13 @@ const traceRowSource = await readFileSync(new URL("./transcript/TraceRow.tsx", i
 test("each tool view kind reaches its pattern, and no card markup is left", () => {
   assert.match(activityRowsSource, /<TerminalTrace[^>]*activityTool=\{block\.toolName\}/);
   assert.match(activityRowsSource, /<SubagentTrace[\s\S]*?foldKey=\{view\.foldKey\}/);
-  assert.match(activityRowsSource, /<ToolTrace view=\{view\} activityTool=\{block\.toolName\}/);
+  assert.match(activityRowsSource, /<ToolTrace[\s\S]*?activityTool=\{block\.toolName\}/);
+  // A search's sources, a to-do split, a failure's stack and a call's media each
+  // have their own pattern: the view model computes them, the row renders them.
+  assert.match(activityRowsSource, /<SourcesTrace sources=\{view\.sources\}/);
+  assert.match(activityRowsSource, /<QueueTrace[\s\S]*?open=\{steps\.filter/);
+  assert.match(activityRowsSource, /<StackTraceTrace[\s\S]*?text=\{resultText \?\? view\.error\}/);
+  assert.match(activityRowsSource, /<MediaTrace images=\{view\.images\}/);
   // The old per-category card (argument table, paired result, two-column patch)
   // is gone; a call renders through a pattern or not at all.
   for (const name of ["ToolFieldRows", "PairedResult", "SplitPatchView", "ToolRowPreview", "RowStatusIcon"]) {

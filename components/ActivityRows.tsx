@@ -1,13 +1,12 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useMemo, useState, type ReactNode } from "react";
 import { BookOpenIcon, BotIcon, CheckIcon, CopyIcon, ExternalLinkIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareTerminalIcon, TriangleAlertIcon, WrenchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { CodeBlock, CodeBlockContent } from "./ui/code-block";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { Skeleton } from "./ui/skeleton";
 import {
   Trace,
   TraceCollapsible,
@@ -20,7 +19,6 @@ import {
 } from "./ui/trace";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
-import { ThinkingIcon } from "./ThinkingIcon";
 import { TerminalTrace } from "./transcript/TerminalTrace";
 import { ToolTrace } from "./transcript/ToolTrace";
 import { TaskTrace } from "./transcript/TaskTrace";
@@ -30,28 +28,22 @@ import { useI18n } from "@/hooks/useI18n";
 import { parseCompactionSummary } from "@/lib/compaction-summary";
 import type { SplitDiffCell, SplitDiffFile } from "@/lib/patch";
 import { diffGapLabel, unifiedDiffLines, type SplitDiffGap, type UnifiedDiffLine } from "@/lib/patch";
-import { applyPatchPreviewToFiles, applyPatchResultHasFailures, extractApplyPatchPaths, getApplyPatchInputText, parseApplyPatchInput } from "@/lib/apply-patch";
-import { isApplyPatchToolName, isWriteToolName } from "@/lib/tool-names";
-import { toToolView } from "@/lib/tool-view";
+import { applyPatchResultHasFailures } from "@/lib/apply-patch";
+import { isApplyPatchToolName } from "@/lib/tool-names";
+import { getMessageImages, getPatchFiles, imageSource, toToolView } from "@/lib/tool-view";
+import { formatToolDuration } from "@/lib/tool-duration";
 
-// A write's file text in place of its JSON (from main's MessageView). Streamed
-// input is still incomplete JSON, and any other argument (a mode, a title)
-// would vanish from this view, so those calls keep the generic view.
-const WRITE_VIEW_KEYS = new Set(["path", "file_path", "content"]);
-
-export function getWrittenFileText(block: ToolCallContent): string | null {
-  if (block.rawInput !== undefined || !isWriteToolName(block.toolName)) return null;
-  const { content } = block.input;
-  if (typeof content !== "string" || content === "") return null;
-  return Object.keys(block.input).every((key) => WRITE_VIEW_KEYS.has(key)) ? content : null;
-}
-import { COLLAPSIBLE_EXPANDED_EVENT } from "@/lib/tool-call-expansion";
-import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { getToolCategory, getToolFilePaths, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
 import { formatUsage, type ActivityItem, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
 import { UsageBar } from "./UsageBar";
-import type { CustomMessage, ImageContent, TextContent, ThinkingContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
+import { ReasoningTrace } from "./transcript/ReasoningTrace";
+import { SourcesTrace } from "./transcript/SourcesTrace";
+import { QueueTrace } from "./transcript/QueueTrace";
+import { StackTraceTrace } from "./transcript/StackTraceTrace";
+import { MediaTrace } from "./transcript/MediaTrace";
+import { ToolSection } from "./transcript/ToolTrace";
+import type { CustomMessage, TextContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared row primitives
@@ -88,20 +80,6 @@ function ToolCategoryIcon({ category }: { category: ToolCategory }) {
 // Tool call rows
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Below this a tool card shows no time: it would read 0.0s on every quick read or search. */
-export const TOOL_DURATION_MIN_MS = 100;
-
-/** A tool's run time as the pi CLI's "Took" writes it: 2.4s, then 3m 5s, then 1h 2m 5s. */
-export function formatToolDuration(ms: number): string {
-  const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const totalSeconds = Math.floor(seconds);
-  const minutes = Math.floor(totalSeconds / 60);
-  const remainder = totalSeconds % 60;
-  if (minutes < 60) return `${minutes}m ${remainder}s`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m ${remainder}s`;
-}
-
 export function getToolCallInputText(block: ToolCallContent): string {
   return block.rawInput ?? JSON.stringify(block.input, null, 2);
 }
@@ -114,17 +92,11 @@ export interface ToolCallEntry {
   ctxTokens?: number;
 }
 
-function applyPatchPaths(block: ToolCallContent, result?: ToolResultMessage): string[] {
-  const fromInput = extractApplyPatchPaths(getApplyPatchInputText(block.input, block.rawInput));
-  if (fromInput.length > 0) return fromInput;
-  const files = getApplyPatchFiles(block, result);
-  return files ? files.map((file) => file.newPath || file.oldPath).filter((path): path is string => Boolean(path)) : [];
-}
 
 
 
 
-export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, onOpenSubagent, isStreaming }: {
+export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, onOpenFile, onOpenSubagent, isStreaming }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
   /** Tool run time in milliseconds (pi 1.1's durationMs, else the timestamps' difference). */
@@ -134,6 +106,8 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   /** Prompt tokens of the next request — context occupancy after this call. */
   ctxTokens?: number;
   ctxWindow?: number;
+  /** Opens one of the files the call named (its chips). */
+  onOpenFile?: (filePath: string) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
   isStreaming?: boolean;
 }) {
@@ -141,7 +115,6 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   const active = Boolean(isStreaming) && !result;
   const view = toToolView({ block, result, t });
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
-  const resultImages = getMessageImages(result ? result.content : []);
 
   const durationNode = !active && duration !== undefined
     ? <TraceDescription className="shrink-0 tabular-nums">{formatToolDuration(duration)}</TraceDescription>
@@ -154,7 +127,44 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
       />
     </div>
   ) : undefined;
-  const belowNode = resultImages.length > 0 ? <ResultImages images={resultImages} /> : undefined;
+  // Images, video and audio the call produced: the viewers below the line, never
+  // the bytes inside a code block.
+  const mediaNode = view.images.length > 0 || view.media
+    ? <MediaTrace images={view.images} video={view.media?.video} audio={view.media?.audio} />
+    : undefined;
+
+  // A patch's own +N −M sits beside the title; every other kind carries the duration alone.
+  const trailing = view.diffStat || durationNode ? (
+    <span className="flex items-center gap-1.5">
+      {view.diffStat && (
+        <>
+          <Badge variant="ghost" className="bg-success/15 text-success">+{view.diffStat.added}</Badge>
+          <Badge variant="ghost" className="bg-destructive/10 text-destructive">−{view.diffStat.removed}</Badge>
+        </>
+      )}
+      {durationNode}
+    </span>
+  ) : undefined;
+
+  // A failed call is its own shape (第 5.2 节): the X icon, and the whole error
+  // repeated above whatever else the call holds.
+  if (view.status === "error" && view.error) {
+    const resultText = view.sections.find((section) => section.kind === "code" && section.label === "result")?.text;
+    const rest = view.sections.filter((section) => section !== view.sections.find((s) => s.kind === "code" && s.label === "result"));
+    return (
+      <StackTraceTrace
+        title={view.title}
+        text={resultText ?? view.error}
+        foldKey={view.foldKey}
+        activityTool={block.toolName}
+        trailing={trailing}
+        below={mediaNode}
+      >
+        {usageNode}
+        {rest.map((section, index) => <ToolSection key={index} section={section} />)}
+      </StackTraceTrace>
+    );
+  }
 
   if (view.kind === "subagent") {
     return (
@@ -176,34 +186,49 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
             <ExternalLinkIcon strokeWidth={2} />
           </Button>
         ) : undefined}
-        below={belowNode}
+        below={mediaNode}
       />
     );
   }
 
   if (view.kind === "terminal") {
-    return <TerminalTrace view={view} activityTool={block.toolName} trailing={durationNode} usage={usageNode} below={belowNode} />;
+    return <TerminalTrace view={view} activityTool={block.toolName} trailing={durationNode} usage={usageNode} below={mediaNode} />;
   }
 
-  // A patch's own +N −M sits beside the title; every other kind carries the duration alone.
-  const trailing = view.diffStat || durationNode ? (
-    <span className="flex items-center gap-1.5">
-      {view.diffStat && (
-        <>
-          <Badge variant="ghost" className="bg-success/15 text-success">+{view.diffStat.added}</Badge>
-          <Badge variant="ghost" className="bg-destructive/10 text-destructive">−{view.diffStat.removed}</Badge>
-        </>
-      )}
-      {durationNode}
-    </span>
-  ) : undefined;
+  // A to-do list (第 5.7 节): open items and done items, never one flat list.
+  if (view.kind === "queue") {
+    const steps = view.sections.find((section) => section.kind === "steps")?.steps ?? [];
+    return (
+      <QueueTrace
+        open={steps.filter((step) => step.status !== "done")}
+        done={steps.filter((step) => step.status === "done")}
+        foldKey={view.foldKey}
+        activityTool={block.toolName}
+      />
+    );
+  }
 
-  return <ToolTrace view={view} activityTool={block.toolName} trailing={trailing} usage={usageNode} below={belowNode} />;
+  // What a search read (第 5.8 节): one line per source, each a link.
+  if (view.sources && view.sources.length > 0) {
+    return <SourcesTrace sources={view.sources} foldKey={view.foldKey} activityTool={block.toolName} trailing={trailing} below={mediaNode} />;
+  }
+
+  return (
+    <ToolTrace
+      view={view}
+      activityTool={block.toolName}
+      trailing={trailing}
+      usage={usageNode}
+      below={mediaNode}
+      onOpenFile={onOpenFile}
+    />
+  );
 }
 
-export function ToolGroupRow({ calls, ctxWindow, onOpenSubagent }: {
+export function ToolGroupRow({ calls, ctxWindow, onOpenFile, onOpenSubagent }: {
   calls: ToolCallEntry[];
   ctxWindow?: number;
+  onOpenFile?: (filePath: string) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
 }) {
   const { t } = useI18n();
@@ -211,7 +236,7 @@ export function ToolGroupRow({ calls, ctxWindow, onOpenSubagent }: {
 
   const category = getToolCategory(calls[0]?.block.toolName ?? "");
   const fileCounts = calls.map((call) => (isApplyPatchToolName(call.block.toolName)
-    ? applyPatchPaths(call.block, call.result).length
+    ? (getPatchFiles(call.block, call.result) ?? []).length
     : getToolFilePaths(call.block.input).length));
   const allHaveFiles = fileCounts.every((count) => count > 0);
   const fileTotal = fileCounts.reduce((sum, count) => sum + count, 0);
@@ -253,6 +278,7 @@ export function ToolGroupRow({ calls, ctxWindow, onOpenSubagent }: {
             usage={call.usage}
             ctxTokens={call.ctxTokens}
             ctxWindow={ctxWindow}
+            onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
           />
         ))}
@@ -265,180 +291,6 @@ export function ToolGroupRow({ calls, ctxWindow, onOpenSubagent }: {
 // Thinking rows
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MAX_THINKING_CACHE_ENTRIES = 100;
-const thinkingContentCache = new Map<string, Promise<string>>();
-
-export function loadThinkingContent(sessionId: string, entryId: string, blockIndex: number): Promise<string> {
-  const key = `${sessionId}:${entryId}:${blockIndex}`;
-  const cached = thinkingContentCache.get(key);
-  if (cached) {
-    thinkingContentCache.delete(key);
-    thinkingContentCache.set(key, cached);
-    return cached;
-  }
-
-  const request = fetch(
-    `/api/sessions/${encodeURIComponent(sessionId)}/entries/${encodeURIComponent(entryId)}/thinking?blockIndex=${blockIndex}`,
-  ).then(async (response) => {
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json() as { thinking?: unknown };
-    if (typeof data.thinking !== "string") throw new Error("Invalid thinking response");
-    return data.thinking;
-  }).catch((error) => {
-    thinkingContentCache.delete(key);
-    throw error;
-  });
-
-  thinkingContentCache.set(key, request);
-  if (thinkingContentCache.size > MAX_THINKING_CACHE_ENTRIES) {
-    const oldestKey = thinkingContentCache.keys().next().value;
-    if (oldestKey) thinkingContentCache.delete(oldestKey);
-  }
-  return request;
-}
-
-/** Distance from the card's bottom within which a manual scroll re-attaches live follow. */
-const THINKING_STREAM_TAIL_TOLERANCE = 24;
-
-export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, active }: {
-  block: ThinkingContent;
-  duration?: number;
-  sessionId?: string;
-  entryId?: string;
-  blockIndex: number;
-  /** The model is still writing this block. */
-  active?: boolean;
-}) {
-  const { t } = useI18n();
-  const [expanded, setExpanded] = useState(isThinkingExpandedByDefault);
-  const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const tRef = useRef(t);
-  tRef.current = t;
-  const detailRef = useRef<HTMLDivElement | null>(null);
-  const stickRef = useRef(true);
-  const prevScrollTopRef = useRef(0);
-  const preview = block.thinking.trimStart().match(/^[^\r\n]{0,240}/u)?.[0].trimEnd() ?? "";
-  // A card the reader opened or closed themselves keeps that choice: only the
-  // automatic expansion of a live block folds away when the block finishes
-  // (AI Elements' Reasoning closes itself once the answer starts).
-  const userToggledRef = useRef(false);
-  const wasActiveRef = useRef(Boolean(active));
-  useEffect(() => {
-    if (wasActiveRef.current && !active && !userToggledRef.current) setExpanded(false);
-    wasActiveRef.current = Boolean(active);
-  }, [active]);
-
-  // Keep already-mounted blocks in sync when the preference changes.
-  useEffect(() => {
-    const onChange = () => setExpanded(isThinkingExpandedByDefault());
-    window.addEventListener(THINKING_EXPANDED_EVENT, onChange);
-    return () => window.removeEventListener(THINKING_EXPANDED_EVENT, onChange);
-  }, []);
-
-  // Load deferred history content whenever the block is expanded.
-  useEffect(() => {
-    if (!expanded || !block.deferred || content !== null) return;
-    if (!sessionId || !entryId) {
-      setError(tRef.current("i18n.thinkingUnavailable"));
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    loadThinkingContent(sessionId, entryId, blockIndex)
-      .then((value) => {
-        if (!cancelled) {
-          setContent(value);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [expanded, block.deferred, content, sessionId, entryId, blockIndex]);
-
-  // Stick the inner scroller to the streaming tail. Detaches when the user
-  // scrolls up inside the card and re-attaches once they return near the
-  // bottom, mirroring the outer message list's live-follow behavior.
-  useEffect(() => {
-    const el = detailRef.current;
-    if (!el || !expanded || !active || !stickRef.current) return;
-    el.scrollTop = el.scrollHeight;
-    prevScrollTopRef.current = el.scrollTop;
-  }, [expanded, active, block.thinking, content]);
-
-  const handleDetailScroll = useCallback(() => {
-    const el = detailRef.current;
-    if (!el) return;
-    const delta = el.scrollTop - prevScrollTopRef.current;
-    prevScrollTopRef.current = el.scrollTop;
-    // |delta| <= 1 is our own content-growth clamping, not a user scroll.
-    if (Math.abs(delta) <= 1) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    stickRef.current = distanceFromBottom <= THINKING_STREAM_TAIL_TOLERANCE;
-  }, []);
-
-  return (
-    <Trace data-activity="thinking">
-      <TraceCollapsible
-        open={expanded}
-        onOpenChange={() => {
-          const next = !expanded;
-          userToggledRef.current = true;
-          // Expanding mid-stream means "show me the live tail"; expanding a
-          // finished block opens from the top for reading.
-          stickRef.current = next && Boolean(active);
-          prevScrollTopRef.current = 0;
-          setExpanded(next);
-          if (next) window.dispatchEvent(new Event(COLLAPSIBLE_EXPANDED_EVENT));
-        }}
-        className="w-auto min-w-0 flex-[0_1_auto]"
-      >
-        <div className="w-full bg-background">
-          <TraceCollapsibleTrigger
-            aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
-            title={t("i18n.thinking")}
-          >
-          <TraceLine status={active ? "running" : undefined}>
-            <TraceIcon className={cn(active && "text-warning")}><ThinkingIcon active={expanded || Boolean(active)} /></TraceIcon>
-            <TraceTitle className="font-medium">{t("i18n.thinking")}</TraceTitle>
-            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
-              {preview}
-            </TraceDescription>
-            {!active && duration !== undefined && (
-              <TraceDescription className="shrink-0 text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] tabular-nums">
-                {duration}s
-              </TraceDescription>
-            )}
-          </TraceLine>
-          </TraceCollapsibleTrigger>
-        </div>
-        <TraceCollapsibleContent>
-          <div
-            ref={detailRef}
-            className={cn(
-              "max-h-[var(--card-max-height)] min-w-0 overflow-y-auto overscroll-contain whitespace-pre-wrap wrap-anywhere",
-              error && "text-destructive",
-            )}
-            onScroll={handleDetailScroll}
-          >
-            {loading ? (
-              <Skeleton className="h-3 w-1/2" />
-            ) : error ?? (block.deferred ? content : block.thinking)}
-          </div>
-        </TraceCollapsibleContent>
-      </TraceCollapsible>
-    </Trace>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom message rows (compaction, subagent notifications, extension output)
@@ -456,22 +308,6 @@ function getMessageText(content: CustomMessage["content"]): string {
     .filter((b): b is TextContent => b.type === "text")
     .map((b) => b.text)
     .join("\n");
-}
-
-function getMessageImages(content: CustomMessage["content"] | ToolResultMessage["content"]): ImageContent[] {
-  if (typeof content === "string") return [];
-  return content.filter((b): b is ImageContent => b.type === "image");
-}
-
-function imageSource(img: ImageContent): string {
-  // SAFETY: same flat-vs-nested image shape split as MessageView; both fields are optional.
-  const flat = img as unknown as { data?: string; mimeType?: string };
-  if (img.source) {
-    return img.source.type === "base64"
-      ? `data:${img.source.media_type};base64,${img.source.data}`
-      : img.source.url ?? "";
-  }
-  return flat.data ? `data:${flat.mimeType};base64,${flat.data}` : "";
 }
 
 function safeJson(value: unknown): string {
@@ -874,6 +710,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
             usage={only.usage}
             ctxTokens={only.ctxTokens}
             ctxWindow={ctxWindow}
+            onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
             isStreaming={live && !only.result}
           />,
@@ -890,6 +727,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
               ctxTokens: entry.ctxTokens,
             }))}
             ctxWindow={ctxWindow}
+            onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
           />,
         );
@@ -903,7 +741,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
     }
     if (item.kind === "thinking") {
       nodes.push(
-        <ThinkingRow
+        <ReasoningTrace
           key={item.key}
           block={item.block}
           duration={item.duration}
@@ -1087,62 +925,8 @@ function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" |
 
 
 
-/**
- * Split diff rows for an apply_patch-style tool call.
- *
- * Prefers parsing the V4A patch document from the call input. The extension's
- * applied result preview contains the complete old/new file with unchanged
- * lines, so it is only used as a fallback when the call input is unavailable.
- * A single call may contain several file operations — each becomes its own
- * file section.
- */
-function getApplyPatchFiles(block: ToolCallContent, result?: ToolResultMessage): SplitDiffFile[] | null {
-  if (!isApplyPatchToolName(block.toolName)) return null;
-
-  const fromInput = parseApplyPatchInput(getApplyPatchInputText(block.input, block.rawInput));
-  if (fromInput) return fromInput;
-
-  const details = result && !result.isError ? (result as ToolResultMessage & { details?: unknown }).details : undefined;
-  if (isRecord(details)) {
-    const fromPreview = applyPatchPreviewToFiles(details.preview);
-    if (fromPreview) return fromPreview;
-  }
-
-  return null;
-}
 
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function ResultImages({ images }: { images: ImageContent[] }) {
-  return (
-    <div
-      className="flex flex-wrap gap-1.5 py-1"
-    >
-      {images.map((image, index) => {
-        const src = imageSource(image);
-        if (!src) return null;
-        return (
-          <ImagePreview
-            key={`${src}-${index}`}
-            src={src}
-            className="max-w-full"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={src}
-              alt=""
-              loading="lazy"
-              className="block max-h-[520px] max-w-[min(100%,720px)] rounded-sm border border-border object-contain"
-            />
-          </ImagePreview>
-        );
-      })}
-    </div>
-  );
-}
 
 // One row per argument: `key: value` on a single line — the key muted, the
 // value in the row's mono face; multiline values keep their own block.

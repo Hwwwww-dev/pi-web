@@ -16,6 +16,7 @@ import {
   WrenchIcon,
 } from "lucide-react";
 import { AnsiText } from "@/components/AnsiText";
+import { Button } from "@/components/ui/button";
 import { isTuiText } from "@/lib/ansi";
 import { CodeBlock, CodeBlockContent, CodeBlockLine } from "@/components/ui/code-block";
 import { Spinner } from "@/components/ui/spinner";
@@ -23,7 +24,7 @@ import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/com
 import { PatchDiffFiles, SafeMarkdownBody } from "@/components/ActivityRows";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import type { ToolView, ToolViewKind, ToolViewSection, ToolViewStatus, ToolViewStep } from "@/lib/tool-view";
+import { baseName, type ToolView, type ToolViewKind, type ToolViewSection, type ToolViewStatus, type ToolViewStep } from "@/lib/tool-view";
 import { TraceRow } from "./TraceRow";
 
 /**
@@ -126,7 +127,35 @@ export function ToolSection({ section }: { section: ToolViewSection }) {
   }
 }
 
-export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below, activityTool }: {
+/** A row names at most this many files: a call that touches fifty would bury its own title. */
+const MAX_FILE_CHIPS = 4;
+
+/**
+ * The files a call named (第 4.1 节): one chip each, opening the viewer at that
+ * file. Chips only appear when the viewer can take them.
+ */
+function FileChips({ paths, onOpenFile }: { paths: string[]; onOpenFile: (path: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {paths.slice(0, MAX_FILE_CHIPS).map((path) => (
+        <Button
+          key={path}
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-6 gap-1 px-2 font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))]"
+          onClick={() => onOpenFile(path)}
+          title={path}
+        >
+          <FileTextIcon className="size-3" />
+          {baseName(path)}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below, activityTool, onOpenFile }: {
   view: ToolView;
   /** Duration and usage belong to the turn, not the tool (第 8 节). */
   trailing?: ReactNode;
@@ -136,10 +165,20 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below,
   below?: ReactNode;
   /** The pi tool name, kept as `data-activity-tool`. */
   activityTool?: string;
+  /** Opens a file the call named (its chips). */
+  onOpenFile?: (path: string) => void;
 }) {
   const { t } = useI18n();
-  const content = view.sections.length > 0
-    ? view.sections.map((section, index) => <ToolSection key={index} section={section} />)
+  const chips = onOpenFile && view.filePaths.length > 0
+    ? <FileChips paths={view.filePaths} onOpenFile={onOpenFile} />
+    : null;
+  const content = chips || view.sections.length > 0
+    ? (
+      <>
+        {chips}
+        {view.sections.map((section, index) => <ToolSection key={index} section={section} />)}
+      </>
+    )
     : undefined;
 
   return (

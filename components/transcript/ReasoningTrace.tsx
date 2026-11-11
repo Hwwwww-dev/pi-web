@@ -14,7 +14,7 @@ import {
   TraceTitle,
 } from "@/components/ui/trace";
 import { ThinkingIcon } from "@/components/ThinkingIcon";
-import { formatToolDuration, loadThinkingContent } from "@/components/ActivityRows";
+import { formatToolDuration } from "@/lib/tool-duration";
 import { useI18n } from "@/hooks/useI18n";
 import { COLLAPSIBLE_EXPANDED_EVENT } from "@/lib/tool-call-expansion";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
@@ -25,6 +25,39 @@ import type { ThinkingContent } from "@/lib/types";
  * The running state comes from `TraceLine status="running"` (the shimmer),
  * never from a per-row animation.
  */
+
+/** Deferred history content, cached per block so a reopened fold does not refetch. */
+const MAX_THINKING_CACHE_ENTRIES = 100;
+const thinkingContentCache = new Map<string, Promise<string>>();
+
+export function loadThinkingContent(sessionId: string, entryId: string, blockIndex: number): Promise<string> {
+  const key = `${sessionId}:${entryId}:${blockIndex}`;
+  const cached = thinkingContentCache.get(key);
+  if (cached) {
+    thinkingContentCache.delete(key);
+    thinkingContentCache.set(key, cached);
+    return cached;
+  }
+
+  const request = fetch(
+    `/api/sessions/${encodeURIComponent(sessionId)}/entries/${encodeURIComponent(entryId)}/thinking?blockIndex=${blockIndex}`,
+  ).then(async (response) => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json() as { thinking?: unknown };
+    if (typeof data.thinking !== "string") throw new Error("Invalid thinking response");
+    return data.thinking;
+  }).catch((error) => {
+    thinkingContentCache.delete(key);
+    throw error;
+  });
+
+  thinkingContentCache.set(key, request);
+  if (thinkingContentCache.size > MAX_THINKING_CACHE_ENTRIES) {
+    const oldestKey = thinkingContentCache.keys().next().value;
+    if (oldestKey) thinkingContentCache.delete(oldestKey);
+  }
+  return request;
+}
 
 /** |delta| ≤ 1 is our own content growth, not a user scroll. */
 const THINKING_STREAM_TAIL_TOLERANCE = 24;

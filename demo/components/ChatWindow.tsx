@@ -1404,6 +1404,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               summary={processSummary}
               foldKey={`process:${entryIds[userIdx] ?? userIdx}`}
               defaultOpen={!finalAnswerMessage}
+              failed={activityItems.some((item) => item.kind === "tool" && Boolean(item.result?.isError))}
               reveal={revealProcess}
               className="mb-5"
             >

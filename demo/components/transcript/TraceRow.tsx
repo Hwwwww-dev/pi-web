@@ -73,6 +73,7 @@ export function TraceRow({
   ariaLabel,
   href,
   activityTool,
+  children,
 }: {
   icon: ReactNode;
   title: string;
@@ -88,6 +89,8 @@ export function TraceRow({
   usage?: ReactNode;
   /** Folding content. Omitted = a plain line that cannot expand. */
   content?: ReactNode;
+  /** Rendered inside the fold after `content`. */
+  children?: ReactNode;
   /** Rendered inside the same `Trace` below the line (media the call produced). */
   below?: ReactNode;
   ariaLabel?: string;
@@ -130,8 +133,10 @@ export function TraceRow({
         <TraceCollapsibleContent className="mt-1 flex flex-col gap-2">
           {usage}
           {content}
+          {children}
         </TraceCollapsibleContent>
       </TraceCollapsible>
+      {below}
     </Trace>
   );
 }
