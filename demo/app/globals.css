@@ -1389,6 +1389,13 @@ span.token.table {
   }
 }
 
+/* The composer's pill row scrolls (overflow-x-auto), which clips a focus ring
+   drawn outside its buttons into four corner wedges. Insetting the ring keeps it
+   whole. */
+.chat-input-controls button:focus-visible {
+  --tw-ring-inset: inset;
+}
+
 /* The composer textarea keeps its scroll but never draws a scrollbar: the
    pill is small and the bar rides over the send-button column on phones. */
 .chat-input-textarea {
