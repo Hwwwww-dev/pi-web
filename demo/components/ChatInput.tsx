@@ -25,9 +25,11 @@ import {
 import { getMarkdownListContinuation } from "@/lib/markdown-list-continuation";
 import { quoteSeparator } from "@/lib/quoted-selection";
 import { isBareMcpCommand, isBuiltinMcpCommand } from "@/lib/mcp-command";
+import { BorderBeam } from "border-beam";
 import { ImagePreview } from "./ImagePreview";
 import { DismissButton } from "./DismissButton";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useTheme } from "@/hooks/useTheme";
 import { useEnterSendMode } from "@/hooks/useEnterSendMode";
 import { useI18n } from "@/hooks/useI18n";
 import { useChatAppearance } from "@/hooks/useChatAppearance";
@@ -812,6 +814,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   compact = false,
 }: Props, ref) {
   const { t } = useI18n();
+  // The running composer's beam picks its palette from the page's theme, not
+  // from the system preference the component falls back to.
+  const { theme } = useTheme();
   const { fontSize } = useChatAppearance();
   const { ui: uiFontFamily, uiWeight } = useFontPreferences();
   const isMobile = useIsMobile();
@@ -2404,310 +2409,330 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               textarea with headroom, tools bottom-left, circular submit
               bottom-right, and a soft tinted focus ring (the border itself
               stays put while typing). */}
-          <InputGroup
-            className={cn(
-              "chat-composer-row min-w-0 rounded-[24px] border-border bg-card shadow-sm has-[[data-slot=input-group-control]:focus-visible]:border-ring/40 has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot=input-group-control]:focus-visible]:ring-ring/15",
-              compact
-                ? "flex-row items-center gap-1 rounded-[18px] p-1.5"
-                : "flex-col items-stretch gap-0 p-2",
-            )}
+          <BorderBeam
+            active={isStreaming && !compact}
+            size="md"
+            colorVariant="colorful"
+            strength={0.7}
+            borderRadius={compact ? 18 : 24}
+            theme={theme === "dark" ? "dark" : "light"}
+            className="min-w-0"
+            // The component's own `overflow: hidden` would clip this card's
+            // focus ring; the beam clips itself with its own clip-path.
+            style={{ overflow: "visible" }}
           >
-          {attachedImages.length > 0 && (
-            <InputGroupAddon align="block-start" className="flex-wrap px-0 pt-0">
-              {attachedImages.map((img, i) => (
-                <div key={i} className="relative shrink-0">
-                  <ImagePreview key={img.previewUrl} src={img.previewUrl}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={img.previewUrl}
-                      alt=""
-                      className="block size-14 rounded-md border border-border object-cover"
-                    />
-                  </ImagePreview>
+            <InputGroup
+              className={cn(
+                "chat-composer-row min-w-0 rounded-[24px] border-border bg-card shadow-sm has-[[data-slot=input-group-control]:focus-visible]:border-ring/40 has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot=input-group-control]:focus-visible]:ring-ring/15",
+                compact
+                  ? "flex-row items-center gap-1 rounded-[18px] p-1.5"
+                  : "flex-col items-stretch gap-0 p-2",
+              )}
+            >
+            {attachedImages.length > 0 && (
+              <InputGroupAddon align="block-start" className="flex-wrap px-0 pt-0">
+                {attachedImages.map((img, i) => (
+                  <div key={i} className="relative shrink-0">
+                    <ImagePreview key={img.previewUrl} src={img.previewUrl}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={img.previewUrl}
+                        alt=""
+                        className="block size-14 rounded-md border border-border object-cover"
+                      />
+                    </ImagePreview>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => removeImage(i)}
+                      title={t("chat.dismiss")}
+                      aria-label={t("chat.dismiss")}
+                      className="absolute -right-1 -top-1 size-4 rounded-full border border-border bg-card p-0 text-muted-foreground"
+                    >
+                      <XIcon className="size-2" strokeWidth={2.5} aria-hidden="true" />
+                    </Button>
+                  </div>
+                ))}
+                {!compact && (
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={() => removeImage(i)}
-                    title={t("chat.dismiss")}
-                    aria-label={t("chat.dismiss")}
-                    className="absolute -right-1 -top-1 size-4 rounded-full border border-border bg-card p-0 text-muted-foreground"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => fileInputRef.current?.click()}
+                    title={t("chat.attachFiles")}
+                    aria-label={t("chat.attachFiles")}
+                    className="h-[26px] rounded-full border-dashed px-2 text-muted-foreground"
                   >
-                    <XIcon className="size-2" strokeWidth={2.5} aria-hidden="true" />
+                    <PlusIcon strokeWidth={2} aria-hidden="true" />
                   </Button>
-                </div>
-              ))}
-              {!compact && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  onClick={() => fileInputRef.current?.click()}
-                  title={t("chat.attachFiles")}
-                  aria-label={t("chat.attachFiles")}
-                  className="h-[26px] rounded-full border-dashed px-2 text-muted-foreground"
-                >
-                  <PlusIcon strokeWidth={2} aria-hidden="true" />
-                </Button>
-              )}
-            </InputGroupAddon>
-          )}
-          <InputGroupTextarea
-            ref={textareaRef}
-            className={cn(
-              "chat-input-textarea w-full min-w-0 px-2.5 py-2 leading-[1.55] text-foreground max-h-44 overflow-auto placeholder:text-muted-foreground",
-              compact ? "min-h-24" : "min-h-11",
+                )}
+              </InputGroupAddon>
             )}
-            data-chat-composer=""
-            aria-label={compact ? t("chat.askInSideChat") : undefined}
-            value={value}
-            onChange={(e) => {
-              valueRef.current = e.target.value;
-              setValue(e.target.value);
-              setHistoryMenuOpen(false);
-              updateAtQuery(e.target.value, e.target.selectionStart);
-            }}
-            onSelect={(e) => {
-              const el = e.currentTarget;
-              updateAtQuery(el.value, el.selectionStart);
-            }}
-            onKeyDown={handleKeyDown}
-            onCompositionStart={() => {
-              isComposingRef.current = true;
-            }}
-            onCompositionEnd={(e) => {
-              isComposingRef.current = false;
-              lastCompositionEndAtRef.current = Date.now();
-              const el = e.currentTarget;
-              updateAtQuery(el.value, el.selectionStart);
-            }}
-            onInput={handleInput}
-            onPaste={handlePaste}
-            placeholder={
-              isCompacting
-                ? t("chat.compactingPlaceholder")
-                : isStreaming && (onSteer || onFollowUp)
-                ? t("chat.steerPlaceholder")
-                : isStreaming ? t("chat.agentPlaceholder")
-                : t("chat.messagePlaceholder")
-            }
-            rows={1}
-          />
+            <InputGroupTextarea
+              ref={textareaRef}
+              className={cn(
+                "chat-input-textarea w-full min-w-0 px-2.5 py-2 leading-[1.55] text-foreground max-h-44 overflow-auto placeholder:text-muted-foreground",
+                compact ? "min-h-24" : "min-h-11",
+              )}
+              data-chat-composer=""
+              aria-label={compact ? t("chat.askInSideChat") : undefined}
+              value={value}
+              onChange={(e) => {
+                valueRef.current = e.target.value;
+                setValue(e.target.value);
+                setHistoryMenuOpen(false);
+                updateAtQuery(e.target.value, e.target.selectionStart);
+              }}
+              onSelect={(e) => {
+                const el = e.currentTarget;
+                updateAtQuery(el.value, el.selectionStart);
+              }}
+              onKeyDown={handleKeyDown}
+              onCompositionStart={() => {
+                isComposingRef.current = true;
+              }}
+              onCompositionEnd={(e) => {
+                isComposingRef.current = false;
+                lastCompositionEndAtRef.current = Date.now();
+                const el = e.currentTarget;
+                updateAtQuery(el.value, el.selectionStart);
+              }}
+              onInput={handleInput}
+              onPaste={handlePaste}
+              placeholder={
+                isCompacting
+                  ? t("chat.compactingPlaceholder")
+                  : isStreaming && (onSteer || onFollowUp)
+                  ? t("chat.steerPlaceholder")
+                  : isStreaming ? t("chat.agentPlaceholder")
+                  : t("chat.messagePlaceholder")
+              }
+              rows={1}
+            />
 
-          {compact ? sendCluster : (
-            // justify-end：发送/停止钮钉在行尾。 pill 行占 flex-1 时看不出差别，
-            // 但它一旦不在（隐藏/缺省），justify-start 会让按钮掉到行首。
-            <InputGroupAddon align="block-end" className="min-w-0 items-center justify-end gap-2 px-1 pb-0.5">
-              {/* One pill row: the pills scroll horizontally instead of wrapping,
-                  and the send button is a sibling so it can never be squeezed
-                  out. chat-input-controls keeps the keyboard-open collapse. */}
-              <div className="chat-input-controls flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {compact ? sendCluster : (
+              // justify-end：发送/停止钮钉在行尾。 pill 行占 flex-1 时看不出差别，
+              // 但它一旦不在（隐藏/缺省），justify-start 会让按钮掉到行首。
+              <InputGroupAddon align="block-end" className="min-w-0 items-center justify-end gap-2 px-1 pb-0.5">
+                {/* One pill row: the pills scroll horizontally instead of wrapping,
+                    and the send button is a sibling so it can never be squeezed
+                    out. chat-input-controls keeps the keyboard-open collapse. */}
+                <div className="chat-input-controls flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        aria-label={t("chat.attachFiles")}
+                        className={cn(
+                          "rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                          attachedImages.length > 0 && "text-primary",
+                        )}
+                      >
+                        <ImageIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("chat.attachFiles")}</TooltipContent>
+                  </Tooltip>
+                  {/* Model selector - visible always, busy while a switch is pending; a switch
+                      during a run applies from its next request.
+                      flex-shrink 8: the model pill gives up width first; the other pills only truncate. */}
+                  {(modelOptions.length > 0 || model || modelError) && onModelChange && (
+                    <div className="flex min-w-[3.5rem] overflow-hidden [flex-shrink:8]">
+                      <ModelSelector
+                        options={modelOptions}
+                        value={model}
+                        onChange={onModelChange}
+                        onReselect={onModelChange}
+                        busy={modelSwitching}
+                        isAutoSelection={isAutoModelSelection}
+                        defaultValue={defaultModel}
+                        onSetDefault={onSetDefaultModel}
+                        allOptions={allModelList?.map((m) => ({ provider: m.provider, providerName: m.providerName, modelId: m.id, name: m.name }))}
+                        onShowAll={onLoadAllModels}
+                        headerSlot={!isMobile && onThinkingLevelChange ? thinkingSection : undefined}
+                        iconClassName={!isMobile && onThinkingLevelChange ? thinkingIconTone : undefined}
+                        titleHint={!isMobile && onThinkingLevelChange ? thinkingDisplayLabel : undefined}
+                      />
+                    </div>
+                  )}
+              {/* Phone: reasoning level and tool preset sit in the row itself as
+                  icon buttons — the same choices the desktop keeps in its menus. */}
+              {isMobile && thinkingChoices && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title={`${t("chat.changeReasoningLabel")}: ${thinkingDisplayLabel}`}
+                      aria-label={`${t("chat.changeReasoningLabel")}: ${thinkingDisplayLabel}`}
+                      className="shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <BrainIcon strokeWidth={1.8} aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="top" align="start" sideOffset={6} className="min-w-[160px] max-w-[calc(100vw-16px)]">
+                    {thinkingChoices}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {isMobile && toolPresetChoices && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      // A run cannot change the preset it started with, so the
+                      // wrench greys out instead of leaving the row.
+                      disabled={isStreaming}
+                      title={`${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
+                      aria-label={`${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
+                      className="shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <WrenchIcon strokeWidth={1.8} aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="top" align="start" sideOffset={6} className="min-w-[160px] max-w-[calc(100vw-16px)]">
+                    {toolPresetChoices}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {/* Tools share one icon menu: the row keeps no text pills. The
+                  wrench tint says which preset is active (full bright, chat-only
+                  dim, others muted), and compacting flips the icon to a
+                  destructive stop (the menu then carries only stop-compaction).
+                  The menu's onSelect fires on a deliberate click, so the run-end
+                  stray-click guard the old direct button needed does not apply
+                  here. */}
+              {!isMobile && (onToolPresetChange || (onCompact && isCompacting)) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      // Same rule as the phone's: the wrench stays in the row
+                      // while a run streams, greyed out (unless compacting,
+                      // where this same button stops the compaction).
+                      disabled={isStreaming && !isCompacting}
+                      title={isCompacting ? t("chat.stopCompaction") : `${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
+                      aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.changeToolPreset")}
+                      className={cn(
+                        "rounded-full",
+                        isCompacting
+                          ? "text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          : onToolPresetChange && !isStreaming && rawToolPresetLabel === "full"
+                            ? "text-primary hover:bg-accent hover:text-accent-foreground"
+                            : onToolPresetChange && !isStreaming && rawToolPresetLabel === "chat-only"
+                              ? "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      )}
+                    >
+                      {isCompacting
+                        ? <SquareIcon className="size-4 fill-current" aria-hidden="true" />
+                        : <WrenchIcon strokeWidth={1.8} aria-hidden="true" />}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="top" align="end" sideOffset={6} className="min-w-[120px]">
+                    {onToolPresetChange && !isStreaming && (
+                      <DropdownMenuRadioGroup
+                        value={toolPreset ?? "configured"}
+                        onValueChange={(next) => {
+                          const preset = TOOL_PRESET_MAP[next as ToolPresetLabel];
+                          if ((toolPreset ?? "configured") !== preset) onToolPresetChange(preset);
+                        }}
+                      >
+                        {TOOL_PRESETS.map((lvl) => {
+                          const text = TOOL_PRESET_TEXT[lvl];
+                          return (
+                            <DropdownMenuRadioItem key={lvl} value={lvl}>
+                              <span className="flex-1 whitespace-nowrap">{t(text.label)}</span>
+                              {text.desc && <span className="min-w-0 text-xs text-muted-foreground">{t(text.desc)}</span>}
+                            </DropdownMenuRadioItem>
+                          );
+                        })}
+                      </DropdownMenuRadioGroup>
+                    )}
+                    {onCompact && isCompacting && (
+                      <>
+                        {onToolPresetChange && !isStreaming && <DropdownMenuSeparator />}
+                        <DropdownMenuItem
+                          onSelect={onAbortCompaction}
+                          className="text-destructive"
+                        >
+                          <SquareIcon className="size-4 fill-current" aria-hidden="true" />
+                          {t("chat.stopCompaction")}
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
+              {onSoundToggle !== undefined && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      aria-label={t("chat.attachFiles")}
+                      onClick={onSoundToggle}
+                      aria-label={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}
                       className={cn(
-                        "rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                        attachedImages.length > 0 && "text-primary",
+                        "rounded-full hover:bg-accent",
+                        soundEnabled ? "text-muted-foreground hover:text-accent-foreground" : "text-muted-foreground/55 hover:text-accent-foreground",
                       )}
                     >
-                      <ImageIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
+                      {soundEnabled
+                        ? <Volume2Icon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
+                        : <VolumeXIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{t("chat.attachFiles")}</TooltipContent>
+                  <TooltipContent>{soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}</TooltipContent>
                 </Tooltip>
-                {/* Model selector - visible always, busy while a switch is pending; a switch
-                    during a run applies from its next request.
-                    flex-shrink 8: the model pill gives up width first; the other pills only truncate. */}
-                {(modelOptions.length > 0 || model || modelError) && onModelChange && (
-                  <div className="flex min-w-[3.5rem] overflow-hidden [flex-shrink:8]">
-                    <ModelSelector
-                      options={modelOptions}
-                      value={model}
-                      onChange={onModelChange}
-                      onReselect={onModelChange}
-                      busy={modelSwitching}
-                      isAutoSelection={isAutoModelSelection}
-                      defaultValue={defaultModel}
-                      onSetDefault={onSetDefaultModel}
-                      allOptions={allModelList?.map((m) => ({ provider: m.provider, providerName: m.providerName, modelId: m.id, name: m.name }))}
-                      onShowAll={onLoadAllModels}
-                      headerSlot={!isMobile && onThinkingLevelChange ? thinkingSection : undefined}
-                      iconClassName={!isMobile && onThinkingLevelChange ? thinkingIconTone : undefined}
-                      titleHint={!isMobile && onThinkingLevelChange ? thinkingDisplayLabel : undefined}
-                    />
-                  </div>
-                )}
-            {/* Phone: reasoning level and tool preset sit in the row itself as
-                icon buttons — the same choices the desktop keeps in its menus. */}
-            {isMobile && thinkingChoices && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    title={`${t("chat.changeReasoningLabel")}: ${thinkingDisplayLabel}`}
-                    aria-label={`${t("chat.changeReasoningLabel")}: ${thinkingDisplayLabel}`}
-                    className="shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <BrainIcon strokeWidth={1.8} aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="start" sideOffset={6} className="min-w-[160px] max-w-[calc(100vw-16px)]">
-                  {thinkingChoices}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            {isMobile && toolPresetChoices && !isStreaming && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    title={`${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
-                    aria-label={`${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
-                    className="shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <WrenchIcon strokeWidth={1.8} aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="start" sideOffset={6} className="min-w-[160px] max-w-[calc(100vw-16px)]">
-                  {toolPresetChoices}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            {/* Tools share one icon menu: the row keeps no text pills. The
-                wrench tint says which preset is active (full bright, chat-only
-                dim, others muted), and compacting flips the icon to a
-                destructive stop (the menu then carries only stop-compaction).
-                The menu's onSelect fires on a deliberate click, so the run-end
-                stray-click guard the old direct button needed does not apply
-                here. */}
-            {!isMobile && ((onToolPresetChange && !isStreaming) || (onCompact && isCompacting)) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    title={isCompacting ? t("chat.stopCompaction") : `${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
-                    aria-label={isCompacting ? t("chat.stopCompaction") : t("chat.changeToolPreset")}
-                    className={cn(
-                      "rounded-full",
-                      isCompacting
-                        ? "text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        : onToolPresetChange && !isStreaming && rawToolPresetLabel === "full"
-                          ? "text-primary hover:bg-accent hover:text-accent-foreground"
-                          : onToolPresetChange && !isStreaming && rawToolPresetLabel === "chat-only"
-                            ? "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                    )}
-                  >
-                    {isCompacting
-                      ? <SquareIcon className="size-4 fill-current" aria-hidden="true" />
-                      : <WrenchIcon strokeWidth={1.8} aria-hidden="true" />}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="end" sideOffset={6} className="min-w-[120px]">
-                  {onToolPresetChange && !isStreaming && (
-                    <DropdownMenuRadioGroup
-                      value={toolPreset ?? "configured"}
-                      onValueChange={(next) => {
-                        const preset = TOOL_PRESET_MAP[next as ToolPresetLabel];
-                        if ((toolPreset ?? "configured") !== preset) onToolPresetChange(preset);
-                      }}
+              )}
+
+              {isMobile && ((isCompacting && onCompact) || onSoundToggle !== undefined) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={t("chat.moreControls")}
+                      className="gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     >
-                      {TOOL_PRESETS.map((lvl) => {
-                        const text = TOOL_PRESET_TEXT[lvl];
-                        return (
-                          <DropdownMenuRadioItem key={lvl} value={lvl}>
-                            <span className="flex-1 whitespace-nowrap">{t(text.label)}</span>
-                            {text.desc && <span className="min-w-0 text-xs text-muted-foreground">{t(text.desc)}</span>}
-                          </DropdownMenuRadioItem>
-                        );
-                      })}
-                    </DropdownMenuRadioGroup>
-                  )}
-                  {onCompact && isCompacting && (
-                    <>
-                      {onToolPresetChange && !isStreaming && <DropdownMenuSeparator />}
-                      <DropdownMenuItem
-                        onSelect={onAbortCompaction}
-                        className="text-destructive"
-                      >
+                      {t("chat.moreControls")}
+                      <ChevronUpIcon data-icon="inline-end" className="shrink-0 opacity-60" aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="top" align="end" sideOffset={6} className="max-w-[calc(100vw-16px)]">
+                    {isCompacting && onCompact && (
+                      <DropdownMenuItem onSelect={onAbortCompaction} className="text-destructive">
                         <SquareIcon className="size-4 fill-current" aria-hidden="true" />
                         {t("chat.stopCompaction")}
                       </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-
-            {onSoundToggle !== undefined && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={onSoundToggle}
-                    aria-label={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}
-                    className={cn(
-                      "rounded-full hover:bg-accent",
-                      soundEnabled ? "text-muted-foreground hover:text-accent-foreground" : "text-muted-foreground/55 hover:text-accent-foreground",
                     )}
-                  >
-                    {soundEnabled
-                      ? <Volume2Icon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
-                      : <VolumeXIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}</TooltipContent>
-              </Tooltip>
-            )}
+                    {onSoundToggle !== undefined && (
+                      <DropdownMenuItem
+                        onSelect={onSoundToggle}
+                        className="text-muted-foreground"
+                      >
+                        {soundEnabled
+                          ? <><Volume2Icon className="size-4" aria-hidden="true" />{t("chat.disableSound")}</>
+                          : <><VolumeXIcon className="size-4" aria-hidden="true" />{t("chat.enableSound")}</>}
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+                </div>
 
-            {isMobile && ((isCompacting && onCompact) || onSoundToggle !== undefined) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={t("chat.moreControls")}
-                    className="gap-1 rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  >
-                    {t("chat.moreControls")}
-                    <ChevronUpIcon data-icon="inline-end" className="shrink-0 opacity-60" aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="end" sideOffset={6} className="max-w-[calc(100vw-16px)]">
-                  {isCompacting && onCompact && (
-                    <DropdownMenuItem onSelect={onAbortCompaction} className="text-destructive">
-                      <SquareIcon className="size-4 fill-current" aria-hidden="true" />
-                      {t("chat.stopCompaction")}
-                    </DropdownMenuItem>
-                  )}
-                  {onSoundToggle !== undefined && (
-                    <DropdownMenuItem
-                      onSelect={onSoundToggle}
-                      className="text-muted-foreground"
-                    >
-                      {soundEnabled
-                        ? <><Volume2Icon className="size-4" aria-hidden="true" />{t("chat.disableSound")}</>
-                        : <><VolumeXIcon className="size-4" aria-hidden="true" />{t("chat.enableSound")}</>}
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                {sendCluster}
+              </InputGroupAddon>
             )}
-              </div>
-
-              {sendCluster}
-            </InputGroupAddon>
-          )}
-          </InputGroup>
+            </InputGroup>
+          </BorderBeam>
         </div>
 
         {/* Bash mode status label */}
