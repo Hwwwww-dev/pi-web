@@ -30,7 +30,7 @@ import { FILE_MODE_LABELS } from "./FileToolbar";
 import { CodeBlock as CodeBlockShell, CodeBlockActions, CodeBlockCopyButton, CodeBlockHeader, CodeBlockTitle } from "./ui/code-block";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
-import { SourceCodeView } from "./SourceCodeView";
+import { SourceCodeView, SOURCE_HIGHLIGHT_MAX_LINES } from "./SourceCodeView";
 import { isDelimitedTablePath } from "@/lib/delimited-table";
 import { FrontmatterCard } from "./FrontmatterCard";
 import { diffGapLabel, parseUnifiedPatch, unifiedDiffLines, type SplitDiffGap, type UnifiedDiffLine } from "@/lib/patch";
@@ -74,8 +74,6 @@ interface FileData {
   // A NUL in the first bytes (lib/text-preview.ts): no text view, only the download.
   binary?: boolean;
 }
-
-const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;
 
 interface SelectedLineRange {
   startLine: number;
@@ -1406,23 +1404,29 @@ function TextFileViewer({
       // only its official structure (group, header, hover-revealed actions).
       className="file-viewer-shell h-full rounded-none! border-0! bg-transparent! dark:bg-transparent!"
     >
-      <CodeBlockHeader className="shrink-0 pb-2">
-        <CodeBlockTitle className="text-[13px]">
-          <FileIcon aria-hidden="true" strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
-          {getFileName(filePath)}
-        </CodeBlockTitle>
-        <PathLabel className="min-w-0 font-mono text-[11.5px]" text={getRelativeFilePath(filePath, cwd)} title={filePath} />
-        <span className="min-w-0 truncate text-[11.5px] text-muted-foreground" title={metadata}>
-          {metadata}
-        </span>
-        {isDeletedDiff ? undefined : (
-          <span
-            title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-            aria-label={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-            className={`inline-block size-[7px] shrink-0 rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--color-success)]" : "bg-border"}`}
-          />
-        )}
-        <CodeBlockActions className="pointer-coarse:opacity-100 opacity-0 transition-opacity group-focus-within/code-block:opacity-100 group-hover/code-block:opacity-100">
+      <CodeBlockHeader className="shrink-0 gap-2 pb-2">
+        {/* Everything that describes the file truncates inside this group, so the
+            actions on the right can never sit on top of the path or the counts. */}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <CodeBlockTitle className="flex min-w-0 shrink items-center gap-1.5 text-[13px]">
+            <FileIcon aria-hidden="true" strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
+            <span className="truncate">{getFileName(filePath)}</span>
+          </CodeBlockTitle>
+          <PathLabel className="min-w-0 shrink font-mono text-[11.5px]" text={getRelativeFilePath(filePath, cwd)} title={filePath} />
+          <span className="min-w-0 shrink truncate text-[11.5px] text-muted-foreground" title={metadata}>
+            {metadata}
+          </span>
+          {isDeletedDiff ? undefined : (
+            <span
+              title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
+              aria-label={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
+              className={`inline-block size-[7px] shrink-0 rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--color-success)]" : "bg-border"}`}
+            />
+          )}
+        </div>
+        {/* In flow and always visible: a hover-revealed overlay is what covered the
+            metadata, and revealing it also made the header jump. */}
+        <CodeBlockActions className="static! shrink-0 opacity-100!">
           {displayModes.length > 1 && (
             <div aria-label={t("i18n.fileViewMode")} className="flex items-center gap-0.5">
               {displayModes.map((mode) => {
