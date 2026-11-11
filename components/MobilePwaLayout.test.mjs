@@ -106,10 +106,11 @@ test("every class the keyboard-open rules target exists on its component", () =>
   assert.match(extensionStatusBarSource, /className="extension-status-bar /);
   assert.match(chatWindowSource, /className="chat-content /);
   // Phone landscape exceeds the 640px breakpoint but has the least height.
-  assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{\s*html\[data-keyboard-open\] \.extension-status-bar \{\s*display: none !important;/);
-  // The pill row is never hidden by the keyboard rules: with the pills gone
-  // the send button drops to the row's left edge.
+  // Nothing in the composer area is hidden by the keyboard rules any more:
+  // the pill row's hide dropped the send button to the row's left edge, and
+  // the status shelf's hide made the bottom row vanish while typing.
   assert.doesNotMatch(cssSource, /html\[data-keyboard-open\] \.chat-input-controls/);
+  assert.doesNotMatch(cssSource, /html\[data-keyboard-open\] \.extension-status-bar/);
   assert.match(cssSource, /html\[data-keyboard-open\] \.chat-content \{\s*padding-bottom: 0 !important;/);
   assert.match(cssSource, /html\[data-keyboard-open\] \.chat-input-shell \{\s*padding-bottom: 6px !important;/);
   // While streaming with an empty composer the main button stops the run.

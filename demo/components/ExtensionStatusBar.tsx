@@ -88,15 +88,15 @@ export function ExtensionStatusBar({
       title={plainStatusLine}
     >
       {cells.map((cell, index) => {
-        // The permissive marker ("yolo", pi-permission-system) renders as the red
-        // pill here — the composer's own pill row no longer repeats it, so this
-        // row is the marker's only surface.
+        // The permissive marker ("yolo", pi-permission-system) renders as bare
+        // red text here — no capsule — and this row is its only surface; the
+        // composer's own pill row no longer repeats it.
         const permissive = cell.kind === "text" && isPermissiveStatusText(cell.text);
         return cell.kind === "text" ? (
         <span
           key={index}
           className={permissive
-            ? "inline-flex max-w-full items-center whitespace-pre rounded-md border border-destructive/35 bg-destructive/[0.06] px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.6px] text-destructive"
+            ? "inline-flex max-w-full items-center whitespace-pre font-mono text-[10px] font-semibold tracking-[0.6px] text-destructive"
             : "inline-flex max-w-full items-center whitespace-pre rounded-md bg-muted/60 px-2 py-1 font-mono text-[11.5px] leading-4 text-muted-foreground"}
         >
           {permissive ? stripAnsi(cell.text).toUpperCase() : <AnsiText text={cell.text} />}
@@ -121,8 +121,9 @@ export function ExtensionStatusBar({
   ) : null;
 
   return (
-    // `extension-status-bar` is a layout hook (keyboard-open collapse below); the
-    // styling itself is shadcn utilities on the row's pills. `relative` anchors
+    // `extension-status-bar` is a layout hook (the keyboard-open CSS and the
+    // mobile shell target it); the styling itself is shadcn utilities on the
+    // row's pills. `relative` anchors
     // an expanded widget's floating panel above the row. 内缩量 = composer 外壳
     // （chat-input-shell 的 px-7/max-sm:px-2.5，本行是它的兄弟节点吃不到）+
     // 24px——卡片圆角 rounded-[24px] 的半径：行端对齐圆角弧线的终点（切点），
