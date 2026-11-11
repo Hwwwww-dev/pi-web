@@ -144,6 +144,28 @@ test("a turn with a failed call is an error turn", () => {
   assert.match(html, /data-status="error"/);
 });
 
+test("a grouped call's chip resolves against the session cwd too", () => {
+  clearExpandedToolCalls();
+  const first = call("read", { file_path: "lib/a.ts" });
+  const second = { ...call("read", { file_path: "lib/b.ts" }), toolCallId: "call-read-2" };
+  setToolCallExpanded(`group:${first.toolCallId}`, true);
+  const html = render(React.createElement(TurnActivityBody, {
+    items: [
+      { kind: "tool", key: "k1", block: first, result: result("read", "x") },
+      { kind: "tool", key: "k2", block: second, result: { ...result("read", "y"), toolCallId: "call-read-2" } },
+    ],
+    cwd: "/repo/pi-web",
+    onOpenFile: () => {},
+    live: false,
+  }));
+
+  // 分组行也必须拿到 cwd，否则 chip 退化成不可点击的静态文本。
+  assert.match(html, /title="\/repo\/pi-web\/lib\/a\.ts"/);
+  assert.match(html, /title="\/repo\/pi-web\/lib\/b\.ts"/);
+  assert.match(html, /role="button"/);
+  clearExpandedToolCalls();
+});
+
 test("the process body forwards the file opener to a grouped call's row", () => {
   clearExpandedToolCalls();
   const first = call("read", { file_path: "a.ts" });

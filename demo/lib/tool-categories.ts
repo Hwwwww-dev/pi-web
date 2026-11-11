@@ -68,7 +68,11 @@ export function isCompactToolName(toolName: string): boolean {
 }
 
 export function isWebToolName(toolName: string): boolean {
-  return matchesToolName(toolName, "webfetch") || matchesToolName(toolName, "websearch") || matchesToolName(toolName, "fetch");
+  return matchesToolName(toolName, "webfetch") ||
+    matchesToolName(toolName, "websearch") ||
+    matchesToolName(toolName, "web_fetch") ||
+    matchesToolName(toolName, "web_search") ||
+    matchesToolName(toolName, "fetch");
 }
 
 export function getToolCategory(toolName: string): ToolCategory {

@@ -703,6 +703,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
               ctxTokens: entry.ctxTokens,
             }))}
             ctxWindow={ctxWindow}
+            cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
           />,
