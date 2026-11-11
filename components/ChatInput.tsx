@@ -36,6 +36,7 @@ import type { ToolPreset } from "@/lib/tool-presets";
 import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
 import {
   ArrowUpIcon,
+  BrainIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
@@ -1911,6 +1912,60 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   })();
   const rawToolPresetLabel = Object.entries(TOOL_PRESET_MAP).find(([, v]) => v === (toolPreset ?? "configured"))?.[0] ?? "configured";
   const toolPresetLabel = t(TOOL_PRESET_TEXT[rawToolPresetLabel as ToolPresetLabel].label);
+  // The reasoning and tool-preset choices render in two places: the phone's row
+  // chips and the desktop wrench menu. They used to be submenus under "More",
+  // which put a level change three taps deep on a phone.
+  const thinkingChoices = onThinkingLevelChange && (
+    <DropdownMenuRadioGroup
+      value={isAutoThinkingSelection ? "auto" : (resolvedThinkingLevel ?? "")}
+      onValueChange={(next) => {
+        if (next === "auto") {
+          if (!isAutoThinkingSelection) onThinkingLevelChange("auto");
+          return;
+        }
+        onThinkingLevelChange(next as typeof THINKING_LEVELS[number]);
+      }}
+    >
+      {THINKING_LEVELS.filter((lvl) => {
+        if (!availableThinkingLevels) return true;
+        if (lvl === "auto") return true;
+        return availableThinkingLevels.includes(lvl);
+      }).map((lvl) => {
+        const desc = t(THINKING_LEVEL_DESC_KEYS[lvl]);
+        const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
+        const displayLabel = titleCaseLabel((mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl);
+        const showOriginal = mappedVal != null && mappedVal !== lvl;
+        return (
+          <DropdownMenuRadioItem key={lvl} value={lvl}>
+            <span className="min-w-0 flex-1">
+              {displayLabel}
+              {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">({lvl})</span>}
+            </span>
+            <span className="text-xs text-muted-foreground">{desc}</span>
+          </DropdownMenuRadioItem>
+        );
+      })}
+    </DropdownMenuRadioGroup>
+  );
+  const toolPresetChoices = onToolPresetChange && (
+    <DropdownMenuRadioGroup
+      value={toolPreset ?? "configured"}
+      onValueChange={(next) => {
+        const preset = TOOL_PRESET_MAP[next as ToolPresetLabel];
+        if ((toolPreset ?? "configured") !== preset) onToolPresetChange(preset);
+      }}
+    >
+      {TOOL_PRESETS.map((lvl) => {
+        const text = TOOL_PRESET_TEXT[lvl];
+        return (
+          <DropdownMenuRadioItem key={lvl} value={lvl}>
+            <span className="flex-1 whitespace-nowrap">{t(text.label)}</span>
+            {text.desc && <span className="min-w-0 text-xs text-muted-foreground">{t(text.desc)}</span>}
+          </DropdownMenuRadioItem>
+        );
+      })}
+    </DropdownMenuRadioGroup>
+  );
 
   // Thinking selects inside the model popover now (pi's /model keeps reasoning
   // beside the model); the row shows no text pill. The model pill's CPU icon
@@ -2474,7 +2529,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     during a run applies from its next request.
                     flex-shrink 8: the model pill gives up width first; the other pills only truncate. */}
                 {(modelOptions.length > 0 || model || modelError) && onModelChange && (
-                  <div className="flex min-w-0 overflow-hidden [flex-shrink:8]">
+                  <div className="flex min-w-[3.5rem] overflow-hidden [flex-shrink:8]">
                     <ModelSelector
                       options={modelOptions}
                       value={model}
@@ -2492,6 +2547,44 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     />
                   </div>
                 )}
+            {/* Phone: reasoning level and tool preset sit in the row itself as
+                icon buttons — the same choices the desktop keeps in its menus. */}
+            {isMobile && thinkingChoices && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title={`${t("chat.changeReasoningLabel")}: ${thinkingDisplayLabel}`}
+                    aria-label={`${t("chat.changeReasoningLabel")}: ${thinkingDisplayLabel}`}
+                    className="shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <BrainIcon strokeWidth={1.8} aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start" sideOffset={6} className="min-w-[160px] max-w-[calc(100vw-16px)]">
+                  {thinkingChoices}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {isMobile && toolPresetChoices && !isStreaming && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title={`${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
+                    aria-label={`${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
+                    className="shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <WrenchIcon strokeWidth={1.8} aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start" sideOffset={6} className="min-w-[160px] max-w-[calc(100vw-16px)]">
+                  {toolPresetChoices}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             {/* Tools share one icon menu: the row keeps no text pills. The
                 wrench tint says which preset is active (full bright, chat-only
                 dim, others muted), and compacting flips the icon to a
@@ -2581,7 +2674,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </Tooltip>
             )}
 
-            {isMobile && (
+            {isMobile && ((isCompacting && onCompact) || onSoundToggle !== undefined) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -2595,73 +2688,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="end" sideOffset={6} className="max-w-[calc(100vw-16px)]">
-                  {onThinkingLevelChange && (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>
-                        <span className="flex-1">{t("chat.changeReasoningLabel")}</span>
-                        <span className="text-xs text-muted-foreground">{thinkingDisplayLabel}</span>
-                      </DropdownMenuSubTrigger>
-                     <DropdownMenuSubContent collisionPadding={8} className="min-w-[140px] max-w-(--radix-dropdown-menu-content-available-width) max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto scrollbar-thin">
-                        <DropdownMenuRadioGroup
-                          value={isAutoThinkingSelection ? "auto" : (resolvedThinkingLevel ?? "")}
-                          onValueChange={(next) => {
-                            if (next === "auto") {
-                              if (!isAutoThinkingSelection) onThinkingLevelChange("auto");
-                              return;
-                            }
-                            onThinkingLevelChange(next as typeof THINKING_LEVELS[number]);
-                          }}
-                        >
-                          {THINKING_LEVELS.filter((lvl) => {
-                            if (!availableThinkingLevels) return true;
-                            if (lvl === "auto") return true;
-                            return availableThinkingLevels.includes(lvl);
-                          }).map((lvl) => {
-                            const desc = t(THINKING_LEVEL_DESC_KEYS[lvl]);
-                            const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
-                            const displayLabel = titleCaseLabel((mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl);
-                            const showOriginal = mappedVal != null && mappedVal !== lvl;
-                            return (
-                              <DropdownMenuRadioItem key={lvl} value={lvl}>
-                                <span className="min-w-0 flex-1">
-                                  {displayLabel}
-                                  {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">({lvl})</span>}
-                                </span>
-                                <span className="text-xs text-muted-foreground">{desc}</span>
-                              </DropdownMenuRadioItem>
-                            );
-                          })}
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuSub>
-                  )}
-                  {!isStreaming && onToolPresetChange && (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>
-                        <span className="flex-1">{t("chat.changeToolPreset")}</span>
-                        <span className="text-xs text-muted-foreground">{toolPresetLabel}</span>
-                      </DropdownMenuSubTrigger>
-                     <DropdownMenuSubContent collisionPadding={8} className="min-w-[140px] max-w-(--radix-dropdown-menu-content-available-width) max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto scrollbar-thin">
-                        <DropdownMenuRadioGroup
-                          value={toolPreset ?? "configured"}
-                          onValueChange={(next) => {
-                            const preset = TOOL_PRESET_MAP[next as ToolPresetLabel];
-                            if ((toolPreset ?? "configured") !== preset) onToolPresetChange(preset);
-                          }}
-                        >
-                          {TOOL_PRESETS.map((lvl) => {
-                            const text = TOOL_PRESET_TEXT[lvl];
-                            return (
-                              <DropdownMenuRadioItem key={lvl} value={lvl}>
-                                <span className="flex-1 whitespace-nowrap">{t(text.label)}</span>
-                                {text.desc && <span className="min-w-0 text-xs text-muted-foreground">{t(text.desc)}</span>}
-                              </DropdownMenuRadioItem>
-                            );
-                          })}
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuSub>
-                  )}
                   {isCompacting && onCompact && (
                     <DropdownMenuItem onSelect={onAbortCompaction} className="text-destructive">
                       <SquareIcon className="size-4 fill-current" aria-hidden="true" />
