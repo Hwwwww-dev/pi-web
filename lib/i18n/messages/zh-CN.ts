@@ -758,6 +758,8 @@ export const zhCNLocale: LocalePlugin = {
     "chat.activity.files": "{count} 个文件",
     "chat.activity.call": "{count} 次",
     "chat.activity.calls": "{count} 次",
+    "chat.activity.successCount": "成功 {count} 次",
+    "chat.activity.failCount": "失败 {count} 次",
     "chat.activity.subagentNotification": "子代理汇报",
     "chat.activity.failed": "执行失败",
     "chat.question.pager": "问题 {index}/{total}",

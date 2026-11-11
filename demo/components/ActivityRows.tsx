@@ -416,13 +416,22 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
     : getToolFilePaths(call.block.input).length));
   const allHaveFiles = fileCounts.every((count) => count > 0);
   const fileTotal = fileCounts.reduce((sum, count) => sum + count, 0);
-  const summaryCount = allHaveFiles
-    ? t("chat.activity.files", { count: fileTotal })
-    : t("chat.activity.calls", { count: calls.length });
   const totalDuration = calls.reduce((sum, call) => sum + (call.duration ?? 0), 0);
   const hasPending = calls.some((call) => !call.result);
-  const isError = calls.some((call) => call.result?.isError
-    || (isApplyPatchToolName(call.block.toolName) && applyPatchResultHasFailures(call.result?.details)));
+  const isFailedCall = (call: ToolCallEntry) => call.result?.isError
+    || (isApplyPatchToolName(call.block.toolName) && applyPatchResultHasFailures(call.result?.details));
+  const isError = calls.some(isFailedCall);
+  // 分组头给出成败细账：完成的调用按结果拆成 成功 x 次 · 失败 y 次；一次都
+  // 没完成（全在跑）时没有账可分，保持原来的「N 次」。
+  const failedCount = calls.filter(isFailedCall).length;
+  const successCount = calls.filter((call) => call.result).length - failedCount;
+  const resultBreakdown = [
+    successCount > 0 ? t("chat.activity.successCount", { count: successCount }) : null,
+    failedCount > 0 ? t("chat.activity.failCount", { count: failedCount }) : null,
+  ].filter(Boolean).join(" · ");
+  const summaryCount = allHaveFiles
+    ? (resultBreakdown ? `${t("chat.activity.files", { count: fileTotal })} · ${resultBreakdown}` : t("chat.activity.files", { count: fileTotal }))
+    : (resultBreakdown || t("chat.activity.calls", { count: calls.length }));
 
   return (
     <Trace data-activity-group={category}>

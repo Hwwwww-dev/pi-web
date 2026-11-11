@@ -96,7 +96,7 @@ export function ExtensionStatusBar({
         <span
           key={index}
           className={permissive
-            ? "inline-flex max-w-full items-center whitespace-pre rounded-md border border-destructive/35 bg-destructive/[0.06] px-2 py-1 font-mono text-[11.5px] font-semibold leading-4 tracking-[0.6px] text-destructive"
+            ? "inline-flex max-w-full items-center whitespace-pre rounded-md border border-destructive/35 bg-destructive/[0.06] px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.6px] text-destructive"
             : "inline-flex max-w-full items-center whitespace-pre rounded-md bg-muted/60 px-2 py-1 font-mono text-[11.5px] leading-4 text-muted-foreground"}
         >
           {permissive ? stripAnsi(cell.text).toUpperCase() : <AnsiText text={cell.text} />}

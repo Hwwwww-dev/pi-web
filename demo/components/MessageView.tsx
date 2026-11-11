@@ -482,7 +482,9 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
             <Badge
               variant="ghost"
               className={cn(
-                "ml-1.5 box-content min-w-[calc(9ch+1px)] justify-center text-center",
+                // 小号：10px、窄内边距，与左侧 token 计数只留一个字的间隙；
+                // 8ch 下限在常用的 10.0–99.9 区间内保持流式计数不抖动。
+                "ml-1 box-content min-w-[calc(8ch+1px)] justify-center px-1.5 py-0 text-[10px] text-center",
                 tps >= 50 ? "bg-primary/15 text-primary"
                   : tps >= 30 ? "bg-success/15 text-success"
                   : tps >= 15 ? "bg-warning/15 text-warning"

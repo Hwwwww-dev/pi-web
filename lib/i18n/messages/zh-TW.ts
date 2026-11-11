@@ -758,6 +758,8 @@ export const zhTWLocale: LocalePlugin = {
     "chat.activity.files": "{count} 個檔案",
     "chat.activity.call": "{count} 次",
     "chat.activity.calls": "{count} 次",
+    "chat.activity.successCount": "成功 {count} 次",
+    "chat.activity.failCount": "失敗 {count} 次",
     "chat.activity.subagentNotification": "子代理彙報",
     "chat.activity.failed": "執行失敗",
     "chat.question.pager": "問題 {index}/{total}",
