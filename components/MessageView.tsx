@@ -464,8 +464,9 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
 }) {
   const { t } = useI18n();
   return (
-    // Fixed row height, tabular numerals and minimum widths keep the streaming
-    // token count and the speed badge from jittering while they count up.
+    // Fixed row height and tabular numerals keep the streaming token count
+    // readable while it counts up; widths are content-driven (no reserved
+    // minimums — those parked dead space between the number and the badge).
     <div className={cn(
       "flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-[11px] leading-[1.5] text-muted-foreground [font-variant-numeric:tabular-nums]",
       className,
@@ -475,16 +476,19 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
         <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground" title={t("i18n.estimatedTokens")}>
           <span className="flex items-center gap-0.5 text-[11px] font-normal">
             <ArrowDownIcon aria-hidden className="size-2.5" strokeWidth={1.5} />
-            {/* Both minimum widths leave a pixel for per-glyph rounding at the widest value. */}
-            <span className="min-w-[calc(6ch+1px)]">{estimatedTokens}</span>
+            {/* No minimum width on purpose: a reserved 6ch made a finished
+                count like 155 carry ~3ch of permanent dead space between the
+                number and the badge. tabular-nums keeps the digits readable
+                while the count grows; compact wins over never shifting. */}
+            <span>{estimatedTokens}</span>
           </span>
           {tps !== null && (
             <Badge
               variant="ghost"
               className={cn(
-                // 小号：10px、窄内边距，与左侧 token 计数只留一个字的间隙；
-                // 8ch 下限在常用的 10.0–99.9 区间内保持流式计数不抖动。
-                "ml-1 box-content min-w-[calc(8ch+1px)] justify-center px-1.5 py-0 text-[10px] text-center",
+                // 小号、贴着 token 计数：宽距只由行内 gap-1 提供，徽章不再
+                // 自带 ml/最小宽度（那会在数字和徽章之间留出死空间）。
+                "px-1.5 py-0 text-[10px]",
                 tps >= 50 ? "bg-primary/15 text-primary"
                   : tps >= 30 ? "bg-success/15 text-success"
                   : tps >= 15 ? "bg-warning/15 text-warning"
