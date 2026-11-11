@@ -668,23 +668,17 @@ html[data-keyboard-open] .terminal-extra-keys {
   }
 }
 
-/* Everything the user types into — the Input/Textarea primitives and the
-   composer — reads at this one size. The phone's step is 16px because iOS zooms
-   the whole page when a field below that takes focus; it is the platform's
-   floor, not a taste. */
-
 /* One cap for every expanded card in the transcript — a tool call, a tool
    group, a thinking block, a turn's process list: past it the card scrolls
    inside itself, so a long script or a wide diff cannot push the rest of the
    turn out of view. */
+/* One size for every field the user types into, at every viewport. Phones used
+   to step up to 16px — iOS's focus-zoom floor — which made the composer read a
+   size larger than the transcript it sits under, on the one device it is used
+   most. Below that floor iOS zooms the page when a field takes focus. */
 :root {
   --field-font-size: 14px;
   --card-max-height: min(70vh, 640px);
-}
-@media (max-width: 640px) {
-  :root {
-    --field-font-size: 16px;
-  }
 }
 
 :root {
@@ -1408,6 +1402,21 @@ span.token.table {
    whole. */
 .chat-input-controls button:focus-visible {
   --tw-ring-inset: inset;
+}
+
+/* The composer's running beam (border-beam's md preset). Its own light-theme
+   preset draws the stroke at 12% and the bloom at 34%, which on a white card
+   reads as a smudge rather than a beam; these multipliers scale its layers
+   without changing the palette it picks. Dark keeps a light touch. */
+.chat-composer-beam {
+  --beam-stroke-opacity: 3.2;
+  --beam-bloom-opacity: 2.6;
+  --beam-inner-opacity: 1.8;
+}
+[data-theme="light"] .chat-composer-beam {
+  --beam-stroke-opacity: 6;
+  --beam-bloom-opacity: 3;
+  --beam-inner-opacity: 2.4;
 }
 
 /* The composer textarea keeps its scroll but never draws a scrollbar: the

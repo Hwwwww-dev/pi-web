@@ -2416,7 +2416,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             strength={0.7}
             borderRadius={compact ? 18 : 24}
             theme={theme === "dark" ? "dark" : "light"}
-            className="min-w-0"
+            className="chat-composer-beam min-w-0"
             // The component's own `overflow: hidden` would clip this card's
             // focus ring; the beam clips itself with its own clip-path.
             style={{ overflow: "visible" }}

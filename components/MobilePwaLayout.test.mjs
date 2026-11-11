@@ -74,12 +74,13 @@ test("contains chat content and inputs within the mobile viewport", () => {
   assert.match(chatInputSource, /"chat-input-textarea w-full min-w-0/);
 });
 
-test("prevents iOS focus zoom from widening the layout", () => {
-  // Every field the user types into takes --field-font-size, whose phone step is
-  // the 16px floor below which iOS zooms the page on focus. A rule that shrinks a
-  // single field under that floor is the regression this guards.
+test("every field shares one font size at every viewport", () => {
+  // One --field-font-size for the whole app, phones included: the composer must
+  // not read larger than the transcript it sits under. Below 16px iOS zooms the
+  // page when a field takes focus — an accepted trade-off, not an oversight. A
+  // second step (the old 16px phone floor) is the regression this guards.
   assert.match(cssSource, /--field-font-size: 14px;/);
-  assert.match(cssSource, /@media \(max-width: 640px\) \{\s*:root \{\s*--field-font-size: 16px;/);
+  assert.doesNotMatch(cssSource, /--field-font-size: (?!14px)/);
   for (const primitive of [inputPrimitiveSource, textareaPrimitiveSource]) {
     assert.match(primitive, /text-\[length:var\(--field-font-size\)\]/);
   }
