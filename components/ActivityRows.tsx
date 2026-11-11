@@ -25,6 +25,7 @@ import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
 import { TerminalTrace } from "./transcript/TerminalTrace";
 import { ToolTrace } from "./transcript/ToolTrace";
+import { TaskTrace } from "./transcript/TaskTrace";
 import { SubagentTrace } from "./transcript/SubagentTrace";
 import { getFileIcon } from "./FileIcons";
 import { copyText } from "@/lib/clipboard";
@@ -596,50 +597,33 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
     : (resultBreakdown || t("chat.activity.calls", { count: calls.length }));
 
   return (
-    <Trace data-activity-group={category}>
-      <TraceCollapsible
-        open={expanded}
-        onOpenChange={toggleExpanded}
-        className="w-auto min-w-0 flex-[0_1_auto]"
+    <span data-activity-group={category} className="contents">
+      <TaskTrace
+        title={t(TOOL_CATEGORY_LABEL_KEYS[category])}
+        description={summaryCount}
+        status={hasPending ? "running" : isError ? "error" : "done"}
+        foldKey={groupKey}
+        defaultOpen={false}
+        trailing={!hasPending && totalDuration > 0 ? (
+          <TraceDescription className="shrink-0 tabular-nums">{formatToolDuration(totalDuration)}</TraceDescription>
+        ) : undefined}
       >
-        <div className="w-full bg-background">
-          <TraceCollapsibleTrigger>
-            <TraceLine status={hasPending ? "running" : isError ? "error" : undefined}>
-              <TraceIcon><RowStatusIcon category={category} isError={isError} active={hasPending} /></TraceIcon>
-              <TraceTitle className="font-medium">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</TraceTitle>
-              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
-                {summaryCount}
-              </TraceDescription>
-              {!hasPending && totalDuration > 0 && (
-                <TraceDescription className="shrink-0 text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] tabular-nums">
-                  {formatToolDuration(totalDuration)}
-                </TraceDescription>
-              )}
-            </TraceLine>
-          </TraceCollapsibleTrigger>
-        </div>
-        {/* A fold of same-category cards is as tall as the cards it holds: no
-            height of its own, so the only scroller is each single card's body. */}
-        <TraceCollapsibleContent>
-          <div className="flex flex-col gap-0.5 py-0.5">
-            {calls.map((call, index) => (
-              <ToolRow
-                key={call.block.toolCallId ?? index}
-                block={call.block}
-                result={call.result}
-                duration={call.duration}
-                usage={call.usage}
-                ctxTokens={call.ctxTokens}
-                ctxWindow={ctxWindow}
-                cwd={cwd}
-                onOpenFile={onOpenFile}
-                onOpenSubagent={onOpenSubagent}
-              />
-            ))}
-          </div>
-        </TraceCollapsibleContent>
-      </TraceCollapsible>
-    </Trace>
+        {calls.map((call, index) => (
+          <ToolRow
+            key={call.block.toolCallId ?? index}
+            block={call.block}
+            result={call.result}
+            duration={call.duration}
+            usage={call.usage}
+            ctxTokens={call.ctxTokens}
+            ctxWindow={ctxWindow}
+            cwd={cwd}
+            onOpenFile={onOpenFile}
+            onOpenSubagent={onOpenSubagent}
+          />
+        ))}
+      </TaskTrace>
+    </span>
   );
 }
 
