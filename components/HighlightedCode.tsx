@@ -40,10 +40,13 @@ export const HighlightedCode = memo(function HighlightedCode({ code, language }:
     try {
       // refractor's core holds the grammars `refractor/all` registered, and
       // throws for one this build lacks: that body renders as plain text.
-      const [codeNode] = refractor.highlight(code, language).children;
-      const children = (codeNode?.type === "element" ? codeNode.children : []).filter(
-        (node) => node.type === "element" || node.type === "text",
-      );
+      // The body's tokens sit straight on the returned root; a `<code>` wrapper
+      // is for the shape an older refractor returned.
+      const root = refractor.highlight(code, language);
+      const first = root.children[0];
+      const body = first && first.type === "element" && first.tagName === "code" ? first.children : root.children;
+      const children = body.filter((node) => node.type === "element" || node.type === "text");
+      if (children.length === 0) return null;
       return children.map((node, index) =>
         renderSyntaxNode(
           // SAFETY: refractor emits hast, and create-element renders exactly that
