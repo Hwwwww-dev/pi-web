@@ -895,7 +895,7 @@ const [error, ...frames] = stack.split("\n").map((line) => line.trim())
 
 - 同步 `demo/components/`（逐字节）。
 - 更新源码断言测试：`MessageView.test.mjs`、`ChatWindow.process-details.test.mjs`、`AppShell.workspace-memory.test.mjs` 中与本文件结构相关的正则。
-- 验收：`npm test` + `tsc --noEmit` + `npm run lint` 全绿。
+- 验收：`tsc --noEmit` 与 `npm run lint` 全绿；`npm test` 相对基线无新增失败（基线 `6cd7d33c` 本身有 120 条失败，分布在未涉及的 mcp 路由/host/sign-in、pi-sdk-internals、AppShell/MobilePwaLayout、useAgentSession、builtin-extensions 等文件；本次新增测试全过）。
 
 ---
 
