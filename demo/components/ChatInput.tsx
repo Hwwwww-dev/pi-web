@@ -416,6 +416,9 @@ export function isExactSlashCommand(message: string, command: SlashCommandPalett
  * `/mcp`, which opens Settings › MCP at once, as it does before the command
  * list has loaded. Every other extension command still takes a second Enter.
  */
+/** Queued pills the composer shows before it folds the rest behind a toggle. */
+const QUEUE_PREVIEW_ROWS = 2;
+
 export function submitsSlashCommandOnEnter(message: string, command: SlashCommandPaletteItem, isStreaming: boolean): boolean {
   if (command.source === "builtin") {
     return isExactSlashCommand(message, command) && (!isStreaming || command.availableWhileStreaming === true);
@@ -686,7 +689,7 @@ function QueuedMessageRow({
     <div
       title={item.text}
       className={cn(
-        "flex min-w-0 max-w-full items-center gap-2 self-start rounded-full py-[5px] pl-1.5 pr-2 text-[12.5px]",
+        "flex min-w-0 max-w-full items-center gap-2 self-start overflow-hidden rounded-full py-[5px] pl-1.5 pr-2 text-[12.5px]",
         isSteer
           ? "border border-primary/45 bg-background text-foreground"
           : "bg-secondary text-secondary-foreground",
@@ -911,6 +914,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   // with the message instead of popping back into the cleared composer.
   const pendingImageTailRef = useRef<Promise<void>>(Promise.resolve());
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [queueExpanded, setQueueExpanded] = useState(false);
   valueRef.current = value;
   attachedImagesRef.current = attachedImages;
 
@@ -2200,22 +2204,40 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             />
           );
         })()}
-        {/* Pending messages: pi delivers them on upcoming turns. The pills sit
-            on the composer's axis, one inner step (13px) in from the card. */}
+        {/* Pending messages: pi delivers them on upcoming turns. Two rows at a
+            time and a toggle, never a nested scroller: a scroll box here read
+            as a row cut in half and, on a phone, swallowed the composer's own
+            taps. The list stays short, so it cannot push the input off screen. */}
         {queuedSubmissions && queuedSubmissions.length > 0 && (
           <div className="flex w-full min-w-0 max-w-full flex-col gap-1.5 px-[13px] max-sm:px-[9px]">
-            {/* Only the rows scroll: a long queue must not push the input and its buttons off screen (#1428). */}
-            <div className="flex min-w-0 max-w-full max-h-[min(180px,calc(var(--app-viewport-height,100dvh)*0.25))] flex-col items-stretch gap-1.5 overflow-x-hidden overflow-y-auto overscroll-contain px-[3px] py-0.5">
-              {queuedSubmissions.map((item, index) => (
-                <QueuedMessageRow
-                  key={item.id}
-                  item={item}
-                  onAction={onQueuedAction}
-                  canMoveUp={queuedSubmissions.some((other, otherIndex) => otherIndex < index && other.behavior === item.behavior)}
-                  canMoveDown={queuedSubmissions.some((other, otherIndex) => otherIndex > index && other.behavior === item.behavior)}
-                />
+            <div className="flex min-w-0 max-w-full flex-col items-stretch gap-1.5 px-[3px] py-0.5">
+              {(queueExpanded ? queuedSubmissions : queuedSubmissions.slice(0, QUEUE_PREVIEW_ROWS)).map((item, index) => (
+                // `w-full` on a block wrapper gives the pill a definite width to
+                // measure `max-w-full` against; as a bare `self-start` flex item
+                // in a shrink-to-fit column that percentage resolved to nothing
+                // and a long message widened the composer past the viewport.
+                <div key={item.id} className="flex w-full min-w-0">
+                  <QueuedMessageRow
+                    item={item}
+                    onAction={onQueuedAction}
+                    canMoveUp={queuedSubmissions.some((other, otherIndex) => otherIndex < index && other.behavior === item.behavior)}
+                    canMoveDown={queuedSubmissions.some((other, otherIndex) => otherIndex > index && other.behavior === item.behavior)}
+                  />
+                </div>
               ))}
             </div>
+            {queuedSubmissions.length > QUEUE_PREVIEW_ROWS && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setQueueExpanded((prev) => !prev)}
+                className="h-6 self-center rounded-full px-2.5 text-[length:calc(12px+var(--chat-font-size-offset,0px))] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                {queueExpanded
+                  ? t("chat.queueShowLess")
+                  : t("chat.queueMore", { count: queuedSubmissions.length - QUEUE_PREVIEW_ROWS })}
+              </Button>
+            )}
           </div>
         )}
         {/* Retry banner */}

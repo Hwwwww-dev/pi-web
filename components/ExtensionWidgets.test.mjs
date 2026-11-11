@@ -36,7 +36,9 @@ test("renders short extension widgets without a truncation marker", () => {
   assert.match(html, /first\nsecond/);
   assert.doesNotMatch(html, /widget truncated/);
   assert.match(html, /aria-expanded="true"/);
-  assert.match(html, /lucide-chevron-up/);
+  // A chip names the widget; the terminal's placement chevron is not on it.
+  assert.doesNotMatch(html, /lucide-chevron-(up|down)/);
+  assert.match(html, /rounded-full bg-muted\/60/);
   assert.doesNotMatch(html, /[\u2191\u2193]/);
 });
 
@@ -51,7 +53,7 @@ test("collapses long widgets by default", () => {
 
   assert.ok(lines.length > DEFAULT_EXPANDED_WIDGET_LINES);
   assert.match(html, /aria-expanded="false"/);
-  assert.match(html, /lucide-chevron-down/);
+  assert.doesNotMatch(html, /lucide-chevron-(up|down)/);
   assert.doesNotMatch(html, /<pre/);
   assert.doesNotMatch(html, /line-1/);
   assert.doesNotMatch(html, /line-10/);
@@ -132,7 +134,7 @@ test("keeps one-line widgets compact but expandable", () => {
   });
 
   assert.match(html, /aria-label="Extension widgets"/);
-  assert.match(html, /lucide-chevron-down/);
+  assert.doesNotMatch(html, /lucide-chevron-(up|down)/);
   assert.doesNotMatch(html, /[\u2191\u2193]/);
   assert.match(html, /Below editor widget/);
   assert.match(html, /<button[^>]*aria-expanded="false"/);
@@ -167,4 +169,13 @@ test("keeps blank-padding widgets non-interactive — an empty panel is worse th
   assert.match(html, /<span[^>]*inline-flex h-6[^>]*>/);
   assert.doesNotMatch(html, /<button/);
   assert.doesNotMatch(html, /<section/);
+});
+
+test("names the todo widget by what it shows, in a chip like the status pills", () => {
+  const html = renderWidgets({ widgets: [{ key: "rpiv-todos", placement: "aboveEditor", lines: ["- [ ] one"], placement: "aboveEditor" }] });
+
+  assert.match(html, />TODO</);
+  assert.doesNotMatch(html, /rpiv-todos</);
+  assert.match(html, /rounded-full bg-muted\/60/);
+  assert.doesNotMatch(html, /lucide-chevron-(up|down)/);
 });

@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
 import { AnsiText } from "@/components/AnsiText";
 import { stripAnsi } from "@/lib/ansi";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import type { ExtensionWidgetItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +56,14 @@ export function getNextExpandedWidgetKey(
   requestedKey: string,
 ): string | null {
   return currentKey === requestedKey ? null : requestedKey;
+}
+
+/** Chip labels name the widget, not its package: `rpiv-todos` is the agent's
+ *  todo list, and the chip is the only place that name surfaces. */
+const WIDGET_DISPLAY_NAMES: Record<string, string> = { "rpiv-todos": "TODO" };
+
+export function extensionWidgetLabel(key: string): string {
+  return WIDGET_DISPLAY_NAMES[key] ?? key;
 }
 
 /**
@@ -143,12 +149,6 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
     setExpandedWidgetKey((current) => getNextExpandedWidgetKey(current, widget.key));
   };
 
-  const renderPlacementIcon = (widget: ExtensionWidgetItem) => (
-    widget.placement === "belowEditor"
-      ? <ChevronDownIcon className="size-3 shrink-0 opacity-50" aria-hidden="true" />
-      : <ChevronUpIcon className="size-3 shrink-0 opacity-50" aria-hidden="true" />
-  );
-
   return (
     <>
       {(panelOpen || panelMounted) && panelWidget && (
@@ -160,70 +160,72 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
         />
       )}
       <div className="flex min-w-0 flex-1 items-center gap-1 pl-0.5 pr-1.5">
-      <div className="flex shrink-0 items-center gap-0.5" aria-label={t("chat.extensionWidgets")}>
-        {widgets.map((widget, index) => {
-          const expandable = hasVisibleWidgetLines(widget.lines);
-          const expanded = expandable && widget.key === expandedWidget?.key;
-          const updating = updatingWidgetKeys.has(widget.key);
-          const lineCountLabel = t(
-            widget.lines.length === 1 ? "chat.extensionWidgetLine" : "chat.extensionWidgetLines",
-            { count: widget.lines.length },
-          );
-          const placementLabel = t(
-            widget.placement === "belowEditor"
-              ? "chat.extensionWidgetBelow"
-              : "chat.extensionWidgetAbove",
-          );
-          const triggerId = `${idPrefix}-trigger-${index}`;
-          const panelId = `${idPrefix}-panel-${index}`;
-          const triggerClass = cn(
-            "shrink-0 gap-1.5 rounded-md px-2 font-mono text-[11.5px] text-muted-foreground",
-            "data-[expanded=true]:bg-accent data-[expanded=true]:text-accent-foreground",
-          );
-          const content = (
-            <>
-              {updating && (
-                <span
-                  aria-hidden="true"
-                  className="size-1.5 shrink-0 rounded-full bg-warning motion-safe:animate-pulse"
-                />
-              )}
-              {renderPlacementIcon(widget)}
-              <span className="min-w-0 truncate">{widget.key}</span>
-            </>
-          );
+        <div className="flex shrink-0 items-center gap-0.5" aria-label={t("chat.extensionWidgets")}>
+          {widgets.map((widget, index) => {
+            const expandable = hasVisibleWidgetLines(widget.lines);
+            const expanded = expandable && widget.key === expandedWidget?.key;
+            const updating = updatingWidgetKeys.has(widget.key);
+            const lineCountLabel = t(
+              widget.lines.length === 1 ? "chat.extensionWidgetLine" : "chat.extensionWidgetLines",
+              { count: widget.lines.length },
+            );
+            const placementLabel = t(
+              widget.placement === "belowEditor"
+                ? "chat.extensionWidgetBelow"
+                : "chat.extensionWidgetAbove",
+            );
+            const triggerId = `${idPrefix}-trigger-${index}`;
+            const panelId = `${idPrefix}-panel-${index}`;
+            // A chip, matching the status pills beside it. The terminal marks a
+            // widget above or below the editor with a chevron; here the panel
+            // always opens above the row, so the name is the whole chip.
+            const triggerClass = cn(
+              "shrink-0 gap-1.5 rounded-full bg-muted/60 px-2.5 font-mono text-[11.5px] text-muted-foreground",
+              "hover:bg-accent hover:text-accent-foreground",
+              "data-[expanded=true]:bg-accent data-[expanded=true]:text-accent-foreground",
+            );
+            const content = (
+              <>
+                {updating && (
+                  <span
+                    aria-hidden="true"
+                    className="size-1.5 shrink-0 rounded-full bg-warning motion-safe:animate-pulse"
+                  />
+                )}
+                <span className="min-w-0 truncate">{extensionWidgetLabel(widget.key)}</span>
+              </>
+            );
 
-          // No tooltip: the key is already the trigger's whole text, and the
-          // placement/expand line only repeated it in jargon.
-          return expandable ? (
-            <Button
-              key={widget.key}
-              id={triggerId}
-              type="button"
-              variant="ghost"
-              size="xs"
-              data-expanded={expanded || undefined}
-              className={triggerClass}
-              aria-controls={panelId}
-              aria-expanded={expanded}
-              aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-              onClick={() => toggleWidget(widget)}
-            >
-              {content}
-            </Button>
-          ) : (
-            <span
-              key={widget.key}
-              className="inline-flex h-6 shrink-0 items-center rounded-md px-2 font-mono text-[11.5px] text-muted-foreground"
-              aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
-            >
-              {content}
-            </span>
-          );
-        })}
-      </div>
-      {children != null && <Separator orientation="vertical" className="h-5 shrink-0 self-center" />}
-      {children}
+            // No tooltip: the name is already the trigger's whole text, and the
+            // placement/expand line only repeated it in jargon.
+            return expandable ? (
+              <Button
+                key={widget.key}
+                id={triggerId}
+                type="button"
+                variant="ghost"
+                size="xs"
+                data-expanded={expanded || undefined}
+                className={triggerClass}
+                aria-controls={panelId}
+                aria-expanded={expanded}
+                aria-label={`${placementLabel}: ${extensionWidgetLabel(widget.key)}, ${lineCountLabel}`}
+                onClick={() => toggleWidget(widget)}
+              >
+                {content}
+              </Button>
+            ) : (
+              <span
+                key={widget.key}
+                className="inline-flex h-6 shrink-0 items-center rounded-full bg-muted/60 px-2.5 font-mono text-[11.5px] text-muted-foreground"
+                aria-label={`${placementLabel}: ${extensionWidgetLabel(widget.key)}, ${lineCountLabel}`}
+              >
+                {content}
+              </span>
+            );
+          })}
+        </div>
+        {children}
       </div>
     </>
   );

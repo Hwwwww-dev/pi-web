@@ -371,7 +371,7 @@ test("a message waiting in the composer keeps the main button on send", () => {
   assert.match(source, /onClick=\{isStreaming \? \(\) => queueFollowUp\(\) : handleSend\}/);
 });
 
-test("scrolls a long queue inside its own box, pills labeled by behavior (#1428)", () => {
+test("folds a long queue to two rows behind a toggle, pills labeled by behavior (#1428)", () => {
   const html = renderToStaticMarkup(
     React.createElement(I18nProvider, null, React.createElement(ChatInput, {
       onSend() {}, onAbort() {}, onSteer() {}, onFollowUp() {}, onQueuedAction() {}, isStreaming: true,
@@ -381,13 +381,28 @@ test("scrolls a long queue inside its own box, pills labeled by behavior (#1428)
       ],
     })),
   );
-  const rows = html.match(/<div class="[^"]*max-h-\[min\(180px[^"]*overflow-y-auto[^"]*">(.*)$/s);
-  assert.ok(rows, "queued rows sit in a capped scroll box");
-  assert.deepEqual([...rows[1].matchAll(/<div title="([^"]+)"/g)].map((match) => match[1]),
-    [...Array.from({ length: 19 }, (_, i) => `steer-${i}`), "follow-up-0"]);
-  // steer pills: the primary tag on a ringed background; follow-up: the muted tag on secondary
+  // No nested scroller: a box here cut its own first row in half and, on a
+  // phone, swallowed the composer's taps. Two rows and a toggle instead, so a
+  // long queue cannot push the input off screen.
+  assert.doesNotMatch(html, /max-h-\[min\(180px/);
+  assert.doesNotMatch(html, /overflow-y-auto[^"]*scrollbar-none/);
+  assert.deepEqual([...html.matchAll(/<div title="([^"]+)"/g)].map((match) => match[1]),
+    ["steer-0", "steer-1"]);
+  assert.match(html, /Show 18 more queued/);
+  // steer pills: the primary tag on a ringed background
   assert.match(html, /border-primary\/45 bg-background/);
+});
+
+test("labels a follow-up pill like a steer one, in the queue's colors", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(I18nProvider, null, React.createElement(ChatInput, {
+      onSend() {}, onAbort() {}, onQueuedAction() {}, isStreaming: true,
+      queuedSubmissions: [{ id: "f-0", text: "follow-up-0", behavior: "followUp", images: [] }],
+    })),
+  );
+
   assert.match(html, /bg-secondary text-secondary-foreground/);
+  assert.match(html, /<span class="min-w-0 flex-1 truncate">follow-up-0<\/span>/);
 });
 
 test("the composer stays editable while compacting and says messages queue", () => {
@@ -496,9 +511,9 @@ test("renders the read-only tool preset as the active selection", () => {
 
   // The row keeps no text pill: the preset name lives on the wrench button's
   // tooltip, and the icon carries a tint instead.
-  assert.match(html, /title="Change tool preset: Read Only"/);
-  assert.match(html, /aria-label="Change tool preset"/);
-  assert.doesNotMatch(html, />Read Only<\/span>/);
+  assert.match(html, /title="Tool preset: Read only"/);
+  assert.match(html, /aria-label="Tool preset"/);
+  assert.doesNotMatch(html, />Read only<\/span>/);
 });
 
 test("renders the empty tool preset as Chat only", () => {
@@ -516,8 +531,8 @@ test("renders the empty tool preset as Chat only", () => {
     ),
   );
 
-  assert.match(html, /title="Change tool preset: Chat only"/);
-  assert.match(html, /aria-label="Change tool preset"/);
+  assert.match(html, /title="Tool preset: Chat only"/);
+  assert.match(html, /aria-label="Tool preset"/);
   assert.doesNotMatch(html, />Chat only<\/span>/);
 });
 

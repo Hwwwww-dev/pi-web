@@ -689,7 +689,7 @@ function QueuedMessageRow({
     <div
       title={item.text}
       className={cn(
-        "flex min-w-0 max-w-full items-center gap-2 self-start rounded-full py-[5px] pl-1.5 pr-2 text-[12.5px]",
+        "flex min-w-0 max-w-full items-center gap-2 self-start overflow-hidden rounded-full py-[5px] pl-1.5 pr-2 text-[12.5px]",
         isSteer
           ? "border border-primary/45 bg-background text-foreground"
           : "bg-secondary text-secondary-foreground",
@@ -2212,13 +2212,18 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           <div className="flex w-full min-w-0 max-w-full flex-col gap-1.5 px-[13px] max-sm:px-[9px]">
             <div className="flex min-w-0 max-w-full flex-col items-stretch gap-1.5 px-[3px] py-0.5">
               {(queueExpanded ? queuedSubmissions : queuedSubmissions.slice(0, QUEUE_PREVIEW_ROWS)).map((item, index) => (
-                <QueuedMessageRow
-                  key={item.id}
-                  item={item}
-                  onAction={onQueuedAction}
-                  canMoveUp={queuedSubmissions.some((other, otherIndex) => otherIndex < index && other.behavior === item.behavior)}
-                  canMoveDown={queuedSubmissions.some((other, otherIndex) => otherIndex > index && other.behavior === item.behavior)}
-                />
+                // `w-full` on a block wrapper gives the pill a definite width to
+                // measure `max-w-full` against; as a bare `self-start` flex item
+                // in a shrink-to-fit column that percentage resolved to nothing
+                // and a long message widened the composer past the viewport.
+                <div key={item.id} className="flex w-full min-w-0">
+                  <QueuedMessageRow
+                    item={item}
+                    onAction={onQueuedAction}
+                    canMoveUp={queuedSubmissions.some((other, otherIndex) => otherIndex < index && other.behavior === item.behavior)}
+                    canMoveDown={queuedSubmissions.some((other, otherIndex) => otherIndex > index && other.behavior === item.behavior)}
+                  />
+                </div>
               ))}
             </div>
             {queuedSubmissions.length > QUEUE_PREVIEW_ROWS && (

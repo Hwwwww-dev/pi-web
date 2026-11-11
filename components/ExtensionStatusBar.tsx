@@ -88,7 +88,16 @@ export function buildExtensionStatusCells(statuses: ExtensionStatusItem[]): Stat
     }
     if (!stripAnsi(text).trim()) continue;
     const list = splitStatusList(text);
-    cells.push(list ? { kind: "list", ...list } : { kind: "text", text });
+    if (list) {
+      cells.push({ kind: "list", ...list });
+      continue;
+    }
+    // A status that only names itself plus "Inactive" reports nothing to act on:
+    // the name alone is the whole message, and the extra word made the row
+    // carry a state nobody could change from there.
+    const plainText = stripAnsi(text).replace(/\s+/g, " ").trim();
+    const named = plainText.replace(/\s+(?:inactive|disabled)\s*$/i, "");
+    cells.push({ kind: "text", text: named && named !== plainText ? named : text });
   }
   return cells;
 }

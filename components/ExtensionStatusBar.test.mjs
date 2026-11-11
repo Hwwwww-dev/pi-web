@@ -244,3 +244,17 @@ test("a status that lists entries becomes a chip named after its heading", () =>
   assert.equal(splitStatusList("LSP Active typescript css html json"), null);
   assert.equal(splitStatusList("Mode: build"), null);
 });
+
+test("a status that only names itself plus Inactive keeps the name alone", () => {
+  const html = renderStatusBar({
+    statuses: [
+      { key: "10-lsp", text: "LSP Inactive" },
+      { key: "20-git", text: "git main" },
+    ],
+  });
+
+  assert.match(html, />LSP</);
+  assert.doesNotMatch(html, /Inactive/);
+  // A status carrying something to act on keeps every word.
+  assert.match(html, /git main/);
+});
