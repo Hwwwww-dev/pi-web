@@ -1381,8 +1381,11 @@ span.token.table {
   select {
     font-size: 16px !important;
   }
+  /* The composer opts out of the 16px floor above: 12.5px is the size of its
+     own menu options, the smallest the typed text may read against them, and
+     iOS's zoom-on-focus is the trade this line accepts. */
   .chat-input-textarea {
-    font-size: max(16px, calc(13.5px + var(--chat-font-size-offset, 0px))) !important;
+    font-size: max(12.5px, calc(12.5px + var(--chat-font-size-offset, 0px))) !important;
   }
 }
 
