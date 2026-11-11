@@ -34,6 +34,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -209,6 +210,9 @@
   --warning-border: color-mix(in srgb, var(--warning) 30%, transparent);
   --warning-bg: color-mix(in srgb, var(--warning) 12%, transparent);
   --ok: oklch(0.627 0.17 149.2);
+  /* 蓝：信息/高速一类的正信号。暗色 --primary 是近白（0.922 0 0），凡拿
+     primary 当彩色高亮的场合（如 t/s ≥50 徽章）在暗色下等于没有颜色。 */
+  --info: oklch(0.55 0.15 250);
   --diff-add: oklch(0.45 0.13 150);
   --diff-del: oklch(0.55 0.2 25);
   --diff-add-bg: color-mix(in srgb, var(--ok) 12%, transparent);
@@ -255,6 +259,7 @@
   --warning-border: color-mix(in srgb, var(--warning) 30%, transparent);
   --warning-bg: color-mix(in srgb, var(--warning) 12%, transparent);
   --ok: oklch(0.72 0.17 150);
+  --info: oklch(0.72 0.13 245);
   --diff-add: oklch(0.7 0.15 150);
   --diff-del: oklch(0.7 0.17 20);
   --diff-add-bg: color-mix(in srgb, var(--ok) 14%, transparent);

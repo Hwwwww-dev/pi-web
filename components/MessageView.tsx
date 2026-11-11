@@ -489,7 +489,7 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
                 // 小号、贴着 token 计数：宽距只由行内 gap-1 提供，徽章不再
                 // 自带 ml/最小宽度（那会在数字和徽章之间留出死空间）。
                 "px-1.5 py-0 text-[10px]",
-                tps >= 50 ? "bg-primary/15 text-primary"
+                tps >= 50 ? "bg-info/15 text-info"
                   : tps >= 30 ? "bg-success/15 text-success"
                   : tps >= 15 ? "bg-warning/15 text-warning"
                   : "bg-destructive/15 text-destructive",
