@@ -109,7 +109,7 @@ export function TraceRow({
       <TraceTitle className={cn("min-w-0", titleClassName)}>{title}</TraceTitle>
       {chips}
       {description && <TraceDescription>{description}</TraceDescription>}
-      {trailing && <span className="ml-auto shrink-0">{trailing}</span>}
+      {trailing && <span className="ml-auto shrink-0 pl-2">{trailing}</span>}
     </TraceLine>
   );
 

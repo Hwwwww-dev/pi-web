@@ -142,7 +142,7 @@ const MAX_FILE_CHIPS = 4;
  */
 function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; onOpenFile: (path: string) => void }) {
   return (
-    <span className="flex min-w-0 shrink items-center gap-1.5">
+    <span className="flex min-w-0 shrink-0 items-center gap-1.5">
       {paths.slice(0, MAX_FILE_CHIPS).map((path) => {
         // A call names files relative to the session cwd; the viewer needs the absolute path.
         const resolved = resolveLocalFilePath(path, cwd);
@@ -153,7 +153,7 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             role={resolved ? "button" : undefined}
             tabIndex={resolved ? 0 : undefined}
             className={cn(
-              "inline-flex max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-sm border border-border px-1.5 py-px font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))] whitespace-nowrap hover:bg-accent hover:text-accent-foreground",
+              "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-sm border border-border px-1.5 py-px font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))] whitespace-nowrap hover:bg-accent hover:text-accent-foreground",
               !resolved && "cursor-default",
             )}
             title={resolved ?? path}
@@ -171,7 +171,7 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             }}
           >
             <FileTextIcon className="size-3 shrink-0" />
-            <span className="overflow-hidden text-ellipsis">{label}</span>
+            <span>{label}</span>
           </span>
         );
       })}
