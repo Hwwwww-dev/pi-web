@@ -222,7 +222,9 @@ export function ExtensionStatusBar({
     // （chat-input-shell 的 px-7/max-sm:px-2.5，本行是它的兄弟节点吃不到）+
     // 24px——卡片圆角 rounded-[24px] 的半径：行端对齐圆角弧线的终点（切点），
     // 而不是卡片最外沿，否则视觉上仍从圆角末端超出去。
-    <div className="extension-status-bar relative -mt-3 mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] shrink-0 items-stretch px-[52px] max-sm:px-[34px] pt-1 pb-1">
+    // mt-1：本行是 composer 外壳的兄弟节点，外壳自带 pb-3.5，再加 4px 让状态行
+    // 明显落在外壳之外，而不是贴着卡片下沿（负 margin 会把它压进输入框的盒子）。
+    <div className="extension-status-bar relative mt-1 mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] shrink-0 items-stretch px-[52px] max-sm:px-[34px] pt-1 pb-1">
       {widgets.length > 0 ? <ExtensionWidgets widgets={widgets}>{statusLine}</ExtensionWidgets> : statusLine}
     </div>
   );

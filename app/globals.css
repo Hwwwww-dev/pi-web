@@ -183,6 +183,18 @@
   background: color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 
+/* The code column starts a line-height's worth of air after its gutter (source)
+   or its +/- marker (diff): flush against the divider the first glyph reads as
+   glued to the edge. Right padding does the same at the end of a long line. */
+.file-source-view .file-source-line-content {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+/* The diff row already carries a right inset; only its left side starts flush. */
+.file-diff-view .file-diff-line-content {
+  padding-left: 12px;
+}
+
 /* trace 运行态标题 shimmer（nova 主题未内置该 utility，等价实现）与
    code-block 引用的细滚动条；scroll-fade-* 官方 utility 未随发布注册表提供，
    vendor 版已移除该类。 */
