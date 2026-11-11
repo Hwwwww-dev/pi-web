@@ -500,9 +500,10 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
               )}
             >
               {/* >120：文字恒白、背景是流动的彩虹渐变（.tps-rainbow，参数为
-                  用户调参器定稿：70px 周期 / L0.70 / C0.25 / 8 色）。滑动
-                  速度随速度加快：50/tps 秒一个循环，0.3s 封底（≥166 t/s
-                  恒为定稿的 0.3s）。 */}
+                  用户调参器定稿：70px 周期 / L0.70 / C0.25 / 8 色；暗色主题
+                  在 globals.css 里把亮度和彩度压到 0.55 / 0.22）。滑动速度随
+                  速度加快：50/tps 秒一个循环，0.3s 封底（≥166 t/s 恒为定稿
+                  的 0.3s）。 */}
               {tps > 120 ? (
                 <>
                   <span

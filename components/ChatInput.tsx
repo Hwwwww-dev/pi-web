@@ -28,7 +28,7 @@ import { isBareMcpCommand, isBuiltinMcpCommand } from "@/lib/mcp-command";
 import { BorderBeam } from "border-beam";
 import { ImagePreview } from "./ImagePreview";
 import { DismissButton } from "./DismissButton";
-import { useIsMobile } from "@/hooks/useIsMobile";
+import { useCoarsePointer, useIsMobile } from "@/hooks/useIsMobile";
 import { useTheme } from "@/hooks/useTheme";
 import { useEnterSendMode } from "@/hooks/useEnterSendMode";
 import { useI18n } from "@/hooks/useI18n";
@@ -641,6 +641,28 @@ function QueueActionButton({ title, onClick, children }: {
   );
 }
 
+/** One clipped line that scrolls its hidden remainder while hovered. The
+ *  distance and duration are measured on the row's own text, so a short message
+ *  never animates. */
+function useHoverScroll() {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [style, setStyle] = useState<React.CSSProperties | null>(null);
+  const start = useCallback(() => {
+    const element = ref.current;
+    if (!element) return;
+    const distance = element.scrollWidth - element.clientWidth;
+    if (distance <= 0) return;
+    // A steady read: ~90px per second, within sane bounds whatever the length.
+    const duration = Math.min(9000, Math.max(2600, distance * 11));
+    setStyle({
+      "--queued-scroll-distance": `${distance}px`,
+      "--queued-scroll-duration": `${duration}ms`,
+    } as React.CSSProperties);
+  }, []);
+  const stop = useCallback(() => setStyle(null), []);
+  return { ref, style, start, stop };
+}
+
 function QueuedMessageRow({
   item,
   onAction,
@@ -653,6 +675,7 @@ function QueuedMessageRow({
   canMoveDown?: boolean;
 }) {
   const { t } = useI18n();
+  const queuedScroll = useHoverScroll();
   const isSteer = item.behavior === "steer";
   const behaviorLabel = isSteer ? t("chat.queueBehaviorSteer") : t("chat.queueBehaviorFollowUp");
   const behaviorChipClass = cn(
@@ -704,7 +727,18 @@ function QueuedMessageRow({
       ) : (
         <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass}>{behaviorLabel}</Badge>
       )}
-      <span className="min-w-0 truncate">{item.text}</span>
+      {/* One clipped line, whatever the message holds: a long queued text used
+          to widen the pill past the composer and give the whole page a
+          horizontal scrollbar. Hovering scrolls the hidden rest into view. */}
+      <span
+        ref={queuedScroll.ref}
+        className={cn("min-w-0 flex-1 truncate", queuedScroll.style && "queued-text-scrolling")}
+        style={queuedScroll.style ?? undefined}
+        onMouseEnter={queuedScroll.start}
+        onMouseLeave={queuedScroll.stop}
+      >
+        {item.text}
+      </span>
       <span className="ml-auto flex shrink-0 items-center gap-0.5">
         {onAction && canMoveUp && (
           <QueueActionButton title={t("chat.moveQueuedUp")} onClick={() => onAction(item.id, "moveUp")}>
@@ -820,6 +854,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const { fontSize } = useChatAppearance();
   const { ui: uiFontFamily, uiWeight } = useFontPreferences();
   const isMobile = useIsMobile();
+  // Enter sends where a hardware keyboard is the input device, whatever the
+  // window's width: a narrow desktop window (an editor's webview) keeps the
+  // desktop shortcut instead of inheriting the phone's Ctrl/Cmd+Enter.
+  const touchKeyboard = useCoarsePointer();
   const enterSendMode = useEnterSendMode();
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>(() => (
@@ -1587,13 +1625,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       const nativeEvent = e.nativeEvent;
       const enterKey = e.key === "Enter" && !e.shiftKey;
-      const sendShortcut = isMobile || enterSendMode === "ctrlEnter"
+      const sendShortcut = touchKeyboard || enterSendMode === "ctrlEnter"
         ? enterKey && (e.ctrlKey || e.metaKey)
         : enterKey;
       // Popup menus and the IME guard take plain Enter in either send mode on a
-      // desktop keyboard. Mobile keyboards insert a line break on Enter, so they
+      // desktop keyboard. Touch keyboards insert a line break on Enter, so they
       // keep using the send shortcut there.
-      const acceptShortcut = isMobile ? sendShortcut : enterKey;
+      const acceptShortcut = touchKeyboard ? sendShortcut : enterKey;
       const recentlyComposed = Date.now() - lastCompositionEndAtRef.current < COMPOSITION_END_ENTER_GRACE_MS;
       const isComposing =
         isComposingRef.current ||
@@ -1731,7 +1769,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         }
       }
     },
-    [isMobile, enterSendMode, isStreaming, onSteer, onFollowUp, onAbort, slashMenuOpen, slashQuery, displayedSlashCommands, slashActiveIndex, applySlashCommand, queueFollowUp, handleSend, getNextSlashIndex, atMenuOpen, atQuery, atMatches, atActiveIndex, applyAtCompletion, historyMenuOpen, inputHistory, historyActiveIndex, applyHistoryInput, value]
+    [touchKeyboard, enterSendMode, isStreaming, onSteer, onFollowUp, onAbort, slashMenuOpen, slashQuery, displayedSlashCommands, slashActiveIndex, applySlashCommand, queueFollowUp, handleSend, getNextSlashIndex, atMenuOpen, atQuery, atMatches, atActiveIndex, applyAtCompletion, historyMenuOpen, inputHistory, historyActiveIndex, applyHistoryInput, value]
   );
 
   const handleInput = useCallback(() => {
@@ -2165,9 +2203,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         {/* Pending messages: pi delivers them on upcoming turns. The pills sit
             on the composer's axis, one inner step (13px) in from the card. */}
         {queuedSubmissions && queuedSubmissions.length > 0 && (
-          <div className="flex flex-col gap-1.5 px-[13px] max-sm:px-[9px]">
+          <div className="flex w-full min-w-0 max-w-full flex-col gap-1.5 px-[13px] max-sm:px-[9px]">
             {/* Only the rows scroll: a long queue must not push the input and its buttons off screen (#1428). */}
-            <div className="flex max-h-[min(180px,calc(var(--app-viewport-height,100dvh)*0.25))] flex-col items-stretch gap-1.5 overflow-y-auto overscroll-contain px-[3px] py-0.5">
+            <div className="flex min-w-0 max-w-full max-h-[min(180px,calc(var(--app-viewport-height,100dvh)*0.25))] flex-col items-stretch gap-1.5 overflow-x-hidden overflow-y-auto overscroll-contain px-[3px] py-0.5">
               {queuedSubmissions.map((item, index) => (
                 <QueuedMessageRow
                   key={item.id}
@@ -2462,7 +2500,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     onClick={() => fileInputRef.current?.click()}
                     title={t("chat.attachFiles")}
                     aria-label={t("chat.attachFiles")}
-                    className="h-[26px] rounded-full border-dashed px-2 text-muted-foreground"
+                    className="size-[26px] shrink-0 rounded-full border-dashed p-0 text-muted-foreground"
                   >
                     <PlusIcon strokeWidth={2} aria-hidden="true" />
                   </Button>

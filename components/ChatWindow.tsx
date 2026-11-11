@@ -2341,7 +2341,7 @@ function ExtensionDialog({
 
         <div
           ref={bodyRef}
-          className="min-h-0 flex-[1_1_auto] overflow-y-auto p-3.5"
+          className="min-h-0 min-w-0 flex-[1_1_auto] overflow-y-auto p-3.5 extension-ask-body"
         >
           {reviewed ? (
             <div className="grid gap-2.5">

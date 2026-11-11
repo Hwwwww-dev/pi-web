@@ -130,6 +130,59 @@
   }
 }
 
+/* A queued message shows one line; hovering it scrolls the hidden remainder
+   into view and back. The distance and duration are measured per row
+   (QueuedMessageRow), so a short message never animates. */
+@keyframes queued-text-scroll {
+  0%,
+  8% {
+    transform: translateX(0);
+  }
+  46%,
+  54% {
+    transform: translateX(calc(-1 * var(--queued-scroll-distance, 0px)));
+  }
+  92%,
+  100% {
+    transform: translateX(0);
+  }
+}
+.queued-text-scrolling {
+  text-overflow: clip;
+  animation: queued-text-scroll var(--queued-scroll-duration, 3s) ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .queued-text-scrolling {
+    animation: none;
+  }
+}
+
+/* An extension's question often arrives as a two-column markdown table
+   (option | description). Auto layout hands the long first cell every pixel
+   and squeezes the description to a character a line, so inside the ask drawer
+   the table splits its columns instead and the description wraps. */
+.extension-ask-body .markdown-table-wrap > table {
+  width: 100%;
+  table-layout: fixed;
+}
+.extension-ask-body .markdown-table-frame {
+  border: 0;
+  margin: 2px 0;
+}
+.extension-ask-body .markdown-body td,
+.extension-ask-body .markdown-body th {
+  max-width: none;
+  overflow-wrap: anywhere;
+  padding: 3px 6px;
+}
+
+/* File viewer source rows: the row under the pointer takes a faint tint so a
+   long line can be followed across the panel. The sticky gutter keeps its own
+   opaque background, so the tint starts at the code column. */
+.file-source-view .file-source-line:hover > .file-source-line-content {
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+
 /* trace 运行态标题 shimmer（nova 主题未内置该 utility，等价实现）与
    code-block 引用的细滚动条；scroll-fade-* 官方 utility 未随发布注册表提供，
    vendor 版已移除该类。 */
@@ -672,13 +725,19 @@ html[data-keyboard-open] .terminal-extra-keys {
    group, a thinking block, a turn's process list: past it the card scrolls
    inside itself, so a long script or a wide diff cannot push the rest of the
    turn out of view. */
-/* One size for every field the user types into, at every viewport. Phones used
-   to step up to 16px — iOS's focus-zoom floor — which made the composer read a
-   size larger than the transcript it sits under, on the one device it is used
-   most. Below that floor iOS zooms the page when a field takes focus. */
+/* One size for every field the user types into. A touch screen keeps 16px:
+   iOS zooms the page when a focused field is smaller than that, and no viewport
+   setting suppresses it. Everything around the field keeps its own scale, the
+   way iOS itself pairs a 17px field with 13px labels. */
 :root {
   --field-font-size: 14px;
   --card-max-height: min(70vh, 640px);
+}
+
+@media (pointer: coarse) {
+  :root {
+    --field-font-size: 16px;
+  }
 }
 
 :root {
@@ -1508,19 +1567,29 @@ span.token.table {
   to { transform: translateX(-70px); }
 }
 .tps-rainbow {
+  /* Lightness and chroma are tokens because a dark surface turns the same
+     saturated gradient into a glare: 0.70/0.25 reads as neon there, so the
+     dark theme drops it to a calmer 0.55/0.22 while the white label still
+     clears 4.5:1. */
+  --tps-rainbow-l: 0.70;
+  --tps-rainbow-c: 0.25;
   width: calc(100% + 70px);
   background-image: repeating-linear-gradient(90deg,
-    oklch(0.70 0.25 0)   0px,
-    oklch(0.70 0.25 45)  8.8px,
-    oklch(0.70 0.25 90)  17.5px,
-    oklch(0.70 0.25 135) 26.3px,
-    oklch(0.70 0.25 180) 35px,
-    oklch(0.70 0.25 225) 43.8px,
-    oklch(0.70 0.25 270) 52.5px,
-    oklch(0.70 0.25 315) 61.3px,
-    oklch(0.70 0.25 360) 70px);
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 0)   0px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 45)  8.8px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 90)  17.5px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 135) 26.3px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 180) 35px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 225) 43.8px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 270) 52.5px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 315) 61.3px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 360) 70px);
   animation: tps-rainbow-slide linear infinite;
   will-change: transform;
+}
+[data-theme="dark"] .tps-rainbow {
+  --tps-rainbow-l: 0.55;
+  --tps-rainbow-c: 0.22;
 }
 @media (prefers-reduced-motion: reduce) {
   .tps-rainbow {

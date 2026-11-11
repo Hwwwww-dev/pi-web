@@ -6,6 +6,7 @@ import type { ExtensionStatusItem, ExtensionWidgetItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
 import { ExtensionWidgets } from "./ExtensionWidgets";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 /**
  * `ctx.ui.setStatus("command:/mode toggle", "Build")` shows "Build" as a button
@@ -43,7 +44,36 @@ export function formatExtensionStatusLine(statuses: ExtensionStatusItem[]): stri
 
 type StatusCell =
   | { kind: "text"; text: string }
+  | { kind: "list"; label: string; title: string; items: string[] }
   | { kind: "command"; command: string; label: string };
+
+/** The permissive marker is pinned to the row's right edge instead of scrolling. */
+function isPermissiveCell(cell: StatusCell): boolean {
+  return cell.kind === "text" && isPermissiveStatusText(cell.text);
+}
+
+/**
+ * A status that lists things after a colon — `LSP Active: typescript, css, …`
+ * — claims the whole row and pushes every other status out of view. It becomes
+ * a chip named after the first word of its heading (`LSP:`), and its popover
+ * lists the entries one per line. Short text, or text without a colon and at
+ * least two entries, stays a plain pill.
+ */
+export function splitStatusList(text: string): { label: string; title: string; items: string[] } | null {
+  const plain = stripAnsi(text).replace(/\s+/g, " ").trim();
+  if (plain.length < 24) return null;
+  const colon = plain.indexOf(":");
+  if (colon <= 0) return null;
+  const head = plain.slice(0, colon).trim();
+  const items = plain
+    .slice(colon + 1)
+    .split(/\s*[,·]\s*/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const firstWord = head.split(/\s+/)[0];
+  if (!firstWord || items.length < 2) return null;
+  return { label: `${firstWord}:`, title: head, items };
+}
 
 /** One cell per status, in key order. A status with nothing visible to show has no cell. */
 export function buildExtensionStatusCells(statuses: ExtensionStatusItem[]): StatusCell[] {
@@ -54,11 +84,74 @@ export function buildExtensionStatusCells(statuses: ExtensionStatusItem[]): Stat
     if (command) {
       const label = stripAnsi(text).replace(/\s+/g, " ").trim();
       cells.push({ kind: "command", command, label: label || command });
-    } else if (stripAnsi(text).trim()) {
-      cells.push({ kind: "text", text });
+      continue;
     }
+    if (!stripAnsi(text).trim()) continue;
+    const list = splitStatusList(text);
+    cells.push(list ? { kind: "list", ...list } : { kind: "text", text });
   }
   return cells;
+}
+
+function StatusPill({
+  cell,
+  onCommand,
+  commandsDisabled,
+}: {
+  cell: StatusCell;
+  onCommand?: (command: string) => void;
+  commandsDisabled: boolean;
+}) {
+  if (cell.kind === "list") {
+    // The chip keeps the row one line wide; the popover is where the entry
+    // list belongs, one per line, scrollable when it is long.
+    const full = `${cell.title}: ${cell.items.join(", ")}`;
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            title={full}
+            aria-label={full}
+            className="shrink-0 bg-muted/60 px-2 font-mono text-[11.5px] font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            {cell.label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent side="top" align="start" className="w-auto min-w-[180px] max-w-[min(340px,calc(100vw-24px))] p-2.5">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{cell.title}</div>
+          <ul className="grid max-h-[min(40vh,320px)] gap-0.5 overflow-y-auto">
+            {cell.items.map((entry, index) => (
+              <li key={index} className="font-mono text-[11.5px] leading-5 text-foreground">{entry}</li>
+            ))}
+          </ul>
+        </PopoverContent>
+      </Popover>
+    );
+  }
+  if (cell.kind === "text") {
+    return (
+      <span className="inline-flex max-w-full items-center whitespace-pre rounded-md bg-muted/60 px-2 py-1 font-mono text-[11.5px] leading-4 text-muted-foreground">
+        <AnsiText text={cell.text} />
+      </span>
+    );
+  }
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="xs"
+      disabled={!onCommand || commandsDisabled}
+      title={`${cell.label} · ${cell.command}`}
+      aria-label={`${cell.label} (${cell.command})`}
+      onClick={() => onCommand?.(cell.command)}
+      className="shrink-0 bg-muted/60 px-2 font-mono text-[11.5px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+    >
+      {cell.label}
+    </Button>
+  );
 }
 
 export function ExtensionStatusBar({
@@ -77,46 +170,47 @@ export function ExtensionStatusBar({
   if (cells.length === 0 && widgets.length === 0) return null;
 
   const plainStatusLine = cells
-    .map((cell) => (cell.kind === "text" ? stripAnsi(cell.text) : cell.label))
+    .map((cell) => {
+      if (cell.kind === "text") return stripAnsi(cell.text);
+      if (cell.kind === "list") return `${cell.title}: ${cell.items.join(", ")}`;
+      return cell.label;
+    })
     .join(" ");
 
+  // The permissive marker is pinned to the row's right edge: it reports a
+  // property of the whole run, so it must stay visible while the ordinary
+  // statuses beside it scroll (a long LSP list used to carry it off-screen).
+  const pinnedCells = cells.filter(isPermissiveCell);
+  const scrollingCells = cells.filter((cell) => !isPermissiveCell(cell));
+
   const statusLine = cells.length > 0 ? (
-    <div
-      role="status"
-      className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden pl-0.5 pr-1.5 scrollbar-none"
-      aria-label={plainStatusLine}
-      title={plainStatusLine}
-    >
-      {cells.map((cell, index) => {
+    <div className="flex min-w-0 flex-1 items-center gap-1">
+      <div
+        role="status"
+        className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden pl-0.5 pr-1.5 scrollbar-none"
+        aria-label={plainStatusLine}
+        title={plainStatusLine}
+      >
+        {scrollingCells.map((cell, index) => (
+          <StatusPill
+            key={index}
+            cell={cell}
+            onCommand={onCommand}
+            commandsDisabled={commandsDisabled}
+          />
+        ))}
+      </div>
+      {pinnedCells.map((cell, index) => (
         // The permissive marker ("yolo", pi-permission-system) renders as bare
         // red text here — no capsule — and this row is its only surface; the
         // composer's own pill row no longer repeats it.
-        const permissive = cell.kind === "text" && isPermissiveStatusText(cell.text);
-        return cell.kind === "text" ? (
         <span
-          key={index}
-          className={permissive
-            ? "inline-flex max-w-full items-center whitespace-pre font-mono text-[10px] font-semibold tracking-[0.6px] text-destructive"
-            : "inline-flex max-w-full items-center whitespace-pre rounded-md bg-muted/60 px-2 py-1 font-mono text-[11.5px] leading-4 text-muted-foreground"}
+          key={`pinned-${index}`}
+          className="inline-flex shrink-0 items-center whitespace-pre font-mono text-[10px] font-semibold tracking-[0.6px] text-destructive"
         >
-          {permissive ? stripAnsi(cell.text).toUpperCase() : <AnsiText text={cell.text} />}
+          {cell.kind === "text" ? stripAnsi(cell.text).toUpperCase() : null}
         </span>
-      ) : (
-        <Button
-          key={index}
-          type="button"
-          variant="ghost"
-          size="xs"
-          disabled={!onCommand || commandsDisabled}
-          title={`${cell.label} · ${cell.command}`}
-          aria-label={`${cell.label} (${cell.command})`}
-          onClick={() => onCommand?.(cell.command)}
-          className="shrink-0 bg-muted/60 px-2 font-mono text-[11.5px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-        >
-          {cell.label}
-        </Button>
-        );
-      })}
+      ))}
     </div>
   ) : null;
 

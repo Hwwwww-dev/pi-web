@@ -12,6 +12,7 @@ const {
   ExtensionStatusBar,
   extensionStatusCommand,
   formatExtensionStatusLine,
+  splitStatusList,
   sanitizeExtensionStatusText,
 } = await jiti.import("./ExtensionStatusBar.tsx");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
@@ -168,8 +169,9 @@ test("command buttons are disabled while commands are blocked or nothing can sen
 
 test("clicking a command button sends its command", () => {
   const sent = [];
-  // The component has no hooks, so calling it returns the element tree; the
-  // cell is the shadcn Button component, so match by props, not tag name.
+  // The component has no hooks, so calling it returns the element tree; each
+  // cell is a component of its own, so walk into function components as well as
+  // children, and match the Button by props rather than tag name.
   const tree = ExtensionStatusBar({
     statuses: [{ key: "command:/mode toggle", text: "Plan" }],
     onCommand: (command) => sent.push(command),
@@ -178,6 +180,7 @@ test("clicking a command button sends its command", () => {
   const walk = (node) => {
     if (!node || typeof node !== "object") return;
     if (Array.isArray(node)) return node.forEach(walk);
+    if (typeof node.type === "function") return walk(node.type(node.props));
     if (node.props?.onClick && node.props["aria-label"] === "Plan (/mode toggle)") {
       buttons.push(node);
     }
@@ -229,4 +232,15 @@ test("without widgets there is no shared row, and without status the row holds o
   });
   assert.match(html, /aria-label="Extension widgets"/);
   assert.doesNotMatch(html, /role="status"/);
+});
+
+test("a status that lists entries becomes a chip named after its heading", () => {
+  assert.deepEqual(
+    splitStatusList("LSP Active: typescript, css, html, json"),
+    { label: "LSP:", title: "LSP Active", items: ["typescript", "css", "html", "json"] },
+  );
+  // Short text, a missing colon, or a single entry stays a plain pill.
+  assert.equal(splitStatusList("LSP: typescript"), null);
+  assert.equal(splitStatusList("LSP Active typescript css html json"), null);
+  assert.equal(splitStatusList("Mode: build"), null);
 });

@@ -74,13 +74,15 @@ test("contains chat content and inputs within the mobile viewport", () => {
   assert.match(chatInputSource, /"chat-input-textarea w-full min-w-0/);
 });
 
-test("every field shares one font size at every viewport", () => {
-  // One --field-font-size for the whole app, phones included: the composer must
-  // not read larger than the transcript it sits under. Below 16px iOS zooms the
-  // page when a field takes focus — an accepted trade-off, not an oversight. A
-  // second step (the old 16px phone floor) is the regression this guards.
+test("every field shares one font size, except a touch screen's 16px floor", () => {
+  // One --field-font-size for the whole app: the composer must not read larger
+  // than the transcript it sits under. A touch screen is the one exception —
+  // below 16px iOS zooms the page when a field takes focus, and no viewport
+  // setting suppresses it — so the floor is declared once, in a pointer query,
+  // and everything around the field keeps its own scale.
   assert.match(cssSource, /--field-font-size: 14px;/);
-  assert.doesNotMatch(cssSource, /--field-font-size: (?!14px)/);
+  assert.match(cssSource, /@media \(pointer: coarse\) \{\s*:root \{\s*--field-font-size: 16px;/);
+  assert.doesNotMatch(cssSource, /max-width: 640px\) \{\s*:root \{\s*--field-font-size/);
   for (const primitive of [inputPrimitiveSource, textareaPrimitiveSource]) {
     assert.match(primitive, /text-\[length:var\(--field-font-size\)\]/);
   }

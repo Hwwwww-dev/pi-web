@@ -75,11 +75,14 @@ test("follow-up shortcuts preserve newline, IME, mobile and completion behavior"
     ["native composition blocks sending", { altKey: true, nativeEvent: { isComposing: true } }, {}, "native"],
     ["IME keyCode blocks sending", { altKey: true, nativeEvent: { keyCode: 229 } }, {}, "native"],
     ["composition grace blocks sending", { altKey: true }, { lastCompositionEndAtRef: { current: 950 } }, "prevented"],
-    ["mobile Alt+Enter keeps native behavior", { altKey: true }, { isMobile: true }, "native"],
-    ["mobile composition grace cannot send", { altKey: true }, { isMobile: true, lastCompositionEndAtRef: { current: 950 } }, "native"],
-    ["mobile Ctrl+Alt+Enter follows up", { altKey: true, ctrlKey: true }, { isMobile: true }, "followup"],
-    ["mobile Cmd+Alt+Enter follows up", { altKey: true, metaKey: true }, { isMobile: true }, "followup"],
-    ["mobile modified Enter respects composition grace", { altKey: true, ctrlKey: true }, { isMobile: true, lastCompositionEndAtRef: { current: 950 } }, "prevented"],
+    ["mobile Alt+Enter keeps native behavior", { altKey: true }, { touchKeyboard: true }, "native"],
+    ["mobile composition grace cannot send", { altKey: true }, { touchKeyboard: true, lastCompositionEndAtRef: { current: 950 } }, "native"],
+    ["mobile Ctrl+Alt+Enter follows up", { altKey: true, ctrlKey: true }, { touchKeyboard: true }, "followup"],
+    ["mobile Cmd+Alt+Enter follows up", { altKey: true, metaKey: true }, { touchKeyboard: true }, "followup"],
+    ["mobile modified Enter respects composition grace", { altKey: true, ctrlKey: true }, { touchKeyboard: true, lastCompositionEndAtRef: { current: 950 } }, "prevented"],
+    // The shortcut follows the input device, not the viewport: a narrow desktop
+    // window with a hardware keyboard keeps the desktop behavior.
+    ["a narrow window with a keyboard keeps Alt+Enter sending", { altKey: true }, { isMobile: true, isStreaming: false }, "send"],
     ["Enter still queues a follow-up without a steer handler", {}, { onSteer: undefined }, "followup"],
     ["Alt+Enter sends when follow-up is unavailable", { altKey: true }, { onFollowUp: undefined }, "send"],
     ["slash completion takes priority", { altKey: true }, { slashMenuOpen: true, slashQuery: "help" }, "slash"],
@@ -96,14 +99,14 @@ test("follow-up shortcuts preserve newline, IME, mobile and completion behavior"
     ["Ctrl+Enter mode: Enter picks from history", {}, { enterSendMode: "ctrlEnter", historyMenuOpen: true }, "history"],
     ["Ctrl+Enter mode: Enter completes an exact slash command instead of sending it", {}, { enterSendMode: "ctrlEnter", isStreaming: false, slashMenuOpen: true, slashQuery: "copy", value: "/copy", displayedSlashCommands: [{ name: "copy", source: "builtin" }] }, "slash"],
     ["Ctrl+Enter mode: Ctrl+Enter sends an exact slash command", { ctrlKey: true }, { enterSendMode: "ctrlEnter", isStreaming: false, slashMenuOpen: true, slashQuery: "copy", value: "/copy", displayedSlashCommands: [{ name: "copy", source: "builtin" }] }, "send"],
-    ["mobile ignores Ctrl+Enter mode for plain Enter", {}, { enterSendMode: "ctrlEnter", isMobile: true }, "native"],
+    ["mobile ignores Ctrl+Enter mode for plain Enter", {}, { enterSendMode: "ctrlEnter", touchKeyboard: true }, "native"],
   ];
   for (const [name, keys, state, expected] of cases) {
     let action = "native";
     const handler = script.runInNewContext({
       Date: { now: () => 1000 },
       COMPOSITION_END_ENTER_GRACE_MS: 100,
-      isMobile: false, isStreaming: true, enterSendMode: "enter",
+      isMobile: false, touchKeyboard: false, isStreaming: true, enterSendMode: "enter",
       isComposingRef: { current: false }, lastCompositionEndAtRef: { current: 0 },
       historyMenuOpen: false, inputHistory: ["previous"], historyActiveIndex: 0,
       slashMenuOpen: false, slashQuery: null, displayedSlashCommands: [{}], slashActiveIndex: 0,
@@ -238,7 +241,7 @@ test("a plain-text paste the browser dropped is inserted from the event's own te
     const handler = script.runInNewContext({
       compact: false, processImageFiles() {}, pendingPasteRef,
       setTimeout(callback, delay) { timers.push([callback, delay]); },
-      replaceTextareaRange(ta, start, end, value) { inserted.push([start, end, value]); },
+      replaceTextareaRange(_ta, start, end, value) { inserted.push([start, end, value]); },
       replaceLinksWithMarkdown,
       DOMParser: class {
         parseFromString() {
@@ -295,7 +298,7 @@ test("file mention arrows wrap around the match list", () => {
     const handler = script.runInNewContext({
       Date: { now: () => 1000 },
       COMPOSITION_END_ENTER_GRACE_MS: 100,
-      isMobile: false, isStreaming: false, enterSendMode: "enter",
+      isMobile: false, touchKeyboard: false, isStreaming: false, enterSendMode: "enter",
       isComposingRef: { current: false }, lastCompositionEndAtRef: { current: 0 },
       historyMenuOpen: false, inputHistory: [], historyActiveIndex: 0,
       slashMenuOpen: false, slashQuery: null, displayedSlashCommands: [], slashActiveIndex: 0,
