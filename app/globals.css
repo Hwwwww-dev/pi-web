@@ -1463,22 +1463,23 @@ span.token.table {
   }
 }
 
-/* t/s > 120 的徽章：文字恒白，背景是流动的彩虹渐变——高亮纯 oklch
-   （不受主题 token 约束）的整条光谱平铺两份，background-position 滑动
-   一个周期即无缝循环；时长由组件按速度内联（animation-duration），
-   越快滑得越快。reduced-motion 下保持静态彩虹渐变。 */
+/* t/s > 120 的徽章：文字恒白，背景是密排的流动彩虹渐变——repeating
+   光谱每 60px 一个周期（红→黄→绿→蓝→紫→红），background-position-x
+   平移一个周期即无缝循环，徽章内始终同时可见一整段彩色；高亮纯 oklch，
+   不受主题 token 约束。时长由组件按速度内联（animation-duration），
+   越快滑得越快。reduced-motion 下保持静态彩虹。 */
 @keyframes tps-rainbow-slide {
-  from { background-position: 0% 50%; }
-  to { background-position: 100% 50%; }
+  from { background-position: 0px 50%; }
+  to { background-position: 60px 50%; }
 }
 .tps-rainbow {
-  background-image: linear-gradient(90deg,
-    oklch(0.7 0.19 0), oklch(0.7 0.19 45), oklch(0.7 0.19 90), oklch(0.7 0.19 135),
-    oklch(0.7 0.19 180), oklch(0.7 0.19 225), oklch(0.7 0.19 270), oklch(0.7 0.19 315),
-    oklch(0.7 0.19 360), oklch(0.7 0.19 405), oklch(0.7 0.19 450), oklch(0.7 0.19 495),
-    oklch(0.7 0.19 540), oklch(0.7 0.19 585), oklch(0.7 0.19 630), oklch(0.7 0.19 675),
-    oklch(0.7 0.19 720));
-  background-size: 200% 100%;
+  background-image: repeating-linear-gradient(90deg,
+    oklch(0.7 0.19 0)   0px,
+    oklch(0.7 0.19 60)  12px,
+    oklch(0.7 0.19 140) 24px,
+    oklch(0.7 0.19 220) 36px,
+    oklch(0.7 0.19 300) 48px,
+    oklch(0.7 0.19 360) 60px);
   animation: tps-rainbow-slide linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
