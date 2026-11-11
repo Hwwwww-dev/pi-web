@@ -1,14 +1,13 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BookOpenIcon, BotIcon, CheckIcon, CircleXIcon, CopyIcon, ExternalLinkIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareTerminalIcon, TriangleAlertIcon, WrenchIcon } from "lucide-react";
+import { BookOpenIcon, BotIcon, CheckIcon, CopyIcon, ExternalLinkIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareTerminalIcon, TriangleAlertIcon, WrenchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { CodeBlock, CodeBlockContent } from "./ui/code-block";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { Skeleton } from "./ui/skeleton";
-import { Spinner } from "./ui/spinner";
 import {
   Trace,
   TraceCollapsible,
@@ -20,22 +19,20 @@ import {
   TraceTitle,
 } from "./ui/trace";
 import { MarkdownBody } from "./MarkdownBody";
-import { HighlightedCode } from "./HighlightedCode";
 import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
-import { getFileIcon } from "./FileIcons";
+import { TerminalTrace } from "./transcript/TerminalTrace";
+import { ToolTrace } from "./transcript/ToolTrace";
+import { TaskTrace } from "./transcript/TaskTrace";
+import { SubagentTrace } from "./transcript/SubagentTrace";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
 import { parseCompactionSummary } from "@/lib/compaction-summary";
-import { isTuiText } from "@/lib/ansi";
-import { getFileName, getRelativeFilePath } from "@/lib/file-paths";
-import { getLanguage } from "@/lib/file-types";
-import { resolveLocalFilePath } from "@/lib/file-links";
-import { useIsMobile } from "@/hooks/useIsMobile";
 import type { SplitDiffCell, SplitDiffFile } from "@/lib/patch";
-import { diffGapLabel, parseUnifiedPatch, unifiedDiffLines, type SplitDiffGap, type UnifiedDiffLine } from "@/lib/patch";
+import { diffGapLabel, unifiedDiffLines, type SplitDiffGap, type UnifiedDiffLine } from "@/lib/patch";
 import { applyPatchPreviewToFiles, applyPatchResultHasFailures, extractApplyPatchPaths, getApplyPatchInputText, parseApplyPatchInput } from "@/lib/apply-patch";
-import { isApplyPatchToolName, isEditToolName, isWriteToolName } from "@/lib/tool-names";
+import { isApplyPatchToolName, isWriteToolName } from "@/lib/tool-names";
+import { toToolView } from "@/lib/tool-view";
 
 // A write's file text in place of its JSON (from main's MessageView). Streamed
 // input is still incomplete JSON, and any other argument (a mode, a title)
@@ -48,14 +45,9 @@ export function getWrittenFileText(block: ToolCallContent): string | null {
   if (typeof content !== "string" || content === "") return null;
   return Object.keys(block.input).every((key) => WRITE_VIEW_KEYS.has(key)) ? content : null;
 }
-import { COLLAPSIBLE_EXPANDED_EVENT, isToolCallExpanded, setToolCallExpanded } from "@/lib/tool-call-expansion";
+import { COLLAPSIBLE_EXPANDED_EVENT } from "@/lib/tool-call-expansion";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
-import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
-import { CODEMODE_TOOL_NAME, codemodeCalls, codemodeScript, codemodeScriptPreview, stripCodemodeHeader } from "@/lib/codemode-view";
-import { toolFieldsOfInput, type ToolField } from "@/lib/tool-fields";
-import { mcpToolLabel, prettyMcpResultText } from "@/lib/mcp-tool-display";
-import { CodemodeCallList } from "./CodemodeToolView";
-import { parseStreamingJson } from "@earendil-works/pi-ai/utils/json-parse";
+import { getToolCategory, getToolFilePaths, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
 import { formatUsage, type ActivityItem, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
 import { UsageBar } from "./UsageBar";
@@ -65,9 +57,6 @@ import type { CustomMessage, ImageContent, TextContent, ThinkingContent, ToolCal
 // Shared row primitives
 // ─────────────────────────────────────────────────────────────────────────────
 
-function RowSpinner({ className }: { className?: string }) {
-  return <Spinner aria-hidden="true" className={cn("size-3.5 shrink-0 text-muted-foreground", className)} />;
-}
 
 function ToolCategoryIcon({ category }: { category: ToolCategory }) {
   const className = "size-[14px] shrink-0";
@@ -93,52 +82,7 @@ function ToolCategoryIcon({ category }: { category: ToolCategory }) {
   }
 }
 
-/** A row's leading icon: spinner while running, the error glyph on failure. */
-function RowStatusIcon({ category, isError, active }: { category?: ToolCategory; isError?: boolean; active?: boolean }) {
-  if (active) return <RowSpinner className="text-warning" />;
-  if (isError) return <CircleXIcon className="size-[14px] shrink-0 text-destructive" strokeWidth={1.8} />;
-  if (category) return <ToolCategoryIcon category={category} />;
-  return null;
-}
 
-/** A clickable file reference inside a tool row, opening the file viewer.
- *  A span rather than a button: it sits inside the row-header button, and
- *  nested buttons double-trigger the row toggle and trip validateDOMNesting. */
-function ToolFileChip({ path, cwd, onOpenFile }: { path: string; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void }) {
-  const resolved = resolveLocalFilePath(path, cwd);
-  const name = getFileName(resolved ?? path);
-  const relative = cwd ? getRelativeFilePath(resolved ?? path, cwd) : resolved ?? path;
-  const dir = relative.includes("/")
-    ? relative.slice(0, relative.lastIndexOf("/"))
-    : relative.includes("\\")
-      ? relative.slice(0, relative.lastIndexOf("\\"))
-      : null;
-  const clickable = Boolean(onOpenFile && resolved);
-  const activate = () => onOpenFile!(resolved!);
-  return (
-    <span
-      className={cn(
-        "inline-flex max-w-full items-center gap-1 overflow-hidden rounded-sm px-1.5 py-px font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))] whitespace-nowrap",
-        clickable && "cursor-pointer hover:bg-accent hover:text-accent-foreground",
-      )}
-      title={resolved ?? path}
-      aria-label={name}
-      role={clickable ? "button" : undefined}
-      tabIndex={clickable ? 0 : undefined}
-      onClick={clickable ? (event) => { event.stopPropagation(); activate(); } : undefined}
-      onKeyDown={clickable ? (event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.stopPropagation();
-        event.preventDefault();
-        activate();
-      } : undefined}
-    >
-      {getFileIcon(name, 12)}
-      <span className="overflow-hidden text-ellipsis">{name}</span>
-      {dir && <span className="overflow-hidden text-ellipsis text-muted-foreground/60">{dir}/</span>}
-    </span>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool call rows
@@ -177,55 +121,10 @@ function applyPatchPaths(block: ToolCallContent, result?: ToolResultMessage): st
   return files ? files.map((file) => file.newPath || file.oldPath).filter((path): path is string => Boolean(path)) : [];
 }
 
-/** A titled block inside an expanded card: the call's own input next to its
- *  result needs a name each, or the two run together (AI Elements' ToolInput /
- *  ToolOutput). A label is passed only when both are on screen. */
-function ToolSection({ label, children }: { label?: string; children: React.ReactNode }) {
-  if (!label) return <>{children}</>;
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-[length:calc(11.5px+var(--chat-font-size-offset,0px))] font-medium text-muted-foreground/70">
-        {label}
-      </span>
-      {children}
-    </div>
-  );
-}
 
-/** Preview nodes for a collapsed tool row: file chips when the call targets files. */
-function ToolRowPreview({ block, result, cwd, onOpenFile }: {
-  block: ToolCallContent;
-  result?: ToolResultMessage;
-  cwd?: string;
-  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
-}) {
-  const paths = useMemo(() => {
-    if (isApplyPatchToolName(block.toolName)) return applyPatchPaths(block, result);
-    return getToolFilePaths(block.input);
-  }, [block, result]);
 
-  if (paths.length > 0 && onOpenFile) {
-    return (
-      <span>
-        {paths.slice(0, 4).map((path) => <ToolFileChip key={path} path={path} cwd={cwd} onOpenFile={onOpenFile} />)}
-        {paths.length > 4 && <span>+{paths.length - 4}</span>}
-      </span>
-    );
-  }
-  const preview = getToolPreviewText(block).slice(0, 160);
-  if (!preview) return null;
-  return <>{preview}</>;
-}
 
-/** A patch over exactly one file names it, for calls whose input names no file. */
-function singlePatchPath(text: string | undefined): string | null {
-  if (!text) return null;
-  const files = parseUnifiedPatch(text);
-  if (!files || files.length !== 1) return null;
-  return files[0].newPath || files[0].oldPath || null;
-}
-
-export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, cwd, onOpenFile, onOpenSubagent, isStreaming }: {
+export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, onOpenSubagent, isStreaming }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
   /** Tool run time in milliseconds (pi 1.1's durationMs, else the timestamps' difference). */
@@ -235,194 +134,36 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   /** Prompt tokens of the next request — context occupancy after this call. */
   ctxTokens?: number;
   ctxWindow?: number;
-  cwd?: string;
-  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
   isStreaming?: boolean;
 }) {
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState(() => isToolCallExpanded(block.toolCallId));
-  const toggleExpanded = () => {
-    const next = !expanded;
-    setToolCallExpanded(block.toolCallId, next);
-    setExpanded(next);
-  };
-
-  const category = getToolCategory(block.toolName);
-  const inputStr = getToolCallInputText(block);
-  const writtenFileText = getWrittenFileText(block);
-  const isStreamingInput = block.rawInput !== undefined;
-  const resultDiff = result && !result.isError ? getResultDiff(result) : null;
-  const diffStat = resultDiff ? countDiffStat(resultDiff.text) : null;
-  const patchFiles = getApplyPatchFiles(block, result);
-  // A script and the calls it made, instead of the input JSON. Streamed input is
-  // still incomplete JSON and keeps the generic view.
-  const codemodeCode = block.toolName === CODEMODE_TOOL_NAME && !isStreamingInput ? codemodeScript(block.input) : null;
-  const codemode = codemodeCode === null ? null : { code: codemodeCode, ...codemodeCalls(result?.details) };
-  // `server/tool` instead of the registered `mcp__server__tool`, as pi's TUI shows it.
-  const mcpLabel = mcpToolLabel(block.toolName, result?.details);
-  const resultContent = result ? (codemode ? stripCodemodeHeader(result.content) : result.content) : [];
-  const joinedResultText = result
-    ? resultContent.filter((b): b is { type: "text"; text: string } => b.type === "text").map((b) => b.text).join("\n")
-    : null;
-  const resultText = mcpLabel && joinedResultText !== null ? prettyMcpResultText(joinedResultText) : joinedResultText;
-  const resultImages = getMessageImages(resultContent);
-  const resultIsEmpty = resultText === null ? false : (resultText.trim() === "(no output)" || resultText.trim() === "");
-  const isError = (result?.isError ?? false)
-    || (isApplyPatchToolName(block.toolName) && applyPatchResultHasFailures(result?.details));
-  const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
-  const codemodeCallCount = codemode ? codemode.calls.length + codemode.omitted : 0;
   const active = Boolean(isStreaming) && !result;
-  // Terminal rows render command + output instead of the raw JSON args: the
-  // command wraps (it is the call's input), the output keeps its own layout —
-  // box art, tables and progress bars must not reflow — and a rule separates
-  // the two, the way a shell session reads. A multi-line command (a heredoc)
-  // must not crowd the output out of the card: it takes at most 4/10 of the
-  // capped height and scrolls, leaving the rest to the output; under that both
-  // size to their content.
-  const commandText = category === "terminal" && !isStreamingInput && typeof block.input?.command === "string"
-    ? block.input.command
-    : null;
-  const terminalOutput = commandText !== null && resultText !== null && !resultIsEmpty ? resultText : null;
-  const combinedTerminalText = commandText === null
-    ? null
-    : `$ ${commandText}${terminalOutput === null ? "" : `\n\n${terminalOutput}`}`;
-  // Flat arguments as rows instead of a JSON blob, unless the card has a view of
-  // its own (a write's file text, codemode, an applied patch, a terminal pair).
-  // Streamed input is incomplete JSON: pi's partial parse shows the fields it
-  // has so far, and a nested argument begun keeps the raw text.
-  const toolFields =
-    writtenFileText === null && codemode === null && patchFiles === null && combinedTerminalText === null
-      ? isStreamingInput
-        ? toolFieldsOfInput(parseStreamingJson(block.rawInput))
-        : toolFieldsOfInput(block.input)
-      : null;
-  // Syntax colors for whatever code the card shows: a terminal row reads as a
-  // shell session, a file the call names takes that file's language, and a
-  // call's own arguments are JSON. Nothing else guesses.
-  const toolPathLanguage = getLanguage(getToolFilePaths(block.input)[0] ?? "");
-  const bodyLanguage = combinedTerminalText !== null
-    ? "bash"
-    : writtenFileText !== null
-      ? toolPathLanguage
-      : /^\s*[[{]/.test(inputStr) ? "json" : "text";
-  const resultLanguage = combinedTerminalText !== null
-    ? "bash"
-    : getToolFilePaths(block.input).length > 0 ? toolPathLanguage : "text";
-  // The call's arguments and its result share the body: name them, or the two
-  // code blocks read as one.
-  const shownSectionLabels = result !== undefined
-    && !patchFiles
-    && combinedTerminalText === null
-    && !resultDiff
-    && !codemode;
+  const view = toToolView({ block, result, t });
+  const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
+  const resultImages = getMessageImages(result ? result.content : []);
 
-  const label = category === "other" ? block.toolName : t(TOOL_CATEGORY_LABEL_KEYS[category]);
-  // The result's single-file patch names the call when its input has no file.
-  const patchLabel = getToolFilePaths(block.input).length === 0 ? singlePatchPath(resultDiff?.text) : null;
+  const durationNode = !active && duration !== undefined
+    ? <TraceDescription className="shrink-0 tabular-nums">{formatToolDuration(duration)}</TraceDescription>
+    : undefined;
+  const usageNode = usage ? (
+    <div className="text-[length:calc(11px+var(--chat-font-size-offset,0px))]">
+      <UsageBar
+        usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
+        ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
+      />
+    </div>
+  ) : undefined;
+  const belowNode = resultImages.length > 0 ? <ResultImages images={resultImages} /> : undefined;
 
-  return (
-    <Trace data-activity-tool={block.toolName}>
-      <div className="flex max-w-full min-w-0 items-center gap-1 bg-background">
-        <TraceCollapsible
-          open={expanded}
-          onOpenChange={toggleExpanded}
-          className="w-auto min-w-0 flex-[0_1_auto]"
-        >
-          <TraceCollapsibleTrigger title={mcpLabel || patchLabel ? block.toolName : undefined}>
-            <TraceLine status={active ? "running" : isError ? "error" : undefined}>
-              <TraceIcon><RowStatusIcon category={category} isError={isError} active={active} /></TraceIcon>
-              <TraceTitle className="font-medium">
-                {mcpLabel ? `${mcpLabel.server}/${mcpLabel.tool}` : patchLabel ?? label}
-              </TraceTitle>
-              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
-                {isStreamingInput
-                  ? t("chat.generatingToolInput")
-                  : codemode
-                    ? codemodeScriptPreview(codemode.code)
-                    : patchLabel
-                      ? null
-                      : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
-              </TraceDescription>
-              {codemodeCallCount > 0 && (
-                <TraceDescription className="shrink-0 text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] tabular-nums">
-                  {codemodeCallCount === 1 ? t("codemode.callCountOne") : t("codemode.callCount", { count: codemodeCallCount })}
-                </TraceDescription>
-              )}
-              {diffStat && (
-                <span className="flex shrink-0 items-center gap-1 text-[length:calc(12px+var(--chat-font-size-offset,0px))] font-medium tabular-nums" aria-hidden="true">
-                  <Badge variant="ghost" className="bg-success/15 text-success">+{diffStat.added}</Badge>
-                  <Badge variant="ghost" className="bg-destructive/10 text-destructive">−{diffStat.removed}</Badge>
-                </span>
-              )}
-              {!active && duration !== undefined && (
-                <TraceDescription className="shrink-0 text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] tabular-nums">
-                  {formatToolDuration(duration)}
-                </TraceDescription>
-              )}
-              {!active && isError && result && (
-                <TraceDescription className="shrink-0 font-medium text-destructive [font-variant-numeric:normal]">
-                  {t("chat.activity.failed")}
-                </TraceDescription>
-              )}
-            </TraceLine>
-          </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent>
-            <div className="flex flex-col gap-2">
-              {usage && (
-                <div className="text-[length:calc(11px+var(--chat-font-size-offset,0px))]">
-                  <UsageBar
-                    usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
-                    ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
-                  />
-                </div>
-              )}
-              {codemode ? (
-                <>
-                  <CodeBlock size="sm"><CodeBlockContent wrap><HighlightedCode code={codemode.code.replace(/\r/g, "").trimEnd()} language="typescript" /></CodeBlockContent></CodeBlock>
-                  <CodemodeCallList calls={codemode.calls} omitted={codemode.omitted} isError={isError} />
-                  {result && (resultText !== null && !resultIsEmpty || resultImages.length > 0) && (
-                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} language={resultLanguage} />
-                  )}
-                </>
-              ) : combinedTerminalText !== null ? (
-                <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-h-[var(--card-max-height)]">
-                  <CodeBlockContent wrap className="max-h-[calc(var(--card-max-height)*0.4)] shrink-0"><HighlightedCode code={`$ ${commandText}`} language="bash" /></CodeBlockContent>
-                  {terminalOutput !== null && (
-                    <>
-                      <div className="h-px shrink-0 bg-border" aria-hidden="true" />
-                      <CodeBlockContent wrap={false} className="min-h-0">{terminalOutput}</CodeBlockContent>
-                    </>
-                  )}
-                </CodeBlock>
-              ) : (
-                <>
-                  {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
-                    <ToolSection label={shownSectionLabels ? t("chat.activity.parameters") : undefined}>
-                      {toolFields ? (
-                        <ToolFieldRows fields={toolFields} />
-                      ) : (
-                        <CodeBlock size="sm" className="max-h-[var(--card-max-height)]"><CodeBlockContent wrap><HighlightedCode code={writtenFileText ?? inputStr} language={bodyLanguage} /></CodeBlockContent></CodeBlock>
-                      )}
-                    </ToolSection>
-                  )}
-                  {patchFiles && <SplitFilesView files={patchFiles} />}
-                  {result && patchFiles && isError && (
-                    <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} language={resultLanguage} />
-                  )}
-                  {result && !patchFiles && combinedTerminalText === null && (
-                    resultDiff ? <SplitPatchView text={resultDiff.text} /> : (!resultIsEmpty || resultImages.length === 0) && (
-                      <ToolSection label={shownSectionLabels ? t("chat.activity.result") : undefined}>
-                        <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} language={resultLanguage} />
-                      </ToolSection>
-                    )
-                  )}
-                </>
-              )}
-            </div>
-          </TraceCollapsibleContent>
-        </TraceCollapsible>
-        {subagent && onOpenSubagent && (
+  if (view.kind === "subagent") {
+    return (
+      <SubagentTrace
+        label={subagent?.description || subagent?.profile}
+        status={view.status}
+        report={view.sections.find((section) => section.kind === "markdown")?.text}
+        foldKey={view.foldKey}
+        action={subagent && onOpenSubagent ? (
           <Button
             type="button"
             variant="ghost"
@@ -434,33 +175,39 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
           >
             <ExternalLinkIcon strokeWidth={2} />
           </Button>
-        )}
-      </div>
+        ) : undefined}
+        below={belowNode}
+      />
+    );
+  }
 
-      {resultImages.length > 0 && <ResultImages images={resultImages} />}
-    </Trace>
-  );
+  if (view.kind === "terminal") {
+    return <TerminalTrace view={view} activityTool={block.toolName} trailing={durationNode} usage={usageNode} below={belowNode} />;
+  }
+
+  // A patch's own +N −M sits beside the title; every other kind carries the duration alone.
+  const trailing = view.diffStat || durationNode ? (
+    <span className="flex items-center gap-1.5">
+      {view.diffStat && (
+        <>
+          <Badge variant="ghost" className="bg-success/15 text-success">+{view.diffStat.added}</Badge>
+          <Badge variant="ghost" className="bg-destructive/10 text-destructive">−{view.diffStat.removed}</Badge>
+        </>
+      )}
+      {durationNode}
+    </span>
+  ) : undefined;
+
+  return <ToolTrace view={view} activityTool={block.toolName} trailing={trailing} usage={usageNode} below={belowNode} />;
 }
 
-/** Merges consecutive same-category tool calls into one collapsed summary row. */
-export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent }: {
+export function ToolGroupRow({ calls, ctxWindow, onOpenSubagent }: {
   calls: ToolCallEntry[];
   ctxWindow?: number;
-  cwd?: string;
-  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
 }) {
   const { t } = useI18n();
   const groupKey = `group:${calls[0]?.block.toolCallId ?? ""}`;
-  // Always start collapsed — live tail, reopened conversations, and finished
-  // turns look the same; only a user click expands (remembered across the
-  // streaming remounts by toolCallId).
-  const [expanded, setExpanded] = useState(() => isToolCallExpanded(groupKey));
-  const toggleExpanded = () => {
-    const next = !expanded;
-    setToolCallExpanded(groupKey, next);
-    setExpanded(next);
-  };
 
   const category = getToolCategory(calls[0]?.block.toolName ?? "");
   const fileCounts = calls.map((call) => (isApplyPatchToolName(call.block.toolName)
@@ -486,50 +233,31 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
     : (resultBreakdown || t("chat.activity.calls", { count: calls.length }));
 
   return (
-    <Trace data-activity-group={category}>
-      <TraceCollapsible
-        open={expanded}
-        onOpenChange={toggleExpanded}
-        className="w-auto min-w-0 flex-[0_1_auto]"
+    <span data-activity-group={category} className="contents">
+      <TaskTrace
+        title={t(TOOL_CATEGORY_LABEL_KEYS[category])}
+        description={summaryCount}
+        status={hasPending ? "running" : isError ? "error" : "done"}
+        foldKey={groupKey}
+        defaultOpen={false}
+        trailing={!hasPending && totalDuration > 0 ? (
+          <TraceDescription className="shrink-0 tabular-nums">{formatToolDuration(totalDuration)}</TraceDescription>
+        ) : undefined}
       >
-        <div className="w-full bg-background">
-          <TraceCollapsibleTrigger>
-            <TraceLine status={hasPending ? "running" : isError ? "error" : undefined}>
-              <TraceIcon><RowStatusIcon category={category} isError={isError} active={hasPending} /></TraceIcon>
-              <TraceTitle className="font-medium">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</TraceTitle>
-              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
-                {summaryCount}
-              </TraceDescription>
-              {!hasPending && totalDuration > 0 && (
-                <TraceDescription className="shrink-0 text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] tabular-nums">
-                  {formatToolDuration(totalDuration)}
-                </TraceDescription>
-              )}
-            </TraceLine>
-          </TraceCollapsibleTrigger>
-        </div>
-        {/* A fold of same-category cards is as tall as the cards it holds: no
-            height of its own, so the only scroller is each single card's body. */}
-        <TraceCollapsibleContent>
-          <div className="flex flex-col gap-0.5 py-0.5">
-            {calls.map((call, index) => (
-              <ToolRow
-                key={call.block.toolCallId ?? index}
-                block={call.block}
-                result={call.result}
-                duration={call.duration}
-                usage={call.usage}
-                ctxTokens={call.ctxTokens}
-                ctxWindow={ctxWindow}
-                cwd={cwd}
-                onOpenFile={onOpenFile}
-                onOpenSubagent={onOpenSubagent}
-              />
-            ))}
-          </div>
-        </TraceCollapsibleContent>
-      </TraceCollapsible>
-    </Trace>
+        {calls.map((call, index) => (
+          <ToolRow
+            key={call.block.toolCallId ?? index}
+            block={call.block}
+            result={call.result}
+            duration={call.duration}
+            usage={call.usage}
+            ctxTokens={call.ctxTokens}
+            ctxWindow={ctxWindow}
+            onOpenSubagent={onOpenSubagent}
+          />
+        ))}
+      </TaskTrace>
+    </span>
   );
 }
 
@@ -1146,8 +874,6 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
             usage={only.usage}
             ctxTokens={only.ctxTokens}
             ctxWindow={ctxWindow}
-            cwd={cwd}
-            onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
             isStreaming={live && !only.result}
           />,
@@ -1164,8 +890,6 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
               ctxTokens: entry.ctxTokens,
             }))}
             ctxWindow={ctxWindow}
-            cwd={cwd}
-            onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
           />,
         );
@@ -1218,26 +942,6 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool call detail views (moved from MessageView; shared with bash executions)
 // ─────────────────────────────────────────────────────────────────────────────
-
-interface ResultDiff {
-  text: string;
-}
-
-/** +N / −M line counts for a unified diff, for the collapsed row badge. */
-function countDiffStat(text: string): { added: number; removed: number } {
-  let added = 0;
-  let removed = 0;
-  for (const line of text.split(/\r?\n/)) {
-    if (line.startsWith("+") && !line.startsWith("+++")) added += 1;
-    else if (line.startsWith("-") && !line.startsWith("---")) removed += 1;
-  }
-  return { added, removed };
-}
-
-function SplitFilesView({ files }: { files: SplitDiffFile[] }) {
-  const layout: PatchDiffLayout = useIsMobile() ? "stacked" : "split";
-  return <PatchDiffFiles files={files} layout={layout} />;
-}
 
 export type PatchDiffLayout = "split" | "stacked";
 
@@ -1381,53 +1085,7 @@ function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" |
   );
 }
 
-function SplitPatchView({ text }: { text: string }) {
-  const files = useMemo(() => parseUnifiedPatch(text), [text]);
-  if (!files) return <PatchTextView text={text} />;
-  return <SplitFilesView files={files} />;
-}
 
-function PatchTextView({ text }: { text: string }) {
-  const lines = text.split(/\r?\n/);
-
-  return (
-    <div className="min-w-0 max-h-[var(--card-max-height)] overflow-x-hidden overflow-y-auto font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]">
-      {lines.map((line, i) => {
-        const kind =
-          line.startsWith("@@") ? "hunk" :
-          line.startsWith("+") && !line.startsWith("+++") ? "added" :
-          line.startsWith("-") && !line.startsWith("---") ? "removed" :
-          "context";
-        const bgClass =
-          kind === "added" ? "bg-diff-add-bg" :
-          kind === "removed" ? "bg-diff-del-bg" :
-          kind === "hunk" ? "bg-diff-hunk-bg" :
-          "";
-        const colorClass =
-          kind === "added" ? "text-diff-add" :
-          kind === "removed" ? "text-diff-del" :
-          kind === "hunk" ? "text-primary" :
-          "text-foreground";
-        const borderClass =
-          kind === "added" ? "border-l-diff-add" :
-          kind === "removed" ? "border-l-diff-del" :
-          kind === "hunk" ? "border-l-primary" :
-          "border-l-transparent";
-
-        return (
-          <div key={i} className={cn("flex border-l-[3px]", bgClass, colorClass, borderClass)}>
-            <span className="w-12 shrink-0 select-none border-r border-border bg-card px-2 text-right text-muted-foreground">
-              {i + 1}
-            </span>
-            <span className={cn("whitespace-pre-wrap wrap-anywhere px-2.5", colorClass)}>
-              {line || "\u00a0"}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 /**
  * Split diff rows for an apply_patch-style tool call.
@@ -1453,18 +1111,6 @@ function getApplyPatchFiles(block: ToolCallContent, result?: ToolResultMessage):
   return null;
 }
 
-function getResultDiff(result: ToolResultMessage): ResultDiff | null {
-  const details = (result as ToolResultMessage & { details?: unknown }).details;
-  if (!isRecord(details)) return null;
-
-  const patch = typeof details.patch === "string" ? details.patch : null;
-  if (patch) return { text: patch };
-
-  const diff = typeof details.diff === "string" ? details.diff : null;
-  if (diff) return { text: diff };
-
-  return null;
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1498,51 +1144,5 @@ function ResultImages({ images }: { images: ImageContent[] }) {
   );
 }
 
-function PairedResult({ text, isEmpty, isError, language }: {
-  text: string;
-  isEmpty: boolean;
-  isError: boolean;
-  language: string;
-}) {
-  const { t } = useI18n();
-  // Terminal output keeps its own layout: box art, tables and progress bars
-  // must not reflow to the container width.
-  const tui = isTuiText(text);
-  return (
-    <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-h-[var(--card-max-height)] max-w-full">
-      <CodeBlockContent
-        wrap={!tui}
-        className={cn(
-          "px-2.5 py-2 text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]",
-          isError ? "text-destructive" : "text-muted-foreground",
-          isEmpty && "italic opacity-60",
-          !tui && "[overflow-wrap:anywhere]",
-        )}
-      >
-        {isEmpty ? t("i18n.noOutput") : <HighlightedCode code={text} language={language} />}
-      </CodeBlockContent>
-    </CodeBlock>
-  );
-}
-
-const TOOL_FIELD_LABEL =
-  "shrink-0 text-muted-foreground/70 text-[length:calc(11px+var(--chat-font-size-offset,0px))] leading-[1.6]";
-
-// A value with newlines of its own keeps them, scrolled in place.
-const TOOL_FIELD_BLOCK =
-  "m-0 mt-0.5 max-h-[var(--card-max-height)] overflow-auto rounded-lg border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
-
 // One row per argument: `key: value` on a single line — the key muted, the
 // value in the row's mono face; multiline values keep their own block.
-function ToolFieldRows({ fields }: { fields: ToolField[] }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
-      {fields.map((field) => (
-        <div key={field.key} className="min-w-0">
-          <span className={TOOL_FIELD_LABEL}>{field.key}:</span>{" "}
-          {field.multiline ? <pre className={TOOL_FIELD_BLOCK}>{field.value}</pre> : field.value}
-        </div>
-      ))}
-    </div>
-  );
-}

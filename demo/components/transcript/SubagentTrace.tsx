@@ -1,0 +1,68 @@
+"use client";
+
+import { memo, type ReactNode } from "react";
+import { BotIcon, CircleCheckIcon, CircleDotIcon, CircleIcon } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
+import { SafeMarkdownBody } from "@/components/ActivityRows";
+import { useI18n } from "@/hooks/useI18n";
+import type { ToolViewStatus, ToolViewStep } from "@/lib/tool-view";
+import { TraceRow } from "./TraceRow";
+
+const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
+  running: <CircleDotIcon className="text-warning" />,
+  done: <CircleCheckIcon />,
+  pending: <CircleIcon />,
+  error: <CircleIcon className="text-destructive" />,
+};
+
+/**
+ * A subagent run (官方 `pattern_subagent.md`): its own steps nested in a
+ * `<Trace>`, the report below them. A run still in the background is the line
+ * alone — there is nothing to show yet.
+ */
+export const SubagentTrace = memo(function SubagentTrace({ label, status, steps, report, foldKey, action, below }: {
+  /** The profile or agent name; omitted for the generic line. */
+  label?: string;
+  status: ToolViewStatus;
+  steps?: ToolViewStep[];
+  /** The agent's final report as Markdown. */
+  report?: string;
+  foldKey: string;
+  /** Row-end action (opening the subagent's tab). */
+  action?: ReactNode;
+  /** Media the run produced, below the line. */
+  below?: ReactNode;
+}) {
+  const { t } = useI18n();
+  const title = label ? `${t("chat.trace.subagent")} · ${label}` : t("chat.trace.subagent");
+  const hasBody = Boolean((steps && steps.length > 0) || report);
+
+  return (
+    <TraceRow
+      icon={status === "running" ? <Spinner className="size-3.5" /> : <BotIcon />}
+      title={title}
+      status={status}
+      foldKey={foldKey}
+      trailing={action}
+      ariaLabel={title}
+      below={below}
+      content={hasBody ? (
+        <>
+          {steps && steps.length > 0 && (
+            <Trace className="gap-1">
+              {steps.map((step, index) => (
+                <TraceLine key={index} status={step.status === "error" ? "error" : step.status === "pending" ? "pending" : step.status === "running" ? "running" : undefined}>
+                  <TraceIcon>{STEP_ICONS[step.status]}</TraceIcon>
+                  <TraceTitle>{step.title}</TraceTitle>
+                  {step.description && <TraceDescription>{step.description}</TraceDescription>}
+                </TraceLine>
+              ))}
+            </Trace>
+          )}
+          {report && <SafeMarkdownBody>{report}</SafeMarkdownBody>}
+        </>
+      ) : undefined}
+    />
+  );
+});

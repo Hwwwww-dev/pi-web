@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "./ui/alert";
 import { Badge } from "./ui/badge";
 import { Bubble, BubbleContent } from "./ui/bubble";
 import { Button } from "./ui/button";
-import { Message, MessageContent } from "./ui/message";
+import { Message, MessageContent, MessageFooter } from "./ui/message";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import {
@@ -345,7 +345,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
   return (
     <Message align="end" className="group mb-5 flex flex-col! items-end gap-1">
-      <Bubble variant="secondary" align="end" className="max-w-[82%] max-sm:max-w-[86%]">
+      <Bubble variant="muted" align="end" className="max-w-[82%] max-sm:max-w-[86%]">
         {/* Cap the height so an abnormally long message does not push the
             conversation off screen; overflow scrolls inside the bubble. */}
         <BubbleContent
@@ -395,8 +395,8 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
       {/* Bottom row: action buttons + timestamp */}
       {(
-        <div className={cn(
-          "flex items-center justify-end gap-1 transition-opacity",
+        <MessageFooter className={cn(
+          "gap-1 px-0 transition-opacity",
           pinnedActions
             ? "opacity-100"
             : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
@@ -453,7 +453,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             </Button>
           )}
           {time && <span className="text-[10px] text-muted-foreground">{time}</span>}
-        </div>
+        </MessageFooter>
       )}
     </Message>
   );
@@ -500,9 +500,10 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
               )}
             >
               {/* >120：文字恒白、背景是流动的彩虹渐变（.tps-rainbow，参数为
-                  用户调参器定稿：70px 周期 / L0.70 / C0.25 / 8 色）。滑动
-                  速度随速度加快：50/tps 秒一个循环，0.3s 封底（≥166 t/s
-                  恒为定稿的 0.3s）。 */}
+                  用户调参器定稿：70px 周期 / L0.70 / C0.25 / 8 色；暗色主题
+                  在 globals.css 里把亮度和彩度压到 0.55 / 0.22）。滑动速度随
+                  速度加快：50/tps 秒一个循环，0.3s 封底（≥166 t/s 恒为定稿
+                  的 0.3s）。 */}
               {tps > 120 ? (
                 <>
                   <span
@@ -781,7 +782,7 @@ function AssistantMessageView({
       )}
 
       {((message.usage && !isStreaming) || (turnDurationMs !== undefined && !isStreaming) || (textContent && !isStreaming && !hideCopy) || (time && !isStreaming)) && (
-        <div className="mt-1.5 flex items-center gap-2">
+        <MessageFooter className="mt-1.5 gap-2 px-0">
           {(message.usage || turnDurationMs !== undefined) && !isStreaming && (
             // One item per count: a single space at 11px ran them together. The
             // spaces stay in the text for copying; the flex gap draws the room.
@@ -810,7 +811,7 @@ function AssistantMessageView({
           {time && !isStreaming && (
             <span className="ml-auto whitespace-nowrap text-[10px] text-muted-foreground">{time}</span>
           )}
-        </div>
+        </MessageFooter>
       )}
       </MessageContent>
     </Message>
@@ -828,7 +829,7 @@ function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDur
     const tc = block as ToolCallContent;
     const result = toolResults?.get(tc.toolCallId);
     const duration = toolCallDurations?.get(tc.toolCallId);
-    return <ToolRow block={tc} result={result} duration={duration} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} isStreaming={isStreaming} />;
+    return <ToolRow block={tc} result={result} duration={duration} onOpenSubagent={onOpenSubagent} isStreaming={isStreaming} />;
   }
   return null;
 }
