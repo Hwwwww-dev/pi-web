@@ -19,7 +19,7 @@ const {
   getToolCallInputText,
   replaceUserMessageText,
 } = await jiti.import("./MessageView.tsx");
-const { PatchDiffFiles } = await jiti.import("./ActivityRows.tsx");
+const { PatchDiffFiles } = await jiti.import("./PatchDiffFiles.tsx");
 const { ReasoningTrace } = await jiti.import("./transcript/ReasoningTrace.tsx");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 const { splitFinalAssistantBlocks } = await jiti.import("@/lib/message-display");

@@ -13,10 +13,10 @@ import { ImagePreview } from "./ImagePreview";
 import {
   CompactionRow,
   CustomRow,
-  SafeMarkdownBody,
   ToolRow,
 } from "./ActivityRows";
 import { ReasoningTrace } from "./transcript/ReasoningTrace";
+import { SafeMarkdownBody } from "./SafeMarkdownBody";
 import { formatNoticeTokens } from "@/lib/transcript-notices";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";

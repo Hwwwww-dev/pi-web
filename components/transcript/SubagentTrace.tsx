@@ -4,7 +4,7 @@ import { memo, type ReactNode } from "react";
 import { BotIcon, CircleCheckIcon, CircleDotIcon, CircleIcon } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
-import { SafeMarkdownBody } from "@/components/ActivityRows";
+import { SafeMarkdownBody } from "@/components/SafeMarkdownBody";
 import { useI18n } from "@/hooks/useI18n";
 import type { ToolViewStatus, ToolViewStep } from "@/lib/tool-view";
 import { TraceRow } from "./TraceRow";
