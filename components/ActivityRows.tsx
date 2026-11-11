@@ -23,6 +23,7 @@ import { MarkdownBody } from "./MarkdownBody";
 import { HighlightedCode } from "./HighlightedCode";
 import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
+import { TerminalTrace } from "./transcript/TerminalTrace";
 import { getFileIcon } from "./FileIcons";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
@@ -36,6 +37,7 @@ import type { SplitDiffCell, SplitDiffFile } from "@/lib/patch";
 import { diffGapLabel, parseUnifiedPatch, unifiedDiffLines, type SplitDiffGap, type UnifiedDiffLine } from "@/lib/patch";
 import { applyPatchPreviewToFiles, applyPatchResultHasFailures, extractApplyPatchPaths, getApplyPatchInputText, parseApplyPatchInput } from "@/lib/apply-patch";
 import { isApplyPatchToolName, isEditToolName, isWriteToolName } from "@/lib/tool-names";
+import { toToolView } from "@/lib/tool-view";
 
 // A write's file text in place of its JSON (from main's MessageView). Streamed
 // input is still incomplete JSON, and any other argument (a mode, a title)
@@ -320,6 +322,31 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   const label = category === "other" ? block.toolName : t(TOOL_CATEGORY_LABEL_KEYS[category]);
   // The result's single-file patch names the call when its input has no file.
   const patchLabel = getToolFilePaths(block.input).length === 0 ? singlePatchPath(resultDiff?.text) : null;
+
+  // 第 3 步：终端行已换成官方 `pattern_terminal` 形状（TerminalTrace）。
+  const view = toToolView({ block, result, t });
+  if (view.kind === "terminal") {
+    return (
+      <TerminalTrace
+        view={view}
+        trailing={!active && duration !== undefined ? (
+          <TraceDescription className="shrink-0 text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] tabular-nums">
+            {formatToolDuration(duration)}
+          </TraceDescription>
+        ) : undefined}
+        usage={usage ? (
+          <div className="text-[length:calc(11px+var(--chat-font-size-offset,0px))]">
+            <UsageBar
+              usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
+              ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
+            />
+          </div>
+        ) : undefined}
+        below={resultImages.length > 0 ? <ResultImages images={resultImages} /> : undefined}
+        activityTool={block.toolName}
+      />
+    );
+  }
 
   return (
     <Trace data-activity-tool={block.toolName}>
