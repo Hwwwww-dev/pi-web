@@ -24,6 +24,7 @@ import { HighlightedCode } from "./HighlightedCode";
 import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
 import { TerminalTrace } from "./transcript/TerminalTrace";
+import { ToolTrace } from "./transcript/ToolTrace";
 import { getFileIcon } from "./FileIcons";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
@@ -344,6 +345,40 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
         ) : undefined}
         below={resultImages.length > 0 ? <ResultImages images={resultImages} /> : undefined}
         activityTool={block.toolName}
+      />
+    );
+  }
+
+  // 第 3 步：读/写/改/搜索行换成官方 `pattern_tool` 形状（ToolTrace）。
+  if (view.kind === "file-read" || view.kind === "file-write" || view.kind === "file-edit" || view.kind === "search") {
+    return (
+      <ToolTrace
+        view={view}
+        activityTool={block.toolName}
+        trailing={
+          view.diffStat || (!active && duration !== undefined) ? (
+            <span className="flex items-center gap-1.5">
+              {view.diffStat && (
+                <>
+                  <Badge variant="ghost" className="bg-success/15 text-success">+{view.diffStat.added}</Badge>
+                  <Badge variant="ghost" className="bg-destructive/10 text-destructive">−{view.diffStat.removed}</Badge>
+                </>
+              )}
+              {!active && duration !== undefined && (
+                <TraceDescription className="shrink-0 tabular-nums">{formatToolDuration(duration)}</TraceDescription>
+              )}
+            </span>
+          ) : undefined
+        }
+        usage={usage ? (
+          <div className="text-[length:calc(11px+var(--chat-font-size-offset,0px))]">
+            <UsageBar
+              usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
+              ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
+            />
+          </div>
+        ) : undefined}
+        below={resultImages.length > 0 ? <ResultImages images={resultImages} /> : undefined}
       />
     );
   }
