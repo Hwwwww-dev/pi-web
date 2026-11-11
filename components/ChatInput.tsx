@@ -2445,7 +2445,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           />
 
           {compact ? sendCluster : (
-            <InputGroupAddon align="block-end" className="min-w-0 items-center gap-2 px-1 pb-0.5">
+            // justify-end：发送/停止钮钉在行尾。 pill 行占 flex-1 时看不出差别，
+            // 但它一旦不在（隐藏/缺省），justify-start 会让按钮掉到行首。
+            <InputGroupAddon align="block-end" className="min-w-0 items-center justify-end gap-2 px-1 pb-0.5">
               {/* One pill row: the pills scroll horizontally instead of wrapping,
                   and the send button is a sibling so it can never be squeezed
                   out. chat-input-controls keeps the keyboard-open collapse. */}

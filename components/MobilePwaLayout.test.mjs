@@ -107,9 +107,9 @@ test("every class the keyboard-open rules target exists on its component", () =>
   assert.match(chatWindowSource, /className="chat-content /);
   // Phone landscape exceeds the 640px breakpoint but has the least height.
   assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{\s*html\[data-keyboard-open\] \.extension-status-bar \{\s*display: none !important;/);
-  // Except while its model picker is open: the picker's filter is the field
-  // the keyboard is for, and hiding its row would hide the picker (#1271).
-  assert.match(cssSource, /html\[data-keyboard-open\] \.chat-input-controls:not\(:has\(\.model-selector \[role="menu"\]\)\) \{\s*display: none !important;/);
+  // The pill row is never hidden by the keyboard rules: with the pills gone
+  // the send button drops to the row's left edge.
+  assert.doesNotMatch(cssSource, /html\[data-keyboard-open\] \.chat-input-controls/);
   assert.match(cssSource, /html\[data-keyboard-open\] \.chat-content \{\s*padding-bottom: 0 !important;/);
   assert.match(cssSource, /html\[data-keyboard-open\] \.chat-input-shell \{\s*padding-bottom: 6px !important;/);
   // While streaming with an empty composer the main button stops the run.

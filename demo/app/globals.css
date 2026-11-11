@@ -1437,21 +1437,16 @@ span.token.table {
 }
 
 /* While the software keyboard is up (set by useViewportHeight), only a few
-   hundred pixels remain above it. Hand them to the conversation: collapse the
-   model/controls row, the extension status shelf and a fresh composer's
-   project bar, and drop the home indicator inset the keyboard already
-   covers. They come back when the keyboard closes. Phone landscape is wider
-   than the mobile breakpoint but leaves the least room of all, so short
-   touch screens opt in too; tablets keep their controls because the keyboard
-   leaves them enough height. */
+   hundred pixels remain above it. Hand them to the conversation: hide the
+   extension status shelf and a fresh composer's project bar, and drop the
+   home indicator inset the keyboard already covers. They come back when the
+   keyboard closes. The composer's pill row stays put — collapsing it shoved
+   the send button to the row's left edge (#1271's hide rule is gone). Phone
+   landscape is wider than the mobile breakpoint but leaves the least room of
+   all, so short touch screens opt in too; tablets keep their controls because
+   the keyboard leaves them enough height. */
 @media (max-width: 640px), (pointer: coarse) and (max-height: 500px) {
   html[data-keyboard-open] .extension-status-bar {
-    display: none !important;
-  }
-  /* Except while its model picker is open: the picker's filter is the field
-     the keyboard is for, and hiding its row would hide the picker (#1271).
-     Its own rule, so a browser without :has() drops only this one. */
-  html[data-keyboard-open] .chat-input-controls:not(:has(.model-selector [role="menu"])) {
     display: none !important;
   }
   html[data-keyboard-open] .chat-content {
