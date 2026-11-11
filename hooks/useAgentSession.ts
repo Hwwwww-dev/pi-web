@@ -36,7 +36,7 @@ import {
   createQueuedSubmission,
   emptyQueuedMessages,
   queuedGraceDeadline,
-  queuedImageRecallFromEntries,
+  queuedImageRecall,
   reconcileQueuedSubmissions,
   splitClearedQueue,
   moveQueuedEntry,
@@ -552,15 +552,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const queuedImageMemoryRef = useRef(createQueuedImageMemory());
   const applyQueuedRecords = useCallback((snapshot: QueuedMessages, entries?: readonly QueuedSnapshotEntry[]) => {
     lastQueueSnapshotRef.current = snapshot;
-    const fromEntries = queuedImageRecallFromEntries(entries);
+    const memory = queuedImageMemoryRef.current;
     setQueuedSubmissions((records) => reconcileQueuedSubmissions(
       records,
       snapshot,
       Date.now(),
-      fromEntries
-        ? (text, behavior) => fromEntries(text, behavior) ?? queuedImageMemoryRef.current.recall(text, behavior)
-        : undefined,
-      (record) => queuedImageMemoryRef.current.remember(record),
+      queuedImageRecall(entries, memory),
+      (record) => memory.remember(record),
     ));
   }, []);
   // SSE queue snapshots are the authoritative feed: they observe a queue
@@ -590,7 +588,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         records,
         lastQueueSnapshotRef.current,
         Date.now(),
-        undefined,
+        (text, behavior) => queuedImageMemoryRef.current.recall(text, behavior),
         (record) => queuedImageMemoryRef.current.remember(record),
       ));
     }, Math.max(0, deadline - Date.now()));

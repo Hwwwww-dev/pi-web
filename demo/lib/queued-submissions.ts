@@ -99,6 +99,8 @@ export interface QueuedImageMemoryOptions {
 
 export interface QueuedImageMemory {
   remember(record: QueuedSubmission): void;
+  /** Remember a set that was just recovered, so a second rebuild keeps it too. */
+  rememberImages(text: string, behavior: QueuedBehavior, images: ChatDraftImage[]): void;
   recall(text: string, behavior: QueuedBehavior): ChatDraftImage[];
 }
 
@@ -107,18 +109,24 @@ export function createQueuedImageMemory(options: QueuedImageMemoryOptions = {}):
   const maxEntries = options.maxEntries ?? 16;
   const maxTotalBytes = options.maxTotalBytes ?? 24 * 1024 * 1024;
   let entries: Array<{ text: string; behavior: QueuedBehavior; images: ChatDraftImage[]; bytes: number; at: number }> = [];
+  const store = (text: string, behavior: QueuedBehavior, images: ChatDraftImage[]) => {
+    if (!text || images.length === 0) return;
+    const bytes = images.reduce((sum, image) => sum + image.data.length, 0);
+    entries = entries.filter((entry) => !(entry.text === text && entry.behavior === behavior));
+    entries.push({ text, behavior, images, bytes, at: Date.now() });
+    let total = entries.reduce((sum, entry) => sum + entry.bytes, 0);
+    // Trim from the oldest but always keep the entry just remembered.
+    while (entries.length > 1 && (entries.length > maxEntries || total > maxTotalBytes)) {
+      const oldest = entries.shift()!;
+      total -= oldest.bytes;
+    }
+  };
   return {
     remember(record) {
-      if (!record.text || record.images.length === 0) return;
-      const bytes = record.images.reduce((sum, image) => sum + image.data.length, 0);
-      entries = entries.filter((entry) => !(entry.text === record.text && entry.behavior === record.behavior));
-      entries.push({ text: record.text, behavior: record.behavior, images: record.images, bytes, at: Date.now() });
-      let total = entries.reduce((sum, entry) => sum + entry.bytes, 0);
-      // Trim from the oldest but always keep the entry just remembered.
-      while (entries.length > 1 && (entries.length > maxEntries || total > maxTotalBytes)) {
-        const oldest = entries.shift()!;
-        total -= oldest.bytes;
-      }
+      store(record.text, record.behavior, record.images);
+    },
+    rememberImages(text, behavior, images) {
+      store(text, behavior, images);
     },
     recall(text, behavior) {
       const now = Date.now();
@@ -150,6 +158,29 @@ export function queuedImageRecallFromEntries(
     if (index < 0) return undefined;
     const [hit] = remaining.splice(index, 1);
     return hit.images.map((image) => ({ data: image.data, mimeType: image.mimeType }));
+  };
+}
+
+/**
+ * The recall an applied snapshot should use. SSE `queue_update` carries no
+ * entries at all, and a wrapper's entries are consumed once, so a row rebuilt
+ * from either channel has to fall back to this tab's memory of images that
+ * already passed through it. Whatever is recovered is remembered again: a row
+ * that flaps out of a snapshot and comes back must not lose its thumbnails on
+ * the second rebuild.
+ */
+export function queuedImageRecall(
+  entries: readonly QueuedSnapshotEntry[] | undefined,
+  memory: QueuedImageMemory,
+): QueuedImageRecall {
+  const fromEntries = queuedImageRecallFromEntries(entries);
+  return (text, behavior) => {
+    const fromServer = fromEntries?.(text, behavior) ?? [];
+    if (fromServer.length > 0) {
+      memory.rememberImages(text, behavior, fromServer);
+      return fromServer;
+    }
+    return memory.recall(text, behavior);
   };
 }
 
