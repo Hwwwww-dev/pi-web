@@ -177,6 +177,21 @@ function applyPatchPaths(block: ToolCallContent, result?: ToolResultMessage): st
   return files ? files.map((file) => file.newPath || file.oldPath).filter((path): path is string => Boolean(path)) : [];
 }
 
+/** A titled block inside an expanded card: the call's own input next to its
+ *  result needs a name each, or the two run together (AI Elements' ToolInput /
+ *  ToolOutput). A label is passed only when both are on screen. */
+function ToolSection({ label, children }: { label?: string; children: React.ReactNode }) {
+  if (!label) return <>{children}</>;
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="text-[length:calc(11.5px+var(--chat-font-size-offset,0px))] font-medium text-muted-foreground/70">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
 /** Preview nodes for a collapsed tool row: file chips when the call targets files. */
 function ToolRowPreview({ block, result, cwd, onOpenFile }: {
   block: ToolCallContent;
@@ -258,14 +273,17 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
   const codemodeCallCount = codemode ? codemode.calls.length + codemode.omitted : 0;
   const active = Boolean(isStreaming) && !result;
-  // Terminal rows render command + output as one ZCode-style block ($ cmd, then
-  // the output) instead of the raw JSON args.
+  // Terminal rows render command + output instead of the raw JSON args: the
+  // command wraps (it is the call's input), the output keeps its own layout —
+  // box art, tables and progress bars must not reflow — and a rule separates
+  // the two, the way a shell session reads.
   const commandText = category === "terminal" && !isStreamingInput && typeof block.input?.command === "string"
     ? block.input.command
     : null;
-  const combinedTerminalText = commandText !== null
-    ? `$ ${commandText}${resultText && !resultIsEmpty ? `\n\n${resultText}` : ""}`
-    : null;
+  const terminalOutput = commandText !== null && resultText !== null && !resultIsEmpty ? resultText : null;
+  const combinedTerminalText = commandText === null
+    ? null
+    : `$ ${commandText}${terminalOutput === null ? "" : `\n\n${terminalOutput}`}`;
   // Flat arguments as rows instead of a JSON blob, unless the card has a view of
   // its own (a write's file text, codemode, an applied patch, a terminal pair).
   // Streamed input is incomplete JSON: pi's partial parse shows the fields it
@@ -288,6 +306,13 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   const resultLanguage = combinedTerminalText !== null
     ? "bash"
     : getToolFilePaths(block.input).length > 0 ? toolPathLanguage : "text";
+  // The call's arguments and its result share the body: name them, or the two
+  // code blocks read as one.
+  const shownSectionLabels = result !== undefined
+    && !patchFiles
+    && combinedTerminalText === null
+    && !resultDiff
+    && !codemode;
 
   const label = category === "other" ? block.toolName : t(TOOL_CATEGORY_LABEL_KEYS[category]);
   // The result's single-file patch names the call when its input has no file.
@@ -295,9 +320,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
 
   return (
     <Trace data-activity-tool={block.toolName}>
-      {/* sticky: the header row stays readable while the card's body scrolls past
-          it, and un-sticks as soon as the card itself leaves the viewport. */}
-      <div className="sticky top-0 z-10 flex max-w-full min-w-0 items-center gap-1 bg-background">
+      <div className="flex max-w-full min-w-0 items-center gap-1 bg-background">
         <TraceCollapsible
           open={expanded}
           onOpenChange={toggleExpanded}
@@ -309,7 +332,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
               <TraceTitle className="font-medium">
                 {mcpLabel ? `${mcpLabel.server}/${mcpLabel.tool}` : patchLabel ?? label}
               </TraceTitle>
-              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
                 {isStreamingInput
                   ? t("chat.generatingToolInput")
                   : codemode
@@ -319,18 +342,18 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
                       : <ToolRowPreview block={block} result={result} cwd={cwd} onOpenFile={onOpenFile} />}
               </TraceDescription>
               {codemodeCallCount > 0 && (
-                <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                <TraceDescription className="shrink-0 text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] tabular-nums">
                   {codemodeCallCount === 1 ? t("codemode.callCountOne") : t("codemode.callCount", { count: codemodeCallCount })}
                 </TraceDescription>
               )}
               {diffStat && (
-                <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] font-medium" aria-hidden="true">
+                <span className="flex shrink-0 items-center gap-1 text-[length:calc(12px+var(--chat-font-size-offset,0px))] font-medium tabular-nums" aria-hidden="true">
                   <Badge variant="ghost" className="bg-success/15 text-success">+{diffStat.added}</Badge>
                   <Badge variant="ghost" className="bg-destructive/10 text-destructive">−{diffStat.removed}</Badge>
                 </span>
               )}
               {!active && duration !== undefined && (
-                <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                <TraceDescription className="shrink-0 text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] tabular-nums">
                   {formatToolDuration(duration)}
                 </TraceDescription>
               )}
@@ -360,17 +383,25 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
                   )}
                 </>
               ) : combinedTerminalText !== null ? (
-                <CodeBlock size="sm" variant={isError ? "destructive" : "default"}>
-                  <CodeBlockContent wrap={false}><HighlightedCode code={combinedTerminalText} language="bash" /></CodeBlockContent>
+                <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-h-[var(--card-max-height)]">
+                  <CodeBlockContent wrap className="shrink-0"><HighlightedCode code={`$ ${commandText}`} language="bash" /></CodeBlockContent>
+                  {terminalOutput !== null && (
+                    <>
+                      <div className="h-px shrink-0 bg-border" aria-hidden="true" />
+                      <CodeBlockContent wrap={false} className="min-h-0">{terminalOutput}</CodeBlockContent>
+                    </>
+                  )}
                 </CodeBlock>
               ) : (
                 <>
                   {(isStreamingInput || !isEditToolName(block.toolName)) && !patchFiles && (
-                    toolFields ? (
-                      <ToolFieldRows fields={toolFields} />
-                    ) : (
-                      <CodeBlock size="sm"><CodeBlockContent wrap><HighlightedCode code={writtenFileText ?? inputStr} language={bodyLanguage} /></CodeBlockContent></CodeBlock>
-                    )
+                    <ToolSection label={shownSectionLabels ? t("chat.activity.parameters") : undefined}>
+                      {toolFields ? (
+                        <ToolFieldRows fields={toolFields} />
+                      ) : (
+                        <CodeBlock size="sm" className="max-h-[var(--card-max-height)]"><CodeBlockContent wrap><HighlightedCode code={writtenFileText ?? inputStr} language={bodyLanguage} /></CodeBlockContent></CodeBlock>
+                      )}
+                    </ToolSection>
                   )}
                   {patchFiles && <SplitFilesView files={patchFiles} />}
                   {result && patchFiles && isError && (
@@ -378,7 +409,9 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
                   )}
                   {result && !patchFiles && combinedTerminalText === null && (
                     resultDiff ? <SplitPatchView text={resultDiff.text} /> : (!resultIsEmpty || resultImages.length === 0) && (
-                      <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} language={resultLanguage} />
+                      <ToolSection label={shownSectionLabels ? t("chat.activity.result") : undefined}>
+                        <PairedResult text={resultText ?? ""} isEmpty={resultIsEmpty} isError={isError} language={resultLanguage} />
+                      </ToolSection>
                     )
                   )}
                 </>
@@ -456,16 +489,16 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
         onOpenChange={toggleExpanded}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <div className="sticky top-0 z-10 w-full bg-background">
+        <div className="w-full bg-background">
           <TraceCollapsibleTrigger>
             <TraceLine status={hasPending ? "running" : isError ? "error" : undefined}>
               <TraceIcon><RowStatusIcon category={category} isError={isError} active={hasPending} /></TraceIcon>
               <TraceTitle className="font-medium">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</TraceTitle>
-              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
                 {summaryCount}
               </TraceDescription>
               {!hasPending && totalDuration > 0 && (
-                <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+                <TraceDescription className="shrink-0 text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] tabular-nums">
                   {formatToolDuration(totalDuration)}
                 </TraceDescription>
               )}
@@ -474,7 +507,7 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
         </div>
         {/* A fold of same-category cards is as tall as the cards it holds: no
             height of its own, so the only scroller is each single card's body. */}
-        <TraceCollapsibleContent className="max-h-none overflow-visible">
+        <TraceCollapsibleContent>
           <div className="flex flex-col gap-0.5 py-0.5">
             {calls.map((call, index) => (
               <ToolRow
@@ -556,6 +589,15 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
   const stickRef = useRef(true);
   const prevScrollTopRef = useRef(0);
   const preview = block.thinking.trimStart().match(/^[^\r\n]{0,240}/u)?.[0].trimEnd() ?? "";
+  // A card the reader opened or closed themselves keeps that choice: only the
+  // automatic expansion of a live block folds away when the block finishes
+  // (AI Elements' Reasoning closes itself once the answer starts).
+  const userToggledRef = useRef(false);
+  const wasActiveRef = useRef(Boolean(active));
+  useEffect(() => {
+    if (wasActiveRef.current && !active && !userToggledRef.current) setExpanded(false);
+    wasActiveRef.current = Boolean(active);
+  }, [active]);
 
   // Keep already-mounted blocks in sync when the preference changes.
   useEffect(() => {
@@ -619,6 +661,7 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
         open={expanded}
         onOpenChange={() => {
           const next = !expanded;
+          userToggledRef.current = true;
           // Expanding mid-stream means "show me the live tail"; expanding a
           // finished block opens from the top for reading.
           stickRef.current = next && Boolean(active);
@@ -628,7 +671,7 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
         }}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <div className="sticky top-0 z-10 w-full bg-background">
+        <div className="w-full bg-background">
           <TraceCollapsibleTrigger
             aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
             title={t("i18n.thinking")}
@@ -636,20 +679,18 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
           <TraceLine status={active ? "running" : undefined}>
             <TraceIcon className={cn(active && "text-warning")}><ThinkingIcon active={expanded || Boolean(active)} /></TraceIcon>
             <TraceTitle className="font-medium">{t("i18n.thinking")}</TraceTitle>
-            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
               {preview}
             </TraceDescription>
             {!active && duration !== undefined && (
-              <TraceDescription className="shrink-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))]">
+              <TraceDescription className="shrink-0 text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] tabular-nums">
                 {duration}s
               </TraceDescription>
             )}
           </TraceLine>
           </TraceCollapsibleTrigger>
         </div>
-        {/* The thinking body is its own scroller (it follows the streaming tail),
-            so the wrapper must not limit it as well. */}
-        <TraceCollapsibleContent className="max-h-none overflow-visible">
+        <TraceCollapsibleContent>
           <div
             ref={detailRef}
             className={cn(
@@ -752,7 +793,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
 
   return (
     <Trace data-activity-custom={message.customType} className={isHiddenDisplay ? "opacity-75" : undefined}>
-      <div className="sticky top-0 z-10 flex max-w-full min-w-0 items-center gap-1 bg-background">
+      <div className="flex max-w-full min-w-0 items-center gap-1 bg-background">
         <TraceCollapsible
           open={expanded}
           onOpenChange={() => setExpanded((v) => !v)}
@@ -762,7 +803,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
             <TraceLine>
               <TraceIcon><ToolCategoryIcon category={subagent ? "subagent" : "other"} /></TraceIcon>
               <TraceTitle className={cn("font-medium", dim && "font-normal")}>{label}</TraceTitle>
-              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
                 {preview || (isHiddenDisplay ? t("i18n.showExtensionMessage") : null)}
               </TraceDescription>
             </TraceLine>
@@ -862,12 +903,12 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
         onOpenChange={() => setExpanded((v) => !v)}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
-        <div className="sticky top-0 z-10 w-full bg-background">
+        <div className="w-full bg-background">
           <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
           <TraceLine>
             <TraceIcon><ToolCategoryIcon category="compact" /></TraceIcon>
             <TraceTitle className="font-medium">{t("i18n.conversationCompacted")}</TraceTitle>
-            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate font-mono text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] [font-variant-numeric:normal]">
+            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
               {preview}
               {typeof tokensBefore === "number" && Number.isFinite(tokensBefore) && (
                 <>
@@ -937,7 +978,7 @@ function CompactionFileList({ title, files }: { title: string; files: string[] }
   return (
     <div className="mt-2">
       <div className="mb-1 text-xs font-semibold text-foreground">{title}</div>
-      <ul className="m-0 max-h-[180px] list-none overflow-auto p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[3px] [&_li+li]:border-t [&_li+li]:border-border">
+      <ul className="m-0 max-h-[var(--card-max-height)] list-none overflow-auto p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[3px] [&_li+li]:border-t [&_li+li]:border-border">
         {files.map((file) => (
           <li key={file}>{file}</li>
         ))}
@@ -1045,7 +1086,7 @@ export function SafeMarkdownBody({ children, className, ...props }: React.Compon
     );
   }
   return (
-    <div className={cn("max-h-[420px] overflow-auto text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.5]", className)}>
+    <div className={cn("max-h-[var(--card-max-height)] overflow-auto text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.5]", className)}>
       <pre className="m-0 whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-muted-foreground">
         {children}
       </pre>
@@ -1207,7 +1248,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
   const showFileHeaders = files.length > 1;
 
   return (
-    <div className="max-h-[560px] overflow-x-hidden overflow-y-auto bg-background">
+    <div className="max-h-[var(--card-max-height)] overflow-x-hidden overflow-y-auto bg-background">
       {files.map((file, fileIndex) => (
         <div
           key={fileIndex}
@@ -1217,7 +1258,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
           )}
         >
           {showFileHeaders && layout === "split" && (
-            <div className="sticky top-0 z-[1] grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] border-b border-border bg-muted">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] border-b border-border bg-muted">
               <SplitDiffHeader title={file.oldPath || t("i18n.before")} side="left" />
               <SplitDiffHeader title={file.newPath || t("i18n.after")} side="right" />
             </div>
@@ -1226,7 +1267,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
           {showFileHeaders && layout === "stacked" && stackedFilePath(file) && (
             <div
               title={stackedFilePath(file)}
-              className="sticky top-0 z-[1] truncate border-b border-border bg-muted px-2.5 py-[5px] text-muted-foreground"
+              className="truncate border-b border-border bg-muted px-2.5 py-[5px] text-muted-foreground"
             >
               {stackedFilePath(file)}
             </div>
@@ -1347,7 +1388,7 @@ function PatchTextView({ text }: { text: string }) {
   const lines = text.split(/\r?\n/);
 
   return (
-    <div className="min-w-0 max-h-[520px] overflow-x-hidden overflow-y-auto font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]">
+    <div className="min-w-0 max-h-[var(--card-max-height)] overflow-x-hidden overflow-y-auto font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]">
       {lines.map((line, i) => {
         const kind =
           line.startsWith("@@") ? "hunk" :
@@ -1465,7 +1506,7 @@ function PairedResult({ text, isEmpty, isError, language }: {
   // must not reflow to the container width.
   const tui = isTuiText(text);
   return (
-    <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-w-full">
+    <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-h-[var(--card-max-height)] max-w-full">
       <CodeBlockContent
         wrap={!tui}
         className={cn(
@@ -1486,7 +1527,7 @@ const TOOL_FIELD_LABEL =
 
 // A value with newlines of its own keeps them, scrolled in place.
 const TOOL_FIELD_BLOCK =
-  "m-0 mt-0.5 max-h-[260px] overflow-auto rounded-lg border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
+  "m-0 mt-0.5 max-h-[var(--card-max-height)] overflow-auto rounded-lg border border-border bg-background px-2.5 py-2 [font:inherit] leading-[1.5] whitespace-pre-wrap";
 
 // One row per argument: `key: value` on a single line — the key muted, the
 // value in the row's mono face; multiline values keep their own block.

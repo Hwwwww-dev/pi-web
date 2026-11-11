@@ -149,7 +149,7 @@ function TraceCollapsibleContent({
       <div
         data-slot="trace-collapsible-content-inner"
         className={cn(
-          "cn-trace-collapsible-content-inner max-h-[var(--card-max-height)] min-w-0 overflow-y-auto overscroll-contain wrap-break-word text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-muted-foreground",
+          "cn-trace-collapsible-content-inner min-w-0 wrap-break-word text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-muted-foreground",
           className
         )}
       >

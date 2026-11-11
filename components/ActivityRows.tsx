@@ -507,7 +507,7 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
         </div>
         {/* A fold of same-category cards is as tall as the cards it holds: no
             height of its own, so the only scroller is each single card's body. */}
-        <TraceCollapsibleContent className="max-h-none overflow-visible">
+        <TraceCollapsibleContent>
           <div className="flex flex-col gap-0.5 py-0.5">
             {calls.map((call, index) => (
               <ToolRow
@@ -690,9 +690,7 @@ export function ThinkingRow({ block, duration, sessionId, entryId, blockIndex, a
           </TraceLine>
           </TraceCollapsibleTrigger>
         </div>
-        {/* The thinking body is its own scroller (it follows the streaming tail),
-            so the wrapper must not limit it as well. */}
-        <TraceCollapsibleContent className="max-h-none overflow-visible">
+        <TraceCollapsibleContent>
           <div
             ref={detailRef}
             className={cn(
