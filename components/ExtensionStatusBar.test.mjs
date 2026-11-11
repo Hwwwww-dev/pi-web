@@ -58,9 +58,9 @@ test("renders each status as its own cell without identifier keys", () => {
 
   assert.match(html, /aria-label="ponytail memory"/);
   assert.match(html, /role="status"/);
-  assert.equal(html.match(/whitespace-pre rounded-md bg-muted\/60 px-2/g)?.length, 2);
+  assert.equal(html.match(/rounded-full bg-muted\/60 px-2\.5/g)?.length, 2);
   assert.match(html, /text-muted-foreground"><span>ponytail<\/span><\/span>/);
-  assert.match(html, /<span style="[^"]*">memory<\/span>/);
+  assert.match(html, /<span class="ansi-[a-z]+-fg">memory<\/span>/);
   assert.doesNotMatch(html, /05-ponytail|20-memory/);
   assert.doesNotMatch(html, /<button/);
 });
@@ -74,7 +74,7 @@ test("a status with nothing visible to show gets no cell", () => {
     ],
   });
 
-  assert.equal(html.match(/whitespace-pre rounded-md bg-muted\/60 px-2/g)?.length, 1);
+  assert.equal(html.match(/rounded-full bg-muted\/60 px-2\.5/g)?.length, 1);
   assert.match(html, /aria-label="shown"/);
   assert.equal(renderStatusBar({ statuses: [{ key: "a", text: "" }] }), "");
 });
@@ -237,7 +237,7 @@ test("without widgets there is no shared row, and without status the row holds o
 test("a status that lists entries becomes a chip named after its heading", () => {
   assert.deepEqual(
     splitStatusList("LSP Active: typescript, css, html, json"),
-    { label: "LSP:", title: "LSP Active", items: ["typescript", "css", "html", "json"] },
+    { label: "LSP", title: "LSP Active", items: ["typescript", "css", "html", "json"] },
   );
   // Short text, a missing colon, or a single entry stays a plain pill.
   assert.equal(splitStatusList("LSP: typescript"), null);

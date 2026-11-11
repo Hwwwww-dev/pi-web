@@ -55,7 +55,7 @@ function isPermissiveCell(cell: StatusCell): boolean {
 /**
  * A status that lists things after a colon — `LSP Active: typescript, css, …`
  * — claims the whole row and pushes every other status out of view. It becomes
- * a chip named after the first word of its heading (`LSP:`), and its popover
+ * a chip named after the first word of its heading (`LSP`), and its popover
  * lists the entries one per line. Short text, or text without a colon and at
  * least two entries, stays a plain pill.
  */
@@ -72,7 +72,7 @@ export function splitStatusList(text: string): { label: string; title: string; i
     .filter(Boolean);
   const firstWord = head.split(/\s+/)[0];
   if (!firstWord || items.length < 2) return null;
-  return { label: `${firstWord}:`, title: head, items };
+  return { label: firstWord, title: head, items };
 }
 
 /** One cell per status, in key order. A status with nothing visible to show has no cell. */
@@ -115,7 +115,7 @@ function StatusPill({
             size="xs"
             title={full}
             aria-label={full}
-            className="shrink-0 bg-muted/60 px-2 font-mono text-[11.5px] font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            className="shrink-0 rounded-full bg-muted/60 px-2.5 font-mono text-[11.5px] font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
             {cell.label}
           </Button>
@@ -133,7 +133,7 @@ function StatusPill({
   }
   if (cell.kind === "text") {
     return (
-      <span className="inline-flex max-w-full items-center whitespace-pre rounded-md bg-muted/60 px-2 py-1 font-mono text-[11.5px] leading-4 text-muted-foreground">
+      <span className="inline-flex h-6 max-w-full shrink-0 items-center whitespace-pre rounded-full bg-muted/60 px-2.5 font-mono text-[11.5px] leading-4 text-muted-foreground">
         <AnsiText text={cell.text} />
       </span>
     );
@@ -147,7 +147,7 @@ function StatusPill({
       title={`${cell.label} · ${cell.command}`}
       aria-label={`${cell.label} (${cell.command})`}
       onClick={() => onCommand?.(cell.command)}
-      className="shrink-0 bg-muted/60 px-2 font-mono text-[11.5px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      className="shrink-0 rounded-full bg-muted/60 px-2.5 font-mono text-[11.5px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
     >
       {cell.label}
     </Button>
