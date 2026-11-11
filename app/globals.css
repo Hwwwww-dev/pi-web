@@ -1464,15 +1464,17 @@ span.token.table {
 }
 
 /* t/s > 120 的徽章：文字恒白，背景是密排的流动彩虹渐变——repeating
-   光谱每 60px 一个周期（红→黄→绿→蓝→紫→红），background-position-x
-   平移一个周期即无缝循环，徽章内始终同时可见一整段彩色；高亮纯 oklch，
-   不受主题 token 约束。时长由组件按速度内联（animation-duration），
-   越快滑得越快。reduced-motion 下保持静态彩虹。 */
+   光谱每 60px 一个周期（红→黄→绿→蓝→紫→红），图层比徽章宽出一个周期、
+   平移一个周期无缝循环，徽章内始终同时可见一整段彩色。动画只动
+   transform（GPU 合成、零重paint）：background-position 每帧重paint，
+   在真机上一顿一顿。高亮纯 oklch，不受主题 token 约束。时长由组件按
+   速度内联（animation-duration），越快滑得越快。reduced-motion 静态。 */
 @keyframes tps-rainbow-slide {
-  from { background-position: 0px 50%; }
-  to { background-position: 60px 50%; }
+  from { transform: translateX(0); }
+  to { transform: translateX(-60px); }
 }
 .tps-rainbow {
+  width: calc(100% + 60px);
   background-image: repeating-linear-gradient(90deg,
     oklch(0.7 0.19 0)   0px,
     oklch(0.7 0.19 60)  12px,
@@ -1481,6 +1483,7 @@ span.token.table {
     oklch(0.7 0.19 300) 48px,
     oklch(0.7 0.19 360) 60px);
   animation: tps-rainbow-slide linear infinite;
+  will-change: transform;
 }
 @media (prefers-reduced-motion: reduce) {
   .tps-rainbow {

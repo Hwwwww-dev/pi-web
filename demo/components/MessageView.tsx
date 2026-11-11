@@ -504,7 +504,7 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
                 <>
                   <span
                     aria-hidden
-                    className="tps-rainbow absolute inset-0 rounded-[inherit]"
+                    className="tps-rainbow absolute inset-y-0 left-0 rounded-[inherit]"
                     style={{ animationDuration: `${Math.max(0.4, 300 / tps).toFixed(2)}s` }}
                   />
                   <span className="relative whitespace-nowrap">{tps.toFixed(1)} t/s</span>
