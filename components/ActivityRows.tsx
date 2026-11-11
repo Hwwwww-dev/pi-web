@@ -276,7 +276,10 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   // Terminal rows render command + output instead of the raw JSON args: the
   // command wraps (it is the call's input), the output keeps its own layout —
   // box art, tables and progress bars must not reflow — and a rule separates
-  // the two, the way a shell session reads.
+  // the two, the way a shell session reads. A multi-line command (a heredoc)
+  // must not crowd the output out of the card: it takes at most 4/10 of the
+  // capped height and scrolls, leaving the rest to the output; under that both
+  // size to their content.
   const commandText = category === "terminal" && !isStreamingInput && typeof block.input?.command === "string"
     ? block.input.command
     : null;
@@ -384,7 +387,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
                 </>
               ) : combinedTerminalText !== null ? (
                 <CodeBlock size="sm" variant={isError ? "destructive" : "default"} className="max-h-[var(--card-max-height)]">
-                  <CodeBlockContent wrap className="shrink-0"><HighlightedCode code={`$ ${commandText}`} language="bash" /></CodeBlockContent>
+                  <CodeBlockContent wrap className="max-h-[calc(var(--card-max-height)*0.4)] shrink-0"><HighlightedCode code={`$ ${commandText}`} language="bash" /></CodeBlockContent>
                   {terminalOutput !== null && (
                     <>
                       <div className="h-px shrink-0 bg-border" aria-hidden="true" />
