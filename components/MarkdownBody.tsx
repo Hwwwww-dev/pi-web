@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, memo, useContext, useMemo, useState, type ComponentProps, type MouseEvent, type ReactNode } from "react";
+import { createContext, Fragment, memo, useContext, useMemo, useState, type ComponentProps, type MouseEvent, type ReactNode } from "react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
@@ -10,7 +10,7 @@ import { parseFileOpenOptions, resolveLocalFileHref, resolveLocalFilePath, shoul
 import { encodeFilePathForApi } from "@/lib/file-paths";
 import { inlineCodeFilePath, inlineCodeLineSuffix, isExternalMarkdownHref, jumpToMarkdownFragment, markdownAppUrlTransform, markdownDocumentRehypePlugins, markdownRehypePlugins, markdownRemarkPlugins, markdownTextLayoutRemarkPlugins, markdownUrlTransform, markdownUserRemarkPlugins, normalizeDisplayMath } from "@/lib/markdown";
 import { isAudioPath, isVideoPath } from "@/lib/file-types";
-import { splitMarkdownBlocks } from "@/lib/markdown-blocks";
+import { parseFenceBlock, splitMarkdownBlocks } from "@/lib/markdown-blocks";
 import { ImagePreview } from "./ImagePreview";
 import { getImageSize, rememberImageSize } from "@/lib/image-size-cache";
 import { MermaidBlock, CodeBlock } from "./MermaidBlock";
@@ -144,6 +144,13 @@ const MarkdownBlock = memo(function MarkdownBlock({ markdown, remarkPlugins, url
   );
 });
 
+/** A fenced block: a diagram's block for mermaid and svg, else a code block. */
+function renderFence(lang: string, code: string, isStreaming: boolean | undefined) {
+  if (lang === "mermaid") return <MermaidBlock code={code} isStreaming={isStreaming} defaultPreview />;
+  if (lang === "svg") return <SvgBlock code={code} isStreaming={isStreaming} />;
+  return <CodeBlock code={code} lang={lang} isStreaming={isStreaming} />;
+}
+
 export const MarkdownBody = memo(function MarkdownBody({ children, className, isStreaming, cwd, onOpenFile, onNavigateLink, keepLineBreaks, keepTextLayout }: MarkdownBodyProps) {
   const normalizedMarkdown = useMemo(() => normalizeDisplayMath(children), [children]);
   // A streaming reply grows by a few characters per chunk; parsing all of it
@@ -159,51 +166,7 @@ export const MarkdownBody = memo(function MarkdownBody({ children, className, is
       const lang = className?.replace("language-", "").toLowerCase() ?? "";
       const raw = String(children);
       const isBlock = className?.includes("language-") || raw.includes("\n");
-      if (isBlock) {
-        if (lang === "mermaid") {
-          return (
-            <MermaidBlock
-              code={raw.replace(/\n$/, "")}
-              isStreaming={isStreaming}
-              defaultPreview
-            />
-          );
-        }
-        if (lang === "svg") {
-          return <SvgBlock code={raw.replace(/\n$/, "")} isStreaming={isStreaming} />;
-        }
-        return <CodeBlock code={raw.replace(/\n$/, "")} lang={lang} isStreaming={isStreaming} />;
-      }
-      // Inline code holding a filesystem path becomes a clickable file link.
-      if (onOpenFile) {
-        const candidate = inlineCodeFilePath(raw);
-        const filePath = candidate ? resolveLocalFilePath(candidate, cwd) : null;
-        if (filePath) {
-          const lineSuffix = inlineCodeLineSuffix(raw);
-          const openFile = () => onOpenFile(filePath, lineSuffix ? { line: lineSuffix.line } : undefined);
-          return (
-            <code
-              // Inline code that holds a filesystem path opens the file viewer.
-              className="markdown-inline-code cursor-pointer underline decoration-dotted decoration-muted-foreground underline-offset-2 hover:text-primary hover:decoration-primary"
-              title={filePath}
-              role="button"
-              tabIndex={0}
-              onClick={(event) => {
-                if (!shouldOpenLocalFileInApp(event)) return;
-                event.preventDefault();
-                openFile();
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                openFile();
-              }}
-            >
-              {children}
-            </code>
-          );
-        }
-      }
+      if (isBlock) return renderFence(lang, raw.replace(/\n$/, ""), isStreaming);
       return (
         <code
           className="markdown-inline-code"
@@ -298,7 +261,13 @@ export const MarkdownBody = memo(function MarkdownBody({ children, className, is
 
   return (
     <div className={["markdown-body", className].filter(Boolean).join(" ")}>
-      {blocks.map((block, index) => (
+      {blocks.map((block, index) => {
+        // While streaming, a block that is only a code fence skips the markdown
+        // parser: a long fence grows every chunk, and parsing all of it again
+        // each time was most of a streamed reply's work.
+        const fence = isStreaming ? parseFenceBlock(block) : null;
+        if (fence) return <Fragment key={index}>{renderFence(fence.lang, fence.code, true)}</Fragment>;
+        return (
         <MarkdownBlock
           key={index}
           markdown={block}
@@ -307,7 +276,8 @@ export const MarkdownBody = memo(function MarkdownBody({ children, className, is
           rehypePlugins={onNavigateLink ? markdownDocumentRehypePlugins : markdownRehypePlugins}
           components={components}
         />
-      ))}
+        );
+      })}
     </div>
   );
 });
