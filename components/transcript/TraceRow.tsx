@@ -198,7 +198,9 @@ export function TraceRow({
   return (
     <Trace ref={rowRef} data-activity="trace-row" data-activity-tool={activityTool}>
       <TraceCollapsible open={open} onOpenChange={toggleFold}>
-        <div className="flex w-full max-w-full items-center gap-1.5">
+        {/* 行内间距与触发区同一个值（gap-1）：有胶囊的行和只有文字的行，箭头前的
+            留白必须一样，否则一排看下去箭头忽远忽近。 */}
+        <div className="flex w-full max-w-full items-center gap-1">
           {/* 触发区只盖文字：胶囊紧跟在动作名后面，不被 flex-1 推到行尾。
               胶囊是按钮，不能嵌进触发按钮里，所以触发区自己不再画箭头，
               箭头改成跟在胶囊后面的兄弟按钮（同样调 toggleFold）。 */}

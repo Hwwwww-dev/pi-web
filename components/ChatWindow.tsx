@@ -912,7 +912,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     /** 离顶多远仍算“贴顶”：触摸惯性带小数，滚不到绝对 0。 */
     const TOP_SLACK = 24;
     const attempt = () => {
-      if (performance.now() < pageCooldownRef.current) return;
+      if (Date.now() < pageCooldownRef.current) return;
       if (container.scrollTop > TOP_SLACK) return;
       // Skip while a page is loading or the last one is still rendering.
       if (loadingOlderRef.current || pageRenderingRef.current) return;
@@ -935,13 +935,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       // 用元素锚点，不用 scrollHeight 差：新插进来的那页里的 markdown、代码高亮和
       // 图片会分几帧长高，高度差只补第一帧，之后读者就被留在接近顶部的位置——顶部
       // 又贴着哨兵，于是一次上滑连读好几页。锚点在页面落地后每帧重测，长多高都不漂。
-      const anchor = captureScrollAnchor(container, messageContentRef.current);
-      scrollAnchorRef.current = anchor;
+      scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
       void loadOlderPage(sid, oldestId).then(() => {
-        holdScrollAnchor(container, anchor);
+        holdScrollAnchor(container, messageContentRef.current);
       }).finally(() => {
         loadingOlderRef.current = false;
-        pageCooldownRef.current = performance.now() + PAGE_COOLDOWN_MS;
+        pageCooldownRef.current = Date.now() + PAGE_COOLDOWN_MS;
       });
     };
     let frame = 0;
@@ -1729,6 +1728,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               <button
                 ref={setSentinel}
                 type="button"
+                // 这一行钉在内容顶部，翻页时它不动；滚动锚点必须跳过它。
+                data-scroll-anchor-ignore=""
                 onClick={() => {
                   if (loadingOlderRef.current || pageRenderingRef.current) return;
                   const sid = session?.id ?? sessionIdRef.current;
