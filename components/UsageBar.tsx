@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { ArrowDown, ArrowUp, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { formatCompactTokens, type UsageContextPart } from "@/lib/turn-view";
 import { ContextBadge } from "@/components/transcript/ContextBadge";
 
@@ -73,9 +74,15 @@ export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8,
       style={{ columnGap: gap, ...style }}
     >
       {segments.map((segment) => (
-        <span key={segment.id} data-usage-seg={segment.id} className="inline-flex items-center gap-1">
+        // 第 4 节：用量数字落在官方 Badge（secondary）里，不再自绘统计块。
+        <Badge
+          key={segment.id}
+          data-usage-seg={segment.id}
+          variant="secondary"
+          className="gap-1 px-1.5 py-0 font-normal tabular-nums"
+        >
           {segment.node}
-        </span>
+        </Badge>
       ))}
     </span>
   );

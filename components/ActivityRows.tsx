@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { CodeBlock, CodeBlockContent } from "./ui/code-block";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import { Separator } from "./ui/separator";
 import {
   Trace,
   TraceCollapsible,
@@ -483,13 +483,8 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
 
   return (
     <Trace data-activity-custom="compaction">
-      <TraceCollapsible
-        open={expanded}
-        onOpenChange={() => setExpanded((v) => !v)}
-        className="w-auto min-w-0 flex-[0_1_auto]"
-      >
-        <div className="w-full bg-background">
-          <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
+      <TraceCollapsible open={expanded} onOpenChange={() => setExpanded((v) => !v)}>
+        <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
           <TraceLine>
             <TraceIcon><ToolCategoryIcon category="compact" /></TraceIcon>
             <TraceTitle className="font-medium">{t("i18n.conversationCompacted")}</TraceTitle>
@@ -503,7 +498,6 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
             </TraceDescription>
           </TraceLine>
         </TraceCollapsibleTrigger>
-        </div>
         <TraceCollapsibleContent>
           <CompactionSummaryDetails summary={summary} cwd={cwd} onOpenFile={onOpenFile} />
         </TraceCollapsibleContent>
@@ -522,7 +516,7 @@ export function CompactionSummaryDetails({ summary, cwd, onOpenFile }: {
 
   return (
     <>
-      <div className="text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground">
+      <div className="text-sm leading-[1.65] text-foreground">
         {t("i18n.compactionDescription")}
       </div>
       {parsedSummary.body ? (
@@ -545,17 +539,23 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
   if (modifiedFiles.length > 0) parts.push(`${modifiedFiles.length} modified`);
 
   return (
-    <Collapsible className="mt-2.5 border-t border-border pt-2 text-xs text-muted-foreground">
-      <CollapsibleTrigger className="flex w-full cursor-pointer justify-start text-left font-semibold leading-[1.4]">
-        {t("i18n.fileContext", { details: parts.join(", ") })}
-      </CollapsibleTrigger>
-      {/* forceMount: the native <details> this replaces kept its lists in the
-          DOM while closed; the lists are tiny, so stay mounted and hidden. */}
-      <CollapsibleContent forceMount>
-        {modifiedFiles.length > 0 && <CompactionFileList title={t("i18n.modifiedFiles")} files={modifiedFiles} />}
-        {readFiles.length > 0 && <CompactionFileList title={t("i18n.readFiles")} files={readFiles} />}
-      </CollapsibleContent>
-    </Collapsible>
+    // 第 4 节：折叠仍走官方 TraceCollapsible，分隔线用 Separator。
+    <div className="mt-2.5 flex flex-col gap-2">
+      <Separator />
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger>
+          <TraceLine>
+            <TraceTitle className="text-xs font-semibold text-muted-foreground">
+              {t("i18n.fileContext", { details: parts.join(", ") })}
+            </TraceTitle>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
+          {modifiedFiles.length > 0 && <CompactionFileList title={t("i18n.modifiedFiles")} files={modifiedFiles} />}
+          {readFiles.length > 0 && <CompactionFileList title={t("i18n.readFiles")} files={readFiles} />}
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </div>
   );
 }
 
@@ -563,7 +563,7 @@ function CompactionFileList({ title, files }: { title: string; files: string[] }
   return (
     <div className="mt-2">
       <div className="mb-1 text-xs font-semibold text-foreground">{title}</div>
-      <ul className="m-0 max-h-[var(--card-max-height)] list-none overflow-auto p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[3px] [&_li+li]:border-t [&_li+li]:border-border">
+      <ul className="m-0 mb-2 list-none p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[1px]">
         {files.map((file) => (
           <li key={file}>{file}</li>
         ))}
