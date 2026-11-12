@@ -1,11 +1,12 @@
 import * as React from "react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import { Item } from "@/components/ui/item"
 import { ChevronRightIcon } from "lucide-react"
 
 function Trace({ className, ...props }: React.ComponentProps<"div">) {
@@ -21,6 +22,12 @@ function Trace({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/**
+ * One line of a transcript pattern: `Item` (official row tokens) rendered onto a
+ * `span`, because these lines live inside a `<button>` or `<a>` — a `div` there
+ * is invalid HTML, and the fold trigger has to stay a real button. Children are
+ * the official `Trace*` spans (icon, title, description).
+ */
 function TraceLine({
   className,
   status,
@@ -29,15 +36,17 @@ function TraceLine({
   status?: "running" | "error" | "pending"
 }) {
   return (
-    <span
-      data-slot="trace-line"
-      data-status={status}
+    <Item
+      asChild
+      size="xs"
       className={cn(
-        "flex w-fit max-w-full min-w-0 items-center gap-2 text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground transition-colors in-[a,button]:cursor-pointer in-[a:hover,button:hover]:text-foreground data-[status=error]:text-destructive data-[status=error]:in-[a:hover,button:hover]:text-destructive data-[status=pending]:opacity-60 data-[status=running]:*:data-[slot=trace-title]:shimmer",
+        "w-fit min-w-0 max-w-full flex-nowrap rounded-lg border-0 px-0 py-0 text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground transition-colors",
+        "in-[a,button]:cursor-pointer in-[a:hover,button:hover]:text-foreground data-[status=error]:text-destructive data-[status=error]:in-[a:hover,button:hover]:text-destructive data-[status=pending]:opacity-60 data-[status=running]:*:data-[slot=trace-title]:shimmer",
         className
       )}
-      {...props}
-    />
+    >
+      <span data-slot="trace-line" data-status={status} {...props} />
+    </Item>
   )
 }
 

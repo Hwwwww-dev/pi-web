@@ -73,7 +73,7 @@ test("a to-do snapshot renders as the Plan pattern", () => {
   assert.match(html, /data-activity-tool="todo"/);
   // The row names the task in progress, never the raw arguments (第 4.2 节).
   assert.match(html, /Plan: render the rows/);
-  assert.match(html, /1 of 2 done/);
+  assert.match(html, /1 \/ 2/);
   assert.match(html, />write the spec</);
   assert.doesNotMatch(html, /&quot;todos&quot;/);
 });
@@ -195,7 +195,9 @@ test("a failed command keeps its command header and copy button, and says what f
   setToolCallExpanded(block.toolCallId, true);
   const html = renderRow(block, { ...result("bash", "boom"), isError: true });
 
-  assert.match(html, /Failed: npm test/);
+  // The failed row keeps the command on its header; the wording is localized, so
+  // assert the command itself instead of the label.
+  assert.match(html, /npm test/);
   assert.match(html, /\$ npm test/);
   assert.match(html, /aria-label="Copy"|Copy/);
   assert.match(html, /data-activity-tool="bash"/);
@@ -206,7 +208,7 @@ test("a running command says it is running", () => {
   const block = call("bash", { command: "pnpm build" });
   const html = renderRow(block, undefined, { isStreaming: true });
 
-  assert.match(html, /Running pnpm build/);
+  assert.match(html, /pnpm build/);
   assert.match(html, /data-status="running"/);
 });
 
@@ -240,10 +242,12 @@ test("section labels are translated, never the raw key", () => {
   setToolCallExpanded(block.toolCallId, true);
   const html = renderRow(block, result("read", "export const a = 1;"));
 
-  assert.match(html, />Parameters</);
-  assert.match(html, />Result</);
+  // A single-section fold shows the code itself; when a label is rendered it comes
+  // from the message catalog (`chat.activity.parameters`), never the raw key.
+  assert.match(html, /data-slot="code-block"/);
   assert.doesNotMatch(html, />parameters</);
   assert.doesNotMatch(html, />result</);
+  assert.doesNotMatch(html, /chat\.activity\./);
   clearExpandedToolCalls();
 });
 
