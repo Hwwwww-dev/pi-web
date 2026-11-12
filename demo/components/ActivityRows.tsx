@@ -49,15 +49,15 @@ import type { CustomMessage, TextContent, ToolCallContent, ToolResultMessage } f
 
 /** 一类的图标颜色：收起时中性灰，展开时才换上这一类自己的颜色。 */
 const CATEGORY_ICON_COLOR: Record<ToolCategory, string> = {
-  view: "text-sky-600 dark:text-sky-400",
-  search: "text-cyan-600 dark:text-cyan-400",
-  edit: "text-success",
-  terminal: "text-primary",
-  subagent: "text-primary",
-  plan: "text-primary",
-  compact: "text-primary",
-  web: "text-sky-600 dark:text-sky-400",
-  other: "text-primary",
+  view: "text-primary/70",
+  search: "text-primary/70",
+  edit: "text-primary/70",
+  terminal: "text-primary/70",
+  subagent: "text-primary/70",
+  plan: "text-primary/70",
+  compact: "text-primary/70",
+  web: "text-primary/70",
+  other: "text-primary/70",
 };
 
 function ToolCategoryIcon({ category, active = false }: { category: ToolCategory; active?: boolean }) {

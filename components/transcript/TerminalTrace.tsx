@@ -5,11 +5,11 @@ import { SquareTerminalIcon, WrapTextIcon } from "lucide-react";
 import {
   CodeBlock,
   CodeBlockActions,
-  CodeBlockContent,
   CodeBlockCopyButton,
   CodeBlockHeader,
   CodeBlockTitle,
 } from "@/components/ui/code-block";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AnsiText } from "@/components/AnsiText";
 import { HighlightedCode } from "@/components/HighlightedCode";
@@ -32,7 +32,7 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
   activityTool?: string;
 }) {
   const { t } = useI18n();
-  const [wrap, setWrap] = useState(false);
+  const [wrap, setWrap] = useState(true);
   const command = view.command ?? "";
   const output = view.sections.find((section) => section.kind === "code")?.text ?? "";
   const failed = view.status === "error";
@@ -52,7 +52,7 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
       content={(
         <CodeBlock size="sm" variant={failed ? "destructive" : "default"} className="max-w-full">
           <CodeBlockHeader>
-            <CodeBlockTitle className={wrap ? "whitespace-pre-wrap break-words" : undefined}>{`$ ${command}`}</CodeBlockTitle>
+            <CodeBlockTitle className="text-muted-foreground">{t("chat.trace.command")}</CodeBlockTitle>
             <CodeBlockActions>
               {/* 默认不换行（高度可控），需要看完整命令时再换行。 */}
               <Button
@@ -70,9 +70,18 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
               <CodeBlockCopyButton value={command} />
             </CodeBlockActions>
           </CodeBlockHeader>
-          <CodeBlockContent wrap={wrap} className="max-h-[var(--card-max-height)]">
-            {isTuiText(output) ? <AnsiText text={output} /> : <HighlightedCode code={output} />}
-          </CodeBlockContent>
+          {/* 总数封顶在 --card-max-height 内：命令占 6 份、结果占 4 份，各自超出就自己滚。 */}
+          <div className="flex max-h-[var(--card-max-height)] min-h-0 flex-col">
+            <div className="max-h-[60%] min-h-0 overflow-auto p-2.5">
+              <span className={cn(
+                "font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-foreground",
+                wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre",
+              )}>{`$ ${command}`}</span>
+            </div>
+            <div className="max-h-[40%] min-h-0 overflow-auto border-t border-border/60 p-2.5">
+              {isTuiText(output) ? <AnsiText text={output} /> : <HighlightedCode code={output} />}
+            </div>
+          </div>
         </CodeBlock>
       )}
     />

@@ -59,18 +59,18 @@ export const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
 
 /** 展开时换成这一类自己的颜色，不填黑、不加粗。 */
 export const KIND_ACTIVE_ICONS: Record<ToolViewKind, ReactNode> = {
-  terminal: <SquareTerminalIcon className={cn(ICON_CLASS, "text-primary")} />,
-  "file-read": <FileTextIcon className={cn(ICON_CLASS, "text-sky-600 dark:text-sky-400")} />,
-  "file-write": <FilePenIcon className={cn(ICON_CLASS, "text-success")} />,
-  "file-edit": <FilePenLineIcon className={cn(ICON_CLASS, "text-success")} />,
-  search: <SearchIcon className={cn(ICON_CLASS, "text-cyan-600 dark:text-cyan-400")} />,
-  web: <GlobeIcon className={cn(ICON_CLASS, "text-sky-600 dark:text-sky-400")} />,
-  codemode: <CodeXmlIcon className={cn(ICON_CLASS, "text-primary")} />,
-  subagent: <BotIcon className={cn(ICON_CLASS, "text-primary")} />,
-  mcp: <PlugIcon className={cn(ICON_CLASS, "text-primary")} />,
-  queue: <ListTodoIcon className={cn(ICON_CLASS, "text-primary")} />,
-  compact: <Minimize2Icon className={cn(ICON_CLASS, "text-primary")} />,
-  generic: <WrenchIcon className={cn(ICON_CLASS, "text-primary")} />,
+  terminal: <SquareTerminalIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  "file-read": <FileTextIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  "file-write": <FilePenIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  "file-edit": <FilePenLineIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  search: <SearchIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  web: <GlobeIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  codemode: <CodeXmlIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  subagent: <BotIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  mcp: <PlugIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  queue: <ListTodoIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  compact: <Minimize2Icon className={cn(ICON_CLASS, "text-primary/70")} />,
+  generic: <WrenchIcon className={cn(ICON_CLASS, "text-primary/70")} />,
 };
 
 const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
