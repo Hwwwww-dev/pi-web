@@ -748,6 +748,7 @@ export const zhCNLocale: LocalePlugin = {
     "chat.toolCategory.view": "读取",
     "chat.toolCategory.search": "搜索",
     "chat.toolCategory.edit": "编辑",
+    "chat.toolCategory.write": "写入",
     "chat.toolCategory.terminal": "终端",
     "chat.toolCategory.subagent": "子代理",
     "chat.toolCategory.plan": "计划",

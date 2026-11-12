@@ -146,13 +146,13 @@ test("a turn with a failed call is an error turn", () => {
 
 test("a grouped call's chip resolves against the session cwd too", () => {
   clearExpandedToolCalls();
-  const first = call("read", { file_path: "lib/a.ts" });
-  const second = { ...call("read", { file_path: "lib/b.ts" }), toolCallId: "call-read-2" };
+  const first = call("custom_tool", { file_path: "lib/a.ts" });
+  const second = { ...call("custom_tool", { file_path: "lib/b.ts" }), toolCallId: "call-custom_tool-2" };
   setToolCallExpanded(`group:${first.toolCallId}`, true);
   const html = render(React.createElement(TurnActivityBody, {
     items: [
-      { kind: "tool", key: "k1", block: first, result: result("read", "x") },
-      { kind: "tool", key: "k2", block: second, result: { ...result("read", "y"), toolCallId: "call-read-2" } },
+      { kind: "tool", key: "k1", block: first, result: { ...result("custom_tool", "x") } },
+      { kind: "tool", key: "k2", block: second, result: { ...result("custom_tool", "y"), toolCallId: "call-custom_tool-2" } },
     ],
     cwd: "/repo/pi-web",
     onOpenFile: () => {},
@@ -209,11 +209,23 @@ test("a running command says it is running", () => {
 
 test("a relative path chip resolves against the session cwd", () => {
   clearExpandedToolCalls();
-  const block = call("read", { file_path: "lib/tool-view.ts" });
-  const html = renderRow(block, result("read", "x"), { cwd: "/repo/pi-web", onOpenFile: () => {} });
+  // 一个标题里没有文件名的工具，chip 才有存在的意义。
+  const block = call("custom_tool", { file_path: "lib/tool-view.ts" });
+  const html = renderRow(block, result("custom_tool", "x"), { cwd: "/repo/pi-web", onOpenFile: () => {} });
 
   assert.match(html, /title="\/repo\/pi-web\/lib\/tool-view\.ts"/);
   assert.equal(resolveLocalFilePath("lib/tool-view.ts", "/repo/pi-web"), "/repo/pi-web/lib/tool-view.ts");
+});
+
+test("a file row shows the name once, in the chip that opens it", () => {
+  clearExpandedToolCalls();
+  const block = call("read", { file_path: "probe-label.png" });
+  const html = renderRow(block, result("read", "x"), { cwd: "/repo/pi-web", onOpenFile: () => {} });
+
+  // 标题只说动作（Read），文件名由 chip 承担且可点（文件跳转）。
+  assert.match(html, /aria-label="Read"/);
+  assert.match(html, /role="button"/);
+  assert.match(html, /title="\/repo\/pi-web\/probe-label\.png"/);
 });
 
 test("section labels are translated, never the raw key", () => {

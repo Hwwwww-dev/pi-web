@@ -104,7 +104,9 @@ export function TraceRow({
 }) {
   const { open, onOpenChange } = useTraceFold(foldKey, defaultOpen);
   const line = (
-    <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="w-full min-w-0">
+    // `!` 覆盖 trace.tsx 里 `*:has-[>[data-slot=trace-line]]:w-fit`：行必须占满内容区，
+    // 否则标题的 truncate 没有可收缩的宽度，长命令会溢出、箭头被挤到文字中间。
+    <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="w-full! min-w-0">
       <TraceIcon>{icon}</TraceIcon>
       <TraceTitle className={cn("min-w-0 shrink truncate", titleClassName)}>{title}</TraceTitle>
       {chips}
@@ -131,7 +133,7 @@ export function TraceRow({
   return (
     <Trace data-activity="trace-row" data-activity-tool={activityTool}>
       <TraceCollapsible open={open} onOpenChange={onOpenChange}>
-        <TraceCollapsibleTrigger aria-label={ariaLabel}>
+        <TraceCollapsibleTrigger aria-label={ariaLabel} className="w-full! max-w-full">
           {line}
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="mt-1 flex flex-col gap-2">

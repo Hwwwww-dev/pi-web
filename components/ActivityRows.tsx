@@ -407,20 +407,25 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
                 ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody>
                 : <span className="text-xs text-muted-foreground">{t("i18n.noMessage")}</span>}
               {hasDetails && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Button type="button" variant="ghost" size="xs" onClick={copyContent}>
-                    {copied ? t("i18n.copied") : t("i18n.copy")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => setDetailsExpanded((v) => !v)}
-                  >
-                    {detailsExpanded ? t("i18n.hideDetails") : t("i18n.showDetails")}
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Button type="button" variant="ghost" size="xs" onClick={copyContent}>
+                      {copied ? t("i18n.copied") : t("i18n.copy")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => setDetailsExpanded((v) => !v)}
+                    >
+                      {detailsExpanded ? t("i18n.hideDetails") : t("i18n.showDetails")}
+                    </Button>
+                  </div>
                   {detailsExpanded && (
-                    <CodeBlock size="sm" className="mt-1.5"><CodeBlockContent wrap>{detailsText}</CodeBlockContent></CodeBlock>
+                    // 详情占满一行；不 reflow，长 id 靠横向滚动看，不被拆成两截。
+                    <CodeBlock size="sm">
+                      <CodeBlockContent wrap={false} className="max-h-[var(--card-max-height)]">{detailsText}</CodeBlockContent>
+                    </CodeBlock>
                   )}
                 </div>
               )}

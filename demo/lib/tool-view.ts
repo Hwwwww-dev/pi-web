@@ -473,9 +473,7 @@ function writeView(p: Prepared): ToolView {
   const view = baseView(p);
   const language = getLanguage(p.filePaths[0] ?? "");
   view.kind = "file-write";
-  view.title = p.filePaths[0]
-    ? p.t("chat.trace.wrote", { path: baseName(p.filePaths[0]) })
-    : p.t(TOOL_CATEGORY_LABEL_KEYS.edit);
+  view.title = p.t("chat.toolCategory.write");
   view.target = p.filePaths[0] ? baseName(p.filePaths[0]) : undefined;
   view.description = p.writtenFileText === null ? p.preview || undefined : undefined;
   view.sections = p.detail([
@@ -491,11 +489,9 @@ function editView(p: Prepared): ToolView {
   const view = baseView(p);
   const names = p.patchFiles ? p.patchFiles.map((file) => file.newPath || file.oldPath) : p.filePaths;
   view.kind = "file-edit";
-  view.title = names.length === 1
-    ? p.t("chat.trace.edited", { path: baseName(names[0] ?? "") })
-    : names.length > 1
-      ? p.t("chat.trace.editedFiles", { count: names.length })
-      : p.t(TOOL_CATEGORY_LABEL_KEYS.edit);
+  view.title = names.length > 1
+    ? p.t("chat.trace.editedFiles", { count: names.length })
+    : p.t(TOOL_CATEGORY_LABEL_KEYS.edit);
   view.target = names.length === 1 ? baseName(names[0] ?? "") : undefined;
   const patchText = p.patchFiles
     ? null
@@ -516,9 +512,8 @@ function editView(p: Prepared): ToolView {
 function readView(p: Prepared): ToolView {
   const view = baseView(p);
   view.kind = "file-read";
-  view.title = p.filePaths[0]
-    ? p.t("chat.trace.read", { path: baseName(p.filePaths[0]) })
-    : p.t(TOOL_CATEGORY_LABEL_KEYS.view);
+  // 文件名由行内的 chip 承担（chip 可点、能跳转），标题只写动作，避免同一个名字出现两次。
+  view.title = p.t(TOOL_CATEGORY_LABEL_KEYS.view);
   view.target = p.filePaths[0] ? baseName(p.filePaths[0]) : undefined;
   view.description = p.filePaths[0] ? undefined : p.preview || undefined;
   view.sections = p.detail([

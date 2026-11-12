@@ -748,6 +748,7 @@ export const enLocale: LocalePlugin = {
     "chat.toolCategory.view": "Read",
     "chat.toolCategory.search": "Search",
     "chat.toolCategory.edit": "Edit",
+    "chat.toolCategory.write": "Write",
     "chat.toolCategory.terminal": "Terminal",
     "chat.toolCategory.subagent": "Sub-agent",
     "chat.toolCategory.plan": "Plan",

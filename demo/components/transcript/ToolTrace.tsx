@@ -204,6 +204,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below,
   onOpenFile?: (path: string) => void;
 }) {
   const { t } = useI18n();
+  // chip 就是文件名本身（标题只说动作），点它打开文件。
   const chips = onOpenFile && view.filePaths.length > 0
     ? <FileChips paths={view.filePaths} cwd={cwd} onOpenFile={onOpenFile} />
     : null;

@@ -166,7 +166,7 @@ export interface ToolView {
   command?: string;
   /** 状态相关标题的目标（命令/文件名/路径/查询词）：进行中拼「正在运行 …」，失败拼「运行失败：…」。 */
   target?: string;
-  /** 可点击的文件 chip，最多显示 4 个；相对路径按会话 cwd 解析（`resolveLocalFilePath`）。 */
+  /** 可点击的文件 chip，最多显示 4 个；相对路径按会话 cwd 解析（`resolveLocalFilePath`）。标题不再重复文件名。 */
   filePaths: string[];
   /** 结果里的图片（data URL），渲染在行外。 */
   images: string[];
@@ -248,6 +248,7 @@ export function toToolView(input: {
 | 行宽 | 占满内容区宽度 | 长标题出省略号，折叠箭头始终留在行尾（`70%` 上限在手机上把命令挤断，已移除） |
 | 换行 | 标题单行 `truncate`，描述同一行；参数/结果才换行 | 元素不能一个上一个下 |
 | 字号 | 行文字 `13.5px + var(--chat-font-size-offset)`；标题与描述同号 | 用户要求字体统一 |
+| 文件名 | 标题只说动作（`读取` / `写入` / `编辑`），文件名由可点击 chip 承担；chip 每行一律渲染，不按标题内容去重（去重会让「可跳转文件」消失） | 用户要求文件可跳转 |
 | 字体样式 | 不用斜体；时间、计数用 `tabular-nums` | 横平竖直 |
 | 图标列 | `TraceIcon` 固定 `size-4`，同一列对齐 | 行与行左边缘对齐 |
 | 缩进 | 子内容用 `TraceCollapsibleContent` 的官方内缩，不叠加自定义 padding | 层级只靠一层缩进 |
