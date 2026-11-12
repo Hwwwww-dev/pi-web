@@ -41,6 +41,7 @@ import { useFilesPlacement, setFilesPlacement } from "@/hooks/useFilesPlacement"
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ProjectTrustStatus, ToolSettingsResponse } from "@/lib/api-types";
 import { KEEP_ALIVE_CONFIG_LIMITS, type ChatKeepAliveConfig } from "@/lib/chat-keepalive";
+import { SETTINGS_BUILTIN_TOOLS } from "@/lib/tool-presets";
 import {
   setLastSettingsSection,
   settingsSectionRequiresProject,
@@ -123,6 +124,8 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   const [shellSettings, setShellSettings] = useState<ToolSettingsResponse | null>(null);
   const [shellSaving, setShellSaving] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
+  const [builtinToolsSaving, setBuiltinToolsSaving] = useState(false);
+  const [builtinToolsError, setBuiltinToolsError] = useState<string | null>(null);
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
   const [cacheMissNotices, setCacheMissNotices] = useState<boolean | null>(null);
   const [cacheMissNoticesSaving, setCacheMissNoticesSaving] = useState(false);
@@ -233,6 +236,28 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     }
   };
 
+  // The global defaultTools the configured preset follows: new sessions only.
+  const toggleBuiltinTool = async (name: string, enabled: boolean) => {
+    if (!shellSettings) return;
+    setBuiltinToolsSaving(true);
+    setBuiltinToolsError(null);
+    try {
+      const builtinTools = enabled ? [...shellSettings.builtinTools, name] : shellSettings.builtinTools.filter((tool) => tool !== name);
+      const response = await fetch("/api/tools/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ builtinTools }),
+      });
+      const data = await response.json() as ToolSettingsResponse & { error?: string };
+      if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+      setShellSettings(data);
+    } catch (cause) {
+      setBuiltinToolsError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBuiltinToolsSaving(false);
+    }
+  };
+
   const registerPush = async () => {
     if (pushRegistering) return;
     setPushRegistering(true);
@@ -303,6 +328,26 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       })}
     </RadioGroup>
   );
+  const builtinToolsBlock = shellSettings ? (
+    <>
+      <p className="m-0 text-sm leading-relaxed text-muted-foreground">{t("settings.builtinToolsDescription")}</p>
+      {SETTINGS_BUILTIN_TOOLS.map((name) => {
+        const label = name === "bash" && shellSettings.powerShellEnabled ? "powershell" : name;
+        return (
+          <Field orientation="horizontal" key={name}>
+            <FieldLabel className={rowLabelClass}>{label}</FieldLabel>
+            <ConfigSwitch
+              checked={shellSettings.builtinTools.includes(name)}
+              loading={builtinToolsSaving}
+              label={label}
+              onChange={(enabled) => void toggleBuiltinTool(name, enabled)}
+            />
+          </Field>
+        );
+      })}
+      {builtinToolsError && <p role="alert" className="m-0 text-xs text-destructive">{builtinToolsError}</p>}
+    </>
+  ) : null;
   const chatOptions = (
     <div className="flex w-full flex-col gap-2.5">
       <Field orientation="horizontal">
@@ -581,6 +626,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             {detail === "chat" && chatOptions}
             {detail === "chat" && keepAliveBlock}
             {detail === "sidebar" && sidebarContent}
+            {detail === "shell" && builtinToolsBlock}
             {detail === "shell" && shellBlock}
             {detail === "push" && pushBlock}
             {detail === "language" && languageGroup}
