@@ -1,5 +1,6 @@
 "use client";
 
+import { LLAMA_CPP_PROVIDER_ID } from "@/lib/provider-listing";
 import { useState, useEffect, useCallback, useId, useRef, type ButtonHTMLAttributes, type DragEvent } from "react";
 import { Check as CheckIcon, ChevronDown, Cpu, Eye, EyeOff, Plus, Search, X as XIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
@@ -1610,26 +1611,25 @@ function OAuthDetail({ provider, onRefresh, enabledModels, contextSettings }: {
 
 // ── API Key detail ────────────────────────────────────────────────────────────
 
+// pi's default router address (`/login llama.cpp`, docs/llama-cpp.md).
+const DEFAULT_LLAMA_ROUTER_URL = "http://127.0.0.1:8080";
+
 function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
   provider: ApiKeyProvider; onRefresh: () => void; enabledModels: EnabledModelsController;
   contextSettings: ModelContextSettings;
 }) {
+  const llama = provider.id === LLAMA_CPP_PROVIDER_ID;
+  const [serverUrl, setServerUrl] = useState(llama && !provider.configured ? DEFAULT_LLAMA_ROUTER_URL : "");
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedOk, setSavedOk] = useState(false);
   const { t } = useI18n();
+  const canSave = Boolean(llama ? serverUrl.trim() : apiKey.trim());
 
-  // Reset state when provider changes
-  useEffect(() => {
-    setApiKey("");
-    setError(null);
-    setSavedOk(false);
-  }, [provider.id]);
-
-  const handleSave = useCallback(async () => {
-    if (!apiKey.trim()) return;
+  async function handleSave() {
+    if (!canSave || saving) return;
     setSaving(true);
     setError(null);
     setSavedOk(false);
@@ -1637,13 +1637,18 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
       const res = await fetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: apiKey.trim() }),
+        body: JSON.stringify({ apiKey: apiKey.trim(), ...(llama ? { serverUrl: serverUrl.trim() } : {}) }),
       });
-      const d = await res.json() as { success?: boolean; error?: string };
+      const d = await res.json() as { error?: string; catalog?: { completed: boolean; reason?: string } };
       if (!res.ok || d.error) {
         setError(d.error ?? `HTTP ${res.status}`);
       } else {
         setApiKey("");
+        if (llama) {
+          setServerUrl("");
+          enabledModels.refresh();
+          if (!d.catalog?.completed) setError(t(d.catalog?.reason === "offline" ? "models.catalogOffline" : "models.catalogUnreachable"));
+        }
         setSavedOk(true);
         setTimeout(() => setSavedOk(false), 2000);
         onRefresh();
@@ -1653,7 +1658,7 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
     } finally {
       setSaving(false);
     }
-  }, [apiKey, provider.id, onRefresh]);
+  }
 
   const handleRemove = useCallback(async () => {
     setRemoving(true);
@@ -1674,7 +1679,7 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
     <div className="flex flex-col gap-4">
       <ConfigDetailHeader>
         <ConfigDetailHeaderInfo>
-          <ConfigDetailTitle>API Key</ConfigDetailTitle>
+          <ConfigDetailTitle>{llama ? provider.displayName : "API Key"}</ConfigDetailTitle>
         </ConfigDetailHeaderInfo>
         <ConfigDetailActions>
           <div className="flex items-center gap-1.5">
@@ -1697,20 +1702,27 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
       </ConfigDetailHeader>
 
       <ConfigCard footer={error ? <p className="m-0 text-xs text-destructive">{error}</p> : undefined}>
-        {!provider.configured && (
+        {!llama && !provider.configured && (
           <p className="m-0 pb-2 text-xs leading-normal text-muted-foreground">
             {provider.modelCount === 1
               ? t("models.apiKeyEnableOne", { provider: provider.displayName })
               : t("models.apiKeyEnable", { provider: provider.displayName, count: provider.modelCount })}
           </p>
         )}
+        {llama && (
+          <label className="m-0 grid gap-1.5 pb-3 text-xs text-muted-foreground">
+            {t("models.llamaRouterUrl")}
+            <Input type="url" value={serverUrl} placeholder={DEFAULT_LLAMA_ROUTER_URL}
+              onChange={(event) => setServerUrl(event.target.value)} spellCheck={false} />
+          </label>
+        )}
 
         <div className="flex gap-1.5">
           <SecretTextInput
             value={apiKey}
             onChange={setApiKey}
-            onKeyDown={(e) => { if (e.key === "Enter" && apiKey.trim()) handleSave(); }}
-            placeholder={provider.configured ? t("models.replaceApiKey") : "sk-…"}
+            onKeyDown={(e) => { if (e.key === "Enter" && canSave) handleSave(); }}
+            placeholder={llama ? t("models.optionalApiKey") : provider.configured ? t("models.replaceApiKey") : "sk-…"}
             className="flex-1"
             autoComplete="off"
             spellCheck={false}
@@ -1718,8 +1730,8 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
           />
           <Button
             onClick={handleSave}
-            disabled={saving || !apiKey.trim() || savedOk}
-            variant={apiKey.trim() || savedOk ? "default" : "outline"}
+            disabled={saving || !canSave || savedOk}
+            variant={canSave || savedOk ? "default" : "outline"}
             className={cn(
               "shrink-0 text-xs font-semibold",
               savedOk && "bg-success text-white hover:bg-success/90",
@@ -1735,7 +1747,14 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
 
       <ProviderUsageSummary providerId={provider.id} enabled={provider.configured} />
 
-      {provider.configured && <EnabledModelsSection providerId={provider.id} controller={enabledModels} contextSettings={contextSettings} />}
+      {provider.configured && (
+        <EnabledModelsSection
+          providerId={provider.id}
+          controller={enabledModels}
+          contextSettings={contextSettings}
+          emptyCatalogHint={llama ? t("models.llamaEmptyCatalog") : undefined}
+        />
+      )}
     </div>
   );
 }
@@ -1846,7 +1865,11 @@ function AddProviderPicker({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-xs font-semibold leading-snug text-foreground">{p.displayName}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{p.modelCount === 1 ? t("models.modelCountOne") : t("models.modelCount", { count: p.modelCount })}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {p.id === LLAMA_CPP_PROVIDER_ID
+                        ? t("models.optionalApiKey")
+                        : t(p.modelCount === 1 ? "models.modelCountOne" : "models.modelCount", { count: p.modelCount })}
+                    </div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
                 </Button>

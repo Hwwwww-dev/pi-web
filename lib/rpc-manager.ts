@@ -10,6 +10,7 @@ import { validateAgentImages } from "./image-attachments";
 import { cwdMissingError } from "./missing-cwd";
 import { invalidateModelsCache } from "./models-cache";
 import { invalidateModelRuntimeWithExtensions } from "./model-runtime";
+import { llamaCppExtension } from "./pi-sdk-internals";
 import { resolveVisibleModels, selectInitialModelScope } from "./model-scope";
 import { findDeferredModel, findDeferredStartupModel, rememberProviderModels } from "./deferred-provider-models";
 import { isBlockingExtensionUiRequest } from "./extension-ui-queue";
@@ -3296,6 +3297,7 @@ export async function startRpcSession(
         ?? (chatOnly ? subagentResources.appendSystemPrompt[0] ?? "" : undefined),
     }) : undefined;
     const subagentExtensionFactories = [
+      llamaCppExtension,
       ...(subagentCodemode ? [subagentCodemode] : []),
       ...(subagentMcp && subagentResources
         ? [...subagentMcp.extensions, createSubagentMcpPolicyExtension(() => subagentResources)]
@@ -3323,7 +3325,7 @@ export async function startRpcSession(
         ? {
             ...subagentExtensionLoaderOptions(subagentResources),
             ...skillsBinding!.loaderOptions,
-            ...(subagentExtensionFactories.length > 0 ? { extensionFactories: subagentExtensionFactories } : {}),
+            extensionFactories: subagentExtensionFactories,
             noPromptTemplates: true,
             noThemes: true,
             noContextFiles: true,
@@ -3339,6 +3341,7 @@ export async function startRpcSession(
           ? { ...CHAT_ONLY_RESOURCE_LOADER_OPTIONS, extensionFactories: [exactSystemPromptExtension] }
         : {
             extensionFactories: [
+              llamaCppExtension,
               ...(builtins?.extensions ?? []),
               createReadOnlyMcpPolicyExtension(),
               createProjectCommandBashExtension({

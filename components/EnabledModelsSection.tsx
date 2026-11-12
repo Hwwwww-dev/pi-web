@@ -366,15 +366,18 @@ export function EnabledModelsSection({
   providerId,
   controller,
   contextSettings,
+  emptyCatalogHint,
 }: {
   providerId: string;
   controller: EnabledModelsController;
   contextSettings?: ModelContextSettings;
+  emptyCatalogHint?: string;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const { view, loading, pending, failure } = controller;
-  const provider = findProviderView(view, providerId);
+  const provider = findProviderView(view, providerId)
+    ?? (emptyCatalogHint && !failure ? { id: providerId, models: [], enabledCount: 0 } : undefined);
   const catalog = useCatalogRefresh(providerId, controller.refresh);
   const noteId = useId();
 
@@ -462,7 +465,7 @@ export function EnabledModelsSection({
       {contextSettings && <div id={contextNoteId} className="text-xs leading-relaxed text-muted-foreground">{t("models.contextOverrideHelp")}</div>}
       <div className="max-h-[360px] overflow-y-auto rounded-lg bg-sidebar p-1">
         {shown.length === 0 ? (
-          <div className="p-3 text-xs text-muted-foreground">{t("models.enabledNoMatches")}</div>
+          <div className="p-3 text-xs text-muted-foreground">{(provider.models.length === 0 && emptyCatalogHint) || t("models.enabledNoMatches")}</div>
         ) : (
           <ItemGroup className="gap-0">
           {shown.map((model) => {
