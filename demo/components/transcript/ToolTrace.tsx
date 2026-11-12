@@ -34,16 +34,36 @@ const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
   error: <CircleIcon className="text-destructive" />,
 };
 
-function CodeSection({ text, language, wrap = true }: {
+function CodeSection({ text, language, wrap = true, lineNumbers = true }: {
   text: string;
   language?: string;
   wrap?: boolean;
+  /** 代码文件的每一块都要有行号（用户要求）；行号与内容同一行高，所以带行号时不折行。 */
+  lineNumbers?: boolean;
 }) {
+  const body = text.replace(/\n$/, "");
+  const lineCount = body.split("\n").length;
+  const gutter = Array.from({ length: lineCount }, (_, index) => String(index + 1)).join("\n");
+  const wrapped = lineNumbers ? false : wrap;
   // 裸代码块：行里已经写了动作和文件，“参数/结果”这种标签只制造两层卡。
   return (
     <CodeBlock size="sm" data-language={language}>
-      <CodeBlockContent wrap={wrap} className="max-h-[var(--card-max-height)]" tabIndex={0}>
-        <HighlightedCode code={text} language={language} />
+      <CodeBlockContent wrap={wrapped} className="max-h-[var(--card-max-height)]" tabIndex={0}>
+        {lineNumbers ? (
+          <span data-slot="code-gutter" className="flex min-w-0">
+            <span
+              aria-hidden="true"
+              className="me-3 shrink-0 select-none whitespace-pre text-end tabular-nums text-muted-foreground"
+            >
+              {gutter}
+            </span>
+            <span className="min-w-0 whitespace-pre">
+              <HighlightedCode code={text} language={language} />
+            </span>
+          </span>
+        ) : (
+          <HighlightedCode code={text} language={language} />
+        )}
       </CodeBlockContent>
     </CodeBlock>
   );
