@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { copyText } from "@/lib/clipboard";
 import type { DebugClientSession, DebugEventConnectionSnapshot, DebugSessionDetail, DebugSessionSummary, DebugSnapshotResponse } from "@/lib/debug-types";
@@ -11,11 +11,23 @@ import { sessionRowTitle } from "./SessionTree";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Empty, EmptyHeader, EmptyTitle } from "./ui/empty";
-import { Separator } from "./ui/separator";
+import { Field, FieldDescription, FieldGroup, FieldTitle } from "./ui/field";
+import { Item, ItemActions, ItemContent, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "./ui/item";
+import { Progress } from "./ui/progress";
+import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { cn } from "@/lib/utils";
-import { CircleXIcon, FolderIcon, LoaderCircleIcon, ServerIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  CircleDashedIcon,
+  CircleIcon,
+  CircleOffIcon,
+  CircleXIcon,
+  FolderIcon,
+  LoaderCircleIcon,
+  ServerIcon,
+  SquareIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import {
   DEBUG_CLOSE_REASON_KEYS,
   DEBUG_LEASE_OUTCOME_KEYS,
@@ -120,10 +132,7 @@ export class DebugPanelBoundary extends Component<{ fallback: string; children: 
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <div
-        role="status"
-        className="border-b border-border bg-card px-4 py-2.5 text-xs text-muted-foreground"
-      >
+      <div role="status" className="px-4 py-2 text-sm text-muted-foreground">
         {this.props.fallback}
       </div>
     );
@@ -330,16 +339,15 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
   const ctx: Ctx = { t, now, clock, myHolder, titleOf };
 
   return (
-    // Same drawer block as the system/tools panels: a fixed height under the
-    // top bar, the popover shell owns the rounded bottom corners, the section
-    // fills it with its own header + scrolling body.
+    // One container for the whole panel (the drawer's own frame): the three sections sit directly
+    // in it, each a heading plus official components, never a card inside a card.
     <section
       ref={sectionRef}
       className="debug-panel flex h-[min(600px,50dvh)] min-h-0 flex-col bg-card text-foreground"
       aria-label={t("debug.panelLabel")}
     >
-      <div className="debug-panel-header flex min-w-0 shrink-0 items-center gap-3 border-b border-border px-4 py-2 text-xs">
-        <span className="debug-panel-heading shrink-0 cursor-help font-bold text-foreground" title={t("debug.readOnly")}>{t("debug.title")}</span>
+      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2 px-4 py-2">
+        <span className="debug-panel-heading shrink-0 cursor-help text-sm font-semibold text-foreground" title={t("debug.readOnly")}>{t("debug.title")}</span>
         {/* Plain text, no live region: a screen reader would read out every change. */}
         <VerdictView verdict={verdict} t={t} />
         <Button type="button" variant="outline" size="xs" className="debug-panel-copy ml-auto shrink-0" onClick={onCopy} title={t("debug.copyTitle")}>
@@ -347,25 +355,17 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
         </Button>
       </div>
       {page !== null && (
-        <div className="debug-panel-scroll">
+        // The panel's own width, not the window's, decides the columns: three when wide, the
+        // sessions under the server's when narrower, one above the other on a phone.
+        <div className="@container flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 pb-3">
           {issues.length > 0 && <IssueList issues={issues} />}
-          {/* What this page holds and measures; what the server holds (its totals and the pages
-              connected to it); the sessions it holds, the chat's details under its own row. Three
-              columns on a wide panel, the sessions under the server's on a narrower one, all one
-              above the other on a phone. */}
-          <div className="debug-cols">
-            <PageColumn page={page} samples={samples} reply={reply} ctx={ctx} />
-            <Card className="debug-col-server min-w-0 gap-2 px-3 py-3 shadow-none">
-              <ServerHead reply={reply} ctx={ctx} />
-              <PageList reply={reply} ctx={ctx} />
-            </Card>
-            <Card className="debug-col-sessions min-w-0 gap-2 px-3 py-3 shadow-none">
-              <SessionList reply={reply} detail={detail} groups={groups} targetSessionId={targetSessionId} sources={page.sources} ctx={ctx} />
-            </Card>
+          <div className="grid min-w-0 grid-cols-1 items-start gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3">
+            <PageColumn page={page} samples={samples} ctx={ctx} className="@2xl:row-span-2 @5xl:row-span-1" />
+            <ServerColumn reply={reply} ctx={ctx} />
+            <SessionColumn reply={reply} detail={detail} groups={groups} targetSessionId={targetSessionId} sources={page.sources} ctx={ctx} />
           </div>
         </div>
       )}
-      <style>{DEBUG_PANEL_CSS}</style>
     </section>
   );
 }
@@ -377,14 +377,14 @@ type GlyphKind = "server" | "warning" | "error";
 const GLYPH_ICONS = { server: ServerIcon, warning: TriangleAlertIcon, error: CircleXIcon } as const;
 
 /** One lucide glyph in `currentColor`; decorative, the text beside it says what it is. */
-function Glyph({ kind, size = 13 }: { kind: GlyphKind; size?: number }) {
+function Glyph({ kind }: { kind: GlyphKind }) {
   const Icon = GLYPH_ICONS[kind];
-  return <Icon size={size} strokeWidth={1.8} className="shrink-0" aria-hidden="true" />;
+  return <Icon className="size-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />;
 }
 
 interface BadgeItem {
   tone: DebugTone;
-  /** This page's own: filled. */
+  /** This page's own stream: kept as the run's first, its tone says whose it is. */
   filled?: boolean;
   /** A stream still starting, a detached shell: a dashed outline. */
   dashed?: boolean;
@@ -395,7 +395,7 @@ interface BadgeItem {
   text?: string;
 }
 
-// The panel's tones as shadcn semantic tokens: Badge, Dot, Bar and the value texts read one map.
+// The panel's tones as shadcn semantic tokens: Badge, Dot, Progress and the value texts read one map.
 const TONE_TEXT: Record<DebugTone, string> = {
   ok: "text-success",
   warning: "text-warning",
@@ -405,38 +405,26 @@ const TONE_TEXT: Record<DebugTone, string> = {
   dim: "text-muted-foreground",
 };
 
-// A filled badge's box in its own tone: the border joins the fill (the accent one is the
-// Badge's default variant, so it is mapped separately).
-const TONE_FILLED: Partial<Record<DebugTone, string>> = {
-  ok: "border-success bg-success text-background",
-  warning: "border-warning bg-warning text-card",
-  error: "border-destructive bg-destructive text-background",
-  muted: "border-muted-foreground bg-muted-foreground text-background",
-  dim: "border-muted-foreground bg-muted-foreground text-background",
-};
-const FILLED_ACCENT = "border-primary";
-
 /**
- * A Badge's tone classes: the tone sets its color; filled, dashed and faint say whose it is and
- * how it stands. The dense telemetry box keeps the panel's own metrics (16px, mono 10px); the
- * tone itself rides the theme's semantic tokens.
+ * A badge's tone classes. Every state is the official outline Badge (no filled box, no own pill):
+ * the tone only tints its border and text, dashed says still starting, faint says gone.
  */
-function badgeClasses(item: Pick<BadgeItem, "tone" | "filled" | "dashed" | "faded">, extra?: string): string {
+function toneClasses(item: Pick<BadgeItem, "tone" | "dashed" | "faded">, extra?: string): string {
   return cn(
-    "h-4 gap-0 rounded-[3px] px-1 py-0 font-mono text-[10px] font-semibold leading-[14px]",
-    item.filled ? cn(FILLED_ACCENT, TONE_FILLED[item.tone]) : cn("border-current", TONE_TEXT[item.tone]),
+    "font-normal",
+    TONE_TEXT[item.tone],
     item.dashed && "border-dashed",
-    item.faded && "opacity-45",
+    item.faded && "opacity-55",
     extra,
   );
 }
 
-/** A boxed word's Badge: this page's own filled (primary), the rest outlined in their tone. */
+/** A boxed word's Badge: outlined in its tone, this page's own included. */
 function BadgeWord({ item, children }: { item: BadgeItem; children: ReactNode }) {
   return (
     <Badge
-      variant={item.filled ? "default" : "outline"}
-      className={badgeClasses(item, item.text !== undefined ? "block max-w-[calc(12ch+10px)] truncate" : undefined)}
+      variant="outline"
+      className={toneClasses(item, item.text !== undefined ? "block max-w-24 truncate" : undefined)}
       title={item.title}
     >
       {item.text ?? children}
@@ -458,11 +446,11 @@ function BadgeRun({ text, items, cap, label, plain = false }: {
 }) {
   if (items.length === 0) return null;
   return (
-    <span className="debug-run" title={label} {...(plain ? {} : { role: "img", "aria-label": label })}>
+    <span className="inline-flex min-w-0 flex-wrap items-center gap-1 align-middle" title={label} {...(plain ? {} : { role: "img", "aria-label": label })}>
       {items.slice(0, cap).map((item, index) => (
         <BadgeWord key={index} item={item}>{text}</BadgeWord>
       ))}
-      {items.length > cap && <span className="debug-run-more">{`+${items.length - cap}`}</span>}
+      {items.length > cap && <span className="text-xs tabular-nums text-muted-foreground">{`+${items.length - cap}`}</span>}
     </span>
   );
 }
@@ -532,7 +520,7 @@ function ClientIcons({ client }: { client: string | null | undefined }) {
   const parts = client ? client.split(" · ").filter((part) => part in CLIENT_GLYPHS) : [];
   if (parts.length === 0) return null;
   return (
-    <span className="debug-client" aria-hidden="true">
+    <span className="inline-flex items-center gap-1" aria-hidden="true">
       {parts.map((part) => (
         <svg
           key={part}
@@ -552,41 +540,57 @@ function ClientIcons({ client }: { client: string | null | undefined }) {
   );
 }
 
+/** A status mark in its tone: a lucide circle, filled when solid, hollow when ringed. */
 function Dot({ tone, ring = false }: { tone: DebugTone; ring?: boolean }) {
-  return <span className={`debug-dot is-${tone}${ring ? " is-ring" : ""}`} aria-hidden="true" />;
+  return (
+    <CircleIcon
+      className={cn("size-2.5 shrink-0", TONE_TEXT[tone])}
+      fill={ring ? "none" : "currentColor"}
+      aria-hidden="true"
+    />
+  );
 }
 
-/** A state word in its tone's outline (shadcn Badge): the box reads the tone's own color. */
+/** A state word in its tone's outline Badge: every state is the official outline, never a fill. */
 function Chip({ tone, children, title }: { tone: DebugTone; children: ReactNode; title?: string }) {
   return (
-    <Badge variant="outline" className={cn("border-current/35 px-1.5 py-0 font-mono text-[11px] leading-4 font-normal", TONE_TEXT[tone])} title={title}>
+    <Badge variant="outline" className={cn("font-normal", TONE_TEXT[tone])} title={title}>
       {children}
     </Badge>
   );
 }
 
-/** A value against its scale; hidden from screen readers, whose text is the label and value beside it. */
-function Bar({ fraction, tone, width, height = 4, notches, title, className }: {
+/** The Progress fill's own color per tone: the official bar, tinted by the theme's token. */
+const PROGRESS_TONE: Record<DebugTone, string> = {
+  ok: "[&>[data-slot=progress-indicator]]:bg-success",
+  warning: "[&>[data-slot=progress-indicator]]:bg-warning",
+  error: "[&>[data-slot=progress-indicator]]:bg-destructive",
+  accent: "[&>[data-slot=progress-indicator]]:bg-primary",
+  muted: "[&>[data-slot=progress-indicator]]:bg-muted-foreground",
+  dim: "[&>[data-slot=progress-indicator]]:bg-muted-foreground",
+};
+
+/**
+ * A value against its scale: the official Progress, its width from the tailwind scale. Hidden
+ * from screen readers, whose text is the label and value beside it.
+ */
+function Bar({ fraction, tone, width = "w-24", title, className }: {
   fraction: number;
   tone: DebugTone;
-  width: number | string;
-  height?: number;
-  notches?: readonly number[];
+  width?: "w-24" | "w-20" | "w-8";
   title?: string;
   className?: string;
 }) {
+  const value = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
   return (
-    // The bar's size and the fill/notch offsets are computed measures (fractions
-    // of a timeout, heartbeats on a scale), not presentation: they stay inline.
-    <span className={`debug-bar is-${tone}${className ? ` ${className}` : ""}`} style={{ width, height }} title={title} aria-hidden="true">
-      <span className="debug-bar-fill" style={{ width: `${fraction * 100}%` }} />
-      {notches?.map((notch) => <span key={notch} className="debug-bar-notch" style={{ left: `${notch * 100}%` }} />)}
-    </span>
+    <Progress
+      value={value}
+      aria-hidden="true"
+      title={title}
+      className={cn("h-1.5 shrink-0", width, PROGRESS_TONE[tone], className)}
+    />
   );
 }
-
-// One width for the panel's bars and sparklines: a wide panel keeps a value next to its bar.
-const BAR_WIDTH = 120;
 
 /**
  * Round trips, newest on the right; the 5 s timeout is full height, a failure is a full bar. The
@@ -597,7 +601,7 @@ function Sparkline({ samples, label }: { samples: readonly DebugSample[]; label:
   const shown = samples.slice(-DEBUG_SAMPLE_COUNT);
   return (
     // A data chart (one rect per round trip on a baseline), not an icon: stays an svg.
-    <span className="debug-spark" role="img" aria-label={label} title={label}>
+    <span className="inline-flex w-30 shrink-0" role="img" aria-label={label} title={label}>
       <svg width="120" height="15" viewBox="0 0 120 15" aria-hidden="true">
         <rect x="0" y="14" width="120" height="1" className="fill-border" />
         {shown.map((sample, index) => {
@@ -605,7 +609,7 @@ function Sparkline({ samples, label }: { samples: readonly DebugSample[]; label:
           return (
             <rect
               key={index}
-              className={`is-${sample.tone}`}
+              className={TONE_TEXT[sample.tone]}
               x={120 - (shown.length - index) * 4 + 1}
               y={14 - height}
               width="3"
@@ -619,26 +623,33 @@ function Sparkline({ samples, label }: { samples: readonly DebugSample[]; label:
   );
 }
 
-/** The sidebar's status slot: spinner, awaiting dot, or a ring by state. */
+/** The sidebar's status slot: spinner, awaiting dot, or the state's mark; the state is its name. */
 function StatusSlot({ state, label }: { state: DebugStatusState; label: string }) {
+  const slot = "inline-flex size-4 shrink-0 items-center justify-center";
   if (state === "awaiting") {
     return (
-      <span className="debug-status">
+      <span className={slot}>
         <span className="session-tree-awaiting" role="img" aria-label={label} title={label} />
       </span>
     );
   }
   if (state === "running") {
     return (
-      <span className="debug-status is-accent" title={label}>
+      <span className={cn(slot, "text-primary")} title={label}>
         {/* sidebar-spin (the retired app/sidebar-menu.css, folded here). */}
         <LoaderCircleIcon size={12} strokeWidth={2.8} className="sidebar-spin shrink-0 animate-spin [animation-duration:0.9s] motion-reduce:animate-none" role="img" aria-label={label} aria-hidden={false} />
       </span>
     );
   }
+  const Icon = state === "alive" ? CircleIcon : state === "none" ? CircleOffIcon : CircleDashedIcon;
   return (
-    <span className="debug-status" role="img" aria-label={label} title={label}>
-      <span className={`debug-status-ring is-${state}`} />
+    <span
+      className={cn(slot, state === "closing" ? "text-warning" : "text-muted-foreground")}
+      role="img"
+      aria-label={label}
+      title={label}
+    >
+      <Icon className="size-3 shrink-0" strokeWidth={2} aria-hidden="true" />
     </span>
   );
 }
@@ -664,13 +675,19 @@ function VerdictView({ verdict, t }: { verdict: DebugVerdict; t: Translate }) {
     waiting: () => t("debug.poll.waiting"),
     ok: () => t("debug.health.ok"),
   }[verdict.kind]();
+  // The verdict is a state too: the official outline Badge, its tone tinting border and text.
+  const tone = verdict.kind === "ok"
+    ? TONE_TEXT.muted
+    : verdict.kind === "issues"
+      ? TONE_TEXT[verdict.tone === "error" ? "error" : "warning"]
+      : TONE_TEXT.dim;
   return (
-    <span className={`debug-panel-status inline-flex min-w-0 items-center gap-1.5 tabular-nums is-${verdict.kind === "ok" ? "muted" : verdict.tone}`}>
+    <Badge variant="outline" className={cn("debug-panel-status min-w-0 gap-1 font-normal tabular-nums", tone)} title={text}>
       {verdict.kind === "issues" && <Glyph kind={verdict.tone === "error" ? "error" : "warning"} />}
       {verdict.kind === "ok" && <Dot tone="ok" />}
       {(verdict.kind === "hidden" || verdict.kind === "waiting") && <Dot tone="dim" ring />}
       <span className="debug-panel-status-text min-w-0 truncate">{text}</span>
-    </span>
+    </Badge>
   );
 }
 
@@ -704,47 +721,80 @@ function sparkLabel(samples: readonly DebugSample[], t: Translate): string {
 
 function SampleValue({ samples, t }: { samples: readonly DebugSample[]; t: Translate }) {
   const last = samples[samples.length - 1];
-  if (!last) return <span className="debug-value is-dim">—</span>;
-  return <span className={`debug-value is-${last.tone}`}>{last.failed ? "—" : formatDebugDuration(last.ms, t)}</span>;
+  if (!last) return <span className="text-xs tabular-nums text-muted-foreground">—</span>;
+  return <span className={cn("text-xs tabular-nums", TONE_TEXT[last.tone])}>{last.failed ? "—" : formatDebugDuration(last.ms, t)}</span>;
 }
 
 /**
- * The page's connections and timings in one column: the meter under its count, then one
- * definition list of name, scale and value for the two polls, the chat's stream and its lease,
- * each with its details on a dim line below.
+ * One measure of the page's field group: its name, then a value line and the details below it.
+ * Field/FieldGroup/FieldTitle are the official key-value row; nothing here draws its own box.
  */
-function PageColumn({ page, samples, reply, ctx }: { page: DebugPageReading; samples: DebugSamples; reply: DebugSnapshotResponse | null; ctx: Ctx }) {
+function Measure({ label, title, value, detail }: {
+  label: ReactNode;
+  title?: string;
+  value: ReactNode;
+  detail?: ReactNode;
+}) {
+  return (
+    <Field orientation="horizontal" className="gap-3">
+      <FieldTitle className="min-w-24 shrink-0 justify-start text-xs font-normal text-muted-foreground" title={title}>{label}</FieldTitle>
+      <div className="flex min-w-0 flex-1 flex-col items-end gap-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{value}</div>
+        {detail !== undefined && (
+          <FieldDescription className="text-xs font-normal tabular-nums [overflow-wrap:anywhere]">{detail}</FieldDescription>
+        )}
+      </div>
+    </Field>
+  );
+}
+
+/**
+ * The page's connections and timings in one column: the meter above its count, then one field per
+ * measure (name, scale and value) for the two polls, the chat's stream and its lease.
+ */
+function PageColumn({ page, samples, ctx, className }: {
+  page: DebugPageReading;
+  samples: DebugSamples;
+  ctx: Ctx;
+  className?: string;
+}) {
   const { t } = ctx;
   const pool = poolSlots(page.sources, page.protocol, page.client?.connection?.sessionId ?? null);
   const running = page.runningPoll;
   return (
-    <Card className="debug-col-page min-w-0 gap-2 px-3 py-3 shadow-none">
-      <CardHeader className="flex min-h-[18px] flex-row items-center gap-2 px-0">
-        <CardTitle className="debug-section-title">{t("debug.section.page")}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex min-w-0 flex-col gap-2 px-0">
-        <Meter pool={pool} ctx={ctx} />
-        <Separator />
-        <dl className="debug-measures">
-          <dt className="debug-measure-name"><span className="debug-label">{t("debug.page.debugPoll")}</span></dt>
-          <dd className="debug-measure-cell"><Sparkline samples={samples.poll} label={sparkLabel(samples.poll, t)} /><SampleValue samples={samples.poll} t={t} /></dd>
-          <dt className="debug-measure-name"><span className="debug-label">{t("debug.page.runningPoll")}</span></dt>
-          <dd className="debug-measure-cell">
-            <Sparkline
-              samples={samples.running}
-              label={join([running && t("debug.page.pollCounts", { count: running.count, failures: running.failures }), sparkLabel(samples.running, t)])}
-            />
-            <SampleValue samples={samples.running} t={t} />
-          </dd>
-          <StreamRows page={page} reply={reply} ctx={ctx} />
-          <LeaseRows page={page} ctx={ctx} />
-        </dl>
-      </CardContent>
-    </Card>
+    <section className={cn("flex min-w-0 flex-col gap-3", className)} aria-labelledby="debug-section-page">
+      <h3 id="debug-section-page" data-debug-section="page" className="text-sm leading-none font-semibold text-foreground">
+        {t("debug.section.page")}
+      </h3>
+      <Meter pool={pool} ctx={ctx} />
+      <FieldGroup className="gap-2">
+        <Measure
+          label={t("debug.page.debugPoll")}
+          value={<><Sparkline samples={samples.poll} label={sparkLabel(samples.poll, t)} /><SampleValue samples={samples.poll} t={t} /></>}
+        />
+        <Measure
+          label={t("debug.page.runningPoll")}
+          value={(
+            <>
+              <Sparkline
+                samples={samples.running}
+                label={join([running && t("debug.page.pollCounts", { count: running.count, failures: running.failures }), sparkLabel(samples.running, t)])}
+              />
+              <SampleValue samples={samples.running} t={t} />
+            </>
+          )}
+        />
+        <StreamRows page={page} ctx={ctx} />
+        <LeaseRows page={page} ctx={ctx} />
+      </FieldGroup>
+    </section>
   );
 }
 
-/** HTTP/1.1's six connections as six slots, filled by this page's own sources, oldest first. */
+/**
+ * This page's share of the browser's connections: the official Progress against the protocol's
+ * cap, then one outline Badge per source it holds (the chat's own first, amber while connecting).
+ */
 function Meter({ pool, ctx }: { pool: DebugPool; ctx: Ctx }) {
   const { t, now, titleOf } = ctx;
   // The slots' own titles are not read inside an image: its name says what they count.
@@ -752,29 +802,28 @@ function Meter({ pool, ctx }: { pool: DebugPool; ctx: Ctx }) {
   const label = pool.cap !== null
     ? join([`${t("debug.page.http1", { protocol: pool.protocol ?? "" })} · ${pool.mine}/${pool.cap}`, ...kindCounts])
     : join([t("debug.section.page"), ...kindCounts, pool.protocol ?? t("debug.unknown")]);
-  const cells: (DebugPoolSlot | null)[] = pool.cap !== null
-    ? Array.from({ length: pool.cap }, (_, index) => pool.slots[index] ?? null)
-    : pool.slots;
   return (
-    <div className="debug-meter-row">
-      <span className={`debug-meter${pool.cap === null ? " is-inline" : ""}`} role="img" aria-label={label} title={label}>
-        {cells.map((slot, index) => slot ? (
-          // The chat's own stream filled, a stream kept through its grace and the rest outlined;
-          // amber and dashed while connecting.
+    <div className="flex min-w-0 flex-col gap-2">
+      {pool.cap !== null && (
+        <div className="flex min-w-0 items-center gap-2">
+          <Progress value={Math.round((pool.mine / pool.cap) * 100)} aria-hidden="true" className="h-1.5 w-24" />
+          <span className="text-xs tabular-nums text-muted-foreground">{`${pool.mine}/${pool.cap}`}</span>
+        </div>
+      )}
+      <span className="flex min-w-0 flex-wrap items-center gap-1" role="img" aria-label={label} title={label}>
+        {pool.slots.map((slot) => (
           <Badge
             key={slot.id}
-            variant={slot.chat ? "default" : "outline"}
-            className={cn("debug-slot", badgeClasses({ tone: slot.connecting ? "warning" : slot.chat ? "accent" : "muted", filled: slot.chat, dashed: slot.connecting }))}
+            variant="outline"
+            className={toneClasses({ tone: slot.connecting ? "warning" : slot.chat ? "accent" : "muted", dashed: slot.connecting }, "min-w-8 justify-center")}
             title={debugSlotTitle(slot, now, t, titleOf)}
           >
             {slot.kind === "agent" ? "SSE" : t(SLOT_TEXT_KEYS[slot.kind])}
           </Badge>
-        ) : (
-          <span key={`empty:${index}`} className="debug-slot is-empty" />
         ))}
-        {pool.overflow > 0 && <span className="debug-meter-overflow is-error">{`+${pool.overflow}`}</span>}
+        {pool.overflow > 0 && <span className="text-xs tabular-nums text-destructive">{`+${pool.overflow}`}</span>}
+        {pool.cap === null && pool.protocol !== null && <Chip tone="dim">{pool.protocol}</Chip>}
       </span>
-      {pool.cap === null && pool.protocol !== null && <Chip tone="dim">{pool.protocol}</Chip>}
     </div>
   );
 }
@@ -835,77 +884,62 @@ function streamStateTitle(client: DebugClientSession, connection: DebugEventConn
   return lines.filter(Boolean).join("\n");
 }
 
-/** The chat's stream: its state's dot by the name, time since its last byte, then its counts. */
-function StreamRows({ page, reply, ctx }: { page: DebugPageReading; reply: DebugSnapshotResponse | null; ctx: Ctx }) {
+/** The chat's stream: the time since its last byte against the watchdog, then its state and counts. */
+function StreamRows({ page, ctx }: { page: DebugPageReading; ctx: Ctx }) {
   const { t, now } = ctx;
   const client = page.client;
   const connection = client?.connection ?? null;
-  const name = (
-    <dt className="debug-measure-name" title={client && connection ? streamStateTitle(client, connection, page, t) : undefined}>
-      <span className="debug-label">{t("debug.section.stream")}</span>
-    </dt>
-  );
   if (!client || !connection) {
     return (
-      <>
-        {name}
-        <dd className="debug-measure-empty">{!client ? (page.clientFailed ? "—" : t("debug.stream.noChat")) : t("debug.stream.noConnection")}</dd>
-      </>
+      <Measure
+        label={t("debug.section.stream")}
+        value={<span className="text-xs text-muted-foreground">{!client ? (page.clientFailed ? "—" : t("debug.stream.noChat")) : t("debug.stream.noConnection")}</span>}
+      />
     );
   }
+  const title = streamStateTitle(client, connection, page, t);
   const freshness = streamFreshness(connection, now);
   const dot = STREAM_DOTS[connection.state];
-  return (
-    <>
-      {name}
-      {freshness ? (
-        <FreshnessCells connection={connection} freshness={freshness} heartbeatMs={reply?.server.heartbeatMs ?? 0} ctx={ctx} />
-      ) : (
-        <dd className="debug-measure-cell"><span className="debug-value is-dim">—</span></dd>
-      )}
-      {/* The state leads its line with its dot, so the names stay in one column. */}
-      <dd className="debug-measure-sub" title={streamStateTitle(client, connection, page, t)}>
-        <Dot tone={dot?.tone ?? "dim"} ring={dot?.ring ?? true} />
-        {join([
-          t(DEBUG_STREAM_STATE_KEYS[connection.state] ?? "debug.unknown"),
-          `${t("debug.stream.events")} ${connection.events}`,
-          connection.retries > 0 && `${t("debug.stream.opens")} ${t("debug.stream.opensRetries", { opens: connection.opens, retries: connection.retries })}`,
-        ])}
-      </dd>
-      {(client.released.active || client.graceDueAt !== null) && (
-        <dd className="debug-measure-sub debug-chips">
-          {client.released.active && <Chip tone="accent">{t("debug.stream.close.released")}</Chip>}
-          {client.graceDueAt !== null && <Chip tone="accent">{`${t("debug.stream.grace")} ${formatSecondsCountdown(client.graceDueAt - now, t)}`}</Chip>}
-        </dd>
-      )}
-    </>
-  );
-}
-
-/** Time since the stream's last byte against the watchdog's limit, notched at each heartbeat. */
-function FreshnessCells({ connection, freshness, heartbeatMs, ctx }: {
-  connection: DebugEventConnectionSnapshot;
-  freshness: { ageMs: number; staleAfterMs: number };
-  heartbeatMs: number;
-  ctx: Ctx;
-}) {
-  const { t, now } = ctx;
-  const { ageMs, staleAfterMs } = freshness;
-  const tone = freshnessTone(ageMs, staleAfterMs);
-  const notches: number[] = [];
-  if (heartbeatMs > 0) {
-    for (let at = heartbeatMs; at < staleAfterMs && notches.length < 12; at += heartbeatMs) notches.push(at / staleAfterMs);
-  }
-  const title = join([
-    `${t("debug.stream.lastData")} ${formatAgo(ageMs, t)}`,
+  const tone = freshness ? freshnessTone(freshness.ageMs, freshness.staleAfterMs) : "dim";
+  // Time since the last byte: the watchdog's limit is the scale, its heartbeat the tooltip's word.
+  const watchdogTitle = freshness ? join([
+    `${t("debug.stream.lastData")} ${formatAgo(freshness.ageMs, t)}`,
     connection.lastHeartbeatAt !== null && t("debug.stream.heartbeat", { time: formatAgo(now - connection.lastHeartbeatAt, t) }),
-    t("debug.stream.watchdogArmed", { time: formatDebugDuration(staleAfterMs, t) }),
-  ]);
+    t("debug.stream.watchdogArmed", { time: formatDebugDuration(freshness.staleAfterMs, t) }),
+  ]) : undefined;
   return (
-    <dd className="debug-measure-cell">
-      <Bar fraction={barFraction(ageMs, staleAfterMs) ?? 0} tone={tone} width={BAR_WIDTH} notches={notches} title={title} />
-      <span className={`debug-value is-${tone}`} title={title}>{t("debug.stream.dataAgo", { time: formatDebugSeconds(ageMs, t) })}</span>
-    </dd>
+    <Field orientation="horizontal" className="gap-3">
+      <FieldTitle className="min-w-24 shrink-0 justify-start text-xs font-normal text-muted-foreground" title={title}>{t("debug.section.stream")}</FieldTitle>
+      <div className="flex min-w-0 flex-1 flex-col items-end gap-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          {freshness ? (
+            <>
+              <Bar fraction={barFraction(freshness.ageMs, freshness.staleAfterMs) ?? 0} tone={tone} title={watchdogTitle} />
+              <span className={cn("text-xs tabular-nums", TONE_TEXT[tone])} title={watchdogTitle}>
+                {t("debug.stream.dataAgo", { time: formatDebugSeconds(freshness.ageMs, t) })}
+              </span>
+            </>
+          ) : (
+            <span className="text-xs tabular-nums text-muted-foreground">—</span>
+          )}
+        </div>
+        {/* The state leads its line with its mark, so the names stay in one column. */}
+        <FieldDescription className="text-xs font-normal tabular-nums [overflow-wrap:anywhere]" title={title}>
+          <span className="mr-1.5 inline-flex align-middle"><Dot tone={dot?.tone ?? "dim"} ring={dot?.ring ?? true} /></span>
+          {join([
+            t(DEBUG_STREAM_STATE_KEYS[connection.state] ?? "debug.unknown"),
+            `${t("debug.stream.events")} ${connection.events}`,
+            connection.retries > 0 && `${t("debug.stream.opens")} ${t("debug.stream.opensRetries", { opens: connection.opens, retries: connection.retries })}`,
+          ])}
+        </FieldDescription>
+        {(client.released.active || client.graceDueAt !== null) && (
+          <div className="flex flex-wrap items-center justify-end gap-1">
+            {client.released.active && <Chip tone="accent">{t("debug.stream.close.released")}</Chip>}
+            {client.graceDueAt !== null && <Chip tone="accent">{`${t("debug.stream.grace")} ${formatSecondsCountdown(client.graceDueAt - now, t)}`}</Chip>}
+          </div>
+        )}
+      </div>
+    </Field>
   );
 }
 
@@ -914,13 +948,12 @@ function LeaseRows({ page, ctx }: { page: DebugPageReading; ctx: Ctx }) {
   const { t, now } = ctx;
   const lease = page.client?.lease ?? null;
   const pageId = page.client?.pageId ?? null;
-  const name = <dt className="debug-measure-name"><span className="debug-label">{t("debug.section.lease")}</span></dt>;
   if (!lease || lease.requests === 0) {
     return (
-      <>
-        {name}
-        <dd className="debug-measure-empty">{!lease ? (page.clientFailed ? "—" : t("debug.stream.noChat")) : t("debug.lease.noHolder")}</dd>
-      </>
+      <Measure
+        label={t("debug.section.lease")}
+        value={<span className="text-xs text-muted-foreground">{!lease ? (page.clientFailed ? "—" : t("debug.stream.noChat")) : t("debug.lease.noHolder")}</span>}
+      />
     );
   }
   const last = lease.last;
@@ -935,49 +968,61 @@ function LeaseRows({ page, ctx }: { page: DebugPageReading; ctx: Ctx }) {
     pageId !== null && `${t("debug.holder.thisPage")} ${shortDebugId(pageId)}`,
   ]);
   return (
-    <>
-      {name}
-      {next === null ? (
-        <dd className="debug-measure-cell"><span className="debug-value is-dim">—</span></dd>
-      ) : (
-        <dd className="debug-measure-cell">
-          {/* Fills toward the renewal, as the stream's bar fills toward its watchdog; waiting for an
-              answer: full and amber until it comes. */}
-          <Bar fraction={waiting ? 1 : 1 - (barFraction(next - now, lease.renewIntervalMs) ?? 1)} tone={tone} width={BAR_WIDTH} title={title} />
-          {/* The value says what it counts: "renews in 18s", as the stream's says "data 21s ago". */}
-          <span className="debug-value is-muted" title={title}>
-            {next - now > 0 ? t("debug.lease.renewsIn", { time: formatDebugSeconds(next - now, t, "ceil") }) : t("debug.lease.renewing")}
-          </span>
-        </dd>
-      )}
-      <dd className="debug-measure-sub">
-        {`${t("debug.lease.last")} ${last
-          ? join([
-            t(DEBUG_LEASE_OUTCOME_KEYS[last.outcome] ?? "debug.unknown"),
-            formatDebugDuration(last.durationMs, t),
-            last.outcome === "error" && last.httpStatus !== null && `HTTP ${last.httpStatus}`,
-            t("debug.time.ago", { time: formatDebugSeconds(now - last.at, t) }),
-          ])
-          : t("debug.notYet")}`}
-      </dd>
-      {(lease.unanswered > 0 || lease.errors > 0) && <dd className="debug-measure-sub">{counts}</dd>}
-    </>
+    <Field orientation="horizontal" className="gap-3">
+      <FieldTitle className="min-w-24 shrink-0 justify-start text-xs font-normal text-muted-foreground" title={title}>{t("debug.section.lease")}</FieldTitle>
+      <div className="flex min-w-0 flex-1 flex-col items-end gap-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          {next === null ? (
+            <span className="text-xs tabular-nums text-muted-foreground">—</span>
+          ) : (
+            <>
+              {/* Fills toward the renewal, as the stream's bar fills toward its watchdog; waiting for an
+                  answer: full and amber until it comes. */}
+              <Bar fraction={waiting ? 1 : 1 - (barFraction(next - now, lease.renewIntervalMs) ?? 1)} tone={tone} title={title} />
+              {/* The value says what it counts: "renews in 18s", as the stream's says "data 21s ago". */}
+              <span className={cn("text-xs tabular-nums", TONE_TEXT[tone])} title={title}>
+                {next - now > 0 ? t("debug.lease.renewsIn", { time: formatDebugSeconds(next - now, t, "ceil") }) : t("debug.lease.renewing")}
+              </span>
+            </>
+          )}
+        </div>
+        <FieldDescription className="text-xs font-normal tabular-nums [overflow-wrap:anywhere]">
+          {`${t("debug.lease.last")} ${last
+            ? join([
+              t(DEBUG_LEASE_OUTCOME_KEYS[last.outcome] ?? "debug.unknown"),
+              formatDebugDuration(last.durationMs, t),
+              last.outcome === "error" && last.httpStatus !== null && `HTTP ${last.httpStatus}`,
+              t("debug.time.ago", { time: formatDebugSeconds(now - last.at, t) }),
+            ])
+            : t("debug.notYet")}`}
+        </FieldDescription>
+        {(lease.unanswered > 0 || lease.errors > 0) && (
+          <FieldDescription className="text-xs font-normal tabular-nums">{counts}</FieldDescription>
+        )}
+      </div>
+    </Field>
   );
 }
 
 // ── C2. Server: totals in the head ──
 
+/** The server's column: its own totals, then the pages holding its streams. */
+function ServerColumn({ reply, ctx }: { reply: DebugSnapshotResponse | null; ctx: Ctx }) {
+  return (
+    <section className="flex min-w-0 flex-col gap-3" aria-labelledby="debug-section-server">
+      <h3 id="debug-section-server" data-debug-section="server" className="text-sm leading-none font-semibold text-foreground">
+        {ctx.t("debug.section.server")}
+      </h3>
+      <ServerHead reply={reply} ctx={ctx} />
+      <PageList reply={reply} ctx={ctx} />
+    </section>
+  );
+}
 
 function ServerHead({ reply, ctx }: { reply: DebugSnapshotResponse | null; ctx: Ctx }) {
   const { t, clock } = ctx;
-  const title = <CardTitle className="debug-section-title">{t("debug.section.server")}</CardTitle>;
   if (!reply || !clock) {
-    return (
-      <CardHeader className="debug-server-head flex min-h-[18px] flex-row flex-wrap items-center gap-x-3.5 gap-y-1 px-0">
-        {title}
-        <span>{t("debug.poll.waiting")}</span>
-      </CardHeader>
-    );
+    return <p className="text-xs text-muted-foreground">{t("debug.poll.waiting")}</p>;
   }
   const global = reply.server;
   const wrappers = t("debug.global.wrappersValue", { ...global.wrappers });
@@ -1004,20 +1049,23 @@ function ServerHead({ reply, ctx }: { reply: DebugSnapshotResponse | null; ctx: 
   const watchesLabel = `${t("debug.global.fileWatches")}: ${global.fileWatches}`;
   const starting = global.wrappers.starting;
   return (
-    <CardHeader className="debug-server-head flex min-h-[18px] flex-row flex-wrap items-center gap-x-3.5 gap-y-1 px-0">
-      {title}
-      <span className="debug-server-item" title={timers}>
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+      <span className="inline-flex min-w-0 items-center gap-1" title={timers}>
         <Glyph kind="server" />
         <span>{`${t("debug.global.uptime")} ${formatDebugDuration(clock.age(global.startedAt), t)}`}</span>
       </span>
-      {/* Wrappers still starting: the status slot's dashed ring each, as on the rows. */}
+      {/* Wrappers still starting: a dashed outline Badge, the same mark the rows use. */}
       {starting > 0 && (
-        <span className="debug-run" role="img" aria-label={wrappers} title={wrappers}>
-          {Array.from({ length: Math.min(starting, 4) }, (_, index) => (
-            <span key={index} className="debug-status"><span className="debug-status-ring is-starting" /></span>
-          ))}
-          {starting > 4 && <span className="debug-run-more">{`+${starting - 4}`}</span>}
-        </span>
+        <Badge
+          variant="outline"
+          className="gap-1 border-dashed font-normal text-muted-foreground tabular-nums"
+          role="img"
+          aria-label={wrappers}
+          title={wrappers}
+        >
+          <LoaderCircleIcon className="size-3 shrink-0 motion-reduce:animate-none" aria-hidden="true" />
+          {starting}
+        </Badge>
       )}
       <BadgeRun
         text={t("debug.box.file")}
@@ -1026,7 +1074,7 @@ function ServerHead({ reply, ctx }: { reply: DebugSnapshotResponse | null; ctx: 
         label={watchesLabel}
       />
       <BadgeRun text={t("debug.box.terminal")} items={terminalItems} cap={4} label={terminalsLabel} />
-    </CardHeader>
+    </div>
   );
 }
 
@@ -1044,39 +1092,50 @@ function PageList({ reply, ctx }: { reply: DebugSnapshotResponse | null; ctx: Ct
   if (sseTotal === 0 && pages.length === 0) return null;
   const holders = thisPageFirst(pages, myHolder);
   return (
-    <CardContent className="min-w-0 px-0">
-      <div className="debug-pages">
-      <div className="debug-page-row debug-list-head">
-        <span className="debug-pages-title">{`${t("debug.pages.title")} ${holders.length}`}</span>
-        <span className="debug-page-count">{`SSE ${t("debug.global.streamTotal", { count: sseTotal })}`}</span>
+    <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="font-medium text-foreground">{`${t("debug.pages.title")} ${holders.length}`}</span>
+        <span className="tabular-nums text-muted-foreground">{`SSE ${t("debug.global.streamTotal", { count: sseTotal })}`}</span>
       </div>
-      {holders.map((entry, index) => {
-        const mine = entry.holder !== null && entry.holder === myHolder;
-        const page = debugHolderLabel(entry.holder, myHolder, t);
-        const count = entry.agent + entry.terminal + entry.fileWatch;
-        // By kind, as the page's own meter counts them.
-        const kinds = join([
-          entry.agent > 0 && `${t(DEBUG_SOURCE_KIND_KEYS.agent)} ${entry.agent}`,
-          entry.terminal > 0 && `${t(DEBUG_SOURCE_KIND_KEYS.terminal)} ${entry.terminal}`,
-          entry.fileWatch > 0 && `${t(DEBUG_SOURCE_KIND_KEYS["file-watch"])} ${entry.fileWatch}`,
-        ]);
-        return (
-          <div
-            key={`${entry.holder ?? ""}:${index}`}
-            className={`debug-page-row${mine ? " is-current" : ""}`}
-            title={join([page, entry.client, entry.address, `SSE ${count}`, kinds])}
-          >
-            <span className="debug-page-icons"><ClientIcons client={entry.client} /></span>
-            <span className={`debug-page-client${entry.client ? "" : " is-dim"}`}>{entry.client ?? t("debug.pages.unknownClient")}</span>
-            <span className="debug-page-address">{entry.address ?? "—"}</span>
-            {/* "this page", or another page's short id: the column says the rest. */}
-            <span className="debug-page-holder">{mine ? t("debug.holder.thisPage") : entry.holder !== null ? shortDebugId(entry.holder) : t("debug.holder.none")}</span>
-            <span className="debug-page-count">{count}</span>
-          </div>
-        );
-      })}
-      </div>
-    </CardContent>
+      <Table>
+        <TableBody>
+          {holders.map((entry, index) => {
+            const mine = entry.holder !== null && entry.holder === myHolder;
+            const page = debugHolderLabel(entry.holder, myHolder, t);
+            const count = entry.agent + entry.terminal + entry.fileWatch;
+            // By kind, as the page's own meter counts them.
+            const kinds = join([
+              entry.agent > 0 && `${t(DEBUG_SOURCE_KIND_KEYS.agent)} ${entry.agent}`,
+              entry.terminal > 0 && `${t(DEBUG_SOURCE_KIND_KEYS.terminal)} ${entry.terminal}`,
+              entry.fileWatch > 0 && `${t(DEBUG_SOURCE_KIND_KEYS["file-watch"])} ${entry.fileWatch}`,
+            ]);
+            return (
+              <TableRow
+                key={`${entry.holder ?? ""}:${index}`}
+                // The current row's tint is the official selected state, not a hand-painted box.
+                data-state={mine ? "selected" : undefined}
+                title={join([page, entry.client, entry.address, `SSE ${count}`, kinds])}
+              >
+                <TableCell className="text-xs">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 text-muted-foreground"><ClientIcons client={entry.client} /></span>
+                    <span className={cn("min-w-0 truncate", entry.client ? "text-foreground" : "text-muted-foreground")}>
+                      {entry.client ?? t("debug.pages.unknownClient")}
+                    </span>
+                  </span>
+                </TableCell>
+                <TableCell className="font-mono text-xs tabular-nums text-muted-foreground">{entry.address ?? "—"}</TableCell>
+                {/* "this page", or another page's short id: the row's title says the rest. */}
+                <TableCell className="text-xs text-muted-foreground">
+                  {mine ? t("debug.holder.thisPage") : entry.holder !== null ? <span className="font-mono tabular-nums">{shortDebugId(entry.holder)}</span> : t("debug.holder.none")}
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">{count}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -1101,46 +1160,55 @@ function SessionList({ reply, detail, groups, targetSessionId, sources, ctx }: {
   else if (!detail) lead = <DebugEmpty>{t("debug.poll.waiting")}</DebugEmpty>;
   else if (!listed) lead = <UnlistedCurrent detail={detail} clock={clock} ctx={ctx} />;
   return (
-    <CardContent className="min-w-0 px-0">
-    <div className="debug-list">
+    <div className="flex min-w-0 flex-col gap-3">
       {lead}
       {groups.length === 0 && !(detail && !listed) && <DebugEmpty>{t("debug.none")}</DebugEmpty>}
-      {/* What the rows' columns are: the badges and the countdown say nothing on their own. */}
-      {groups.length > 0 && (
-        <div className="debug-row debug-list-head" aria-hidden="true">
-          <span />
-          <span>{t("debug.sessions.head.session")}</span>
-          <span className="debug-list-head-holders">{t("debug.sessions.head.holders")}</span>
-          <span className="debug-list-head-idle">{t("debug.server.idle")}</span>
-        </div>
-      )}
-          {groups.map((group) => (
-        <div key={group.key} className="debug-group">
-          <div className="debug-group-head">
-            {group.name !== null && <FolderIcon size={11} />}
-            <span className="debug-group-name">{group.name ?? t("debug.sessions.unlisted")}</span>
-            <span className="debug-group-count">{group.rows.filter((row) => row.summary !== null).length}</span>
+      {groups.map((group) => (
+        <div key={group.key} className="flex min-w-0 flex-col gap-1">
+          <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            {group.name !== null && <FolderIcon className="size-3 shrink-0" aria-hidden="true" />}
+            <span className="min-w-0 truncate font-medium">{group.name ?? t("debug.sessions.unlisted")}</span>
+            <span className="tabular-nums">{group.rows.filter((row) => row.summary !== null).length}</span>
           </div>
-          {group.rows.map((row) => {
-            const mine = row.current && detail?.sessionId === row.id ? detail : null;
-            return (
-              <Fragment key={row.id}>
+          <ItemGroup className="gap-0.5">
+            {group.rows.map((row) => {
+              const mine = row.current && detail?.sessionId === row.id ? detail : null;
+              return (
                 <SessionRow
+                  key={row.id}
                   row={row}
                   sources={sources}
                   idleTimeoutMs={reply.server.idleTimeoutMs}
                   clock={clock}
                   ctx={ctx}
                   current={mine ? currentRowExtras(mine, clock, ctx) : undefined}
+                  detail={mine ? <SessionDetail detail={mine} clock={clock} ctx={ctx} /> : null}
                 />
-                {mine && <SessionDetail detail={mine} clock={clock} ctx={ctx} />}
-              </Fragment>
-            );
-          })}
+              );
+            })}
+          </ItemGroup>
         </div>
       ))}
     </div>
-    </CardContent>
+  );
+}
+
+/** The sessions' column: the groups, with the chat's details under its own row. */
+function SessionColumn(props: {
+  reply: DebugSnapshotResponse | null;
+  detail: DebugSessionDetail | null;
+  groups: readonly DebugSessionGroup[] | null;
+  targetSessionId: string | null;
+  sources: DebugPageReading["sources"];
+  ctx: Ctx;
+}) {
+  return (
+    <section className="flex min-w-0 flex-col gap-3" aria-labelledby="debug-section-sessions">
+      <h3 id="debug-section-sessions" data-debug-section="sessions" className="text-sm leading-none font-semibold text-foreground">
+        {props.ctx.t("debug.sessions.head.session")}
+      </h3>
+      <SessionList {...props} />
+    </section>
   );
 }
 
@@ -1184,13 +1252,19 @@ function UnlistedCurrent({ detail, clock, ctx }: { detail: DebugSessionDetail; c
   const name = titleOf(detail.sessionId) ?? shortDebugId(detail.sessionId);
   const status = detailStatus(detail);
   return (
-    <div className="debug-group">
-      <div className="debug-row is-current has-detail is-placeholder" title={t("debug.sessions.current")}>
-        <span className="debug-row-status"><StatusSlot state={status} label={t(DEBUG_STATUS_KEYS[status])} /></span>
-        <span className="debug-row-title"><span className="debug-row-name">{name}</span></span>
-      </div>
-      <SessionDetail detail={detail} clock={clock} ctx={ctx} unlisted />
-    </div>
+    <ItemGroup className="gap-0.5">
+      <Item size="xs" variant="muted" className="flex-wrap gap-x-2 gap-y-1" title={t("debug.sessions.current")}>
+        <ItemMedia className="w-4">
+          <StatusSlot state={status} label={t(DEBUG_STATUS_KEYS[status])} />
+        </ItemMedia>
+        <ItemContent className="min-w-0">
+          <ItemTitle className="min-w-0 max-w-full text-xs font-medium text-muted-foreground">{name}</ItemTitle>
+        </ItemContent>
+        <ItemFooter className="min-w-0 flex-col items-stretch gap-1.5">
+          <SessionDetail detail={detail} clock={clock} ctx={ctx} unlisted />
+        </ItemFooter>
+      </Item>
+    </ItemGroup>
   );
 }
 
@@ -1220,13 +1294,13 @@ function SessionDetail({ detail, clock, ctx, unlisted = false }: { detail: Debug
     live && wrapper.lastCommand && `${t("debug.server.lastCommand")} ${wrapper.lastCommand.type} ${ago(wrapper.lastCommand.at)}`,
   ]);
   return (
-    <div className="debug-detail">
-      <div className="debug-detail-line">
-        {titleOf(detail.sessionId) !== null && <span className="debug-detail-id">{shortDebugId(detail.sessionId)}</span>}
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+        {titleOf(detail.sessionId) !== null && <span className="font-mono tabular-nums">{shortDebugId(detail.sessionId)}</span>}
         {!wrapper && <span className="text-xs text-muted-foreground">{t(detail.starting ? "debug.server.starting" : "debug.server.noWrapper")}</span>}
         {/* A listed row has its own ↻ count. */}
         {unlisted && lifecycle && lifecycle.starts > 1 && (
-          <span className="debug-starts" title={startsTitle(lifecycle, ago, t)}>{`↻${lifecycle.starts}`}</span>
+          <span className="font-mono tabular-nums" title={startsTitle(lifecycle, ago, t)}>{`↻${lifecycle.starts}`}</span>
         )}
         {closing && <Chip tone="warning">{closing}</Chip>}
         {wrapper?.chatOnly && <Chip tone="dim">{t("debug.server.chatOnly")}</Chip>}
@@ -1234,10 +1308,10 @@ function SessionDetail({ detail, clock, ctx, unlisted = false }: { detail: Debug
         {wrapper?.stale && <Chip tone="warning">{t("debug.server.stale")}</Chip>}
         <ListenerMismatch detail={detail} t={t} />
         {live && <RunChips detail={detail} t={t} />}
-        {activity && <span className="debug-line">{activity}</span>}
+        {activity && <span className="min-w-0 font-mono text-xs tabular-nums [overflow-wrap:anywhere]">{activity}</span>}
       </div>
-      {live && <CardSubagents detail={detail} clock={clock} ctx={ctx} />}
-      {live && <CardMcp detail={detail} clock={clock} ctx={ctx} />}
+      {live && <SubagentRows detail={detail} clock={clock} ctx={ctx} />}
+      {live && <McpRows detail={detail} clock={clock} ctx={ctx} />}
     </div>
   );
 }
@@ -1347,61 +1421,69 @@ const RUN_TONES: Partial<Record<string, DebugTone>> = {
 /** A subagent run's mark: the sidebar's spinner while it runs, the agent switcher's shapes once settled. */
 function RunIcon({ status }: { status: string }) {
   if (status === "running" || status === "starting") {
-    return <span className="debug-run-icon is-accent"><LoaderCircleIcon size={12} /></span>;
+    return <LoaderCircleIcon className="size-3 shrink-0 animate-spin text-primary motion-reduce:animate-none" aria-hidden="true" />;
   }
   const tone = RUN_TONES[status];
-  if (tone) return <span className={`debug-run-icon is-${tone}`}><StatusIcon status={status as SubagentSessionStatus} /></span>;
-  return <span className="debug-run-icon"><span className="debug-status-ring is-alive" /></span>;
+  if (tone) return <span className={cn("inline-flex size-3 shrink-0 items-center justify-center", TONE_TEXT[tone])}><StatusIcon status={status as SubagentSessionStatus} /></span>;
+  return <CircleIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />;
 }
 
-function CardSubagents({ detail, clock, ctx }: { detail: DebugSessionDetail; clock: DebugServerClock; ctx: Ctx }) {
+function SubagentRows({ detail, clock, ctx }: { detail: DebugSessionDetail; clock: DebugServerClock; ctx: Ctx }) {
   const { t, titleOf } = ctx;
   const subagents = detail.subagents;
   if (!subagents.active && subagents.runs.length === 0 && subagents.notifications.length === 0) return null;
   const ago = (at: number) => formatAgo(clock.age(at), t);
   return (
-    <div className="debug-block">
-      <div className="debug-subhead">
-        <span>{t("debug.server.subagents")}</span>
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <span className="text-xs font-semibold text-foreground">{t("debug.server.subagents")}</span>
         {subagents.active && <Chip tone="accent">{t("debug.server.subagentsActive")}</Chip>}
       </div>
-      {subagents.runs.map((run, index) => (
-        <div key={`${run.sessionId}:${index}`} className="debug-run-line">
-          <RunIcon status={run.status} />
-          <span className="debug-run-name">{titleOf(run.sessionId) ?? run.profile ?? shortDebugId(run.sessionId)}</span>
-          <span className="debug-line">
+      <ItemGroup className="gap-0.5">
+        {subagents.runs.map((run, index) => (
+          <Item key={`${run.sessionId}:${index}`} size="xs" className="flex-wrap gap-x-2 gap-y-1">
+            <ItemMedia className="w-3"><RunIcon status={run.status} /></ItemMedia>
+            <ItemContent className="min-w-0">
+              <ItemTitle className="min-w-0 max-w-full text-xs font-medium">
+                {titleOf(run.sessionId) ?? run.profile ?? shortDebugId(run.sessionId)}
+              </ItemTitle>
+            </ItemContent>
+            <ItemActions className="min-w-0 flex-wrap justify-end gap-1 text-xs text-muted-foreground tabular-nums [overflow-wrap:anywhere]">
+              <span>
+                {join([
+                  translateDebugCode(run.status, DEBUG_RUN_STATUS_KEYS, t),
+                  run.background && t("debug.server.background"),
+                  run.resumed && t("debug.server.resumed"),
+                  run.dispatchedAt !== null && ago(run.dispatchedAt),
+                ])}
+              </span>
+              {run.abortRequested && <Chip tone="warning">{t("debug.server.abortRequested")}</Chip>}
+              {run.mcpWaiting && <Chip tone="warning">{t("debug.run.waitingForMcp")}</Chip>}
+            </ItemActions>
+          </Item>
+        ))}
+        {subagents.notifications.map((notification, index) => (
+          <p key={`${notification.sessionId}:${index}`} className="min-w-0 px-2.5 text-xs text-warning tabular-nums [overflow-wrap:anywhere]">
             {join([
-              translateDebugCode(run.status, DEBUG_RUN_STATUS_KEYS, t),
-              run.background && t("debug.server.background"),
-              run.resumed && t("debug.server.resumed"),
-              run.dispatchedAt !== null && ago(run.dispatchedAt),
+              t("debug.server.notifying", { parent: shortDebugId(notification.parentSessionId) }),
+              notification.since !== null && ago(notification.since),
             ])}
-          </span>
-          {run.abortRequested && <Chip tone="warning">{t("debug.server.abortRequested")}</Chip>}
-          {run.mcpWaiting && <Chip tone="warning">{t("debug.run.waitingForMcp")}</Chip>}
-        </div>
-      ))}
-      {subagents.notifications.map((notification, index) => (
-        <div key={`${notification.sessionId}:${index}`} className="debug-line is-warning">
-          {join([
-            t("debug.server.notifying", { parent: shortDebugId(notification.parentSessionId) }),
-            notification.since !== null && ago(notification.since),
-          ])}
-        </div>
-      ))}
+          </p>
+        ))}
+      </ItemGroup>
     </div>
   );
 }
 
-function CardMcp({ detail, clock, ctx }: { detail: DebugSessionDetail; clock: DebugServerClock; ctx: Ctx }) {
+function McpRows({ detail, clock, ctx }: { detail: DebugSessionDetail; clock: DebugServerClock; ctx: Ctx }) {
   const { t } = ctx;
   const mcp = detail.mcp;
   if (!mcp || (mcp.servers.length === 0 && mcp.problems === 0)) return null;
   const release = mcp.idleReleaseAt !== null && mcp.idleMs > 0 ? clock.remaining(mcp.idleReleaseAt) : null;
   return (
-    <div className="debug-block">
-      <div className="debug-pills">
-        <span className={`debug-subhead${mcp.active ? "" : " is-dim"}`}>MCP</span>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <span className={cn("text-xs font-semibold", mcp.active ? "text-foreground" : "text-muted-foreground")}>MCP</span>
         {mcp.servers.map((mcpServer, index) => {
           const { tone, filled } = mcpServerTone(mcpServer);
           const stateWord = translateDebugCode(mcpServer.state, MCP_SESSION_STATE_KEYS, t);
@@ -1412,30 +1494,37 @@ function CardMcp({ detail, clock, ctx }: { detail: DebugSessionDetail; clock: De
             mcpServer.hasError && t("debug.server.mcpError"),
           ]);
           // Any state but connected also in words, and an error on a connected one: the dot's
-          // amber and red alone are a hue.
+          // amber and red alone are a hue. The state word is an outline Badge like every other.
           const word = mcpServer.state !== "connected" ? stateWord : mcpServer.hasError ? t("debug.server.mcpError") : null;
           return (
-            <span key={`${mcpServer.scope}:${mcpServer.name}:${index}`} className="debug-pill" role="img" aria-label={label} title={label}>
+            <Badge
+              key={`${mcpServer.scope}:${mcpServer.name}:${index}`}
+              variant="outline"
+              className={cn("gap-1 font-normal", TONE_TEXT[tone])}
+              role="img"
+              aria-label={label}
+              title={label}
+            >
               <Dot tone={tone} ring={!filled} />
-              <span className={mcpServer.released ? "is-dim" : undefined}>{mcpServer.name}</span>
-              {word && <span className="debug-pill-state">{`· ${word}`}</span>}
-            </span>
+              <span className={mcpServer.released ? "text-muted-foreground" : undefined}>{mcpServer.name}</span>
+              {word && <span className="font-normal text-muted-foreground">{`· ${word}`}</span>}
+            </Badge>
           );
         })}
         {mcp.problems > 0 && <Chip tone="warning">{t("debug.server.mcpProblems", { count: mcp.problems })}</Chip>}
         {mcp.disposed && <Chip tone="dim">{t("debug.server.mcpDisposed")}</Chip>}
       </div>
       {release !== null && (
-        <div className="debug-idle-row">
-          <Bar fraction={barFraction(release, mcp.idleMs) ?? 0} tone="dim" width={80} />
-          <span className="debug-value is-muted">{t("debug.server.mcpRelease", { time: formatCountdown(release, t) })}</span>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Bar fraction={barFraction(release, mcp.idleMs) ?? 0} tone="dim" width="w-20" />
+          <span className="text-xs tabular-nums text-muted-foreground">{t("debug.server.mcpRelease", { time: formatCountdown(release, t) })}</span>
         </div>
       )}
     </div>
   );
 }
 
-function SessionRow({ row, sources, idleTimeoutMs, clock, ctx, current }: {
+function SessionRow({ row, sources, idleTimeoutMs, clock, ctx, current, detail }: {
   row: DebugSessionRow;
   sources: DebugPageReading["sources"];
   idleTimeoutMs: number;
@@ -1443,39 +1532,48 @@ function SessionRow({ row, sources, idleTimeoutMs, clock, ctx, current }: {
   ctx: Ctx;
   /** The chat's row: what the session's detail adds to the summary. */
   current?: CurrentRowExtras;
+  /** The chat's details, in the row's own footer: one Item, never a card inside a card. */
+  detail?: ReactNode;
 }) {
   const { t } = ctx;
   const summary = row.summary;
   const name = row.info ? sessionRowTitle(row.info) : shortDebugId(row.id);
   const remaining = summary && summary.nextIdleCheckAt !== null ? clock.remaining(summary.nextIdleCheckAt) : null;
   const state = summary ? debugStatusState(summary) : null;
-  // The chat's row with its details: they follow on the same tint.
-  const className = ["debug-row", row.depth === 1 && "is-sub", row.current && "is-current", current && "has-detail", row.placeholder && "is-placeholder"]
-    .filter(Boolean)
-    .join(" ");
   return (
-    <div
-      className={className}
+    <Item
+      size="xs"
+      variant={row.current ? "muted" : "default"}
+      data-current={row.current ? "true" : undefined}
+      data-depth={row.depth === 1 ? "sub" : undefined}
+      data-placeholder={row.placeholder ? "true" : undefined}
+      className="flex-wrap gap-x-2 gap-y-1"
       title={join([row.current && t("debug.sessions.current"), summary ? debugSessionTitle(summary, remaining, t) : name])}
     >
-      <span className="debug-row-status">{state && <StatusSlot state={state} label={t(DEBUG_STATUS_KEYS[state])} />}</span>
-      <span className="debug-row-title">
-        {row.depth === 1 && <span className="debug-row-branch" aria-hidden="true" />}
-        <span className="debug-row-name">{name}</span>
-        {summary && summary.starts > 1 && <span className="debug-row-starts" title={current?.startsTitle}>{`↻${summary.starts}`}</span>}
-      </span>
+      <ItemMedia className="w-4">{state && <StatusSlot state={state} label={t(DEBUG_STATUS_KEYS[state])} />}</ItemMedia>
+      <ItemContent className={cn("min-w-0", row.depth === 1 && "pl-4")}>
+        <ItemTitle className={cn("min-w-0 max-w-full gap-1 text-xs font-medium", row.depth === 1 && "text-muted-foreground", row.placeholder && "text-muted-foreground")}>
+          {name}
+          {summary && summary.starts > 1 && (
+            <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground" title={current?.startsTitle}>{`↻${summary.starts}`}</span>
+          )}
+        </ItemTitle>
+      </ItemContent>
       {summary && (
-        <SessionRowCells
-          summary={summary}
-          mine={pageAgentStreamCount(sources, row.id)}
-          remaining={remaining}
-          idleTimeoutMs={idleTimeoutMs}
-          t={t}
-          badges={current?.badges}
-          idleTitle={current?.idleTitle}
-        />
+        <ItemActions className="min-w-0 flex-wrap justify-end gap-1">
+          <SessionRowCells
+            summary={summary}
+            mine={pageAgentStreamCount(sources, row.id)}
+            remaining={remaining}
+            idleTimeoutMs={idleTimeoutMs}
+            t={t}
+            badges={current?.badges}
+            idleTitle={current?.idleTitle}
+          />
+        </ItemActions>
       )}
-    </div>
+      {detail && <ItemFooter className="min-w-0 flex-col items-stretch gap-1.5">{detail}</ItemFooter>}
+    </Item>
   );
 }
 
@@ -1502,8 +1600,8 @@ function SessionRowCells({ summary, mine, remaining, idleTimeoutMs, t, badges, i
   const forcedLabel = remaining !== null ? t("debug.overlay.closesIn", { time: formatDebugSeconds(remaining, t) }) : undefined;
   return (
     <>
-      {/* One cell for both runs: a second line under the title in a narrow panel. */}
-      <span className="debug-row-badges">
+      {/* The row's badges: one run per kind, a second line under the title in a narrow panel. */}
+      <span className="flex min-w-0 flex-wrap items-center justify-end gap-1">
         {badges ?? (
           <>
             <BadgeRun text="SSE" items={streams} cap={3} label={streamsLabel} />
@@ -1511,656 +1609,23 @@ function SessionRowCells({ summary, mine, remaining, idleTimeoutMs, t, badges, i
           </>
         )}
       </span>
-      <span className={`debug-row-idle is-${idleTone}`} title={idleTitle}>
+      <span
+        className={cn("flex shrink-0 items-center gap-1 text-xs tabular-nums", TONE_TEXT[idleTone])}
+        title={idleTitle}
+      >
         {idleShown && remaining !== null && (
           <>
             {idleTimeoutMs > 0 && (
-              <Bar fraction={barFraction(remaining, idleTimeoutMs) ?? 0} tone={idleTone} width={36} height={3} className="debug-row-idle-bar" />
+              <Bar fraction={barFraction(remaining, idleTimeoutMs) ?? 0} tone={idleTone} width="w-8" />
             )}
             {/* Closing after Stop, at every width: a stop square, not the amber alone. */}
-            {summary.forcedByStop && <span className="debug-row-forced" role="img" aria-label={forcedLabel} title={forcedLabel} />}
-            <span className="debug-row-idle-text">{formatDebugSeconds(remaining, t)}</span>
+            {summary.forcedByStop && (
+              <SquareIcon className="size-2.5 shrink-0" fill="currentColor" role="img" aria-label={forcedLabel} />
+            )}
+            <span className="min-w-9 text-right">{formatDebugSeconds(remaining, t)}</span>
           </>
         )}
       </span>
     </>
   );
 }
-
-// The session info popover's look (AppShell): the panel's background, a border below. Tones are
-// classes setting `color`, and every mark is drawn in currentColor. No transitions: bars and rings
-// jump once a second. Narrow rules follow the panel's own width, not the window's. Badges, chips,
-// issue callouts and the empty states are shadcn components; the columns are Card compositions —
-// what stays here is the data-viz chrome (bars, dots, rings, rows, the container queries).
-const DEBUG_PANEL_CSS = `
-  /* Tones read the theme's state tokens; the container declaration stays here
-     because the panel's own width, not the window's, drives the rules below. */
-  .debug-panel {
-    --dbg-ok: var(--ok);
-    --dbg-warn: var(--warning);
-    --dbg-err: var(--destructive);
-    container-type: inline-size;
-    container-name: debug-panel;
-  }
-  .debug-panel .is-ok { color: var(--dbg-ok); }
-  .debug-panel .is-warning { color: var(--dbg-warn); }
-  .debug-panel .is-error { color: var(--dbg-err); }
-  .debug-panel .is-accent { color: var(--accent); }
-  .debug-panel .is-muted { color: var(--muted-foreground); }
-  .debug-panel .is-dim { color: var(--muted-foreground); }
-  .debug-panel-scroll {
-    display: flex;
-    min-height: 0;
-    flex: 1;
-    flex-direction: column;
-    gap: 12px;
-    overflow: auto;
-    padding: 10px 16px 12px;
-    font-size: 12px;
-    line-height: 1.5;
-  }
-  .debug-section-title {
-    color: var(--foreground);
-    font-size: 11px;
-    font-weight: 700;
-  }
-  .debug-label {
-    color: var(--muted-foreground);
-    font-size: 11px;
-    white-space: nowrap;
-  }
-  .debug-value {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-  .debug-line {
-    color: var(--muted-foreground);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    overflow-wrap: anywhere;
-  }
-  .debug-panel .debug-line.is-warning {
-    color: var(--dbg-warn);
-  }
-
-  /* Three columns when the panel is wide: the page's as wide as its table, the server's and the
-     sessions' each capped, so names never stretch and push the badges to the far edge. Each
-     column is a shadcn Card; only its place in the grid is this sheet's business. */
-  .debug-cols {
-    display: grid;
-    grid-template-areas: "page server sessions";
-    grid-template-columns: minmax(320px, max-content) minmax(340px, 480px) minmax(360px, 560px);
-    gap: 12px;
-  }
-  .debug-col-page {
-    grid-area: page;
-  }
-  .debug-col-server {
-    grid-area: server;
-  }
-  .debug-col-sessions {
-    grid-area: sessions;
-  }
-  .debug-list,
-  .debug-block {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .debug-block {
-    gap: 4px;
-  }
-  /* Name, scale, value; a measure's details span the row below it. */
-  /* As wide as the column (the details get the room), never so wide a value drifts off its bar. */
-  .debug-measures {
-    display: grid;
-    max-width: 400px;
-    grid-template-columns: max-content minmax(0, 1fr);
-    align-items: center;
-    gap: 4px 10px;
-  }
-  /* A measure's scale and value share the second column, the value on its right edge. */
-  .debug-measures > .debug-measure-cell {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    grid-column: 2;
-    min-width: 0;
-  }
-  .debug-measure-name {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .debug-measure-name[title] {
-    cursor: help;
-  }
-  /* Wrapped to the table's width rather than widening it (a percentage min-width adds nothing to
-     the columns' sizes). */
-  .debug-measure-sub,
-  .debug-measure-empty {
-    grid-column: 2 / -1;
-    width: 0;
-    min-width: 100%;
-    color: var(--muted-foreground);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    overflow-wrap: anywhere;
-  }
-  .debug-measure-sub {
-    margin-top: -4px;
-  }
-  .debug-measure-sub > .debug-dot {
-    margin-right: 6px;
-    vertical-align: 0;
-  }
-  .debug-measure-empty {
-    font-family: inherit;
-    font-size: 12px;
-  }
-  .debug-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-
-  /* A page's browser and system marks. */
-  .debug-client {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-  }
-  .debug-client svg {
-    display: block;
-    flex-shrink: 0;
-  }
-
-  /* The connected pages: marks, browser and system, address, page, its stream count. */
-  .debug-pages {
-    display: flex;
-    flex-direction: column;
-  }
-  .debug-page-row {
-    position: relative;
-    display: grid;
-    min-height: 22px;
-    grid-template-columns: 30px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 32px;
-    align-items: center;
-    column-gap: 8px;
-    padding: 0 4px;
-    border-radius: 4px;
-    font-size: 11px;
-  }
-  .debug-page-row.debug-list-head {
-    min-height: 18px;
-    grid-template-columns: minmax(0, 1fr) auto;
-    color: var(--muted-foreground);
-    font-size: 10px;
-  }
-  .debug-page-row.is-current {
-    background: var(--accent);
-  }
-  .debug-page-row.is-current::before {
-    content: "";
-    position: absolute;
-    top: 4px;
-    left: 0;
-    width: 3px;
-    height: 14px;
-    border-radius: 0 2px 2px 0;
-    background: var(--accent);
-  }
-  .debug-page-icons {
-    display: inline-flex;
-    padding-left: 4px;
-    color: var(--muted-foreground);
-  }
-  .debug-page-icons svg {
-    width: 12px;
-    height: 12px;
-  }
-  .debug-page-client,
-  .debug-page-address,
-  .debug-page-holder {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .debug-page-client {
-    color: var(--foreground);
-  }
-  .debug-page-address {
-    color: var(--muted-foreground);
-    font-family: var(--font-mono);
-  }
-  .debug-page-holder {
-    color: var(--muted-foreground);
-  }
-  .debug-page-count {
-    justify-self: end;
-    color: var(--muted-foreground);
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-  .debug-list-head .debug-page-count {
-    color: var(--muted-foreground);
-  }
-  .debug-run {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 3px;
-    vertical-align: middle;
-  }
-  .debug-run-more {
-    color: var(--muted-foreground);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    line-height: 16px;
-  }
-
-  .debug-meter-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-  }
-  .debug-meter {
-    display: flex;
-    min-height: 18px;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 3px;
-  }
-  .debug-slot {
-    display: inline-flex;
-    min-width: 32px;
-    height: 18px;
-    box-sizing: border-box;
-    align-items: center;
-    justify-content: center;
-    border-radius: 3px;
-  }
-  .debug-slot.is-empty {
-    border: 1px dotted var(--border);
-  }
-  .debug-meter.is-inline .debug-slot {
-    min-width: 0;
-    height: 16px;
-  }
-  .debug-meter-overflow {
-    margin-left: 2px;
-    font-family: var(--font-mono);
-    font-size: 11px;
-  }
-
-  .debug-spark {
-    display: inline-flex;
-    width: 120px;
-    height: 15px;
-  }
-  .debug-spark svg {
-    display: block;
-  }
-  .debug-bar {
-    position: relative;
-    display: inline-block;
-    flex-shrink: 0;
-    overflow: hidden;
-    border-radius: 2px;
-    background: var(--border);
-    vertical-align: middle;
-  }
-  .debug-bar-fill {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    background: currentColor;
-  }
-  .debug-bar-notch {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: var(--sidebar);
-  }
-  .debug-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: currentColor;
-  }
-  .debug-dot.is-ring {
-    background: transparent;
-    box-shadow: inset 0 0 0 1.5px currentColor;
-  }
-
-  .debug-status {
-    display: inline-flex;
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-  }
-  .debug-status-ring {
-    width: 7px;
-    height: 7px;
-    box-sizing: border-box;
-    border: 1.5px solid var(--muted-foreground);
-    border-radius: 50%;
-  }
-  .debug-status-ring.is-closing {
-    border-style: dashed;
-    border-color: var(--dbg-warn);
-  }
-  .debug-status-ring.is-none {
-    border-style: dotted;
-    border-color: var(--muted-foreground);
-  }
-  .debug-status-ring.is-starting {
-    border-style: dashed;
-  }
-
-  /* The chat's details under its row, from the title's edge; the row's tint carried down. */
-  .debug-detail {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: 2px;
-    padding: 0 4px 5px 24px;
-    border-radius: 0 0 4px 4px;
-    background: var(--accent);
-  }
-  .debug-detail-line {
-    display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px 6px;
-  }
-  .debug-detail-id,
-  .debug-starts {
-    color: var(--muted-foreground);
-    font-family: var(--font-mono);
-    font-size: 11px;
-  }
-  .debug-idle-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 8px;
-  }
-  .debug-subhead {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--foreground);
-    font-size: 11px;
-    font-weight: 700;
-  }
-  .debug-panel .debug-subhead.is-dim {
-    color: var(--muted-foreground);
-  }
-  .debug-run-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px 6px;
-  }
-  .debug-run-icon {
-    display: inline-flex;
-    width: 12px;
-    height: 12px;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-  }
-  .debug-run-icon svg {
-    width: 12px;
-    height: 12px;
-  }
-  .debug-run-name {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--foreground);
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .debug-pills {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 10px;
-  }
-  .debug-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-  }
-  .debug-pill-state {
-    color: var(--muted-foreground);
-    white-space: nowrap;
-  }
-
-  .debug-group {
-    display: flex;
-    flex-direction: column;
-  }
-  .debug-group-head {
-    display: flex;
-    min-height: 22px;
-    align-items: center;
-    gap: 5px;
-    color: var(--muted-foreground);
-    font-size: 11px;
-  }
-  .debug-group-head svg {
-    flex-shrink: 0;
-  }
-  .debug-group-name {
-    min-width: 0;
-    overflow: hidden;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .debug-group-count {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-variant-numeric: tabular-nums;
-  }
-  .debug-row {
-    display: grid;
-    min-height: 24px;
-    /* The title keeps room for a few characters; the badges wrap before they take it all. */
-    grid-template-columns: 14px minmax(96px, 1fr) auto 104px;
-    align-items: center;
-    column-gap: 6px;
-    padding: 0 4px;
-    border-radius: 4px;
-  }
-  .debug-row.debug-list-head {
-    min-height: 18px;
-    color: var(--muted-foreground);
-    font-size: 10px;
-  }
-  /* At the end of their columns, spilling left rather than out of the row when wider. */
-  .debug-list-head-holders,
-  .debug-list-head-idle {
-    justify-self: end;
-    white-space: nowrap;
-  }
-  .debug-row.is-current {
-    position: relative;
-    background: var(--accent);
-  }
-  .debug-row.has-detail {
-    border-radius: 4px 4px 0 0;
-  }
-  /* The sidebar's mark of the selected session (app/sidebar.css): a short bar on the left edge,
-     on the first line however many lines the row takes. */
-  .debug-row.is-current::before {
-    content: "";
-    position: absolute;
-    top: 5px;
-    left: 0;
-    width: 3px;
-    height: 14px;
-    border-radius: 0 2px 2px 0;
-    background: var(--accent);
-  }
-  .debug-row-status {
-    display: inline-flex;
-    width: 14px;
-    justify-content: center;
-  }
-  .debug-row-title {
-    position: relative;
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 4px;
-  }
-  .debug-row.is-sub .debug-row-title {
-    padding-left: 16px;
-  }
-  .debug-row-branch {
-    position: absolute;
-    top: calc(50% - 8px);
-    left: 4px;
-    width: 8px;
-    height: 8px;
-    border-bottom: 1px solid var(--border);
-    border-left: 1px solid var(--border);
-  }
-  .debug-row-name {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--foreground);
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .debug-row.is-sub .debug-row-name {
-    color: var(--muted-foreground);
-  }
-  .debug-row.is-current .debug-row-name {
-    font-weight: 600;
-  }
-  .debug-row.is-placeholder .debug-row-name {
-    color: var(--muted-foreground);
-  }
-  .debug-row-starts {
-    flex-shrink: 0;
-    color: var(--muted-foreground);
-    font-family: var(--font-mono);
-    font-size: 10px;
-  }
-  .debug-row-badges {
-    display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 3px 8px;
-  }
-  .debug-row-idle {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 4px;
-  }
-  .debug-row-forced {
-    width: 6px;
-    height: 6px;
-    flex-shrink: 0;
-    border-radius: 1px;
-    background: currentColor;
-  }
-  .debug-row-idle-text {
-    min-width: 3ch;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
-
-  /* The server's totals beside its title. */
-  .debug-server-head {
-    flex-wrap: wrap;
-    gap: 4px 14px;
-    color: var(--muted-foreground);
-    font-size: 11px;
-  }
-  .debug-server-item {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 3px 4px;
-  }
-
-  /* Narrower: the sessions under the server's card; the page's card beside them,
-     its height going to the sessions' row rather than opening a gap under the pages. */
-  @container debug-panel (max-width: 1239px) {
-    .debug-cols {
-      grid-template-areas: "page server" "page sessions";
-      grid-template-columns: minmax(320px, max-content) minmax(0, 560px);
-      grid-template-rows: auto 1fr;
-    }
-  }
-  @container debug-panel (max-width: 760px) {
-    .debug-cols {
-      grid-template-areas: "page" "server" "sessions";
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: none;
-    }
-  }
-  @container debug-panel (max-width: 520px) {
-    .debug-detail-id {
-      display: none;
-    }
-    .debug-row {
-      grid-template-columns: 14px minmax(0, 1fr) 64px;
-    }
-    /* The badges take a line of their own under the title, which keeps its width. */
-    .debug-row-badges {
-      grid-column: 2 / -1;
-      grid-row: 2;
-      flex-wrap: wrap;
-      justify-content: flex-start;
-      padding-bottom: 4px;
-    }
-    .debug-row.is-sub .debug-row-badges {
-      padding-left: 16px;
-    }
-    .debug-row-badges:empty,
-    .debug-list-head-holders,
-    .debug-page-holder {
-      display: none;
-    }
-    .debug-page-row {
-      grid-template-columns: 30px minmax(0, 1fr) minmax(0, 1fr) 24px;
-    }
-    .debug-row-idle-bar {
-      display: none;
-    }
-    .debug-server-head .debug-section-title {
-      flex-basis: 100%;
-    }
-  }
-`;
