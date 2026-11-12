@@ -45,7 +45,7 @@
 1. **只用官方 pattern 的组合**。过程区的每一行都是 `Trace` → `TraceLine`（→ `TraceCollapsible`）；任何输出都是 `CodeBlock`（代码/终端）、`Markdown`（正文）、`DiffView`（补丁）或媒体元素。不允许自拼卡片、自造标题栏、自造边框、自造分割线。
 2. **每一行都要有图标**。`TraceIcon` 在标题前表示动作类型；在标题后表示指示（跳转箭头、状态）。
 3. **`TraceLine` 是 `span`，本身不可点击**。要可点必须包在 `TraceCollapsibleTrigger` 里（折叠），或包在 `<a>` / 官方按钮里（跳转）。
-4. **`children` 只放 content，不放 layout**。标题一句话一个行；计数/时长/路径摘要进 `TraceDescription`。
+4. **`children` 只放 content，不放 layout**。标题一句话一个行；计数与路径摘要进 `TraceDescription`。**工具行不挂时长**：时长只出现在思考行（`Thought for 5s`）与折叠组头（组内累计）。
 5. **状态只映射到 `status`**：`"running" | "error" | "pending"`。running 的 shimmer 由底座提供，不自己加动画。
 6. **标题时态按官方规则**：进行中现在时（`正在运行 pnpm build`）、完成无时态（`运行 pnpm build`）、失败（`运行失败：pnpm build` → `status="error"`）。
 7. **长内容靠 `CodeBlock` 自己封顶**：`size="sm"`，`wrap`（工具输出换行），`className="max-h-64"`。不自己算高度比例。
@@ -112,7 +112,7 @@ L0  数据   lib/tool-view.ts                  纯函数：pi 消息 → ToolVie
 | `components/transcript/StackTraceTrace.tsx` | 任何错误输出（工具失败、异常栈） | 新建 |
 | `components/transcript/SubagentTrace.tsx` | `Agent` / `get_subagent_result` | 新建 |
 | `components/transcript/TurnTrace.tsx` | 轮总览行 + 内部 `<Trace>` | 新建（替代 `ProcessDetailsGroup`） |
-| `components/transcript/ContextBadge.tsx` | ctx% HoverCard + Progress | 新建 |
+| `components/transcript/ContextBadge.tsx` | ctx% 行内小字 + HoverCard 内的 Progress | 新建 |
 | `components/transcript/MediaTrace.tsx` | 图片 / 视频 / 音频 | 新建 |
 | `components/ui/hover-card.tsx` | 官方 HoverCard（radix 适配，与现有 `ui/*` 同风格） | 新建（第 14 节第 3 条已定） |
 
@@ -358,7 +358,7 @@ export function TurnTrace({ summary, defaultOpen, children }: {
 </Trace>
 ```
 
-- 行尾时长与用量仍由调用方追加（第 8 节），不进 `ToolView`。
+- 行尾只由调用方追加 diff 统计（`+N −M`，纯文本）与该轮的用量节点；工具行不再有时长，`ToolView` 不承载任何视觉。
 - 有 `action` 且无 `sections` 时：`<a>` 包 `TraceLine` + 尾部 `<TraceIcon><ArrowUpRightIcon /></TraceIcon>`（官方 Sources 同形）。
 - `sections` 为空：不渲染 `TraceCollapsible`，直接 `TraceLine`（官方 States 里的纯行）。
 
@@ -631,7 +631,7 @@ const [error, ...frames] = stack.split("\n").map((line) => line.trim())
 
 **本项目实现** `components/transcript/SubagentTrace.tsx`
 
-- 标题 `运行子代理` / `运行子代理 <name>`；进行中 `status="running"` + `TraceDescription`（已运行时长）。
+- 标题 `运行子代理` / `运行子代理 <name>`；进行中 `status="running"`（底座 shimmer），步骤行用 `TraceDescription` 显示各自说明，不挂行尾时长。
 - 内容：`<Trace>` 内是子代理做的事，下面是报告正文（`MarkdownBody`）。步骤取自 `view.sections` 的 `steps` 段，由 `subagentView` 从 `result.details` 的运行记录生成；当前内置 subagent 的 details 不带 step 记录，因此行内只渲染报告正文，等 producer 提供 steps 后自动出现。
 - 行尾动作保留：点击打开子代理 tab（`onOpenSubagent`），沿用 `SessionChatPanel`，不改。
 - 后台运行未完成：只有 `TraceLine`（`status="running"`），没有内容区。
@@ -657,11 +657,11 @@ const [error, ...frames] = stack.split("\n").map((line) => line.trim())
 
 **本项目实现** `components/transcript/ContextBadge.tsx`
 
-- radix 写法：`<HoverCardTrigger asChild><Button variant="ghost" size="sm" /></HoverCardTrigger>`。
+- radix 写法：`<HoverCardTrigger asChild><span className="cursor-default" /></HoverCardTrigger>`；触发体是行内小字（`ctx 12.3% / 200k`），不是按钮也不是 `Badge`。
 - 数据来自现有 `ctxTokens` / `ctxWindow`（`UsageBar` 已算好），不新增请求。
 - `formatTokens()` 与现有会话 stats 的紧凑格式保持一致（`lib/session-stats-format.ts`）。
 
-**允许的差异**：触发器用 `ghost`/`sm` 而非 `outline`，以免轮末出现第二个描边按钮。
+**允许的差异**：触发器用行内文字而非 `outline` 按钮——轮末用量是一行文字，官方 trace 示例的 meta 也是文字，加按钮会多出第二个描边控件。
 
 ### 5.12 Message / Bubble（消息级）—— `pattern_message.md` + `docs_components_base_*`
 
@@ -751,7 +751,7 @@ const [error, ...frames] = stack.split("\n").map((line) => line.trim())
 
 - 容器：`flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-[11px] tabular-nums`。
 - token 数：`ArrowDownIcon`（`size-2.5`、`strokeWidth 1.5`）+ 整数（不补千分位、不设最小宽度），`title` 为 `i18n.estimatedTokens`。
-- 速率为 `null` 时不渲染徽章；否则 `Badge variant="ghost"`、`px-1.5 py-0 text-[10px]`、文本恒为 `${tps.toFixed(1)} t/s`（一位小数）。
+- 速率为 `null` 时不渲染；否则是**行内小字**（`text-muted-foreground`、`tabular-nums`，与其它 meta 同档位）、文本恒为 `${tps.toFixed(1)} t/s`（一位小数）。不用 `Badge`、不加底色。
 - 五档（按 `tps` 降序判断）：
 
 | 速率 | 样式 |
@@ -851,7 +851,7 @@ const [error, ...frames] = stack.split("\n").map((line) => line.trim())
 | --- | --- | --- |
 | 1 | toolCall/toolResult 配对，参数未到也有占位行 | `6.3` + `ToolTrace` |
 | 2 | 错误态（`isError`、退出码、失败文案）、成功无输出不渲染空框 | `5.3` `5.9` + `4.3` |
-| 3 | 工具行时长 + 发起请求的用量（`UsageBar`）；轮末 `↑入 ↓出 ⛁缓存 $成本 ctx%` | 不改，留在 `ActivityRows`/`MessageView`/`ChatWindow` |
+| 3 | 每 turn 一行用量（`UsageBar`，行内小字 `↑入 ↓出 ⛁缓存 $成本 ctx%`）；工具行不再挂时长 | 留在 `MessageView`/`ChatWindow`，`ActivityRows` 只出 diff 统计 |
 | 4 | 展开记忆（按会话、抗 remount） | `6.2` |
 | 5 | 思考两态 + 手机字号 offset + 流式跟随 | `5.4` |
 | 6 | 稳定 key、`useStreamingSelector`、延迟渲染、图片懒加载、Prism 队列 | 保留（`lib/message-keys.ts`、`lib/highlight-queue.ts`、`hooks/usePrismLanguages.ts`） |
