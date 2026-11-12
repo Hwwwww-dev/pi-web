@@ -180,7 +180,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
             // widget above or below the editor with a chevron; here the panel
             // always opens above the row, so the name is the whole chip.
             const triggerClass = cn(
-              "shrink-0 gap-1.5 rounded-full bg-muted/60 px-2.5 font-mono text-[11.5px] text-muted-foreground",
+              "shrink-0 gap-1.5 font-mono text-xs text-muted-foreground",
               "hover:bg-accent hover:text-accent-foreground",
               "data-[expanded=true]:bg-accent data-[expanded=true]:text-accent-foreground",
             );
@@ -217,7 +217,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
             ) : (
               <span
                 key={widget.key}
-                className="inline-flex h-6 shrink-0 items-center rounded-full bg-muted/60 px-2.5 font-mono text-[11.5px] text-muted-foreground"
+                className="inline-flex h-6 shrink-0 items-center font-mono text-xs text-muted-foreground"
                 aria-label={`${placementLabel}: ${extensionWidgetLabel(widget.key)}, ${lineCountLabel}`}
               >
                 {content}
@@ -254,7 +254,7 @@ export function ExtensionWidgetPanel({ widget, triggerId, panelId, closing = fal
       // 关闭闪烁的根因）， forwards 把终态钉在透明/缩小上。
       className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:fill-mode-forwards"
     >
-      <div className="border-b px-3 py-1.5 font-mono text-[11px] text-muted-foreground">{widget.key}</div>
+      <div className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{widget.key}</div>
       {/* Extension widgets render TUI output: tables, progress bars and box drawing
           only line up while the monospace grid survives, so the panel scrolls
           sideways rather than wrapping a line into a broken row. */}

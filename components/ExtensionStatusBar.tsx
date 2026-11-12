@@ -74,7 +74,7 @@ export function splitStatusList(text: string): { label: string; title: string; i
     .map((entry) => entry.trim())
     .filter(Boolean);
   const firstWord = head.split(/\s+/)[0];
-  if (!firstWord || items.length < 2) return null;
+  if (!firstWord || items.length < 1) return null;
   return { label: firstWord, title: head, items };
 }
 
@@ -127,16 +127,16 @@ function StatusPill({
             size="xs"
             title={full}
             aria-label={full}
-            className="shrink-0 rounded-full font-mono text-[11.5px] font-medium text-muted-foreground"
+            className="shrink-0 font-mono text-xs font-medium text-muted-foreground"
           >
             {displayLabel(cell.label)}
           </Button>
         </PopoverTrigger>
         <PopoverContent side="top" align="start" className="w-auto min-w-[180px] max-w-[min(340px,calc(100vw-24px))] p-2.5">
-          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{cell.title}</div>
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{cell.title}</div>
           <ul className="grid max-h-[min(40vh,320px)] gap-0.5 overflow-y-auto">
             {cell.items.map((entry, index) => (
-              <li key={index} className="font-mono text-[11.5px] leading-5 text-foreground">{entry}</li>
+              <li key={index} className="font-mono text-xs leading-5 text-foreground">{entry}</li>
             ))}
           </ul>
         </PopoverContent>
@@ -145,7 +145,7 @@ function StatusPill({
   }
   if (cell.kind === "text") {
     return (
-      <Badge variant="outline" className="max-w-full shrink-0 font-mono text-[11.5px] font-normal whitespace-pre text-muted-foreground">
+      <Badge variant="outline" className="max-w-full shrink-0 font-mono text-xs font-normal whitespace-pre text-muted-foreground">
         {/* Plain status text is a label like any other; ANSI text is the extension's own. */}
         {/\u001b/.test(cell.text) ? <AnsiText text={cell.text} /> : displayLabel(cell.text)}
       </Badge>
@@ -160,7 +160,7 @@ function StatusPill({
       title={`${cell.label} · ${cell.command}`}
       aria-label={`${cell.label} (${cell.command})`}
       onClick={() => onCommand?.(cell.command)}
-      className="shrink-0 rounded-full font-mono text-[11.5px] text-muted-foreground"
+      className="shrink-0 font-mono text-xs text-muted-foreground"
     >
       {displayLabel(cell.label)}
     </Button>
@@ -222,7 +222,7 @@ export function ExtensionStatusBar({
         // composer's own pill row no longer repeats it.
         <span
           key={`pinned-${index}`}
-          className="inline-flex shrink-0 items-center whitespace-pre font-mono text-[10px] font-semibold tracking-[0.6px] text-destructive"
+          className="inline-flex shrink-0 items-center whitespace-pre font-mono text-xs font-semibold tracking-[0.6px] text-destructive"
         >
           {cell.kind === "text" ? stripAnsi(cell.text).toUpperCase() : null}
         </span>

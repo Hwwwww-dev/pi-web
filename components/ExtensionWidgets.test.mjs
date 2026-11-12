@@ -38,7 +38,9 @@ test("renders short extension widgets without a truncation marker", () => {
   assert.match(html, /aria-expanded="true"/);
   // A chip names the widget; the terminal's placement chevron is not on it.
   assert.doesNotMatch(html, /lucide-chevron-(up|down)/);
-  assert.match(html, /rounded-full bg-muted\/60/);
+  // The chip is an official ghost Button, not a hand-painted pill.
+  assert.match(html, /data-slot="button"/);
+  assert.doesNotMatch(html, /rounded-full/);
   assert.doesNotMatch(html, /[\u2191\u2193]/);
 });
 
@@ -154,7 +156,7 @@ test("keeps empty widgets non-interactive", () => {
     widgets: [{ key: "empty-widget", lines: [], placement: "aboveEditor" }],
   });
 
-  assert.match(html, /<span[^>]*inline-flex h-6[^>]*>/);
+  assert.match(html, /<span[^>]*aria-label="Above editor widget/);
   assert.doesNotMatch(html, /<button/);
   assert.doesNotMatch(html, /aria-expanded/);
   assert.doesNotMatch(html, /title="[^"]*"/);
@@ -166,7 +168,7 @@ test("keeps blank-padding widgets non-interactive — an empty panel is worse th
     widgets: [{ key: "blank-widget", lines: ["", "  ", "\u001b[0m"], placement: "aboveEditor" }],
   });
 
-  assert.match(html, /<span[^>]*inline-flex h-6[^>]*>/);
+  assert.match(html, /<span[^>]*aria-label="Above editor widget/);
   assert.doesNotMatch(html, /<button/);
   assert.doesNotMatch(html, /<section/);
 });
@@ -176,6 +178,8 @@ test("names the todo widget by what it shows, in a chip like the status pills", 
 
   assert.match(html, />TODO</);
   assert.doesNotMatch(html, /rpiv-todos</);
-  assert.match(html, /rounded-full bg-muted\/60/);
+  // The chip is an official ghost Button, not a hand-painted pill.
+  assert.match(html, /data-slot="button"/);
+  assert.doesNotMatch(html, /rounded-full/);
   assert.doesNotMatch(html, /lucide-chevron-(up|down)/);
 });
