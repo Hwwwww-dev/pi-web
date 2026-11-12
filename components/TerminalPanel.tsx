@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { LinkIcon, MoonIcon, RotateCwIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { terminalFontSize, useChatAppearance } from "@/hooks/useChatAppearance";
 import { useI18n } from "@/hooks/useI18n";
@@ -299,8 +300,11 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
       aria-label={t("terminal.title")}
     >
       <header className="flex min-w-0 shrink-0 items-center gap-2 px-2.5 text-muted-foreground">
-        <span
-          className={`size-[7px] shrink-0 rounded-full ${statusDotClass}`}
+        {/* 第 4 节：状态点走官方 Badge，不自绘圆点。 */}
+        <Badge
+          variant="outline"
+          aria-hidden={false}
+          className={`size-2 shrink-0 rounded-full border-0 p-0 ${statusDotClass}`}
           title={t(`terminal.${status}`)}
           aria-label={t(`terminal.${status}`)}
         />

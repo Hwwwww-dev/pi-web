@@ -48,11 +48,8 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --color-warning: var(--warning);
   --color-success: var(--ok);
-  --color-diff-add-bg: var(--diff-add-bg);
-  --color-diff-del-bg: var(--diff-del-bg);
   --color-diff-add: var(--diff-add);
   --color-diff-del: var(--diff-del);
-  --color-diff-hunk-bg: var(--diff-hunk-bg);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -224,9 +221,6 @@
   --info: oklch(0.55 0.15 250);
   --diff-add: oklch(0.45 0.13 150);
   --diff-del: oklch(0.55 0.2 25);
-  --diff-add-bg: color-mix(in srgb, var(--ok) 12%, transparent);
-  --diff-del-bg: color-mix(in srgb, var(--destructive) 12%, transparent);
-  --diff-hunk-bg: color-mix(in srgb, oklch(0.6 0.12 250) 12%, transparent);
   --chat-content-max-width: 820px;
   --chat-content-font-size: 14px;
 }
@@ -271,9 +265,6 @@
   --info: oklch(0.72 0.13 245);
   --diff-add: oklch(0.7 0.15 150);
   --diff-del: oklch(0.7 0.17 20);
-  --diff-add-bg: color-mix(in srgb, var(--ok) 14%, transparent);
-  --diff-del-bg: color-mix(in srgb, var(--destructive) 14%, transparent);
-  --diff-hunk-bg: color-mix(in srgb, oklch(0.6 0.12 250) 16%, transparent);
 }
 
 /* WebKit reports dvh/innerHeight without the status-bar strip for installed

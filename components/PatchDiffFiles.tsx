@@ -126,7 +126,7 @@ function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" |
     <div
       className={cn(
         "flex min-w-0",
-        cell.type === "added" ? "bg-diff-add-bg" : cell.type === "removed" ? "bg-diff-del-bg" : cell.type === "empty" && "bg-muted",
+        cell.type === "added" ? "bg-foreground/5" : cell.type === "removed" ? "bg-destructive/10" : cell.type === "empty" && "bg-muted",
         side === "left" && "border-r border-border",
       )}
     >
