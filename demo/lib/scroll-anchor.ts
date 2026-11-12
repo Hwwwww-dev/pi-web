@@ -75,7 +75,7 @@ const HOLD_MAX_MS = 4000;
  * It lets go on a deliberate scroll (wheel, touch, key) and after
  * `SCROLL_ANCHOR_SETTLE_MS`, so the reader is never held hostage by it.
  */
-export function holdScrollAnchor(container: HTMLElement, content: HTMLElement | null): () => void {
+export function holdScrollAnchor(container: HTMLElement, content: HTMLElement | null, onSettle?: () => void): () => void {
   const pick = () => {
     if (!content) return null;
     const containerTop = container.getBoundingClientRect().top;
@@ -87,7 +87,10 @@ export function holdScrollAnchor(container: HTMLElement, content: HTMLElement | 
   };
   const first = pick();
   const entryId = first?.getAttribute("data-entry-id");
-  if (!first || !entryId) return () => {};
+  if (!first || !entryId) {
+    onSettle?.();
+    return () => {};
+  }
   // 这一行原来的位置。每一帧都朝它校正，所以它本身不再变。
   const baseline = first.getBoundingClientRect().top;
   let stopped = false;
@@ -97,6 +100,7 @@ export function holdScrollAnchor(container: HTMLElement, content: HTMLElement | 
     container.removeEventListener("wheel", stop);
     container.removeEventListener("touchstart", stop);
     container.removeEventListener("keydown", stop);
+    onSettle?.();
   };
   // 追加的一页不是一帧就长完的：接着每帧重测这名行，直到它连续几帧不再移动。
   // 固定时长的版本会在还没长完时就撒手，读者于是又漂回去一截。
