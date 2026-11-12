@@ -197,7 +197,9 @@ const MAX_FILE_CHIPS = 4;
  */
 function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; onOpenFile: (path: string) => void }) {
   return (
-    <span className="flex min-w-0 shrink-0 items-center gap-1.5">
+    // 胶囊组占“剩下的空间”：以前是 shrink-0，名单一长就把行撑超宽，
+    // 行又是 overflow-hidden，于是被裁掉的是前面的动作名（“编辑”只剩“编”）。
+    <span className="flex min-w-0 flex-1 items-center gap-1.5">
       {paths.slice(0, MAX_FILE_CHIPS).map((path) => {
         // A call names files relative to the session cwd; the viewer needs the absolute path.
         const resolved = resolveLocalFilePath(path, cwd);
@@ -211,7 +213,7 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             disabled={!resolved}
             // 胶囊给名字留一个上限：手机上更窄（半个屏），超长文件名自己省略号，
             // 而不能把前面的动作名和后面的 +N/-N 挤出可见区。
-            className="min-w-0 max-w-full shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
+            className="min-w-0 shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
             title={resolved ?? path}
             aria-label={label}
             onClick={(event) => {

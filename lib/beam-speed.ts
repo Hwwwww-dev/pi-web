@@ -9,9 +9,9 @@
  * browser applies from wherever the beam currently is.
  *
  * The rate that drives it is integrated with a slew limit, not smoothed
- * exponentially: it moves toward the measured rate at a constant number of
- * tokens per second per second, quickly upward and slowly downward. That keeps
- * 1 → 0.1 a few seconds of steady deceleration instead of a step.
+ * exponentially: it moves toward the measured rate at a constant slope —
+ * quickly upward, very slowly downward — and every step re-compares the two, so
+ * a reply that speeds up again midway through a slowdown climbs straight back.
  */
 
 /** One trip at rest, in seconds: the CSS animation's period, never changed at runtime. */
@@ -20,31 +20,45 @@ export const BEAM_SLOWEST_SECONDS = 4;
 export const BEAM_BASE_SECONDS = BEAM_SLOWEST_SECONDS;
 /** One trip on the fastest reply, in seconds. */
 export const BEAM_FASTEST_SECONDS = 0.6;
+/** The rate that counts as "as fast as it gets" (tokens per second). */
+export const BEAM_FASTEST_RATE = 600;
+
 /**
- * The rate that already counts as "as fast as it gets" (tokens per second).
+ * The curve's falloff, in tokens/s.
  *
- * 150 太低：真实回包常在 150~300 t/s，一上来就顶到最快档，看起来反而“一直匀速”。
+ * Exponential, not linear: a linear map makes every t/s step look equally big,
+ * so 300 → 150 reads as a hard brake while 60 → 30 reads as nothing. Here the
+ * low end is flat (60 t/s is still a slow-looking beam) and only the top end
+ * closes the last half-second.
  */
-export const BEAM_FASTEST_RATE = 400;
+export const BEAM_CURVE_K = 180;
+
+/** How many tokens/s the rate may gain per second: a stream that starts should look fast almost at once. */
+export const BEAM_RISE_PER_SECOND = 400;
 
 /**
- * How many tokens/s the rate may gain per second. Fast: a reply that starts
- * streaming should look fast almost at once.
+ * How many tokens/s it may lose per second. Deliberately small — a gap between
+ * chunks is not a slowdown, and the beam must not look like it hit the brakes.
  */
-export const BEAM_RISE_PER_SECOND = 800;
-/**
- * How many tokens/s it may lose per second. Much slower than the rise: a pause
- * between chunks must not read as the beam slamming to a crawl.
- */
-export const BEAM_FALL_PER_SECOND = 45;
+export const BEAM_FALL_PER_SECOND = 18;
 
-/** One trip around the card for a rate, linearly between the two ends. */
+/** No single step may drop more than this share of the current rate, however long the step. */
+export const BEAM_FALL_CAP_SHARE = 0.06;
+
+/**
+ * What a pause asks for: this share of the current rate, not zero.
+ *
+ * A reply that stops arriving for a second is a pause, not the end — the beam
+ * glides down a little each step and recovers the moment chunks return.
+ */
+export const BEAM_IDLE_SHARE = 0.55;
+
+/** One trip around the card for a rate. Exponential between the two ends. */
 export function beamDurationSeconds(rate: number): number {
   if (!Number.isFinite(rate) || rate <= 0) return BEAM_SLOWEST_SECONDS;
   if (rate >= BEAM_FASTEST_RATE) return BEAM_FASTEST_SECONDS;
   const span = BEAM_SLOWEST_SECONDS - BEAM_FASTEST_SECONDS;
-  const seconds = BEAM_SLOWEST_SECONDS - span * (rate / BEAM_FASTEST_RATE);
-  return Math.min(BEAM_SLOWEST_SECONDS, Math.max(BEAM_FASTEST_SECONDS, seconds));
+  return BEAM_FASTEST_SECONDS + span * Math.exp(-rate / BEAM_CURVE_K);
 }
 
 /** The playback rate that turns the fixed period into the duration for a rate. */
@@ -52,11 +66,17 @@ export function beamPlaybackRate(rate: number): number {
   return BEAM_BASE_SECONDS / beamDurationSeconds(rate);
 }
 
+/** What a measured rate asks the integrated rate to become. */
+export function beamTargetRate(measured: number, current: number): number {
+  if (!Number.isFinite(measured) || measured <= 0) return current * BEAM_IDLE_SHARE;
+  return measured;
+}
+
 /** Move `current` toward `target` by at most one slew step for `elapsedMs`. */
 export function slewBeamRate(current: number, target: number, elapsedMs: number): number {
   const dt = Math.max(0, elapsedMs) / 1000;
   const clampedTarget = Math.min(BEAM_FASTEST_RATE, Math.max(0, Number.isFinite(target) ? target : 0));
-  if (clampedTarget > current) return Math.min(clampedTarget, current + BEAM_RISE_PER_SECOND * dt);
-  if (clampedTarget < current) return Math.max(clampedTarget, current - BEAM_FALL_PER_SECOND * dt);
-  return current;
+  if (clampedTarget >= current) return Math.min(clampedTarget, current + BEAM_RISE_PER_SECOND * dt);
+  const drop = Math.min(current - clampedTarget, BEAM_FALL_PER_SECOND * dt, current * BEAM_FALL_CAP_SHARE);
+  return current - drop;
 }
