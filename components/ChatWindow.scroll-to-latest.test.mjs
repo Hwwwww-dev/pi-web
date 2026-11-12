@@ -64,3 +64,20 @@ test("clearing the gate re-arms the sentinel without a scroll round-trip", () =>
   // report fire for a sentinel that is still on screen, so paging continues.
   assert.match(source, /\}, \[sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState\]\);/);
 });
+
+test("a minimap jump reads one page at a time, never the whole branch", () => {
+  const jump = source.slice(
+    source.indexOf("const revealTurnForMinimap"),
+    source.indexOf("const revealTurnForMinimap") + 2000,
+  );
+  // No bulk window widening: the prepend sync effect keeps the window at the
+  // loaded count, so a jump cannot render a second copy of everything at once.
+  assert.doesNotMatch(jump, /messagesLenRef\.current \* 2/);
+  // Same page size as scrolling; the anchor stops the loop.
+  assert.doesNotMatch(jump, /tail: 100|tail: 200/);
+  assert.match(jump, /await loadOlderPage\(sid, snapshot\.historyCursor\)/);
+  // A cursor that stopped moving would fetch the same page again.
+  assert.match(jump, /if \(snapshot\.historyCursor === cursor\) break;/);
+  // A turn that is not on this branch is not chased further.
+  assert.match(jump, /if \(!snapshot\.historyCursor \|\| !snapshot\.hasEarlierMessages\) break;/);
+});

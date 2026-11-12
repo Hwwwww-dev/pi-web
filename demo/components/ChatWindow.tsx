@@ -649,21 +649,30 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       if (!pageRenderingRef.current) setOlderPageState("idle");
     }
   }, [activeLeafId, loadContext]);
-  // Jump to a minimap turn: reveal everything already in memory, then page
-  // ancestors in until the turn's anchor entry is loaded. Pages are small
-  // (≈10–15 turns each) and the loop stops the moment the anchor lands, so
-  // clicking a nearby turn never drags in thirty; the minimap scrolls once
-  // the anchor renders.
+  // Jump to a minimap turn: reveal what is already in memory, then page ancestors
+  // in one page at a time until the turn's anchor entry is loaded. Each step waits
+  // for the previous page to render (loadOlderPage), the page size is the same one
+  // scrolling uses, and the loop stops on the anchor — jumping never drags the rest
+  // of the branch in behind it.
   const revealTurnForMinimap = useCallback(async (turnNumber: number) => {
-    setVisibleCount((current) => Math.max(current, messagesLenRef.current * 2));
     const sid = session?.id;
     const target = minimapTurnIndex[turnNumber];
     if (!sid || !target) return;
+    // Already loaded: just show it. Nothing is read from disk.
+    if (searchHistoryRef.current.entryIds.includes(target.entryId)) {
+      setVisibleCount((current) => Math.max(current, messagesLenRef.current));
+      return;
+    }
+    let cursor = "";
     for (let guard = 0; guard < 100; guard++) {
       const snapshot = searchHistoryRef.current;
       if (snapshot.entryIds.includes(target.entryId)) break;
+      // No older pages left: the turn is not on this branch, so nothing to load.
       if (!snapshot.historyCursor || !snapshot.hasEarlierMessages) break;
-      const page = await loadOlderPage(sid, snapshot.historyCursor, { tail: 100 });
+      // The cursor stopped moving — paging again would fetch the same page.
+      if (snapshot.historyCursor === cursor) break;
+      cursor = snapshot.historyCursor;
+      const page = await loadOlderPage(sid, snapshot.historyCursor);
       if (!page) break;
     }
     setVisibleCount((current) => Math.max(current, messagesLenRef.current));
@@ -795,8 +804,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         loadingOlderRef.current = true;
         const container = scrollContainerRef.current;
         if (container) scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
-        // ponytail: one extra page of 200 entries; deeper or other-branch hits just open the session.
-        const context = await loadOlderPage(searchTarget.sessionId, history.historyCursor, { tail: 200, signal: controller.signal });
+        // ponytail: one extra page, the same size scrolling reads; an older or other-branch hit just opens the session.
+        const context = await loadOlderPage(searchTarget.sessionId, history.historyCursor, { signal: controller.signal });
         loadingOlderRef.current = false;
         found = Boolean(context?.entryIds.includes(searchTarget.entryId));
       }
