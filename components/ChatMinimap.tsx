@@ -710,7 +710,7 @@ export const ChatMinimap = memo(function ChatMinimap({
                       className={cn(
                         "ml-2 mt-px mb-[3px] truncate font-mono text-[10.5px] leading-[15px] tabular-nums",
                         isLocated
-                          ? "text-[color-mix(in_srgb,var(--primary)_65%,var(--muted-foreground))]"
+                          ? "text-primary/65"
                           : "text-muted-foreground",
                         isUnloaded && "italic",
                       )}

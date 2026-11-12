@@ -58,7 +58,7 @@ test("renders each status as its own cell without identifier keys", () => {
 
   assert.match(html, /aria-label="ponytail memory"/);
   assert.match(html, /role="status"/);
-  assert.equal(html.match(/rounded-full bg-muted\/60 px-2\.5/g)?.length, 2);
+  assert.equal(html.match(/data-slot="badge"/g)?.length, 2);
   assert.match(html, /text-muted-foreground"><span>ponytail<\/span><\/span>/);
   assert.match(html, /<span class="ansi-[a-z]+-fg">memory<\/span>/);
   assert.doesNotMatch(html, /05-ponytail|20-memory/);
@@ -74,7 +74,7 @@ test("a status with nothing visible to show gets no cell", () => {
     ],
   });
 
-  assert.equal(html.match(/rounded-full bg-muted\/60 px-2\.5/g)?.length, 1);
+  assert.equal(html.match(/data-slot="badge"/g)?.length, 1);
   assert.match(html, /aria-label="shown"/);
   assert.equal(renderStatusBar({ statuses: [{ key: "a", text: "" }] }), "");
 });

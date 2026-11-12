@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import { ChevronDownIcon, GitBranchIcon } from "lucide-react";
 import type { BranchPreview, SessionEntry, SessionTreeNode } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -167,11 +168,14 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
           <div className="absolute top-1/2 left-[7px] h-px w-[9px] bg-border" />
         </div>
 
-        {/* Node dot */}
-        <div
+        {/* Node marker: the official badge, not a self-drawn dot (第 4 节分支行). */}
+        <Badge
+          variant={isActive ? "default" : "outline"}
+          aria-hidden
           className={cn(
-            "mr-1.5 size-[7px] shrink-0 rounded-full transition-colors duration-100",
-            isActive ? "border-0 bg-primary" : isOnPath ? "border border-muted-foreground/50 bg-muted-foreground" : "border border-muted-foreground/50 bg-border",
+            "mr-1.5 size-2 shrink-0 rounded-full p-0 transition-colors duration-100",
+            !isActive && !isOnPath && "bg-border",
+            !isActive && isOnPath && "border-muted-foreground/50 bg-muted-foreground",
           )}
         />
 
