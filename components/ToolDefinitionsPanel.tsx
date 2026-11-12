@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ToolEntry } from "@/lib/tool-presets";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
@@ -99,9 +100,9 @@ export function getToolParameterFields(parameters?: Record<string, unknown>): Pa
 /** An inline "nothing yet" line: the Empty state, compact and left-aligned like the pane's text. */
 function EmptyState({ children }: { children: string }) {
   return (
-    <Empty className="flex-none items-start gap-0 rounded-none border-0 p-3.5 text-left md:p-3.5">
+    <Empty className="flex-none items-start gap-0 border-0 p-3.5 text-left">
       <EmptyHeader className="items-start text-left">
-        <EmptyTitle className="text-xs font-normal italic text-muted-foreground [overflow-wrap:anywhere]">{children}</EmptyTitle>
+        <EmptyTitle className="text-sm font-normal text-muted-foreground [overflow-wrap:anywhere]">{children}</EmptyTitle>
       </EmptyHeader>
     </Empty>
   );
@@ -110,9 +111,9 @@ function EmptyState({ children }: { children: string }) {
 /** While the tools load, a few quiet rows stand in for the list. */
 function LoadingRows() {
   return (
-    <div className="flex-none px-2 py-2">
+    <div className="flex-none p-2">
       {[0, 1, 2].map((row) => (
-        <Skeleton key={row} className="mb-px h-9 rounded-none" />
+        <Skeleton key={row} className="mb-1 h-8" />
       ))}
     </div>
   );
@@ -141,30 +142,33 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
   const fields = selectedTool ? getToolParameterFields(selectedTool.parameters) : [];
 
   return (
-    <div className="grid h-[min(640px,70dvh)] min-h-60 grid-cols-[clamp(120px,26%,220px)_minmax(0,1fr)] overflow-hidden bg-card max-[640px]:grid-cols-[136px_minmax(0,1fr)]">
-      <nav
-        aria-label={translate("tools.title")}
-        className="m-1.5 mr-0 flex min-h-0 min-w-0 flex-col rounded-lg bg-muted/40"
-      >
+    <div className="grid h-[min(640px,70dvh)] min-h-60 grid-cols-[clamp(140px,26%,220px)_minmax(0,1fr)] overflow-hidden bg-card max-[640px]:grid-cols-[136px_minmax(0,1fr)]">
+      <nav aria-label={translate("tools.title")} className="flex min-h-0 min-w-0 flex-col bg-muted/40">
         {/* 名称行永远换行，横向不出列：x 轴锁死，行 min-w-0，长名拆到第二行。 */}
-        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1.5 py-1">
-          {declaredTools && declaredTools.length > 0 ? declaredTools.map((tool) => {
-            const selected = tool.name === selectedTool?.name;
-            return (
-              <Button
-                key={tool.name}
-                type="button"
-                variant="ghost"
-                size="default"
-                data-selected={selected}
-                aria-pressed={selected}
-                onClick={() => setSelectedToolName(tool.name)}
-                className="flex h-auto min-h-[34px] w-full min-w-0 cursor-pointer justify-start items-center rounded-md bg-transparent px-2.5 py-1.5 text-left font-normal text-muted-foreground hover:bg-accent/60 hover:text-foreground data-[selected=true]:bg-background data-[selected=true]:text-foreground data-[selected=true]:shadow-sm"
-              >
-                <code className="min-w-0 whitespace-normal text-[11px] font-semibold [overflow-wrap:anywhere]">{tool.name}</code>
-              </Button>
-            );
-          }) : declaredTools ? (
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-1.5">
+          {declaredTools && declaredTools.length > 0 ? (
+            <ItemGroup className="gap-0.5">
+              {declaredTools.map((tool) => {
+                const selected = tool.name === selectedTool?.name;
+                return (
+                  <Item asChild key={tool.name} size="xs" variant={selected ? "muted" : "default"}>
+                    <button
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setSelectedToolName(tool.name)}
+                      className="cursor-pointer text-left hover:bg-muted"
+                    >
+                      <ItemContent>
+                        <ItemTitle className="line-clamp-none w-full font-mono text-xs font-medium whitespace-normal [overflow-wrap:anywhere]">
+                          {tool.name}
+                        </ItemTitle>
+                      </ItemContent>
+                    </button>
+                  </Item>
+                );
+              })}
+            </ItemGroup>
+          ) : declaredTools ? (
             <EmptyState>{translate("tools.noTools")}</EmptyState>
           ) : loading ? (
             <LoadingRows />
@@ -176,72 +180,76 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
 
       <section aria-label={translate("tools.details")} className="flex min-h-0 min-w-0 flex-col">
         {selectedTool ? (
-          <div className="min-h-0 flex-1 overflow-auto p-3.5 pb-5 max-[640px]:p-3">
-            {selectedTool.description && (
-              <section className="flex flex-col gap-1.5">
-                <div className="text-[11px] font-semibold text-muted-foreground">{translate("tools.description")}</div>
-                <div className="whitespace-pre-wrap text-xs/relaxed text-muted-foreground [overflow-wrap:anywhere]">{selectedTool.description}</div>
-              </section>
-            )}
-
-            <section className={cn("flex flex-col gap-1.5", selectedTool.description && "mt-[18px]")}>
-              <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-muted-foreground">
-                <span>{translate("tools.parameters")}</span>
-                <span className="whitespace-nowrap font-normal">{translate("tools.parameterCount", { count: fields.length })}</span>
-              </div>
-              {fields.length > 0 ? (
-                <div className="border-t border-border">
-                  {fields.map((field) => (
-                    <div
-                      className="grid grid-cols-[minmax(88px,0.75fr)_minmax(0,1.5fr)] gap-3 border-b border-border py-2.5 text-[11px]/[1.45] max-[640px]:grid-cols-[minmax(74px,0.7fr)_minmax(0,1.3fr)] max-[640px]:gap-2"
-                      key={field.name}
-                    >
-                      <div className="flex min-w-0 flex-col gap-[3px] text-foreground">
-                        <code className="[overflow-wrap:anywhere]">{field.name}</code>
-                        <Badge
-                          variant="outline"
-                          className={cn("w-fit border-current/35 px-1 py-0 font-mono text-[10px] leading-[14px]", field.required ? "text-primary" : "text-muted-foreground")}
-                        >
-                          {translate(field.required ? "tools.required" : "tools.optional")}
-                        </Badge>
-                      </div>
-                      <div className="min-w-0 text-muted-foreground [overflow-wrap:anywhere]">
-                        <code className="mb-[3px] block text-foreground">{field.type}</code>
-                        {field.description && <div>{field.description}</div>}
-                        {field.allowedValues && (
-                          <div className="mt-1 text-muted-foreground">
-                            {translate("tools.allowedValues")}: <code className="text-muted-foreground">{field.allowedValues}</code>
-                          </div>
-                        )}
-                        {field.defaultValue !== undefined && (
-                          <div className="mt-1 text-muted-foreground">
-                            {translate("tools.defaultValue")}: <code className="text-muted-foreground">{field.defaultValue}</code>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="pb-2.5 pt-0.5 text-[11px] text-muted-foreground">{translate("tools.noParameters")}</div>
+          <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+            <FieldGroup className="gap-5">
+              {selectedTool.description && (
+                <Field>
+                  <FieldLabel>{translate("tools.description")}</FieldLabel>
+                  <FieldDescription className="whitespace-pre-wrap [overflow-wrap:anywhere]">{selectedTool.description}</FieldDescription>
+                </Field>
               )}
-            </section>
 
-            {selectedTool.promptGuidelines && selectedTool.promptGuidelines.length > 0 && (
-              <section className="mt-[18px] flex flex-col gap-1.5">
-                <div className="text-[11px] font-semibold text-muted-foreground">{translate("tools.guidelines")}</div>
-                <ul className="m-0 pl-[18px] text-[11px]/[1.5] text-muted-foreground">
-                  {selectedTool.promptGuidelines.map((guideline, index) => (
-                    <li key={`${selectedTool.name}:${index}`}>{guideline}</li>
-                  ))}
-                </ul>
-              </section>
-            )}
+              <Field>
+                <FieldLabel>
+                  {translate("tools.parameters")}
+                  <span className="font-normal text-muted-foreground">{translate("tools.parameterCount", { count: fields.length })}</span>
+                </FieldLabel>
+                {fields.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{translate("tools.parameters")}</TableHead>
+                        <TableHead>{translate("tools.description")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {fields.map((field) => (
+                        <TableRow key={field.name}>
+                          <TableCell className="whitespace-normal align-top">
+                            <code className="text-xs [overflow-wrap:anywhere]">{field.name}</code>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <code className="text-xs text-muted-foreground">{field.type}</code>
+                              <Badge variant="outline">{translate(field.required ? "tools.required" : "tools.optional")}</Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-normal align-top text-muted-foreground">
+                            {field.description && <span className="block [overflow-wrap:anywhere]">{field.description}</span>}
+                            {field.allowedValues && (
+                              <span className="block text-xs">
+                                {translate("tools.allowedValues")}: <code>{field.allowedValues}</code>
+                              </span>
+                            )}
+                            {field.defaultValue !== undefined && (
+                              <span className="block text-xs">
+                                {translate("tools.defaultValue")}: <code>{field.defaultValue}</code>
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <FieldDescription>{translate("tools.noParameters")}</FieldDescription>
+                )}
+              </Field>
+
+              {selectedTool.promptGuidelines && selectedTool.promptGuidelines.length > 0 && (
+                <Field>
+                  <FieldLabel>{translate("tools.guidelines")}</FieldLabel>
+                  <ul className="flex list-disc flex-col gap-1 pl-4 text-sm text-muted-foreground">
+                    {selectedTool.promptGuidelines.map((guideline, index) => (
+                      <li key={`${selectedTool.name}:${index}`}>{guideline}</li>
+                    ))}
+                  </ul>
+                </Field>
+              )}
+            </FieldGroup>
           </div>
         ) : declaredTools ? (
           <EmptyState>{translate("tools.noTools")}</EmptyState>
         ) : loading ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3.5 pb-5 max-[640px]:p-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-3">
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-3 w-full max-w-md" />
             <Skeleton className="h-3 w-full max-w-sm" />
