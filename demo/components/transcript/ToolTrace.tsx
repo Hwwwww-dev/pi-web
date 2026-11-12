@@ -57,38 +57,47 @@ const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
   error: <CircleIcon className="text-destructive" />,
 };
 
+/** 参数/结果标签在详情块上方（第 4.1 节）；放进块内会压到卡片的圆角边框上。 */
+function SectionLabel({ label }: { label?: ToolViewSection["label"] }) {
+  const { t } = useI18n();
+  if (!label) return null;
+  return <div className="mb-1 text-[length:calc(11px+var(--chat-font-size-offset,0px))] text-muted-foreground">{t(`chat.activity.${label}`)}</div>;
+}
+
 function CodeSection({ text, language, label, wrap = true }: {
   text: string;
   language?: string;
   label?: ToolViewSection["label"];
   wrap?: boolean;
 }) {
-  const { t } = useI18n();
   return (
-    <CodeBlock size="sm" data-language={language}>
-      {label && <CodeBlockLine className="text-muted-foreground">{t(`chat.activity.${label}`)}</CodeBlockLine>}
-      <CodeBlockContent wrap={wrap} className="max-h-[var(--card-max-height)]" tabIndex={0}>
-        <HighlightedCode code={text} language={language} />
-      </CodeBlockContent>
-    </CodeBlock>
+    <div className="min-w-0">
+      <SectionLabel label={label} />
+      <CodeBlock size="sm" data-language={language}>
+        <CodeBlockContent wrap={wrap} className="max-h-[var(--card-max-height)]" tabIndex={0}>
+          <HighlightedCode code={text} language={language} />
+        </CodeBlockContent>
+      </CodeBlock>
+    </div>
   );
 }
 
 function FieldsSection({ section }: { section: ToolViewSection }) {
-  const { t } = useI18n();
   return (
-    <CodeBlock size="sm">
-      {section.label && <CodeBlockLine className="text-muted-foreground">{t(`chat.activity.${section.label}`)}</CodeBlockLine>}
-      <CodeBlockContent wrap className="max-h-[var(--card-max-height)]">
-        {(section.fields ?? []).map((field) => (
-          <CodeBlockLine key={field.key}>
-            <span className="text-muted-foreground">{field.key}</span>
-            {": "}
-            {field.value}
-          </CodeBlockLine>
-        ))}
-      </CodeBlockContent>
-    </CodeBlock>
+    <div className="min-w-0">
+      <SectionLabel label={section.label} />
+      <CodeBlock size="sm">
+        <CodeBlockContent wrap className="max-h-[var(--card-max-height)]">
+          {(section.fields ?? []).map((field) => (
+            <CodeBlockLine key={field.key}>
+              <span className="text-muted-foreground">{field.key}</span>
+              {": "}
+              {field.value}
+            </CodeBlockLine>
+          ))}
+        </CodeBlockContent>
+      </CodeBlock>
+    </div>
   );
 }
 
