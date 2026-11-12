@@ -21,17 +21,17 @@ export const BEAM_BASE_SECONDS = BEAM_SLOWEST_SECONDS;
 /** One trip on the fastest reply, in seconds. */
 export const BEAM_FASTEST_SECONDS = 0.6;
 /** The rate that counts as "as fast as it gets" (tokens per second). */
-export const BEAM_FASTEST_RATE = 600;
+export const BEAM_FASTEST_RATE = 180;
 
 /**
- * The curve's falloff, in tokens/s.
+ * The curve's exponent between a resting beam and the fastest one.
  *
- * Exponential, not linear: a linear map makes every t/s step look equally big,
- * so 300 → 150 reads as a hard brake while 60 → 30 reads as nothing. Here the
- * low end is flat (60 t/s is still a slow-looking beam) and only the top end
- * closes the last half-second.
+ * `rate / BEAM_FASTEST_RATE` is how much of that travel is done; the shortfall
+ * raised to this power keeps the low end flat — a 60 t/s reply still looks
+ * unhurried — and closes the last half second at 180 t/s, with no step at the
+ * knee.
  */
-export const BEAM_CURVE_K = 180;
+export const BEAM_CURVE_EXPONENT = 1.5;
 
 /** How many tokens/s the rate may gain per second: a stream that starts should look fast almost at once. */
 export const BEAM_RISE_PER_SECOND = 400;
@@ -53,12 +53,13 @@ export const BEAM_FALL_CAP_SHARE = 0.06;
  */
 export const BEAM_IDLE_SHARE = 0.55;
 
-/** One trip around the card for a rate. Exponential between the two ends. */
+/** One trip around the card for a rate. */
 export function beamDurationSeconds(rate: number): number {
   if (!Number.isFinite(rate) || rate <= 0) return BEAM_SLOWEST_SECONDS;
   if (rate >= BEAM_FASTEST_RATE) return BEAM_FASTEST_SECONDS;
   const span = BEAM_SLOWEST_SECONDS - BEAM_FASTEST_SECONDS;
-  return BEAM_FASTEST_SECONDS + span * Math.exp(-rate / BEAM_CURVE_K);
+  const rest = 1 - rate / BEAM_FASTEST_RATE;
+  return BEAM_FASTEST_SECONDS + span * rest ** BEAM_CURVE_EXPONENT;
 }
 
 /** The playback rate that turns the fixed period into the duration for a rate. */

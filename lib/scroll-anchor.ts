@@ -46,3 +46,44 @@ export function applyScrollAnchor(container: HTMLElement, anchor: ScrollAnchor):
 
 /** How long content above the anchor may keep changing height before we stop chasing it. */
 export const SCROLL_ANCHOR_SETTLE_MS = 800;
+
+/**
+ * Hold an anchor in place every frame until the content above it settles.
+ *
+ * One application is not enough after a prepend: the new rows grow for several
+ * frames (markdown, Prism colors, images reporting their size), and each growth
+ * above the anchor pushes it back down. Chasing it frame by frame keeps the
+ * reader on the row they were reading, which is also what stops a session that
+ * opens at the top from reading page after page in one gesture — the top edge
+ * stays where the prepend left it instead of crawling back to zero.
+ *
+ * It lets go on a deliberate scroll (wheel, touch, key) and after
+ * `SCROLL_ANCHOR_SETTLE_MS`, so the reader can never be held hostage by it.
+ */
+export function holdScrollAnchor(container: HTMLElement, anchor: ScrollAnchor | null): () => void {
+  if (!anchor) return () => {};
+  let stopped = false;
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    window.clearTimeout(timer);
+    container.removeEventListener("wheel", stop);
+    container.removeEventListener("touchstart", stop);
+    container.removeEventListener("keydown", stop);
+  };
+  const keep = () => {
+    if (stopped) return;
+    if (!anchor.element.isConnected) {
+      stop();
+      return;
+    }
+    applyScrollAnchor(container, anchor);
+    requestAnimationFrame(keep);
+  };
+  const timer = window.setTimeout(stop, SCROLL_ANCHOR_SETTLE_MS);
+  container.addEventListener("wheel", stop, { passive: true });
+  container.addEventListener("touchstart", stop, { passive: true });
+  container.addEventListener("keydown", stop);
+  requestAnimationFrame(keep);
+  return stop;
+}

@@ -197,9 +197,10 @@ const MAX_FILE_CHIPS = 4;
  */
 function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; onOpenFile: (path: string) => void }) {
   return (
-    // 胶囊组占“剩下的空间”：以前是 shrink-0，名单一长就把行撑超宽，
-    // 行又是 overflow-hidden，于是被裁掉的是前面的动作名（“编辑”只剩“编”）。
-    <span className="flex min-w-0 flex-1 items-center gap-1.5">
+    // 胶囊组不 grow：行是 `w-fit`，grow 子项会把行的固有宽度按 0 参与计算，
+    // 于是行比内容窄、胶囊明明还有空位就先省略了。``flex: 0 1 auto`` 让行先按
+    // 完整文件名撑到 `max-w-full`，真的排不下才缩。
+    <span className="flex min-w-0 items-center gap-1.5">
       {paths.slice(0, MAX_FILE_CHIPS).map((path) => {
         // A call names files relative to the session cwd; the viewer needs the absolute path.
         const resolved = resolveLocalFilePath(path, cwd);
