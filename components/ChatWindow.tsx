@@ -1478,7 +1478,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         );
 
         for (let renderIdx = finalAssistantIdx + 1; renderIdx < endIdx; renderIdx++) {
-          rendered.push(renderMessage(renderIdx, { showModelLabel: true }));
+          // 一轮只留 TurnMetaLine 那一条用量：中间的每一步都不再各带一行。
+          rendered.push(renderMessage(renderIdx, { showModelLabel: true, hideUsage: true }));
         }
         idx = endIdx;
       }

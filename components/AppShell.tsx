@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftIcon,
@@ -155,6 +155,28 @@ const TOOL_END_REFRESH_MS = 1000;
 function lastAgentTabId(tabs: readonly { sessionId: string }[]): string | null {
   const last = tabs.at(-1);
   return last ? `agent:${last.sessionId}` : null;
+}
+
+/**
+ * 顶栏下挂的四张浮层（系统 / 工具定义 / 会话信息 / 调试）共用这一张卡：顶栏下方 8px，
+ * 左右各 8px（宽度减 16 再配 mx-2，两侧对称），四角 rounded-xl。差异只能加在内容里，
+ * 外壳不在各处手写。
+ */
+function TopPanelPopoverContent({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <PopoverContent
+      side="bottom"
+      align="start"
+      sideOffset={8}
+      avoidCollisions={false}
+      className={cn(
+        "z-[240] mx-2 w-[calc(var(--radix-popover-trigger-width)-16px)] min-w-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg",
+        className,
+      )}
+    >
+      {children}
+    </PopoverContent>
+  );
 }
 
 export function AppShell() {
@@ -2525,53 +2547,35 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <PopoverAnchor virtualRef={topBarRef} />
             {/* 系统提示与工具定义是同一张浮层卡：顶栏下方 8px，左右各 8px
                 （宽度减 16 + mx-2 让两侧边距对称），四角同为 rounded-xl。 */}
-            <PopoverContent
-              side="bottom"
-              align="start"
-              sideOffset={8}
-              avoidCollisions={false}
-              className="z-[240] mx-2 w-[calc(var(--radix-popover-trigger-width)-16px)] min-w-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
-            >
+            <TopPanelPopoverContent>
               <SystemPromptPanel
                 loading={systemInfoLoading}
                 prompt={systemPrompt}
                 translate={translate}
               />
-            </PopoverContent>
+            </TopPanelPopoverContent>
           </Popover>
           <Popover
             open={activeTopPanel === "tools"}
             onOpenChange={(next) => next ? setActiveTopPanel("tools") : closeTopPanel("tools")}
           >
             <PopoverAnchor virtualRef={topBarRef} />
-            <PopoverContent
-              side="bottom"
-              align="start"
-              sideOffset={8}
-              avoidCollisions={false}
-              // Same floating card as the system prompt: inset from the trigger,
-              // rounded, bordered, with a shadow, so both panels frame alike.
-              className="z-[240] mx-2 w-[calc(var(--radix-popover-trigger-width)-16px)] min-w-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
-            >
+            <TopPanelPopoverContent>
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
                 tools={systemTools}
                 translate={translate}
               />
-            </PopoverContent>
+            </TopPanelPopoverContent>
           </Popover>
           <Popover
             open={activeTopPanel === "session"}
             onOpenChange={(next) => next ? setActiveTopPanel("session") : closeTopPanel("session")}
           >
             <PopoverAnchor virtualRef={topBarRef} />
-            {/* 会话信息浮层：标准弹层观感；session-info-popover 类名保留作 e2e 定位锚。 */}
-            <PopoverContent
-              side="bottom"
-              align="end"
-              sideOffset={0}
-              className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-lg p-0"
-            >
+            {/* 会话信息浮层：与系统提示/工具定义/调试同一张浮层卡（同宽、同圆角、同描边阴影）；
+                session-info-popover 类名保留作 e2e 定位锚，内容自己的滚动在面板内部。 */}
+            <TopPanelPopoverContent className="session-info-popover">
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
                 const ws = selectedSession;
@@ -2680,7 +2684,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                    {translate("session.load")}
                 </div>
               )}
-            </PopoverContent>
+            </TopPanelPopoverContent>
           </Popover>
           <Popover
             open={activeTopPanel === "debug"}
@@ -2689,14 +2693,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               : setActiveTopPanel((cur) => cur === "debug" ? null : cur)}
           >
             <PopoverAnchor virtualRef={topBarRef} />
-            <PopoverContent
-              side="bottom"
-              align="start"
-              sideOffset={8}
-              avoidCollisions={false}
-              // 与系统提示/工具定义同一张浮层卡：两侧各 8px、圆角、描边、阴影。
-              className="z-[240] mx-2 w-[calc(var(--radix-popover-trigger-width)-16px)] min-w-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
-            >
+            <TopPanelPopoverContent>
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
                   readerRef={debugSnapshotReaderRef}
@@ -2705,7 +2702,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   onClose={closeDebugPanel}
                 />
               </DebugPanelBoundary>
-            </PopoverContent>
+            </TopPanelPopoverContent>
           </Popover>
 
         {isMobile && renderProjectTrustWarning(true)}
