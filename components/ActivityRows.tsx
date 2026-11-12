@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useMemo, useState, type ReactNode } from "react";
-import { BookOpenIcon, BotIcon, CheckIcon, CopyIcon, ExternalLinkIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareTerminalIcon, WrenchIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { CodeBlock, CodeBlockContent } from "./ui/code-block";
@@ -19,7 +19,8 @@ import {
 import { SafeMarkdownBody } from "./SafeMarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import { TerminalTrace } from "./transcript/TerminalTrace";
-import { ToolTrace } from "./transcript/ToolTrace";
+import { ToolTrace, KIND_ICONS, KIND_ACTIVE_ICONS } from "./transcript/ToolTrace";
+import type { ToolViewKind } from "@/lib/tool-view";
 import { TaskTrace } from "./transcript/TaskTrace";
 import { SubagentTrace } from "./transcript/SubagentTrace";
 import { copyText } from "@/lib/clipboard";
@@ -47,41 +48,26 @@ import type { CustomMessage, TextContent, ToolCallContent, ToolResultMessage } f
 // ─────────────────────────────────────────────────────────────────────────────
 
 
-/** 一类的图标颜色：收起时中性灰，展开时才换上这一类自己的颜色。 */
-const CATEGORY_ICON_COLOR: Record<ToolCategory, string> = {
-  view: "text-primary/70",
-  search: "text-primary/70",
-  edit: "text-primary/70",
-  terminal: "text-primary/70",
-  subagent: "text-primary/70",
-  plan: "text-primary/70",
-  compact: "text-primary/70",
-  web: "text-primary/70",
-  other: "text-primary/70",
+/**
+ * 一类的图标：直接复用工具行那套 `KIND_ICONS`，同一件事只有一套图标。
+ * 以前分类行自备一套（BookOpen/Pen/Shrink），同一次编辑在组头和行里是两个
+ * 不同的笔，同一个 bash 又是两种终端。
+ */
+const CATEGORY_KIND: Record<ToolCategory, ToolViewKind> = {
+  view: "file-read",
+  search: "search",
+  edit: "file-edit",
+  terminal: "terminal",
+  subagent: "subagent",
+  plan: "queue",
+  compact: "compact",
+  web: "web",
+  other: "generic",
 };
 
 function ToolCategoryIcon({ category, active = false }: { category: ToolCategory; active?: boolean }) {
-  const className = cn("size-3.5 shrink-0", active ? CATEGORY_ICON_COLOR[category] : "text-muted-foreground");
-  switch (category) {
-    case "view":
-      return <BookOpenIcon className={className} strokeWidth={1.8} />;
-    case "search":
-      return <SearchIcon className={className} strokeWidth={1.8} />;
-    case "edit":
-      return <PenIcon className={className} strokeWidth={1.8} />;
-    case "terminal":
-      return <SquareTerminalIcon className={className} strokeWidth={1.8} />;
-    case "subagent":
-      return <BotIcon className={className} strokeWidth={1.8} />;
-    case "plan":
-      return <ListChecksIcon className={className} strokeWidth={1.8} />;
-    case "compact":
-      return <ShrinkIcon className={className} strokeWidth={1.8} />;
-    case "web":
-      return <GlobeIcon className={className} strokeWidth={1.8} />;
-    default:
-      return <WrenchIcon className={className} strokeWidth={1.8} />;
-  }
+  const kind = CATEGORY_KIND[category];
+  return <>{active ? KIND_ACTIVE_ICONS[kind] : KIND_ICONS[kind]}</>;
 }
 
 

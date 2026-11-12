@@ -405,7 +405,9 @@ function kindOf(p: Prepared): ToolViewKind {
   if (p.mcp) return "mcp";
   if (isSubagentToolName(name)) return "subagent";
   if (p.codemode) return "codemode";
-  if (p.command !== null) return "terminal";
+  // 只看工具名，不看已解析的 command：还在流式输入参数时 command 还没成形，
+  // 按命令判会让 bash 行在运行中先显示成通用扳手、跑完又变成终端图标。
+  if (getToolCategory(name) === "terminal") return "terminal";
   if (isWriteToolName(name)) return "file-write";
   if (isEditToolName(name) || isApplyPatchToolName(name)) return "file-edit";
   const category = getToolCategory(name);
