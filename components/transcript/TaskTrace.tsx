@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, type ReactNode } from "react";
+import { ListChecksIcon } from "lucide-react";
 import { Trace } from "@/components/ui/trace";
 import { TraceRow } from "./TraceRow";
 import type { ToolViewStatus } from "@/lib/tool-view";
@@ -22,6 +23,7 @@ export const TaskTrace = memo(function TaskTrace({ title, description, status, f
 }) {
   return (
     <TraceRow
+      icon={<ListChecksIcon className="size-3.5" />}
       title={title}
       description={description}
       status={status}

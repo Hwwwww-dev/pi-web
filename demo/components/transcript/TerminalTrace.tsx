@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, type ReactNode } from "react";
-import { WrapTextIcon } from "lucide-react";
+import { SquareTerminalIcon, WrapTextIcon } from "lucide-react";
 import {
   CodeBlock,
   CodeBlockActions,
@@ -39,6 +39,7 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
 
   return (
     <TraceRow
+      icon={<SquareTerminalIcon className="size-3.5" />}
       title={view.title}
       object={view.object}
       description={view.description}

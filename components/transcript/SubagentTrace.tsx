@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, type ReactNode } from "react";
-import { CircleCheckIcon, CircleDotIcon, CircleIcon } from "lucide-react";
+import { BotIcon, CircleCheckIcon, CircleDotIcon, CircleIcon } from "lucide-react";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { SafeMarkdownBody } from "@/components/SafeMarkdownBody";
 import { useI18n } from "@/hooks/useI18n";
@@ -39,6 +39,7 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
 
   return (
     <TraceRow
+      icon={<BotIcon className="size-3.5" />}
       title={title}
       status={status}
       foldKey={foldKey}

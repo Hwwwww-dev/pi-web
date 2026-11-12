@@ -6,9 +6,11 @@ import {
   TraceCollapsible,
   TraceCollapsibleContent,
   TraceCollapsibleTrigger,
+  TraceIcon,
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace";
+import { LayersIcon } from "lucide-react";
 import { useTraceFold } from "./TraceRow";
 
 /**
@@ -38,6 +40,9 @@ export function TurnTrace({ summary, foldKey, defaultOpen, reveal = false, class
       >
         <TraceCollapsibleTrigger aria-label={summary}>
           <TraceLine>
+            <TraceIcon>
+              <LayersIcon className="size-3.5" />
+            </TraceIcon>
             <TraceTitle className="font-medium">{summary}</TraceTitle>
           </TraceLine>
         </TraceCollapsibleTrigger>
