@@ -364,13 +364,15 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
           <TraceCollapsibleTrigger>
             <TraceLine>
               <TraceIcon><ToolCategoryIcon category={subagent ? "subagent" : "other"} active={expanded} /></TraceIcon>
-              <TraceTitle className={cn("font-medium", dim && "font-normal")}>{label}</TraceTitle>
-              <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
+              {/* 名字不可收缩：以前没有 `shrink-0`，`plugin-hook-context` 被压成 `plugin`。 */}
+              <TraceTitle className={cn("shrink-0 whitespace-nowrap font-medium", dim && "font-normal")}>{label}</TraceTitle>
+              <TraceDescription className="min-w-0 flex-1 truncate [font-variant-numeric:normal]">
                 {preview || (isHiddenDisplay ? t("i18n.showExtensionMessage") : null)}
               </TraceDescription>
             </TraceLine>
           </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent>
+          {/* 扩展消息的内容以前不限高：一条长 markdown（插件注入的规范文档）能把整页顶开。 */}
+          <TraceCollapsibleContent className="max-h-[var(--card-max-height)] overflow-auto">
             <div className="flex flex-col gap-2">
               {images.length > 0 && (
                 <div className={cn("flex flex-wrap gap-1.5", text && "mb-2")}>

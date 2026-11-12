@@ -232,7 +232,9 @@ export function TraceRow({
           <span className="min-w-0 flex-1" aria-hidden="true" />
           {actions}
         </div>
-        <TraceCollapsibleContent className="mt-1 flex flex-col gap-2">
+        {/* 展开区统一封顶：markdown（子代理报告、web 结果）以前是唯一没有上限的，
+            长内容会把整张卡无限拉高；代码块自己也封顶，同值叠加无害。 */}
+        <TraceCollapsibleContent className="mt-1 max-h-[var(--card-max-height)] overflow-auto [&>*]:min-w-0">
           {content}
           {children}
         </TraceCollapsibleContent>
