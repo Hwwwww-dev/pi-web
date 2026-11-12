@@ -13,7 +13,6 @@ import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { isHiddenCustomMessage, isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
 import { getToolCategory, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
 import { buildTurnActivityItems, getFinishedTurnView } from "@/lib/turn-view";
-import { isFailedResult } from "@/lib/tool-view";
 import { type WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
 import { dropMentionText, splitDroppedItems, uploadFiles, type DroppedItem } from "@/lib/file-upload-client";
@@ -1405,7 +1404,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               summary={processSummary}
               foldKey={`process:${entryIds[userIdx] ?? userIdx}`}
               defaultOpen={!finalAnswerMessage}
-              failed={activityItems.some((item) => item.kind === "tool" && isFailedResult(item.block.toolName, item.result))}
               reveal={revealProcess}
               className="mb-5"
             >

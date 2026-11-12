@@ -318,6 +318,15 @@ function getMessageText(content: CustomMessage["content"]): string {
     .join("\n");
 }
 
+/** Same JSON, formatting aside: a body that repeats the details verbatim needs no second copy. */
+function sameJson(a: string, b: string): boolean {
+  try {
+    return JSON.stringify(JSON.parse(a)) === JSON.stringify(JSON.parse(b));
+  } catch {
+    return a.trim() === b.trim();
+  }
+}
+
 function safeJson(value: unknown): string {
   try {
     return JSON.stringify(value, null, 2);
@@ -327,7 +336,8 @@ function safeJson(value: unknown): string {
 }
 
 function previewText(text: string, limit = 140): string {
-  const normalized = text.replace(/\s+/g, " ").trim();
+  // 一行预览里的代码栅栏记号（```json）只占位置，没有信息。
+  const normalized = text.replace(/```[a-zA-Z0-9]*/g, " ").replace(/\s+/g, " ").trim();
   if (!normalized) return "";
   return normalized.length > limit ? `${normalized.slice(0, limit)}...` : normalized;
 }
@@ -354,6 +364,8 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
   const images = getMessageImages(message.content);
   const hasDetails = message.details !== undefined;
   const detailsText = hasDetails ? safeJson(message.details) : "";
+  // 正文本来就是这段 JSON 时（扩展把 details 也写进正文），详情卡只会重复一遍。
+  const detailsRepeatBody = hasDetails && sameJson(text.replace(/```[a-zA-Z0-9]*/g, ""), detailsText);
   const subagent = isSubagentToolDetails(message.details) ? message.details : null;
   const { label, dim } = customRowLabel(message, t);
   const preview = previewText(text, 120);
@@ -406,7 +418,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
               {text
                 ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody>
                 : <span className="text-xs text-muted-foreground">{t("i18n.noMessage")}</span>}
-              {hasDetails && (
+              {hasDetails && !detailsRepeatBody && (
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Button type="button" variant="ghost" size="xs" onClick={copyContent}>
@@ -429,7 +441,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
                   )}
                 </div>
               )}
-              {!hasDetails && text && (
+              {(detailsRepeatBody || !hasDetails) && text && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Button type="button" variant="ghost" size="xs" onClick={copyContent}>
                     {copied ? t("i18n.copied") : t("i18n.copy")}

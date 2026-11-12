@@ -80,7 +80,8 @@ function TraceDescription({
     <span
       data-slot="trace-description"
       className={cn(
-        "cn-trace-description min-w-0 truncate text-muted-foreground/70 tabular-nums",
+        // basis-0 + 增长：描述吃掉行内剩余宽度并截断，标题保持自身宽度（只在整行放不下时才缩）。
+        "cn-trace-description min-w-0 flex-1 basis-0 truncate text-muted-foreground/70 tabular-nums",
         className
       )}
       {...props}

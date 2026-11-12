@@ -22,8 +22,10 @@ test("notifications, dialog titles and option previews fall back to terminal ren
 });
 
 test("tool results stop reflowing when they are terminal output", () => {
-  // 第 8 节第 8 条：终端输出不 reflow。终端行在 TerminalTrace，其它代码段在 ToolTrace。
+  // 第 8 节第 8 条：终端输出默认不 reflow，行头提供换行开关。
   assert.match(terminalTrace, /isTuiText\(output\)/);
-  assert.match(terminalTrace, /<CodeBlockContent wrap=\{false\}/);
-  assert.match(toolTrace, /<CodeBlockContent wrap=\{wrap\}/);
+  assert.match(terminalTrace, /const \[wrap, setWrap\] = useState\(false\)/);
+  assert.match(terminalTrace, /<CodeBlockContent wrap=\{wrap\}/);
+  // 其它代码段默认换行（参数/结果），终端是例外。
+  assert.match(toolTrace, /wrap = true/);
 });

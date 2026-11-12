@@ -767,6 +767,8 @@ export const zhCNLocale: LocalePlugin = {
     "chat.activity.result": "结果",
     "chat.trace.running": "正在运行 {target}",
     "chat.trace.failed": "运行失败：{target}",
+    "chat.trace.wrap": "自动换行",
+    "chat.trace.unwrap": "取消换行",
     "chat.trace.ran": "运行 {command}",
     "chat.trace.read": "读取 {path}",
     "chat.trace.wrote": "写入 {path}",

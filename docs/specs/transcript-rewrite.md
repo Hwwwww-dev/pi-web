@@ -247,6 +247,7 @@ export function toToolView(input: {
 | --- | --- | --- |
 | 行宽 | 占满内容区宽度 | 长标题出省略号，折叠箭头始终留在行尾（`70%` 上限在手机上把命令挤断，已移除） |
 | 换行 | 标题单行 `truncate`，描述同一行；参数/结果才换行 | 元素不能一个上一个下 |
+| 收缩 | 描述 `flex-1 basis-0` 吃掉剩余宽度并截断，标题保持自身宽度（只在此行放不下时才缩） | 标题被描述挤成 `U..` 是错的 |
 | 字号 | 行文字 `13.5px + var(--chat-font-size-offset)`；标题与描述同号 | 用户要求字体统一 |
 | 文件名 | 标题只说动作（`读取` / `写入` / `编辑`），文件名由可点击 chip 承担；chip 每行一律渲染，不按标题内容去重（去重会让「可跳转文件」消失） | 用户要求文件可跳转 |
 | 字体样式 | 不用斜体；时间、计数用 `tabular-nums` | 横平竖直 |
@@ -285,16 +286,15 @@ export function toToolView(input: {
 **本项目实现** `components/transcript/TurnTrace.tsx`
 
 ```tsx
-export function TurnTrace({ summary, status, defaultOpen, children }: {
+export function TurnTrace({ summary, defaultOpen, children }: {
   summary: string;                 // "处理详情 · 8 终端 · 2 文件"
-  status?: "error";
   defaultOpen: boolean;
   children: ReactNode;
 }) {
   return (
     <TraceCollapsible defaultOpen={defaultOpen} onOpenChange={...}>
       <TraceCollapsibleTrigger>
-        <TraceLine status={status}>
+        <TraceLine>
           <TraceTitle>{summary}</TraceTitle>
         </TraceLine>
       </TraceCollapsibleTrigger>
@@ -383,7 +383,10 @@ export function TurnTrace({ summary, status, defaultOpen, children }: {
       <CodeBlock size="sm" variant={status === "error" ? "destructive" : "default"}>
         <CodeBlockHeader>
           <CodeBlockTitle>{"$ " + command}</CodeBlockTitle>
-          <CodeBlockActions><CodeBlockCopyButton value={command} /></CodeBlockActions>
+          <CodeBlockActions>
+            <Button aria-pressed={wrap} onClick={() => setWrap(!wrap)}><WrapTextIcon /></Button>
+            <CodeBlockCopyButton value={command} />
+          </CodeBlockActions>
         </CodeBlockHeader>
         <CodeBlockContent wrap className="max-h-64">{output}</CodeBlockContent>
       </CodeBlock>
@@ -393,6 +396,7 @@ export function TurnTrace({ summary, status, defaultOpen, children }: {
 ```
 
 - 命令进 `CodeBlockHeader`（官方 Header 的用途：一行标题 + 操作），输出进 `CodeBlockContent`。
+- 换行开关在复制按钮左侧，默认关（不换行 = 高度可控、长行靠横向滚动）；打开后命令行与输出都按宽度换行。
 - ANSI：`AnsiText` 结果放进 `CodeBlockContent`；`CodeBlock` 不支持 ANSI 时用 `AnsiText` + 相同 `max-h-64` 容器，不改配色。
 - 错误：`variant="destructive"` + `status="error"` + 内容顶部重复错误行（官方 Stack Trace 同形）。
 

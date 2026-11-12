@@ -767,6 +767,8 @@ export const zhTWLocale: LocalePlugin = {
     "chat.activity.result": "結果",
     "chat.trace.running": "正在執行 {target}",
     "chat.trace.failed": "執行失敗：{target}",
+    "chat.trace.wrap": "自動換行",
+    "chat.trace.unwrap": "取消換行",
     "chat.trace.ran": "執行 {command}",
     "chat.trace.read": "讀取 {path}",
     "chat.trace.wrote": "寫入 {path}",

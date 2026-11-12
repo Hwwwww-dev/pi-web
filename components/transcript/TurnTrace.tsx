@@ -16,11 +16,9 @@ import { useTraceFold } from "./TraceRow";
  * answer. It has no icon — the summary text is the whole line — and its content
  * is a `<Trace>` of the same rows the answer is made of.
  */
-export function TurnTrace({ summary, failed, foldKey, defaultOpen, reveal = false, className, children }: {
+export function TurnTrace({ summary, foldKey, defaultOpen, reveal = false, className, children }: {
   /** "处理详情 · 8 终端 · 2 文件". */
   summary: string;
-  /** A tool in this turn failed: the line is destructive, as the官方 example shows. */
-  failed?: boolean;
   foldKey: string;
   defaultOpen: boolean;
   /** A search hit sits inside: the fold opens and stays open while the hit is pending. */
@@ -39,7 +37,7 @@ export function TurnTrace({ summary, failed, foldKey, defaultOpen, reveal = fals
         }}
       >
         <TraceCollapsibleTrigger aria-label={summary}>
-          <TraceLine status={failed ? "error" : undefined}>
+          <TraceLine>
             <TraceTitle className="font-medium">{summary}</TraceTitle>
           </TraceLine>
         </TraceCollapsibleTrigger>
