@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { BEAM_SLOWEST_SECONDS, beamDurationSeconds, nextBeamRate } from "@/lib/beam-speed";
+import { BEAM_SLOWEST_SECONDS, advanceBeamRate, beamDurationSeconds } from "@/lib/beam-speed";
 import { getStreamCharacters, subscribeStreamCharacters } from "@/lib/stream-beam";
 
 /** How often the arriving characters are measured; per-chunk sampling made the beam twitch. */
-const SAMPLE_MS = 300;
+const SAMPLE_MS = 200;
 /** pi's own rough conversion, so the beam and the t/s badge agree on what a token is. */
 const CHARS_PER_TOKEN = 4;
 
@@ -40,7 +40,7 @@ export function useStreamBeamDuration(active: boolean): number {
     if (elapsed < SAMPLE_MS) return;
     const measured = Math.max(0, ((tokens - last.tokens) / elapsed) * 1000);
     lastRef.current = { at: now, tokens };
-    const rate = nextBeamRate(rateRef.current, measured);
+    const rate = advanceBeamRate(rateRef.current, measured, elapsed / 1000);
     rateRef.current = rate;
     setDuration(beamDurationSeconds(rate));
   }, [active, characters]);

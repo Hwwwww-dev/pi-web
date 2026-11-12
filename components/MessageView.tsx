@@ -16,6 +16,7 @@ import {
 } from "./ActivityRows";
 import { ReasoningTrace } from "./transcript/ReasoningTrace";
 import { SafeMarkdownBody } from "./SafeMarkdownBody";
+import { beamDurationSeconds } from "@/lib/beam-speed";
 import { formatNoticeTokens } from "@/lib/transcript-notices";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
@@ -506,7 +507,7 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
                 <span
                   aria-hidden="true"
                   className="tps-rainbow pointer-events-none absolute inset-y-0 left-0 -z-10"
-                  style={{ animationDuration: `${Math.max(0.3, 50 / tps).toFixed(2)}s` }}
+                  style={{ animationDuration: `${beamDurationSeconds(tps).toFixed(2)}s` }}
                 />
               )}
               {tps.toFixed(1)} t/s
