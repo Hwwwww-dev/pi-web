@@ -45,37 +45,21 @@
    fallback insets with device sizes; +8px mirrors the edge margins. */
 @media (max-width: 640px) {
   .settings-card-safe {
-    inset: calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px) 8px;
-    /* Stretch between the insets instead of the utilities' centered size, and
-       drop the Radix centering translate: plain rules beat the layered
-       utilities on every width this media query matches (including exactly
-       640px, where max-sm: does not). Tailwind v4 writes its
-       translate-x/y-[-50%] utilities to the standalone `translate` property,
-       not `transform`, so both have to be reset — clearing only `transform`
-       left the card shifted half its size off the top-left corner. */
-    width: auto;
-    height: auto;
-    transform: none;
-    translate: none;
+    /* 位置交给官方 DialogContent 的居中（translate 由它的入场动画控制，覆盖不掉）；
+       这里只把尺寸收到手机可用区域，卡片就回到屏幕中间。 */
+    width: calc(100vw - 16px);
+    /* 高度固定为视口 80%，居中后四周留白一致。 */
+    height: 80dvh;
+    max-height: none;
   }
 }
 
+/* 官方 DialogContent 用 translate 居中，入场动画也占着同一个属性，任何 inset 写法都会把卡片推掉半个身位。
+   所以手机/独立安装态只调尺寸（可用区域扣掉安全区），位置始终交给居中。 */
 @supports (-webkit-touch-callout: none) {
   @media (display-mode: standalone) {
     .settings-card-safe {
-      top: max(67px, calc(env(safe-area-inset-top) + 8px));
-      right: max(16px, calc(env(safe-area-inset-right) + 8px));
-      bottom: max(32px, calc(env(safe-area-inset-bottom) + 8px));
-      left: max(16px, calc(env(safe-area-inset-left) + 8px));
-    }
-  }
-
-  @media (display-mode: standalone) and (orientation: landscape) {
-    .settings-card-safe {
-      top: max(16px, calc(env(safe-area-inset-top) + 8px));
-      right: max(67px, calc(env(safe-area-inset-right) + 8px));
-      bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px));
-      left: max(67px, calc(env(safe-area-inset-left) + 8px));
+      max-height: calc(100dvh - max(67px, env(safe-area-inset-top)) - max(32px, env(safe-area-inset-bottom)));
     }
   }
 }

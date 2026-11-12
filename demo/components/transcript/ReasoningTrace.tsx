@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SparklesIcon } from "lucide-react";
 import {
   Trace,
   TraceCollapsible,
   TraceCollapsibleContent,
   TraceCollapsibleTrigger,
   TraceDescription,
+  TraceIcon,
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace";
@@ -183,6 +185,9 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
           title={t("i18n.thinking")}
         >
           <TraceLine status={active ? "running" : undefined}>
+            <TraceIcon>
+              <SparklesIcon className="size-3.5" />
+            </TraceIcon>
             <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
             {!active && duration !== undefined && (
               <TraceDescription className="shrink-0 tabular-nums">

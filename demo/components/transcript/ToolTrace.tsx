@@ -2,10 +2,21 @@
 
 import { memo, type ReactNode } from "react";
 import {
+  BotIcon,
   CircleCheckIcon,
   CircleDotIcon,
   CircleIcon,
+  CodeXmlIcon,
+  FilePenIcon,
+  FilePenLineIcon,
   FileTextIcon,
+  GlobeIcon,
+  ListTodoIcon,
+  Minimize2Icon,
+  PlugIcon,
+  SearchIcon,
+  SquareTerminalIcon,
+  WrenchIcon,
 } from "lucide-react";
 import { AnsiText } from "@/components/AnsiText";
 import { HighlightedCode } from "@/components/HighlightedCode";
@@ -18,7 +29,7 @@ import { SafeMarkdownBody } from "@/components/SafeMarkdownBody";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { resolveLocalFilePath } from "@/lib/file-links";
-import { baseName, type ToolView, type ToolViewSection, type ToolViewStatus, type ToolViewStep } from "@/lib/tool-view";
+import { baseName, type ToolView, type ToolViewKind, type ToolViewSection, type ToolViewStatus, type ToolViewStep } from "@/lib/tool-view";
 import { TraceRow } from "./TraceRow";
 
 /**
@@ -26,6 +37,24 @@ import { TraceRow } from "./TraceRow";
  * arguments and the result inside the fold. The icon, title and content slot
  * follow `ToolView.kind`; nothing about the layout is per-tool.
  */
+
+const ICON_CLASS = "size-3.5";
+
+/** 一类工具一个图标，尺寸与颜色统一（颜色由行本身给）。 */
+const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
+  terminal: <SquareTerminalIcon className={ICON_CLASS} />,
+  "file-read": <FileTextIcon className={ICON_CLASS} />,
+  "file-write": <FilePenIcon className={ICON_CLASS} />,
+  "file-edit": <FilePenLineIcon className={ICON_CLASS} />,
+  search: <SearchIcon className={ICON_CLASS} />,
+  web: <GlobeIcon className={ICON_CLASS} />,
+  codemode: <CodeXmlIcon className={ICON_CLASS} />,
+  subagent: <BotIcon className={ICON_CLASS} />,
+  mcp: <PlugIcon className={ICON_CLASS} />,
+  queue: <ListTodoIcon className={ICON_CLASS} />,
+  compact: <Minimize2Icon className={ICON_CLASS} />,
+  generic: <WrenchIcon className={ICON_CLASS} />,
+};
 
 const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
   running: <CircleDotIcon className="text-warning" />,
@@ -215,6 +244,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, activi
 
   return (
     <TraceRow
+      icon={KIND_ICONS[view.kind]}
       title={view.title}
       object={chipNamesObject ? undefined : view.object}
       chips={chips}
