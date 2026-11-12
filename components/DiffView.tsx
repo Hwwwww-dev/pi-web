@@ -38,10 +38,13 @@ const LINE_NUMBER_BASE: CSSProperties = {
 /** Gutter width for a view whose largest line number is `lineCount`. */
 export function lineNumberGutter(lineCount: number, pinned = false): CSSProperties {
   const digits = Math.max(2, String(Math.max(1, Math.floor(lineCount))).length);
-  const width = `calc(${digits}ch + 12px)`;
+  // 宽度 = 数字宽度 + 左右 padding + 余量。写成 width 而不是 minWidth 时，
+  // border-box 把 8px+8px 的 padding 算在那点宽度里，四位数直接把字挤到
+  // gutter 外面，+/− 标记就贴在行号后面了。
+  const width = `calc(${digits}ch + 22px)`;
   return {
     ...LINE_NUMBER_BASE,
-    width,
+    boxSizing: "border-box",
     minWidth: width,
     // Only views of at most SOURCE_HIGHLIGHT_MAX_LINES rows pin it: a long plain
     // fallback or huge diff scrolled with 50-67 ms frames while pinned, so those

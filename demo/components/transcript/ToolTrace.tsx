@@ -209,9 +209,9 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             variant="outline"
             size="xs"
             disabled={!resolved}
-            // 胶囊给名字留一个上限：超长文件名自己省略号，而不能把前面的动作名和
-            // 编辑的 +N/-N 挤出可见区。
-            className="min-w-0 max-w-[14rem] shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
+            // 胶囊给名字留一个上限：手机上更窄（半个屏），超长文件名自己省略号，
+            // 而不能把前面的动作名和后面的 +N/-N 挤出可见区。
+            className="min-w-0 max-w-[9rem] shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] sm:max-w-[14rem]"
             title={resolved ?? path}
             aria-label={label}
             onClick={(event) => {

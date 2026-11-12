@@ -599,6 +599,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // State, not a ref: the sentinel can appear with nothing else changing (a
   // finished turn regrouped into more rows), and must get an observer then.
   const [sentinel, setSentinel] = useState<HTMLElement | null>(null);
+  /** 展开/折叠一行的那几帧：不让 scroller 跟着内容贴底，否则行会被拉上去。 */
+  const [foldInFlight, setFoldInFlight] = useState(false);
+  const foldTimerRef = useRef<number | undefined>(undefined);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
   /** 一页更早消息开始加载时的内容高度：新内容接上后按高度差把读者留在原处。 */
@@ -720,6 +723,21 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // Expanding a collapsed row no longer kicks the list: `components/transcript/TraceRow.tsx`
   // keeps the toggled row's own top edge fixed across the change, so opening a card
   // grows it downward instead of scrolling the tail into view.
+
+  // 展开/折叠一行的这几帧关掉贴底跟随：行留在原地、内容向下长，而不是行被
+  // 拉上去再补内容（就是用户看到的“展开后闪一下、然后向上移”）。
+  useEffect(() => {
+    const onFold = () => {
+      setFoldInFlight(true);
+      window.clearTimeout(foldTimerRef.current);
+      foldTimerRef.current = window.setTimeout(() => setFoldInFlight(false), 260);
+    };
+    window.addEventListener("pi-web:trace-fold", onFold);
+    return () => {
+      window.removeEventListener("pi-web:trace-fold", onFold);
+      window.clearTimeout(foldTimerRef.current);
+    };
+  }, []);
 
   // 收键盘时视口一下子长回来，列表会在那一帧贴回底部——硬跳。把它改成滑下去：
   // 只有“长高”才处理（弹起是变矮），并尊重系统的减少动画。
@@ -1660,7 +1678,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} waitingCount={waitingExtensionCustomUiCount} onInput={sendExtensionCustomInput} />
         )}
         {!isEmptyNew && <>
-        <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
+        <MessageScrollerProvider autoScroll={!foldInFlight} defaultScrollPosition="last-anchor">
         <MessageScroller className="min-h-0 min-w-0 flex-1">
         <MessageScrollerViewport
           ref={scrollContainerRef}

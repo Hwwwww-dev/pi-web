@@ -61,7 +61,8 @@ test("the diff view wraps when the viewer wraps, and the key reaches the diff", 
   assert.match(diffView, /wrapLines \? "shrink whitespace-pre-wrap \[overflow-wrap:anywhere\]" : "shrink-0 whitespace-pre"/);
   // Unwrapped stays exactly as before: one line per row, sideways scroll. The
   // +/- marker column never shrinks either way.
-  assert.match(diffView, /className="min-w-4 shrink-0 select-none px-1\.5 font-semibold"/);
+  assert.match(diffView, /line\.type === "added" && "text-success"/);
+  assert.match(diffView, /line\.type === "removed" && "text-destructive"/);
   assert.match(source, /<DiffView patch=\{gitDiff\.patch!\} wrapLines=\{wrapLines\} \/>/);
 
   // The wrap control is offered for the diff as well as the source, never for a

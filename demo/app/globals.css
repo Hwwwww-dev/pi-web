@@ -1131,6 +1131,13 @@ span.token.table {
   100% { transform: scale(1); opacity: 0; }
 }
 
+/* 展开一行时高度从 0 长到实际高度（Radix 会把实际高度写在变量上）：
+   没有这一段，内容是“凭空出现”的一帧，列表只会在下一帧被按到底部，看上去就是闪一下。 */
+@keyframes trace-fold-down {
+  from { height: 0; opacity: 0 }
+  to { height: var(--radix-collapsible-content-height); opacity: 1 }
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

@@ -14,7 +14,7 @@ test("one scroll-to-latest control, and it is the official one", () => {
 });
 
 test("the scroller keeps its official defaults for prepends and the initial anchor", () => {
-  assert.match(source, /<MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">/);
+  assert.match(source, /<MessageScrollerProvider autoScroll=\{!foldInFlight\} defaultScrollPosition="last-anchor">/);
   // Hand-rolled compensation must not sit next to the official one.
   assert.equal(source.includes("preserveScrollOnPrepend={false}"), false);
   // The last user message is the anchor the scroller opens at.

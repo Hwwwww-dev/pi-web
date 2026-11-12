@@ -148,7 +148,7 @@ function TraceCollapsibleContent({
   return (
     <CollapsibleContent
       data-slot="trace-collapsible-content"
-      className="min-w-0 overflow-hidden"
+      className="min-w-0 overflow-hidden data-[state=open]:animate-[trace-fold-down_180ms_ease-out] motion-reduce:data-[state=open]:animate-none"
       {...props}
     >
       <div

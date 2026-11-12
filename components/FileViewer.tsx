@@ -268,9 +268,9 @@ function DiffView({ patch, wrapLines }: { patch: string; wrapLines: boolean }) {
           // variant's absolute ::after so wrapped text keeps clearing it, and
           // content-none drops that second marker.
           const rowTone = line.type === "added"
-            ? "bg-foreground/5"
+            ? "bg-success/12"
             : line.type === "removed"
-            ? "bg-destructive/10"
+            ? "bg-destructive/12"
             : "";
 
           return (
@@ -284,7 +284,13 @@ function DiffView({ patch, wrapLines }: { patch: string; wrapLines: boolean }) {
               >
                 {line.type === "removed" ? line.oldLineNo : line.newLineNo}
               </span>
-              <span className="min-w-4 shrink-0 select-none px-1.5 font-semibold">
+              <span
+                className={cn(
+                  "min-w-4 shrink-0 select-none px-1.5 font-semibold",
+                  line.type === "added" && "text-success",
+                  line.type === "removed" && "text-destructive",
+                )}
+              >
                 {prefix}
               </span>
               <span

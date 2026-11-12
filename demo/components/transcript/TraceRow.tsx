@@ -83,6 +83,7 @@ export function TraceRow({
   object,
   titleClassName,
   chips,
+  suffix,
   actions,
   description,
   status = "done",
@@ -105,6 +106,8 @@ export function TraceRow({
   titleClassName?: string;
   /** File chips the call named, right after the title (第 4.1 节). */
   chips?: ReactNode;
+  /** 胶囊后面的定量（编辑的 +N/−N）：胶囊指哪个文件、改了多少，读起来是一句。 */
+  suffix?: ReactNode;
   /** 行尾的动作按钮（比如打开子代理面板）：放在折叠触发按钮之外，
       因为按钮不能嵌按钮，而触发按钮里只能有那一行文字。 */
   actions?: ReactNode;
@@ -137,6 +140,8 @@ export function TraceRow({
       const row = rowRef.current;
       const container = row ? scrollParentOf(row) : null;
       if (row && container) pinRef.current = { container, top: row.getBoundingClientRect().top };
+      // 告诉列表“这一行正在折叠”：这几帧不要贴底跟随，否则展开的行会被拉上去。
+      window.dispatchEvent(new Event("pi-web:trace-fold"));
       onOpenChange(next);
     },
     [onOpenChange],
@@ -152,7 +157,7 @@ export function TraceRow({
   // 文件胶囊是真正的按钮，行本身是折叠触发按钮：按钮不能嵌按钮，否则 HTML 结构
   // 非法、点击事件在移动端也会被里层吃掉。所以有展开内容时，行按钮只放文字，
   // 胶囊作为它的兄弟摆在行尾（同一行对齐）。
-  const line = (withChips: boolean) => (
+  const line = (withChips: boolean, withTrailing = true) => (
     // 行宽跟随内容（官方 `w-fit max-w-full`）：箭头紧跟文字，不甩到行尾；
     // 超宽时由对象/描述上的 `truncate` 收缩，箭头始终贴住最后一段文字。
       <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0 overflow-hidden" data-expanded={open || undefined}>
@@ -164,8 +169,9 @@ export function TraceRow({
       {/* 对象是唯一能让步的一段：名字、胶囊、行尾都不收缩。 */}
       {object && <span className="min-w-0 flex-1 truncate">{object}</span>}
       {withChips && chips}
+      {withChips && suffix != null && <span className="shrink-0 whitespace-nowrap">{suffix}</span>}
       {description && <TraceDescription className="min-w-0 shrink truncate">{description}</TraceDescription>}
-      {trailing && <span className="shrink-0 pl-2">{trailing}</span>}
+      {withTrailing && trailing && <span className="shrink-0 pl-2">{trailing}</span>}
       </TraceLine>
   );
 
@@ -197,9 +203,14 @@ export function TraceRow({
             className="min-w-0 max-w-full"
             showChevron={chips == null}
           >
-            {line(false)}
+            {line(false, false)}
           </TraceCollapsibleTrigger>
           {chips}
+          {suffix != null && (
+            <span className="shrink-0 whitespace-nowrap">{suffix}</span>
+          )}
+          {/* 行尾计数（编辑的 +N/−N）跟在胶囊后面：“哪个文件、改了多少”一句话读完。 */}
+          {trailing && <span className="shrink-0 pl-2">{trailing}</span>}
           {chips != null && (
             <button
               type="button"
