@@ -39,7 +39,8 @@ function mount({ hasEarlierMessages, landed = true }) {
     cancelAnimationFrame: () => {},
     loadingOlderRef: { current: false }, pageRenderingRef: { current: false }, pageRenderWaitersRef: { current: [] },
     setOlderPageState: () => {}, prevScrollDistanceRef: { current: null }, requestedCursorRef: { current: null },
-    scrollAnchorRef: { current: null }, prependHeightRef: { current: null }, messageContentRef: { current: null }, captureScrollAnchor: () => ({ top: 0, height: 0 }),
+    scrollAnchorRef: { current: null }, messageContentRef: { current: null },
+    captureScrollAnchor: () => ({ top: 0, height: 0 }), holdScrollAnchor: () => () => {},
     hasEarlierMessages, historyCursor: "older", session: { id: "a" }, sessionIdRef: { current: "a" }, activeLeafId: "leaf",
     captureScrollDistance, getNextVisibleCount,
     setVisibleCount: (update) => { calls.visibleCount = update(calls.visibleCount); },
@@ -73,9 +74,9 @@ function mount({ hasEarlierMessages, landed = true }) {
 async function reachTop(state) {
   const { calls, context, reachTop: report } = mount(state);
   await report();
-  // 分页只关心「要不要加宽/要不要拉上一页」；位置补偿记在 prependHeightRef（scrollHeight 差），
+  // 分页只关心「要不要加宽/要不要拉上一页」；位置补偿记在 scrollAnchorRef（元素锚点），
   // 由 ChatWindow 的 layout effect 消费。
-  return { ...calls, anchored: context.scrollAnchorRef.current !== null || context.prependHeightRef.current !== null };
+  return { ...calls, anchored: context.scrollAnchorRef.current !== null };
 }
 
 const cursors = (calls) => calls.loads.map((args) => args[2]);

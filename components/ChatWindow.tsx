@@ -133,13 +133,6 @@ interface Props {
 // quote composer, the composer and the new-session hero all read one var.
 const CHAT_COLUMN_PADDING = 28;
 const CHAT_COLUMN_PADDING_MOBILE = 14;
-/**
- * 一页更早消息落地后多久内不再读下一页。
- *
- * 锚点是在布局阶段补的，新行的 markdown、代码高亮、图片还要再长几帧；这段时间里
- * 读者看上去仍在顶部，一个手势就会连发好几页请求。
- */
-const PAGE_COOLDOWN_MS = 320;
 
 // One update check per page. Every fresh composer mounts the header again
 // (each move of the new-session bar does), and a link that turned up late
@@ -613,8 +606,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const foldTimerRef = useRef<number | undefined>(undefined);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
-  /** 冷却到什么时候：上一页落地后要等锚点补齐，这期间不再发请求。 */
-  const pageCooldownRef = useRef(0);
   /** 上一页请求还在路上。 */
   const loadingOlderRef = useRef(false);
   /**
@@ -912,7 +903,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     /** 离顶多远仍算“贴顶”：触摸惯性带小数，滚不到绝对 0。 */
     const TOP_SLACK = 24;
     const attempt = () => {
-      if (Date.now() < pageCooldownRef.current) return;
       if (container.scrollTop > TOP_SLACK) return;
       // Skip while a page is loading or the last one is still rendering.
       if (loadingOlderRef.current || pageRenderingRef.current) return;
@@ -940,7 +930,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         holdScrollAnchor(container, messageContentRef.current);
       }).finally(() => {
         loadingOlderRef.current = false;
-        pageCooldownRef.current = Date.now() + PAGE_COOLDOWN_MS;
       });
     };
     let frame = 0;
@@ -1726,10 +1715,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             {hasMoreRendered && (
               // 手动入口：自动加载要等上一页渲染完成，这一行让读者随时能自己要一页。
               <button
-                ref={setSentinel}
-                type="button"
                 // 这一行钉在内容顶部，翻页时它不动；滚动锚点必须跳过它。
                 data-scroll-anchor-ignore=""
+                ref={setSentinel}
+                type="button"
                 onClick={() => {
                   if (loadingOlderRef.current || pageRenderingRef.current) return;
                   const sid = session?.id ?? sessionIdRef.current;
