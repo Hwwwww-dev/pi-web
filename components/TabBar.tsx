@@ -135,14 +135,14 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onReorderTa
               if (!tab.closing) onCloseTab(tab.id);
             }}
             className={cn(
-              "flex h-7 min-w-20 max-w-[180px] shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md py-0 pr-1 pl-2.5 whitespace-nowrap text-xs transition-colors",
+              "flex h-7 min-w-20 max-w-[180px] shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md border border-transparent py-0 pr-1 pl-2.5 whitespace-nowrap text-xs transition-colors",
               isActive
-                ? "bg-background font-medium text-foreground shadow-xs"
+                ? "border-border bg-background font-medium text-foreground shadow-xs"
                 : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
               // Drop line on the half the dragged tab is over.
               dropTarget?.id === tab.id && (dropTarget.after
-                ? "shadow-[inset_-2px_0_0_var(--accent)]"
-                : "shadow-[inset_2px_0_0_var(--accent)]"),
+                ? "border-l-2 border-accent"
+                : "border-r-2 border-accent"),
             )}
           >
             <span className={cn("flex shrink-0 items-center", isActive ? "opacity-100" : "opacity-70")}>

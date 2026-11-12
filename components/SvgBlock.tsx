@@ -102,9 +102,9 @@ export function SvgBlock({ code, isStreaming }: { code: string; isStreaming?: bo
       }
     >
       {source === undefined ? (
-        <div className="mermaid-block mermaid-block-loading p-3 overflow-x-auto bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] min-h-[120px]" />
+        <div className="mermaid-block mermaid-block-loading p-3 overflow-x-auto bg-muted min-h-[120px]" />
       ) : !ready ? (
-        <div className="mermaid-block mermaid-block-error p-3 overflow-x-auto bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] text-muted-foreground font-mono text-xs">{t("i18n.invalidSvg")}</div>
+        <div className="mermaid-block mermaid-block-error p-3 overflow-x-auto bg-muted text-muted-foreground font-mono text-xs">{t("i18n.invalidSvg")}</div>
       ) : (
         <>
           {!zoomOpen && (

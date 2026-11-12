@@ -702,6 +702,7 @@ export const enLocale: LocalePlugin = {
     "files.dismissError": "Dismiss error",
     "files.addUploadedFile": "Add uploaded file to chat",
     "files.addAllUploadedFiles": "Add all uploaded files to chat",
+    "files.more": "More file actions",
     "files.dismissUploadResults": "Dismiss upload results",
     "files.loading": "Loading files...",
     "files.noFiles": "No files found",

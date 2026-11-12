@@ -22,7 +22,7 @@ export const FILE_LINE_NUMBER_STYLE: CSSProperties = {
   padding: "0 10px",
   textAlign: "right",
   color: "var(--muted-foreground)",
-  background: "color-mix(in srgb, var(--muted) 55%, var(--background))",
+  
   borderRight: "1px solid var(--border)",
   fontFamily: "var(--font-mono)",
   fontWeight: "var(--font-mono-weight)",

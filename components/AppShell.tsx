@@ -1987,7 +1987,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         className={cn(
           "shrink-0 gap-1.5 text-left text-[11px] font-normal leading-[1.35] text-warning hover:bg-warning/10 hover:text-warning",
           mobileBanner
-            ? "h-auto min-h-8 w-full justify-start rounded-none border-b border-border bg-warning/10 px-3 py-1.5"
+            ? "h-auto min-h-8 w-full justify-start rounded-md border-b border-border bg-warning/10 px-3 py-1.5"
             : "self-center justify-center rounded-full bg-warning/10 px-3",
         )}
         data-mobile-trust-banner={mobileBanner ? "true" : undefined}
@@ -2547,7 +2547,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               align="start"
               sideOffset={0}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-t-none rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-lg border-0 border-b bg-card p-0 shadow-none"
             >
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
@@ -2566,7 +2566,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               side="bottom"
               align="end"
               sideOffset={0}
-              className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-t-none p-0"
+              className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-lg p-0"
             >
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
@@ -2687,7 +2687,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               align="start"
               sideOffset={0}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-t-none rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-lg border-0 border-b bg-card p-0 shadow-none"
             >
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel

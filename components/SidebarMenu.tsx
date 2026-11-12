@@ -355,7 +355,7 @@ const isolateEvents = {
 /* ------------------------------------------------------------------ */
 
 /** The Delete-confirmation ring: three pixels of half-transparent accent. The bodies' own buttons (a form's Create, a question's Confirm) take it too. */
-export const SIDEBAR_MENU_FOCUS_RING = "focus-visible:outline-none focus-visible:[box-shadow:0_0_0_3px_color-mix(in_srgb,var(--accent)_50%,transparent)]";
+export const SIDEBAR_MENU_FOCUS_RING = "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 const FOCUS_RING = SIDEBAR_MENU_FOCUS_RING;
 
 function menuBoxClassName(classic: boolean): string {

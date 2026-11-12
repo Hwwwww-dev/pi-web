@@ -4,7 +4,6 @@ import { Fragment, memo, useState, useRef, useEffect, useMemo } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, ClockIcon, CopyIcon, CornerDownRightIcon, GitBranchIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Badge } from "./ui/badge";
 import { Bubble, BubbleContent } from "./ui/bubble";
 import { Button } from "./ui/button";
 import { Message, MessageContent, MessageFooter } from "./ui/message";
@@ -351,7 +350,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
         <BubbleContent
           className={cn(
             "max-h-[300px] overflow-y-auto text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
-            isEditing && "ring-2 ring-[color-mix(in_srgb,var(--accent)_16%,transparent)]",
+            isEditing && "ring-2 ring-ring/30",
           )}
         >
           {commandText ? (
@@ -363,7 +362,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   onClick={() => setExpanded((prev) => !prev)}
                   title={expanded ? t("i18n.collapse") : t("i18n.expand")}
                   aria-expanded={expanded}
-                  className="flex h-auto shrink-0 cursor-pointer items-center gap-1.5 rounded-none border-none bg-transparent p-0 text-left font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] font-normal text-primary hover:bg-transparent hover:text-primary"
+                  className="flex h-auto shrink-0 cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-left font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] font-normal text-primary hover:bg-transparent hover:text-primary"
                 >
                   <span className="truncate">
                     {commandName}

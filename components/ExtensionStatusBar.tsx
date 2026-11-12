@@ -2,6 +2,7 @@
 
 import { stripAnsi } from "@/lib/ansi";
 import { isPermissiveStatusText } from "@/lib/extension-status";
+import { displayLabel } from "@/lib/label-case";
 import type { ExtensionStatusItem, ExtensionWidgetItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
 import { ExtensionWidgets } from "./ExtensionWidgets";
@@ -128,7 +129,7 @@ function StatusPill({
             aria-label={full}
             className="shrink-0 rounded-full font-mono text-[11.5px] font-medium text-muted-foreground"
           >
-            {cell.label}
+            {displayLabel(cell.label)}
           </Button>
         </PopoverTrigger>
         <PopoverContent side="top" align="start" className="w-auto min-w-[180px] max-w-[min(340px,calc(100vw-24px))] p-2.5">
@@ -160,7 +161,7 @@ function StatusPill({
       onClick={() => onCommand?.(cell.command)}
       className="shrink-0 rounded-full font-mono text-[11.5px] text-muted-foreground"
     >
-      {cell.label}
+      {displayLabel(cell.label)}
     </Button>
   );
 }

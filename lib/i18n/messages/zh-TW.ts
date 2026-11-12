@@ -702,6 +702,7 @@ export const zhTWLocale: LocalePlugin = {
     "files.dismissError": "關閉錯誤訊息",
     "files.addUploadedFile": "將上傳的檔案加入聊天",
     "files.addAllUploadedFiles": "將所有上傳的檔案加入聊天",
+    "files.more": "更多檔案操作",
     "files.dismissUploadResults": "關閉上傳結果",
     "files.loading": "正在載入檔案...",
     "files.noFiles": "找不到檔案",

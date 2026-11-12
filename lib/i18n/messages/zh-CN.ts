@@ -702,6 +702,7 @@ export const zhCNLocale: LocalePlugin = {
     "files.dismissError": "关闭错误",
     "files.addUploadedFile": "将上传的文件添加到聊天",
     "files.addAllUploadedFiles": "将所有上传的文件添加到聊天",
+    "files.more": "更多文件操作",
     "files.dismissUploadResults": "关闭上传结果",
     "files.loading": "正在加载文件...",
     "files.noFiles": "未找到文件",

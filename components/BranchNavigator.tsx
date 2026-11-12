@@ -342,7 +342,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
               aria-label={t("i18n.branches")}
               aria-pressed={open}
               className={cn(
-                "h-full rounded-none border-y-0 border-l-0 border-r border-r-border border-t-2 px-3 py-0 text-xs font-normal",
+                "h-full rounded-md border-0 border-t-2 px-3 py-0 text-xs font-normal",
                 open ? "border-t-primary bg-accent text-foreground" : "border-t-transparent text-muted-foreground",
               )}
             >
@@ -370,7 +370,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
-          className="h-8 w-full justify-start rounded-none px-3 text-xs font-normal text-muted-foreground"
+          className="h-8 w-full justify-start rounded-md px-3 text-xs font-normal text-muted-foreground"
         >
           {branchIcon}
           <span>{t("i18n.branches")}</span>

@@ -563,7 +563,7 @@ function AddSkillPanel({
                   disabled={isInstalled || isInstalling || installing !== null}
                   style={isInstalled
                     ? {
-                        background: "color-mix(in srgb, var(--ok) 10%, transparent)",
+                        
                         color: "var(--ok)",
                       }
                     : undefined}

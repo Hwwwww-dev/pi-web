@@ -113,9 +113,9 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
   }
 
   const body = renderState?.key === currentKey && renderState.status === "error" ? (
-      <div className="mermaid-block mermaid-block-error p-3 overflow-x-auto bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] text-muted-foreground font-mono text-xs">{t("i18n.invalidMermaid")}</div>
+      <div className="mermaid-block mermaid-block-error p-3 overflow-x-auto bg-muted text-muted-foreground font-mono text-xs">{t("i18n.invalidMermaid")}</div>
     ) : renderState?.key !== currentKey || renderState.status !== "ready" ? (
-      <div className="mermaid-block mermaid-block-loading p-3 overflow-x-auto bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] min-h-[120px]" aria-label={t("i18n.renderingMermaid")} />
+      <div className="mermaid-block mermaid-block-loading p-3 overflow-x-auto bg-muted min-h-[120px]" aria-label={t("i18n.renderingMermaid")} />
     ) : (
       <>
         {!zoomOpen && (
@@ -123,7 +123,7 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
             ref={previewRef}
             type="button"
             variant="ghost"
-            className="block h-auto max-h-[min(600px,60dvh)] w-full overflow-auto rounded-none border-0 text-left font-normal text-inherit cursor-zoom-in hover:opacity-85"
+            className="block h-auto max-h-[min(600px,60dvh)] w-full overflow-auto border-0 text-left font-normal text-inherit cursor-zoom-in hover:opacity-85"
             title={t("i18n.openMermaidViewer")}
             aria-label={t("i18n.openMermaidViewer")}
             onClick={() => setZoomOpen(true)}
@@ -440,7 +440,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
       {isStreaming ? (
         <CodeBlockContent
           wrap
-          className="bg-[color-mix(in_srgb,var(--background)_92%,var(--sidebar))] px-[13px] py-[11px] text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] leading-[1.62]"
+          className="bg-muted px-[13px] py-[11px] text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] leading-[1.62]"
         >
           {code}
         </CodeBlockContent>
@@ -464,7 +464,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
             // ui CodeBlock frame is the only border.
             border: "none",
             borderRadius: 0,
-            backgroundColor: "color-mix(in srgb, var(--background) 92%, var(--sidebar))",
+            backgroundColor: "" /* the preview inherits the block's own background */,
           }}
           codeTagProps={{ style: { fontFamily: "var(--font-mono)", fontWeight: "var(--font-mono-weight)" } }}
         >
