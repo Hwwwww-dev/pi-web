@@ -14,7 +14,7 @@ import { getLanguage } from "./file-types";
 import { mcpToolLabel, prettyMcpResultText, type McpToolLabel } from "./mcp-tool-display";
 import type { SplitDiffFile } from "./patch";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, isSubagentToolName } from "./tool-categories";
-import { toolFieldsOfInput, type ToolField } from "./tool-fields";
+import { EMPTY_FIELD_VALUE, toolFieldsOfInput, type ToolField } from "./tool-fields";
 import { isApplyPatchToolName, isEditToolName, isWriteToolName } from "./tool-names";
 import type { ImageContent, ToolCallContent, ToolResultMessage } from "./types";
 import type { TranslationParams } from "./i18n/types";
@@ -25,6 +25,7 @@ export type ToolViewKind =
   | "file-write"
   | "file-edit"
   | "search"
+  | "compact"
   | "web"
   | "codemode"
   | "subagent"
@@ -382,6 +383,7 @@ function kindOf(p: Prepared): ToolViewKind {
   if (category === "search") return "search";
   if (category === "web") return "web";
   if (category === "plan" && todoSteps(p.block.input)) return "queue";
+  if (category === "compact") return "compact";
   return "generic";
 }
 
@@ -414,6 +416,7 @@ function createView(p: Prepared): ToolView {
     case "search": return searchView(p);
     case "web": return webView(p);
     case "queue": return queueView(p);
+    case "compact": return compactView(p);
     default: return genericView(p);
   }
 }
@@ -534,8 +537,9 @@ function readView(p: Prepared): ToolView {
   view.title = p.t(TOOL_CATEGORY_LABEL_KEYS.view);
   view.target = p.filePaths[0] ? baseName(p.filePaths[0]) : undefined;
   view.description = p.filePaths[0] ? undefined : p.preview || undefined;
+  const structured = p.fields ? null : structuredArgSections(p.block.input);
   view.sections = p.detail([
-    ...(p.fields ? fieldsSection(p.fields) : jsonSection(p.inputStr, "json")),
+    ...(p.fields ? fieldsSection(p.fields) : structured ?? jsonSection(p.inputStr, "json")),
     ...resultSections(p.text, getLanguage(p.filePaths[0] ?? "")),
   ]);
   return view;
@@ -583,6 +587,97 @@ function queueView(p: Prepared): ToolView {
   view.description = p.t("chat.trace.planProgress", { done, total: steps.length });
   view.sections = p.detail([{ kind: "steps", steps }]);
   return view;
+}
+
+/**
+ * A compression call: the row names the range it folded, the detail shows the
+ * summary as Markdown — not the raw arguments object.
+ */
+function compactView(p: Prepared): ToolView {
+  const view = baseView(p);
+  const input = p.block.input;
+  const start = isRecord(input) && typeof input.startId === "string" ? input.startId : null;
+  const end = isRecord(input) && typeof input.endId === "string" ? input.endId : null;
+  const summaryText = isRecord(input) && typeof input.summary === "string" ? input.summary : null;
+  const range = start && end ? `${start}–${end}` : start ?? end ?? null;
+  view.kind = "compact";
+  view.title = p.t("chat.trace.compact");
+  view.target = range ?? undefined;
+  view.sections = p.detail(summaryText
+    ? [{ kind: "markdown" as const, label: "parameters" as const, text: summaryText }]
+    : []);
+  return view;
+}
+
+/** The keys a nested row leads with, most specific first. */
+const ROW_TITLE_KEYS = ["title", "subject", "task_id", "id", "kind", "activeForm"] as const;
+const ROW_STATUS_KEYS = ["status", "state"] as const;
+
+function scalarText(value: unknown): string | null {
+  if (value === null) return "null";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return null;
+}
+
+/**
+ * A nested argument object as the detail's rows: flat keys become fields, an
+ * array of records becomes steps (its own title/status keys), and anything
+ * deeper is shown as its JSON. Returns `null` when nothing nests.
+ */
+function structuredArgSections(input: unknown): ToolViewSection[] | null {
+  if (!isRecord(input)) return null;
+  const fields: ToolField[] = [];
+  const steps: ToolViewStep[] = [];
+  const deeper: string[] = [];
+  let nested = false;
+
+  for (const [key, value] of Object.entries(input)) {
+    const flat = scalarText(value);
+    if (flat !== null) {
+      fields.push({ key, value: flat === "" ? EMPTY_FIELD_VALUE : flat, multiline: flat.includes("\n") });
+      continue;
+    }
+    if (Array.isArray(value) && value.length > 0 && value.every((item) => isRecord(item))) {
+      nested = true;
+      for (const item of value) {
+        const entries = Object.entries(item);
+        const title = ROW_TITLE_KEYS.map((name) => scalarText(item[name])).find((text) => text);
+        const statusText = ROW_STATUS_KEYS.map((name) => scalarText(item[name])).find((text) => text);
+        const description = entries
+          .filter(([name, entry]) => scalarText(entry) !== null
+            && name !== "status" && name !== "state"
+            && !ROW_TITLE_KEYS.includes(name as (typeof ROW_TITLE_KEYS)[number]))
+          .map(([name, entry]) => `${name}: ${scalarText(entry)}`)
+          .join(" · ");
+        if (!title) {
+          deeper.push(`${key}: ${JSON.stringify(item)}`);
+          continue;
+        }
+        steps.push({
+          title,
+          status: statusText === "complete" || statusText === "completed" || statusText === "done"
+            ? "done"
+            : statusText === "start" || statusText === "in_progress" || statusText === "running"
+              ? "running"
+              : statusText === "blocked" || statusText === "error" || statusText === "skipped"
+                ? "error"
+                : "pending",
+          ...(description ? { description } : {}),
+        });
+      }
+      continue;
+    }
+    nested = true;
+    deeper.push(`${key}: ${JSON.stringify(value)}`);
+  }
+
+  if (!nested) return null;
+  return [
+    ...(fields.length > 0 ? [{ kind: "fields" as const, label: "parameters" as const, fields }] : []),
+    ...(steps.length > 0 ? [{ kind: "steps" as const, label: "parameters" as const, steps }] : []),
+    ...(deeper.length > 0 ? [{ kind: "code" as const, label: "parameters" as const, text: deeper.join("\n"), language: "json" }] : []),
+  ];
 }
 
 function genericView(p: Prepared): ToolView {

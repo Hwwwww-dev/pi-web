@@ -2542,6 +2542,8 @@ function ExtensionCustomPanel({
   const composingRef = useRef(false);
   const [collapsed, setCollapsed] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  // Same panel-anchored official Dialog as the request drawer.
+  const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
   const dialogMaxHeight = useDialogMaxHeight(wrapperRef);
   const displayLines = normalizeCustomPanelLines(request.lines);
   const summary = displayLines.map(stripAnsi).find((line) => line.trim())?.trim();
@@ -2552,7 +2554,10 @@ function ExtensionCustomPanel({
 
   return (
     <div
-      ref={wrapperRef}
+      ref={(node) => {
+        wrapperRef.current = node;
+        setPortalHost(node);
+      }}
       className={cn("absolute inset-0 z-[95] flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-center")}
     >
       {collapsed ? (
@@ -2580,15 +2585,18 @@ function ExtensionCustomPanel({
           </span>
         </Button>
       ) : (
-      <div
-        role="dialog"
+      <Dialog open modal={false}>
+      <DialogContent
+        container={portalHost}
+        showCloseButton={false}
+        overlayClassName="hidden"
         aria-label={t("chat.extensionPanel")}
         onClick={(event) => {
           if (!(event.target as HTMLElement).closest("button")) inputRef.current?.focus();
         }}
         // The extension already wrapped its lines to the width it asked for; show them
         // whole when that is wider than the usual 920px instead of scrolling sideways.
-        className="pointer-events-auto relative flex w-max min-w-[min(920px,100%)] max-w-full flex-col overflow-hidden rounded-md border border-border bg-background shadow-2xl outline-none"
+        className="pointer-events-auto static top-auto left-auto mx-auto translate-x-0 translate-y-0 flex w-max min-w-[min(920px,100%)] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-lg border border-border bg-background shadow-2xl outline-none"
         style={{
           // Bounded by the panel that holds it, so a tall editor cannot push the
           // drawer past the chat area and clip its header.
@@ -2667,7 +2675,8 @@ function ExtensionCustomPanel({
         <pre className="m-0 min-h-0 overflow-auto bg-card p-3.5 text-sm leading-[1.45] text-foreground font-mono whitespace-pre">
           <AnsiText text={displayLines.join("\n")} />
         </pre>
-      </div>
+      </DialogContent>
+      </Dialog>
       )}
     </div>
   );

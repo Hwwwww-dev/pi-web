@@ -19,7 +19,7 @@ test("confines extension overlays to the content region above the composer", () 
   assert.match(customSource, /"absolute inset-0 z-\[95\] flex/);
   assert.match(customSource, /pointer-events-none/);
   assert.doesNotMatch(source, /z-\[100\]|zIndex: 100/);
-  assert.match(customSource, /ref=\{wrapperRef\}/);
+  assert.match(customSource, /wrapperRef\.current = node;/);
   assert.match(customSource, /const dialogMaxHeight = useDialogMaxHeight\(wrapperRef\);/);
   assert.match(customSource, /maxHeight: dialogMaxHeight/);
 });
@@ -85,8 +85,8 @@ test("select answers are two-step: click selects, confirm sends", () => {
 test("shows how many extension requests wait behind the one on screen", () => {
   const expandedHeader = dialogSource.slice(dialogSource.indexOf("<DialogContent"), dialogSource.indexOf("{request.method === \"confirm\""));
   const collapsedButton = dialogSource.slice(dialogSource.indexOf("{collapsed ? ("), dialogSource.indexOf("<DialogContent"));
-  const customCollapsed = customSource.slice(customSource.indexOf("{collapsed ? ("), customSource.indexOf('role="dialog"'));
-  const customExpanded = customSource.slice(customSource.indexOf('role="dialog"'));
+  const customCollapsed = customSource.slice(customSource.indexOf("{collapsed ? ("), customSource.indexOf("<DialogContent"));
+  const customExpanded = customSource.slice(customSource.indexOf("<DialogContent"));
   const waitingSource = source.slice(source.indexOf("function ExtensionWaitingCount"), source.indexOf("function ExtensionDialog("));
 
   assert.match(source, /<ExtensionDialog\s+key=\{extensionDialog\.id\}\s+request=\{extensionDialog\}\s+waitingCount=\{waitingExtensionDialogCount\}/);
@@ -125,6 +125,6 @@ test("fits dialogs to their code blocks and lets the user maximize them (#947)",
 test("shows a custom panel's lines whole instead of scrolling when they are wider than 920px (#947)", () => {
   // The extension wraps its lines to the width it asked for, so the panel only has to be
   // as wide as the widest of them, capped to the content region.
-  assert.match(customSource, /w-max min-w-\[min\(920px,100%\)\] max-w-full/);
+  assert.match(customSource, /w-max min-w-\[min\(920px,100%\)\] max-w-\[calc\(100%-2rem\)\]/);
   assert.doesNotMatch(customSource.slice(0, customSource.indexOf("\n}\n")), /toggleFull|extensionMaximize/);
 });

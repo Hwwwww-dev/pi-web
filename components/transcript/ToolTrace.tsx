@@ -13,6 +13,7 @@ import {
   PenIcon,
   SearchIcon,
   SquareTerminalIcon,
+  MinimizeIcon,
   WrenchIcon,
 } from "lucide-react";
 import { AnsiText } from "@/components/AnsiText";
@@ -47,6 +48,7 @@ const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
   subagent: <BotIcon />,
   mcp: <WrenchIcon />,
   queue: <ListTodoIcon />,
+  compact: <MinimizeIcon />,
   generic: <WrenchIcon />,
 };
 
