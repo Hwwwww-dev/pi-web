@@ -652,6 +652,13 @@ html[data-keyboard-open] .terminal-extra-keys {
   --card-max-height: min(40vh, 480px);
 }
 
+/* 代码块（命令头、代码正文、diff）与转录行、思考正文同一个字号：之前命令是 12px、
+   思考是 13px、胶囊是 11px，三套字号并排就显得“都不一样”。 */
+[data-slot="code-block"],
+[data-slot="code-block"] .font-mono {
+  font-size: calc(13px + var(--chat-font-size-offset, 0px));
+}
+
 @media (pointer: coarse) {
   :root {
     --field-font-size: 16px;

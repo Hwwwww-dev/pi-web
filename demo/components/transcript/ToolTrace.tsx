@@ -207,7 +207,7 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             size="xs"
             disabled={!resolved}
             // 胶囊只包住文件名本身：宽度由名字决定，不设上限、不截断。
-            className="shrink-0 gap-1 rounded-full px-2 font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))]"
+            className="shrink-0 gap-1 rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
             title={resolved ?? path}
             aria-label={label}
             onClick={(event) => {
