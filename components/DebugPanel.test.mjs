@@ -48,6 +48,13 @@ function visibleText(html) {
   return html.replace(/<style>[\s\S]*?<\/style>/g, "").replace(/<(?:[^>"']|"[^"]*"|'[^']*')*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * A tag's attributes up to its own ">". The official utilities carry ">" inside
+ * their class string ([&>svg], [&>[data-slot=…]]), so "[^>]*" stops inside a
+ * class and never reaches the tag's end.
+ */
+const TAG_ATTRS = String.raw`(?:[^>"]|"[^"]*")*`;
+
 /** One of the panel's three sections: its heading's hook to the next heading. */
 function section(html, key) {
   const at = html.indexOf(`data-debug-section="${key}"`);
@@ -91,12 +98,12 @@ function rowOf(html, name) {
 
 /** The badges of a chunk, as their opening tags: their variant is what they are. */
 function badgeTags(chunk) {
-  return [...chunk.matchAll(/<span [^>]*data-slot="badge"[^>]*>/g)].map((match) => match[0]);
+  return [...chunk.matchAll(new RegExp(String.raw`<span ${TAG_ATTRS}data-slot="badge"${TAG_ATTRS}>`, "g"))].map((match) => match[0]);
 }
 
 /** A Progress' aria-valuenow attributes, in order. */
 function progressValues(chunk) {
-  return [...chunk.matchAll(/<div [^>]*data-slot="progress"[^>]*>/g)]
+  return [...chunk.matchAll(new RegExp(String.raw`<div ${TAG_ATTRS}data-slot="progress"${TAG_ATTRS}>`, "g"))]
     .map((match) => Number(/aria-valuenow="(\d+)"/.exec(match[0])?.[1] ?? Number.NaN));
 }
 
@@ -268,7 +275,7 @@ test("a quiet page reads OK: no issue list, the meter's scale in its label, ever
   const text = visibleText(html);
   assert.doesNotMatch(text, /six connections|every 15s|timeout 10m|stale after/);
   // The measures are the official Field rows: a title, then the value.
-  assert.match(pageSection(html), /<div role="group" data-slot="field" data-orientation="horizontal"[^>]*><div data-slot="field-label" class="[^"]*"/);
+  assert.match(pageSection(html), new RegExp(String.raw`<div role="group" data-slot="field" data-orientation="horizontal"${TAG_ATTRS}><div data-slot="field-label"`));
   assert.doesNotMatch(html, /debug-panel-footer/);
   assert.match(html, /<span class="debug-panel-heading[^"]*" title="Read-only: [^"]+">Debug<\/span>/);
   assert.match(html, /<button data-slot="button"[^>]*class="[^"]*debug-panel-copy[^"]*"[^>]*>Copy JSON<\/button>/);
@@ -361,8 +368,8 @@ test("one boxed word per stream and provider, all outline; the holders' tone say
   assert.equal(pageRows(html).filter((row) => row.includes('data-state="selected"')).length, 1, "one current page");
   // Every SSE kind counts, each a connection of the browser's pool; the title says which.
   assert.equal(pageRows(html).join("").match(/<svg /g)?.length, 4, "two marks each, hidden from screen readers");
-  assert.ok(titles(pageSection(html)).includes("other page page-oth · Safari · iOS · 192.168.1.20 · SSE 3 · Agent 2 · Terminal 1"), titles(pageSection(html)).join("\n"));
-  assert.ok(titles(pageSection(html)).includes("this page page-min · Chrome · macOS · 127.0.0.1 · SSE 2 · Agent 1 · File watch 1"));
+  assert.ok(titles(pageRows(html).join("")).includes("other page page-oth · Safari · iOS · 192.168.1.20 · SSE 3 · Agent 2 · Terminal 1"), titles(pageRows(html).join("")).join("\n"));
+  assert.ok(titles(pageRows(html).join("")).includes("this page page-min · Chrome · macOS · 127.0.0.1 · SSE 2 · Agent 1 · File watch 1"));
   // A page opened without a page id or a known browser still gets its row.
   const bare = reply();
   bare.server.sseTotal = 1;
@@ -389,7 +396,7 @@ test("a starting stream is dashed amber, one dropping events amber; past the cap
   const current = rowOf(render({ server: withDetail({ eventStreams }) }), "this chat");
   const from = current.indexOf('title="SSE: 8 (this page 1, other page 7)"');
   assert.notEqual(from, -1);
-  const run = current.slice(current.lastIndexOf("<span", from), current.indexOf("</span></span>", from));
+  const run = current.slice(current.lastIndexOf("<span", from), current.indexOf("</span></span>", from) + "</span>".length);
   assert.equal(run.match(/>SSE<\/span>/g).length, 3, "three badges, a row's cap");
   assert.match(run, />\+5<\/span>$/);
   // This page's own still starting: amber and dashed; another page's that dropped events: amber, solid.
@@ -718,7 +725,7 @@ test("a tooltip holds the view still: the mouse on a titled element freezes what
 });
 
 test("the Debug menu item only toggles its panel, beside the theme item and the stats", () => {
-  const item = between(shellSource, 'onSelect={() => toggleTopPanel("debug", mobile)}', "</DropdownMenuItem>");
+  const item = between(shellSource, 'onSelect={() => openTopPanelFromMenu(() => toggleTopPanel("debug"))}', "</DropdownMenuItem>");
   assert.doesNotMatch(item, /handleSystemInfoToggle|sendAgentCommand|fetch\(|setSessionKey|loadSession|systemInfoLoaderRef/);
   assert.match(item, /disabled=\{!showChat\}/);
   assert.match(item, /title=\{translate\("debug\.title"\)\}/);

@@ -305,11 +305,11 @@ test("below the sessions the section's header row holds the files' keys in the f
 
   // The fit, added up from the components' classes: the sidebar's width less
   // its line, the row's padding (on the right the files' inset beside the
-  // session tree's classic scrollbar, Chromium's 10px) and the gap before
-  // the keys; the toggle's content in Chromium's 11px system font (its 5px
+  // session tree's classic scrollbar, Chromium's 8px) and the gap before
+  // the keys; the toggle's content at the current 12px meta size (its 5px
   // on either side, the 12px chevron, a 3px gap, the label, then a 3px gap
   // and the count): "Files" 34px, "文件" 24px, "· 123" 26px, "· 2" 14px.
-  const [scrollbar] = px(globalStyles.slice(globalStyles.indexOf("::-webkit-scrollbar {")), "width");
+  const [scrollbar] = px(globalStyles.slice(globalStyles.indexOf("\n::-webkit-scrollbar {")), "width");
   const right = filesInsetRight(scrollbar);
   // The spacing scale's utilities carry their lengths: gap-0.5 is 2px,
   // pl-1.5 is 6px (an arbitrary one is its own pixels).
@@ -331,9 +331,9 @@ test("below the sessions the section's header row holds the files' keys in the f
     const key = Math.min(keyMax, Math.max(keyMin, (room - toggleContent) / 7));
     return { key, toggle: room - 7 * key };
   };
-  // At the default 260px the toggle keeps all of its content, the keys
-  // wider than at their minimum: about 21px beside "Files · 123", 24px
-  // beside "文件 · 2".
+  // At the default 272px the toggle keeps all of its content, the keys
+  // wider than at their minimum: about 23px beside "Files · 123", at their
+  // widest beside "文件 · 2".
   const filesCount = fit(SIDEBAR_DEFAULT_WIDTH, content(34, 26));
   assert.ok(filesCount.key > keyMin && filesCount.toggle >= content(34, 26), `"Files · 123" leaves ${filesCount.key}px keys`);
   assert.ok(fit(SIDEBAR_DEFAULT_WIDTH, content(24, 14)).key >= 24);
@@ -555,7 +555,7 @@ test("search results of archived families are tagged, not hidden", () => {
   assert.match(searchSource, /archivedSessionIds\?: ReadonlySet<string>;/);
   assert.match(
     searchSource,
-    /\{archivedSessionIds\?\.has\(session\.id\) && \(\s*<span className="[^"']*text-\[10px\][^"']*"?>\{t\("sidebar\.archived"\)\}<\/span>/,
+    /\{archivedSessionIds\?\.has\(session\.id\) && \(\s*<span className="[^"']*text-xs[^"']*"?>\{t\("sidebar\.archived"\)\}<\/span>/,
   );
   // The whole family counts: a subagent hit of an archived session is tagged too.
   assert.match(source, /for \(const id of familyIds\(family\)\) ids\.add\(id\);/);

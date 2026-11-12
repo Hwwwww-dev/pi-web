@@ -92,7 +92,7 @@ test("the brand's text sits in the chevron column and is never cut at the sideba
   // (36px cells each), "Pi Web" fits in its 15px code type (0.6em a
   // character), and the versions in the 11px of data-fit 2.
   assert.match(brand, /(?:^|\s)font-mono(?:\s|$)/);
-  assert.match(brand, /(?:^|\s)text-\[15px\](?:\s|$)/);
+  assert.match(brand, /(?:^|\s)text-base(?:\s|$)/);
   assert.match(css, /\.sidebar-header\[data-fit="2"\] \.sidebar-brand \{\s*font-size: 11px;\s*\}/);
   const room = SIDEBAR_MIN_WIDTH - 1 - 36 - 36;
   const box = (text, fontSize) => 7 + 2 * 4 + text.length * 0.6 * fontSize;

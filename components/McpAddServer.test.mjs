@@ -20,9 +20,39 @@ function decode(html) {
   return html.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 }
 
+function stripTags(html) {
+  // A class string can hold `>` (`[&>[role=checkbox]]:…`), so a tag ends at the
+  // first `>` that is not inside quotes.
+  let out = "";
+  let index = 0;
+  while (index < html.length) {
+    if (html[index] !== "<") {
+      out += html[index];
+      index += 1;
+      continue;
+    }
+    let cursor = index + 1;
+    let quote = null;
+    while (cursor < html.length) {
+      const char = html[cursor];
+      if (quote) {
+        if (char === quote) quote = null;
+      } else if (char === '"' || char === "'") {
+        quote = char;
+      } else if (char === ">") {
+        break;
+      }
+      cursor += 1;
+    }
+    out += " ";
+    index = cursor + 1;
+  }
+  return out;
+}
+
 function text(html) {
   // A line-break opportunity is no space: the save target's path holds one after each folder.
-  return decode(html.replace(/<wbr\/>/g, "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+  return decode(stripTags(html.replace(/<wbr\/>/g, ""))).replace(/\s+/g, " ").trim();
 }
 
 const globalFile = { scope: "global", path: "/Users/me/.pi/agent/mcp.json", exists: true, problems: [] };

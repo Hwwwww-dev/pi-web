@@ -42,7 +42,7 @@ test("renders extension confirmation and options as markdown", () => {
 
 test("preserves title newlines like pi's TUI and keeps long titles from hiding the body", () => {
   const header = dialogSource.slice(dialogSource.indexOf('role="dialog"'), dialogSource.indexOf("{request.method === \"confirm\""));
-  assert.match(header, /<ExtensionDialogTitle title=\{multiSelect \? multiSelect\.question \|\| request\.title : request\.title\} \/>/);
+  assert.match(header, /<ExtensionDialogTitle title=\{multiSelect \? stripAnsi\(multiSelect\.question \|\| request\.title\) : stripAnsi\(request\.title\)\} \/>/);
   // #890: a non-shrinkable header grows to its full text height, pushing the
   // option list and the footer past the dialog's overflow edge. The header has
   // to be allowed to shrink and scroll instead.

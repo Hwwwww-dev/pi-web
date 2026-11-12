@@ -9,6 +9,7 @@ const chatInputSource = await readFile(new URL("./ChatInput.tsx", import.meta.ur
 const viewportHookSource = await readFile(new URL("../hooks/useViewportHeight.ts", import.meta.url), "utf8");
 const extensionStatusBarSource = await readFile(new URL("./ExtensionStatusBar.tsx", import.meta.url), "utf8");
 const mermaidBlockSource = await readFile(new URL("./MermaidBlock.tsx", import.meta.url), "utf8");
+const codeBlockPrimitiveSource = await readFile(new URL("./ui/code-block.tsx", import.meta.url), "utf8");
 const mcpConfigSource = await readFile(new URL("./McpConfig.tsx", import.meta.url), "utf8");
 const mcpSignInSource = await readFile(new URL("./McpSignIn.tsx", import.meta.url), "utf8");
 const mcpAddSource = await readFile(new URL("./McpAddServer.tsx", import.meta.url), "utf8");
@@ -54,14 +55,18 @@ test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(cssSource, /height: var\(--app-viewport-height, 100dvh\)/);
   // The self-drawn drawer's `left: env(safe-area-inset-left)` went with it;
   // the sidebar is the ui Sidebar primitive's Sheet now, and the main area
-  // carries the safe-area utilities asserted above.
-  assert.match(chatWindowSource, /\[padding-bottom:calc\(env\(safe-area-inset-bottom,0px\)\/2\)\]/);
+  // carries the safe-area utilities asserted above. The chat content reserves
+  // the bottom inset in full (not half), so the extension shelf and the
+  // composer stay clear of the home indicator in standalone mode.
+  assert.match(chatWindowSource, /\[padding-bottom:env\(safe-area-inset-bottom,0px\)\]/);
 });
 
 test("contains chat content and inputs within the mobile viewport", () => {
   assert.match(cssSource, /\.markdown-body \{[\s\S]*?min-width: 0;[\s\S]*?max-width: 100%;[\s\S]*?overflow-x: hidden;/);
-  // Code fences keep their bounds through the ui CodeBlock's own utilities.
-  assert.match(mermaidBlockSource, /<CodeBlockFrame className="w-full min-w-0 max-w-full">/);
+  // Code fences keep their bounds through the ui CodeBlock's own utilities: the
+  // frame carries w-full itself, so the local class only adds the min/max caps.
+  assert.match(mermaidBlockSource, /<CodeBlockFrame className="min-w-0 max-w-full">/);
+  assert.match(codeBlockPrimitiveSource, /relative flex w-full min-w-0 flex-col overflow-hidden/);
   assert.match(chatWindowSource, /overflow-x-hidden overflow-y-auto/);
   // The extension overlays are bounded by the panel that anchors them, not the
   // visual viewport, which is far taller than the chat panel on mobile.
@@ -90,15 +95,20 @@ test("every field shares one font size, except a touch screen's 16px floor", () 
 });
 
 test("keeps modal dialogs clear of the iOS status bar in standalone mode", () => {
-  // The settings dialog fills a phone's screen (.settings-phone-safe), and the
-  // stylesheet pads it with env() insets; iOS standalone's env() can report 0,
-  // so the @supports fallback pads with device sizes instead.
-  assert.match(settingsPanelSource, /settings-phone-safe z-\[1000\]/);
-  assert.match(settingsPanelSource, /max-sm:inset-0 max-sm:h-full max-sm:w-full/);
+  // The settings dialog floats inset from a phone's edges (.settings-card-safe)
+  // inside the safe areas, and the stylesheet owns those insets with env();
+  // iOS standalone's env() can report 0, so the @supports fallback insets with
+  // device sizes instead.
+  assert.match(settingsPanelSource, /settings-card-safe z-\[1000\]/);
+  assert.match(settingsPanelSource, /h-\[84vh\] max-h-\[calc\(100dvh-16px\)\] w-\[min\(1080px,calc\(100vw-16px\)\)\] max-w-none/);
+  assert.match(settingsCssSource, /@media \(max-width: 640px\) \{\s*\.settings-card-safe \{\s*inset: calc\(env\(safe-area-inset-top\) \+ 8px\) 8px calc\(env\(safe-area-inset-bottom\) \+ 8px\) 8px;/);
+  assert.match(settingsCssSource, /@supports \(-webkit-touch-callout: none\) \{[\s\S]*?@media \(display-mode: standalone\) \{\s*\.settings-card-safe \{/);
+  assert.match(settingsCssSource, /top: max\(67px, calc\(env\(safe-area-inset-top\) \+ 8px\)\);[\s\S]*?right: max\(16px, calc\(env\(safe-area-inset-right\) \+ 8px\)\);[\s\S]*?bottom: max\(32px, calc\(env\(safe-area-inset-bottom\) \+ 8px\)\);[\s\S]*?left: max\(16px, calc\(env\(safe-area-inset-left\) \+ 8px\)\);/);
+  assert.match(settingsCssSource, /@media \(display-mode: standalone\) and \(orientation: landscape\) \{\s*\.settings-card-safe \{[\s\S]*?top: max\(16px, calc\(env\(safe-area-inset-top\) \+ 8px\)\);[\s\S]*?right: max\(67px, calc\(env\(safe-area-inset-right\) \+ 8px\)\);[\s\S]*?bottom: max\(16px, calc\(env\(safe-area-inset-bottom\) \+ 8px\)\);[\s\S]*?left: max\(67px, calc\(env\(safe-area-inset-left\) \+ 8px\)\);/);
+  // The full-screen phone variant still safe-area pads the dialogs that fill
+  // the screen (the trust dialog keeps it).
   assert.match(settingsCssSource, /@media \(max-width: 640px\) \{\s*\.settings-phone-safe \{\s*padding: env\(safe-area-inset-top\)/);
   assert.match(settingsCssSource, /@supports \(-webkit-touch-callout: none\) \{[\s\S]*?@media \(display-mode: standalone\) \{\s*\.settings-phone-safe \{/);
-  assert.match(settingsCssSource, /padding-top: max\(59px, env\(safe-area-inset-top\)\);[\s\S]*?padding-right: max\(8px, env\(safe-area-inset-right\)\);[\s\S]*?padding-bottom: max\(24px, env\(safe-area-inset-bottom\)\);[\s\S]*?padding-left: max\(8px, env\(safe-area-inset-left\)\);/);
-  assert.match(settingsCssSource, /@media \(display-mode: standalone\) and \(orientation: landscape\) \{\s*\.settings-phone-safe \{[\s\S]*?padding-top: max\(8px, env\(safe-area-inset-top\)\);[\s\S]*?padding-right: max\(59px, env\(safe-area-inset-right\)\);[\s\S]*?padding-bottom: max\(8px, env\(safe-area-inset-bottom\)\);[\s\S]*?padding-left: max\(59px, env\(safe-area-inset-left\)\);/);
   // A config panel opened on its own stays capped to the viewport under the
   // same query: the shell's own utilities (ConfigPanelShell in SettingsUi)
   // fill the phone's screen under the safe areas, frameless.

@@ -137,9 +137,9 @@ test("with a project, its group comes first and every row names its state", () =
   const markup = decode(html);
   assert.ok(markup.indexOf(">project<") < markup.indexOf(">global<"));
   // Each heading holds its n/m count and the group switch, on only while every server is.
-  assert.match(markup, /<span class="font-mono text-\[11px\] text-muted-foreground">1\/2<\/span><button type="button" role="switch" aria-checked="false"[^>]*aria-label="Turn on every global server"/);
+  assert.match(markup, /<span class="font-mono text-xs tabular-nums text-muted-foreground">1\/2<\/span><button type="button" role="switch" aria-checked="false"[^>]*aria-label="Turn on every global server"/);
   // The untrusted project's switch waits for trust, pointing at the notice that says so.
-  const projectSwitch = markup.match(/<span class="font-mono text-\[11px\] text-muted-foreground">2\/2<\/span>(<button[^>]*>)/)?.[1];
+  const projectSwitch = markup.match(/<span class="font-mono text-xs tabular-nums text-muted-foreground">2\/2<\/span>(<button[^>]*>)/)?.[1];
   assert.match(projectSwitch, /aria-checked="true"[^>]*aria-label="Turn off every project server"/);
   assert.match(projectSwitch, /\sdisabled="/);
   const noticeId = projectSwitch.match(/aria-describedby="([^"]+)"/)[1];
@@ -187,9 +187,9 @@ test("a stdio server's detail shows its masked command line, folder, env names a
   assert.match(markup, /<div class="config-detail-title[^"]*">lint<\/div>/);
   // The Command label says it runs over stdio: no Transport row repeats it.
   assert.doesNotMatch(shown, /Transport/);
-  assert.match(markup, /<div class="config-detail-grid-label[^"]*">Command<\/div><div class="config-detail-grid-value is-mono[^"]*">npx -y @acme\/lint-mcp --api-key=••••<\/div>/);
+  assert.match(markup, /<td(?:[^>"']|"[^"]*"|'[^']*')*class="[^"]*config-detail-grid-label[^"]*">Command<\/td><td(?:[^>"']|"[^"]*"|'[^']*')*class="[^"]*config-detail-grid-value is-mono[^"]*">npx -y @acme\/lint-mcp --api-key=••••<\/td>/);
   assert.match(shown, /Working directory tools/);
-  assert.match(markup, /<code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">NODE_ENV<\/code><code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">LINT_TOKEN<\/code>/);
+  assert.match(markup, /<code class="max-w-full rounded-md bg-muted px-1\.5 py-0\.5 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">NODE_ENV<\/code><code class="max-w-full rounded-md bg-muted px-1\.5 py-0\.5 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">LINT_TOKEN<\/code>/);
   // Names only: the values stay in the file.
   assert.doesNotMatch(shown, /Values are not shown here/);
   assert.match(shown, /Shell commands Runs a shell command on every connection: env LINT_TOKEN/);
@@ -301,7 +301,7 @@ test("MCP being off, a refused project folder, and file problems are said above 
     load: { state: "loaded", data: overview(), projectError: { error: "cwd must be a directory", reason: "cwd-not-directory" } },
   });
   assert.match(text(projectError), /This project's servers are not listed: The project folder no longer exists or is not a folder\./);
-  assert.match(decode(projectError), /class="px-2 pt-px pb-\[5px\] text-xs leading-\[1\.4\] text-muted-foreground \[overflow-wrap:anywhere\]">Not listed</);
+  assert.match(decode(projectError), /class="px-2 pt-0.5 pb-1 text-xs leading-snug text-muted-foreground \[overflow-wrap:anywhere\]">Not listed</);
 
   const broken = view({
     load: {
@@ -312,7 +312,7 @@ test("MCP being off, a refused project folder, and file problems are said above 
   const shown = text(broken);
   assert.match(decode(broken), /class="config-footer-status-summary is-error[^"]*">1 file problem</);
   assert.match(shown, /~\/\.pi\/agent\/mcp\.json The file is not valid JSON, so none of its servers load\. Unexpected token \} in JSON at position 9/);
-  assert.match(decode(broken), /class="px-2 pt-px pb-\[5px\] text-xs leading-\[1\.4\] text-muted-foreground \[overflow-wrap:anywhere\]">Not listed: see the file problem below</);
+  assert.match(decode(broken), /class="px-2 pt-0.5 pb-1 text-xs leading-snug text-muted-foreground \[overflow-wrap:anywhere\]">Not listed: see the file problem below</);
   // The detail pane agrees: the servers are hidden by the problem, not missing.
   assert.match(shown, /No servers could be listed: see the file problems below\./);
   assert.doesNotMatch(shown, /No MCP servers yet/);
@@ -861,7 +861,7 @@ test("why a server cannot be changed is the visible note its controls point at",
   assert.equal(mcpOff.note, "MCP is off on this Pi Web server, so it changes no server.");
   assert.match(mcpOff.toggle, /disabled=""/);
   assert.match(text(offHtml), /MCP is off: PI_WEB_DISABLE_MCP is set where Pi Web runs\. The servers are listed, but no session connects them\. Servers cannot be changed here while MCP is off\./);
-  const offSwitch = decode(offHtml).match(/<span class="font-mono text-\[11px\] text-muted-foreground">1\/2<\/span>(<button[^>]*>)/)[1];
+  const offSwitch = decode(offHtml).match(/<span class="font-mono text-xs tabular-nums text-muted-foreground">1\/2<\/span>(<button[^>]*>)/)[1];
   const bannerId = offSwitch.match(/aria-describedby="([^"]+)"/)?.[1];
   assert.ok(bannerId, "the disabled group switch points at the banner");
   assert.match(decode(offHtml), new RegExp(`<div id="${bannerId}" role="status" class="config-notice[^"]*">MCP is off`));
@@ -892,7 +892,7 @@ test("while a change is on its way every control waits, and the one in use says 
   // A load on its way holds the controls too, so a click acts on the listing shown.
   assert.match(detailControls(writeView({ view: { refreshing: true } })).toggle, /disabled=""/);
   // The group switch shows its own wait (on: the one server off references PI_WEB_PASSWORD).
-  assert.match(decode(writeView({ view: { busy: "group:global" } })), /<span class="font-mono text-\[11px\] text-muted-foreground">1\/2<\/span><button type="button" role="switch" aria-checked="true"[^>]*aria-busy="true"/);
+  assert.match(decode(writeView({ view: { busy: "group:global" } })), /<span class="font-mono text-xs tabular-nums text-muted-foreground">1\/2<\/span><button type="button" role="switch" aria-checked="true"[^>]*aria-busy="true"/);
 });
 
 test("a failed change is said in the server's pane with its reason, and a timeout as possibly landed", () => {
@@ -938,7 +938,7 @@ test("a removal offers Undo until the route lets it go, and says why an undo fai
 
 /** The opening tag of a group's switch, found by the n/m count in front of it. */
 function groupSwitch(html, count) {
-  return decode(html).match(new RegExp(`<span class="font-mono text-\\[11px\\] text-muted-foreground">${count.replace("/", "\\/")}</span>(<button[^>]*>)`))?.[1];
+  return decode(html).match(new RegExp(`<span class="font-mono text-xs tabular-nums text-muted-foreground">${count.replace("/", "\\/")}</span>(<button[^>]*>)`))?.[1];
 }
 
 test("a group holding a server the switch never turns on can still be switched off from its heading", () => {
@@ -1008,7 +1008,7 @@ test("under -builtin:mcp a change is saved, and the note says no session connect
  */
 function statusRow(html) {
   const markup = decode(html);
-  const row = markup.match(/<div class="config-detail-grid-label[^"]*">Status<\/div><div class="config-detail-grid-value[^"]*">([\s\S]*?)<\/div>/)?.[1];
+  const row = markup.match(/<td(?:[^>"']|"[^"]*"|'[^']*')*class="[^"]*config-detail-grid-label[^"]*">Status<\/td><td(?:[^>"']|"[^"]*"|'[^']*')*class="[^"]*config-detail-grid-value[^"]*">([\s\S]*?)<\/td>/)?.[1];
   assert.ok(row, "the detail pane has a Status row");
   const head = row.match(/^<div class="flex min-w-0 flex-col gap-1"><span data-slot="badge" data-variant="[a-z]+" class="[^"]*">([^<]*)<\/span>/);
   assert.ok(head, "the Status row starts with the state label");
@@ -1088,7 +1088,7 @@ test("a connected test shows what it listed, and the row reads connected", () =>
   const markup = decode(html);
   // The dot and the accessible name follow the test; connected needs no badge, as on needs none.
   assert.match(row(html, "docs"), /aria-label="docs: Connected when tested"/);
-  assert.match(markup, /<button(?:[^>"']|"[^"]*"|'[^']*')*aria-label="docs: Connected when tested"(?:[^>"']|"[^"]*"|'[^']*')*><span aria-hidden="true" class="size-1.5 shrink-0 rounded-full bg-muted-foreground"><\/span><span class="block min-w-0 truncate text-\[13px\] leading-\[1\.35\] flex-1">docs<\/span><\/button>/);
+  assert.match(markup, /<button(?:[^>"']|"[^"]*"|'[^']*')*aria-label="docs: Connected when tested"(?:[^>"']|"[^"]*"|'[^']*')*><span aria-hidden="true" class="size-1.5 shrink-0 rounded-full bg-muted-foreground"><\/span><span class="block min-w-0 truncate text-sm flex-1">docs<\/span><\/button>/);
   const { label, value, text: shown } = statusRow(html);
   // The state is said once: what the test found follows it without its own "Connected".
   assert.equal(label, "Connected when tested");
@@ -1100,13 +1100,13 @@ test("a connected test shows what it listed, and the row reads connected", () =>
   // A server that offers no resources does not say so.
   assert.doesNotMatch(statusRow(testView({ status: { ...status, resources: undefined } })).text, /resource/);
   // The tools it listed go under the Tools row's choice, in the same row.
-  const tools = markup.match(/<div class="config-detail-grid-label[^"]*">Tools<\/div><div class="config-detail-grid-value[^"]*">([\s\S]*?)<\/div>/)?.[1];
+  const tools = markup.match(/<td(?:[^>"']|"[^"]*"|'[^']*')*class="[^"]*config-detail-grid-label[^"]*">Tools<\/td><td(?:[^>"']|"[^"]*"|'[^']*')*class="[^"]*config-detail-grid-value[^"]*">([\s\S]*?)<\/td>/)?.[1];
   assert.ok(tools, "a Tools row");
   assert.match(tools, /<button[^>]*role="combobox"[^>]*>[\s\S]*?<\/button>[\s\S]*<ul class="mt-1 flex min-w-0 flex-col gap-1\.5">/);
-  assert.match(tools, /<li class="flex min-w-0 flex-col gap-0\.5"><span class="flex min-w-0 flex-wrap gap-1"><code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">search<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-muted-foreground">read-only<\/span><\/span><span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">Search the docs\.<\/span><\/li>/);
+  assert.match(tools, /<li class="flex min-w-0 flex-col gap-0\.5"><span class="flex min-w-0 flex-wrap gap-1"><code class="max-w-full rounded-md bg-muted px-1\.5 py-0\.5 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">search<\/code><span class="whitespace-nowrap text-xs leading-5 text-muted-foreground">read-only<\/span><\/span><span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">Search the docs\.<\/span><\/li>/);
   // A tool whose exposure differs from its server's says so; one like its server's does not.
-  assert.match(tools, /<code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">publish<\/code><span class="whitespace-nowrap text-xs leading-\[18px\] text-muted-foreground">direct<\/span>/);
-  assert.doesNotMatch(tools, /<span class="whitespace-nowrap text-xs leading-\[18px\] text-muted-foreground">Code mode<\/span>/);
+  assert.match(tools, /<code class="max-w-full rounded-md bg-muted px-1\.5 py-0\.5 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">publish<\/code><span class="whitespace-nowrap text-xs leading-5 text-muted-foreground">direct<\/span>/);
+  assert.doesNotMatch(tools, /<span class="whitespace-nowrap text-xs leading-5 text-muted-foreground">Code mode<\/span>/);
   // A tool name is the server's text: hidden characters are shown as codes.
   assert.match(tools, /bidi\\u\{202E\}tool/);
   // More tools than listed say how many are not shown.
@@ -1131,7 +1131,7 @@ test("a failed test shows the error and stderr, a sign-in, and no answer, each w
   const { label, value } = statusRow(failed);
   assert.equal(label, "Did not connect when tested");
   assert.match(value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">Gave up after 1\.3 s, tested at/);
-  assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Error: <code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">spawn lint-mcp ENOENT<\/code><\/span>/);
+  assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Error: <code class="max-w-full rounded-md bg-muted px-1\.5 py-0\.5 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">spawn lint-mcp ENOENT<\/code><\/span>/);
   // The stderr tail keeps its lines, and its control characters are shown as codes.
   assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">The last lines it wrote to stderr:<\/span><pre class="max-h-\[160px\][^"]*">line one\nline\\u\{0007\}two<\/pre>/);
 
@@ -1259,7 +1259,7 @@ test("a session's report names the state in the row and says which session saw i
   assert.match(decode(failed), /<span data-slot="badge" data-variant="destructive" class="[^"]*">failed<\/span>/);
   const failedRow = statusRow(failed).value;
   assert.match(failedRow, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">A session in ~\/repo could not connect it at/);
-  assert.match(failedRow, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Error: <code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">spawn lint ENOENT<\/code><\/span>/);
+  assert.match(failedRow, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Error: <code class="max-w-full rounded-md bg-muted px-1\.5 py-0\.5 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">spawn lint ENOENT<\/code><\/span>/);
   assert.match(failedRow, /<pre class="max-h-\[160px\][^"]*">no\nconfig<\/pre>/);
   assert.match(text(decode(failed)), /Status Did not connect in a session A session in ~\/repo could not connect it/);
 
@@ -1310,7 +1310,7 @@ test("connecting, a dropped connection and a name another extension holds each h
   const takenRow = statusRow(taken).value;
   assert.match(takenRow, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">A session in ~\/repo found the name taken at [^,]+, so it did not connect this entry\.<\/span>/);
   // The owner is named, the home folder shortened as everywhere in the panel.
-  assert.match(takenRow, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Registered first by: <code class="max-w-full rounded-\[3px\] border border-border bg-background px-\[5px\] font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">~\/\.pi\/agent\/extensions\/jira\.ts<\/code><\/span>/);
+  assert.match(takenRow, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Registered first by: <code class="max-w-full rounded-md bg-muted px-1\.5 py-0\.5 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">~\/\.pi\/agent\/extensions\/jira\.ts<\/code><\/span>/);
   assert.match(statusRow(taken).text, /jira\.ts Rename the entry in its file, or turn the other extension off\.$/);
 });
 
@@ -1349,10 +1349,11 @@ test("a session whose /mcp is another extension's is said above the list, unless
 /** The Sign-in row's value. */
 function signInRow(html) {
   const markup = decode(html);
-  const marker = markup.indexOf('>Sign-in</div>');
+  const marker = markup.indexOf('>Sign-in</td>');
   assert.ok(marker >= 0, "the detail pane has a Sign-in row");
-  const start = markup.lastIndexOf('<div', marker);
-  const value = markup.slice(start, markup.indexOf('<div class="config-detail-grid-label', start + 1));
+  const start = markup.indexOf('<td', marker);
+  const nextCell = markup.indexOf('<td', start + 1);
+  const value = markup.slice(start, nextCell >= 0 ? nextCell : markup.indexOf('</tr>', start));
   return { value, text: text(value) };
 }
 

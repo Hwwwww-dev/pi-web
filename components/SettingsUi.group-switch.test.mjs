@@ -26,7 +26,7 @@ test("a group switch is on only while every row of the group is", () => {
   assert.match(renderSwitch(3, 3), /aria-checked="true"/);
   assert.match(renderSwitch(2, 3), /aria-checked="false"/);
   assert.match(renderSwitch(0, 3), /aria-checked="false"/);
-  assert.match(renderSwitch(2, 3), /<span class="font-mono text-\[11px\] text-muted-foreground">2\/3<\/span>/);
+  assert.match(renderSwitch(2, 3), /<span class="font-mono text-xs tabular-nums text-muted-foreground">2\/3<\/span>/);
 });
 
 test("the group switch shares the heading row and uses the regular switch", () => {

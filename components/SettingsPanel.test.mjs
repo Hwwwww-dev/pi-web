@@ -102,7 +102,7 @@ test("the desktop dialog is a horizontal section tab bar over the sections", () 
   assert.doesNotMatch(panelSource, /orientation="vertical"/);
   assert.doesNotMatch(panelSource, /variant="line"/);
   assert.match(panelSource, /<TabsList\s*\n\s*className="ml-4 min-w-0 flex-1 self-center justify-start gap-0\.5/);
-  assert.match(panelSource, /h-7 flex-none gap-1\.5 px-2\.5 text-\[12\.5px\] font-normal data-\[state=active\]:font-medium/);
+  assert.match(panelSource, /h-7 flex-none gap-1\.5 px-2\.5 text-xs font-normal data-\[state=active\]:font-medium/);
   // General keeps one shape on every size: the sub-section list beside its
   // detail (a phone shows one pane at a time through the navigation context).
   const generalReturn = panelSource.slice(

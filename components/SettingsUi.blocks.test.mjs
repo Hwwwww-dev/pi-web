@@ -28,10 +28,10 @@ const noop = () => {};
 test("a scope tag shows the caller's label and tints only the project scope", () => {
   const project = render(h(ConfigScopeTag, { scope: "project" }, "项目"));
   assert.match(project, /data-slot="badge" data-variant="secondary"/);
-  assert.match(project, /bg-\[rgba\(99,102,241,0\.12\)\] text-\[rgba\(99,102,241,0\.8\)\]/);
+  assert.match(project, /class="[^"]*config-scope-tag[^"]*bg-primary\/10 text-primary"/);
   assert.match(project, />项目<\/span>$/);
   const global = render(h(ConfigScopeTag, { scope: "global" }, "global"));
-  assert.doesNotMatch(global, /rgba\(99,102,241/);
+  assert.doesNotMatch(global, /bg-primary\/10/);
   assert.match(global, /bg-secondary text-secondary-foreground/);
 });
 
@@ -110,11 +110,11 @@ test("a detail grid pairs each label with its value", () => {
     h(ConfigDetailGridRow, { label: "Path", mono: true }, "~/x"),
     h(ConfigDetailGridRow, { label: "Installed path", tone: "error" }, "Not found"),
   ));
-  // The grid values wrap anywhere; the tone classes keep their hook names.
-  assert.match(html, /<div class="config-detail-grid[^"]*">/);
-  assert.match(html, /<div class="config-detail-grid-label[^"]*">Status<\/div><div class="config-detail-grid-value min-w-0 \[overflow-wrap:anywhere\]" style="color:red">loaded<\/div>/);
-  assert.match(html, /<div class="config-detail-grid-label[^"]*">Path<\/div><div class="config-detail-grid-value is-muted is-mono min-w-0 \[overflow-wrap:anywhere\] text-muted-foreground font-mono">~\/x<\/div>/);
-  assert.match(html, /<div class="config-detail-grid-label[^"]*">Installed path<\/div><div class="config-detail-grid-value is-error min-w-0 \[overflow-wrap:anywhere\] text-destructive">Not found<\/div>/);
+  // The grid is the official Table, and the grid values wrap anywhere; the tone classes keep their hook names.
+  assert.match(html, /<div data-slot="table-container"[^>]*><table data-slot="table" class="[^"]*config-detail-grid"><tbody data-slot="table-body"/);
+  assert.match(html, /<tr data-slot="table-row" class="[^"]*config-detail-grid-row[^"]*"><td data-slot="table-cell" class="[^"]*config-detail-grid-label[^"]*">Status<\/td><td data-slot="table-cell" class="[^"]*config-detail-grid-value min-w-0 whitespace-normal align-top \[overflow-wrap:anywhere\]" style="color:red">loaded<\/td><\/tr>/);
+  assert.match(html, /<tr data-slot="table-row" class="[^"]*config-detail-grid-row[^"]*"><td data-slot="table-cell" class="[^"]*config-detail-grid-label[^"]*">Path<\/td><td data-slot="table-cell" class="[^"]*config-detail-grid-value is-muted is-mono min-w-0 whitespace-normal align-top \[overflow-wrap:anywhere\] text-muted-foreground font-mono">~\/x<\/td><\/tr>/);
+  assert.match(html, /<tr data-slot="table-row" class="[^"]*config-detail-grid-row[^"]*"><td data-slot="table-cell" class="[^"]*config-detail-grid-label[^"]*">Installed path<\/td><td data-slot="table-cell" class="[^"]*config-detail-grid-value is-error min-w-0 whitespace-normal align-top \[overflow-wrap:anywhere\] text-destructive">Not found<\/td><\/tr>/);
 });
 
 test("a footer status with details opens a visible list instead of a tooltip", () => {
@@ -134,7 +134,7 @@ test("a footer status with details opens a visible list instead of a tooltip", (
 test("a trust notice offers its button only when the caller can trust the project", () => {
   assert.equal(
     render(h(ConfigTrustNotice, { message: "Project plugins are not loaded." })),
-    '<div role="status" class="config-notice border-b bg-sidebar px-4 py-2 text-xs text-muted-foreground">Project plugins are not loaded.</div>',
+    '<div role="status" class="config-notice px-4 py-2 text-xs text-muted-foreground">Project plugins are not loaded.</div>',
   );
   // A label without a handler would be a button that does nothing.
   assert.doesNotMatch(render(h(ConfigTrustNotice, { message: "x", trustLabel: "Trust project" })), /<button/);

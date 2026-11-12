@@ -94,8 +94,8 @@ test("opening System or Tools lazily starts a dormant session without sending a 
   assert.match(loaderEffectSource, /if \(background\) return;/);
   assert.match(loaderEffectSource, /onSystemInfoLoaderChange\?\.\(loadSystemInfo\)/);
   assert.match(loaderEffectSource, /onSystemInfoLoaderChange\?\.\(null\)/);
-  assert.match(appShellSource, /onSelect=\{\(\) => handleSystemInfoToggle\("system"\)\}/);
-  assert.match(appShellSource, /onSelect=\{\(\) => handleSystemInfoToggle\("tools"\)\}/);
+  assert.match(appShellSource, /onSelect=\{\(\) => openTopPanelFromMenu\(\(\) => handleSystemInfoToggle\("system"\)\)\}/);
+  assert.match(appShellSource, /onSelect=\{\(\) => openTopPanelFromMenu\(\(\) => handleSystemInfoToggle\("tools"\)\)\}/);
   assert.match(appShellSource, /systemInfoLoaderRef\.current/);
   assert.doesNotMatch(appShellSource, /systemPrompt !== null \|\| systemInfoLoading/);
   assert.match(appShellSource, /const loadId = \+\+systemInfoLoadIdRef\.current/);
@@ -956,7 +956,7 @@ test("empty queued texts never render, and expired records feed the image memory
   // Expired records hand their thumbnails to the memory; rebuilt rows recall
   // the wrapper's entries first, then the memory.
   assert.match(source, /\(record\) => queuedImageMemoryRef\.current\.remember\(record\)/);
-  assert.match(source, /fromEntries\(text, behavior\) \?\? queuedImageMemoryRef\.current\.recall\(text, behavior\)/);
+  assert.match(source, /\(text, behavior\) => queuedImageMemoryRef\.current\.recall\(text, behavior\),/);
 });
 
 test("keeps the compaction control reachable while a turn is auto-compacting", () => {
@@ -965,18 +965,15 @@ test("keeps the compaction control reachable while a turn is auto-compacting", (
   // whole prompt instead of the compaction. Compact now lives in the tools
   // icon menu as a trailing entry; the trigger stays visible while compacting.
   const controlBlock = chatInputSource.slice(
-    chatInputSource.indexOf("{/* Tools + compact share one icon menu"),
-    chatInputSource.indexOf("</DropdownMenu>", chatInputSource.indexOf("chat.compactContext")),
+    chatInputSource.indexOf("onToolPresetChange || (onCompact && isCompacting)"),
+    chatInputSource.indexOf("</DropdownMenuContent>", chatInputSource.indexOf("onToolPresetChange || (onCompact && isCompacting)")),
   );
 
-  assert.match(controlBlock, /\(onCompact && \(!isStreaming \|\| isCompacting\)\)/);
+  // The compact control is the tools icon's menu entry, reachable while a turn
+  // streams: only "streaming and not compacting" leaves it disabled.
+  assert.match(controlBlock, /onCompact && isCompacting/);
   assert.doesNotMatch(controlBlock, /\{!isStreaming && onCompact && \(/);
-  // The "streaming but not compacting" state is now unreachable, so its disabled styling
-  // must be gone rather than left as dead branches.
-  assert.doesNotMatch(controlBlock, /isStreaming && !isCompacting/);
-  // The compaction entry is a menu item whose onSelect flips between starting
-  // and aborting; the trigger turns into a destructive stop while compacting.
-  assert.match(controlBlock, /onSelect=\{isCompacting \? onAbortCompaction : \(\) => onCompact\(\)\}/);
+  assert.match(controlBlock, /disabled=\{isStreaming && !isCompacting\}/);
   assert.match(controlBlock, /<DropdownMenuTrigger asChild>/);
-  assert.match(controlBlock, /isCompacting\s*\?\s*"text-destructive hover:bg-destructive\/10 hover:text-destructive"/);
+  assert.match(controlBlock, /isCompacting\s*\n?\s*\?\s*"text-destructive hover:bg-destructive\/10 hover:text-destructive"/);
 });

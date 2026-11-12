@@ -6,7 +6,7 @@ const source = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf
 const hookSource = await readFile(new URL("../hooks/useAgentSession.ts", import.meta.url), "utf8");
 
 function elementBlock() {
-  const start = source.indexOf("size-[34px] cursor-pointer rounded-full");
+  const start = source.indexOf("size-8 cursor-pointer rounded-full");
   assert.notEqual(start, -1, "scroll-to-latest button not found");
   const buttonStart = source.lastIndexOf("<Button", start);
   const buttonEnd = source.indexOf("</Button>", start);
@@ -24,7 +24,7 @@ test("shows the scroll-to-latest button only when the viewport is detached from 
 
 test("floats the scroll-to-latest button centered over the composer's 700px card", () => {
   const gate = source.indexOf("{!isEmptyNew && (");
-  const marker = source.indexOf("size-[34px] cursor-pointer rounded-full", gate);
+  const marker = source.indexOf("size-8 cursor-pointer rounded-full", gate);
   assert.notEqual(gate, -1);
   assert.notEqual(marker, -1);
   const container = source.slice(gate, marker);
@@ -43,7 +43,7 @@ test("floats the scroll-to-latest button centered over the composer's 700px card
   // z-30 clears the minimap rail's zIndex 25, which otherwise covers the
   // button's whole strip and swallows its clicks.
   // The detached-tail state is a faint floating chip; hover or focus reveals it.
-  assert.match(block, /rounded-full border border-border bg-card p-0 text-muted-foreground shadow-sm/);
+  assert.match(block, /size-8 cursor-pointer rounded-full p-0 text-muted-foreground/);
   assert.match(block, /hover:opacity-100 hover:bg-secondary hover:text-foreground/);
   assert.match(block, /onClick=\{\(\) => scrollToBottom\("smooth"\)\}/);
 });

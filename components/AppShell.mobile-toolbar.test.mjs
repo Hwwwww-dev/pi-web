@@ -19,10 +19,11 @@ test("keeps action pills inline in medium mobile toolbars", () => {
 });
 
 test("uses a compact mobile toolbar row with a Radix overflow menu", () => {
-  // The row is a column item of the title row's wrapper (items-stretch), so
-  // it takes the free width and may shrink (min-w-0), and wraps under the
-  // title row on a phone.
-  assert.match(source, /data-mobile-toolbar="true"\s+className="flex h-10 min-w-0 flex-wrap items-center gap-1\.5 pb-1"/);
+  // A phone's header is one row: ☰, the truncating title, then the stats and
+  // the controls on the same line. The title takes the free width and yields
+  // first when space runs out; the row itself may shrink (min-w-0).
+  assert.match(source, /<header className="flex min-h-\(--header-height\)[\s\S]*?<div className="flex h-10 min-w-0 flex-1 items-center gap-1">/);
+  assert.match(source, /<span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">/);
   // The menu is Radix-controlled and end-aligned to its ⋯ trigger; the old
   // slide-in layer is gone.
   assert.doesNotMatch(source, /position: "absolute",\s*top: 0,\s*right: 0,\s*bottom: 0/);
@@ -37,12 +38,18 @@ test("uses a compact mobile toolbar row with a Radix overflow menu", () => {
 
 test("only renders the Agents switcher when the active session family has subagents", () => {
   assert.match(source, /const agentsBadge = activeSessionFamily \? getAgentsBadge\(activeSessionFamily\.subagents, runningSessionIds\) : null;/);
-  // Upstream v0.14.2: on a narrow phone the Agents control leaves the More menu, so it
-  // passes mobile && !isNarrowMobile and keeps that menu's state untouched.
+  // The Agents control opens/toggles its own top panel and leaves the ⋯ menu's
+  // state alone: since the menu-driven panels defer their open past the menu's
+  // unmount (openTopPanelFromMenu), no keepMobileToolbarOpen flag is needed.
   assert.match(
     source,
-    /onOpenChange=\{\(\) => toggleTopPanel\("agents", mobile && !isNarrowMobile\)\}\s*>\s*<Tooltip>\s*<TooltipTrigger asChild>\s*<PopoverTrigger asChild>\s*<Button\s+variant="ghost"\s+size="sm"\s+disabled=\{!activeSessionFamily\}/,
+    /onOpenChange=\{\(\) => toggleTopPanel\("agents"\)\}\s*>\s*<Tooltip>\s*<TooltipTrigger asChild>\s*<PopoverTrigger asChild>\s*<Button\s+variant="ghost"\s+size="sm"\s+disabled=\{!activeSessionFamily\}/,
   );
+  const agentsButton = source.slice(
+    source.indexOf("const renderAgentsButton = (mobile: boolean) => ("),
+    source.indexOf("const renderToolbarBGroup = (mobile: boolean) => ("),
+  );
+  assert.doesNotMatch(agentsButton, /setMobileToolbarMoreOpen/);
   // The panel itself renders only while the family and the selected session exist.
   assert.match(source, /\{activeSessionFamily && selectedSession && \(\n          <AgentSessionPanel/);
 });
@@ -85,7 +92,11 @@ test("keeps the naming menu open while the title generates", () => {
   assert.ok(nameItem);
   assert.match(nameItem, /event\.preventDefault\(\);\s*void handleAutoName\(\);/);
   assert.doesNotMatch(nameItem, /setMobileToolbarMoreOpen\(false\)/);
-  assert.match(source, /toggleTopPanel\("branches", true\)/);
+  // The other menu items defer their panel open past the menu's unmount, so
+  // the synchronous select-close does not read as focus-outside and close the
+  // panel again; the deferral replaces the retired keepMobileToolbarOpen flag.
+  assert.match(source, /openTopPanelFromMenu\(\(\) => toggleTopPanel\("branches"\)\)/);
+  assert.match(source, /const openTopPanelFromMenu = useCallback\(\(open: \(\) => void\) => \{\s*window\.setTimeout\(open, 0\);\s*\}, \[\]\);/);
   assert.match(source, /handleSystemInfoToggle\("system"\)/);
   assert.match(source, /handleSystemInfoToggle\("tools"\)/);
   assert.match(source, /onClick=\{\(\) => toggleTopPanel\("session"\)\}/);
