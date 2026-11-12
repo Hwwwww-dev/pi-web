@@ -60,6 +60,11 @@ import {
 } from "@/lib/chat-lazy-load";
 import { SCROLL_ANCHOR_SETTLE_MS, applyScrollAnchor, captureScrollAnchor, type ScrollAnchor } from "@/lib/scroll-anchor";
 
+/** Pages fetched up front: enough for a very long session, and a guard against a broken cursor. */
+const PREFETCH_MAX_PAGES = 40;
+/** Entries per background page — fewer round-trips than the scroll-triggered page. */
+const PREFETCH_PAGE_SIZE = 200;
+
 interface Props {
   session: SessionInfo | null;
   searchTarget?: { sessionId: string; entryId: string; blockIndex?: number } | null;
@@ -881,6 +886,50 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   useEffect(() => {
     setVisibleCount((current) => Math.max(current, messages.length));
   }, [messages.length]);
+
+  // Read the rest of the branch in the background, right after the first page.
+  // Paging on scroll means one re-anchor per page and dozens of pages in a long
+  // session; fetching them up front costs the same bytes and settles once. Each
+  // page yields a frame so the list stays responsive, and a tail reader stays at
+  // the tail instead of being dragged into the older rows growing above.
+  useEffect(() => {
+    if (loading || !session?.id) return;
+    const sid = session.id;
+    const controller = new AbortController();
+    let stopped = false;
+    const run = async () => {
+      for (let page = 0; page < PREFETCH_MAX_PAGES && !stopped; page++) {
+        // A scroll-triggered page may be in flight: let it land rather than
+        // asking for the same cursor twice.
+        for (let waited = 0; loadingOlderRef.current && waited < 50 && !stopped; waited++) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if (stopped || loadingOlderRef.current) return;
+        const snapshot = searchHistoryRef.current;
+        if (!snapshot.hasEarlierMessages || !snapshot.historyCursor) return;
+        const container = scrollContainerRef.current;
+        const atTail = container
+          ? isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)
+          : true;
+        if (container && !atTail) scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
+        loadingOlderRef.current = true;
+        try {
+          const context = await loadOlderPage(sid, snapshot.historyCursor, { tail: PREFETCH_PAGE_SIZE, signal: controller.signal });
+          if (!context) return;
+          setVisibleCount((current) => Math.max(current, messagesLenRef.current));
+        } finally {
+          loadingOlderRef.current = false;
+        }
+        if (atTail) requestAnimationFrame(() => scrollToBottom("instant"));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    };
+    void run();
+    return () => {
+      stopped = true;
+      controller.abort();
+    };
+  }, [loading, loadOlderPage, scrollContainerRef, scrollToBottom, session?.id]);
 
   // After visibleCount increases (older messages prepended) put the row the
   // reader was looking at back where it was — and keep it there while the rows
