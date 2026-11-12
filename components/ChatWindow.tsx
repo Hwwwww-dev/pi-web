@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
+import { formatTurnDuration, getTurnDurationMs } from "@/lib/turn-duration";
 import { phaseLabel } from "@/lib/chat-phase-label";
 import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
 import { selectHasStreamingContent, selectIsStreaming, selectStreamingMessage, useStreamingSelector } from "@/hooks/useStreamingSelector";
@@ -1386,9 +1387,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const categorySummary = [...categoryCounts.entries()]
           .map(([category, count]) => `${count} ${t(TOOL_CATEGORY_LABEL_KEYS[category])}`)
           .join(" · ");
-        const processSummary = categorySummary
-          ? `${t("chat.processDetails")} · ${categorySummary}`
-          : `${t("chat.processDetails")} · ${processMessageCount} ${t(processMessageCount === 1 ? "chat.message" : "chat.messages")}`;
+        // 一轮的折叠行说这一轮本身（官方 Whole Turn：「Worked for 2m 4s, 1 command failed」）；
+        // 还没跑完、拿不到时长时才退回分类计数。
+        const failedCalls = activityItems.filter((item) => item.kind === "tool" && item.result?.isError).length;
+        const turnDurationMs = getTurnDurationMs(messages, userIdx, finalAssistantIdx + 1);
+        const workedFor = turnDurationMs === undefined ? undefined : formatTurnDuration(turnDurationMs);
+        const processSummary = workedFor
+          ? (failedCalls > 0
+            ? t("chat.activity.workedForFailed", { duration: workedFor, count: failedCalls })
+            : t("chat.activity.workedFor", { duration: workedFor }))
+          : categorySummary
+            ? `${t("chat.processDetails")} · ${categorySummary}`
+            : `${t("chat.processDetails")} · ${processMessageCount} ${t(processMessageCount === 1 ? "chat.message" : "chat.messages")}`;
 
         if (activityItems.length > 0) {
           rendered.push(

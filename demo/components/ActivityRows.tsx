@@ -30,7 +30,7 @@ import { isApplyPatchToolName } from "@/lib/tool-names";
 import { getMessageImages, getPatchFiles, imageSource, toToolView } from "@/lib/tool-view";
 import { formatToolDuration } from "@/lib/tool-duration";
 
-import { getToolCategory, getToolFilePaths, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
+import { getToolCategory, getToolFilePaths, type ToolCategory } from "@/lib/tool-categories";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
 import { formatUsage, type ActivityItem, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
 import { UsageBar } from "./UsageBar";
@@ -204,23 +204,15 @@ export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSubagent }: {
   const isFailedCall = (call: ToolCallEntry) => call.result?.isError
     || (isApplyPatchToolName(call.block.toolName) && applyPatchResultHasFailures(call.result?.details));
   const isError = calls.some(isFailedCall);
-  // 分组头给出成败细账：完成的调用按结果拆成 成功 x 次 · 失败 y 次；一次都
-  // 没完成（全在跑）时没有账可分，保持原来的「N 次」。
+  // 组头一句话（官方 Whole Turn）：条数与失败数说在同一行。
   const failedCount = calls.filter(isFailedCall).length;
-  const successCount = calls.filter((call) => call.result).length - failedCount;
-  const resultBreakdown = [
-    successCount > 0 ? t("chat.activity.successCount", { count: successCount }) : null,
-    failedCount > 0 ? t("chat.activity.failCount", { count: failedCount }) : null,
-  ].filter(Boolean).join(" · ");
-  const summaryCount = allHaveFiles
-    ? (resultBreakdown ? `${t("chat.activity.files", { count: fileTotal })} · ${resultBreakdown}` : t("chat.activity.files", { count: fileTotal }))
-    : (resultBreakdown || t("chat.activity.calls", { count: calls.length }));
+  const itemCount = allHaveFiles ? fileTotal : calls.length;
+  const groupTitle = `${t(`chat.activity.group.${category}`, { count: itemCount })}${failedCount > 0 ? t("chat.activity.groupFailed", { count: failedCount }) : ""}`;
 
   return (
     <span data-activity-group={category} className="contents">
       <TaskTrace
-        title={t(TOOL_CATEGORY_LABEL_KEYS[category])}
-        description={summaryCount}
+        title={groupTitle}
         status={hasPending ? "running" : isError ? "error" : "done"}
         foldKey={groupKey}
         defaultOpen={false}
