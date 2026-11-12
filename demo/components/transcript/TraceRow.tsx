@@ -60,6 +60,7 @@ export function useTraceFold(foldKey?: string, defaultOpen = false) {
 
 export function TraceRow({
   icon,
+  activeIcon,
   title,
   object,
   titleClassName,
@@ -77,6 +78,8 @@ export function TraceRow({
   children,
 }: {
   icon?: ReactNode;
+  /** Shown instead of `icon` while the row is expanded: the coloured version. */
+  activeIcon?: ReactNode;
   title: string;
   /** The thing the action applies to: elided before the action ever is. */
   object?: string;
@@ -107,7 +110,9 @@ export function TraceRow({
     // 行宽跟随内容（官方 `w-fit max-w-full`）：箭头紧跟文字，不甩到行尾；
     // 超宽时由对象/描述上的 `truncate` 收缩，箭头始终贴住最后一段文字。
       <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0" data-expanded={open || undefined}>
-      {icon != null && <TraceIcon className={open ? "opacity-100" : undefined}>{icon}</TraceIcon>}
+      {(icon != null || activeIcon != null) && (
+        <TraceIcon>{open && activeIcon != null ? activeIcon : icon}</TraceIcon>
+      )}
       {/* The action is never elided: it is the row's name (用户要求：工具名称不可省略). */}
       <TraceTitle className={cn("shrink-0 whitespace-nowrap", titleClassName)}>{title}</TraceTitle>
       {object && <span className="min-w-0 truncate">{object}</span>}

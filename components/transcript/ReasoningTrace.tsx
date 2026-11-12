@@ -186,7 +186,7 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
         >
           <TraceLine status={active ? "running" : undefined}>
             <TraceIcon>
-              <BrainIcon className="size-3.5" />
+              <BrainIcon className={cn("size-3.5", expanded ? "text-warning" : "text-muted-foreground")} />
             </TraceIcon>
             <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
             {!active && duration !== undefined && (

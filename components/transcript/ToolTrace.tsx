@@ -41,8 +41,24 @@ import { TraceRow } from "./TraceRow";
 
 const ICON_CLASS = "size-3.5";
 
-/** 一类工具一个图标，尺寸统一；颜色按类别给（终端紫、读取蓝、写入/编辑绿、思考黄、搜索青）。 */
+/** 默认中性灰，图标本身不带颜色。 */
 const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
+  terminal: <SquareTerminalIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  "file-read": <FileTextIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  "file-write": <FilePenIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  "file-edit": <FilePenLineIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  search: <SearchIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  web: <GlobeIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  codemode: <CodeXmlIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  subagent: <BotIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  mcp: <PlugIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  queue: <ListTodoIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  compact: <Minimize2Icon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  generic: <WrenchIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+};
+
+/** 展开时换成这一类自己的颜色，不填黑、不加粗。 */
+const KIND_ACTIVE_ICONS: Record<ToolViewKind, ReactNode> = {
   terminal: <SquareTerminalIcon className={cn(ICON_CLASS, "text-primary")} />,
   "file-read": <FileTextIcon className={cn(ICON_CLASS, "text-sky-600 dark:text-sky-400")} />,
   "file-write": <FilePenIcon className={cn(ICON_CLASS, "text-success")} />,
@@ -51,10 +67,10 @@ const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
   web: <GlobeIcon className={cn(ICON_CLASS, "text-sky-600 dark:text-sky-400")} />,
   codemode: <CodeXmlIcon className={cn(ICON_CLASS, "text-primary")} />,
   subagent: <BotIcon className={cn(ICON_CLASS, "text-primary")} />,
-  mcp: <PlugIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
-  queue: <ListTodoIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
-  compact: <Minimize2Icon className={cn(ICON_CLASS, "text-muted-foreground")} />,
-  generic: <WrenchIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  mcp: <PlugIcon className={cn(ICON_CLASS, "text-primary")} />,
+  queue: <ListTodoIcon className={cn(ICON_CLASS, "text-primary")} />,
+  compact: <Minimize2Icon className={cn(ICON_CLASS, "text-primary")} />,
+  generic: <WrenchIcon className={cn(ICON_CLASS, "text-primary")} />,
 };
 
 const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
@@ -246,6 +262,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, activi
   return (
     <TraceRow
       icon={KIND_ICONS[view.kind]}
+      activeIcon={KIND_ACTIVE_ICONS[view.kind]}
       title={view.title}
       object={chipNamesObject ? undefined : view.object}
       chips={chips}
