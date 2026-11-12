@@ -246,6 +246,8 @@ export interface UseAgentSessionOptions {
   newSessionDraftKey: string | null;
   /** A run ended; `aborted` when it was stopped rather than finished (pi's `agent_settled.aborted`). */
   onAgentEnd?: (end: AgentEndInfo) => void;
+  /** An extension's `ctx.shutdown()` ended this session's runtime, as pi quits. Its file may remain. */
+  onSessionEnded?: (sessionId: string) => void;
   /** A top-level tool call finished; the files it touched may have changed. */
   onToolEnd?: (toolName: string) => void;
   onAttentionNeeded?: (request: BlockingExtensionUiRequest) => void;
@@ -493,7 +495,7 @@ function dedupePage(ids: readonly string[], messages: readonly AgentMessage[], e
 
 export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
-    session, newSessionCwd, newSessionDraftKey, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
+    session, newSessionCwd, newSessionDraftKey, onAgentEnd, onSessionEnded, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen, background = false, dormant = false,
     onOpenSettings, onDebugSnapshotReaderChange, onReloadSessionChange,
   } = opts;
@@ -677,6 +679,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const isCompactingRef = useRef(false);
   const extensionUiCountRef = useRef(0);
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
+  const endedSessionRef = useRef<string | null>(null);
   const sessionPropIdRef = useRef<string | null>(session?.id ?? null);
   // False while the session carries no tool selection of its own, so its loadout
   // follows settings.json defaultTools and the picker must say so rather than
@@ -772,6 +775,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // before each (re)connect, the debug reader to show it.
   const wantsEventStream = useCallback((sid: string) => (
     sessionHookMountedRef.current
+    && endedSessionRef.current !== sid
     && sessionIdRef.current === sid
     && (
       agentRunningRef.current
@@ -2171,7 +2175,20 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, [dormant, session, loadSession]);
 
   const handleAgentEvent = useCallback((event: AgentEvent) => {
+    if (endedSessionRef.current) return;
     switch (event.type) {
+      case "session_ended": {
+        const sid = sessionIdRef.current;
+        if (!sid || event.sessionId !== sid) return;
+        // The owner leaves the session (a fresh composer, or the tab closes) and this view
+        // unmounts; until then nothing reconnects, which would start the runtime again.
+        endedSessionRef.current = sid;
+        cancelEventStreamGrace();
+        eventConnectionRef.current?.close();
+        deleteSessionViewSnapshot(sid);
+        onSessionEnded?.(sid);
+        return;
+      }
       case "connected": {
         dispatch({ type: "end" });
         if (Array.isArray(event.pendingExtensionUiIds)) {
@@ -2519,7 +2536,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
       }
     }
-  }, [activeToolsStore, addNotice, agentPhaseStore, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, notifyPromptStage, onAgentEnd, onToolEnd, opts.chatInputRef, refreshContextUsage, scheduleEventStreamClose, scrollToBottom, settleUiStage, syncEntryIdsAfterRun, syncLiveModel]);
+  }, [activeToolsStore, addNotice, agentPhaseStore, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, onAgentEnd, onSessionEnded, onToolEnd, opts.chatInputRef, refreshContextUsage, scheduleEventStreamClose, scrollToBottom, settleUiStage, syncEntryIdsAfterRun, syncLiveModel]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {
@@ -3644,7 +3661,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // dialogs, so their completion and attention notifications reach the page as
   // if it had never let go. Nothing is resent.
   reattachEventStreamRef.current = (sid: string, reason: "visible" | "activity") => {
-    if (!eventStreamReleasedRef.current) return;
+    if (!eventStreamReleasedRef.current || endedSessionRef.current === sid) return;
     eventStreamReleasedRef.current = false;
     reattachDebugRef.current = { count: reattachDebugRef.current.count + 1, lastAt: Date.now(), lastReason: reason };
     setEventStreamReattachCount((count) => count + 1);
