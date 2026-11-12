@@ -799,6 +799,26 @@ const [error, ...frames] = stack.split("\n").map((line) => line.trim())
 | StackTrace | 收起（错误标题已可见） |
 | 用户手动开合 | 覆盖默认，记入 `lib/tool-call-expansion.ts` / `lib/thinking-expansion-preference.ts` |
 
+### 7.2 收起与展开的信息契约
+
+**收起态只留一行一件事，展开态必须给全，不得截断。**
+
+| 层 | 收起态（只读一眼） | 展开态（完整信息） |
+| --- | --- | --- |
+| 工具行 | 动作（`Ran`/`Read`/`Edit`，永不省略）+ 对象（命令首行、文件名 chip）+ chevron | 完整命令（多行全文，不取首行）、参数表全部字段、结果原文（不截断、不省略中段），只有代码块按 `--card-max-height` 限高 |
+| 思考行 | `Thought`/`Thinking` + 时长 | 思考全文，分段流式、保留段落空行 |
+| 搜索行 | 查询词 + 文件数 | 每个文件及其命中行 |
+| Plan / Queue | 当前项 + `N of M done` | 全部步骤与状态 |
+| Turn 总览 | 一句话（步骤数/失败数/总时长） | 该轮全部步骤行，逐行可再展开 |
+| 自定义事件 | 首行摘要 | 事件正文全文 + 原始 payload（JSON 走 `CodeBlock`，可复制） |
+
+规则：
+
+- **动作名称永不省略**（`shrink-0 whitespace-nowrap`），省略只发生在对象与描述上（`min-w-0 truncate`）。
+- 展开态不二次截断：不出现“…”结尾的业务文本，不出现只显示前 N 行且无提示的结果；限高只作用于代码/终端块（块内滚动）。
+- 收起态不得重复展开态已有的信息载体：文件名由 chip 承担时，标题不再重复文件名。
+- 每个 turn 的 usage 只有一行（行内小字），不挂在每行工具上。
+
 ### 7.2 展开记忆
 
 - key：`foldKey`（工具调用 id；合并组用 `groupKey`）。

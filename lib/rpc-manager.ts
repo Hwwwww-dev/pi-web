@@ -1329,18 +1329,24 @@ export class AgentSessionWrapper {
         if (this.mcpPromptWait) {
           const wait = this.mcpPromptWait;
           wait.controller.abort();
-          await wait.done;
+          // Stop answers without waiting for that preparation to unwind.
+          void wait.done.catch(() => {});
         }
         // Stop ends the compaction, whose end would send the parked prompts:
         // they go back to the composer instead, as the TUI's abort restores
         // queued messages to the editor.
         const recalled = this.recallParkedPrompts();
-        try {
-          await this.withFinalIdleReset(() => this.inner.abort());
-          return recalled.steering.length || recalled.followUp.length ? recalled : null;
-        } finally {
-          if (!this.isRunning()) this.forceShutdownOnIdle = false;
-        }
+        // The SDK's abort() resolves only once the running tool call unwinds, so
+        // awaiting it left the Stop request hanging — no reply for as long as the
+        // tool ran. Ask for the stop, answer now, and let the unwind finish alone.
+        void this.withFinalIdleReset(() => this.inner.abort())
+          .catch((error: unknown) => {
+            console.error("[pi-web] abort failed:", error instanceof Error ? error.message : error);
+          })
+          .finally(() => {
+            if (!this.isRunning()) this.forceShutdownOnIdle = false;
+          });
+        return recalled.steering.length || recalled.followUp.length ? recalled : null;
       }
 
       case "get_state": {
