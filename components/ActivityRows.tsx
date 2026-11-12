@@ -3,7 +3,6 @@
 import { memo, useMemo, useState, type ReactNode } from "react";
 import { BookOpenIcon, BotIcon, CheckIcon, CopyIcon, ExternalLinkIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareTerminalIcon, WrenchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { CodeBlock, CodeBlockContent } from "./ui/code-block";
 import { Separator } from "./ui/separator";
@@ -94,11 +93,9 @@ export interface ToolCallEntry {
 
 
 
-export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, cwd, onOpenFile, onOpenSubagent, isStreaming }: {
+export function ToolRow({ block, result, usage, ctxTokens, ctxWindow, cwd, onOpenFile, onOpenSubagent }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
-  /** Tool run time in milliseconds (pi 1.1's durationMs, else the timestamps' difference). */
-  duration?: number;
   /** The request that issued this tool call (its own assistant message's usage). */
   usage?: TurnUsage;
   /** Prompt tokens of the next request — context occupancy after this call. */
@@ -109,16 +106,12 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   /** Opens one of the files the call named (its chips). */
   onOpenFile?: (filePath: string) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
-  isStreaming?: boolean;
 }) {
   const { t } = useI18n();
-  const active = Boolean(isStreaming) && !result;
+
   const view = toToolView({ block, result, t });
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
 
-  const durationNode = !active && duration !== undefined
-    ? <TraceDescription className="shrink-0 tabular-nums">{formatToolDuration(duration)}</TraceDescription>
-    : undefined;
   const usageNode = usage ? (
     <div className="text-[length:calc(11px+var(--chat-font-size-offset,0px))]">
       <UsageBar
@@ -133,16 +126,12 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
     ? <MediaTrace images={view.images} video={view.media?.video} audio={view.media?.audio} />
     : undefined;
 
-  // A patch's own +N −M sits beside the title; every other kind carries the duration alone.
-  const trailing = view.diffStat || durationNode ? (
-    <span className="flex items-center gap-1.5">
-      {view.diffStat && (
-        <>
-          <Badge variant="ghost" className="bg-success/15 text-success">+{view.diffStat.added}</Badge>
-          <Badge variant="ghost" className="bg-destructive/10 text-destructive">−{view.diffStat.removed}</Badge>
-        </>
-      )}
-      {durationNode}
+  // A patch's own +N −M sits beside the title as plain text（官方 Commit 示例）;
+  // 单行不再挂时长，时长只在折叠组与思考行出现。
+  const trailing = view.diffStat ? (
+    <span className="shrink-0 tabular-nums">
+      <span className="text-success">+{view.diffStat.added}</span>{" "}
+      <span className="text-destructive">−{view.diffStat.removed}</span>
     </span>
   ) : undefined;
 
@@ -195,7 +184,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   }
 
   if (view.kind === "terminal") {
-    return <TerminalTrace view={view} activityTool={block.toolName} trailing={durationNode} usage={usageNode} below={mediaNode} />;
+    return <TerminalTrace view={view} activityTool={block.toolName} usage={usageNode} below={mediaNode} />;
   }
 
   // A todo snapshot (第 4.2 节): the Plan pattern — what is running now, how far it got, the steps.
@@ -273,7 +262,6 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
             key={call.block.toolCallId ?? index}
             block={call.block}
             result={call.result}
-            duration={call.duration}
             usage={call.usage}
             ctxTokens={call.ctxTokens}
             ctxWindow={ctxWindow}
@@ -692,14 +680,12 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
             key={item.key}
             block={only.block}
             result={only.result}
-            duration={only.duration}
             usage={only.usage}
             ctxTokens={only.ctxTokens}
             ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
-            isStreaming={live && !only.result}
           />,
         );
       } else {

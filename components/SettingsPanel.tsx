@@ -24,6 +24,7 @@ import { Field, FieldContent, FieldDescription, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
 import { Slider } from "./ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "./ui/item";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import {
@@ -810,7 +811,7 @@ export function SettingsPanel({
           {/* §3.5: one top bar on every size — the title, a phone's Back, the
               desktop's horizontal section tabs; the built-in close sits at its
               right edge. */}
-          <div ref={headerRef} className="flex min-h-[50px] shrink-0 items-center gap-1 border-b pr-[52px] pl-[18px] max-sm:pl-2">
+          <div ref={headerRef} className="flex min-h-[50px] shrink-0 items-center gap-1 pr-[52px] pl-[18px] max-sm:pl-2">
             {isPhone && phone.level !== "home" && (() => {
               const backName = phone.level === "detail" ? sectionLabel : t("settings.title");
               return (
@@ -834,8 +835,7 @@ export function SettingsPanel({
             </strong>
             {!isPhone && (
               <TabsList
-                variant="line"
-                className="ml-4 min-w-0 flex-1 self-center justify-start gap-1 overflow-x-auto rounded-none border-0 bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="ml-4 min-w-0 flex-1 self-center justify-start gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 {sections.map((item) => {
                   const disabled = item.requiresProject && !cwd;
@@ -845,7 +845,7 @@ export function SettingsPanel({
                       value={item.id}
                       disabled={disabled}
                       title={disabled ? t("settings.projectRequired") : item.label}
-                      className="h-full flex-none gap-1.5 rounded-none px-3 py-0 text-[12.5px] font-normal after:bottom-0 data-[state=active]:font-semibold"
+                      className="h-7 flex-none gap-1.5 px-2.5 text-[12.5px] font-normal data-[state=active]:font-medium"
                     >
                       <SettingsSectionIcon section={item.id} size={15} />
                       <span className="truncate">{item.label}</span>
@@ -860,32 +860,36 @@ export function SettingsPanel({
             {/* A phone's home level lists the sections; its section and detail
                 levels show the section itself. */}
             {isPhone && phone.level === "home" && (
-              <nav aria-label={t("settings.title")} className="flex flex-1 flex-col overflow-y-auto pb-2">
-                {sections.map((item) => {
-                  const disabled = item.requiresProject && !cwd;
-                  return (
-                    <Button
-                      key={item.id}
-                      type="button"
-                      variant="ghost"
-                      className="flex min-h-[52px] w-full items-center justify-start gap-3.5 rounded-none border-b px-4 text-left text-[15px] font-normal text-foreground disabled:text-muted-foreground"
-                      disabled={disabled}
-                      aria-describedby={disabled ? `settings-phone-home-${item.id}-note` : undefined}
-                      onClick={() => openSectionFromHome(item.id)}
-                    >
-                      <span className="text-muted-foreground"><SettingsSectionIcon section={item.id} size={20} /></span>
-                      <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
-                        <span>{item.label}</span>
-                        {disabled && (
-                          <span id={`settings-phone-home-${item.id}-note`} className="text-xs font-normal text-muted-foreground">
-                            {t("settings.projectRequired")}
-                          </span>
-                        )}
-                      </span>
-                      <ChevronRightIcon size={16} className="shrink-0 text-muted-foreground" />
-                    </Button>
-                  );
-                })}
+              <nav aria-label={t("settings.title")} className="flex-1 overflow-y-auto">
+                <ItemGroup className="gap-2 p-4">
+                  {sections.map((item) => {
+                    const disabled = item.requiresProject && !cwd;
+                    return (
+                      <Item key={item.id} asChild variant="outline" size="sm">
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          aria-describedby={disabled ? `settings-phone-home-${item.id}-note` : undefined}
+                          onClick={() => openSectionFromHome(item.id)}
+                          className="text-left disabled:opacity-50"
+                        >
+                          <ItemMedia variant="icon">
+                            <SettingsSectionIcon section={item.id} size={18} />
+                          </ItemMedia>
+                          <ItemContent>
+                            <ItemTitle>{item.label}</ItemTitle>
+                            {disabled && (
+                              <ItemDescription id={`settings-phone-home-${item.id}-note`}>
+                                {t("settings.projectRequired")}
+                              </ItemDescription>
+                            )}
+                          </ItemContent>
+                          <ChevronRightIcon size={16} className="shrink-0 text-muted-foreground" />
+                        </button>
+                      </Item>
+                    );
+                  })}
+                </ItemGroup>
               </nav>
             )}
             {hostedSections}

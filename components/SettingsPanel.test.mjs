@@ -97,11 +97,12 @@ test("groups fonts, chat font size and width with the chat switches, without row
 });
 
 test("the desktop dialog is a horizontal section tab bar over the sections", () => {
-  // Desktop: the original top bar — title, then the horizontal line Tabs whose
-  // active trigger is underlined; the phone's Back rides in the same bar.
+  // Desktop: the original top bar — title, then the official segmented Tabs
+  // (muted track, rounded active segment); the phone's Back rides in the same bar.
   assert.doesNotMatch(panelSource, /orientation="vertical"/);
-  assert.match(panelSource, /<TabsList\s*\n\s*variant="line"/);
-  assert.match(panelSource, /h-full flex-none gap-1\.5 rounded-none px-3 py-0 text-\[12\.5px\] font-normal after:bottom-0 data-\[state=active\]:font-semibold/);
+  assert.doesNotMatch(panelSource, /variant="line"/);
+  assert.match(panelSource, /<TabsList\s*\n\s*className="ml-4 min-w-0 flex-1 self-center justify-start gap-0\.5/);
+  assert.match(panelSource, /h-7 flex-none gap-1\.5 px-2\.5 text-\[12\.5px\] font-normal data-\[state=active\]:font-medium/);
   // General keeps one shape on every size: the sub-section list beside its
   // detail (a phone shows one pane at a time through the navigation context).
   const generalReturn = panelSource.slice(
@@ -140,7 +141,10 @@ test("hosts the sections in one full-size layer, listed on a phone's home level"
   // Desktop: the horizontal TabsList in the top bar; phone home: a list of
   // sections opened by openSectionFromHome. The sections themselves mount once
   // in full-size hosts, `hidden` unless active (a phone's level rides along).
-  assert.match(panelSource, /<TabsList\s*\n\s*variant="line"/);
+  assert.match(panelSource, /<TabsList\s*\n\s*className="ml-4 min-w-0 flex-1 self-center/);
+  // The phone's home level is a list of official Items, not divider-topped rows.
+  assert.match(panelSource, /<ItemGroup className="gap-2 p-4">/);
+  assert.match(panelSource, /<Item key=\{item\.id\} asChild variant="outline" size="sm">/);
   assert.match(panelSource, /openSectionFromHome/);
   assert.match(panelSource, /hidden=\{section !== id \|\| phone\.level === "home"\}/);
   assert.match(panelSource, /data-phone-level=\{isPhone \? phone\.level : undefined\}/);

@@ -599,20 +599,6 @@ function AssistantMessageView({
     return secs > 0 ? secs : undefined;
   }, [messageDurationMs, message.timestamp, prevTimestamp]);
 
-  // Tool call durations in milliseconds: the execution time pi records on each result since 1.1,
-  // as the pi CLI's "Took" shows it. An older result only has timestamps, the result's minus this
-  // message's (when its request started), which counts the model's generation too.
-  const toolCallDurations = useMemo<Map<string, number>>(() => {
-    const map = new Map<string, number>();
-    if (!toolResults) return map;
-    for (const [callId, result] of toolResults) {
-      const ms = recordedDurationMs(result.durationMs)
-        ?? (result.timestamp && message.timestamp ? result.timestamp - message.timestamp : undefined);
-      if (ms !== undefined && ms >= TOOL_DURATION_MIN_MS) map.set(callId, ms);
-    }
-    return map;
-  }, [toolResults, message.timestamp]);
-
   const textContent = blocks
     .filter((b): b is TextContent => b.type === "text")
     .map((b) => b.text)
@@ -717,7 +703,7 @@ function AssistantMessageView({
       {/* Not keyed by the entry id: a message of this run gets one when the file is
           read again, and its blocks keep their state across that read (#1184). */}
       {blockItems.map(({ block, originalIndex }) => (
-        <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
+        <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
       ))}
 
       {providerError && (
@@ -792,7 +778,7 @@ function AssistantMessageView({
   );
 }
 
-function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDuration, toolCallDurations, cwd, onOpenFile, onOpenSubagent, sessionId, entryId, blockIndex }: { block: AssistantContentBlock; searchTarget?: boolean; toolResults?: Map<string, ToolResultMessage>; isStreaming?: boolean; streamingDuration?: number; toolCallDurations?: Map<string, number>; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void; onOpenSubagent?: (sessionId: string, label: string) => void; sessionId?: string; entryId?: string; blockIndex: number }) {
+function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDuration, cwd, onOpenFile, onOpenSubagent, sessionId, entryId, blockIndex }: { block: AssistantContentBlock; searchTarget?: boolean; toolResults?: Map<string, ToolResultMessage>; isStreaming?: boolean; streamingDuration?: number; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void; onOpenSubagent?: (sessionId: string, label: string) => void; sessionId?: string; entryId?: string; blockIndex: number }) {
   if (block.type === "text") {
     return <div data-message-text data-search-target={searchTarget || undefined}><TextBlock block={block as TextContent} isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile} /></div>;
   }
@@ -802,8 +788,7 @@ function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDur
   if (block.type === "toolCall") {
     const tc = block as ToolCallContent;
     const result = toolResults?.get(tc.toolCallId);
-    const duration = toolCallDurations?.get(tc.toolCallId);
-    return <ToolRow block={tc} result={result} duration={duration} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} isStreaming={isStreaming} />;
+    return <ToolRow block={tc} result={result} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />;
   }
   return null;
 }
@@ -821,7 +806,6 @@ function recordedDurationMs(value: unknown): number | undefined {
 /** Below this a tool card shows no time: it would read 0.0s on every quick read or search. */
 export { CompactionSummaryDetails } from "./ActivityRows";
 export { formatToolDuration, TOOL_DURATION_MIN_MS } from "@/lib/tool-duration";
-import { TOOL_DURATION_MIN_MS } from "@/lib/tool-duration";
 
 
 
@@ -944,7 +928,7 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
 
   return (
     <div className="mb-5">
-      <ToolRow block={block} result={result} isStreaming={isPending} />
+      <ToolRow block={block} result={result} />
       {message.truncated && fullOutputUrl && (
         <div className="-mt-px px-1 py-1 text-xs">
           {showFullButton && (

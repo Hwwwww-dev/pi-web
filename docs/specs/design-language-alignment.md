@@ -265,3 +265,29 @@ TraceCollapsible defaultOpen
 - 门禁：`lib/design-language.test.mjs`（第 6 节）扫描 `components/ app/ hooks/ lib/`，白名单逐条写在测试里并注明理由。
 - 标签大小写：`lib/label-case.ts` + `lib/label-case.test.mjs`，`ExtensionStatusBar` 的列表、纯文本、命令三类 pill 都过它。
 - 截图：桌面 1440 与 390px、浅深各一组，取自真实会话（dev 30221），行标题修复后重拍；比对结论见第 10 节逐项。
+
+## 14. 全局收敛清单（逐块核对，一块一提交）
+
+S1–S5 只把**消息列表的骨架**换成了官方组件。用户指出的“看起来还是老样子”来自其余仍有自制边框、分割线、胶囊、任意字号的界面。下面每一行都按“现状 → 官方落点 → 验收”写清，逐块执行，一块一个 commit，做完把该行标为 ✅。
+
+统一原则（每一块都适用）：
+
+- 只用官方组件已定义的形状：列表用 `Item`/`ItemGroup`，字段用 `Field`/`FieldGroup`，表格用 `Table`，容器用 `Card`/`Separator`/`Empty`，状态用 `Badge variant="outline"`，进度用 `Progress`，弹层用 `Dialog`/`Sheet`/`Popover`/`DropdownMenu`。
+- 不出现：自制分割线（`border-t`/`border-b` 行）、自制胶囊（`rounded-full` + 底色）、任意字号（`text-[13px]` 这类，除非是等宽数字）、`shadow-[...]`、`style={{...}}` 内联布局。
+- 每个面的正文行只保留“一行一件事”：图标 + 一句标题，必要的一行描述；其余信息进折叠内容或 `HoverCard`。
+
+| # | 面 | 现状问题 | 官方落点 | 验收 | 状态 |
+|---|---|---|---|---|---|
+| A | 消息列表（`MessageView`/`TurnTrace`/`ActivityRows`/`TranscriptNotices`） | 每行挂时长与 usage；组内再套一层 `Trace`；行内 meta 太多 | `Trace` 行只留 icon+title(+description)；时长只在思考行与折叠组头；usage 每 turn 一行行内小字 | 单行最多两段文字；无胶囊、无边框、无自制底色 | 🔄 |
+| B | 系统提示与工具定义（`ToolDefinitionsPanel`、系统消息卡） | 自制列表 + 参数表 + “必填/可选”自绘标记 | `ItemGroup`/`Item` + `Table` + `Badge variant="outline"` + `CodeBlock` | 无自制边框/分割线；参数表走官方 `Table` | ⬜ |
+| C | 调试面板（`DebugPanel`/`debug-panel-state`） | 卡片套卡片、自绘进度条、自制 grid | `Item`列表 + `Badge outline` + `Progress` + `Table` | 一层卡片；状态全走 `Badge` | ⬜ |
+| D | 设置外壳（`SettingsPanel`） | 顶栏分割线、行分割线、下划线 tab | 已改：官方 segmented `Tabs` + 手机 `Item` 列表 | 无分割线、无直角、tab 为官方形状 | ✅ |
+| E | 设置内页（`ModelsConfig`/`McpConfig`/`SkillsConfig`/`PluginsConfig`/`EnabledModelsSection`/`AgentsConfig`/`SettingsUi`） | `border-t`/`border-b` 行、卡片叠分割线、自制表头 | `ItemGroup` 分组 + `Field` 行 + `Table`；`SettingsUi` 只保留官方 `Card`/`Empty` 组合 | 无 `border-t/b` 行；字号只用官方档位 | ⬜ |
+| F | 侧栏与菜单（`SessionSidebar`/`SessionTree`/`SidebarMenu`/`ProjectWorktreePicker`/`NewSessionContextBar`/`KeepAliveDock`） | 自制行高与选中底色、贴边胶囊 | `Item size="xs"` / `DropdownMenu` / `Sheet` / `Button variant="outline" size="xs"` | 行高由 `Item` 决定；选中态用官方 `data-[state]` | ⬜ |
+| G | 文件面（`FileToolbar`/`FileExplorer`/`FileViewer`/`TabBar`/`DelimitedTable`/`GitPanel`） | 自制工具栏分组、表格斑马线 | `Tabs`/`Button`/`Table`/`Empty`/`ScrollArea` | 工具栏只剩官方按钮组；表格走 `Table` | ⬜ |
+| H | 终端（`TerminalPanel`/`TerminalExtraKeys`） | 自制状态条与按钮排布 | `Card` + `Badge` + `Button size="xs"`；保留 `--terminal-*` 调色板 | 状态走 `Badge`；按钮全官方尺寸 | ⬜ |
+| I | 输入区（`ChatInput`/`ModelSelector`/`PromptInput`） | 自制圆角与阴影、按钮尺寸混杂 | 官方 `prompt-input` pattern：`InputGroup` + `Textarea` + `Popover` | 无自制阴影；按钮只用官方尺寸 | ⬜ |
+| J | 媒体与 Markdown（`ImagePreview`/`MermaidBlock`/`SvgBlock`/`MarkdownBody`） | 自制图片边框、自制工具栏 | `Attachment`/`Dialog`/`CodeBlock`/官方工具栏 `Button group` | 无自制边框；工具栏为官方组合 | ⬜ |
+| K | 扩展 UI（`ExtensionStatusBar`/`ExtensionWidgets`/扩展弹窗） | 已改状态标签；弹窗仍自制 | `Badge outline`/`Button`/`Sheet`/`Dialog` | 扩展弹窗走官方 `Sheet`/`Dialog` | 🔄 |
+
+执行顺序：A → B → C → E → F → G → H → I → J → K，每块完成后跑门禁与相关测试并单独提交，本文档同步把状态改为 ✅。
