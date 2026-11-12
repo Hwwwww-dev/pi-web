@@ -129,7 +129,7 @@ export function WorktreeRemoveForm({
     // The sheet's look arrives as variants (the retired app/sidebar-menu.css,
     // folded here); the body only ever shows in a sheet.
     <div className="sidebar-worktree-form px-1 pt-0.5 pb-1 [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2.5 [.sidebar-sheet_&]:pb-1">
-      {heading && <div className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-2 pt-1.5 pb-1 text-[11px] [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs">{heading}</div>}
+      {heading && <div className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-2 pt-1.5 pb-1 text-xs [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs">{heading}</div>}
       {dirty && <div className="sidebar-worktree-message pt-0.5 px-1 text-foreground text-xs leading-[1.4]">{t("sidebar.forceRemoveCheckout")}</div>}
       {(dirty || showCancel) && (
         <div className="sidebar-worktree-form-buttons flex gap-1.5 mt-1.5">
@@ -159,7 +159,7 @@ export function WorktreeRemoveForm({
           )}
         </div>
       )}
-      {error && <div className="sidebar-worktree-error mt-1.5 text-destructive text-[11px] leading-[1.35] [overflow-wrap:anywhere]" role="alert">{error}</div>}
+      {error && <div className="sidebar-worktree-error mt-1.5 text-destructive text-xs leading-[1.35] [overflow-wrap:anywhere]" role="alert">{error}</div>}
     </div>
   );
 }
@@ -174,8 +174,8 @@ function WorktreeConfirmRow({ busy, onForce, onCancel }: { busy: boolean; onForc
   const { t } = useI18n();
   const questionId = useId();
   return (
-    <div className="sidebar-worktree-confirm flex items-center gap-1.5 px-2.5 py-[7px] border-b border-(--border) bg-destructive/10">
-      <span id={questionId} className="sidebar-worktree-confirm-text flex-1 min-w-0 overflow-hidden text-foreground text-[11px] text-ellipsis whitespace-nowrap" title={t("sidebar.forceRemoveCheckout")}>
+    <div className="sidebar-worktree-confirm flex items-center gap-1.5 px-2.5 py-[7px] bg-destructive/10">
+      <span id={questionId} className="sidebar-worktree-confirm-text flex-1 min-w-0 overflow-hidden text-foreground text-xs text-ellipsis whitespace-nowrap" title={t("sidebar.forceRemoveCheckout")}>
         {t("sidebar.forceRemoveCheckout")}
       </span>
       <Button
@@ -187,7 +187,7 @@ function WorktreeConfirmRow({ busy, onForce, onCancel }: { busy: boolean; onForc
         data-sidebar-menu-item=""
         aria-describedby={questionId}
         aria-disabled={busy ? true : undefined}
-        className={["focus-visible:ring-0 focus-visible:border-transparent dark:bg-destructive", "sidebar-worktree-force", "flex-none h-auto px-[9px] py-[3px] border border-destructive rounded-(--radius-sm) bg-destructive text-white text-[11px] font-semibold", "aria-disabled:cursor-not-allowed aria-disabled:opacity-50", FOCUS_RING].join(" ")}
+        className={["focus-visible:ring-0 focus-visible:border-transparent dark:bg-destructive", "sidebar-worktree-force", "flex-none h-auto px-[9px] py-[3px] border border-destructive rounded-(--radius-sm) bg-destructive text-white text-xs font-semibold", "aria-disabled:cursor-not-allowed aria-disabled:opacity-50", FOCUS_RING].join(" ")}
         onClick={() => { if (!busy) onForce(); }}
       >
         {t("sidebar.force")}
@@ -200,7 +200,7 @@ function WorktreeConfirmRow({ busy, onForce, onCancel }: { busy: boolean; onForc
         tabIndex={-1}
         data-sidebar-menu-item=""
         data-sidebar-menu-autofocus=""
-        className={["focus-visible:ring-0 focus-visible:border-(--border)", "sidebar-worktree-cancel", "flex-none h-auto px-[9px] py-[3px] border border-(--border) rounded-(--radius-sm) bg-secondary text-muted-foreground text-[11px] cursor-pointer", FOCUS_RING].join(" ")}
+        className={["focus-visible:ring-0 focus-visible:border-(--border)", "sidebar-worktree-cancel", "flex-none h-auto px-[9px] py-[3px] border border-(--border) rounded-(--radius-sm) bg-secondary text-muted-foreground text-xs cursor-pointer", FOCUS_RING].join(" ")}
         onClick={onCancel}
       >
         {t("sidebar.cancel")}
@@ -583,7 +583,7 @@ export function ProjectWorktreePicker({
         </div>
       );
     } else if (body?.kind === "remove" && body.error) {
-      menuFooter = <div className="sidebar-worktree-error mt-1.5 text-destructive text-[11px] leading-[1.35] [overflow-wrap:anywhere] [.is-classic_&]:m-0 [.is-classic_&]:px-2.5 [.is-classic_&]:pt-[5px] [.is-classic_&]:pb-2" role="alert">{body.error}</div>;
+      menuFooter = <div className="sidebar-worktree-error mt-1.5 text-destructive text-xs leading-[1.35] [overflow-wrap:anywhere] [.is-classic_&]:m-0 [.is-classic_&]:px-2.5 [.is-classic_&]:pt-[5px] [.is-classic_&]:pb-2" role="alert">{body.error}</div>;
     }
   } else if (body?.kind === "create") {
     menuTitle = newWorktreeTitle;
@@ -635,7 +635,7 @@ export function ProjectWorktreePicker({
   // focus-visible ring。尾部类经 cn/twMerge 覆盖 ghost 的同名面。
   const boxClass = inline
     ? "inline-flex shrink min-w-0 items-center gap-1 h-[26px] px-1.5 rounded-(--radius-sm) text-left text-xs font-normal text-muted-foreground transition-colors hover:bg-secondary aria-expanded:bg-secondary dark:hover:bg-secondary dark:aria-expanded:bg-secondary pointer-coarse:min-h-9"
-    : "inline-flex shrink min-w-0 items-center gap-1.5 h-[29px] px-2.5 border border-border rounded-(--radius-sm) bg-secondary text-left text-[11px] font-normal text-muted-foreground transition-colors aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:aria-expanded:bg-accent pointer-coarse:min-h-9";
+    : "inline-flex shrink min-w-0 items-center gap-1.5 h-[29px] px-2.5 border border-border rounded-(--radius-sm) bg-secondary text-left text-xs font-normal text-muted-foreground transition-colors aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:aria-expanded:bg-accent pointer-coarse:min-h-9";
   // 每个布局里盒子的伸缩：inline 的两个按钮只缩到自己的最小宽度（一个百万
   // 倍的 shrink 系数让分支先让路），files 的行里路径/分支吃满剩下的空间。
   const projectBoxFlex = inline ? "min-w-14" : layout === "row" ? "grow basis-0" : "w-full";
@@ -650,8 +650,8 @@ export function ProjectWorktreePicker({
         inline
           ? "project-picker is-inline flex min-w-0 items-center gap-0.5 text-xs leading-none font-normal"
           : layout === "row"
-            ? "project-picker is-row flex flex-none flex-row min-w-0 items-center gap-1.5 text-[11px] leading-none font-normal"
-            : "project-picker is-stacked flex flex-none flex-col min-w-0 items-stretch gap-1.5 text-[11px] leading-none font-normal"
+            ? "project-picker is-row flex flex-none flex-row min-w-0 items-center gap-1.5 text-xs leading-none font-normal"
+            : "project-picker is-stacked flex flex-none flex-col min-w-0 items-stretch gap-1.5 text-xs leading-none font-normal"
       }
       role="group"
       aria-label={label}
@@ -722,8 +722,8 @@ export function ProjectWorktreePicker({
               narrow sidebar and the branch needs the room; inline the
               branch is text on the page. The icon (the primary only for a
               linked checkout) still tells the main one. */}
-          {current?.isMain && layout === "stacked" && <span className="project-picker-note text-[10px] leading-none flex-none text-muted-foreground">{t("sidebar.main")}</span>}
-          {stacked && worktrees.length > 1 && <span className="project-picker-note text-[10px] leading-none flex-none text-muted-foreground">{worktrees.length}</span>}
+          {current?.isMain && layout === "stacked" && <span className="project-picker-note text-xs leading-none flex-none text-muted-foreground">{t("sidebar.main")}</span>}
+          {stacked && worktrees.length > 1 && <span className="project-picker-note text-xs leading-none flex-none text-muted-foreground">{worktrees.length}</span>}
           <ChevronRightIcon size={9} className="project-picker-chevron size-[9px] shrink-0 rotate-90 text-muted-foreground" />
         </Button>
       )}

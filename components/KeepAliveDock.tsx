@@ -124,7 +124,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                 size="xs"
                 className={cn(
                   // 官方 outline 胶囊（与扩展状态 pill 同一形状），不再自绘贴边标签。
-                  "h-7 gap-1 rounded-full bg-background px-2 text-xs font-normal text-muted-foreground shadow-xs select-none [touch-action:none]",
+                  "h-7 gap-1 rounded-md bg-background px-2 text-xs font-normal text-muted-foreground shadow-xs select-none [touch-action:none]",
                   "hover:bg-accent hover:text-accent-foreground",
                   open && "bg-accent text-accent-foreground",
                 )}
@@ -201,7 +201,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                     </span>
                     <PathLabel
                       text={info.cwd}
-                      className="text-[10px] font-mono text-muted-foreground"
+                      className="text-xs font-mono text-muted-foreground"
                     />
                   </Button>
                   <Button
@@ -220,7 +220,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
             })}
           </div>
           {slots.some((slot) => slot.session.id !== selectedSessionId) && (
-            <div className="mt-1 border-t border-border px-1.5 pb-0.5 pt-1">
+            <div className="mt-1 px-1.5 pb-0.5 pt-1">
               <Button
                 type="button"
                 variant="ghost"

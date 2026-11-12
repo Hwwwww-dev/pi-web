@@ -40,7 +40,7 @@ export function WorktreeCreateForm({
     // folded here); the menu's `is-classic` box and the sheet's ancestors
     // pick them.
     <div className="sidebar-worktree-form px-1 pt-0.5 pb-1 [.is-classic_&]:px-2 [.is-classic_&]:py-1.5 [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2.5 [.sidebar-sheet_&]:pb-1">
-      {heading && <div className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-2 pt-1.5 pb-1 text-[11px] [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs">{heading}</div>}
+      {heading && <div className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-2 pt-1.5 pb-1 text-xs [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs">{heading}</div>}
       <Field className="gap-0">
         <Input
           className="sidebar-worktree-input h-7 px-2 rounded-(--radius-sm) bg-background border-(--accent) font-mono text-foreground shadow-none [user-select:text] [-webkit-user-select:text] [.is-classic_&]:h-auto [.is-classic_&]:py-[5px] [.sidebar-sheet_&]:h-10"
@@ -61,7 +61,7 @@ export function WorktreeCreateForm({
       <div className="sidebar-worktree-form-buttons flex gap-1.5 mt-1.5 [.is-classic_&]:gap-[5px] [.is-classic_&]:mt-[5px]">
         <Button
           type="button"
-          className="sidebar-worktree-create flex-1 h-[26px] rounded-(--radius-sm) text-xs font-semibold [.is-classic_&]:h-auto [.is-classic_&]:py-1 [.is-classic_&]:text-[11px] [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"
+          className="sidebar-worktree-create flex-1 h-7 rounded-(--radius-sm) text-xs font-semibold [.is-classic_&]:h-auto [.is-classic_&]:py-1 [.is-classic_&]:text-xs [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"
           disabled={busy || !trimmed}
           onClick={submit}
         >
@@ -71,7 +71,7 @@ export function WorktreeCreateForm({
           <Button
             type="button"
             variant="outline"
-            className="sidebar-worktree-cancel flex-1 h-[26px] rounded-(--radius-sm) text-xs text-muted-foreground hover:text-muted-foreground bg-background hover:bg-accent dark:hover:bg-accent [.is-classic_&]:h-auto [.is-classic_&]:py-1 [.is-classic_&]:bg-secondary [.is-classic_&]:text-[11px] [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"
+            className="sidebar-worktree-cancel flex-1 h-7 rounded-(--radius-sm) text-xs text-muted-foreground hover:text-muted-foreground bg-background hover:bg-accent dark:hover:bg-accent [.is-classic_&]:h-auto [.is-classic_&]:py-1 [.is-classic_&]:bg-secondary [.is-classic_&]:text-xs [.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"
             onClick={onCancel}
           >
             {t("sidebar.cancel")}
@@ -79,7 +79,7 @@ export function WorktreeCreateForm({
         )}
       </div>
       {error && (
-        <FieldError className="sidebar-worktree-error mt-1.5 text-[11px] leading-[1.35] [overflow-wrap:anywhere] [.is-classic_&]:mt-[5px]">
+        <FieldError className="sidebar-worktree-error mt-1.5 text-xs leading-[1.35] [overflow-wrap:anywhere] [.is-classic_&]:mt-[5px]">
           {error}
         </FieldError>
       )}

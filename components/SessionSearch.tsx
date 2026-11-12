@@ -64,17 +64,17 @@ export function SessionSearch({ open, query, children, selectedSessionId, onSele
           size="default"
           onClick={() => onSelectSession(session, entryId, blockIndex)}
           aria-current={session.id === selectedSessionId ? "true" : undefined}
-          className={`h-auto justify-start rounded-md font-normal whitespace-normal block w-full cursor-pointer border-b border-border px-3 py-2 text-left hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring focus-visible:ring-0 focus-visible:border-transparent ${session.id === selectedSessionId ? "bg-accent" : ""}`}
+          className={`h-auto justify-start rounded-md font-normal whitespace-normal block w-full cursor-pointer px-3 py-2 text-left hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring focus-visible:ring-0 focus-visible:border-transparent ${session.id === selectedSessionId ? "bg-accent" : ""}`}
         >
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="min-w-0 truncate text-xs font-medium text-foreground">
               {titleMatch ? <>{before}<mark className="rounded-sm bg-primary/20 text-foreground">{match}</mark>{after}</> : session.name || session.firstMessage}
             </span>
             {archivedSessionIds?.has(session.id) && (
-              <span className="shrink-0 rounded-sm border border-border px-1 text-[10px] leading-[14px] text-muted-foreground">{t("sidebar.archived")}</span>
+              <span className="shrink-0 rounded-sm border border-border px-1 text-xs leading-[14px] text-muted-foreground">{t("sidebar.archived")}</span>
             )}
           </span>
-          <span className="mt-1 flex min-w-0 gap-2 text-[10px] text-muted-foreground">
+          <span className="mt-1 flex min-w-0 gap-2 text-xs text-muted-foreground">
             <span className="min-w-0 flex-1 truncate" title={session.cwd}>{session.cwd}</span>
             <span className="shrink-0">{formatRelativeTime(session.modified, locale)}</span>
           </span>
