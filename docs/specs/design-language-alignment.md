@@ -288,7 +288,7 @@ S1–S5 只把**消息列表的骨架**换成了官方组件。用户指出的�
 | H | 终端（`TerminalPanel`/`TerminalExtraKeys`） | 自制状态条与按钮排布 | `Card` + `Badge` + `Button size="xs"`；保留 `--terminal-*` 调色板 | 状态走 `Badge`；按钮全官方尺寸 | ✅ |
 | I | 输入区（`ChatInput`/`ModelSelector`/`PromptInput`） | 自制圆角与阴影、按钮尺寸混杂 | 官方 `prompt-input` pattern：`InputGroup` + `Textarea` + `Popover` | 无自制阴影；按钮只用官方尺寸 | ✅ |
 | J | 媒体与 Markdown（`ImagePreview`/`MermaidBlock`/`SvgBlock`/`MarkdownBody`） | 自制图片边框、自制工具栏 | `Attachment`/`Dialog`/`CodeBlock`/官方工具栏 `Button group` | 无自制边框；工具栏为官方组合 | ✅ |
-| K | 扩展 UI（`ExtensionStatusBar`/`ExtensionWidgets`/扩展弹窗） | 已改状态标签；弹窗仍自制 | `Badge outline`/`Button`/`Sheet`/`Dialog` | 扩展弹窗走官方 `Sheet`/`Dialog` | 🔄 |
+| K | 扩展 UI（`ExtensionStatusBar`/`ExtensionWidgets`/扩展弹窗） | 已改状态标签；弹窗仍自制 | `Badge outline`/`Button`/`Sheet`/`Dialog` | 扩展弹窗走官方 `Sheet`/`Dialog` | ✅ |
 
 执行顺序：A → B → C → E → F → G → H → I → J → K，每块完成后跑门禁与相关测试并单独提交，本文档同步把状态改为 ✅。
 记录在案的例外（官方组件无法承载的结构，理由写在这里，代码里保持同一做法）：
@@ -296,5 +296,5 @@ S1–S5 只把**消息列表的骨架**换成了官方组件。用户指出的�
 - `SessionTree` 与会话侧栏的虚拟滚动行：行高与位置是测量值（`rowStyle(top, height)`），因此行容器仍是 `div role="treeitem"`，不给它套 `Item`（`Item` 自带 `rounded-2xl`/`py-2`/`flex-wrap`，会推翻测量结果）；选中态与行内形状沿用官方 token。
 - `DelimitedTable` 的虚拟化表格（十万行 CSV）：单元格是绝对定位的行网格，`Table` 的 `<tr>` 布局无法承载虚拟化，保留 div grid；它是「一整张网格」，`border-b` 由门禁显式放行。
 - `SidebarMenu` 手机端是底部 `Sheet` 形状，用官方 `Button`/`Input` 组成内容，外壳保留既有动画与 `--sidebar-*` 变量。
-- 扩展弹窗（`ChatWindow` 的 `ExtensionDialog`）锚定在聊天面板内部、高度受面板限制，保留面板内浮层；内部控件全部为官方 `Button`/`Badge`/`MarkdownBody`。
+- 扩展弹窗与自定义面板都是官方 `Dialog`，用 `DialogContent` 的 `container` 透传锚定在聊天面板内部（否则会盖住整个应用），高度仍受面板限制。
 
