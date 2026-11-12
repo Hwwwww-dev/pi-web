@@ -265,7 +265,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   ];
   const activeDetailLabel = generalDetails.find((item) => item.id === detail)?.label ?? t("settings.appearance");
   // A form row's label: 13px, regular, per the draft's frow2 density.
-  const rowLabelClass = "text-[13px] font-normal";
+  const rowLabelClass = "text-sm font-normal";
 
   // Sub-section content, shared by both shapes: a phone shows one at a time
   // behind its own list (the three-level stack); the desktop stacks them as
@@ -424,7 +424,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   // The keep-alive rows sit flat in the chat detail (its own sub-section).
   const keepAliveBlock = (
     <div className="flex flex-col gap-2.5">
-      <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{t("settings.keepAliveDescription")}</p>
+      <p className="m-0 text-sm leading-relaxed text-muted-foreground">{t("settings.keepAliveDescription")}</p>
       <Field orientation="horizontal">
         <FieldLabel htmlFor="settings-keepalive-max-sessions" className={rowLabelClass}>{t("settings.keepAliveMaxSessions")}</FieldLabel>
         <Input
@@ -482,7 +482,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   );
   const shellBlock = shellSettings ? (
     <>
-      <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{t("settings.shellToolDescription")}</p>
+      <p className="m-0 text-sm leading-relaxed text-muted-foreground">{t("settings.shellToolDescription")}</p>
       <Field orientation="horizontal">
         <FieldLabel className={rowLabelClass}>{t("settings.usePowerShell")}</FieldLabel>
         <ConfigSwitch
@@ -497,7 +497,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   ) : null;
   const pushBlock = (
     <>
-      <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{t("settings.pushPermissionDescription")}</p>
+      <p className="m-0 text-sm leading-relaxed text-muted-foreground">{t("settings.pushPermissionDescription")}</p>
       <Field orientation="horizontal">
         <FieldLabel className={rowLabelClass}>{t("settings.pushPermission")}</FieldLabel>
         <ConfigButton
@@ -527,7 +527,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
             role="radio"
             aria-checked={selected}
             onClick={() => setLocale(plugin.id as typeof locale)}
-            className="group flex h-9 min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50 aria-checked:bg-accent/50 aria-checked:font-medium"
+            className="group flex h-9 min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-left text-sm text-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50 aria-checked:bg-accent/50 aria-checked:font-medium"
           >
             <span
               aria-hidden="true"
@@ -539,7 +539,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
               {selected && <span className="size-2 rounded-full bg-primary" />}
             </span>
             <span className="min-w-0 flex-1">{plugin.label}</span>
-            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{plugin.id}</span>
+            <span className="shrink-0 font-mono text-xs text-muted-foreground">{plugin.id}</span>
           </button>
         );
       })}
@@ -818,7 +818,7 @@ export function SettingsPanel({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="settings-phone-back h-11 max-w-full shrink-0 justify-start gap-0.5 px-1.5 text-[15px] text-primary"
+                  className="settings-phone-back h-11 max-w-full shrink-0 justify-start gap-0.5 px-1.5 text-base text-primary"
                   onClick={goUpPhoneLevel}
                   aria-label={t("settings.backTo", { name: backName })}
                 >
@@ -828,7 +828,7 @@ export function SettingsPanel({
               );
             })()}
             {/* A phone names the level it shows: Settings, the section, the detail's row. */}
-            <strong className="settings-dialog-title shrink-0 text-[15px] font-semibold whitespace-nowrap max-[640px]:truncate max-[640px]:text-center">
+            <strong className="settings-dialog-title shrink-0 text-base font-semibold whitespace-nowrap max-[640px]:truncate max-[640px]:text-center">
               {!isPhone || phone.level === "home"
                 ? t("settings.title")
                 : phone.level === "section" ? sectionLabel : detailTitle}
@@ -845,7 +845,7 @@ export function SettingsPanel({
                       value={item.id}
                       disabled={disabled}
                       title={disabled ? t("settings.projectRequired") : item.label}
-                      className="h-7 flex-none gap-1.5 px-2.5 text-[12.5px] font-normal data-[state=active]:font-medium"
+                      className="h-7 flex-none gap-1.5 px-2.5 text-xs font-normal data-[state=active]:font-medium"
                     >
                       <SettingsSectionIcon section={item.id} size={15} />
                       <span className="truncate">{item.label}</span>

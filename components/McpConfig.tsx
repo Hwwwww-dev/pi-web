@@ -206,7 +206,7 @@ function McpRowBadge({ tone, children }: { tone: McpStateTone; children: ReactNo
     <Badge
       variant={toneBadgeVariant(tone)}
       className={cn(
-        "max-w-[45%] shrink-0 rounded-full px-1.5 py-0 text-[10px] font-normal",
+        "max-w-[45%] shrink-0 font-normal",
         tone !== "warning" && tone !== "error" && "text-muted-foreground",
       )}
     >
@@ -241,7 +241,7 @@ function Lines({ children }: { children: ReactNode }) {
 /** Literal text (a name, a URL or command line, a path) as code, one mono size across the pane. */
 function McpCode({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <code className={cn("max-w-full rounded-[3px] border border-border bg-background px-[5px] font-mono text-xs text-foreground [overflow-wrap:anywhere]", className)}>
+    <code className={cn("max-w-full rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground [overflow-wrap:anywhere]", className)}>
       {children}
     </code>
   );
@@ -1084,9 +1084,9 @@ export function McpConfigView({
     >
       {/* Up to six at once: they scroll in their own box, so the list and the pane keep most of the height.
           The last notice needs no separator above the split view. */}
-      <div className="mcp-config-notices max-h-[40vh] min-h-0 flex-[0_1_auto] overflow-y-auto max-[640px]:max-h-[30dvh] [&_.config-notice:last-child]:border-b-0">
+      <div className="mcp-config-notices max-h-[40vh] min-h-0 flex-[0_1_auto] overflow-y-auto max-[640px]:max-h-[30dvh]">
         {hasNotices && (
-          <ConfigCard className="py-1">
+          <div className="flex flex-col">
             {unavailable && (
               <ConfigNotice id={unavailableNoticeId}>
                 {noticeText(unavailable, t)}
@@ -1130,7 +1130,7 @@ export function McpConfigView({
                 onSignIn={onSignIn}
               />
             )}
-          </ConfigCard>
+          </div>
         )}
       </div>
 
@@ -1141,8 +1141,8 @@ export function McpConfigView({
             {load.state === "loading" ? (
               <div className="flex min-w-0 flex-col gap-1.5">
                 <div className="px-2 py-2.5 text-xs text-muted-foreground">{t("i18n.loading")}</div>
-                <Skeleton className="mx-2 h-[30px] w-auto" />
-                <Skeleton className="mx-2 h-[30px] w-auto" />
+                <Skeleton className="mx-2 h-7 w-auto" />
+                <Skeleton className="mx-2 h-7 w-auto" />
               </div>
             ) : load.state === "failed" ? (
               <div role="alert" className="px-2 py-2.5 text-xs text-destructive">
@@ -1439,7 +1439,7 @@ function McpServerGroupList({
         {scopeLabel(group.scope, t)}
       </ConfigSidebarGroupLabel>
       {statusText && <ConfigSidebarGroupStatus note={statusText.note} error={statusText.error} />}
-      {emptyKey && <div className="px-2 pt-px pb-[5px] text-xs leading-[1.4] text-muted-foreground [overflow-wrap:anywhere]">{t(emptyKey)}</div>}
+      {emptyKey && <div className="px-2 pt-0.5 pb-1 text-xs leading-snug text-muted-foreground [overflow-wrap:anywhere]">{t(emptyKey)}</div>}
       {group.servers.map((server) => {
         const key = mcpServerKey(server);
         const state = mcpServerRowState(server, context);
@@ -1868,7 +1868,7 @@ function McpStatusOutput({ error, stderr }: { error?: string; stderr?: string })
       {stderr && (
         <>
           <Line tone="dim">{t("mcp.test.stderr")}</Line>
-          <pre className="max-h-[160px] max-w-full overflow-auto whitespace-pre-wrap rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs leading-[1.45] text-muted-foreground [overflow-wrap:anywhere]">{revealLines(stderr)}</pre>
+          <pre className="max-h-[160px] max-w-full overflow-auto whitespace-pre-wrap rounded-md bg-muted px-2 py-1.5 font-mono text-xs leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">{revealLines(stderr)}</pre>
         </>
       )}
     </>
@@ -1972,9 +1972,9 @@ function McpTestToolList({ status, serverExposure }: { status: McpServerStatus &
           <li key={`${index}\0${tool.name}`} className="flex min-w-0 flex-col gap-0.5">
             <McpChips>
               <McpCode>{revealHiddenCharacters(tool.name)}</McpCode>
-              {tool.readOnly && <span className="whitespace-nowrap text-xs leading-[18px] text-muted-foreground">{t("mcp.test.readOnly")}</span>}
+              {tool.readOnly && <span className="whitespace-nowrap text-xs leading-5 text-muted-foreground">{t("mcp.test.readOnly")}</span>}
               {tool.exposure !== (serverExposure ?? "codemode") && (
-                <span className="whitespace-nowrap text-xs leading-[18px] text-muted-foreground">{t(MCP_EXPOSURE_SHORT_KEYS[tool.exposure])}</span>
+                <span className="whitespace-nowrap text-xs leading-5 text-muted-foreground">{t(MCP_EXPOSURE_SHORT_KEYS[tool.exposure])}</span>
               )}
             </McpChips>
             {tool.description && <Line tone="dim">{revealHiddenCharacters(tool.description)}</Line>}

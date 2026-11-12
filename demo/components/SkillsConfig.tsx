@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useLayoutEffect, useRef } from "react
 import { ArrowUpIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { Input } from "@/components/ui/input";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { PathLabel } from "./PathLabel";
 import type {
   SkillContentResponse,
@@ -326,7 +327,7 @@ function SkillDetail({
           </ConfigField>
 
           <ConfigField label={t("i18n.description")}>
-            <span className="text-xs leading-[1.5] text-muted-foreground">
+            <span className="text-xs leading-relaxed text-muted-foreground">
               {skill.description}
             </span>
           </ConfigField>
@@ -459,7 +460,7 @@ function AddSkillPanel({
   return (
     <ConfigDetailStack className="h-full">
       {/* ── Header area ── */}
-      <div className="mb-5 flex flex-col gap-3">
+      <div className="flex flex-col gap-3">
         <ConfigAddSourceHeading
           title={t("i18n.addSkill")}
           catalogs={[{ href: "https://skills.sh", label: "skills.sh" }]}
@@ -487,8 +488,8 @@ function AddSkillPanel({
             onKeyDown={(e) => {
               if (e.key === "Enter") search(query);
             }}
-             placeholder={t("i18n.skillSearchPlaceholder")}
-            className="min-w-0 flex-1 h-auto rounded-md border-border bg-background px-2.5 py-[7px] text-foreground shadow-none focus-visible:border-border focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            placeholder={t("i18n.skillSearchPlaceholder")}
+            className="min-w-0 flex-1"
           />
           <ConfigButton
             variant="primary"
@@ -513,6 +514,7 @@ function AddSkillPanel({
       {/* ── Results list ── */}
       {results.length > 0 && (
         <div className="flex-1 overflow-y-auto">
+          <ItemGroup className="gap-1">
           {results.map((r) => {
             const isInstalled =
               installedPackages[scope].has(r.package) ||
@@ -523,21 +525,18 @@ function AddSkillPanel({
             const repopart = atIdx > -1 ? r.package.slice(0, atIdx) : r.package;
             const skillpart = atIdx > -1 ? r.package.slice(atIdx + 1) : null;
             return (
-              <div
-                key={r.package}
-                className="flex items-center gap-3.5 border-b border-border py-3"
-              >
-                <div className="min-w-0 flex-1">
+              <Item key={r.package} size="sm" className="flex-nowrap">
+                <ItemContent className="min-w-0">
                   {/* skill name prominent */}
-                  <div className="mb-[3px] text-[13px] font-semibold text-foreground">
+                  <ItemTitle className="font-semibold text-foreground">
                     {skillpart ?? repopart}
-                  </div>
+                  </ItemTitle>
                   {/* repo + installs + link row */}
                   <div className="flex flex-wrap items-center gap-2.5">
                     <span className="font-mono text-xs text-muted-foreground">
                       {repopart}
                     </span>
-                    <span className="text-xs font-medium text-muted-foreground">
+                    <span className="text-xs font-medium tabular-nums text-muted-foreground">
                       {r.installs}
                     </span>
                     {r.url && (
@@ -551,22 +550,15 @@ function AddSkillPanel({
                       </a>
                     )}
                   </div>
-                </div>
-                {/* The installed tint is a state color the variant system has
-                    no slot for: dynamic CSS var injection, not a static style. */}
+                </ItemContent>
                 <ConfigButton
                   size="small"
+                  variant={isInstalled ? "secondary" : "primary"}
                   className="shrink-0"
                   onClick={() =>
                     !isInstalled && !isInstalling && install(r.package)
                   }
                   disabled={isInstalled || isInstalling || installing !== null}
-                  style={isInstalled
-                    ? {
-                        background: "color-mix(in srgb, var(--ok) 10%, transparent)",
-                        color: "var(--ok)",
-                      }
-                    : undefined}
                 >
                   {isInstalled
                      ? `✓ ${t("i18n.installed")}`
@@ -574,9 +566,10 @@ function AddSkillPanel({
                        ? t("i18n.installing")
                        : t("i18n.install")}
                 </ConfigButton>
-              </div>
+              </Item>
             );
           })}
+          </ItemGroup>
         </div>
       )}
     </ConfigDetailStack>

@@ -12,6 +12,8 @@ import {
 } from "./enabled-models-helpers";
 import { ConfigButton, ConfigSwitch } from "./SettingsUi";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ModelContextWindow, type ModelContextSettings } from "./ModelContextWindow";
 
 /**
@@ -193,9 +195,9 @@ export function EnabledModelsBanner({ controller }: { controller: EnabledModelsC
   if (!scoped && stale === 0) return null;
 
   return (
-    <div className="enabled-models-banner flex items-center gap-2.5 border-b bg-sidebar px-3 py-1.5">
+    <div className="enabled-models-banner flex items-center gap-2.5 bg-sidebar px-3 py-1.5">
       <span
-        className="flex min-w-0 flex-1 items-baseline gap-1 text-xs leading-[1.4] text-muted-foreground"
+        className="flex min-w-0 flex-1 items-baseline gap-1 text-xs leading-snug text-muted-foreground"
         {...(stale > 0 ? { title: t("models.enabledStaleHint") } : {})}
       >
         {/* Name the setting and the file that holds it: the count alone left
@@ -383,7 +385,7 @@ export function EnabledModelsSection({
   }
   if (!provider) {
     return failure?.message
-      ? <div className="rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs leading-[1.4] text-destructive">{failure.message}</div>
+      ? <div className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs leading-snug text-destructive">{failure.message}</div>
       : <div className="p-3 text-xs text-muted-foreground">{t("models.enabledUnavailable")}</div>;
   }
 
@@ -409,8 +411,8 @@ export function EnabledModelsSection({
   return (
     <div className="flex flex-col gap-2 pt-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[13px] leading-[1.35] font-semibold text-foreground">{t("models.enabledSection")}</span>
-        <span className="mr-auto font-mono text-[10px] text-muted-foreground">
+        <span className="text-sm leading-snug font-semibold text-foreground">{t("models.enabledSection")}</span>
+        <span className="mr-auto font-mono text-xs tabular-nums text-muted-foreground">
           {t("models.enabledCount", { enabled: provider.enabledCount, total: provider.models.length })}
         </span>
         <ConfigButton
@@ -439,12 +441,12 @@ export function EnabledModelsSection({
         </ConfigButton>
       </div>
 
-      {catalog.note && <div className="text-xs leading-[1.5] text-muted-foreground">{t(catalog.note)}</div>}
+      {catalog.note && <div className="text-xs leading-relaxed text-muted-foreground">{t(catalog.note)}</div>}
 
-      {!editable && <div id={scopeNoteId} className="text-xs leading-[1.5] text-muted-foreground">{t("models.enabledProjectScope")}</div>}
-      {showLastModelNote && <div id={lastModelNoteId} className="text-xs leading-[1.5] text-muted-foreground">{t("models.enabledLastModel")}</div>}
+      {!editable && <div id={scopeNoteId} className="text-xs leading-relaxed text-muted-foreground">{t("models.enabledProjectScope")}</div>}
+      {showLastModelNote && <div id={lastModelNoteId} className="text-xs leading-relaxed text-muted-foreground">{t("models.enabledLastModel")}</div>}
       {failure && (
-        <div className="rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs leading-[1.4] text-destructive">
+        <div className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs leading-snug text-destructive">
           {failure.messageKey ? t(failure.messageKey) : failure.message}
         </div>
       )}
@@ -457,28 +459,31 @@ export function EnabledModelsSection({
           aria-label={t("models.enabledFilter")}
         />
       )}
-      {contextSettings && <div id={contextNoteId} className="text-xs leading-[1.5] text-muted-foreground">{t("models.contextOverrideHelp")}</div>}
-      <div className="max-h-[360px] overflow-y-auto rounded-md border border-border bg-sidebar">
+      {contextSettings && <div id={contextNoteId} className="text-xs leading-relaxed text-muted-foreground">{t("models.contextOverrideHelp")}</div>}
+      <div className="max-h-[360px] overflow-y-auto rounded-lg bg-sidebar p-1">
         {shown.length === 0 ? (
           <div className="p-3 text-xs text-muted-foreground">{t("models.enabledNoMatches")}</div>
-        ) : shown.map((model) => {
+        ) : (
+          <ItemGroup className="gap-0">
+          {shown.map((model) => {
           const lastOne = isLastEnabledModel(view, model);
           const override = contextSettings?.overrides?.[model.id];
           const contextValue = override && typeof override === "object" && !Array.isArray(override)
             ? (override as Record<string, unknown>).contextWindow : undefined;
           return (
-            <div key={model.ref} className="flex min-h-[36px] items-center gap-2 border-border px-2.5 py-1.5 [&:not(:first-child)]:border-t">
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs text-foreground">{model.name}</span>
-                <code className="block truncate font-mono text-[10px] text-muted-foreground">{model.id}</code>
-              </span>
+            <Item key={model.ref} size="sm" className="flex-nowrap rounded-lg hover:bg-muted/50">
+              <ItemContent className="min-w-0">
+                <ItemTitle>{model.name}</ItemTitle>
+                <ItemDescription className="truncate font-mono text-xs">{model.id}</ItemDescription>
+              </ItemContent>
               {model.thinkingPin && (
-                <span
-                  className="shrink-0 rounded-[3px] bg-[rgba(99,102,241,0.12)] px-1 py-px text-[10px] text-[rgba(99,102,241,0.8)]"
+                <Badge
+                  variant="outline"
+                  className="shrink-0 font-normal text-muted-foreground"
                   title={t("models.enabledPinHint")}
                 >
                   {model.thinkingPin}
-                </span>
+                </Badge>
               )}
               {contextSettings && (
                 <ModelContextWindow
@@ -498,9 +503,11 @@ export function EnabledModelsSection({
                 describedBy={!editable ? scopeNoteId : lastOne ? lastModelNoteId : undefined}
                 onChange={(checked) => controller.setModels(model.ref, [model.ref], checked)}
               />
-            </div>
+            </Item>
           );
         })}
+          </ItemGroup>
+        )}
       </div>
     </div>
   );

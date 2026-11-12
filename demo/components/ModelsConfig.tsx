@@ -6,9 +6,12 @@ import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { ButtonGroup } from "./ui/button-group";
+import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Separator } from "./ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import type { ModelCatalogPreset, ModelCatalogRecommendation } from "@/lib/model-catalog";
 import type { DiscoveredModel } from "@/lib/model-discovery";
@@ -484,7 +487,7 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
           </ConfigButton>
         ) : undefined}
         footer={discoveryState.phase === "error" ? (
-          <div role="alert" className="rounded-sm border border-destructive/30 px-2.5 py-[7px] text-xs leading-normal text-destructive">
+          <div role="alert" className="rounded-md bg-destructive/10 px-2.5 py-2 text-xs leading-normal text-destructive">
             {discoveryState.message}
           </div>
         ) : undefined}
@@ -499,63 +502,77 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
               className={cn(inputClass, "min-w-0")}
             />
 
-            <div className="max-h-[220px] overflow-y-auto rounded-sm border border-border bg-card">
-              <div
-                className="sticky top-0 z-[1] flex min-h-8 items-center gap-2 border-b border-border bg-background px-2.5 py-[5px] text-[10px] font-semibold text-muted-foreground"
-              >
-                <Checkbox
-                  id={selectShownId}
-                  checked={selectShownState}
-                  disabled={selectableShownIds.length === 0}
-                  onCheckedChange={() => toggleShownModels()}
-                  className="shrink-0"
-                />
-                <Label
-                  htmlFor={selectShownId}
-                  className={cn(
-                    "min-w-0 flex-1 truncate text-[10px] font-semibold text-muted-foreground",
-                    selectableShownIds.length ? "cursor-pointer" : "cursor-default",
-                  )}
-                >
-                  {t("models.discoverySelectShown")}
-                </Label>
-              </div>
+            <div className="max-h-[220px] overflow-y-auto rounded-lg bg-muted/40">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-8">
+                    <Checkbox
+                      id={selectShownId}
+                      checked={selectShownState}
+                      disabled={selectableShownIds.length === 0}
+                      onCheckedChange={() => toggleShownModels()}
+                      className="shrink-0"
+                    />
+                  </TableHead>
+                  <TableHead>
+                    <Label
+                      htmlFor={selectShownId}
+                      className={cn(
+                        "min-w-0 truncate font-semibold text-muted-foreground",
+                        selectableShownIds.length ? "cursor-pointer" : "cursor-default",
+                      )}
+                    >
+                      {t("models.discoverySelectShown")}
+                    </Label>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
               {shownDiscoveredModels.length === 0 ? (
-                <div className="p-3 text-xs text-muted-foreground">{t("models.discoveryNoMatches")}</div>
-              ) : shownDiscoveredModels.map((model, index) => {
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={2} className="text-xs text-muted-foreground">
+                    {t("models.discoveryNoMatches")}
+                  </TableCell>
+                </TableRow>
+              ) : shownDiscoveredModels.map((model) => {
                 const alreadyAdded = existingModelIds.has(model.id);
                 const checked = selectedModelIds.includes(model.id);
                 return (
-                  <div
+                  <TableRow
                     key={model.id}
-                    className={cn(
-                      "flex min-h-9 items-center gap-2 px-2.5 py-1.5",
-                      index > 0 && "border-t border-border",
-                      alreadyAdded && "opacity-65",
-                    )}
+                    className={cn(alreadyAdded && "opacity-65")}
                   >
-                    <Checkbox
-                      id={`${selectShownId}:${model.id}`}
-                      checked={alreadyAdded ? true : checked}
-                      disabled={alreadyAdded}
-                      onCheckedChange={() => toggleDiscoveredModel(model.id)}
-                      className="shrink-0"
-                    />
-                    <Label
-                      htmlFor={`${selectShownId}:${model.id}`}
-                      className="min-w-0 flex-1 cursor-pointer font-normal"
-                    >
-                      <span className="block truncate text-xs text-foreground">{model.name ?? model.id}</span>
-                      {model.name && <code className="block truncate font-mono text-[10px] font-normal text-muted-foreground">{model.id}</code>}
-                    </Label>
-                    {alreadyAdded && <span className="text-[10px] text-muted-foreground">{t("models.discoveryAdded")}</span>}
-                  </div>
+                    <TableCell className="w-8">
+                      <Checkbox
+                        id={`${selectShownId}:${model.id}`}
+                        checked={alreadyAdded ? true : checked}
+                        disabled={alreadyAdded}
+                        onCheckedChange={() => toggleDiscoveredModel(model.id)}
+                        className="shrink-0"
+                      />
+                    </TableCell>
+                    <TableCell className="p-0">
+                      <Label
+                        htmlFor={`${selectShownId}:${model.id}`}
+                        className="min-w-0 cursor-pointer py-2 font-normal"
+                      >
+                        <span className="block truncate text-left text-xs text-foreground">{model.name ?? model.id}</span>
+                        {model.name && <code className="block truncate text-left font-mono text-xs font-normal text-muted-foreground">{model.id}</code>}
+                      </Label>
+                    </TableCell>
+                    <TableCell className="w-px text-right text-xs whitespace-nowrap text-muted-foreground">
+                      {alreadyAdded ? t("models.discoveryAdded") : null}
+                    </TableCell>
+                  </TableRow>
                 );
               })}
+              </TableBody>
+            </Table>
             </div>
 
             <div className="flex items-center justify-between gap-2.5">
-              <span title={discoveryState.endpoint} className="min-w-0 truncate text-[10px] text-muted-foreground">
+              <span title={discoveryState.endpoint} className="min-w-0 truncate text-xs tabular-nums text-muted-foreground">
                 {filteredDiscoveredModels.length > shownDiscoveredModels.length
                   ? t("models.discoveryShowing", { shown: shownDiscoveredModels.length, total: filteredDiscoveredModels.length })
                   : t("models.discoveryFetched", { count: discoveryState.models.length })}
@@ -627,9 +644,9 @@ function ThinkingLevelMapEditor({
         return (
           <div
             key={level}
-            className="flex items-center gap-2 rounded-sm border border-transparent px-1 py-[5px]"
+            className="flex items-center gap-2 px-1 py-1"
           >
-            <div className="flex w-[68px] shrink-0 items-center gap-[5px]">
+            <div className="flex w-16 shrink-0 items-center gap-1.5">
               <span
                 className={cn(
                   "size-1.5 shrink-0 rounded-full",
@@ -679,7 +696,7 @@ function ThinkingLevelMapEditor({
                 onFocus={() => { if (state !== "string") setLevel(level, strVal || level); }}
                 placeholder={level}
                 maxLength={10}
-                className="h-6 w-[12ch] rounded-r-md border-l-0 px-2 font-mono shadow-none"
+                className="h-6 w-[12ch] rounded-r-md border-l-0 px-2 font-mono tabular-nums shadow-none"
               />
             </ButtonGroup>
           </div>
@@ -1052,19 +1069,20 @@ function ModelDetail({
         </ConfigDetailHeaderInfo>
         <ConfigDetailActions>
           {testSummary && (
-            <span
+            <Badge
+              variant="outline"
               title={testSummary}
               className={cn(
-                "inline-flex h-7 max-w-[260px] items-center truncate rounded-sm border px-2 text-xs",
+                "max-w-[260px] truncate font-normal",
                 testState.phase === "error"
-                  ? "border-destructive/30 bg-destructive/10 text-foreground"
+                  ? "border-destructive/30 text-destructive"
                   : testState.phase === "success"
-                    ? "border-success/40 bg-success/10 text-foreground"
-                    : "border-border bg-secondary text-foreground",
+                    ? "border-success/40 text-success"
+                    : "text-muted-foreground",
               )}
             >
               {testSummary}
-            </span>
+            </Badge>
           )}
           <ConfigButton
             size="small"
@@ -1097,7 +1115,7 @@ function ModelDetail({
               href="https://github.com/anomalyco/models.dev"
               target="_blank"
               rel="noreferrer"
-              className="text-[10px] text-muted-foreground no-underline"
+              className="text-xs text-muted-foreground no-underline"
             >
               {t("models.catalogSource")}
             </a>
@@ -1106,7 +1124,7 @@ function ModelDetail({
         footer={catalogStatusText ? (
           <div
             aria-live="polite"
-            className={cn("flex items-center justify-between gap-2 text-[10px]", catalogStatusClass)}
+            className={cn("flex items-center justify-between gap-2 text-xs", catalogStatusClass)}
           >
             <span title={catalogStatusText} className="min-w-0 truncate">
               {catalogStatusText}
@@ -1166,7 +1184,7 @@ function ModelDetail({
           </div>
 
           <div>
-            <div className="text-[10px] font-semibold uppercase text-muted-foreground">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">
               {t("models.costPerMillion")}
             </div>
             {costEditing ? (
@@ -1177,7 +1195,7 @@ function ModelDetail({
                   </Field>
                 ))}
                 {hasModelCostDraftValue(costDraft) && !parseCompleteModelCost(costDraft) && (
-                  <div aria-live="polite" className="col-span-full text-[10px] text-warning">
+                  <div aria-live="polite" className="col-span-full text-xs text-warning">
                     {t("models.costAllRequired")}
                   </div>
                 )}
@@ -1188,8 +1206,8 @@ function ModelDetail({
                   const missing = model.cost?.[key] === undefined;
                   return (
                     <div key={key} className="min-w-0">
-                      <div className="truncate text-[10px] text-muted-foreground">{label}</div>
-                      <div className={cn("mt-[3px] font-mono text-xs tabular-nums", missing ? "text-muted-foreground" : "text-foreground")}>
+                      <div className="truncate text-xs text-muted-foreground">{label}</div>
+                      <div className={cn("mt-1 font-mono text-xs tabular-nums", missing ? "text-muted-foreground" : "text-foreground")}>
                         {formatCost(key)}
                       </div>
                     </div>
@@ -1213,7 +1231,7 @@ function ModelDetail({
           >
             <span className="min-w-0">
               <span className="block text-xs font-semibold">{t("models.advancedSettings")}</span>
-              <span className="mt-[3px] block truncate text-[10px] text-muted-foreground">
+              <span className="mt-1 block truncate text-xs text-muted-foreground">
                 {advancedSummary}
               </span>
             </span>
@@ -1240,7 +1258,7 @@ function ModelDetail({
                   headers={model.headers}
                   onChange={(headers) => set("headers", headers)}
                 />
-                <span className="mt-0.5 text-[10px] text-muted-foreground">
+                <span className="mt-0.5 text-xs text-muted-foreground">
                   {t("models.headersHelp")}
                 </span>
               </Field>
@@ -1253,11 +1271,11 @@ function ModelDetail({
                     placeholder={String(DEFAULT_IMAGE_MAX_BYTES)}
                     invalid={parsedImageLimit === undefined && imageLimit !== undefined}
                   />
-                  <span className="mt-0.5 text-[10px] text-muted-foreground">
+                  <span className="mt-0.5 text-xs text-muted-foreground">
                     {parsedImageLimit !== undefined && `${formatImageBytes(parsedImageLimit)} · `}
                     {t("models.imageMaxBytesHelp", { size: formatImageBytes(DEFAULT_IMAGE_MAX_BYTES) })}
                   </span>
-                  <code className="font-mono text-[10px] text-muted-foreground">
+                  <code className="font-mono text-xs text-muted-foreground">
                     inputLimits.images.resize.maxBytes
                   </code>
                 </Field>
@@ -1283,7 +1301,7 @@ function ModelDetail({
                         checked={effectiveCompat(provider, model)["forceAdaptiveThinking"] === true}
                         onChange={(v) => onChange(setCompatFlag(model, "forceAdaptiveThinking", v, provider.compat?.["forceAdaptiveThinking"] === true))}
                       />
-                      <code className="pl-[19px] font-mono text-[10px] text-muted-foreground">
+                      <code className="pl-5 font-mono text-xs text-muted-foreground">
                         compat.forceAdaptiveThinking
                       </code>
                     </div>
@@ -1297,7 +1315,7 @@ function ModelDetail({
                           variant="ghost"
                           size="xs"
                           onClick={() => set("thinkingLevelMap", undefined)}
-                          className="px-[5px] text-muted-foreground"
+                          className="px-1.5 text-muted-foreground"
                         >
                           {t("models.clearAll")}
                         </Button>
@@ -1455,7 +1473,7 @@ function OAuthDetail({ provider, onRefresh, enabledModels, contextSettings }: {
         </ConfigDetailHeaderInfo>
         <ConfigDetailActions>
           <div className="flex items-center gap-1.5">
-            <span className={cn("inline-block size-[7px] rounded-full", provider.loggedIn ? "bg-success" : "bg-border")} />
+            <span className={cn("inline-block size-2 rounded-full", provider.loggedIn ? "bg-success" : "bg-border")} />
             <span className={cn("text-xs", provider.loggedIn ? "text-success" : "text-muted-foreground")}>
                {provider.loggedIn ? t("i18n.connected") : t("i18n.notConnected")}
             </span>
@@ -1550,7 +1568,7 @@ function OAuthDetail({ provider, onRefresh, enabledModels, contextSettings }: {
                 <p className="m-0 text-xs leading-normal text-muted-foreground">
                   {t("models.oauthDeviceCode")}
                 </p>
-                <div className="rounded-sm border border-border bg-background px-2.5 py-2 font-mono text-base font-bold text-foreground">
+                <div className="rounded-md bg-muted px-3 py-2 font-mono text-base font-bold text-foreground">
                   {loginState.userCode}
                 </div>
                 <p className="m-0 text-xs leading-normal text-muted-foreground">
@@ -1651,7 +1669,7 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
         </ConfigDetailHeaderInfo>
         <ConfigDetailActions>
           <div className="flex items-center gap-1.5">
-            <span className={cn("inline-block size-[7px] rounded-full", provider.configured ? "bg-success" : "bg-border")} />
+            <span className={cn("inline-block size-2 rounded-full", provider.configured ? "bg-success" : "bg-border")} />
             <span className={cn("text-xs", provider.configured ? "text-success" : "text-muted-foreground")}>
                {provider.configured ? t("i18n.configured") : t("i18n.notConfigured")}
             </span>
@@ -1756,9 +1774,9 @@ function AddProviderPicker({
         onClose();
       }}
     >
-      <div className="flex max-h-[min(72vh,calc(100vh-32px))] w-[820px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-[0_8px_32px_rgba(0,0,0,0.22)]">
+      <div className="flex max-h-[min(72vh,calc(100vh-32px))] w-[820px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-lg">
         {/* Search */}
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3.5 py-2.5">
+        <div className="flex shrink-0 items-center gap-2 px-3.5 py-2.5">
           <Search size={13} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
           <Input
             ref={inputRef}
@@ -1777,7 +1795,7 @@ function AddProviderPicker({
           ) : (
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-2">
               {showCustom && (
-                 <div className="col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">{t("i18n.custom")}</div>
+                 <div className="col-span-full text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("i18n.custom")}</div>
               )}
               {showCustom && (
                 <Button
@@ -1786,40 +1804,40 @@ function AddProviderPicker({
                   className={cardClass}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-semibold leading-[1.3] text-foreground">OpenAI / Anthropic compatible</div>
-                     <div className="mt-0.5 text-[10px] text-muted-foreground">{t("i18n.customEndpoint")}</div>
+                    <div className="truncate text-xs font-semibold leading-snug text-foreground">OpenAI / Anthropic compatible</div>
+                     <div className="mt-0.5 text-xs text-muted-foreground">{t("i18n.customEndpoint")}</div>
                   </div>
-                  <span className="flex size-[26px] shrink-0 items-center justify-center rounded-sm border border-dashed border-border bg-secondary">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-dashed border-border bg-secondary">
                     <Plus size={13} strokeWidth={1.8} className="text-muted-foreground" />
                   </span>
                 </Button>
               )}
 
               {availableOAuth.length > 0 && (
-                 <div className={cn("col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground", showCustom && "pt-1.5")}>{t("i18n.subscriptions")}</div>
+                 <div className={cn("col-span-full text-xs font-semibold uppercase tracking-wide text-muted-foreground", showCustom && "pt-1.5")}>{t("i18n.subscriptions")}</div>
               )}
               {availableOAuth.map((p) => (
                 <Button key={p.id} variant="outline" onClick={() => { onSelectOAuth(p.id); onClose(); }}
                   className={cardClass}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-semibold leading-[1.3] text-foreground">{p.name}</div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">OAuth</div>
+                    <div className="truncate text-xs font-semibold leading-snug text-foreground">{p.name}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">OAuth</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
                 </Button>
               ))}
 
               {availableApiKey.length > 0 && (
-                <div className={cn("col-span-full text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground", availableOAuth.length > 0 && "pt-1.5")}>API Key</div>
+                <div className={cn("col-span-full text-xs font-semibold uppercase tracking-wide text-muted-foreground", availableOAuth.length > 0 && "pt-1.5")}>API Key</div>
               )}
               {availableApiKey.map((p) => (
                 <Button key={p.id} variant="outline" onClick={() => { onSelectApiKey(p.id); onClose(); }}
                   className={cardClass}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-semibold leading-[1.3] text-foreground">{p.displayName}</div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">{p.modelCount === 1 ? t("models.modelCountOne") : t("models.modelCount", { count: p.modelCount })}</div>
+                    <div className="truncate text-xs font-semibold leading-snug text-foreground">{p.displayName}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{p.modelCount === 1 ? t("models.modelCountOne") : t("models.modelCount", { count: p.modelCount })}</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
                 </Button>
@@ -2189,7 +2207,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
   // `12/40` next to a provider makes a narrowed selector visible at a glance.
   const scopeBadge = (providerId: string) => {
     const label = providerBadgeLabel(enabledModels.view, providerId);
-    return label ? <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{label}</span> : null;
+    return label ? <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{label}</span> : null;
   };
   const activeOAuth = oauthProviders.filter((p) => p.loggedIn);
   const activeApiKey = apiKeyProviders.filter((p) => p.configured);
@@ -2291,7 +2309,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
 
               {/* Divider before custom providers, only when there are active managed providers */}
               {(activeOAuth.length > 0 || activeApiKey.length > 0) && providers.length > 0 && (
-                <div className="mx-2 my-1 border-t border-border" />
+                <Separator className="my-1" />
               )}
 
               {/* Custom providers */}
@@ -2335,8 +2353,8 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                         <ConfigSidebarItem
                           key={modelKey}
                           active={isModelSelected}
-                          className="pl-[26px]"
-                          style={drop ? { boxShadow: `inset 0 ${drop.after ? "-2px" : "2px"} 0 var(--accent)` } : undefined}
+                          className={cn("pl-6", drop && "ring-2 ring-ring ring-inset")}
+                          data-drop={drop ? (drop.after ? "after" : "before") : undefined}
                           aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
                           onClick={() => setSelection({ type: "model", providerName: pName, index: i })}
                           onKeyDown={(event) => {
@@ -2353,7 +2371,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                           </ConfigSidebarText>
                           {/* Reasoning pin: no pi token for the indigo tint, kept literal. */}
                           {m.reasoning && (
-                            <span className="shrink-0 rounded-[3px] bg-[rgba(99,102,241,0.12)] px-1 py-px text-[10px] text-[rgba(99,102,241,0.8)]">T</span>
+                            <Badge variant="outline" className="shrink-0 px-1 font-mono font-normal text-primary">T</Badge>
                           )}
                         </ConfigSidebarItem>
                       );
@@ -2362,14 +2380,14 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                     {/* Add model button, and A–Z */}
                     <div className="flex items-center">
                       <ConfigSidebarItem
-                        className="w-auto flex-1 pl-[26px] pr-1 text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+                        className="w-auto flex-1 pl-6 pr-1 text-muted-foreground hover:text-foreground focus-visible:text-foreground"
                         onClick={(e) => { e.stopPropagation(); addModel(pName); }}
                       >
                         <ConfigSidebarText>+ {t("i18n.model")}</ConfigSidebarText>
                       </ConfigSidebarItem>
                       <button
                         type="button"
-                        className="h-[30px] w-9 shrink-0 cursor-pointer rounded-xs p-0 font-mono text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:cursor-default disabled:opacity-35"
+                        className="h-8 w-9 shrink-0 cursor-pointer rounded-md p-0 font-mono text-xs tabular-nums text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:cursor-default disabled:opacity-35"
                         aria-label={t("models.sortByName")}
                         title={t("models.sortByName")}
                         disabled={saving || loadError !== null || models.length < 2}

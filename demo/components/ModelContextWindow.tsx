@@ -28,9 +28,9 @@ export function ModelContextWindow({ modelName, effective, value, onChange, disa
     <Input
       type="text"
       inputMode="numeric"
-      // Eight digits wide (ch follows the phones' 16px form text), and no
-      // taller than the name and id beside it, so the row keeps its height.
-      className="h-6 w-[calc(8ch+16px)] shrink-0 rounded-md border-input bg-background px-2 text-right font-mono"
+      // Eight digits wide, no taller than the name and id beside it, so the
+      // row keeps its height; the values line up on the tabular figures.
+      className="h-7 w-24 shrink-0 px-2 text-right font-mono tabular-nums"
       value={value === undefined ? "" : String(value)}
       placeholder={effective === undefined ? undefined : String(effective)}
       title={t("models.contextWindow")}

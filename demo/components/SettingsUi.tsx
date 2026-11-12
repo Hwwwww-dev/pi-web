@@ -6,12 +6,13 @@ import { PlusIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { Empty, EmptyDescription, EmptyHeader } from "./ui/empty";
 import { Field, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
 import { Switch } from "./ui/switch";
+import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { Textarea } from "./ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
@@ -84,8 +85,8 @@ export function ConfigPanelShell({
         style={panelStyle}
       >
         {!embedded && (
-          <div className="flex h-[50px] shrink-0 items-center gap-2.5 border-b pr-3 pl-4">
-            <strong className="min-w-0 text-[15px]">{title}</strong>
+          <div className="flex h-12 shrink-0 items-center gap-2.5 pr-3 pl-4">
+            <strong className="min-w-0 text-base">{title}</strong>
             {subtitle && (
               <code className="min-w-0 overflow-hidden font-mono text-xs text-muted-foreground truncate" title={subtitle}>
                 {subtitle}
@@ -185,10 +186,10 @@ export function ConfigSidebar({ children, className }: { children: ReactNode; cl
         "config-sidebar flex w-full min-h-0 shrink-0 flex-col bg-sidebar md:w-[240px]",
         pane
           ? cn(
-              "max-[640px]:h-auto max-[640px]:flex-[1_1_auto] max-[640px]:border-b-0",
+              "max-[640px]:h-auto max-[640px]:flex-[1_1_auto]",
               pane === "detail" && "max-[640px]:hidden",
             )
-          : "max-[640px]:h-[190px] max-[640px]:border-b max-[640px]:border-border max-[640px]:border-r-0",
+          : "max-[640px]:h-[190px]",
         className,
       )}
     >
@@ -208,7 +209,7 @@ export function ConfigSidebarGroupLabel({ children, aside }: { children: ReactNo
     // `config-sidebar-group-label` stays as the phone sizing hook (group-switch pins it).
     <div
       className={cn(
-        "config-sidebar-group-label flex items-center gap-1.5 px-2 pt-1 pb-1 text-[11px] font-medium text-muted-foreground",
+        "config-sidebar-group-label flex items-center gap-1.5 px-2 pt-1 pb-1 text-xs font-medium text-muted-foreground",
         navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:pt-2.5 max-[640px]:text-xs",
       )}
     >
@@ -249,7 +250,7 @@ export function ConfigSidebarGroupSwitch({
 }) {
   return (
     <span className="inline-flex shrink-0 items-center gap-1.5">
-      <span className="font-mono text-[11px] text-muted-foreground">{enabled}/{total}</span>
+      <span className="font-mono text-xs tabular-nums text-muted-foreground">{enabled}/{total}</span>
       <ConfigSwitch
         checked={checked ?? (total > 0 && enabled === total)}
         disabled={disabled}
@@ -299,7 +300,7 @@ export function ConfigSidebarItem({
       aria-current={active ? "page" : undefined}
       className={cn(
         // `config-sidebar-item` stays as the phone row-height hook (McpConfig's tests read it).
-        "config-sidebar-item h-9 w-full min-w-0 justify-start gap-2 px-2 text-left text-[13px] font-normal text-sidebar-foreground [&[aria-current='page']]:bg-sidebar-accent [&[aria-current='page']]:font-medium [&[aria-current='page']]:text-sidebar-accent-foreground",
+        "config-sidebar-item h-9 w-full min-w-0 justify-start gap-2 px-2 text-left text-sm font-normal text-sidebar-foreground [&[aria-current='page']]:bg-sidebar-accent [&[aria-current='page']]:font-medium [&[aria-current='page']]:text-sidebar-accent-foreground",
         navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:h-11 max-[640px]:min-h-11 max-[640px]:text-sm",
         className,
       )}
@@ -313,7 +314,7 @@ export function ConfigSidebarText({ className, ...props }: HTMLAttributes<HTMLSp
   return (
     <span
       {...props}
-      className={cn("block min-w-0 truncate text-[13px] leading-[1.35]", className)}
+      className={cn("block min-w-0 truncate text-sm", className)}
     />
   );
 }
@@ -357,18 +358,14 @@ export function ConfigDetailActions({ className, ...props }: HTMLAttributes<HTML
 
 export function ConfigDetailTitle({ children, className }: { children: ReactNode; className?: string }) {
   // `config-detail-title` stays as the hook the MCP panel's tests read.
-  return <div className={cn("config-detail-title text-[15px] leading-[1.35] font-semibold", className)}>{children}</div>;
-}
-
-export function ConfigSectionTitle({ children }: { children: ReactNode }) {
-  return <div className="text-xs leading-[1.35] font-medium text-muted-foreground">{children}</div>;
+  return <div className={cn("config-detail-title text-base font-semibold", className)}>{children}</div>;
 }
 
 /**
- * A settings group as a Card (§4.4/§7.3): a titled section with an optional
- * description, its controls, and a footer for state (save target, trust
- * notice). Density stays tighter than the stock Card: settings panels are
- * dense surfaces (header 13.5px title, body a 10px-gap column).
+ * A settings group: the official Card, with its header slots for a title,
+ * a description and row-level actions, its content, and an optional footer
+ * for state (a save target, a trust notice). No custom padding or type sizes:
+ * the Card's own spacing and the type scale carry the density.
  */
 export function ConfigCard({
   title,
@@ -389,41 +386,41 @@ export function ConfigCard({
 }) {
   const hasHeader = title !== undefined || actions !== undefined || description !== undefined;
   return (
-    <Card className={cn("gap-0 overflow-hidden py-0 shadow-none", className)}>
+    <Card className={cn("gap-4 py-5", className)}>
       {hasHeader && (
-        <CardHeader className="flex flex-row items-start justify-between gap-3 px-[16px] pt-[14px] pb-[4px]">
-          <div className="min-w-0">
-            {title !== undefined && <CardTitle className="text-[13.5px] leading-snug font-semibold">{title}</CardTitle>}
-            {description !== undefined && <CardDescription className="mt-0.5 text-xs">{description}</CardDescription>}
-          </div>
-          {actions !== undefined && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        <CardHeader>
+          {title !== undefined && <CardTitle className="text-base">{title}</CardTitle>}
+          {description !== undefined && <CardDescription>{description}</CardDescription>}
+          {actions !== undefined && <CardAction>{actions}</CardAction>}
         </CardHeader>
       )}
-      {children !== undefined && <CardContent className="flex flex-col gap-2.5 px-4 pt-3.5 pb-3.5">{children}</CardContent>}
-      {footer !== undefined && (
-        <CardFooter className="justify-start px-4 pt-1 pb-3.5">{footer}</CardFooter>
-      )}
+      {children !== undefined && <CardContent className="flex flex-col gap-4">{children}</CardContent>}
+      {footer !== undefined && <CardFooter className="justify-start">{footer}</CardFooter>}
     </Card>
   );
 }
 
 export function ConfigField({ label, children, style, ref }: { label: ReactNode; children: ReactNode; style?: CSSProperties; ref?: Ref<HTMLDivElement> }) {
   return (
-    <Field ref={ref} style={style} className="min-w-0 gap-1.5">
-      <FieldLabel className="text-[13px] font-medium text-muted-foreground">{label}</FieldLabel>
+    <Field ref={ref} style={style} className="min-w-0">
+      <FieldLabel className="font-medium text-muted-foreground">{label}</FieldLabel>
       {children}
     </Field>
   );
 }
 
 /**
- * A detail pane's two-column label/value grid. Each row is a
+ * A detail pane's label/value table, on the official Table. Each row is a
  * `ConfigDetailGridRow`; values wrap anywhere so a long path never widens the
  * pane. The `config-detail-grid*` names stay as the hooks the MCP panel's
  * tests read.
  */
-export function ConfigDetailGrid({ children }: { children: ReactNode }) {
-  return <div className="config-detail-grid grid grid-cols-[96px_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-[13px] leading-[1.5]">{children}</div>;
+export function ConfigDetailGrid({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <Table className={cn("config-detail-grid", className)}>
+      <TableBody>{children}</TableBody>
+    </Table>
+  );
 }
 
 export function ConfigDetailGridRow({
@@ -443,14 +440,16 @@ export function ConfigDetailGridRow({
   children: ReactNode;
 }) {
   return (
-    <>
-      <div className="config-detail-grid-label text-muted-foreground">{label}</div>
-      <div
+    <TableRow className="config-detail-grid-row hover:bg-transparent">
+      <TableCell className="config-detail-grid-label w-24 min-w-24 whitespace-normal align-top text-muted-foreground">
+        {label}
+      </TableCell>
+      <TableCell
         className={cn(
           "config-detail-grid-value",
           tone === "plain" ? null : `is-${tone}`,
           mono ? "is-mono" : null,
-          "min-w-0 [overflow-wrap:anywhere]",
+          "min-w-0 whitespace-normal align-top [overflow-wrap:anywhere]",
           (tone === "muted" || tone === "dim") && "text-muted-foreground",
           tone === "error" && "text-destructive",
           mono && "font-mono",
@@ -459,21 +458,21 @@ export function ConfigDetailGridRow({
         style={style}
       >
         {children}
-      </div>
-    </>
+      </TableCell>
+    </TableRow>
   );
 }
 
-/** Where a row lives (`global`, `project`, …); a project scope is tinted. */
+/** Where a row lives (`global`, `project`, …): the official badge, with the project tint the palette has no token for. */
 export function ConfigScopeTag({ scope, children }: { scope: string; children: ReactNode }) {
   return (
     <Badge
       variant="secondary"
       className={cn(
-        "shrink-0 rounded-[3px] px-1.5 py-px text-[10px] font-normal",
-        // The project tint has no pi token, kept literal (as .config-scope-tag was).
+        "config-scope-tag shrink-0 font-normal",
         scope === "project" && "bg-[rgba(99,102,241,0.12)] text-[rgba(99,102,241,0.8)]",
       )}
+      data-scope={scope}
     >
       {children}
     </Badge>
@@ -537,9 +536,10 @@ export function ConfigScopeSwitch<S extends string>({
               aria-describedby={option.disabled && reason ? reasonId : undefined}
               disabled={option.disabled}
               className={cn(
+                "font-normal text-muted-foreground data-[state=on]:text-foreground",
                 size === "small"
-                  ? "h-auto px-2.5 py-0.5 font-normal text-muted-foreground data-[state=on]:font-semibold data-[state=on]:text-foreground"
-                  : "h-[30px] w-[76px] font-normal text-muted-foreground data-[state=on]:font-medium",
+                  ? "px-2.5 py-0.5 data-[state=on]:font-semibold"
+                  : "px-3 py-1 data-[state=on]:font-medium",
               )}
             >
               {option.label}
@@ -549,7 +549,7 @@ export function ConfigScopeSwitch<S extends string>({
         {children}
       </div>
       {reason && (
-        <span id={reasonId} className="config-scope-switch-reason max-w-80 text-xs leading-[1.4] text-muted-foreground">
+        <span id={reasonId} className="config-scope-switch-reason max-w-80 text-xs leading-snug text-muted-foreground">
           {reason}
         </span>
       )}
@@ -607,7 +607,7 @@ export function ConfigSaveTarget<S extends string>({
         size="small"
         onChange={onChange}
       >
-        <span className="config-save-target-path min-w-0 flex-[1_1_14em] font-mono text-xs leading-[1.4] text-muted-foreground [overflow-wrap:anywhere]">
+        <span className="config-save-target-path min-w-0 flex-[1_1_14em] font-mono text-xs leading-snug text-muted-foreground [overflow-wrap:anywhere]">
           {typeof path === "string" ? pathWithBreaks(path) : path}
         </span>
       </ConfigScopeSwitch>
@@ -817,7 +817,7 @@ export function ConfigAddSourcePanel({
                 key={example}
                 type="button"
                 variant="outline"
-                className="config-add-source-example h-auto min-h-[30px] w-full justify-start px-2.5 py-1.5 text-left font-mono text-xs font-normal whitespace-normal"
+                className="config-add-source-example h-auto min-h-7 w-full justify-start px-2.5 py-1.5 text-left font-mono text-xs font-normal whitespace-normal"
                 onClick={() => onValueChange(example)}
               >
                 {example}
@@ -827,7 +827,7 @@ export function ConfigAddSourcePanel({
                 key={example.value}
                 type="button"
                 variant="outline"
-                className="config-add-source-example has-label grid h-auto min-h-[30px] w-full grid-cols-[minmax(0,15em)_minmax(0,1fr)] items-baseline gap-x-3 gap-y-0.5 px-2.5 py-1.5 text-left font-normal max-[640px]:grid-cols-1"
+                className="config-add-source-example has-label grid h-auto min-h-7 w-full grid-cols-[minmax(0,15em)_minmax(0,1fr)] items-baseline gap-x-3 gap-y-0.5 px-2.5 py-1.5 text-left font-normal max-[640px]:grid-cols-1"
                 onClick={() => onValueChange(example.value)}
               >
                 <span className="config-add-source-example-label text-xs text-muted-foreground">{example.label}</span>
@@ -855,7 +855,7 @@ export function ConfigNotice({ id, action, children }: { id?: string; action?: R
       id={id}
       role="status"
       className={cn(
-        "config-notice border-b bg-sidebar px-4 py-2 text-xs text-muted-foreground",
+        "config-notice px-4 py-2 text-xs text-muted-foreground",
         action && "has-action flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5",
       )}
     >
@@ -901,7 +901,7 @@ export function ConfigEmptyState({ children }: { children: ReactNode }) {
   return (
     <Empty className="min-h-40">
       <EmptyHeader>
-        <EmptyDescription className="text-xs">{children}</EmptyDescription>
+        <EmptyDescription>{children}</EmptyDescription>
       </EmptyHeader>
     </Empty>
   );
@@ -913,7 +913,7 @@ export function ConfigDetail({ children, style, className }: { children: ReactNo
   return (
     <div
       className={cn(
-        "min-h-0 min-w-0 flex-1 overflow-y-auto p-6 text-[13px] leading-[1.55]",
+        "min-h-0 min-w-0 flex-1 overflow-y-auto p-6 text-sm leading-relaxed",
         "max-[640px]:p-4",
         // Inside Settings a phone shows one pane at a time: the list hides its detail.
         pane === "list" && "max-[640px]:hidden",
@@ -928,7 +928,7 @@ export function ConfigDetail({ children, style, className }: { children: ReactNo
 
 export function ConfigFooter({ status, children }: { status?: ReactNode; children?: ReactNode }) {
   return (
-    <footer className="flex min-h-[52px] shrink-0 items-center gap-2 border-t px-3.5 py-2">
+    <footer className="flex min-h-12 shrink-0 items-center gap-2 px-4 py-2">
       <div className="min-w-0 flex-1 overflow-hidden text-xs text-muted-foreground">{status}</div>
       <div className="flex shrink-0 items-center justify-end gap-2 [&_[data-slot=button][data-size=sm]]:min-w-24">
         {children}
@@ -990,9 +990,8 @@ export function ConfigButton({
       type="button"
       variant={CONFIG_BUTTON_VARIANTS[variant]}
       size={size === "small" ? "xs" : "sm"}
-      // The settings density: 28px for `small`, where the stock xs runs 24px.
+      // Density comes from the official sizes; no per-button height override.
       className={cn(
-        size === "small" && "h-7 px-2.5",
         variant === "danger" &&
           "text-destructive hover:bg-destructive/10 hover:text-destructive focus-visible:ring-destructive/20",
         className,
@@ -1056,7 +1055,7 @@ export function ConfigListAction({ active = false, children, className, onClick,
         aria-current={active ? "page" : undefined}
         className={cn(
           // `config-list-action-button` stays as the phone row-height hook (McpAddServer's tests read it).
-          "config-list-action-button h-9 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-[13px] font-normal text-muted-foreground",
+          "config-list-action-button h-9 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-sm font-normal text-muted-foreground",
           navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:h-11 max-[640px]:min-h-11 max-[640px]:text-sm",
           className,
         )}
@@ -1068,13 +1067,25 @@ export function ConfigListAction({ active = false, children, className, onClick,
   );
 }
 
+/** The fill a caller's colour token maps to, so the dot stays a token class and not an inline style. */
+const STATUS_DOT_FILLS: Record<string, string> = {
+  "var(--accent)": "bg-accent",
+  "var(--warning)": "bg-warning",
+  "var(--muted-foreground)": "bg-muted-foreground",
+  "var(--destructive)": "bg-destructive",
+  "var(--success)": "bg-success",
+};
+
 export function ConfigStatusDot({ active, color }: { active?: boolean; color?: string }) {
   return (
     <span
       aria-hidden="true"
       // State reads from the dot's presence and tone, never from colour alone: the row says it too.
-      className={cn("size-1.5 shrink-0 rounded-full bg-muted-foreground", active === false && "opacity-45")}
-      style={color ? { backgroundColor: color } : undefined}
+      className={cn(
+        "size-1.5 shrink-0 rounded-full",
+        color ? (STATUS_DOT_FILLS[color] ?? "bg-muted-foreground") : "bg-muted-foreground",
+        active === false && "opacity-45",
+      )}
     />
   );
 }

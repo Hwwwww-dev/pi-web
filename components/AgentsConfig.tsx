@@ -85,12 +85,12 @@ const EMPTY_PROFILE: EditableProfile = {
 };
 
 /**
- * 各控件共享的观感：禁用时退到面板底色并弱化文字；高度由每个控件自带
- * （字段 34px，提示词 textarea 更高）。边框、焦点环、禁用手势交给 ui/
- * 原语，这里只留需要与现状对齐的项（含 dark 与 md 断点压过原语的默认值）。
+ * 各控件共享的观感：禁用时退到面板底色并弱化文字；高度用官方档位
+ * （字段 h-9，提示词 textarea 更高）。边框、焦点环、禁用手势交给 ui/
+ * 原语，这里只加禁用态。
  */
 const controlClassName =
-  "min-w-0 rounded-md border border-border bg-background dark:bg-background px-[9px] text-xs md:text-xs text-foreground disabled:bg-card disabled:text-muted-foreground disabled:cursor-default";
+  "min-w-0 rounded-md border border-border bg-background dark:bg-background px-2.5 text-xs md:text-xs text-foreground disabled:bg-card disabled:text-muted-foreground disabled:cursor-default";
 
 function editableProfile(profile: SubagentProfile): EditableProfile {
   return {
@@ -172,8 +172,8 @@ function Toggle({ checked, disabled, label, onChange }: { checked: boolean; disa
   return (
     // label 包裹 Checkbox：点击文字仍转发为一次切换。
     <label className={disabled
-      ? "flex cursor-default items-center gap-[7px] text-xs text-muted-foreground"
-      : "flex cursor-pointer items-center gap-[7px] text-xs text-muted-foreground"}
+      ? "flex cursor-default items-center gap-2 text-xs text-muted-foreground"
+      : "flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"}
     >
       <Checkbox checked={checked} disabled={disabled} onCheckedChange={(next) => onChange(next === true)} />
       {label}
@@ -533,7 +533,7 @@ export function AgentsConfig({
                 disabled={settingsLoading || settingsSaving}
                 onChange={(event) => setMaxConcurrent(Number(event.target.value))}
                 onBlur={() => void updateMaxConcurrent(maxConcurrent)}
-                className="h-7 w-[52px] px-1.5 text-center"
+                className="h-7 w-14 px-1.5 text-center"
               />
             </label>
             <ConfigSwitch
@@ -570,11 +570,11 @@ export function AgentsConfig({
                         >
                           <ConfigSidebarText className={`flex-1${profile.enabled ? "" : " text-muted-foreground"}`}>{profile.displayName}</ConfigSidebarText>
                           {!profile.enabled && (
-                            <Badge variant="secondary" className="shrink-0 px-1.5 text-[10px] font-normal text-muted-foreground">
+                            <Badge variant="outline" className="shrink-0 font-normal text-muted-foreground">
                               {t("agents.codemode.off")}
                             </Badge>
                           )}
-                          {overridden && <span className="shrink-0 text-[10px] leading-none whitespace-nowrap text-muted-foreground">{t("agents.overridden")}</span>}
+                          {overridden && <span className="shrink-0 text-xs leading-none whitespace-nowrap text-muted-foreground">{t("agents.overridden")}</span>}
                         </ConfigSidebarItem>
                       );
                     })}
@@ -630,24 +630,24 @@ export function AgentsConfig({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <Field label={t("agents.name")}>
                       {creating ? (
-                        <Input aria-label={t("agents.name")} value={draft.name} disabled={disabled} onChange={(event) => update("name", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
+                        <Input aria-label={t("agents.name")} value={draft.name} disabled={disabled} onChange={(event) => update("name", event.target.value)} className={`${controlClassName} h-9 w-full`} />
                       ) : (
-                        <code className="flex min-h-[34px] items-center overflow-hidden text-ellipsis whitespace-nowrap text-xs text-foreground">
+                        <code className="flex min-h-9 items-center overflow-hidden text-ellipsis whitespace-nowrap text-xs text-foreground">
                           {draft.name}
                         </code>
                       )}
                     </Field>
                     <Field label={t("agents.displayName")}>
-                      <Input aria-label={t("agents.displayName")} value={draft.displayName} disabled={disabled} onChange={(event) => update("displayName", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
+                      <Input aria-label={t("agents.displayName")} value={draft.displayName} disabled={disabled} onChange={(event) => update("displayName", event.target.value)} className={`${controlClassName} h-9 w-full`} />
                     </Field>
                   </div>
                   <Field label={t("agents.description")}>
-                    <Input aria-label={t("agents.description")} value={draft.description} disabled={disabled} onChange={(event) => update("description", event.target.value)} className={`${controlClassName} h-[34px] w-full`} />
+                    <Input aria-label={t("agents.description")} value={draft.description} disabled={disabled} onChange={(event) => update("description", event.target.value)} className={`${controlClassName} h-9 w-full`} />
                   </Field>
                   <Field label={t("agents.prompt")}>
                     {/* Keep the native resize corner usable when the global scrollbar is present. */}
                     <Textarea
-                      className={`${controlClassName} h-[195px] min-h-[195px] max-h-[60vh] w-full py-[9px] overflow-auto leading-normal resize-y disabled:resize-none [scrollbar-width:auto] [&::-webkit-scrollbar]:w-3.5 [&::-webkit-scrollbar]:h-3.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb]:border-[5px] [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:bg-clip-padding`}
+                      className={`${controlClassName} h-[195px] min-h-[195px] max-h-[60vh] w-full py-2.5 overflow-auto leading-normal resize-y disabled:resize-none [scrollbar-width:auto] [&::-webkit-scrollbar]:w-3.5 [&::-webkit-scrollbar]:h-3.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb]:border-[5px] [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:bg-clip-padding`}
                       aria-label={t("agents.prompt")} value={draft.systemPrompt} disabled={disabled} onChange={(event) => update("systemPrompt", event.target.value)} />
                   </Field>
 
@@ -668,25 +668,25 @@ export function AgentsConfig({
                     </div>
                     {/* `skills:` and `extensions:` lists are edited in the profile file; show what they load. */}
                     {draft.loadSkills && draft.skills !== undefined && (
-                      <span className="[overflow-wrap:anywhere] text-xs leading-[1.4] text-muted-foreground">
+                      <span className="[overflow-wrap:anywhere] text-xs leading-snug text-muted-foreground">
                         {draft.skills.length > 0
                           ? t("agents.skillsOnly", { skills: draft.skills.join(", ") })
                           : t("agents.skillsNone")}
                       </span>
                     )}
                     {draft.loadExtensions && draft.extensions !== undefined && (
-                      <span className="[overflow-wrap:anywhere] text-xs leading-[1.4] text-muted-foreground">
+                      <span className="[overflow-wrap:anywhere] text-xs leading-snug text-muted-foreground">
                         {draft.extensions.length > 0
                           ? t("agents.extensionsOnly", { extensions: draft.extensions.join(", ") })
                           : t("agents.extensionsNone")}
                       </span>
                     )}
                     {!disabled && chatOnlyDraft ? (
-                      <span className="text-xs leading-[1.4] text-muted-foreground">
+                      <span className="text-xs leading-snug text-muted-foreground">
                         {t("agents.mcpChatOnly")}
                       </span>
                     ) : draft.mcp === "on" && (
-                      <span className="text-xs leading-[1.4] text-muted-foreground">
+                      <span className="text-xs leading-snug text-muted-foreground">
                         {t("agents.mcpHint")}
                       </span>
                     )}
@@ -702,7 +702,7 @@ export function AgentsConfig({
                       >
                         <SelectTrigger
                           aria-label={t("agents.codemode")}
-                          className={`${controlClassName} h-[34px] w-auto min-w-[180px] self-start data-[size=default]:h-[34px]`}
+                          className={`${controlClassName} h-9 w-auto min-w-[180px] self-start data-[size=default]:h-9`}
                         >
                           <SelectValue />
                         </SelectTrigger>
@@ -712,7 +712,7 @@ export function AgentsConfig({
                           <SelectItem value="off">{t("agents.codemode.off")}</SelectItem>
                         </SelectContent>
                       </Select>
-                      <span className="text-xs leading-[1.4] text-muted-foreground">
+                      <span className="text-xs leading-snug text-muted-foreground">
                         {t("agents.codemodeHint")}
                       </span>
                     </div>
@@ -735,7 +735,7 @@ export function AgentsConfig({
                           variant="field"
                           placement="auto"
                         />
-                        {modelsError && <span className="text-[10px] text-destructive">{modelsError}</span>}
+                        {modelsError && <span className="text-xs text-destructive">{modelsError}</span>}
                       </div>
                     </Field>
                     <Field label={t("agents.thinking")}>
@@ -744,7 +744,7 @@ export function AgentsConfig({
                         onValueChange={(value) => update("thinking", (value === THINKING_NONE ? undefined : value) as EditableProfile["thinking"])}
                         disabled={disabled}
                       >
-                        <SelectTrigger aria-label={t("agents.thinking")} className={`${controlClassName} h-[34px] w-full data-[size=default]:h-[34px]`}>
+                        <SelectTrigger aria-label={t("agents.thinking")} className={`${controlClassName} h-9 w-full data-[size=default]:h-9`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent position="popper" align="start" className="z-[1100]">
@@ -757,7 +757,7 @@ export function AgentsConfig({
                       </Select>
                     </Field>
                     <Field label={t("agents.maxTurns")}>
-                      <Input aria-label={t("agents.maxTurns")} type="number" min={1} value={draft.maxTurns ?? ""} disabled={disabled} onChange={(event) => update("maxTurns", event.target.value ? Number(event.target.value) : undefined)} className={`${controlClassName} h-[34px] w-full`} />
+                      <Input aria-label={t("agents.maxTurns")} type="number" min={1} value={draft.maxTurns ?? ""} disabled={disabled} onChange={(event) => update("maxTurns", event.target.value ? Number(event.target.value) : undefined)} className={`${controlClassName} h-9 w-full`} />
                     </Field>
                   </div>
 

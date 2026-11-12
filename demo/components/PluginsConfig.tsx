@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ArrowUpIcon } from "lucide-react";
 import { Badge } from "./ui/badge";
+import { Item, ItemDescription, ItemGroup, ItemTitle } from "./ui/item";
 import { Separator } from "./ui/separator";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type {
@@ -197,21 +198,25 @@ function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
         <Fragment key={group.kind}>
           {groupIndex > 0 && <Separator />}
           <div>
-            <div className="mb-1.5 text-[10px] font-bold uppercase text-muted-foreground">
+            <div className="mb-1.5 text-xs font-semibold uppercase text-muted-foreground">
               {group.label}
             </div>
-            <div className="flex flex-col gap-1.5">
+            <ItemGroup className="gap-1">
               {group.resources.map((resource) => (
-                <div key={`${resource.kind}:${resource.path}`} className="min-w-0">
-                  <div className="truncate font-mono text-xs text-foreground" title={resource.path}>
+                <Item
+                  key={`${resource.kind}:${resource.path}`}
+                  size="xs"
+                  className="min-w-0 flex-col items-start gap-0.5"
+                >
+                  <ItemTitle className="max-w-full min-w-0 truncate font-mono" title={resource.path}>
                     {resource.name}
-                  </div>
-                  <div className="mt-px truncate font-mono text-[10px] text-muted-foreground" title={resource.path}>
+                  </ItemTitle>
+                  <ItemDescription className="w-full truncate font-mono text-xs" title={resource.path}>
                     {resource.relativePath}
-                  </div>
-                </div>
+                  </ItemDescription>
+                </Item>
               ))}
-            </div>
+            </ItemGroup>
           </div>
         </Fragment>
       ))}
@@ -345,11 +350,11 @@ function PackageDetail({
               <div className="flex flex-wrap items-center gap-1.5">
                 <ConfigScopeTag scope={pkg.scope}>{scopeLabel(pkg.scope, t)}</ConfigScopeTag>
                 {pkg.disabled ? (
-                  <Badge variant="secondary" className="rounded-[3px] px-1.5 py-px text-[10px] font-normal text-muted-foreground">
+                  <Badge variant="secondary" className="font-normal text-muted-foreground">
                     {t("i18n.disabled")}
                   </Badge>
                 ) : pkg.filtered && (
-                  <Badge variant="secondary" className="rounded-[3px] bg-warning/10 px-1.5 py-px text-[10px] font-normal text-warning">
+                  <Badge variant="warning" className="font-normal">
                     {t("i18n.filtered")}
                   </Badge>
                 )}
@@ -410,7 +415,7 @@ function PackageDetail({
           a wall of text wrapped into a narrow label column is what made the
           old detail pane feel broken. */}
       {description && (
-        <p className="max-w-prose text-[13px] leading-relaxed text-muted-foreground">
+        <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
           {description}
         </p>
       )}
