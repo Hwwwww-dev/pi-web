@@ -183,7 +183,7 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
         {role && (
           <span
             className={cn(
-              "mr-[5px] shrink-0 rounded-[3px] border px-1 font-mono text-[10px] leading-4",
+              "mr-[5px] shrink-0 rounded-[3px] border px-1 font-mono text-xs leading-4",
               role === "user"
                 ? "border-primary/20 bg-primary/8 text-primary"
                 : "border-border bg-secondary text-muted-foreground",
@@ -195,7 +195,7 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
 
         {/* Skipped indicator */}
         {skipped > 0 && (
-          <span className="mr-[5px] shrink-0 text-[10px] text-muted-foreground">
+          <span className="mr-[5px] shrink-0 text-xs text-muted-foreground">
             +{skipped}
           </span>
         )}
