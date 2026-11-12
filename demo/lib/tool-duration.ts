@@ -5,6 +5,11 @@
 /** Below this a tool row shows no time: it would read 0.0s on every quick read or search. */
 export const TOOL_DURATION_MIN_MS = 100;
 
+/** A tool's run time in the one format the transcript shows everywhere, or null below the threshold. */
+export function formatToolDurationIfShown(ms: number): string | null {
+  return ms < TOOL_DURATION_MIN_MS ? null : formatToolDuration(ms);
+}
+
 /** A tool's run time as the pi CLI's "Took" writes it: 2.4s, then 3m 5s, then 1h 2m 5s. */
 export function formatToolDuration(ms: number): string {
   const seconds = ms / 1000;

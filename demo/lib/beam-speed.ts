@@ -8,10 +8,10 @@
  * car: it picks up quickly and coasts down slowly.
  */
 
-/** One trip at rest, in seconds. */
-export const BEAM_SLOWEST_SECONDS = 6;
-/** One trip at a fast reply, in seconds. */
-export const BEAM_FASTEST_SECONDS = 1;
+/** One trip at rest, in seconds: slow enough to read as "still working", not as a spinner. */
+export const BEAM_SLOWEST_SECONDS = 2.5;
+/** One trip on a fast reply, in seconds. */
+export const BEAM_FASTEST_SECONDS = 0.5;
 /** The rate that already counts as "fast" (tokens per second). */
 const BEAM_FASTEST_RATE = 120;
 

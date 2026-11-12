@@ -14,7 +14,7 @@ import {
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace";
-import { formatToolDuration } from "@/lib/tool-duration";
+import { formatToolDurationIfShown } from "@/lib/tool-duration";
 import { useI18n } from "@/hooks/useI18n";
 import { COLLAPSIBLE_EXPANDED_EVENT } from "@/lib/tool-call-expansion";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
@@ -189,9 +189,9 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
               <BrainIcon className={cn("size-3.5", expanded ? "text-primary/70" : "text-muted-foreground")} />
             </TraceIcon>
             <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
-            {!active && duration !== undefined && (
+            {!active && duration !== undefined && formatToolDurationIfShown(duration * 1000) && (
               <TraceDescription className="shrink-0 tabular-nums">
-                {formatToolDuration(duration * 1000)}
+                {formatToolDurationIfShown(duration * 1000)}
               </TraceDescription>
             )}
           </TraceLine>
