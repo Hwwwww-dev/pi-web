@@ -260,7 +260,13 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, activi
   const hideFields = view.kind === "file-read" || view.kind === "file-write" || view.kind === "file-edit";
   const sections = hideFields ? view.sections.filter((section) => section.kind !== "fields") : view.sections;
   const content = sections.length > 0
-    ? sections.map((section, index) => <ToolSection key={index} section={section} />)
+    ? sections.map((section, index) => (
+      // 每种 section 内部己经封顶的是代码块；markdown / ANSI 这些没有，
+      // 一层统一的封顶放在外面，否则一段长输出会把整张卡无限拉高。
+      <div key={index} className="max-h-[var(--card-max-height)] overflow-auto">
+        <ToolSection section={section} />
+      </div>
+    ))
     : undefined;
 
   return (
