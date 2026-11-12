@@ -646,15 +646,24 @@ function AssistantMessageView({
 
   useEffect(() => {
     if (!isStreaming) {
-      // Finalise any un-finished thinking block durations on stream end
-      const now = new Date().getTime();
-      setStreamingDurations((prev: Map<number, number>) => {
-        const next = new Map(prev);
-        for (const [idx, start] of blockStartTimesRef.current) {
-          if (!next.has(idx)) next.set(idx, Math.round((now - start) / 1000));
-        }
-        return next;
-      });
+      // 只有真流过的那条消息才有未结算的块。从文件读出来的消息块开始时间表是空的，
+      // 这条分支就不该再 setState：一次挂载上百条消息，每条都排一个状态更新，
+      // React 的嵌套更新上限会被顶穿（“Maximum update depth exceeded”），整页变空。
+      if (blockStartTimesRef.current.size > 0) {
+        const now = new Date().getTime();
+        setStreamingDurations((prev: Map<number, number>) => {
+          let changed = false;
+          const next = new Map(prev);
+          for (const [idx, start] of blockStartTimesRef.current) {
+            if (!next.has(idx)) {
+              next.set(idx, Math.round((now - start) / 1000));
+              changed = true;
+            }
+          }
+          return changed ? next : prev;
+        });
+        blockStartTimesRef.current = new Map();
+      }
       streamStartRef.current = null;
       setTps(null);
       // 结束后停留一帧的最终读数，到点再撤（撤时行随 estimatedTokens=0 收起）。

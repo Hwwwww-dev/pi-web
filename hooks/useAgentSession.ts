@@ -445,6 +445,27 @@ type SlashCommandsResponse = {
   commands?: SlashCommandInfo[];
 };
 
+/**
+ * 一页里已经在列表中的条目不再上一遍。重发的一页、与上页重叠的一页都会把
+ * 同一条消息插进列表两次，阅读位置和“已加载多少条”也跟着错。
+ */
+function dedupePage(ids: readonly string[], messages: readonly AgentMessage[], existing: readonly string[]) {
+  const seen = new Set(existing);
+  const entryIds: string[] = [];
+  const kept: AgentMessage[] = [];
+  ids.forEach((id, index) => {
+    const message = messages[index];
+    if (message === undefined) return;
+    if (id) {
+      if (seen.has(id)) return;
+      seen.add(id);
+    }
+    entryIds.push(id);
+    kept.push(message);
+  });
+  return { entryIds, messages: kept };
+}
+
 export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, newSessionDraftKey, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
@@ -685,6 +706,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const dataRef = useRef<SessionData | null>(null);
   const messagesRef = useRef<AgentMessage[]>([]);
   const entryIdsRef = useRef<string[]>([]);
+  /** 正在路上的更早一页的游标：同一页只发一次。 */
+  const loadingBeforeRef = useRef<string | null>(null);
   const activeLeafIdRef = useRef<string | null>(null);
   const historyCursorRef = useRef<string | null>(null);
   const hasEarlierMessagesRef = useRef(false);
@@ -1075,6 +1098,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { tail?: number; signal?: AbortSignal }) => {
     try {
+      // 同一页正在路上：滚到顶与预取会同时要它，两次都回来就会把这一页 prepend 两通。
+      if (before) {
+        if (loadingBeforeRef.current === before) return;
+        loadingBeforeRef.current = before;
+      }
       const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1" });
       if (leafId) params.set("leafId", leafId);
       // Page upward: ask the server for the `tail` ancestors preceding `before`,
@@ -1089,26 +1117,36 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // switches would otherwise let A's late response overwrite B's tree.
       if (sessionIdRef.current !== sid || options?.signal?.aborted || !sessionHookMountedRef.current) return;
       if (leafId && activeLeafIdRef.current !== leafId) return;
+      // 同一页第二次到达（游标没前进）：再 prepend 一次会让同一批消息在列表里
+      // 出现两遍，下面那些“已加载多少条”的游标也会跟着错位。
+      if (before && d.context.oldestEntryId === before && d.context.messages.length > 0) return d.context;
       setHistoryCursor(d.context.oldestEntryId);
       setHasEarlierMessages(d.context.hasMore);
       setEarlierTurnCount(d.context.turnsBefore ?? 0);
       setData((prev) => {
         if (!prev || prev.sessionId !== sid) return prev;
-        const context = before ? {
-          ...prev.context,
-          messages: [...d.context.messages, ...prev.context.messages],
-          entryIds: [...d.context.entryIds, ...prev.context.entryIds],
-          oldestEntryId: d.context.oldestEntryId,
-          hasMore: d.context.hasMore,
-          turnsBefore: d.context.turnsBefore,
-        } : d.context;
-        return { ...prev, context };
+        if (!before) return { ...prev, context: d.context };
+        const page = dedupePage(d.context.entryIds, d.context.messages, prev.context.entryIds);
+        return {
+          ...prev,
+          context: {
+            ...prev.context,
+            messages: [...page.messages, ...prev.context.messages],
+            entryIds: [...page.entryIds, ...prev.context.entryIds],
+            oldestEntryId: d.context.oldestEntryId,
+            hasMore: d.context.hasMore,
+            turnsBefore: d.context.turnsBefore,
+          },
+        };
       });
       if (before) {
         // Older page: prepend so scroll position stays anchored.
         browsingHistoryRef.current = true;
-        setMessages((prev) => [...d.context.messages, ...prev]);
-        setEntryIds((prev) => [...d.context.entryIds, ...prev]);
+        // 已加载过的条目不再上一次：重发的一页、与上页重叠的一页都会让同一条消息
+        // 在列表里出现两遍，阅读位置和“已加载多少条”也跟着错。
+        const page = dedupePage(d.context.entryIds, d.context.messages, entryIdsRef.current);
+        setMessages((prev) => [...page.messages, ...prev]);
+        setEntryIds((prev) => [...page.entryIds, ...prev]);
       } else {
         setMessages(d.context.messages);
         setEntryIds(d.context.entryIds ?? []);
@@ -1116,6 +1154,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       return d.context;
     } catch (e) {
       if (!options?.signal?.aborted) console.error("Failed to load context:", e);
+    } finally {
+      if (before) loadingBeforeRef.current = null;
     }
   }, []);
 

@@ -29,6 +29,7 @@ function mount({ hasEarlierMessages, landed = true }) {
   const context = createContext({
     sentinel: {}, scrollContainerRef: { current: { scrollHeight: 4000, scrollTop: 0 } },
     loadingOlderRef: { current: false }, prevScrollDistanceRef: { current: null }, requestedCursorRef: { current: null },
+    scrollAnchorRef: { current: null }, messageContentRef: { current: null }, captureScrollAnchor: () => ({ top: 0, height: 0 }),
     hasEarlierMessages, historyCursor: "older", session: { id: "a" }, sessionIdRef: { current: "a" }, activeLeafId: "leaf",
     captureScrollDistance, getNextVisibleCount,
     setVisibleCount: (update) => { calls.visibleCount = update(calls.visibleCount); },
@@ -56,13 +57,14 @@ function mount({ hasEarlierMessages, landed = true }) {
 async function reachTop(state) {
   const { calls, context, reachTop: report } = mount(state);
   await report();
-  return { ...calls, scrollDistance: context.prevScrollDistanceRef.current };
+  // 分页只关心「要不要加宽/要不要拉上一页」；滚动位置的补偿由 scroll-anchor 自己的测试盯着。
+  return { ...calls, anchored: context.scrollAnchorRef.current !== null };
 }
 
 const cursors = (calls) => calls.loads.map((args) => args[2]);
 
 test("with every message loaded, reaching the top widens the window over rows still hidden", async () => {
-  assert.deepEqual(await reachTop({ hasEarlierMessages: false }), { visibleCount: 100, loads: [], scrollDistance: 4000 });
+  assert.deepEqual(await reachTop({ hasEarlierMessages: false }), { visibleCount: 100, loads: [], anchored: true });
 });
 
 test("with older history on the server, reaching the top fetches the previous page", async () => {

@@ -71,6 +71,7 @@ export function TraceRow({
   object,
   titleClassName,
   chips,
+  actions,
   description,
   status = "done",
   foldKey,
@@ -92,6 +93,9 @@ export function TraceRow({
   titleClassName?: string;
   /** File chips the call named, right after the title (第 4.1 节). */
   chips?: ReactNode;
+  /** 行尾的动作按钮（比如打开子代理面板）：放在折叠触发按钮之外，
+      因为按钮不能嵌按钮，而触发按钮里只能有那一行文字。 */
+  actions?: ReactNode;
   description?: string;
   status?: ToolViewStatus;
   /** Fold memory key (`toolCallId`, `groupKey`, …). */
@@ -112,7 +116,10 @@ export function TraceRow({
   activityTool?: string;
 }) {
   const { open, onOpenChange } = useTraceFold(foldKey, defaultOpen);
-  const line = (
+  // 文件胶囊是真正的按钮，行本身是折叠触发按钮：按钮不能嵌按钮，否则 HTML 结构
+  // 非法、点击事件在移动端也会被里层吃掉。所以有展开内容时，行按钮只放文字，
+  // 胶囊作为它的兄弟摆在行尾（同一行对齐）。
+  const line = (withChips: boolean) => (
     // 行宽跟随内容（官方 `w-fit max-w-full`）：箭头紧跟文字，不甩到行尾；
     // 超宽时由对象/描述上的 `truncate` 收缩，箭头始终贴住最后一段文字。
       <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0 overflow-hidden" data-expanded={open || undefined}>
@@ -122,10 +129,10 @@ export function TraceRow({
       {/* The action is never elided: it is the row's name (用户要求：工具名称不可省略). */}
       <TraceTitle className={cn("shrink-0 whitespace-nowrap", titleClassName)}>{title}</TraceTitle>
       {object && <span className="min-w-0 truncate">{object}</span>}
-      {chips}
+      {withChips && chips}
       {description && <TraceDescription className="min-w-0 shrink truncate">{description}</TraceDescription>}
       {trailing && <span className="shrink-0 pl-2">{trailing}</span>}
-    </TraceLine>
+      </TraceLine>
   );
 
   if (!content) {
@@ -133,11 +140,12 @@ export function TraceRow({
       <Trace data-activity="trace-row" data-activity-tool={activityTool}>
         {href ? (
           <a href={href} target="_blank" rel="noreferrer">
-            {line}
+            {line(true)}
           </a>
         ) : (
-          line
+          line(true)
         )}
+        {actions}
         {below}
       </Trace>
     );
@@ -146,9 +154,13 @@ export function TraceRow({
   return (
     <Trace data-activity="trace-row" data-activity-tool={activityTool}>
       <TraceCollapsible open={open} onOpenChange={onOpenChange}>
-        <TraceCollapsibleTrigger aria-label={ariaLabel} className="w-full! max-w-full">
-          {line}
-        </TraceCollapsibleTrigger>
+        <div className="flex w-full max-w-full items-center gap-1.5">
+          <TraceCollapsibleTrigger aria-label={ariaLabel} className="min-w-0 max-w-full flex-1!">
+            {line(false)}
+          </TraceCollapsibleTrigger>
+          {chips}
+          {actions}
+        </div>
         <TraceCollapsibleContent className="mt-1 flex flex-col gap-2">
           {content}
           {children}

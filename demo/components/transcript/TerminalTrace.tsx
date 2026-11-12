@@ -71,16 +71,18 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
               <CodeBlockCopyButton value={command} />
             </CodeBlockActions>
           </CodeBlockHeader>
-          {/* 总数封顶在 --card-max-height 内：命令占 6 份、结果占 4 份，各自超出就自己滚。 */}
+          {/* 总数封顶在 --card-max-height 内：命令占 6 份、结果占 4 份，各自超出就自己滚。
+              百分比 max-height 需要一个有确定高度的父元素，而这个盒子只有 max-height，
+              百分比解析不出来等于没写，命令就把整张卡吃掉了——所以按总上限算长度。 */}
           <div className="flex max-h-[var(--card-max-height)] min-h-0 flex-col">
-            <div className="max-h-[60%] min-h-0 overflow-auto p-2.5">
+            <div className="max-h-[calc(var(--card-max-height)*0.6)] min-h-0 overflow-auto p-2.5">
               <span className={cn(
                 "font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-foreground",
                 wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre",
               )}>{`$ ${command}`}</span>
             </div>
             <Separator className="bg-border/60" />
-            <div className="max-h-[40%] min-h-0 overflow-auto p-2.5">
+            <div className="max-h-[calc(var(--card-max-height)*0.4)] min-h-0 overflow-auto p-2.5">
               {isTuiText(output) ? <AnsiText text={output} /> : <HighlightedCode code={output} />}
             </div>
           </div>
