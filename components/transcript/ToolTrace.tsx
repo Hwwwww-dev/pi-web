@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 import { AnsiText } from "@/components/AnsiText";
 import { HighlightedCode } from "@/components/HighlightedCode";
+import { Button } from "@/components/ui/button";
 import { isTuiText } from "@/lib/ansi";
 import { CodeBlock, CodeBlockContent, CodeBlockLine } from "@/components/ui/code-block";
 import { Spinner } from "@/components/ui/spinner";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
-import { cn } from "@/lib/utils";
 import { PatchDiffFiles } from "@/components/PatchDiffFiles";
 import { SafeMarkdownBody } from "@/components/SafeMarkdownBody";
 import { useI18n } from "@/hooks/useI18n";
@@ -146,8 +146,8 @@ export function ToolSection({ section }: { section: ToolViewSection }) {
 const MAX_FILE_CHIPS = 4;
 
 /**
- * The files a call named (第 4.1 节): one chip each, opening the viewer at that
- * file. Chips only appear when the viewer can take them.
+ * The files a call named (第 4 节): one official outline pill each, opening the
+ * viewer at that file. Pills only appear when the viewer can take them.
  */
 function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; onOpenFile: (path: string) => void }) {
   return (
@@ -157,14 +157,13 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
         const resolved = resolveLocalFilePath(path, cwd);
         const label = baseName(resolved ?? path);
         return (
-          <span
+          <Button
             key={path}
-            role={resolved ? "button" : undefined}
-            tabIndex={resolved ? 0 : undefined}
-            className={cn(
-              "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-sm border border-border px-1.5 py-px font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))] whitespace-nowrap hover:bg-accent hover:text-accent-foreground",
-              !resolved && "cursor-default",
-            )}
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!resolved}
+            className="max-w-[12rem] shrink-0 gap-1 rounded-full px-2 font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))]"
             title={resolved ?? path}
             aria-label={label}
             onClick={(event) => {
@@ -172,16 +171,10 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
               event.stopPropagation();
               if (resolved) onOpenFile(resolved);
             }}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" && event.key !== " ") return;
-              event.stopPropagation();
-              event.preventDefault();
-              if (resolved) onOpenFile(resolved);
-            }}
           >
             <FileTextIcon className="size-3 shrink-0" />
-            <span>{label}</span>
-          </span>
+            <span className="truncate">{label}</span>
+          </Button>
         );
       })}
     </span>
@@ -208,6 +201,12 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below,
   const chips = onOpenFile && view.filePaths.length > 0
     ? <FileChips paths={view.filePaths} cwd={cwd} onOpenFile={onOpenFile} />
     : null;
+  // The chip already carries the name; a description that repeats it is noise (第 4 节).
+  const repeatsChip = view.filePaths.some((path) =>
+    path === view.description || baseName(path) === view.description);
+  const description = view.streamingInput
+    ? t("chat.generatingToolInput")
+    : chips && repeatsChip ? undefined : view.description;
   const content = view.sections.length > 0
     ? view.sections.map((section, index) => <ToolSection key={index} section={section} />)
     : undefined;
@@ -217,7 +216,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below,
       icon={view.status === "running" ? <Spinner className="size-3.5" /> : KIND_ICONS[view.kind]}
       title={view.title}
       chips={chips}
-      description={view.streamingInput ? t("chat.generatingToolInput") : view.description}
+      description={description}
       status={view.status}
       foldKey={view.foldKey}
       trailing={trailing}

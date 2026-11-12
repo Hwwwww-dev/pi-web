@@ -542,7 +542,8 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
     // 第 4 节：折叠仍走官方 TraceCollapsible，分隔线用 Separator。
     <div className="mt-2.5 flex flex-col gap-2">
       <Separator />
-      <TraceCollapsible>
+      {/* 文件清单默认展开：摘要里最常被查的就是它。 */}
+      <TraceCollapsible defaultOpen>
         <TraceCollapsibleTrigger>
           <TraceLine>
             <TraceTitle className="text-xs font-semibold text-muted-foreground">

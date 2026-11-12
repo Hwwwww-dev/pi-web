@@ -164,7 +164,8 @@ test("a grouped call's chip resolves against the session cwd too", () => {
   // 分组行也必须拿到 cwd，否则 chip 退化成不可点击的静态文本。
   assert.match(html, /title="\/repo\/pi-web\/lib\/a\.ts"/);
   assert.match(html, /title="\/repo\/pi-web\/lib\/b\.ts"/);
-  assert.match(html, /role="button"/);
+  // chip 是官方胶囊按钮（第 4 节），不是自绘 span。
+  assert.match(html, /data-slot="button"[^>]*rounded-full/);
   clearExpandedToolCalls();
 });
 
@@ -226,8 +227,11 @@ test("a file row shows the name once, in the chip that opens it", () => {
 
   // 标题只说动作（Read），文件名由 chip 承担且可点（文件跳转）。
   assert.match(html, /aria-label="Read"/);
-  assert.match(html, /role="button"/);
+  assert.match(html, /data-slot="button"[^>]*rounded-full/);
   assert.match(html, /title="\/repo\/pi-web\/probe-label\.png"/);
+  // 标题与描述都不再重复文件名，只有 chip 承担它。
+  assert.doesNotMatch(html, /data-slot="trace-title"[^>]*>probe-label\.png/);
+  assert.doesNotMatch(html, /data-slot="trace-description"[^>]*>probe-label\.png/);
 });
 
 test("section labels are translated, never the raw key", () => {
