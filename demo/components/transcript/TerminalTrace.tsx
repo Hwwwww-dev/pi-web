@@ -10,6 +10,7 @@ import {
   CodeBlockTitle,
 } from "@/components/ui/code-block";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { AnsiText } from "@/components/AnsiText";
 import { HighlightedCode } from "@/components/HighlightedCode";
@@ -78,7 +79,8 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
                 wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre",
               )}>{`$ ${command}`}</span>
             </div>
-            <div className="max-h-[40%] min-h-0 overflow-auto border-t border-border/60 p-2.5">
+            <Separator className="bg-border/60" />
+            <div className="max-h-[40%] min-h-0 overflow-auto p-2.5">
               {isTuiText(output) ? <AnsiText text={output} /> : <HighlightedCode code={output} />}
             </div>
           </div>

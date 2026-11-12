@@ -1471,3 +1471,38 @@ span.token.table {
   }
 }
 
+
+/* t/s > 120 的徽章：文字恒白，背景是密排的流动彩虹渐变。周期 70px · 亮度
+   0.70 · 饱和 0.25 · 每周期 8 色。图层比徽章宽出一个周期、平移一个周期无缝
+   循环，动画只动 transform（GPU 合成、零重 paint）。组件按速度内联
+   animation-duration：50/tps 秒、0.3s 封底。reduced-motion 下保持静态彩虹。 */
+@keyframes tps-rainbow-slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(-70px); }
+}
+.tps-rainbow {
+  --tps-rainbow-l: 0.70;
+  --tps-rainbow-c: 0.25;
+  width: calc(100% + 70px);
+  background-image: repeating-linear-gradient(90deg,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 0)   0px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 45)  8.8px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 90)  17.5px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 135) 26.3px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 180) 35px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 225) 43.8px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 270) 52.5px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 315) 61.3px,
+    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 360) 70px);
+  animation: tps-rainbow-slide linear infinite;
+  will-change: transform;
+}
+[data-theme="dark"] .tps-rainbow {
+  --tps-rainbow-l: 0.55;
+  --tps-rainbow-c: 0.22;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tps-rainbow {
+    animation: none;
+  }
+}

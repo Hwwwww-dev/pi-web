@@ -159,22 +159,20 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
               </div>
             ) : (
               <CodeBlockContent wrap={false} className="max-h-[var(--card-max-height)]">
-                {lines.map((entry) => (
-                  "gap" in entry
-                    ? <GapLine key={entry.key} gap={entry.gap} />
-                    : (
-                      <DiffLine
-                        key={entry.key}
-                        maxLineNo={maxLineNo}
-                        cell={{
-                          // One gutter, so a removed line keeps the old number and everything else the new one.
-                          lineNo: entry.row.right.type === "removed" ? entry.row.left.lineNo : entry.row.right.lineNo,
-                          text: entry.row.right.type === "removed" ? entry.row.left.text : entry.row.right.text,
-                          type: entry.row.right.type === "removed" ? "removed" : entry.row.right.type,
-                        }}
-                      />
-                    )
-                ))}
+                {lines.flatMap((entry) => {
+                  if ("gap" in entry) return [<GapLine key={entry.key} gap={entry.gap} />];
+                  // 一行里左边是删除、右边是新增：单栏要把两行都排出来，删除在上、
+                  // 新增在下，各自带自己文件的号码。只取 right 会把删除行整行吞掉。
+                  const cells: SplitDiffCell[] = [];
+                  if (entry.row.left.type === "removed") cells.push(entry.row.left);
+                  if (entry.row.right.type === "added") cells.push(entry.row.right);
+                  if (cells.length === 0) {
+                    cells.push(entry.row.right.type === "empty" ? entry.row.left : entry.row.right);
+                  }
+                  return cells.map((cell, index) => (
+                    <DiffLine key={`${entry.key}c${index}`} cell={cell} maxLineNo={maxLineNo} />
+                  ));
+                })}
               </CodeBlockContent>
             )}
           </CodeBlock>

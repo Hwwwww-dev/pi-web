@@ -207,7 +207,7 @@ test("keeps streamed tool input out of collapsed markup while counting it", () =
 
 
 
-test("a nested argument keeps the JSON body: a row cannot hold a subtree", () => {
+test("a nested argument becomes rows, one per leaf: a row cannot hold a subtree", () => {
   const block = {
     type: "toolCall",
     toolCallId: "call-mcp-nested",
@@ -218,9 +218,12 @@ test("a nested argument keeps the JSON body: a row cannot hold a subtree", () =>
   setToolCallExpanded(block.toolCallId, true);
   try {
     const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
+    const text = textOf(html);
     assert.ok(!html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
-    assert.ok(textOf(html).includes('"filter"'));
-    assert.ok(textOf(html).includes('"labels"'));
+    // 叶子各自一行，路径写成 `filter.labels[0]`：表格的一行装不下子树。
+    assert.ok(text.includes("filter.labels[0]"));
+    assert.ok(text.includes("filter.assignee"));
+    assert.ok(!text.includes('"filter"'));
   } finally {
     clearExpandedToolCalls();
   }
@@ -652,7 +655,7 @@ test("one column numbers a removed line by the old file and every other line by 
 +LATE
 `), "stacked");
 
-  const gutter = [...stacked.matchAll(/w-\[42px\][^>]*>(\d*)</g)].map((match) => match[1]);
+  const gutter = [...stacked.matchAll(/w-\[\d+ch\]">(\d*)</g)].map((match) => match[1]);
   // done() is old line 12 but new line 13: the new file's number, as in the file viewer's gutter.
   assert.deepEqual(gutter, ["10", "11", "11", "12", "13", "30", "31"]);
   // The lines between the hunks stay marked, as in the two-column view.

@@ -39,6 +39,7 @@ import { formatTurnDuration, getTurnDurationMs } from "@/lib/turn-duration";
 import { phaseLabel } from "@/lib/chat-phase-label";
 import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
 import { selectHasStreamingContent, selectIsStreaming, selectStreamingMessage, useStreamingSelector } from "@/hooks/useStreamingSelector";
+import { publishStreamCharacters } from "@/lib/stream-beam";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useDialogMaxHeight } from "@/hooks/useDialogMaxHeight";
@@ -297,6 +298,19 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const streamingMessage = useStreamingSelector(streamingStore, selectStreamingMessage);
   // streamState shape kept from the dev hook contract; derived from the store selectors.
   const streamState = useMemo(() => ({ isStreaming, streamingMessage }), [isStreaming, streamingMessage]);
+  // 输入框边光的油门：当前流的字符数。发布给 `lib/stream-beam`，让被 memo 的
+  // 输入框自己订阅；一个 chunk 只多算一次减法，不必每 chunk 换一次 prop。
+  const streamCharacters = useMemo(() => {
+    let total = 0;
+    for (const block of streamingMessage?.content ?? []) {
+      if (block.type === "text") total += block.text.length;
+      else if (block.type === "thinking") total += block.thinking.length;
+    }
+    return total;
+  }, [streamingMessage]);
+  useEffect(() => {
+    publishStreamCharacters(streamCharacters);
+  }, [streamCharacters]);
   const getStreamingMessage = useCallback(() => streamingStore.getState().streamingMessage, [streamingStore]);
   const sessionBusy = agentRunning || bashRunning;
   // Context window + live reading for usage lines: the polled reading when a

@@ -34,6 +34,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useEnterSendMode } from "@/hooks/useEnterSendMode";
 import { useI18n } from "@/hooks/useI18n";
 import { useChatAppearance } from "@/hooks/useChatAppearance";
+import { useStreamBeamDuration } from "@/hooks/useStreamBeamDuration";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import type { ToolPreset } from "@/lib/tool-presets";
 import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
@@ -847,6 +848,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   // desktop shortcut instead of inheriting the phone's Ctrl/Cmd+Enter.
   const touchKeyboard = useCoarsePointer();
   const enterSendMode = useEnterSendMode();
+  // 边光的油门：按当前流的 tokens/s 算每圈时长（快提速慢降速）。
+  const beamDuration = useStreamBeamDuration(isStreaming && !compact);
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>(() => (
     draftKey ? draftImagesToAttachedImages(getDraft(draftKey)?.images) : []
@@ -2411,6 +2414,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             size="md"
             colorVariant="colorful"
             strength={0.7}
+            duration={beamDuration}
             borderRadius={compact ? 18 : 24}
             theme={theme === "dark" ? "dark" : "light"}
             className="chat-composer-beam min-w-0"

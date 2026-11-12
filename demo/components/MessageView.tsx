@@ -4,6 +4,7 @@ import { Fragment, memo, useState, useRef, useEffect, useMemo } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, ClockIcon, CopyIcon, CornerDownRightIcon, GitBranchIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "./ui/alert";
+import { Badge } from "./ui/badge";
 import { Bubble, BubbleContent } from "./ui/bubble";
 import { Button } from "./ui/button";
 import { Message, MessageContent, MessageFooter } from "./ui/message";
@@ -488,10 +489,30 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
             <span>{estimatedTokens}</span>
           </span>
           {tps !== null && (
-            // 第 4 节：速率是行内 meta（`TraceDescription` 档位），不是自绘徽章。
-            <span className="shrink-0 whitespace-nowrap tabular-nums text-muted-foreground/70">
-              {tps.toFixed(1)} t/s
-            </span>
+            // 速率分三档：低速是行内 meta；中速用官方 Badge;超过 120 换成官方
+            // Badge 外形的彩虹胶囊（文字恒白，底层密排彩虹按速度平移，
+            // ≥166 t/s 后固定 0.3s 一圈，再快不再加速）。
+            tps > 120 ? (
+              <span
+                className="relative isolate inline-flex shrink-0 overflow-hidden rounded-md px-1.5 text-xs leading-tight font-medium tabular-nums text-white"
+                title={`${tps.toFixed(1)} t/s`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="tps-rainbow pointer-events-none absolute inset-y-0 left-0 -z-10"
+                  style={{ animationDuration: `${Math.max(0.3, 50 / tps).toFixed(2)}s` }}
+                />
+                {tps.toFixed(1)} t/s
+              </span>
+            ) : tps > 60 ? (
+              <Badge variant="secondary" className="shrink-0 tabular-nums">
+                {tps.toFixed(1)} t/s
+              </Badge>
+            ) : (
+              <span className="shrink-0 whitespace-nowrap tabular-nums text-muted-foreground/70">
+                {tps.toFixed(1)} t/s
+              </span>
+            )
           )}
         </span>
       )}
