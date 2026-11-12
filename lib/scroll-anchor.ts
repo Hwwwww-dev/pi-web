@@ -27,11 +27,8 @@ export interface ScrollAnchor {
 export function captureScrollAnchor(container: HTMLElement, content: HTMLElement | null): ScrollAnchor | null {
   if (!content) return null;
   const containerTop = container.getBoundingClientRect().top;
-  for (const child of content.children) {
+  for (const child of Array.from(content.children)) {
     if (!(child instanceof HTMLElement)) continue;
-    // A virtual window's spacer is not a row: its height stands for turns that
-    // are not in the DOM.
-    if (child.dataset.spacer) continue;
     const rect = child.getBoundingClientRect();
     if (rect.bottom > containerTop) return { element: child, top: rect.top - containerTop };
   }

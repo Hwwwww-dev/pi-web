@@ -59,14 +59,6 @@ import {
   VISIBLE_PAGE_SIZE,
 } from "@/lib/chat-lazy-load";
 import { SCROLL_ANCHOR_SETTLE_MS, applyScrollAnchor, captureScrollAnchor, type ScrollAnchor } from "@/lib/scroll-anchor";
-import {
-  TURN_ESTIMATE_HEIGHT,
-  TURN_WINDOW_MIN_TURNS,
-  averageTurnHeight,
-  computeTurnWindow,
-  turnOffsets,
-  type TurnWindow,
-} from "@/lib/turn-window";
 
 /** Pages fetched up front: enough for a very long session, and a guard against a broken cursor. */
 const PREFETCH_MAX_PAGES = 40;
@@ -559,8 +551,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // Only render the last N messages initially. When the user scrolls to the
   // top, load another page while keeping the scroll position stable.
   const [visibleCount, setVisibleCount] = useState(VISIBLE_PAGE_SIZE);
-  // 长会话的窗口暂停：跳转到某条消息、minimap 定位时需要整段 DOM 都在。
-  const [windowPaused, setWindowPaused] = useState(false);
   const messageRefs = useMessageRefs(messages.length);
   const messagesLenRef = useRef(0);
   messagesLenRef.current = messages.length;
@@ -641,9 +631,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // the anchor renders.
   const revealTurnForMinimap = useCallback(async (turnNumber: number) => {
     setVisibleCount((current) => Math.max(current, messagesLenRef.current * 2));
-    // 目标可能落在窗口之外：先暂停窗口一会儿，让 minimap 的滚动能拿到元素。
-    setWindowPaused(true);
-    window.setTimeout(() => setWindowPaused(false), 800);
     const sid = session?.id;
     const target = minimapTurnIndex[turnNumber];
     if (!sid || !target) return;
@@ -673,8 +660,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         return;
       }
       const viewportTop = container.getBoundingClientRect().top;
-      const candidates = Array.from(content.querySelectorAll<HTMLElement>("[data-entry-id]")).flatMap((element) => {
-        if (!element.dataset.entryId) return [];
+      const candidates = Array.from(content.children).flatMap((element) => {
+        if (!(element instanceof HTMLElement) || !element.dataset.entryId) return [];
         const rect = element.getBoundingClientRect();
         return [{ entryId: element.dataset.entryId, top: rect.top, bottom: rect.bottom }];
       });
@@ -799,7 +786,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     const position = pendingScrollRestore;
     const content = messageContentRef.current;
     if (!position || !content || searchTarget) return;
-    const element = content.querySelector<HTMLElement>(`[data-entry-id="${CSS.escape(position.anchorEntryId)}"]`);
+    const element = Array.from(content.children).find((candidate) => (
+      candidate instanceof HTMLElement && candidate.dataset.entryId === position.anchorEntryId
+    ));
     if (element instanceof HTMLElement) {
       scrollToMessage(element, position.anchorOffset);
       setPendingScrollRestore(null);
@@ -1332,13 +1321,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       };
 
       const rendered: ReactNode[] = [];
-      // 一轮的节点是平铺 push 的；虚拟窗口要“一轮一个节点”，所以这一轮先攒在
-      // turnNodes 里，结束时包成带 data-turn-key 的一层（行高按它测量）。
-      let turnNodes: ReactNode[] = [];
-      const closeTurn = (key: string | number) => {
-        rendered.push(<div key={`turn-${key}`} data-turn-key={String(key)}>{turnNodes}</div>);
-        turnNodes = [];
-      };
       let idx = 0;
       // Lazy pagination: the loaded window may begin mid-turn, before
       // this turn's user message, so the anchor scan cannot group it.
@@ -1378,8 +1360,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       for (; idx < messages.length;) {
         const msg = messages[idx];
         if (!isMessageGroupAnchor(msg)) {
-          turnNodes.push(renderMessage(idx, { showModelLabel: true }));
-          closeTurn(entryIds[idx] ?? idx);
+          rendered.push(renderMessage(idx, { showModelLabel: true }));
           idx += 1;
           continue;
         }
@@ -1392,9 +1373,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
         if (finalAssistantIdx === -1) {
           for (let renderIdx = userIdx; renderIdx < endIdx; renderIdx++) {
-            turnNodes.push(renderMessage(renderIdx, { showModelLabel: true }));
+            rendered.push(renderMessage(renderIdx, { showModelLabel: true }));
           }
-          closeTurn(entryIds[userIdx] ?? userIdx);
           idx = endIdx;
           continue;
         }
@@ -1403,7 +1383,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         if (isLiveTail) {
           // A running turn streams as flat activity rows (no wrapper, no
           // final-answer split); once settled the turn regroups below.
-          turnNodes.push(renderMessage(userIdx));
+          rendered.push(renderMessage(userIdx));
           const liveItems = buildTurnActivityItems({
             messages,
             startIdx: userIdx + 1,
@@ -1415,7 +1395,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           });
           if (liveItems.length > 0) {
             liveActivityRendered = true;
-            turnNodes.push(
+            rendered.push(
               <TurnActivityBody
                 key={`live-activity-${entryIds[userIdx] ?? userIdx}`}
                 items={liveItems}
@@ -1427,12 +1407,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               />,
             );
           }
-          closeTurn(entryIds[userIdx] ?? userIdx);
           idx = endIdx;
           continue;
         }
 
-        turnNodes.push(renderMessage(userIdx));
+        rendered.push(renderMessage(userIdx));
 
         // Per-turn view model, cached by the turn's entry fingerprint so its
         // object identities survive list recomputes (memoized MessageView /
@@ -1501,7 +1480,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
         if (activityItems.length > 0) {
           const processKey = entryIds[userIdx];
-          turnNodes.push(
+          rendered.push(
             <div
               key={`process-group-${processKey ?? userIdx}`}
               ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
@@ -1527,7 +1506,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         }
 
         if (finalAnswerMessage) {
-          turnNodes.push(renderMessage(finalAssistantIdx, {
+          rendered.push(renderMessage(finalAssistantIdx, {
             messageOverride: finalAnswerMessage,
             writtenFiles,
             // The turn's timestamp lives on the TurnMetaLine right below; a
@@ -1556,7 +1535,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const liveCtx = turnView.nextPromptTokens === undefined && isConversationTail
           ? ctxInfoRef.current ?? null
           : null;
-        turnNodes.push(
+        rendered.push(
           <TurnMetaLine
             key={`turn-meta-${entryIds[userIdx] ?? userIdx}`}
             usage={turnUsage}
@@ -1571,9 +1550,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
         for (let renderIdx = finalAssistantIdx + 1; renderIdx < endIdx; renderIdx++) {
           // 一轮只留 TurnMetaLine 那一条用量：中间的每一步都不再各带一行。
-          turnNodes.push(renderMessage(renderIdx, { showModelLabel: true, hideUsage: true }));
+          rendered.push(renderMessage(renderIdx, { showModelLabel: true, hideUsage: true }));
         }
-        closeTurn(entryIds[userIdx] ?? userIdx);
         idx = endIdx;
       }
     return { rendered, liveActivityRendered };
@@ -1584,68 +1562,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
   const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
   const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
-
-  // 长会话只挂载视口附近的若干轮：千轮会话每来一个 chunk 都要重排整棵 markdown
-  // 树。两端用占位高度撑住滚动条，阅读位置靠 lib/scroll-anchor 的元素锚点保住。
-  const visibleTurns = useMemo(() => turnRendered.slice(startIndex), [turnRendered, startIndex]);
-  const turnKeys = useMemo(
-    () => visibleTurns.map((node) => String((node as { key?: unknown }).key ?? "")),
-    [visibleTurns],
-  );
-  const [turnWindow, setTurnWindow] = useState<TurnWindow | null>(null);
-  const turnHeightsRef = useRef(new Map<string, number>());
-  const windowEnabled = !windowPaused && !pendingScrollRestore && !pendingSearchScroll
-    && turnKeys.length > TURN_WINDOW_MIN_TURNS;
-
-  useEffect(() => {
-    if (!windowEnabled) setTurnWindow(null);
-  }, [windowEnabled]);
-
-  // 量一遍已挂载的轮：量到的真实高度存起来，未挂载的用平均值估算。
-  useLayoutEffect(() => {
-    const content = messageContentRef.current;
-    if (!content) return;
-    for (const node of content.querySelectorAll<HTMLElement>("[data-turn-key]")) {
-      const key = node.dataset.turnKey;
-      if (key) turnHeightsRef.current.set(key, node.offsetHeight);
-    }
-  }, [turnKeys, turnWindow]);
-
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    const content = messageContentRef.current;
-    if (!windowEnabled || !container || !content) return;
-    let frame = 0;
-    const measure = () => {
-      frame = 0;
-      const heights = turnKeys.map((key) => turnHeightsRef.current.get(key));
-      const estimate = averageTurnHeight(heights) ?? TURN_ESTIMATE_HEIGHT;
-      const offsets = turnOffsets(heights, estimate);
-      const first = content.querySelector<HTMLElement>("[data-turn-key]");
-      const firstTop = first ? first.getBoundingClientRect().top - content.getBoundingClientRect().top : 0;
-      // 视口顶部换算到“第 0 轮之上多少像素”的坐标系：已挂载的第一轮在文档里的
-      // 位置，加上它前面那些轮（含占位）的累计高度。
-      const viewportTop = container.scrollTop - firstTop + offsets[turnWindow?.start ?? 0];
-      const next = computeTurnWindow(heights, estimate, viewportTop, container.clientHeight);
-      const unchanged = turnWindow
-        && next.start === turnWindow.start
-        && next.end === turnWindow.end
-        && Math.abs(next.topHeight - turnWindow.topHeight) <= 1
-        && Math.abs(next.bottomHeight - turnWindow.bottomHeight) <= 1;
-      if (!unchanged) setTurnWindow(next);
-    };
-    const schedule = () => {
-      if (frame === 0) frame = requestAnimationFrame(measure);
-    };
-    measure();
-    container.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
-    return () => {
-      container.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [windowEnabled, turnKeys, turnWindow, scrollContainerRef]);
   if (loading) {
     return (
       <div className="flex h-full flex-col justify-center gap-3 px-10">
@@ -1752,15 +1668,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 {t("chat.loadEarlier")}
               </div>
             )}
-            {windowEnabled && turnWindow && turnWindow.start > 0 && (
-              <div data-spacer="turn" aria-hidden="true" style={{ height: turnWindow.topHeight }} />
-            )}
-            {windowEnabled && turnWindow
-              ? visibleTurns.slice(turnWindow.start, turnWindow.end)
-              : visibleTurns}
-            {windowEnabled && turnWindow && turnWindow.end < visibleTurns.length && (
-              <div data-spacer="turn" aria-hidden="true" style={{ height: turnWindow.bottomHeight }} />
-            )}
+            {turnRendered.slice(startIndex)}
             {streamState.isStreaming && hasStreamingContent && streamState.streamingMessage && (
               <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
             )}
