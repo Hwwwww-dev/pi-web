@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { stripAnsi } from "@/lib/ansi";
 import { isPermissiveStatusText } from "@/lib/extension-status";
 import { displayLabel } from "@/lib/label-case";
@@ -104,6 +105,44 @@ export function buildExtensionStatusCells(statuses: ExtensionStatusItem[]): Stat
   return cells;
 }
 
+/**
+ * 列表状态的胶囊。弹出层受控：焦点移出（Tab 走、点到别处）就收起，不等下一次点击。
+ */
+function StatusListChip({ title, items, label, full }: { title: string; items: string[]; label: string; full: string }) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          title={full}
+          aria-label={full}
+          className="shrink-0 font-mono text-xs font-medium text-muted-foreground"
+        >
+          {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="start"
+        onFocusOutside={close}
+        onInteractOutside={close}
+        className="w-auto min-w-[180px] max-w-[min(340px,calc(100vw-24px))] p-2.5"
+      >
+        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+        <ul className="grid max-h-[min(40vh,320px)] gap-0.5 overflow-y-auto">
+          {items.map((entry, index) => (
+            <li key={index} className="font-mono text-xs leading-5 text-foreground">{entry}</li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function StatusPill({
   cell,
   onCommand,
@@ -117,30 +156,7 @@ function StatusPill({
     // The chip keeps the row one line wide; the popover is where the entry
     // list belongs, one per line, scrollable when it is long.
     const full = `${cell.title}: ${cell.items.join(", ")}`;
-    return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            title={full}
-            aria-label={full}
-            className="shrink-0 font-mono text-xs font-medium text-muted-foreground"
-          >
-            {displayLabel(cell.label)}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent side="top" align="start" className="w-auto min-w-[180px] max-w-[min(340px,calc(100vw-24px))] p-2.5">
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{cell.title}</div>
-          <ul className="grid max-h-[min(40vh,320px)] gap-0.5 overflow-y-auto">
-            {cell.items.map((entry, index) => (
-              <li key={index} className="font-mono text-xs leading-5 text-foreground">{entry}</li>
-            ))}
-          </ul>
-        </PopoverContent>
-      </Popover>
-    );
+    return <StatusListChip title={cell.title} items={cell.items} label={displayLabel(cell.label)} full={full} />;
   }
   if (cell.kind === "text") {
     return (

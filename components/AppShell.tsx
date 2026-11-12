@@ -2070,7 +2070,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         // 给出，这里只负责定位（贴触发钮右缘）、宽度（AGENT_PANEL_WIDTH）与
         // z-500（高于引用工具栏的层序）。
         align="end"
-        className="z-[500] w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden p-1"
+        sideOffset={8}
+        className="z-[500] mt-0 w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
         style={{ "--agent-panel-width": `${AGENT_PANEL_WIDTH}px` } as React.CSSProperties}
       >
         {activeSessionFamily && selectedSession && (
