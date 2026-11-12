@@ -1138,6 +1138,13 @@ span.token.table {
   to { height: var(--radix-collapsible-content-height); opacity: 1 }
 }
 
+/* 收起也要有退场动画：没有它，Radix 立刻卸掉内容，几百像素的高度一帧塌掉，
+   加上行顶锚定在布局后校正，看起来就是“闪一下”。 */
+@keyframes trace-fold-up {
+  from { height: var(--radix-collapsible-content-height); opacity: 1 }
+  to { height: 0; opacity: 0 }
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
