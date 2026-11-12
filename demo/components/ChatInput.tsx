@@ -73,7 +73,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-
 export interface AttachedImage {
   data: string;   // base64, no prefix
   mimeType: string;
@@ -192,10 +191,24 @@ const ANCHORED_MENU_GAP = 8;
 // scroll-to-caret and bounces while editing text above the fold once the
 // scrollbar appears.
 function autoresizeTextarea(ta: HTMLTextAreaElement) {
+  const followCaret = shouldFollowBottom(ta);
   const keepScroll = ta.scrollTop;
   ta.style.height = "auto";
   ta.style.height = `${Math.min(ta.scrollHeight + 2, 120)}px`;
-  ta.scrollTop = keepScroll;
+  ta.scrollTop = followCaret ? ta.scrollHeight : keepScroll;
+}
+
+/**
+ * Growing the box must not scroll a reader who is editing higher up, and must
+ * follow the caret when the last line is the one that grew. Both halves are
+ * required: restoring scrollTop unconditionally left a new last line below the
+ * visible area, and always snapping to the bottom yanks the view while editing
+ * a middle line.
+ */
+function shouldFollowBottom(ta: HTMLTextAreaElement) {
+  const atEnd = ta.selectionStart === ta.value.length && ta.selectionEnd === ta.value.length;
+  const wasAtBottom = ta.scrollTop + ta.clientHeight >= ta.scrollHeight - 1;
+  return atEnd && wasAtBottom;
 }
 
 export function getUpwardMenuMaxHeight(menuBottom: number, visibleTop: number, gap = ANCHORED_MENU_GAP): number {
@@ -1252,10 +1265,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
+    const followCaret = shouldFollowBottom(ta);
     const keepScroll = ta.scrollTop;
     ta.style.height = "auto";
     if (ta.value) ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
-    ta.scrollTop = keepScroll;
+    ta.scrollTop = followCaret ? ta.scrollHeight : keepScroll;
   }, []);
 
   useLayoutEffect(resizeTextarea, [value, fontSize, uiFontFamily, uiWeight, resizeTextarea]);
@@ -1986,6 +2000,27 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">({lvl})</span>}
             </span>
             <span className="text-xs text-muted-foreground">{desc}</span>
+            {onSetDefaultThinkingLevel && lvl !== "auto" && (
+              <span
+                role={savedDefaultThinkingLevel === lvl ? "img" : "button"}
+                aria-label={savedDefaultThinkingLevel === lvl ? t("chat.defaultThinking") : t("chat.saveDefaultThinking")}
+                title={savedDefaultThinkingLevel === lvl ? t("chat.defaultThinking") : t("chat.saveDefaultThinking")}
+                aria-hidden={savedDefaultThinkingLevel === lvl ? undefined : "true"}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSetDefaultThinkingLevel(lvl);
+                }}
+                className={cn(
+                  "flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground",
+                  savedDefaultThinkingLevel === lvl && "opacity-100",
+                )}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill={savedDefaultThinkingLevel === lvl ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true" className="size-3 shrink-0">
+                  <polygon points="12 2.5 14.9 8.6 21.5 9.4 16.6 13.9 17.9 20.5 12 17.2 6.1 20.5 7.4 13.9 2.5 9.4 9.1 8.6" />
+                </svg>
+              </span>
+            )}
           </DropdownMenuRadioItem>
         );
       })}
@@ -2009,79 +2044,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         );
       })}
     </DropdownMenuRadioGroup>
-  );
-
-  // Thinking selects inside the model popover now (pi's /model keeps reasoning
-  // beside the model); the row shows no text pill. The model pill's CPU icon
-  // carries the state instead — a pinned level lights up in primary, off dims,
-  // auto stays muted — and the popover section below does the selecting.
-  const thinkingPinned = !isAutoThinkingSelection && resolvedThinkingLevel != null;
-  const thinkingIconTone = thinkingPinned ? "text-primary" : thinkingLevel === "off" ? "opacity-45" : undefined;
-  const thinkingSection = onThinkingLevelChange && (
-    <div role="radiogroup" aria-label={t("chat.changeReasoningLabel")} className="flex flex-col">
-      <div className="px-2 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t("chat.thinkingSection")}</div>
-      {THINKING_LEVELS.filter((lvl) => {
-        if (!availableThinkingLevels) return true;
-        if (lvl === "auto") return true;
-        return availableThinkingLevels.includes(lvl);
-      }).map((lvl) => {
-        const desc = t(THINKING_LEVEL_DESC_KEYS[lvl]);
-        const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
-        const displayLabel = titleCaseLabel((mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl);
-        const showOriginal = mappedVal != null && mappedVal !== lvl;
-        const selected = lvl === "auto" ? isAutoThinkingSelection : (!isAutoThinkingSelection && resolvedThinkingLevel === lvl);
-        return (
-          <Button
-            key={lvl}
-            type="button"
-            variant="ghost"
-            role="radio"
-            aria-checked={selected}
-            onClick={() => {
-              if (lvl === "auto") {
-                if (!isAutoThinkingSelection) onThinkingLevelChange("auto");
-                return;
-              }
-              // Re-selecting the pinned level keeps the popover open, like the
-              // old menu's no-op onSelect guard.
-              if (!isAutoThinkingSelection && resolvedThinkingLevel === lvl) return;
-              onThinkingLevelChange(lvl as typeof THINKING_LEVELS[number]);
-            }}
-            className={cn(
-              "flex h-auto w-full cursor-pointer justify-start rounded-sm px-2 py-1 text-left text-xs font-normal",
-              selected ? "text-foreground" : "text-muted-foreground",
-            )}
-          >
-            <CheckIcon className={cn("size-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")} strokeWidth={2.2} aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate">
-              {displayLabel}
-              {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">({lvl})</span>}
-            </span>
-            <span className="whitespace-nowrap text-[11px] text-muted-foreground">{desc}</span>
-            {onSetDefaultThinkingLevel && lvl !== "auto" && (
-              <span
-                role={savedDefaultThinkingLevel === lvl ? "img" : "button"}
-                aria-label={savedDefaultThinkingLevel === lvl ? t("chat.defaultThinking") : t("chat.saveDefaultThinking")}
-                title={savedDefaultThinkingLevel === lvl ? t("chat.defaultThinking") : t("chat.saveDefaultThinking")}
-                aria-hidden={savedDefaultThinkingLevel === lvl ? undefined : "true"}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSetDefaultThinkingLevel(lvl);
-                }}
-                className={cn(
-                  "pointer-events-auto flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground",
-                  savedDefaultThinkingLevel === lvl && "opacity-100",
-                )}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill={savedDefaultThinkingLevel === lvl ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true" className="size-3 shrink-0">
-                  <polygon points="12 2.5 14.9 8.6 21.5 9.4 16.6 13.9 17.9 20.5 12 17.2 6.1 20.5 7.4 13.9 2.5 9.4 9.1 8.6" />
-                </svg>
-              </span>
-            )}
-          </Button>
-        );
-      })}
-    </div>
   );
 
   // The history menu keeps its own anchor positioning (it is a typing-driven
@@ -2616,15 +2578,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         onSetDefault={onSetDefaultModel}
                         allOptions={allModelList?.map((m) => ({ provider: m.provider, providerName: m.providerName, modelId: m.id, name: m.name }))}
                         onShowAll={onLoadAllModels}
-                        headerSlot={!isMobile && onThinkingLevelChange ? thinkingSection : undefined}
-                        iconClassName={!isMobile && onThinkingLevelChange ? thinkingIconTone : undefined}
-                        titleHint={!isMobile && onThinkingLevelChange ? thinkingDisplayLabel : undefined}
                       />
                     </div>
                   )}
-              {/* Phone: reasoning level and tool preset sit in the row itself as
-                  icon buttons — the same choices the desktop keeps in its menus. */}
-              {isMobile && thinkingChoices && (
+              {/* Reasoning level and tool preset are their own icon buttons, on
+                  desktop as well as phone: the model menu lists models only. */}
+              {thinkingChoices && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button

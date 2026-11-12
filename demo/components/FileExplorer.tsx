@@ -49,7 +49,6 @@ import type { GitFileStatus, GitFileStatusKind, GitStatusResponse } from "@/lib/
 import type { FileIndexEntry } from "@/lib/file-fuzzy";
 import { uploadFiles, type DroppedItem, type UploadConflictStrategy, type UploadError, type UploadResponse } from "@/lib/file-upload-client";
 import { buildSearchTree, type SearchTreeNode } from "@/lib/search-tree";
-import { staticFileUrlForApi } from "@/mock/files";
 import type { FileTreeHiddenReason } from "@/lib/file-tree-visibility";
 import { createExpandedPathsMemory } from "@/lib/file-tree-expansion";
 import { loadChangesViewMode, saveChangesViewMode, type ChangesViewMode } from "@/lib/sidebar-prefs";
@@ -484,7 +483,7 @@ export function TreeNode({
             title={t("files.download")}
           >
             <a
-              href={staticFileUrlForApi(`/api/files/${encodeFilePathForApi(node.fullPath)}?type=download`)}
+              href={`/api/files/${encodeFilePathForApi(node.fullPath)}?type=download`}
               download
               onClick={(e) => e.stopPropagation()}
             >

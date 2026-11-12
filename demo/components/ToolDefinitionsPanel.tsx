@@ -141,10 +141,10 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
   const fields = selectedTool ? getToolParameterFields(selectedTool.parameters) : [];
 
   return (
-    <div className="grid h-[min(600px,50dvh)] min-h-60 grid-cols-[clamp(120px,26%,220px)_minmax(0,1fr)] overflow-hidden border-b bg-card max-[640px]:grid-cols-[136px_minmax(0,1fr)]">
+    <div className="grid h-[min(640px,70dvh)] min-h-60 grid-cols-[clamp(120px,26%,220px)_minmax(0,1fr)] overflow-hidden bg-card max-[640px]:grid-cols-[136px_minmax(0,1fr)]">
       <nav
         aria-label={translate("tools.title")}
-        className="flex min-h-0 min-w-0 flex-col border-r bg-[color-mix(in_srgb,var(--sidebar)_94%,var(--background))]"
+        className="m-1.5 mr-0 flex min-h-0 min-w-0 flex-col rounded-lg bg-muted/40"
       >
         {/* 名称行永远换行，横向不出列：x 轴锁死，行 min-w-0，长名拆到第二行。 */}
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1.5 py-1">
@@ -159,7 +159,7 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
                 data-selected={selected}
                 aria-pressed={selected}
                 onClick={() => setSelectedToolName(tool.name)}
-                className="flex h-auto min-h-[34px] w-full min-w-0 cursor-pointer justify-start items-center rounded-md bg-transparent px-2.5 py-1.5 text-left font-normal text-muted-foreground hover:bg-accent/60 hover:text-foreground data-[selected=true]:bg-accent data-[selected=true]:text-foreground data-[selected=true]:shadow-[inset_2px_0_0_var(--accent)]"
+                className="flex h-auto min-h-[34px] w-full min-w-0 cursor-pointer justify-start items-center rounded-md bg-transparent px-2.5 py-1.5 text-left font-normal text-muted-foreground hover:bg-accent/60 hover:text-foreground data-[selected=true]:bg-background data-[selected=true]:text-foreground data-[selected=true]:shadow-sm"
               >
                 <code className="min-w-0 whitespace-normal text-[11px] font-semibold [overflow-wrap:anywhere]">{tool.name}</code>
               </Button>

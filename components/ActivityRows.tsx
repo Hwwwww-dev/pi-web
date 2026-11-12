@@ -17,7 +17,6 @@ import {
   TraceLine,
   TraceTitle,
 } from "./ui/trace";
-import { MarkdownBody } from "./MarkdownBody";
 import { SafeMarkdownBody } from "./SafeMarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import { TerminalTrace } from "./transcript/TerminalTrace";
@@ -408,7 +407,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
                         <img
                           src={src}
                           alt=""
-                          className="block max-h-60 max-w-60 rounded-md border border-border object-contain"
+                          className="block max-h-[var(--card-max-height)] max-w-60 rounded-md border border-border object-contain"
                         />
                       </ImagePreview>
                     );
@@ -416,7 +415,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
                 </div>
               )}
               {text
-                ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody>
+                ? <SafeMarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</SafeMarkdownBody>
                 : <span className="text-xs text-muted-foreground">{t("i18n.noMessage")}</span>}
               {hasDetails && !detailsRepeatBody && (
                 <div className="flex flex-col gap-2">
@@ -533,7 +532,7 @@ export function CompactionSummaryDetails({ summary, cwd, onOpenFile }: {
         {t("i18n.compactionDescription")}
       </div>
       {parsedSummary.body ? (
-        <MarkdownBody className="markdown-compaction-message" cwd={cwd} onOpenFile={onOpenFile}>{parsedSummary.body}</MarkdownBody>
+        <SafeMarkdownBody className="markdown-compaction-message" cwd={cwd} onOpenFile={onOpenFile}>{parsedSummary.body}</SafeMarkdownBody>
       ) : (
         <span className="text-xs text-muted-foreground">{t("i18n.noSummary")}</span>
       )}

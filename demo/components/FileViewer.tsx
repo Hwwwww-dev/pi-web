@@ -42,7 +42,6 @@ import {
   type FileViewerDisplayMode as DisplayMode,
   type FileViewerState,
 } from "@/lib/file-viewer-state";
-import { staticFileUrlForApi } from "@/mock/files";
 
 export type { FileViewerState } from "@/lib/file-viewer-state";
 
@@ -153,8 +152,7 @@ function getFileApiUrl(
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) searchParams.set(key, String(value));
   }
-  // Demo: images, media and downloads load straight from the static snapshot.
-  return staticFileUrlForApi(`/api/files/${encoded}?${searchParams.toString()}`);
+  return `/api/files/${encoded}?${searchParams.toString()}`;
 }
 
 function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceSessionId?: string | null }) {

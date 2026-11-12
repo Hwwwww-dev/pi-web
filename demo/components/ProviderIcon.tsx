@@ -1,5 +1,3 @@
-import { demoAssetPath } from "@/mock/base-path";
-
 const PROVIDER_ICONS: Record<string, { symbol: string; color: boolean }> = {
   anthropic: { symbol: "anthropic", color: false },
   openai: { symbol: "openai", color: false },
@@ -58,7 +56,7 @@ export function ProviderIcon({ id, size }: { id: string; size: number }) {
         fill={icon.color ? undefined : "currentColor"}
         className="shrink-0 text-muted-foreground"
       >
-        <use href={demoAssetPath(`/provider-icons.svg#${icon.symbol}`)} />
+        <use href={`/provider-icons.svg#${icon.symbol}`} />
       </svg>
     );
   }

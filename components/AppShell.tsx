@@ -2521,12 +2521,14 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             onOpenChange={(next) => next ? setActiveTopPanel("system") : closeTopPanel("system")}
           >
             <PopoverAnchor virtualRef={topBarRef} />
+            {/* 工具面板是浮层卡片，不是贴顶抽屉：与顶栏留 8px，左右各 8px
+                （宽度减 16 + mx-2 让两侧边距对称），四角同为 rounded-xl。 */}
             <PopoverContent
               side="bottom"
               align="start"
-              sideOffset={0}
+              sideOffset={8}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-t-none rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              className="z-[240] mx-2 w-[calc(var(--radix-popover-trigger-width)-16px)] min-w-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
             >
               <SystemPromptPanel
                 loading={systemInfoLoading}

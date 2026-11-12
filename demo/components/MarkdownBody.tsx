@@ -7,7 +7,6 @@ import { useI18n } from "@/hooks/useI18n";
 import { copyText } from "@/lib/clipboard";
 import { parseFileOpenOptions, resolveLocalFileHref, resolveLocalFilePath, shouldOpenLocalFileInApp } from "@/lib/file-links";
 import { encodeFilePathForApi } from "@/lib/file-paths";
-import { staticFileUrlForApi } from "@/mock/files";
 import { inlineCodeFilePath, inlineCodeLineSuffix, isExternalMarkdownHref, jumpToMarkdownFragment, markdownAppUrlTransform, markdownDocumentRehypePlugins, markdownRehypePlugins, markdownRemarkPlugins, markdownTextLayoutRemarkPlugins, markdownUrlTransform, markdownUserRemarkPlugins, normalizeDisplayMath } from "@/lib/markdown";
 import { isAudioPath, isVideoPath } from "@/lib/file-types";
 import { splitMarkdownBlocks } from "@/lib/markdown-blocks";
@@ -42,7 +41,7 @@ function MarkdownImage({
   const href = typeof src === "string" ? src : undefined;
   const filePath = href ? resolveLocalFileHref(href, cwd) : null;
   const mediaSrc = filePath
-    ? staticFileUrlForApi(`/api/files/${encodeFilePathForApi(filePath)}?type=read`)
+    ? `/api/files/${encodeFilePathForApi(filePath)}?type=read`
     : href;
   // `![](take.wav)` is how a model shows a sound or clip it made, and an <img>
   // cannot play it. The file API already streams both with range requests.

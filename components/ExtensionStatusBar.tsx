@@ -226,14 +226,15 @@ export function ExtensionStatusBar({
   return (
     // `extension-status-bar` is a layout hook (the keyboard-open CSS and the
     // mobile shell target it); the styling itself is shadcn utilities on the
-    // row's pills. `relative` anchors
-    // an expanded widget's floating panel above the row. 内缩量 = composer 外壳
-    // （chat-input-shell 的 px-7/max-sm:px-2.5，本行是它的兄弟节点吃不到）+
-    // 24px——卡片圆角 rounded-[24px] 的半径：行端对齐圆角弧线的终点（切点），
-    // 而不是卡片最外沿，否则视觉上仍从圆角末端超出去。
-    // mt-1：本行是 composer 外壳的兄弟节点，外壳自带 pb-3.5，再加 4px 让状态行
-    // 明显落在外壳之外，而不是贴着卡片下沿（负 margin 会把它压进输入框的盒子）。
-    <div className="extension-status-bar relative mt-1 mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] shrink-0 items-stretch px-[52px] max-sm:px-[34px] pt-1 pb-1">
+    // row's pills. `relative` anchors an expanded widget's floating panel above
+    // the row.
+    //
+    // The row stands beside the composer shell, so it cannot inherit its
+    // padding: its inset is measured from the composer card's own content edge
+    // instead — `InputGroup` p-2 (8px) plus the control's px-3 (12px) = 20px,
+    // which is where the input's first glyph starts. A larger inset (the old
+    // 52px) left the pills floating under the middle of the card on desktop.
+    <div className="extension-status-bar relative mt-1 mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] shrink-0 items-stretch px-[20px] max-sm:px-[12px] pb-0.5">
       {widgets.length > 0 ? <ExtensionWidgets widgets={widgets}>{statusLine}</ExtensionWidgets> : statusLine}
     </div>
   );
