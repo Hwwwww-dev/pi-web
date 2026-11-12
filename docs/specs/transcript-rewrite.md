@@ -1021,3 +1021,12 @@ CodeBlockCopyButton, CodeBlockContent, CodeBlockLine, CodeBlockFooter
 
 要点：状态由**图标 + `status`** 共同表达；`pending` 用空心圆，`running` 用 loader 并且标题自带 shimmer，`error` 用 `CircleXIcon` 并把失败动作写在标题里。
 
+## 14. 设计语言落地后的实现事实（与本节其余条目冲突时以本节为准）
+
+- 转录行的 class 全部是官方 `trace.tsx` 的类名，`cn-trace-*` 自定义层已删除（`app/globals.css` 不再覆盖）。断言的依据是 `data-slot`（`trace-line`、`trace-title`、`trace-description`、`trace-collapsible-trigger`），不是类名。
+- 文件 chip 是官方 `Button variant="outline" size="sm" rounded-full`，文件名只出现在 chip 里；标题只说动作，描述与 chip 重复时置空。
+- 媒体行走官方 `Attachment`（图片纵向小图、视频/音频通栏播放器），不再自绘容器。
+- `todo` 行是 `Plan` pattern：标题 `Plan: <进行中任务>`，描述 `N of M done`，步骤行勾/点/空圈，不渲染原始 JSON。
+- 扩展自定义消息默认折叠，正文不进折叠行；标题取消息首行。
+- `SafeMarkdownBody` 不再套 `max-h`/`overflow-auto`：正文不设高度上限，块内滚动只留给代码、终端、图片与展开的过程块（第 7.1 节）。
+- 扩展状态标签走 `lib/label-case.ts`：单词首字母大写、纯辅音缩写全大写、已有大小写与译文不动。

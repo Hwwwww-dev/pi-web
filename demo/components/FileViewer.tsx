@@ -1502,7 +1502,7 @@ function TextFileViewer({
 
       {showLoadMore && data?.truncated && (
         <div
-          className="absolute right-3 bottom-3 z-[2] mx-3 flex max-w-[calc(100%-24px)] shrink-0 items-center justify-center gap-2.5 rounded-md border border-border bg-card px-2 py-[5px] text-xs text-muted-foreground shadow-[0_3px_12px_color-mix(in_srgb,var(--foreground)_18%,transparent)] [pointer-events:auto]"
+          className="absolute right-3 bottom-3 z-[2] mx-3 flex max-w-[calc(100%-24px)] shrink-0 items-center justify-center gap-2.5 rounded-md border border-border bg-card px-2 py-[5px] text-xs text-muted-foreground shadow-lg [pointer-events:auto]"
         >
           <span>{formatFileSize(data.nextOffset)} / {formatFileSize(data.size)}</span>
           <Button

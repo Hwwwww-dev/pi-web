@@ -4,7 +4,6 @@ import { Fragment, memo, useState, useRef, useEffect, useMemo } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, ClockIcon, CopyIcon, CornerDownRightIcon, GitBranchIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Badge } from "./ui/badge";
 import { Bubble, BubbleContent } from "./ui/bubble";
 import { Button } from "./ui/button";
 import { Message, MessageContent, MessageFooter } from "./ui/message";
@@ -351,7 +350,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
         <BubbleContent
           className={cn(
             "max-h-[300px] overflow-y-auto text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
-            isEditing && "ring-2 ring-[color-mix(in_srgb,var(--accent)_16%,transparent)]",
+            isEditing && "ring-2 ring-ring/30",
           )}
         >
           {commandText ? (
@@ -363,7 +362,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   onClick={() => setExpanded((prev) => !prev)}
                   title={expanded ? t("i18n.collapse") : t("i18n.expand")}
                   aria-expanded={expanded}
-                  className="flex h-auto shrink-0 cursor-pointer items-center gap-1.5 rounded-none border-none bg-transparent p-0 text-left font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] font-normal text-primary hover:bg-transparent hover:text-primary"
+                  className="flex h-auto shrink-0 cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-left font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] font-normal text-primary hover:bg-transparent hover:text-primary"
                 >
                   <span className="truncate">
                     {commandName}
@@ -486,35 +485,10 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
             <span>{estimatedTokens}</span>
           </span>
           {tps !== null && (
-            <Badge
-              variant="ghost"
-              className={cn(
-                // 小号、贴着 token 计数：宽距只由行内 gap-1 提供，徽章不再
-                // 自带 ml/最小宽度（那会在数字和徽章之间留出死空间）。
-                "px-1.5 py-0 text-[10px]",
-                tps > 120 ? "relative overflow-hidden text-white"
-                  : tps >= 50 ? "bg-info/15 text-info"
-                  : tps >= 30 ? "bg-success/15 text-success"
-                  : tps >= 15 ? "bg-warning/15 text-warning"
-                  : "bg-destructive/15 text-destructive",
-              )}
-            >
-              {/* >120：文字恒白、背景是流动的彩虹渐变（.tps-rainbow，参数为
-                  用户调参器定稿：70px 周期 / L0.70 / C0.25 / 8 色；暗色主题
-                  在 globals.css 里把亮度和彩度压到 0.55 / 0.22）。滑动速度随
-                  速度加快：50/tps 秒一个循环，0.3s 封底（≥166 t/s 恒为定稿
-                  的 0.3s）。 */}
-              {tps > 120 ? (
-                <>
-                  <span
-                    aria-hidden
-                    className="tps-rainbow absolute inset-y-0 left-0 rounded-[inherit]"
-                    style={{ animationDuration: `${Math.max(0.3, 50 / tps).toFixed(2)}s` }}
-                  />
-                  <span className="relative whitespace-nowrap">{tps.toFixed(1)} t/s</span>
-                </>
-              ) : `${tps.toFixed(1)} t/s`}
-            </Badge>
+            // 第 4 节：速率是行内 meta（`TraceDescription` 档位），不是自绘徽章。
+            <span className="shrink-0 whitespace-nowrap tabular-nums text-muted-foreground/70">
+              {tps.toFixed(1)} t/s
+            </span>
           )}
         </span>
       )}

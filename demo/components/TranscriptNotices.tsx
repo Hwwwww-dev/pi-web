@@ -1,8 +1,9 @@
 "use client";
 
 import { memo } from "react";
-import { TriangleAlert } from "lucide-react";
+import { TriangleAlertIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   formatCacheWarmCost,
   formatNoticeCost,
@@ -60,22 +61,24 @@ export const TranscriptNoticeLines = memo(function TranscriptNoticeLines({ notic
   const { t } = useI18n();
   const shown = notices.filter((notice) => !(notice.kind === "summary_cost" && notice.source === "compaction"));
   if (shown.length === 0) return null;
+  const warned = shown.some((notice) => notice.kind !== "cache_warm");
   return (
-    <div className="transcript-notices -mt-1.5 mb-3 flex flex-col gap-0.5">
-      {shown.map((notice, index) => {
-        const warning = notice.kind !== "cache_warm";
-        return (
-          <div
+    // 第 4 节：提示线落在官方 `Alert` 槽位，不再是一条自绘细条。
+    <Alert
+      variant={warned ? "warning" : "default"}
+      className="transcript-notices -mt-1.5 mb-3 w-auto px-3 py-2 text-xs leading-normal"
+    >
+      {warned && <TriangleAlertIcon />}
+      <AlertDescription className="flex flex-col gap-0.5 wrap-anywhere">
+        {shown.map((notice, index) => (
+          <span
             key={index}
-            className={`flex items-start gap-1.5 text-xs leading-normal wrap-anywhere ${warning ? "text-warning" : "text-muted-foreground"}`}
+            className={notice.kind === "cache_warm" ? "text-muted-foreground" : undefined}
           >
-            {warning && (
-              <TriangleAlert size={13} strokeWidth={1.8} className="mt-[3px] shrink-0" />
-            )}
-            <span>{transcriptNoticeText(t, notice)}</span>
-          </div>
-        );
-      })}
-    </div>
+            {transcriptNoticeText(t, notice)}
+          </span>
+        ))}
+      </AlertDescription>
+    </Alert>
   );
 });

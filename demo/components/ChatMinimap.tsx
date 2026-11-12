@@ -670,7 +670,7 @@ export const ChatMinimap = memo(function ChatMinimap({
                   // One hairline between turns keeps the card scannable without
                   // boxing every row.
                   "grid grid-cols-[22px_minmax(0,1fr)] gap-x-1 rounded-[10px] px-1.5 pt-[5px] pb-[3px] transition-colors duration-[120ms]",
-                  "[&:not(:first-child)]:border-t [&:not(:first-child)]:rounded-t-none [&:not(:first-child)]:border-border/55",
+                  "[&:not(:first-child)]:border-t [&:not(:first-child)]:border-border/55",
                   isLocated && "bg-accent/10",
                 )}
                 data-minimap-preview-index={node.index}
@@ -710,7 +710,7 @@ export const ChatMinimap = memo(function ChatMinimap({
                       className={cn(
                         "ml-2 mt-px mb-[3px] truncate font-mono text-[10.5px] leading-[15px] tabular-nums",
                         isLocated
-                          ? "text-[color-mix(in_srgb,var(--primary)_65%,var(--muted-foreground))]"
+                          ? "text-primary/65"
                           : "text-muted-foreground",
                         isUnloaded && "italic",
                       )}

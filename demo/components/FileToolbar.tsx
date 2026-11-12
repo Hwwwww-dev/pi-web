@@ -1,9 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { AtSign, WrapText } from "lucide-react";
+import { AtSign, Ellipsis, WrapText } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PathLabel } from "./PathLabel";
 
@@ -68,6 +69,20 @@ export function FileToolbar<Mode extends string = string>({
   pathLabel, pathTitle, meta, metaTitle, live, modes = [], activeMode, onSelectMode, actions, wrapLines, onToggleWrapLines, download,
 }: Props<Mode>) {
   const { t } = useI18n();
+  const wrapToggle = onToggleWrapLines ? (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon-xs"
+      onClick={onToggleWrapLines}
+      title={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
+      aria-label={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
+      aria-pressed={wrapLines}
+      className={wrapLines ? "bg-accent text-foreground" : undefined}
+    >
+      <WrapText strokeWidth={1.8} />
+    </Button>
+  ) : null;
 
   return (
     <div className="flex min-h-[35px] min-w-0 shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-[5px] text-xs text-muted-foreground max-[380px]:gap-1.5 max-[380px]:px-2">
@@ -105,26 +120,28 @@ export function FileToolbar<Mode extends string = string>({
           </ToggleGroup>
         )}
 
-        <div className="order-first flex h-6 shrink-0 items-center gap-1">
+        {/* 第 7.1 节：窄屏只留路径 + 视图切换 + “…”（其余动作进菜单）。 */}
+        <div className="order-first flex h-6 shrink-0 items-center gap-1 max-[640px]:hidden">
           {actions}
-          {onToggleWrapLines && (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-xs"
-              onClick={onToggleWrapLines}
-              title={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
-              aria-label={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
-              aria-pressed={wrapLines}
-              className={wrapLines ? "bg-accent text-foreground" : undefined}
-            >
-              <WrapText strokeWidth={1.8} />
-            </Button>
-          )}
+          {wrapToggle}
+        </div>
+        <div className="hidden shrink-0 items-center max-[640px]:flex">
+          {download}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="icon-xs" aria-label={t("i18n.more")}>
+                <Ellipsis strokeWidth={1.8} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="flex flex-wrap items-center gap-1 p-1.5">
+              {actions}
+              {wrapToggle}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {download}
+      <span className="max-[640px]:hidden">{download}</span>
     </div>
   );
 }

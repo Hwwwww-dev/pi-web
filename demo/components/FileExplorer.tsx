@@ -387,7 +387,7 @@ export function TreeNode({
           "relative flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg pr-2 text-[12.5px] text-foreground",
           // 拖拽目标虚线框优先于行悬停底色（hovered 态不触发于拖拽中，二者不冲突）
           isDropTarget &&
-            "bg-[color-mix(in_srgb,var(--accent)_16%,transparent)] outline-1 outline-dashed outline-primary -outline-offset-1",
+            "bg-accent/20 outline-1 outline-dashed outline-primary -outline-offset-1",
           !isDropTarget && hovered && "bg-sidebar-accent",
         )}
         style={{ paddingLeft: 4 + depth * 14 }} /* 树深度缩进为逐行计算值 */

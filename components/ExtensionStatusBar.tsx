@@ -146,7 +146,8 @@ function StatusPill({
   if (cell.kind === "text") {
     return (
       <Badge variant="outline" className="max-w-full shrink-0 font-mono text-[11.5px] font-normal whitespace-pre text-muted-foreground">
-        <AnsiText text={cell.text} />
+        {/* Plain status text is a label like any other; ANSI text is the extension's own. */}
+        {/\u001b/.test(cell.text) ? <AnsiText text={cell.text} /> : displayLabel(cell.text)}
       </Badge>
     );
   }

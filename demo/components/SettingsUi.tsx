@@ -182,7 +182,7 @@ export function ConfigSidebar({ children, className }: { children: ReactNode; cl
     <aside
       // `config-sidebar` stays as the phone pane layout hook (detail-navigation pins the attribute).
       className={cn(
-        "config-sidebar flex w-full min-h-0 shrink-0 flex-col border-sidebar-border bg-sidebar md:w-[240px] md:border-r",
+        "config-sidebar flex w-full min-h-0 shrink-0 flex-col bg-sidebar md:w-[240px]",
         pane
           ? cn(
               "max-[640px]:h-auto max-[640px]:flex-[1_1_auto] max-[640px]:border-b-0",

@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Progress } from "@/components/ui/progress";
 import { useI18n } from "@/hooks/useI18n";
@@ -32,13 +33,13 @@ export function ContextBadge({ tokens, contextWindow, percent, color }: {
   );
 
   if (tokens === undefined || !contextWindow) {
-    return <span className="inline-flex items-center gap-1">{label}</span>;
+    return <Badge variant="secondary" className="gap-1 px-1.5 py-0 font-normal tabular-nums">{label}</Badge>;
   }
 
   return (
     <HoverCard>
       <HoverCardTrigger asChild>
-        <span className="inline-flex cursor-default items-center gap-1">{label}</span>
+        <Badge variant="secondary" className="cursor-default gap-1 px-1.5 py-0 font-normal tabular-nums">{label}</Badge>
       </HoverCardTrigger>
       <HoverCardContent className="flex w-56 flex-col gap-2">
         <div className="flex items-center justify-between gap-3 text-sm">

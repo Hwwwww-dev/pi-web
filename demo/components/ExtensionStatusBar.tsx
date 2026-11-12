@@ -2,10 +2,13 @@
 
 import { stripAnsi } from "@/lib/ansi";
 import { isPermissiveStatusText } from "@/lib/extension-status";
+import { displayLabel } from "@/lib/label-case";
 import type { ExtensionStatusItem, ExtensionWidgetItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
 import { ExtensionWidgets } from "./ExtensionWidgets";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 /**
@@ -120,13 +123,13 @@ function StatusPill({
         <PopoverTrigger asChild>
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="xs"
             title={full}
             aria-label={full}
-            className="shrink-0 rounded-full bg-muted/60 px-2.5 font-mono text-[11.5px] font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            className="shrink-0 rounded-full font-mono text-[11.5px] font-medium text-muted-foreground"
           >
-            {cell.label}
+            {displayLabel(cell.label)}
           </Button>
         </PopoverTrigger>
         <PopoverContent side="top" align="start" className="w-auto min-w-[180px] max-w-[min(340px,calc(100vw-24px))] p-2.5">
@@ -142,23 +145,24 @@ function StatusPill({
   }
   if (cell.kind === "text") {
     return (
-      <span className="inline-flex h-6 max-w-full shrink-0 items-center whitespace-pre rounded-full bg-muted/60 px-2.5 font-mono text-[11.5px] leading-4 text-muted-foreground">
-        <AnsiText text={cell.text} />
-      </span>
+      <Badge variant="outline" className="max-w-full shrink-0 font-mono text-[11.5px] font-normal whitespace-pre text-muted-foreground">
+        {/* Plain status text is a label like any other; ANSI text is the extension's own. */}
+        {/\u001b/.test(cell.text) ? <AnsiText text={cell.text} /> : displayLabel(cell.text)}
+      </Badge>
     );
   }
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="outline"
       size="xs"
       disabled={!onCommand || commandsDisabled}
       title={`${cell.label} · ${cell.command}`}
       aria-label={`${cell.label} (${cell.command})`}
       onClick={() => onCommand?.(cell.command)}
-      className="shrink-0 rounded-full bg-muted/60 px-2.5 font-mono text-[11.5px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      className="shrink-0 rounded-full font-mono text-[11.5px] text-muted-foreground"
     >
-      {cell.label}
+      {displayLabel(cell.label)}
     </Button>
   );
 }
@@ -209,6 +213,9 @@ export function ExtensionStatusBar({
           />
         ))}
       </div>
+      {pinnedCells.length > 0 && scrollingCells.length > 0 && (
+        <Separator orientation="vertical" className="mx-1 h-4" />
+      )}
       {pinnedCells.map((cell, index) => (
         // The permissive marker ("yolo", pi-permission-system) renders as bare
         // red text here — no capsule — and this row is its only surface; the

@@ -213,11 +213,11 @@ TraceCollapsible defaultOpen
 
 | 阶段 | 内容 | 提交 |
 |---|---|---|
-| S1 | `trace.tsx`、`code-block.tsx`、`message.tsx`、`bubble.tsx` 恢复官方源码；新增 `item.tsx`、`attachment.tsx`、`message-scroller.tsx`、`marker.tsx`；删除 `globals.css` 组件覆盖层 | 1 个 commit |
-| S2 | 转录区收口：标题承载动作+对象，description 只放短 meta；组摘要行改官方写法；自定义事件默认折叠；todo → `Plan` pattern；`ActivityRows` 死代码删除；正文解除限高 | 1–2 个 commit |
-| S3 | 自研元素映射（第 4 节逐行）：用量/速率/压缩/cache-miss/状态栏/chip/子代理/队列/plan/sources/上下文/minimap/分支/diff/媒体 | 按主题拆 3–4 个 commit |
-| S4 | 列表外界面（第 7 节）：设置、侧栏、抽屉、TabBar、文件面板、输入区 | 按区域拆 3–4 个 commit |
-| S5 | 门禁测试 + `transcript-rewrite.md` 同步 + 截图比对 | 1 个 commit |
+| S1 | `trace.tsx`、`code-block.tsx`、`message.tsx`、`bubble.tsx` 恢复官方源码；新增 `item.tsx`、`attachment.tsx`、`marker.tsx`；删除 `globals.css` 组件覆盖层 | `3eb739a1` + `377583fa`（偏差记录） |
+| S2 | 转录区收口：自定义事件默认折叠；todo → `Plan` pattern；正文解除限高；`ActivityRows` 死代码确认无残留 | `16ddebb1` |
+| S3 | 自研元素映射（第 4 节逐行）：用量/速率/压缩/cache-miss/状态栏/chip/子代理/队列/plan/sources/上下文/minimap/分支/diff/媒体 | `aaac80a4`、`6ec90b2a`、`96e644cb`、`6615e489` |
+| S4 | 列表外界面（第 7 节）：设置、侧栏、抽屉、TabBar、文件面板、输入区；扩展状态标签大小写归一 | `273bc872`、`53999b69` |
+| S5 | 门禁测试 + `transcript-rewrite.md` 同步 + 截图比对 | `53999b69`（门禁）与本轮文档提交 |
 
 每个阶段自检：`tsc --noEmit`、`eslint`、该阶段相关测试；S5 之后完整跑一遍，再构建。
 
@@ -243,6 +243,10 @@ TraceCollapsible defaultOpen
 | 官方 `scroll-fade-x/y` utility | 本仓未注册（`shadcn/tailwind.css` 未引入），`code-block` 内联类里省去，不加假类 |
 | `@shadcn/react/message-scroller` | 不引入依赖；消息列表滚动用现有实现 |
 | 用户字号偏好 | 改缩放根字号，不引入自定档位 |
+| “直角清零”的边界 | 只在**自绘背景**的面板/卡片上禁止 `rounded-none`：列表行、`TabsList` 内的段、填充整行的骨架屏没有表面可圆，官方自己也是这么写的。门禁用「同一行出现裸 `bg-*` 才判定」表达这条边界 |
+| `Subagent` 行 | 本机官方语料没有 `agent.tsx` 源码，按 trace 槽位组合（标题+状态+折叠内容）实现，未自创子代理专属视觉 |
+| 行内 hex 保留项 | 主题色 `<meta>`/manifest（浏览器读不到 CSS 变量）、favicon 画布、xterm 调色板、`ModelsConfig` 六级思考强度色阶（无对应令牌）、设置里的主题预览色块；其余 hex 已清零 |
+| 扩展状态标签大小写 | 自由文本按 `lib/label-case.ts` 归一：单词首字母大写，纯辅音的缩写（mcp/ssh/lsp）全大写，已有大写与译文不动 |
 
 ## 12. 不做
 
@@ -250,3 +254,10 @@ TraceCollapsible defaultOpen
 - 不改 markdown 渲染语义与 ANSI 解析。
 - 不新增第三方依赖（除从官方源码纳入的组件）。
 - 不为"未来主题"预留抽象；不改动与本次无关的业务逻辑。
+
+## 13. 变更记录（本轮实现）
+
+- S1–S4 各阶段提交见第 9 节表格；每阶段自检 `tsc --noEmit`、`eslint`、该阶段测试。
+- 门禁：`lib/design-language.test.mjs`（第 6 节）扫描 `components/ app/ hooks/ lib/`，白名单逐条写在测试里并注明理由。
+- 标签大小写：`lib/label-case.ts` + `lib/label-case.test.mjs`，`ExtensionStatusBar` 的列表、纯文本、命令三类 pill 都过它。
+- 截图：桌面 1440 与 390px、浅深各一组，取自真实会话（dev 30221）。

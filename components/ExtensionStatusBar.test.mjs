@@ -59,7 +59,8 @@ test("renders each status as its own cell without identifier keys", () => {
   assert.match(html, /aria-label="ponytail memory"/);
   assert.match(html, /role="status"/);
   assert.equal(html.match(/data-slot="badge"/g)?.length, 2);
-  assert.match(html, /text-muted-foreground"><span>ponytail<\/span><\/span>/);
+  // Plain status text has no ANSI wrapper; only its casing is normalized.
+  assert.match(html, /text-muted-foreground">Ponytail<\/span>/);
   assert.match(html, /<span class="ansi-[a-z]+-fg">memory<\/span>/);
   assert.doesNotMatch(html, /05-ponytail|20-memory/);
   assert.doesNotMatch(html, /<button/);
@@ -147,7 +148,8 @@ test("a command key that is not a slash command stays plain status text", () => 
   });
 
   assert.doesNotMatch(html, /<button/);
-  assert.match(html, />hello</);
+  // A label reads like a word even when the extension wrote it lowercase.
+  assert.match(html, />Hello</);
 });
 
 test("falls back to the command when the status text is empty", () => {
