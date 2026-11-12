@@ -405,7 +405,9 @@ function kindOf(p: Prepared): ToolViewKind {
   if (p.mcp) return "mcp";
   if (isSubagentToolName(name)) return "subagent";
   if (p.codemode) return "codemode";
-  if (p.command !== null) return "terminal";
+  // 只看工具名，不看已解析的 command：还在流式输入参数时 command 还没成形，
+  // 按命令判会让 bash 行在运行中先显示成通用扳手、跑完又变成终端图标。
+  if (getToolCategory(name) === "terminal") return "terminal";
   if (isWriteToolName(name)) return "file-write";
   if (isEditToolName(name) || isApplyPatchToolName(name)) return "file-edit";
   const category = getToolCategory(name);
@@ -528,7 +530,6 @@ function writeView(p: Prepared): ToolView {
   view.kind = "file-write";
   view.title = p.t("chat.toolCategory.write");
   view.target = p.filePaths[0] ? baseName(p.filePaths[0]) : undefined;
-  view.description = p.writtenFileText === null ? p.preview || undefined : undefined;
   view.sections = p.detail([
     ...(p.writtenFileText === null
       ? [...fieldsSection(p.fields), ...(p.fields ? [] : jsonSection(p.inputStr, language === "text" ? "json" : language))]
@@ -568,7 +569,6 @@ function readView(p: Prepared): ToolView {
   // 文件名由行内的 chip 承担（chip 可点、能跳转），标题只写动作，避免同一个名字出现两次。
   view.title = p.t(TOOL_CATEGORY_LABEL_KEYS.view);
   view.target = p.filePaths[0] ? baseName(p.filePaths[0]) : undefined;
-  view.description = p.filePaths[0] ? undefined : p.preview || undefined;
   const structured = p.fields ? null : structuredArgSections(p.block.input);
   view.sections = p.detail([
     ...(p.fields ? fieldsSection(p.fields) : structured ?? jsonSection(p.inputStr, "json")),
@@ -583,7 +583,9 @@ function searchView(p: Prepared): ToolView {
     ? p.block.input.pattern
     : typeof p.block.input.query === "string" ? p.block.input.query : "";
   view.kind = "search";
-  view.title = p.t("chat.trace.searched", { pattern: query || p.preview || p.t(TOOL_CATEGORY_LABEL_KEYS.search) });
+  // 动作是标题，搜索词是对象：对象可以截断，动作永远完整。
+  view.title = p.t(TOOL_CATEGORY_LABEL_KEYS.search);
+  view.object = query || p.preview || undefined;
   view.target = query || p.preview || undefined;
   view.sections = p.detail([...fieldsSection(p.fields), ...resultSections(p.text, "text")]);
   return view;
@@ -593,9 +595,11 @@ function webView(p: Prepared): ToolView {
   const view = baseView(p);
   const sources = /search/i.test(p.block.toolName) ? resultSources(p.text) : [];
   view.kind = "web";
+  // 同上：动作单独成词，来源数/地址放在对象位。
   view.title = sources.length > 0
     ? p.t("chat.trace.sources", { count: sources.length })
-    : p.t("chat.trace.fetched", { target: p.preview || p.t(TOOL_CATEGORY_LABEL_KEYS.web) });
+    : p.t(TOOL_CATEGORY_LABEL_KEYS.web);
+  view.object = sources.length > 0 ? undefined : p.preview || undefined;
   view.target = p.preview || undefined;
   if (sources.length > 0) view.sources = sources;
   view.sections = p.detail(sources.length > 0
@@ -747,8 +751,9 @@ function structuredArgSections(input: unknown): ToolViewSection[] | null {
 function genericView(p: Prepared): ToolView {
   const view = baseView(p);
   view.kind = "generic";
+  // 行上只写工具名：名字永远完整显示，参数/正文一律进展开的内容。
+  // （以前把输入的首行预览放在名字后面，长文本会把这一行占满。）
   view.title = humanizeToolName(p.block.toolName);
-  view.description = p.preview || undefined;
   view.sections = p.detail([
     ...(p.fields ? fieldsSection(p.fields) : jsonSection(p.inputStr, "json")),
     ...resultSections(p.text, /^\s*[[{]/.test(p.text ?? "") ? "json" : "text"),

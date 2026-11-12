@@ -34,13 +34,15 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
   below?: ReactNode;
 }) {
   const { t } = useI18n();
-  const title = label ? `${t("chat.trace.subagent")} · ${label}` : t("chat.trace.subagent");
+  // 行上的名字只有「子代」：profile/描述可长，放在会截断的描述位，不挤占名字。
+  const title = t("chat.trace.subagent");
   const hasBody = Boolean((steps && steps.length > 0) || report);
 
   return (
     <TraceRow
       icon={<BotIcon className="size-3.5" />}
       title={title}
+      description={label}
       status={status}
       foldKey={foldKey}
       trailing={action}
