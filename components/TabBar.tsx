@@ -157,7 +157,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onReorderTa
               ) : getFileIcon(tab.label, 13)}
             </span>
             <span
-              className={cn("min-w-0 flex-1 truncate font-mono text-[11.5px]", isActive ? "font-medium" : "font-normal")}
+              className={cn("min-w-0 flex-1 truncate font-mono text-xs", isActive ? "font-medium" : "font-normal")}
               title={tab.filePath}
             >
               {tab.kind === "git" ? t("gitPanel.title") : tab.label}
