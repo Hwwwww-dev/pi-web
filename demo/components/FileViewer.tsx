@@ -1406,12 +1406,13 @@ function TextFileViewer({
         {/* Everything that describes the file truncates inside this group, so the
             actions on the right can never sit on top of the path or the counts. */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <CodeBlockTitle className="flex min-w-0 shrink items-center gap-1.5 text-sm">
+          {/* 文件名是第一信息：不压缩、不省略；路径和元信息让位，由路径自己截断。 */}
+          <CodeBlockTitle className="flex shrink-0 items-center gap-1.5 text-sm font-medium">
             <FileIcon aria-hidden="true" strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
-            <span className="truncate">{getFileName(filePath)}</span>
+            <span className="whitespace-nowrap">{getFileName(filePath)}</span>
           </CodeBlockTitle>
-          <PathLabel className="min-w-0 shrink font-mono text-xs" text={getRelativeFilePath(filePath, cwd)} title={filePath} />
-          <span className="min-w-0 shrink truncate text-xs text-muted-foreground" title={metadata}>
+          <PathLabel className="min-w-0 flex-1 truncate font-mono text-xs" text={getRelativeFilePath(filePath, cwd)} title={filePath} />
+          <span className="hidden min-w-0 shrink truncate text-xs text-muted-foreground sm:inline" title={metadata}>
             {metadata}
           </span>
           {isDeletedDiff ? undefined : (
