@@ -345,11 +345,11 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   return (
     <Message align="end" className="group mb-5 flex flex-col! items-end gap-1">
       <Bubble variant="muted" align="end" className="max-w-[82%] max-sm:max-w-[86%]">
-        {/* Cap the height so an abnormally long message does not push the
-            conversation off screen; overflow scrolls inside the bubble. */}
+        {/* 官方 BubbleContent 只负责气泡底色与圆角（overflow-hidden）；长消息不截断、不叠第二根滚动条，
+            需要收起的内容交给上文的命令折叠。 */}
         <BubbleContent
           className={cn(
-            "max-h-[300px] overflow-y-auto text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
+            "text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
             isEditing && "ring-2 ring-ring/30",
           )}
         >

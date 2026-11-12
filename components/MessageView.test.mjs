@@ -83,7 +83,7 @@ test("matches response model aliases and otherwise includes the provider", () =>
   assert.equal(getModelDisplayName("gateway", "unknown-model", names), "gateway/unknown-model");
 });
 
-test("previews the first thinking line and reveals the full text with the saved default", () => {
+test("keeps a thought to its name and duration, and reveals the full text with the saved default", () => {
   const previousWindow = globalThis.window;
   try {
     for (const expanded of [false, true]) {
@@ -98,7 +98,6 @@ test("previews the first thinking line and reveals the full text with the saved 
         }),
       ));
       assert.match(html, new RegExp(`aria-expanded="${expanded}"`));
-      assert.match(html, /aria-label="Thinking: /);
       // The trace prints the same "3.0s" the tool rows do.
       assert.match(html, /3\.0s/);
       if (expanded) {
@@ -133,12 +132,12 @@ test("long thinking renders in pages instead of one DOM blob (#1196)", () => {
   assert.match(readFileSync(new URL("./transcript/ReasoningTrace.tsx", import.meta.url), "utf8"), /loadThinkingContent/);
 });
 
-test("shows deferred thinking previews without loading the full content", () => {
+test("a collapsed thought is one line: its name, never its text (official reasoning row)", () => {
   const html = renderMessage({
     role: "assistant",
     content: [{ type: "thinking", thinking: "Historical first line", deferred: true }],
   });
-  assert.match(html, />Historical first line<\/span>/);
+  assert.doesNotMatch(html, /Historical first line/);
   assert.match(html, /aria-expanded="false"/);
 });
 

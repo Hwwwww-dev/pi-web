@@ -76,7 +76,7 @@ export function TraceRow({
   activityTool,
   children,
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   title: string;
   /** The thing the action applies to: elided before the action ever is. */
   object?: string;
@@ -107,7 +107,7 @@ export function TraceRow({
     // `!` 覆盖 trace.tsx 里 `*:has-[>[data-slot=trace-line]]:w-fit`：行必须占满内容区，
     // 否则标题的 truncate 没有可收缩的宽度，长命令会溢出、箭头被挤到文字中间。
     <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="w-full! min-w-0">
-      <TraceIcon>{icon}</TraceIcon>
+      {icon != null && <TraceIcon>{icon}</TraceIcon>}
       {/* The action is never elided: it is the row's name (用户要求：工具名称不可省略). */}
       <TraceTitle className={cn("shrink-0 whitespace-nowrap", titleClassName)}>{title}</TraceTitle>
       {object && <span className="min-w-0 truncate">{object}</span>}

@@ -104,7 +104,6 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
   const detailRef = useRef<HTMLDivElement | null>(null);
   const stickRef = useRef(true);
   const prevScrollTopRef = useRef(0);
-  const preview = block.thinking.trimStart().match(/^[^\r\n]{0,240}/u)?.[0].trimEnd() ?? "";
   // A card the reader opened or closed themselves keeps that choice: only the
   // automatic expansion of a live block folds away when the block finishes.
   const userToggledRef = useRef(false);
@@ -183,7 +182,6 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
         <TraceCollapsibleTrigger
-          aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
           title={t("i18n.thinking")}
         >
           <TraceLine status={active ? "running" : undefined}>
@@ -191,9 +189,6 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
               <ThinkingIcon active={expanded || Boolean(active)} />
             </TraceIcon>
             <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
-            <TraceDescription className="min-w-0 shrink truncate [font-variant-numeric:normal]">
-              {preview}
-            </TraceDescription>
             {!active && duration !== undefined && (
               <TraceDescription className="shrink-0 tabular-nums">
                 {formatToolDuration(duration * 1000)}

@@ -358,7 +358,7 @@ export function TurnTrace({ summary, defaultOpen, children }: {
 </Trace>
 ```
 
-- 行尾只由调用方追加 diff 统计（`+N −M`，纯文本）与该轮的用量节点；工具行不再有时长，`ToolView` 不承载任何视觉。
+- 行尾不再追加任何东西：diff 统计（`+N −M`）与逐次结果都在展开的正文里，用量节点只出现在轮尾；工具行没有时长，`ToolView` 不承载任何视觉。
 - 有 `action` 且无 `sections` 时：`<a>` 包 `TraceLine` + 尾部 `<TraceIcon><ArrowUpRightIcon /></TraceIcon>`（官方 Sources 同形）。
 - `sections` 为空：不渲染 `TraceCollapsible`，直接 `TraceLine`（官方 States 里的纯行）。
 

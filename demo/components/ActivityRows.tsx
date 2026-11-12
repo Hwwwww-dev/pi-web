@@ -111,15 +111,6 @@ export function ToolRow({ block, result, cwd, onOpenFile, onOpenSubagent }: {
     ? <MediaTrace images={view.images} video={view.media?.video} audio={view.media?.audio} />
     : undefined;
 
-  // A patch's own +N −M sits beside the title as plain text（官方 Commit 示例）;
-  // 单行不再挂时长，时长只在折叠组与思考行出现。
-  const trailing = view.diffStat ? (
-    <span className="shrink-0 tabular-nums">
-      <span className="text-success">+{view.diffStat.added}</span>{" "}
-      <span className="text-destructive">−{view.diffStat.removed}</span>
-    </span>
-  ) : undefined;
-
   // A failed call is its own shape (第 5.2 节): the X icon, and the whole error
   // repeated above whatever else the call holds.
   // A terminal failure keeps its command header and copy button (第 12.1 节), so
@@ -133,8 +124,7 @@ export function ToolRow({ block, result, cwd, onOpenFile, onOpenSubagent }: {
         text={resultText ?? view.error}
         foldKey={view.foldKey}
         activityTool={block.toolName}
-        trailing={trailing}
-        below={mediaNode}
+          below={mediaNode}
       >
         {rest.map((section, index) => <ToolSection key={index} section={section} />)}
       </StackTraceTrace>
@@ -179,14 +169,13 @@ export function ToolRow({ block, result, cwd, onOpenFile, onOpenSubagent }: {
 
   // What a search read (第 5.8 节): one line per source, each a link.
   if (view.sources && view.sources.length > 0) {
-    return <SourcesTrace sources={view.sources} foldKey={view.foldKey} activityTool={block.toolName} trailing={trailing} below={mediaNode} />;
+    return <SourcesTrace sources={view.sources} foldKey={view.foldKey} activityTool={block.toolName} below={mediaNode} />;
   }
 
   return (
     <ToolTrace
       view={view}
       activityTool={block.toolName}
-      trailing={trailing}
       below={mediaNode}
       cwd={cwd}
       onOpenFile={onOpenFile}

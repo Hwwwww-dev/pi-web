@@ -22,7 +22,6 @@ export const TaskTrace = memo(function TaskTrace({ title, description, status, f
 }) {
   return (
     <TraceRow
-      icon={<span className="size-1.5 rounded-full bg-current" />}
       title={title}
       description={description}
       status={status}
