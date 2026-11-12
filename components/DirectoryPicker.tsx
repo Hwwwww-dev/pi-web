@@ -96,8 +96,11 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const createBackdropPressRef = useRef(false);
+  const pathInputRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(false);
 
-  const navigateTo = useCallback(async (directory?: string) => {
+  // Resolves to the listed folder's path, or null when it could not be listed.
+  const navigateTo = useCallback(async (directory?: string): Promise<string | null> => {
     setLoading(true);
     setLoadError(null);
     try {
@@ -108,8 +111,10 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
       setPathInput(nextPath);
       setDirectories(data.directories ?? []);
       setDrives(data.drives ?? null);
+      return nextPath;
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : String(cause));
+      return null;
     } finally {
       setLoading(false);
     }
@@ -118,6 +123,18 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
   useEffect(() => {
     void navigateTo(initialPath || undefined);
   }, [initialPath, navigateTo]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // Select and Go are disabled while they check, which drops focus to the page,
+  // where Escape stops the running agent instead of closing the picker. A
+  // refusal puts focus back in the field, to retype or dismiss.
+  useEffect(() => {
+    if (loadError || error) pathInputRef.current?.focus();
+  }, [loadError, error]);
 
   const handlePathSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -152,9 +169,22 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
     }
   };
 
-  const hasUncommittedPath = pathInput.trim() !== currentPath;
-  const canSelect = Boolean(currentPath) && !hasUncommittedPath && !busy && !loading;
+  // A typed path that is not the listed folder needs no Go first: Select browses
+  // it, as Go does, and selects the browse route's realpath, so one folder is
+  // one cwd however it was typed (case, a link, `..`, a trailing slash), like
+  // pi's process.cwd(). A path that cannot be listed shows Go's error here.
+  // "New directory" still waits for the list, which is where it creates.
+  const typedPath = pathInput.trim();
+  const hasUncommittedPath = typedPath !== currentPath;
+  const canSelect = Boolean(typedPath) && !busy && !loading;
+  const canCreate = Boolean(currentPath) && !hasUncommittedPath && !busy && !loading;
   const canNavigateUp = Boolean(parentDirectory) || isWindowsDriveRoot(currentPath);
+
+  const handleSelect = async () => {
+    const path = hasUncommittedPath ? await navigateTo(typedPath) : currentPath;
+    // Cancelled while it browsed: nothing is selected.
+    if (path && mountedRef.current) onSelect(path);
+  };
 
   return (
     // The official Dialog carries the overlay, Escape, focus trap and the
@@ -211,6 +241,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
             {t("directoryPicker.directoryPath")}
           </label>
           <Input
+            ref={pathInputRef}
             className={cn("directory-picker-path min-w-0 flex-1", textInputClass)}
             id="directory-path"
             type="text"
@@ -291,7 +322,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
               setCreateOpen(true);
               setCreateError(null);
             }}
-            disabled={!canSelect}
+            disabled={!canCreate}
           >
             {t("directoryPicker.newDirectory")}
           </Button>
@@ -301,9 +332,9 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
             type="button"
             variant="default"
             size="default"
-            onClick={() => onSelect(currentPath)}
+            onClick={() => void handleSelect()}
             disabled={!canSelect}
-            title={hasUncommittedPath ? t("directoryPicker.openBeforeSelecting") : t("directoryPicker.selectCurrentDirectory")}
+            title={hasUncommittedPath && typedPath ? t("directoryPicker.selectTypedPath", { path: typedPath }) : t("directoryPicker.selectCurrentDirectory")}
           >
             {busy ? t("i18n.checking") : t("directoryPicker.selectThisFolder")}
           </Button>
