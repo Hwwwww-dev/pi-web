@@ -602,12 +602,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   /** 展开/折叠一行的那几帧：不让 scroller 跟着内容贴底，否则行会被拉上去。 */
   const [foldInFlight, setFoldInFlight] = useState(false);
   /**
-   * 正在按住读者那一行（刚翻了一页更早的消息）。
-   *
-   * 这几帧不能贴底跟随：官方 scroller 在内容变化时会按“是否跟随”重算位置，而
-   * 前插一整页正是它最容易判错的时候 —— 读者在中间看历史，却被滑到底部。
+   * 读者是否贴着底部。贴底跟随是官方 scroller 的状态，不是常量：给它一个恒为
+   * true 的 `autoScroll`，前插一整页时它会当作“跟随”而滑到底部，而读者明明在
+   * 中间看历史 —— 于是翻页时在底和顶之间来回跳。
    */
-  const [pagingHold, setPagingHold] = useState(false);
+  const [atTail, setAtTail] = useState(true);
   /** 收键盘的那几帧：同上，让“滑回底部”自己演完，不跟 scroller 抢。 */
   const [keyboardClosing, setKeyboardClosing] = useState(false);
   const foldTimerRef = useRef<number | undefined>(undefined);
@@ -724,6 +723,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   useEffect(() => {
     if (searchTarget) setPendingScrollRestore(null);
   }, [searchTarget]);
+
+  // 贴底与否只听滚动：官方 scroller 的跟随状态跟着它走。
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const update = () => {
+      setAtTail(isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight));
+    };
+    update();
+    container.addEventListener("scroll", update, { passive: true });
+    return () => container.removeEventListener("scroll", update);
+  }, [scrollContainerRef, session?.id, loading]);
 
   // Expanding a collapsed thinking row or tool card grows the content. While
   // the user reads at the tail, keep the tail in view instead of letting the
@@ -933,10 +944,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       // 图片会分几帧长高，高度差只补第一帧，之后读者就被留在接近顶部的位置——顶部
       // 又贴着哨兵，于是一次上滑连读好几页。锚点在页面落地后每帧重测，长多高都不漂。
       scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
-      // 从请求发出就关掉贴底跟随：这一页提交的那一帧也不能被拉到底部。
-      setPagingHold(true);
       void loadOlderPage(sid, oldestId).then(() => {
-        holdScrollAnchor(container, messageContentRef.current, () => setPagingHold(false));
+        // 按住读者那一行：它让新页只长在下面，也把滚动位置从顶端挪开 ——
+        // 否则哨兵一直贴在视口里，一页接一页地自动读下去。
+        holdScrollAnchor(container, messageContentRef.current);
       }).finally(() => {
         loadingOlderRef.current = false;
       });
@@ -1708,7 +1719,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} waitingCount={waitingExtensionCustomUiCount} onInput={sendExtensionCustomInput} />
         )}
         {!isEmptyNew && <>
-        <MessageScrollerProvider autoScroll={!foldInFlight && !keyboardClosing && !pagingHold} defaultScrollPosition="last-anchor">
+        <MessageScrollerProvider autoScroll={atTail && !foldInFlight && !keyboardClosing} defaultScrollPosition="last-anchor">
         <MessageScroller className="min-h-0 min-w-0 flex-1">
         <MessageScrollerViewport
           ref={scrollContainerRef}
