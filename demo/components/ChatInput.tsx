@@ -2420,7 +2420,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           >
             <InputGroup
               className={cn(
-                "chat-composer-row min-w-0 rounded-[24px] border-border bg-card shadow-sm has-[[data-slot=input-group-control]:focus-visible]:border-ring/40 has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot=input-group-control]:focus-visible]:ring-ring/15",
+                "chat-composer-row min-w-0 rounded-[24px] border-border bg-card shadow-sm",
                 compact
                   ? "flex-row items-center gap-1 rounded-[18px] p-1.5"
                   : "flex-col items-stretch gap-0 p-2",
