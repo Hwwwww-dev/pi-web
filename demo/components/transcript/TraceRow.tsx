@@ -106,7 +106,7 @@ export function TraceRow({
   const line = (
     <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="w-full min-w-0">
       <TraceIcon>{icon}</TraceIcon>
-      <TraceTitle className={cn("min-w-0", titleClassName)}>{title}</TraceTitle>
+      <TraceTitle className={cn("min-w-0 shrink truncate", titleClassName)}>{title}</TraceTitle>
       {chips}
       {description && <TraceDescription>{description}</TraceDescription>}
       {trailing && <span className="ml-auto shrink-0 pl-2">{trailing}</span>}
@@ -115,7 +115,7 @@ export function TraceRow({
 
   if (!content) {
     return (
-      <Trace data-activity="trace-row" data-activity-tool={activityTool} className="max-w-[70%]">
+      <Trace data-activity="trace-row" data-activity-tool={activityTool}>
         {href ? (
           <a href={href} target="_blank" rel="noreferrer">
             {line}
@@ -129,7 +129,7 @@ export function TraceRow({
   }
 
   return (
-    <Trace data-activity="trace-row" data-activity-tool={activityTool} className="max-w-[70%]">
+    <Trace data-activity="trace-row" data-activity-tool={activityTool}>
       <TraceCollapsible open={open} onOpenChange={onOpenChange}>
         <TraceCollapsibleTrigger aria-label={ariaLabel}>
           {line}
