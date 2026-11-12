@@ -59,7 +59,7 @@ function TraceTitle({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       data-slot="trace-title"
-      className={cn("min-w-0 whitespace-nowrap motion-reduce:shimmer-none", className)}
+      className={cn("min-w-0 overflow-hidden whitespace-nowrap motion-reduce:shimmer-none", className)}
       {...props}
     />
   )

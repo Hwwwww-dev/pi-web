@@ -185,15 +185,44 @@ export function ToolRow({ block, result, cwd, onOpenFile, onOpenSubagent }: {
     return <SourcesTrace sources={view.sources} foldKey={view.foldKey} activityTool={block.toolName} below={mediaNode} />;
   }
 
+  const changeCounts = (view.kind === "file-edit" || view.kind === "file-write")
+    ? patchChangeCounts(block, result)
+    : null;
+  const changeTrailing = changeCounts
+    ? (
+      <span className="shrink-0 font-mono text-xs tabular-nums">
+        <span className="text-success">+{changeCounts.added}</span>{" "}
+        <span className="text-destructive">-{changeCounts.removed}</span>
+      </span>
+    )
+    : undefined;
+
   return (
     <ToolTrace
       view={view}
       activityTool={block.toolName}
       below={mediaNode}
+      trailing={changeTrailing}
       cwd={cwd}
       onOpenFile={onOpenFile}
     />
   );
+}
+
+/** 编辑/写入行的改动计数：从补丁行直接数，新增 +、删除 -。 */
+function patchChangeCounts(block: ToolCallContent, result?: ToolResultMessage): { added: number; removed: number } | null {
+  const files = getPatchFiles(block, result);
+  if (!files) return null;
+  let added = 0;
+  let removed = 0;
+  for (const file of files) {
+    for (const row of file.rows) {
+      if (row.type !== "line") continue;
+      if (row.right.type === "added") added += 1;
+      if (row.left.type === "removed") removed += 1;
+    }
+  }
+  return added > 0 || removed > 0 ? { added, removed } : null;
 }
 
 export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSubagent }: {
