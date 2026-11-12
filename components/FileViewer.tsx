@@ -1428,27 +1428,24 @@ function TextFileViewer({
         {/* In flow and always visible: a hover-revealed overlay is what covered the
             metadata, and revealing it also made the header jump. */}
         <CodeBlockActions className="static! shrink-0 opacity-100!">
-          {displayModes.length > 1 && (
-            <div aria-label={t("i18n.fileViewMode")} className="flex items-center gap-0.5">
-              {displayModes.map((mode) => {
-                const active = effectiveDisplayMode === mode;
-                return (
-                  <Button
-                    key={mode}
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => updateDisplayMode(mode)}
-                    title={mode === "diff" ? t("i18n.compareHead") : undefined}
-                    aria-pressed={active}
-                    className={cn(active ? "text-foreground" : "text-muted-foreground")}
-                  >
-                    {FILE_MODE_LABELS[mode]}
-                  </Button>
-                );
-              })}
-            </div>
-          )}
+          {displayModes.length > 1 && (() => {
+            // 两个视图合成一个钮：显示下一个模式，点它就切过去。
+            const currentIndex = displayModes.indexOf(effectiveDisplayMode as (typeof displayModes)[number]);
+            const nextMode = displayModes[(currentIndex + 1) % displayModes.length] ?? displayModes[0];
+            return (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => updateDisplayMode(nextMode)}
+                title={nextMode === "diff" ? t("i18n.compareHead") : FILE_MODE_LABELS[nextMode]}
+                aria-label={FILE_MODE_LABELS[nextMode]}
+                className="px-1.5 text-xs text-muted-foreground"
+              >
+                {FILE_MODE_LABELS[nextMode]}
+              </Button>
+            );
+          })()}
           {(effectiveDisplayMode === "source" || effectiveDisplayMode === "diff") && !isBinary && (
             <Button
               type="button"
@@ -1487,7 +1484,7 @@ function TextFileViewer({
               }
               aria-label={t("files.mention")}
               disabled={!onAtMention && !onMentionLines}
-              className="hidden text-muted-foreground sm:inline-flex"
+              className="text-muted-foreground"
             >
               <AtSign className="size-3.5" strokeWidth={1.8} />
             </Button>
