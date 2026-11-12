@@ -470,7 +470,7 @@ export function ConfigScopeTag({ scope, children }: { scope: string; children: R
       variant="secondary"
       className={cn(
         "config-scope-tag shrink-0 font-normal",
-        scope === "project" && "bg-[rgba(99,102,241,0.12)] text-[rgba(99,102,241,0.8)]",
+        scope === "project" && "bg-primary/10 text-primary",
       )}
       data-scope={scope}
     >

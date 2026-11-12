@@ -217,7 +217,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
             ) : (
               <span
                 key={widget.key}
-                className="inline-flex h-6 shrink-0 items-center font-mono text-xs text-muted-foreground"
+                className="inline-flex shrink-0 items-center font-mono text-xs text-muted-foreground"
                 aria-label={`${placementLabel}: ${extensionWidgetLabel(widget.key)}, ${lineCountLabel}`}
               >
                 {content}
