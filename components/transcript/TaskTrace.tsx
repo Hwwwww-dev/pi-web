@@ -23,7 +23,7 @@ export const TaskTrace = memo(function TaskTrace({ title, description, status, f
 }) {
   return (
     <TraceRow
-      icon={<ListChecksIcon className="size-3.5 fill-current" />}
+      icon={<ListChecksIcon className="size-3.5" />}
       title={title}
       description={description}
       status={status}

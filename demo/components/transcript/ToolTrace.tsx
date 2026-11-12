@@ -18,6 +18,7 @@ import {
   SquareTerminalIcon,
   WrenchIcon,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { AnsiText } from "@/components/AnsiText";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { Button } from "@/components/ui/button";
@@ -38,22 +39,22 @@ import { TraceRow } from "./TraceRow";
  * follow `ToolView.kind`; nothing about the layout is per-tool.
  */
 
-const ICON_CLASS = "size-3.5 fill-current";
+const ICON_CLASS = "size-3.5";
 
-/** 一类工具一个图标，尺寸与颜色统一（颜色由行本身给）。 */
+/** 一类工具一个图标，尺寸统一；颜色按类别给（终端紫、读取蓝、写入/编辑绿、思考黄、搜索青）。 */
 const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
-  terminal: <SquareTerminalIcon className={ICON_CLASS} />,
-  "file-read": <FileTextIcon className={ICON_CLASS} />,
-  "file-write": <FilePenIcon className={ICON_CLASS} />,
-  "file-edit": <FilePenLineIcon className={ICON_CLASS} />,
-  search: <SearchIcon className={ICON_CLASS} />,
-  web: <GlobeIcon className={ICON_CLASS} />,
-  codemode: <CodeXmlIcon className={ICON_CLASS} />,
-  subagent: <BotIcon className={ICON_CLASS} />,
-  mcp: <PlugIcon className={ICON_CLASS} />,
-  queue: <ListTodoIcon className={ICON_CLASS} />,
-  compact: <Minimize2Icon className={ICON_CLASS} />,
-  generic: <WrenchIcon className={ICON_CLASS} />,
+  terminal: <SquareTerminalIcon className={cn(ICON_CLASS, "text-primary")} />,
+  "file-read": <FileTextIcon className={cn(ICON_CLASS, "text-sky-600 dark:text-sky-400")} />,
+  "file-write": <FilePenIcon className={cn(ICON_CLASS, "text-success")} />,
+  "file-edit": <FilePenLineIcon className={cn(ICON_CLASS, "text-success")} />,
+  search: <SearchIcon className={cn(ICON_CLASS, "text-cyan-600 dark:text-cyan-400")} />,
+  web: <GlobeIcon className={cn(ICON_CLASS, "text-sky-600 dark:text-sky-400")} />,
+  codemode: <CodeXmlIcon className={cn(ICON_CLASS, "text-primary")} />,
+  subagent: <BotIcon className={cn(ICON_CLASS, "text-primary")} />,
+  mcp: <PlugIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  queue: <ListTodoIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  compact: <Minimize2Icon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  generic: <WrenchIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
 };
 
 const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
