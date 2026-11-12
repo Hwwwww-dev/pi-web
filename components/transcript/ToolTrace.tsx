@@ -42,7 +42,7 @@ import { TraceRow } from "./TraceRow";
 const ICON_CLASS = "size-3.5";
 
 /** 默认中性灰，图标本身不带颜色。 */
-const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
+export const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
   terminal: <SquareTerminalIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
   "file-read": <FileTextIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
   "file-write": <FilePenIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
@@ -58,7 +58,7 @@ const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
 };
 
 /** 展开时换成这一类自己的颜色，不填黑、不加粗。 */
-const KIND_ACTIVE_ICONS: Record<ToolViewKind, ReactNode> = {
+export const KIND_ACTIVE_ICONS: Record<ToolViewKind, ReactNode> = {
   terminal: <SquareTerminalIcon className={cn(ICON_CLASS, "text-primary")} />,
   "file-read": <FileTextIcon className={cn(ICON_CLASS, "text-sky-600 dark:text-sky-400")} />,
   "file-write": <FilePenIcon className={cn(ICON_CLASS, "text-success")} />,

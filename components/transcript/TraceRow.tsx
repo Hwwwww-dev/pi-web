@@ -109,7 +109,7 @@ export function TraceRow({
   const line = (
     // 行宽跟随内容（官方 `w-fit max-w-full`）：箭头紧跟文字，不甩到行尾；
     // 超宽时由对象/描述上的 `truncate` 收缩，箭头始终贴住最后一段文字。
-      <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0" data-expanded={open || undefined}>
+      <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0 overflow-hidden" data-expanded={open || undefined}>
       {(icon != null || activeIcon != null) && (
         <TraceIcon>{open && activeIcon != null ? activeIcon : icon}</TraceIcon>
       )}

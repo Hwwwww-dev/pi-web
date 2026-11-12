@@ -47,8 +47,21 @@ import type { CustomMessage, TextContent, ToolCallContent, ToolResultMessage } f
 // ─────────────────────────────────────────────────────────────────────────────
 
 
-function ToolCategoryIcon({ category }: { category: ToolCategory }) {
-  const className = "size-[14px] shrink-0";
+/** 一类的图标颜色：收起时中性灰，展开时才换上这一类自己的颜色。 */
+const CATEGORY_ICON_COLOR: Record<ToolCategory, string> = {
+  view: "text-sky-600 dark:text-sky-400",
+  search: "text-cyan-600 dark:text-cyan-400",
+  edit: "text-success",
+  terminal: "text-primary",
+  subagent: "text-primary",
+  plan: "text-primary",
+  compact: "text-primary",
+  web: "text-sky-600 dark:text-sky-400",
+  other: "text-primary",
+};
+
+function ToolCategoryIcon({ category, active = false }: { category: ToolCategory; active?: boolean }) {
+  const className = cn("size-3.5 shrink-0", active ? CATEGORY_ICON_COLOR[category] : "text-muted-foreground");
   switch (category) {
     case "view":
       return <BookOpenIcon className={className} strokeWidth={1.8} />;
@@ -217,6 +230,8 @@ export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSubagent }: {
         status={hasPending ? "running" : isError ? "error" : "done"}
         foldKey={groupKey}
         defaultOpen={false}
+        icon={<ToolCategoryIcon category={category} />}
+        activeIcon={<ToolCategoryIcon category={category} active />}
         trailing={!hasPending && totalDuration > 0 ? (
           <TraceDescription className="shrink-0 tabular-nums">{formatToolDuration(totalDuration)}</TraceDescription>
         ) : undefined}
@@ -330,7 +345,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
         >
           <TraceCollapsibleTrigger>
             <TraceLine>
-              <TraceIcon><ToolCategoryIcon category={subagent ? "subagent" : "other"} /></TraceIcon>
+              <TraceIcon><ToolCategoryIcon category={subagent ? "subagent" : "other"} active={expanded} /></TraceIcon>
               <TraceTitle className={cn("font-medium", dim && "font-normal")}>{label}</TraceTitle>
               <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
                 {preview || (isHiddenDisplay ? t("i18n.showExtensionMessage") : null)}

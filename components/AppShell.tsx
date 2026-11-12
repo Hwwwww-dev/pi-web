@@ -2661,16 +2661,19 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     </div>
                   );
                 return (
-                  <div className="flex flex-col gap-4 p-3.5 font-mono text-xs leading-normal">
-                    {section(translate("session.infoSection"), sessionRows)}
-                    {projectRows.length > 0 && section(translate("session.projectSection"), projectRows)}
-                    {section(translate("session.messages"), messageRows.map(([label, value]) => ({ label, value })))}
-                    {section(
-                      translate("session.tokens"),
-                      [...tokenRows, ...extraTokenRows].map(([label, value]) => ({ label, value })),
-                      "right",
-                    )}
-                  </div>
+                  // 与「系统」同一张面板：同高度、同内边距、同滚动区域。
+                  <section className="flex h-[min(600px,50dvh)] min-h-55 flex-col">
+                    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 py-3 font-mono text-xs leading-normal">
+                      {section(translate("session.infoSection"), sessionRows)}
+                      {projectRows.length > 0 && section(translate("session.projectSection"), projectRows)}
+                      {section(translate("session.messages"), messageRows.map(([label, value]) => ({ label, value })))}
+                      {section(
+                        translate("session.tokens"),
+                        [...tokenRows, ...extraTokenRows].map(([label, value]) => ({ label, value })),
+                        "right",
+                      )}
+                    </div>
+                  </section>
                 );
               })() : (
                 <div className="p-3.5 text-xs italic text-muted-foreground">
