@@ -601,6 +601,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const [sentinel, setSentinel] = useState<HTMLElement | null>(null);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
+  /** 一页更早消息开始加载时的内容高度：新内容接上后按高度差把读者留在原处。 */
+  const prependHeightRef = useRef<number | null>(null);
   /** 上一页请求还在路上。 */
   const loadingOlderRef = useRef(false);
   /**
@@ -718,6 +720,26 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // Expanding a collapsed row no longer kicks the list: `components/transcript/TraceRow.tsx`
   // keeps the toggled row's own top edge fixed across the change, so opening a card
   // grows it downward instead of scrolling the tail into view.
+
+  // 收键盘时视口一下子长回来，列表会在那一帧贴回底部——硬跳。把它改成滑下去：
+  // 只有“长高”才处理（弹起是变矮），并尊重系统的减少动画。
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    let height = viewport.height;
+    const onResize = () => {
+      const next = viewport.height;
+      const keyboadClosed = next - height > 80;
+      height = next;
+      if (!keyboadClosed) return;
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      container.scrollTo({ top: container.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+    };
+    viewport.addEventListener("resize", onResize);
+    return () => viewport.removeEventListener("resize", onResize);
+  }, [scrollContainerRef]);
 
   // 键盘弹起时不去写回任何滚动位置：官方 scroller 自己知道谁在贴尾、谁在看历史，
   // 而以前那个 focusin 手回写 scrollTop/window.scrollY，正好在视口缩高的那一帧
@@ -845,6 +867,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
+        // 必须真的触顶才读下一页：预言加载区域一大，哨兵在还没读完时就进视口，
+        // 翻页跟着一页接一页地跑。滚到顶才动，读者不往上就永远不再读。
+        if (container.scrollTop > 2) return;
         // Skip while a page is loading or the last one is still rendering.
         if (loadingOlderRef.current || pageRenderingRef.current) return;
         if (!hasEarlierMessages) {
@@ -864,7 +889,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const sid = session?.id ?? sessionIdRef.current;
         if (!sid) return;
         loadingOlderRef.current = true;
-        scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
+        // 顶到顶才读，读回来要靠高度差把读者按在原来那一行：元素锚点在整页插到
+        // 前面时会被重建，量不到；scrollHeight 的增量则一定等于新插进来的高度。
+        prependHeightRef.current = container.scrollHeight;
         void loadOlderPage(sid, oldestId).finally(() => {
           loadingOlderRef.current = false;
         });
@@ -913,6 +940,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   useLayoutEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
+
+    // 新插入的一页把内容整体往下推，把读者按在自己的行上：scrollTop 加同样的高度差。
+    const previousHeight = prependHeightRef.current;
+    if (previousHeight !== null) {
+      prependHeightRef.current = null;
+      const added = container.scrollHeight - previousHeight;
+      if (added > 0) container.scrollTop = Math.max(0, container.scrollTop + added);
+      return;
+    }
 
     const anchor = scrollAnchorRef.current;
     if (!anchor) return;

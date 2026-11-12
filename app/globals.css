@@ -700,6 +700,9 @@ pre, code {
   word-break: break-word;
 }
 .markdown-body p { margin: 0 0 8px; }
+/* 块与块的间距同一档：段落、代码卡、表格框、图都用 8px，段落和卡片不再各说各的。 */
+.markdown-body :is([data-slot="code-block"], .markdown-table-frame, .mermaid-block) { margin: 8px 0; }
+.markdown-body > :is([data-slot="code-block"], .markdown-table-frame):first-child { margin-top: 0; }
 .markdown-body p:last-child { margin-bottom: 0; }
 /* A reply ending in a list, code block or table kept that block's bottom
    margin, so its stats line sat further down than under a paragraph. */

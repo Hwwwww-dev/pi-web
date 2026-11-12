@@ -2429,6 +2429,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               bottom-right, and a soft tinted focus ring (the border itself
               stays put while typing). */}
           <BorderBeam
+            ref={beamRef}
             active={isStreaming && !compact}
             size="md"
             colorVariant="colorful"

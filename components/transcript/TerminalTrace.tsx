@@ -83,7 +83,15 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
             </div>
             <Separator className="bg-border/60" />
             <div className="max-h-[calc(var(--card-max-height)*0.4)] min-h-0 overflow-auto p-2.5">
-              {isTuiText(output) ? <AnsiText text={output} /> : <HighlightedCode code={output} />}
+              {/* 结果的行内换行是内容的一部分（图、表格、对齐都是拿空格和换行拍的），
+                  所以最内层必须自带 whitespace-pre*：HighlightedCode 只吐 token,
+                  本身不带 <pre>，少了这一层换行会被折叠成一段。 */}
+              <div className={cn(
+                "font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground",
+                wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre",
+              )}>
+                {isTuiText(output) ? <AnsiText text={output} /> : <HighlightedCode code={output} />}
+              </div>
             </div>
           </div>
         </CodeBlock>

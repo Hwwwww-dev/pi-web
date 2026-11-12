@@ -115,8 +115,12 @@ function TraceCollapsible({
 function TraceCollapsibleTrigger({
   className,
   children,
+  showChevron = true,
   ...props
-}: React.ComponentProps<typeof CollapsibleTrigger>) {
+}: React.ComponentProps<typeof CollapsibleTrigger> & {
+  /** 行尾还有胶囊时，箭头得跟在胶囊后面：由调用方在外面自己画一个。 */
+  showChevron?: boolean;
+}) {
   return (
     <CollapsibleTrigger
       data-slot="trace-collapsible-trigger"
@@ -127,9 +131,11 @@ function TraceCollapsibleTrigger({
       {...props}
     >
       {children}
-      <TraceIcon className="transition-transform group-aria-expanded/trace-collapsible-trigger:rotate-90">
-        <ChevronRightIcon />
-      </TraceIcon>
+      {showChevron && (
+        <TraceIcon className="transition-transform group-aria-expanded/trace-collapsible-trigger:rotate-90">
+          <ChevronRightIcon />
+        </TraceIcon>
+      )}
     </CollapsibleTrigger>
   )
 }

@@ -393,6 +393,8 @@ function renderCodeLines({ rows, stylesheet, useInlineStyles }: CodeLinesProps) 
  * box, no tokens) until an idle slice lets it take its language.
  */
 export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isStreaming }: CodeBlockProps) {
+  // 末尾的空行不算内容：它只在卡片底部多出一条线的空白。
+  const body = code.replace(/\n+$/, "");
   const { isDark } = useTheme();
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
@@ -442,7 +444,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
           wrap
           className="bg-muted px-[13px] py-[11px] text-[length:calc(12.5px+var(--chat-font-size-offset,0px))] leading-[1.62]"
         >
-          {code}
+          {body}
         </CodeBlockContent>
       ) : (
         <SyntaxHighlighter
@@ -468,7 +470,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
           }}
           codeTagProps={{ style: { fontFamily: "var(--font-mono)", fontWeight: "var(--font-mono-weight)" } }}
         >
-          {code}
+          {body}
         </SyntaxHighlighter>
       )}
     </CodeBlockFrame>

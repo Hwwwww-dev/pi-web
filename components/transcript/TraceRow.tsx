@@ -12,6 +12,7 @@ import {
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace";
+import { ChevronRightIcon } from "lucide-react";
 import {
   COLLAPSIBLE_EXPANDED_EVENT,
   getFoldChoice,
@@ -160,7 +161,8 @@ export function TraceRow({
       )}
       {/* The action is never elided: it is the row's name (用户要求：工具名称不可省略). */}
       <TraceTitle className={cn("shrink-0 whitespace-nowrap", titleClassName)}>{title}</TraceTitle>
-      {object && <span className="min-w-0 truncate">{object}</span>}
+      {/* 对象是唯一能让步的一段：名字、胶囊、行尾都不收缩。 */}
+      {object && <span className="min-w-0 flex-1 truncate">{object}</span>}
       {withChips && chips}
       {description && <TraceDescription className="min-w-0 shrink truncate">{description}</TraceDescription>}
       {trailing && <span className="shrink-0 pl-2">{trailing}</span>}
@@ -187,11 +189,30 @@ export function TraceRow({
     <Trace ref={rowRef} data-activity="trace-row" data-activity-tool={activityTool}>
       <TraceCollapsible open={open} onOpenChange={toggleFold}>
         <div className="flex w-full max-w-full items-center gap-1.5">
-          {/* 触发区只盖文字：胶囊紧跟在动作名后面，不被 flex-1 推到行尾。 */}
-          <TraceCollapsibleTrigger aria-label={ariaLabel} className="min-w-0 max-w-full">
+          {/* 触发区只盖文字：胶囊紧跟在动作名后面，不被 flex-1 推到行尾。
+              胶囊是按钮，不能嵌进触发按钮里，所以触发区自己不再画箭头，
+              箭头改成跟在胶囊后面的兄弟按钮（同样调 toggleFold）。 */}
+          <TraceCollapsibleTrigger
+            aria-label={ariaLabel}
+            className="min-w-0 max-w-full"
+            showChevron={chips == null}
+          >
             {line(false)}
           </TraceCollapsibleTrigger>
           {chips}
+          {chips != null && (
+            <button
+              type="button"
+              onClick={() => toggleFold(!open)}
+              aria-expanded={open}
+              aria-label={ariaLabel}
+              className="flex shrink-0 cursor-pointer items-center text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <TraceIcon className={cn("transition-transform", open && "rotate-90")}>
+                <ChevronRightIcon />
+              </TraceIcon>
+            </button>
+          )}
           {/* 行尾留白，把折叠箭头和 ··· 留在右边缘（胶囊是链接，不能嵌进按钮）。 */}
           <span className="min-w-0 flex-1" aria-hidden="true" />
           {actions}
