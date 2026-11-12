@@ -294,7 +294,7 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
     <section
       // 面板壳的网格布局（38px 头行 / 状态行 / 终端行）批 4 自 app/globals.css
       // 迁入；--terminal-* 调色板仍由 globals 的 .terminal-panel 按主题注入。
-      className="terminal-panel cn-code-block group/code-block relative grid h-full min-h-0 w-full min-w-0 grid-rows-[38px_auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-input bg-(--terminal-bg) text-xs dark:bg-input/30"
+      className="terminal-panel group/code-block relative grid h-full min-h-0 w-full min-w-0 grid-rows-[38px_auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-input bg-(--terminal-bg) text-xs dark:bg-input/30"
       data-terminal-theme={theme}
       aria-label={t("terminal.title")}
     >

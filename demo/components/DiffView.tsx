@@ -150,7 +150,7 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
             <span
               key={si}
               data-slot="code-block-line"
-              className="cn-code-block-line cn-code-block-line-variant-highlighted flex min-w-full items-center py-0.5 font-sans text-xs text-muted-foreground after:content-none"
+              className="-mx-4 px-4 group-data-[size=sm]/code-block:-mx-3 group-data-[size=sm]/code-block:px-3 bg-foreground/5 flex min-w-full items-center py-0.5 font-sans text-xs text-muted-foreground after:content-none"
             >
               <span aria-hidden="true" className="min-w-4 shrink-0 select-none px-1.5">⋯</span>
               <span className="shrink-0 px-1.5">{seg.count} unchanged lines</span>
@@ -165,16 +165,16 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
           // variant's absolute ::after so wrapped text keeps clearing it, and
           // content-none drops that second marker.
           const rowTone = line.type === "added"
-            ? "cn-code-block-line-variant-added"
+            ? "bg-foreground/5"
             : line.type === "removed"
-            ? "cn-code-block-line-variant-removed"
+            ? "bg-destructive/10"
             : "";
 
           return (
             <span
               key={li}
               data-slot="code-block-line"
-              className={`cn-code-block-line file-diff-line flex min-w-full after:content-none ${rowTone}`}
+              className={`-mx-4 px-4 group-data-[size=sm]/code-block:-mx-3 group-data-[size=sm]/code-block:px-3 file-diff-line flex min-w-full after:content-none ${rowTone}`}
             >
               <span style={lineNumberStyle}>
                 {line.type === "removed" ? line.oldLineNo : line.newLineNo}
