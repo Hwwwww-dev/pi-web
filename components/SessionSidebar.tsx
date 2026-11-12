@@ -3091,6 +3091,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           selectedSessionId={selectedSessionId}
           onSelectSession={handleSelectSessionFromList}
           archivedSessionIds={archiveIndex.ids}
+          projectNames={projectNames}
         >
           {/* The tree and the archive view share one cell: the archive
               slides in over the tree and away from it again. */}
