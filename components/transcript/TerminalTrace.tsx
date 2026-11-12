@@ -52,7 +52,8 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
       ariaLabel={view.object ? `${view.title} ${view.object}` : view.title}
       content={(
         <CodeBlock size="sm" variant={failed ? "destructive" : "default"} className="max-w-full">
-          <CodeBlockHeader>
+          {/* 标签和右侧按钮在一条居中行里，行底下留一点空，否则看着像贴着代码。 */}
+          <CodeBlockHeader className="min-h-9 items-center">
             <CodeBlockTitle className="text-muted-foreground">{t("chat.trace.command")}</CodeBlockTitle>
             <CodeBlockActions>
               {/* 默认不换行（高度可控），需要看完整命令时再换行。 */}

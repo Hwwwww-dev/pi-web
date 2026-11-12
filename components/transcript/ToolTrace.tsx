@@ -123,7 +123,7 @@ function FieldsSection({ section }: { section: ToolViewSection }) {
   return (
     <CodeBlock size="sm">
       {section.label && (
-        <CodeBlockHeader>
+        <CodeBlockHeader className="min-h-9 items-center">
           <CodeBlockTitle>{t(`chat.activity.${section.label}`)}</CodeBlockTitle>
         </CodeBlockHeader>
       )}
@@ -211,7 +211,7 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             disabled={!resolved}
             // 胶囊给名字留一个上限：手机上更窄（半个屏），超长文件名自己省略号，
             // 而不能把前面的动作名和后面的 +N/-N 挤出可见区。
-            className="min-w-0 max-w-[9rem] shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] sm:max-w-[14rem]"
+            className="min-w-0 max-w-full shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
             title={resolved ?? path}
             aria-label={label}
             onClick={(event) => {

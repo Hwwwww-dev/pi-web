@@ -84,6 +84,7 @@ export function TraceRow({
   titleClassName,
   chips,
   suffix,
+  duration,
   actions,
   description,
   status = "done",
@@ -108,6 +109,8 @@ export function TraceRow({
   chips?: ReactNode;
   /** 胶囊后面的定量（编辑的 +N/−N）：胶囊指哪个文件、改了多少，读起来是一句。 */
   suffix?: ReactNode;
+  /** 这一行花了多久。和思考行一样放在箭头**里面**，不能一半在里面一半在外面。 */
+  duration?: ReactNode;
   /** 行尾的动作按钮（比如打开子代理面板）：放在折叠触发按钮之外，
       因为按钮不能嵌按钮，而触发按钮里只能有那一行文字。 */
   actions?: ReactNode;
@@ -171,6 +174,7 @@ export function TraceRow({
       {withChips && chips}
       {withChips && suffix != null && <span className="shrink-0 whitespace-nowrap">{suffix}</span>}
       {description && <TraceDescription className="min-w-0 shrink truncate">{description}</TraceDescription>}
+      {duration != null && <span className="shrink-0 tabular-nums">{duration}</span>}
       {withTrailing && trailing && <span className="shrink-0 pl-2">{trailing}</span>}
       </TraceLine>
   );

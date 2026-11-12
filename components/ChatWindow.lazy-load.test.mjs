@@ -14,8 +14,8 @@ const hook = (name, includes) => nodes.find((node) => ts.isCallExpression(node)
   && node.expression.getText(source) === name
   && node.arguments[0].getText(source).includes(includes));
 const compile = (node) => new Script(ts.transpileModule(`(${node.getText(source)})`, { compilerOptions: { target: ts.ScriptTarget.ESNext } }).outputText);
-const effect = hook("useEffect", "new IntersectionObserver");
-assert.ok(effect, "missing the sentinel observer effect");
+const effect = hook("useEffect", "addEventListener(\"scroll\"");
+assert.ok(effect, "missing the sentinel effect");
 const [body] = effect.arguments;
 const script = compile(body);
 const loadOlderPage = compile(hook("useCallback", "requestedCursorRef.current = before").arguments[0]);
@@ -27,7 +27,16 @@ function mount({ hasEarlierMessages, landed = true }) {
   const calls = { visibleCount: 50, loads: [] };
   let observed = null;
   const context = createContext({
-    sentinel: {}, scrollContainerRef: { current: { scrollHeight: 4000, scrollTop: 0 } },
+    sentinel: {},
+    scrollContainerRef: {
+      current: {
+        scrollHeight: 4000, scrollTop: 2000, clientHeight: 800,
+        addEventListener: (type, handler) => { if (type === "scroll") observed = handler; },
+        removeEventListener: () => {},
+      },
+    },
+    requestAnimationFrame: (callback) => { callback(0); return 0; },
+    cancelAnimationFrame: () => {},
     loadingOlderRef: { current: false }, pageRenderingRef: { current: false }, pageRenderWaitersRef: { current: [] },
     setOlderPageState: () => {}, prevScrollDistanceRef: { current: null }, requestedCursorRef: { current: null },
     scrollAnchorRef: { current: null }, prependHeightRef: { current: null }, messageContentRef: { current: null }, captureScrollAnchor: () => ({ top: 0, height: 0 }),
@@ -44,12 +53,16 @@ function mount({ hasEarlierMessages, landed = true }) {
     calls,
     context,
     reachTop: async () => {
-      observed([{ isIntersecting: true }]);
+      // 贴顶：scrollTop 进 TOP_SLACK 内，滚动回调下一次就该读上一页。
+      context.scrollContainerRef.current.scrollTop = 0;
+      observed();
       await new Promise((resolve) => setImmediate(resolve));
     },
     render: (cursor) => {
       context.historyCursor = cursor;
       // The prepend landed and was painted, so the next page may be asked for again.
+      // 读者已经被新内容推到下面（不在顶部）：只验证游标更新，不附带“贴顶继续读”。
+      context.scrollContainerRef.current.scrollTop = 2000;
       context.pageRenderingRef.current = false;
       forgetCursor.runInContext(context)();
       run();

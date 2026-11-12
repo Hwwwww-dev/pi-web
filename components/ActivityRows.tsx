@@ -252,9 +252,7 @@ export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSubagent }: {
         defaultOpen={false}
         icon={<ToolCategoryIcon category={category} />}
         activeIcon={<ToolCategoryIcon category={category} active />}
-        trailing={!hasPending && totalDuration > 0 && formatToolDurationIfShown(totalDuration) ? (
-          <TraceDescription className="shrink-0 tabular-nums">{formatToolDurationIfShown(totalDuration)}</TraceDescription>
-        ) : undefined}
+        duration={!hasPending && totalDuration > 0 ? formatToolDurationIfShown(totalDuration) : undefined}
       >
         {calls.map((call, index) => (
           <ToolRow

@@ -97,8 +97,9 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
     const prevMessage = messages[idx - 1] as (AgentMessage & { timestamp?: number }) | undefined;
     let thinkingDuration: number | undefined;
     if (assistantMessage.timestamp && prevMessage?.timestamp) {
-      const secs = Math.round((assistantMessage.timestamp - prevMessage.timestamp) / 1000);
-      if (secs > 0) thinkingDuration = secs;
+      // 保留小数：先取整秒会把 0.4s 的思考抹成 0 而完全不显示（用户要求 0.1s 以上都要显示）。
+      const secs = (assistantMessage.timestamp - prevMessage.timestamp) / 1000;
+      if (secs >= 0.1) thinkingDuration = secs;
     }
     for (let blockIdx = 0; blockIdx < content.length && blockIdx < limit; blockIdx++) {
       const block = content[blockIdx];
@@ -119,8 +120,8 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
           if (recorded !== undefined) {
             duration = recorded;
           } else if (result.timestamp && assistantMessage.timestamp) {
-            const secs = Math.round((result.timestamp - assistantMessage.timestamp) / 1000);
-            if (secs > 0) duration = secs * 1000;
+            const secs = (result.timestamp - assistantMessage.timestamp) / 1000;
+            if (secs >= 0.1) duration = secs * 1000;
           }
         }
         items.push({

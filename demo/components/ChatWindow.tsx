@@ -601,6 +601,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const [sentinel, setSentinel] = useState<HTMLElement | null>(null);
   /** 展开/折叠一行的那几帧：不让 scroller 跟着内容贴底，否则行会被拉上去。 */
   const [foldInFlight, setFoldInFlight] = useState(false);
+  /** 收键盘的那几帧：同上，让“滑回底部”自己演完，不跟 scroller 抢。 */
+  const [keyboardClosing, setKeyboardClosing] = useState(false);
   const foldTimerRef = useRef<number | undefined>(undefined);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
@@ -739,24 +741,40 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     };
   }, []);
 
-  // 收键盘时视口一下子长回来，列表会在那一帧贴回底部——硬跳。把它改成滑下去：
-  // 只有“长高”才处理（弹起是变矮），并尊重系统的减少动画。
+  // 收键盘时视口一下子长回来，列表要在那一帧贴回底部。以前直接 scrollTo(smooth)：
+  // iOS 的 visualViewport 会分好几帧长高，每帧都重启一次平滑滚动，后面再被官方
+  // scroller 的贴底抢一下——看到的就是闪。现在键盘收起期间先括住 scroller 的贴底，
+  // 等高度稳定了再滑一次，滑完再放开。
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
     let height = viewport.height;
+    let settle = 0;
     const onResize = () => {
       const next = viewport.height;
-      const keyboadClosed = next - height > 80;
+      const keyboardClosed = next - height > 80;
       height = next;
-      if (!keyboadClosed) return;
+      if (!keyboardClosed) return;
       const container = scrollContainerRef.current;
       if (!container) return;
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      container.scrollTo({ top: container.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+      // 读者本来就不在底部（在看历史）：视口长高只意味着多看到几行，不动。
+      const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+      if (!atBottom) return;
+      setKeyboardClosing(true);
+      window.clearTimeout(settle);
+      settle = window.setTimeout(() => {
+        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const target = scrollContainerRef.current;
+        target?.scrollTo({ top: target.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+        // 动画期间不能让 scroller 提前抢着贴底，否则又回到一跳一闪。
+        settle = window.setTimeout(() => setKeyboardClosing(false), reduce ? 0 : 260);
+      }, 140);
     };
     viewport.addEventListener("resize", onResize);
-    return () => viewport.removeEventListener("resize", onResize);
+    return () => {
+      viewport.removeEventListener("resize", onResize);
+      window.clearTimeout(settle);
+    };
   }, [scrollContainerRef]);
 
   // 键盘弹起时不去写回任何滚动位置：官方 scroller 自己知道谁在贴尾、谁在看历史，
@@ -877,50 +895,59 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     onSearchTargetHandled?.(pendingSearchScroll);
   }, [pendingSearchScroll, searchTarget, searchMessage, scrollContainerRef, scrollToMessage, onSearchTargetHandled]);
 
-  // IntersectionObserver on the sentinel div at the top of the message list.
-  // When it becomes visible, load the next page of older messages.
+  // 贴顶就自动读下一页。IntersectionObserver 只在交叉状态“变化”时回调：哨兵一直在
+  // 视口里（贴顶打开一个会话就是这样）便一次也不报，于是必须再往下滑一段、让它先
+  // 离开再回来才会加载。改成直接听 scroll：贴顶就试，试不成的事交给闸门释放后的
+  // 下一轮 effect。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!sentinel || !container) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries[0]?.isIntersecting) return;
-        // 必须真的触顶才读下一页：预言加载区域一大，哨兵在还没读完时就进视口，
-        // 翻页跟着一页接一页地跑。滚到顶才动，读者不往上就永远不再读。
-        if (container.scrollTop > 2) return;
-        // Skip while a page is loading or the last one is still rendering.
-        if (loadingOlderRef.current || pageRenderingRef.current) return;
-        if (!hasEarlierMessages) {
-          // Everything is loaded, yet the sentinel shows: the messages render as
-          // more rows than the window holds (an answer and its thinking are
-          // two), so widen the window. The observer is renewed with it, in case
-          // the sentinel stays in view.
-          scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
-          setVisibleCount((current) => getNextVisibleCount(current));
-          return;
-        }
-        // Fetch the previous page from the server and prepend it (loadContext
-        // handles prepend + scroll anchoring).
-        const oldestId = historyCursor;
-        // Its page already landed; the next cursor has not rendered yet.
-        if (!oldestId || oldestId === requestedCursorRef.current) return;
-        const sid = session?.id ?? sessionIdRef.current;
-        if (!sid) return;
-        loadingOlderRef.current = true;
-        // 顶到顶才读，读回来要靠高度差把读者按在原来那一行：元素锚点在整页插到
-        // 前面时会被重建，量不到；scrollHeight 的增量则一定等于新插进来的高度。
-        prependHeightRef.current = container.scrollHeight;
-        void loadOlderPage(sid, oldestId).finally(() => {
-          loadingOlderRef.current = false;
-        });
-      },
-      { root: container, threshold: 0 }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-    // `olderPageState` is a dependency on purpose: clearing the gate recreates the
-    // observer, whose first report fires for a sentinel still in view. Without it
-    // the reader would have to scroll away and back to get the next page.
+    /** 离顶多远仍算“贴顶”：触摸惯性带小数，滚不到绝对 0。 */
+    const TOP_SLACK = 24;
+    const attempt = () => {
+      if (container.scrollTop > TOP_SLACK) return;
+      // Skip while a page is loading or the last one is still rendering.
+      if (loadingOlderRef.current || pageRenderingRef.current) return;
+      if (!hasEarlierMessages) {
+        // Everything is loaded, yet the sentinel shows: the messages render as
+        // more rows than the window holds (an answer and its thinking are
+        // two), so widen the window.
+        scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
+        setVisibleCount((current) => getNextVisibleCount(current));
+        return;
+      }
+      // Fetch the previous page from the server and prepend it (loadContext
+      // handles prepend + scroll anchoring).
+      const oldestId = historyCursor;
+      // Its page already landed; the next cursor has not rendered yet.
+      if (!oldestId || oldestId === requestedCursorRef.current) return;
+      const sid = session?.id ?? sessionIdRef.current;
+      if (!sid) return;
+      loadingOlderRef.current = true;
+      // 顶到顶才读，读回来要靠高度差把读者按在原来那一行：元素锚点在整页插到
+      // 前面时会被重建，量不到；scrollHeight 的增量则一定等于新插进来的高度。
+      prependHeightRef.current = container.scrollHeight;
+      void loadOlderPage(sid, oldestId).finally(() => {
+        loadingOlderRef.current = false;
+      });
+    };
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        attempt();
+      });
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
+    // 首次也试一次：贴顶打开的会话没有任何滚动事件。
+    attempt();
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+    // `olderPageState` 是刻意的依赖：上一页落地并画完后 effect 重建，reader 还在顶上
+    // 就继续读下一页，而不用再滑一下。
   }, [sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState]);
 
   // Keep the rendered window at least as large as what's loaded, so prepended
@@ -1678,7 +1705,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} waitingCount={waitingExtensionCustomUiCount} onInput={sendExtensionCustomInput} />
         )}
         {!isEmptyNew && <>
-        <MessageScrollerProvider autoScroll={!foldInFlight} defaultScrollPosition="last-anchor">
+        <MessageScrollerProvider autoScroll={!foldInFlight && !keyboardClosing} defaultScrollPosition="last-anchor">
         <MessageScroller className="min-h-0 min-w-0 flex-1">
         <MessageScrollerViewport
           ref={scrollContainerRef}

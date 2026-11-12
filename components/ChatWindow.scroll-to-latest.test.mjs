@@ -14,7 +14,7 @@ test("one scroll-to-latest control, and it is the official one", () => {
 });
 
 test("the scroller keeps its official defaults for prepends and the initial anchor", () => {
-  assert.match(source, /<MessageScrollerProvider autoScroll=\{!foldInFlight\} defaultScrollPosition="last-anchor">/);
+  assert.match(source, /<MessageScrollerProvider autoScroll=\{!foldInFlight && !keyboardClosing\} defaultScrollPosition="last-anchor">/);
   // Hand-rolled compensation must not sit next to the official one.
   assert.equal(source.includes("preserveScrollOnPrepend={false}"), false);
   // The last user message is the anchor the scroller opens at.
@@ -33,8 +33,9 @@ test("nothing else writes the reader's scroll position", () => {
 test("no background read of the whole branch", () => {
   assert.equal(source.includes("PREFETCH_MAX_PAGES"), false);
   assert.equal(source.includes("PREFETCH_PAGE_SIZE"), false);
-  // Older pages arrive only from the sentinel / "load earlier" request.
-  assert.match(source, /observer\.observe\(sentinel\)/);
+  // Older pages arrive only from the sentinel / "load earlier" request: the top-of-list
+  // scroll listener and the click handler both call loadOlderPage.
+  assert.match(source, /container\.addEventListener\("scroll", onScroll, \{ passive: true \}\)/);
 });
 
 test("one page at a time: the next request waits for the last one to render", () => {
@@ -60,8 +61,8 @@ test("the earlier-messages row is a real button", () => {
 });
 
 test("clearing the gate re-arms the sentinel without a scroll round-trip", () => {
-  // IntersectionObserver only reports a change; recreating it makes the initial
-  // report fire for a sentinel that is still on screen, so paging continues.
+  // 监听 scroll 的 effect 重建后自己先试一次：上一页落地时读者还在顶上，就接着读，
+  // 不用再滑一下让它“重新进入”。
   assert.match(source, /\}, \[sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState\]\);/);
 });
 

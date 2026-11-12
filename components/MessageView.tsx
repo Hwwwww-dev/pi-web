@@ -620,8 +620,9 @@ function AssistantMessageView({
   const thinkingDurationFromFile = useMemo<number | undefined>(() => {
     const ms = messageDurationMs ?? (message.timestamp && prevTimestamp ? message.timestamp - prevTimestamp : undefined);
     if (ms === undefined) return undefined;
-    const secs = Math.round(ms / 1000);
-    return secs > 0 ? secs : undefined;
+    // 保留小数：整秒化会把 0.4s 变成 0，于是 0.1s 以上的思考反而不显示时长。
+    const secs = ms / 1000;
+    return secs >= 0.1 ? secs : undefined;
   }, [messageDurationMs, message.timestamp, prevTimestamp]);
 
   const textContent = blocks

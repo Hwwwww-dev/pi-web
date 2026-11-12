@@ -854,20 +854,24 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const beamRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const root = beamRef.current;
-    if (!root) return;
-    const beam = root.querySelector("[data-beam]");
-    if (!beam) return;
+    if (!root || typeof Animation === "undefined") return;
+    // 边光组件会把动画挂在自己的子树（`[data-beam]`，有的版本还带 bloom 层），
+    // 名字也带实例后缀（`beam-spin-<id>`）。别靠名字或层级去挑：把整棵子树里
+    // 的动画都按商品站点的方式同步播放速率，更不会漏。
     const apply = () => {
-      for (const animation of beam.getAnimations({ subtree: true })) {
-        const name = (animation as CSSAnimation).animationName;
-        if (typeof name !== "string" || !name.includes("beam-spin")) continue;
-        animation.updatePlaybackRate(beamPlaybackRate);
+      for (const animation of root.getAnimations({ subtree: true })) {
+        if (animation.playbackRate !== beamPlaybackRate) animation.updatePlaybackRate(beamPlaybackRate);
       }
     };
-    // 动画在激活后的下一帧才挂上，首帧取不到就等一帧再取一次。
     apply();
+    // 动画可能在激活后的下一帧才挂上，也可能被组件的重新渲染重建（重置为 1x）。
+    // 一个静态的 interval 比任何一次性的 effect 都可靠，而它只在播放期间运行。
     const frame = requestAnimationFrame(apply);
-    return () => cancelAnimationFrame(frame);
+    const timer = isStreaming && !compact ? window.setInterval(apply, 400) : 0;
+    return () => {
+      cancelAnimationFrame(frame);
+      if (timer) window.clearInterval(timer);
+    };
   }, [beamPlaybackRate, isStreaming, compact]);
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>(() => (

@@ -20,14 +20,18 @@ export const BEAM_SLOWEST_SECONDS = 4;
 export const BEAM_BASE_SECONDS = BEAM_SLOWEST_SECONDS;
 /** One trip on the fastest reply, in seconds. */
 export const BEAM_FASTEST_SECONDS = 0.6;
-/** The rate that already counts as "as fast as it gets" (tokens per second). */
-export const BEAM_FASTEST_RATE = 150;
+/**
+ * The rate that already counts as "as fast as it gets" (tokens per second).
+ *
+ * 150 太低：真实回包常在 150~300 t/s，一上来就顶到最快档，看起来反而“一直匀速”。
+ */
+export const BEAM_FASTEST_RATE = 400;
 
 /**
  * How many tokens/s the rate may gain per second. Fast: a reply that starts
  * streaming should look fast almost at once.
  */
-export const BEAM_RISE_PER_SECOND = 400;
+export const BEAM_RISE_PER_SECOND = 800;
 /**
  * How many tokens/s it may lose per second. Much slower than the rise: a pause
  * between chunks must not read as the beam slamming to a crawl.
@@ -37,6 +41,7 @@ export const BEAM_FALL_PER_SECOND = 45;
 /** One trip around the card for a rate, linearly between the two ends. */
 export function beamDurationSeconds(rate: number): number {
   if (!Number.isFinite(rate) || rate <= 0) return BEAM_SLOWEST_SECONDS;
+  if (rate >= BEAM_FASTEST_RATE) return BEAM_FASTEST_SECONDS;
   const span = BEAM_SLOWEST_SECONDS - BEAM_FASTEST_SECONDS;
   const seconds = BEAM_SLOWEST_SECONDS - span * (rate / BEAM_FASTEST_RATE);
   return Math.min(BEAM_SLOWEST_SECONDS, Math.max(BEAM_FASTEST_SECONDS, seconds));
