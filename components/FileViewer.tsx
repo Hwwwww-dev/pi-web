@@ -1411,7 +1411,9 @@ function TextFileViewer({
             <FileIcon aria-hidden="true" strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
             <span className="whitespace-nowrap">{getFileName(filePath)}</span>
           </CodeBlockTitle>
-          <PathLabel className="min-w-0 flex-1 truncate font-mono text-xs" text={getRelativeFilePath(filePath, cwd)} title={filePath} />
+          {getRelativeFilePath(filePath, cwd) !== getFileName(filePath) && (
+            <PathLabel className="min-w-0 flex-1 truncate font-mono text-xs" text={getRelativeFilePath(filePath, cwd)} title={filePath} />
+          )}
           <span className="hidden min-w-0 shrink truncate text-xs text-muted-foreground sm:inline" title={metadata}>
             {metadata}
           </span>
@@ -1456,7 +1458,7 @@ function TextFileViewer({
               title={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
               aria-label={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
               aria-pressed={wrapLines}
-              className={cn("text-muted-foreground", wrapLines && "bg-accent text-foreground")}
+              className={cn("hidden text-muted-foreground sm:inline-flex", wrapLines && "bg-accent text-foreground")}
             >
               <WrapText className="size-3.5" strokeWidth={1.8} />
             </Button>
@@ -1485,7 +1487,7 @@ function TextFileViewer({
               }
               aria-label={t("files.mention")}
               disabled={!onAtMention && !onMentionLines}
-              className="text-muted-foreground"
+              className="hidden text-muted-foreground sm:inline-flex"
             >
               <AtSign className="size-3.5" strokeWidth={1.8} />
             </Button>
