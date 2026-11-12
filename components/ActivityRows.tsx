@@ -350,7 +350,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
                         <img
                           src={src}
                           alt=""
-                          className="block max-h-[var(--card-max-height)] max-w-60 rounded-md border border-border object-contain"
+                          className="block max-h-[var(--card-max-height)] max-w-60 object-contain"
                         />
                       </ImagePreview>
                     );

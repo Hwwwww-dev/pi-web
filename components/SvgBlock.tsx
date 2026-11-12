@@ -111,7 +111,7 @@ export function SvgBlock({ code, isStreaming }: { code: string; isStreaming?: bo
             <Button
               type="button"
               variant="ghost"
-              className="block h-auto max-h-[min(600px,60dvh)] w-full overflow-auto rounded-none border-0 text-left font-normal text-inherit cursor-zoom-in hover:opacity-85"
+              className="block h-auto max-h-[min(600px,60dvh)] w-full cursor-zoom-in overflow-auto p-0 text-left font-normal text-inherit"
               title={t("i18n.openSvgViewer")}
               aria-label={t("i18n.openSvgViewer")}
               onClick={() => setZoomOpen(true)}

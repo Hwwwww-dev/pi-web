@@ -321,7 +321,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               alt=""
               loading="lazy"
               decoding="async"
-              className="block max-h-60 max-w-60 rounded-md border border-border object-contain"
+              className="block max-h-60 max-w-60 object-contain"
             />
           </ImagePreview>
         );

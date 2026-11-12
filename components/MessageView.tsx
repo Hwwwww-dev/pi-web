@@ -321,7 +321,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               alt=""
               loading="lazy"
               decoding="async"
-              className="block max-h-60 max-w-60 rounded-md border border-border object-contain"
+              className="block max-h-60 max-w-60 object-contain"
             />
           </ImagePreview>
         );
@@ -451,7 +451,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               <GitBranchIcon strokeWidth={1.8} />
             </Button>
           )}
-          {time && <span className="text-[10px] text-muted-foreground">{time}</span>}
+          {time && <span className="text-xs text-muted-foreground">{time}</span>}
         </MessageFooter>
       )}
     </Message>
@@ -470,13 +470,13 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
     // readable while it counts up; widths are content-driven (no reserved
     // minimums — those parked dead space between the number and the badge).
     <div className={cn(
-      "flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-[11px] leading-[1.5] text-muted-foreground [font-variant-numeric:tabular-nums]",
+      "flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-xs leading-[1.5] text-muted-foreground [font-variant-numeric:tabular-nums]",
       className,
     )}>
       {modelName && <span className="min-w-0 truncate">{modelName}</span>}
       {estimatedTokens > 0 && (
         <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground" title={t("i18n.estimatedTokens")}>
-          <span className="flex items-center gap-0.5 text-[11px] font-normal">
+          <span className="flex items-center gap-0.5 text-xs font-normal">
             <ArrowDownIcon aria-hidden className="size-2.5" strokeWidth={1.5} />
             {/* No minimum width on purpose: a reserved 6ch made a finished
                 count like 155 carry ~3ch of permanent dead space between the
@@ -746,7 +746,7 @@ function AssistantMessageView({
           {(message.usage || turnDurationMs !== undefined) && !isStreaming && (
             // One item per count: a single space at 11px ran them together. The
             // spaces stay in the text for copying; the flex gap draws the room.
-            <div className="flex flex-wrap gap-x-[7px] font-mono text-[11px] text-muted-foreground tabular-nums">
+            <div className="flex flex-wrap gap-x-[7px] font-mono text-xs text-muted-foreground tabular-nums">
               {stats.map((part, index) => (
                 <Fragment key={index}>{index > 0 && " "}<UsagePart part={part} /></Fragment>
               ))}
@@ -769,7 +769,7 @@ function AssistantMessageView({
           </Button>
           )}
           {time && !isStreaming && (
-            <span className="ml-auto whitespace-nowrap text-[10px] text-muted-foreground">{time}</span>
+            <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground">{time}</span>
           )}
         </MessageFooter>
       )}
@@ -845,7 +845,7 @@ interface StatPart {
 
 // Unseen but still text: font-size 0 stays in a copied selection, where a
 // zero-width overflow box drops it and sr-only's absolute box adds a line break.
-const HIDDEN_STAT_TEXT = "text-[0px]";
+const HIDDEN_STAT_TEXT = "sr-only";
 
 // ↑ and ↓ come from whatever font has them: Segoe UI or a CJK fallback on
 // Windows draws them small, heavy or off the baseline. The icons are drawn

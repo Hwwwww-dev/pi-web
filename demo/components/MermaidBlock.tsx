@@ -8,6 +8,7 @@ import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { CheckIcon, CopyIcon, Maximize, Minus, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
 import {
   CodeBlock as CodeBlockFrame,
   CodeBlockActions,
@@ -15,7 +16,13 @@ import {
   CodeBlockHeader,
   CodeBlockTitle,
 } from "@/components/ui/code-block";
-import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useTheme } from "@/hooks/useTheme";
 import { useI18n } from "@/hooks/useI18n";
 import { usePrismLanguages } from "@/hooks/usePrismLanguages";
@@ -123,7 +130,7 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
             ref={previewRef}
             type="button"
             variant="ghost"
-            className="block h-auto max-h-[min(600px,60dvh)] w-full overflow-auto border-0 text-left font-normal text-inherit cursor-zoom-in hover:opacity-85"
+            className="block h-auto max-h-[min(600px,60dvh)] w-full cursor-zoom-in overflow-auto p-0 text-left font-normal text-inherit"
             title={t("i18n.openMermaidViewer")}
             aria-label={t("i18n.openMermaidViewer")}
             onClick={() => setZoomOpen(true)}
@@ -163,7 +170,8 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
 // What a previewed fence (mermaid here, svg in components/SvgBlock.tsx) shares:
 // the header with its toggle and download button, and the zoom viewer.
 
-/** Header tool buttons: the ghost xs Button, active = accent. */
+/* Header tool buttons: official Buttons inside the header's ButtonGroup, the
+   active one marked by text color as the official copy button marks "copied". */
 export function PreviewToggleButton({ isStreaming, previewVisible, onToggle, title }: {
   isStreaming?: boolean;
   previewVisible: boolean;
@@ -181,7 +189,7 @@ export function PreviewToggleButton({ isStreaming, previewVisible, onToggle, tit
       disabled={isStreaming}
       title={isStreaming ? t("i18n.previewAfterStreaming") : title}
       aria-pressed={previewVisible}
-      className={previewVisible ? "bg-accent text-foreground" : undefined}
+      className={previewVisible ? "text-foreground" : "text-muted-foreground"}
     >
       {previewVisible ? t("i18n.source") : t("i18n.preview")}
     </Button>
@@ -204,18 +212,30 @@ export function SvgDownloadButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+/**
+ * The frame a previewed fence shares with a code fence: the official CodeBlock
+ * header, whose actions are one official ButtonGroup — no hand-drawn toolbar.
+ */
 export function PreviewFrame({ lang, actions, children }: { lang: string; actions: ReactNode; children: ReactNode }) {
   return (
-    <CodeBlockFrame className="w-full min-w-0 max-w-full">
-      <CodeBlockHeader className="border-b px-2.5 py-1">
-        <CodeBlockTitle className="font-mono text-xs font-medium text-muted-foreground">{lang}</CodeBlockTitle>
-        <CodeBlockActions className="gap-1">{actions}</CodeBlockActions>
+    <CodeBlockFrame className="min-w-0 max-w-full">
+      <CodeBlockHeader>
+        <CodeBlockTitle>{lang}</CodeBlockTitle>
+        <CodeBlockActions>
+          <ButtonGroup>{actions}</ButtonGroup>
+        </CodeBlockActions>
       </CodeBlockHeader>
       {children}
     </CodeBlockFrame>
   );
 }
 
+/**
+ * The zoomed view of a diagram: an official Dialog that nearly fills a phone
+ * and becomes a large card on a desktop, whose toolbar is one official
+ * ButtonGroup per group of controls. Radix owns the overlay, the scroll lock,
+ * Escape and the focus return; the dialog draws no chrome of its own.
+ */
 export function DiagramZoomDialog({ title, label, onClose, children }: {
   title: string;
   label: string;
@@ -223,48 +243,29 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
   children: ReactNode;
 }) {
   const { t } = useI18n();
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [zoom, setZoom] = useState(1);
 
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog.showModal();
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      if (dialog.open) dialog.close();
-    };
-  }, []);
-
   return (
-    <dialog
-      ref={dialogRef}
-      className="mermaid-zoom-dialog w-screen max-w-none h-dvh max-h-none m-0 border-0 bg-background p-0 text-foreground backdrop:bg-black/35"
-      aria-label={label}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== "Escape") return;
-        event.preventDefault();
-        onClose();
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
     >
-      <div className="mermaid-zoom-layout grid grid-rows-[auto_minmax(0,1fr)] h-full">
-        <div className="mermaid-zoom-toolbar flex min-h-10 items-center gap-2.5 border-b border-border bg-sidebar px-2.5 py-[7px] max-[480px]:px-2">
-          <span className="mermaid-zoom-title min-w-0 overflow-hidden font-mono text-xs font-semibold text-ellipsis whitespace-nowrap text-muted-foreground max-[480px]:text-[10px]">{title}</span>
-          <div className="mermaid-zoom-actions ml-auto flex items-center gap-1.5">
-            <div className="flex h-6 items-center overflow-hidden rounded-md border border-border bg-background">
+      <DialogContent
+        showCloseButton={false}
+        aria-label={label}
+        aria-describedby={undefined}
+        className="mermaid-zoom-dialog grid h-[min(92dvh,56rem)] w-full max-w-[calc(100%-2rem)] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-4xl"
+      >
+        <DialogHeader className="mermaid-zoom-toolbar flex-row items-center gap-2 px-3 py-2">
+          <DialogTitle className="mermaid-zoom-title min-w-0 truncate font-mono text-sm font-medium text-muted-foreground">{title}</DialogTitle>
+          <div className="mermaid-zoom-actions ms-auto flex shrink-0 items-center gap-2">
+            <ButtonGroup>
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="icon-xs"
-                className="size-[22px] rounded-none"
                 onClick={() => setZoom((value) => Math.max(ZOOM_MIN, value - ZOOM_STEP))}
                 disabled={zoom <= ZOOM_MIN}
                 title={t("i18n.zoomOut")}
@@ -272,14 +273,13 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
               >
                 <Minus strokeWidth={1.8} />
               </Button>
-              <Separator orientation="vertical" className="h-[22px]" />
-              <span className="min-w-12 text-center font-mono text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
-              <Separator orientation="vertical" className="h-[22px]" />
+              <ButtonGroupText className="px-2 text-xs tabular-nums">
+                {Math.round(zoom * 100)}%
+              </ButtonGroupText>
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="icon-xs"
-                className="size-[22px] rounded-none"
                 onClick={() => setZoom((value) => Math.min(ZOOM_MAX, value + ZOOM_STEP))}
                 disabled={zoom >= ZOOM_MAX}
                 title={t("i18n.zoomIn")}
@@ -287,43 +287,41 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
               >
                 <Plus strokeWidth={1.8} />
               </Button>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-xs"
-              onClick={() => setZoom(1)}
-              title={t("i18n.fitToWidth")}
-              aria-label={t("i18n.fitToWidth")}
-            >
-              <Maximize strokeWidth={1.8} />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-xs"
-              onClick={onClose}
-              title={t("i18n.close")}
-              aria-label={t("i18n.close")}
-            >
-              <X strokeWidth={1.8} />
-            </Button>
+            </ButtonGroup>
+            <ButtonGroup>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-xs"
+                onClick={() => setZoom(1)}
+                title={t("i18n.fitToWidth")}
+                aria-label={t("i18n.fitToWidth")}
+              >
+                <Maximize strokeWidth={1.8} />
+              </Button>
+              <DialogClose asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-xs"
+                  title={t("i18n.close")}
+                  aria-label={t("i18n.close")}
+                >
+                  <X strokeWidth={1.8} />
+                </Button>
+              </DialogClose>
+            </ButtonGroup>
           </div>
-        </div>
-        <div
-          className="mermaid-zoom-viewport min-h-0 min-w-0 overflow-auto bg-background p-6 [-webkit-overflow-scrolling:touch] max-[480px]:p-3"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) onClose();
-          }}
-        >
+        </DialogHeader>
+        <div className="mermaid-zoom-viewport min-h-0 min-w-0 overflow-auto p-6 [-webkit-overflow-scrolling:touch] max-[480px]:p-3">
           {/* The zoom factor is a computed width, not a static presentation.
               mermaid 生成的 svg 的块级铺满规则留在 globals（.mermaid-zoom-canvas svg）。 */}
-          <div className="mermaid-zoom-canvas mx-auto border border-border rounded-(--radius-sm) bg-sidebar p-3 transition-[width] duration-150 ease-[ease]" style={{ width: `${zoom * 100}%` }}>
+          <div className="mermaid-zoom-canvas mx-auto transition-[width] duration-150 ease-[ease]" style={{ width: `${zoom * 100}%` }}>
             {children}
           </div>
         </div>
-      </div>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -419,22 +417,24 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
   };
 
   return (
-    <CodeBlockFrame className="w-full min-w-0 max-w-full">
-      <CodeBlockHeader className="border-b px-2.5 py-1">
-        <CodeBlockTitle className="font-mono text-xs font-medium text-muted-foreground">{lang || "text"}</CodeBlockTitle>
-        <CodeBlockActions className="gap-1">
-          {headerAction}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            onClick={copy}
-            title={copied ? t("i18n.copied") : t("i18n.copy")}
-            aria-label={copied ? t("i18n.copied") : t("i18n.copy")}
-            className={copied ? "text-primary" : "text-muted-foreground"}
-          >
-            {copied ? <CheckIcon strokeWidth={1.8} /> : <CopyIcon strokeWidth={1.8} />}
-          </Button>
+    <CodeBlockFrame className="min-w-0 max-w-full">
+      <CodeBlockHeader>
+        <CodeBlockTitle>{lang || "text"}</CodeBlockTitle>
+        <CodeBlockActions>
+          <ButtonGroup>
+            {headerAction}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={copy}
+              title={copied ? t("i18n.copied") : t("i18n.copy")}
+              aria-label={copied ? t("i18n.copied") : t("i18n.copy")}
+              className={copied ? "text-primary" : "text-muted-foreground"}
+            >
+              {copied ? <CheckIcon strokeWidth={1.8} /> : <CopyIcon strokeWidth={1.8} />}
+            </Button>
+          </ButtonGroup>
         </CodeBlockActions>
       </CodeBlockHeader>
       {isStreaming ? (

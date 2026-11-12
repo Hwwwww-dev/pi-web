@@ -24,10 +24,13 @@ export const MediaTrace = memo(function MediaTrace({ images, video, audio }: {
         <AttachmentGroup className="flex-wrap overflow-visible">
           {images?.map((src, index) => (
             <Attachment key={index} orientation="vertical" size="sm" className="max-w-full">
-              <AttachmentMedia variant="image" className="aspect-auto w-auto">
-                <ImagePreview src={src}>
+              <AttachmentMedia variant="image">
+                {/* The preview trigger sits between the tile and the picture, so
+                    the tile's own image sizing (*:[img]) no longer reaches it:
+                    the thumbnail carries the same square cover itself. */}
+                <ImagePreview src={src} className="w-full">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" className="max-h-64 w-auto object-contain" loading="lazy" />
+                  <img src={src} alt="" className="aspect-square w-full object-cover" loading="lazy" />
                 </ImagePreview>
               </AttachmentMedia>
             </Attachment>
