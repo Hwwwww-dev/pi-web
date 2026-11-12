@@ -52,7 +52,6 @@ import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useDialogMaxHeight } from "@/hooks/useDialogMaxHeight";
 import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
-import { COLLAPSIBLE_EXPANDED_EVENT } from "@/lib/tool-call-expansion";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import type { DebugClientSession } from "@/lib/debug-types";
 import type { AppUpdateResponse } from "@/lib/api-types";
@@ -67,11 +66,6 @@ import {
   VISIBLE_PAGE_SIZE,
 } from "@/lib/chat-lazy-load";
 import { SCROLL_ANCHOR_SETTLE_MS, applyScrollAnchor, captureScrollAnchor, type ScrollAnchor } from "@/lib/scroll-anchor";
-
-/** Pages fetched up front: enough for a very long session, and a guard against a broken cursor. */
-const PREFETCH_MAX_PAGES = 40;
-/** Entries per background page — fewer round-trips than the scroll-triggered page. */
-const PREFETCH_PAGE_SIZE = 200;
 
 interface Props {
   session: SessionInfo | null;
@@ -286,7 +280,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     savedDefaultThinkingLevel,
     agentPhase,
     isNew,
-    showScrollToBottom,
     sessionIdRef, scrollContainerRef,
     lastUserMsgRef, promptAnchorActive,
     handleSend, handleAbort, startSideChat, handleFork, handleModelChange,
@@ -608,6 +601,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
+  /** 后台读完整分支时贴尾读者的意图：必须在提交后的布局阶段就用上，不能等下一帧。 */
   const loadingOlderRef = useRef(false);
   const restoreStartedRef = useRef(false);
   const pendingScrollRestoreRef = useRef(pendingScrollRestore);
@@ -689,53 +683,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
   // Expanding a collapsed thinking row or tool card grows the content. While
   // the user reads at the tail, keep the tail in view instead of letting the
-  // opened body fall below the fold.
-  useEffect(() => {
-    const onExpanded = () => {
-      const container = scrollContainerRef.current;
-      if (!container) return;
-      // Measured synchronously: the expansion has not painted yet, so this is
-      // the pre-expand distance from the tail.
-      if (!isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)) return;
-      requestAnimationFrame(() => scrollToBottom("smooth"));
-    };
-    window.addEventListener(COLLAPSIBLE_EXPANDED_EVENT, onExpanded);
-    return () => window.removeEventListener(COLLAPSIBLE_EXPANDED_EVENT, onExpanded);
-  }, [scrollContainerRef, scrollToBottom]);
+  // Expanding a collapsed row no longer kicks the list: `components/transcript/TraceRow.tsx`
+  // keeps the toggled row's own top edge fixed across the change, so opening a card
+  // grows it downward instead of scrolling the tail into view.
 
-  // Focusing the composer on a phone opens the keyboard, and the browser then
-  // scrolls every ancestor it can to reveal the caret — the message list lands
-  // somewhere the user never asked for (queue rows make the composer taller and
-  // the jump worse). Put the list back where it was: once after layout settles
-  // and again on the keyboard's first viewport resize. At the tail the restore
-  // clamps to the new (shorter) maximum, so tail-stick survives; mid-list the
-  // reading position holds.
-  useEffect(() => {
-    const onFocusIn = (event: FocusEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target?.matches?.("[data-chat-composer]")) return;
-      const container = scrollContainerRef.current;
-      const containerTop = container?.scrollTop ?? null;
-      const pageTop = window.scrollY;
-      let seenViewportResize = false;
-      const restore = () => {
-        if (container && containerTop !== null) container.scrollTop = containerTop;
-        window.scrollTo(0, pageTop);
-      };
-      const viewport = window.visualViewport;
-      const onViewportResize = () => {
-        if (seenViewportResize) return;
-        seenViewportResize = true;
-        restore();
-        viewport?.removeEventListener("resize", onViewportResize);
-      };
-      requestAnimationFrame(() => requestAnimationFrame(restore));
-      viewport?.addEventListener("resize", onViewportResize);
-      window.setTimeout(() => viewport?.removeEventListener("resize", onViewportResize), 800);
-    };
-    document.addEventListener("focusin", onFocusIn);
-    return () => document.removeEventListener("focusin", onFocusIn);
-  }, [scrollContainerRef]);
+  // 键盘弹起时不去写回任何滚动位置：官方 scroller 自己知道谁在贴尾、谁在看历史，
+  // 而以前那个 focusin 手回写 scrollTop/window.scrollY，正好在视口缩高的那一帧
+  // 把列表拉回去——这就是“输入法上移、消息不跟着上移、还卡停跳一下”。
 
   useEffect(() => {
     const position = pendingScrollRestore;
@@ -895,57 +849,20 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     setVisibleCount((current) => Math.max(current, messages.length));
   }, [messages.length]);
 
-  // Read the rest of the branch in the background, right after the first page.
-  // Paging on scroll means one re-anchor per page and dozens of pages in a long
-  // session; fetching them up front costs the same bytes and settles once. Each
-  // page yields a frame so the list stays responsive, and a tail reader stays at
-  // the tail instead of being dragged into the older rows growing above.
-  useEffect(() => {
-    if (loading || !session?.id) return;
-    const sid = session.id;
-    const controller = new AbortController();
-    let stopped = false;
-    const run = async () => {
-      for (let page = 0; page < PREFETCH_MAX_PAGES && !stopped; page++) {
-        // A scroll-triggered page may be in flight: let it land rather than
-        // asking for the same cursor twice.
-        for (let waited = 0; loadingOlderRef.current && waited < 50 && !stopped; waited++) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        if (stopped || loadingOlderRef.current) return;
-        const snapshot = searchHistoryRef.current;
-        if (!snapshot.hasEarlierMessages || !snapshot.historyCursor) return;
-        const container = scrollContainerRef.current;
-        const atTail = container
-          ? isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)
-          : true;
-        if (container && !atTail) scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
-        loadingOlderRef.current = true;
-        try {
-          const context = await loadOlderPage(sid, snapshot.historyCursor, { tail: PREFETCH_PAGE_SIZE, signal: controller.signal });
-          if (!context) return;
-          setVisibleCount((current) => Math.max(current, messagesLenRef.current));
-        } finally {
-          loadingOlderRef.current = false;
-        }
-        if (atTail) requestAnimationFrame(() => scrollToBottom("instant"));
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-    };
-    void run();
-    return () => {
-      stopped = true;
-      controller.abort();
-    };
-  }, [loading, loadOlderPage, scrollContainerRef, scrollToBottom, session?.id]);
+  // Read one more page only when the reader asks for it (the sentinel at the top
+  // or the "load earlier" row). Reading the whole branch up front put dozens of
+  // page-sized prepends on screen while the reader was still at the tail, which
+  // is what made loading look like it was jumping around.
 
   // After visibleCount increases (older messages prepended) put the row the
   // reader was looking at back where it was — and keep it there while the rows
   // above settle (markdown, highlighting, images all report their height late).
   useLayoutEffect(() => {
-    const anchor = scrollAnchorRef.current;
     const container = scrollContainerRef.current;
-    if (!anchor || !container) return;
+    if (!container) return;
+
+    const anchor = scrollAnchorRef.current;
+    if (!anchor) return;
     scrollAnchorRef.current = null;
     applyScrollAnchor(container, anchor);
     const content = messageContentRef.current;
@@ -957,7 +874,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       observer.disconnect();
       window.clearTimeout(stop);
     };
-  }, [visibleCount, messages.length, scrollContainerRef]);
+  }, [visibleCount, messages.length, scrollContainerRef, scrollToBottom]);
   // Push session stats up to AppShell for the top bar.
   // Compare scalar fields to avoid loops from new object identity each render.
   const statsKey = sessionStats
@@ -1654,12 +1571,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} waitingCount={waitingExtensionCustomUiCount} onInput={sendExtensionCustomInput} />
         )}
         {!isEmptyNew && <>
-        <MessageScrollerProvider autoScroll>
+        <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
         <MessageScroller className="min-h-0 min-w-0 flex-1">
         <MessageScrollerViewport
           ref={scrollContainerRef}
-          // 前插历史保位置由 lib/scroll-anchor 自己做：两边同时补偿会多跳一屏。
-          preserveScrollOnPrepend={false}
           className={cn("pt-[22px] pb-2 max-sm:pt-4", pendingScrollRestore && "invisible")}
         >
           <MessageScrollerContent>
@@ -1679,8 +1594,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               // 跳过渲染，长会话只付可见部分的开销。不是元素的行（空渲染）原样放过。
               if (!isValidElement<{ "data-entry-id"?: string }>(node)) return node;
               const messageId = node.props["data-entry-id"] ?? `turn-${startIndex + index}`;
+              // 官方锚点：`defaultScrollPosition="last-anchor"` 把最后一条用户消息
+              // 顶到顶部（回复比一屏长时），否则直接贴尾。
+              const anchorRole = (node.props as { message?: { role?: string } }).message?.role;
               return (
-                <MessageScrollerItem key={node.key ?? messageId} messageId={messageId}>
+                <MessageScrollerItem key={node.key ?? messageId} messageId={messageId} scrollAnchor={anchorRole === "user"}>
                   {node}
                 </MessageScrollerItem>
               );
@@ -1718,7 +1636,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           </div>
           </MessageScrollerContent>
         </MessageScrollerViewport>
-        <MessageScrollerButton />
+        <MessageScrollerButton className="text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100">
+          <ArrowDownIcon className="size-4" aria-hidden="true" />
+          <span className="sr-only">{t("chat.scrollToLatest")}</span>
+        </MessageScrollerButton>
         </MessageScroller>
         </MessageScrollerProvider>
         {isMobile || pendingScrollRestore || !minimapPaneWide ? null : (
@@ -1817,36 +1738,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       )}
 
       <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding}px` }}>
-        {/* Floats centered over the composer's 700px card; z-30 also keeps it
-            clear of the rail's zIndex 25. */}
-        {!isEmptyNew && (
-          // Centered over the composer's 700px card (the same mx-auto column as
-          // the messages); z-30 also keeps it clear of the rail's zIndex 25.
-          <div className="pointer-events-none absolute inset-x-0 bottom-full z-30">
-            <div className="relative mx-auto w-full max-w-[min(var(--chat-content-max-width,820px),700px)]">
-              <Button
-                type="button"
-                variant="ghost"
-                className={cn(
-                  // The ghost Button's transition-all fades opacity and flips
-                  // visibility discretely, which is exactly the reveal/hide curve.
-                  "absolute left-1/2 -translate-x-1/2 bottom-[14px] max-sm:bottom-[10px]",
-                  "size-8 cursor-pointer rounded-full p-0 text-muted-foreground duration-[160ms]",
-                  // Reduced motion keeps the fade but drops the slide/scale.
-                  "motion-reduce:translate-y-0 motion-reduce:scale-100",
-                  showScrollToBottom && !pendingScrollRestore
-                    ? "pointer-events-auto visible translate-y-0 scale-100 opacity-[0.28] hover:opacity-100 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 focus-visible:bg-secondary focus-visible:text-foreground"
-                    : "pointer-events-none invisible translate-y-1 scale-[0.96] opacity-0",
-                )}
-                title={t("chat.scrollToLatest")}
-                aria-label={t("chat.scrollToLatest")}
-                onClick={() => scrollToBottom("smooth")}
-              >
-              <ArrowDownIcon size={16} strokeWidth={2} className="size-4" aria-hidden="true" />
-              </Button>
-            </div>
-          </div>
-        )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the
             composer's left edge. */}

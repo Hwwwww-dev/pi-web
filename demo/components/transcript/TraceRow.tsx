@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import {
   Trace,
@@ -31,6 +31,17 @@ const STATUS_ATTR = {
   pending: "pending",
   done: undefined,
 } as const;
+
+/** The nearest ancestor that actually scrolls — the message list's viewport. */
+function scrollParentOf(element: HTMLElement): HTMLElement | null {
+  let node = element.parentElement;
+  while (node) {
+    const overflowY = getComputedStyle(node).overflowY;
+    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
 
 /**
  * Fold state for one row. `foldKey` keeps the user's choice across remounts
@@ -116,6 +127,27 @@ export function TraceRow({
   activityTool?: string;
 }) {
   const { open, onOpenChange } = useTraceFold(foldKey, defaultOpen);
+  // 展开/收起时行不动，下方内容长在它下面：否则列表会整块上跳（收起）或滑到底
+  // （展开），看着就是“闪一下”。锚定的是这一行自己的顶边，量在布局阶段、画之前。
+  const rowRef = useRef<HTMLDivElement>(null);
+  const pinRef = useRef<{ container: HTMLElement; top: number } | null>(null);
+  const toggleFold = useCallback(
+    (next: boolean) => {
+      const row = rowRef.current;
+      const container = row ? scrollParentOf(row) : null;
+      if (row && container) pinRef.current = { container, top: row.getBoundingClientRect().top };
+      onOpenChange(next);
+    },
+    [onOpenChange],
+  );
+  useLayoutEffect(() => {
+    const pin = pinRef.current;
+    pinRef.current = null;
+    const row = rowRef.current;
+    if (!pin || !row || !pin.container.isConnected) return;
+    const delta = row.getBoundingClientRect().top - pin.top;
+    if (delta !== 0) pin.container.scrollTop += delta;
+  }, [open]);
   // 文件胶囊是真正的按钮，行本身是折叠触发按钮：按钮不能嵌按钮，否则 HTML 结构
   // 非法、点击事件在移动端也会被里层吃掉。所以有展开内容时，行按钮只放文字，
   // 胶囊作为它的兄弟摆在行尾（同一行对齐）。
@@ -137,7 +169,7 @@ export function TraceRow({
 
   if (!content) {
     return (
-      <Trace data-activity="trace-row" data-activity-tool={activityTool}>
+      <Trace ref={rowRef} data-activity="trace-row" data-activity-tool={activityTool}>
         {href ? (
           <a href={href} target="_blank" rel="noreferrer">
             {line(true)}
@@ -152,13 +184,16 @@ export function TraceRow({
   }
 
   return (
-    <Trace data-activity="trace-row" data-activity-tool={activityTool}>
-      <TraceCollapsible open={open} onOpenChange={onOpenChange}>
+    <Trace ref={rowRef} data-activity="trace-row" data-activity-tool={activityTool}>
+      <TraceCollapsible open={open} onOpenChange={toggleFold}>
         <div className="flex w-full max-w-full items-center gap-1.5">
-          <TraceCollapsibleTrigger aria-label={ariaLabel} className="min-w-0 max-w-full flex-1!">
+          {/* 触发区只盖文字：胶囊紧跟在动作名后面，不被 flex-1 推到行尾。 */}
+          <TraceCollapsibleTrigger aria-label={ariaLabel} className="min-w-0 max-w-full">
             {line(false)}
           </TraceCollapsibleTrigger>
           {chips}
+          {/* 行尾留白，把折叠箭头和 ··· 留在右边缘（胶囊是链接，不能嵌进按钮）。 */}
+          <span className="min-w-0 flex-1" aria-hidden="true" />
           {actions}
         </div>
         <TraceCollapsibleContent className="mt-1 flex flex-col gap-2">

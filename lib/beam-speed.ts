@@ -1,43 +1,57 @@
 /**
  * The composer's running beam, driven by how fast tokens arrive.
  *
- * `border-beam` takes a `duration` in seconds for one trip around the card. A
- * reply that streams fast should look fast, so the duration follows the rate —
- * but only in steps: a continuous curve would retime the animation on almost
- * every sample, and a restarted CSS animation jumps back to the start of its
- * trip, which reads as the beam stuttering and the badge flickering.
+ * `border-beam` animates with a CSS keyframe whose period comes from its
+ * `duration` prop, and the whole stylesheet (keyframes included) is regenerated
+ * when that prop changes — so a per-sample duration restarts the trip and the
+ * beam snaps back to the start. The period therefore stays fixed at
+ * `BEAM_BASE_SECONDS` and only the animation's playback rate changes, which the
+ * browser applies from wherever the beam currently is.
  *
- * So the rate is quantized into bands. Inside a band the animation keeps its
- * duration and runs uninterrupted; a new sample only matters when it lands in a
- * different band, and even then the caller waits for a second sample before
- * retiming (see `useStreamBeamDuration`), so one burst cannot jolt the beam.
+ * The rate that drives it is integrated with a slew limit, not smoothed
+ * exponentially: it moves toward the measured rate at a constant number of
+ * tokens per second per second, quickly upward and slowly downward. That keeps
+ * 1 → 0.1 a few seconds of steady deceleration instead of a step.
  */
 
-/** One trip at rest, in seconds: the beam's default before any sample says otherwise. */
+/** One trip at rest, in seconds: the CSS animation's period, never changed at runtime. */
 export const BEAM_SLOWEST_SECONDS = 4;
+/** The same period, named for what it is at runtime: the playback-rate base. */
+export const BEAM_BASE_SECONDS = BEAM_SLOWEST_SECONDS;
 /** One trip on the fastest reply, in seconds. */
 export const BEAM_FASTEST_SECONDS = 0.6;
 /** The rate that already counts as "as fast as it gets" (tokens per second). */
 export const BEAM_FASTEST_RATE = 150;
 
 /**
- * Band floors and their trip time, fastest first. A rate takes the first band
- * whose floor it reaches; anything below the lowest floor runs at rest.
+ * How many tokens/s the rate may gain per second. Fast: a reply that starts
+ * streaming should look fast almost at once.
  */
-const BEAM_BANDS: ReadonlyArray<{ min: number; seconds: number }> = [
-  { min: BEAM_FASTEST_RATE, seconds: BEAM_FASTEST_SECONDS },
-  { min: 100, seconds: 0.9 },
-  { min: 50, seconds: 1.4 },
-  { min: 20, seconds: 2.2 },
-  { min: 5, seconds: 3.2 },
-  { min: 0, seconds: BEAM_SLOWEST_SECONDS },
-];
+export const BEAM_RISE_PER_SECOND = 400;
+/**
+ * How many tokens/s it may lose per second. Much slower than the rise: a pause
+ * between chunks must not read as the beam slamming to a crawl.
+ */
+export const BEAM_FALL_PER_SECOND = 45;
 
-/** One trip around the card for a rate. */
+/** One trip around the card for a rate, linearly between the two ends. */
 export function beamDurationSeconds(rate: number): number {
   if (!Number.isFinite(rate) || rate <= 0) return BEAM_SLOWEST_SECONDS;
-  for (const band of BEAM_BANDS) {
-    if (rate >= band.min) return band.seconds;
-  }
-  return BEAM_SLOWEST_SECONDS;
+  const span = BEAM_SLOWEST_SECONDS - BEAM_FASTEST_SECONDS;
+  const seconds = BEAM_SLOWEST_SECONDS - span * (rate / BEAM_FASTEST_RATE);
+  return Math.min(BEAM_SLOWEST_SECONDS, Math.max(BEAM_FASTEST_SECONDS, seconds));
+}
+
+/** The playback rate that turns the fixed period into the duration for a rate. */
+export function beamPlaybackRate(rate: number): number {
+  return BEAM_BASE_SECONDS / beamDurationSeconds(rate);
+}
+
+/** Move `current` toward `target` by at most one slew step for `elapsedMs`. */
+export function slewBeamRate(current: number, target: number, elapsedMs: number): number {
+  const dt = Math.max(0, elapsedMs) / 1000;
+  const clampedTarget = Math.min(BEAM_FASTEST_RATE, Math.max(0, Number.isFinite(target) ? target : 0));
+  if (clampedTarget > current) return Math.min(clampedTarget, current + BEAM_RISE_PER_SECOND * dt);
+  if (clampedTarget < current) return Math.max(clampedTarget, current - BEAM_FALL_PER_SECOND * dt);
+  return current;
 }

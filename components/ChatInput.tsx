@@ -34,7 +34,8 @@ import { useTheme } from "@/hooks/useTheme";
 import { useEnterSendMode } from "@/hooks/useEnterSendMode";
 import { useI18n } from "@/hooks/useI18n";
 import { useChatAppearance } from "@/hooks/useChatAppearance";
-import { useStreamBeamDuration } from "@/hooks/useStreamBeamDuration";
+import { useStreamBeamPlaybackRate } from "@/hooks/useStreamBeamPlaybackRate";
+import { BEAM_BASE_SECONDS } from "@/lib/beam-speed";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import type { ToolPreset } from "@/lib/tool-presets";
 import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
@@ -848,8 +849,26 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   // desktop shortcut instead of inheriting the phone's Ctrl/Cmd+Enter.
   const touchKeyboard = useCoarsePointer();
   const enterSendMode = useEnterSendMode();
-  // 边光的油门：按当前流的 tokens/s 算每圈时长（快提速慢降速）。
-  const beamDuration = useStreamBeamDuration(isStreaming && !compact);
+  // 边光的油门：速率连续积分，只改播放速率（改 duration 会重启动画，那才是“跳”）。
+  const beamPlaybackRate = useStreamBeamPlaybackRate(isStreaming && !compact);
+  const beamRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = beamRef.current;
+    if (!root) return;
+    const beam = root.querySelector("[data-beam]");
+    if (!beam) return;
+    const apply = () => {
+      for (const animation of beam.getAnimations({ subtree: true })) {
+        const name = (animation as CSSAnimation).animationName;
+        if (typeof name !== "string" || !name.includes("beam-spin")) continue;
+        animation.updatePlaybackRate(beamPlaybackRate);
+      }
+    };
+    // 动画在激活后的下一帧才挂上，首帧取不到就等一帧再取一次。
+    apply();
+    const frame = requestAnimationFrame(apply);
+    return () => cancelAnimationFrame(frame);
+  }, [beamPlaybackRate, isStreaming, compact]);
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>(() => (
     draftKey ? draftImagesToAttachedImages(getDraft(draftKey)?.images) : []
@@ -2414,7 +2433,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             size="md"
             colorVariant="colorful"
             strength={0.7}
-            duration={beamDuration}
+            duration={BEAM_BASE_SECONDS}
             borderRadius={compact ? 18 : 24}
             theme={theme === "dark" ? "dark" : "light"}
             className="chat-composer-beam min-w-0"
