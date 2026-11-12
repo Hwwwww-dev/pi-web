@@ -49,7 +49,7 @@
 5. **状态只映射到 `status`**：`"running" | "error" | "pending"`。running 的 shimmer 由底座提供，不自己加动画。
 6. **标题时态按官方规则**：进行中现在时（`正在运行 pnpm build`）、完成无时态（`运行 pnpm build`）、失败（`运行失败：pnpm build` → `status="error"`）。
 7. **长内容靠 `CodeBlock` 自己封顶**：`size="sm"`，`wrap`（工具输出换行），`className="max-h-64"`。不自己算高度比例。
-7.1 **对话列表内任何块都不得超过 `--card-max-height`**（`min(40vh, 480px)`，`app/globals.css`），超出在块内滚动：正文用 `SafeMarkdownBody`，代码/终端用 `CodeBlock` 的 `max-h-[var(--card-max-height)]`，图片用 `max-h-[var(--card-max-height)]`。自定义消息、压缩摘要、插件事件等“非工具”块同样适用，不得裸用 `MarkddownBody`。
+7.1 **过程块限高、正文不限高**：代码/终端/图片/展开的过程块不超过 `--card-max-height`（`min(40vh, 480px)`，`app/globals.css`），超出在块内滚动，靠 `CodeBlock` 的 `max-h-[var(--card-max-height)]` 或媒体容器；**用户消息与 assistant 正文不套 `max-h` / `overflow-auto`**（`SafeMarkdownBody` 只负责“超大文本转纯文本”，不负责限高），否则消息里会出现第二条纵向滚动条；自定义事件、压缩摘要等“非工具”块同样适用此规则。
 8. **错误行**：`status="error"` + `CircleXIcon`，且**内容顶部重复完整错误**（官方明确：标题会截断）。
 9. **嵌套层级最多三层**：轮（过程分组）→ 步骤行 → 输出。需要更深时把中间层换成 `CodeBlock` 里的文本。
 10. **组件不读 pi 消息**。所有"这行是什么"的判断集中在 `lib/tool-view.ts`（第 4 节），pattern 组件只吃 `ToolView` 与纯 props。

@@ -555,11 +555,14 @@ function webView(p: Prepared): ToolView {
 function queueView(p: Prepared): ToolView {
   const view = baseView(p);
   const steps = todoSteps(p.block.input) ?? [];
-  const open = steps.filter((step) => step.status !== "done").length;
+  const done = steps.filter((step) => step.status === "done").length;
   view.kind = "queue";
-  view.title = open > 0
-    ? p.t("chat.trace.todoOpen", { count: open })
-    : p.t("chat.trace.todoDone", { count: steps.length });
+  // Plan pattern (第 4.2 节): the row names the task in progress, not the tool call.
+  const current = steps.find((step) => step.status === "running") ?? steps.find((step) => step.status !== "done");
+  view.title = current
+    ? p.t("chat.trace.planNamed", { name: current.title })
+    : p.t("chat.trace.plan");
+  view.description = p.t("chat.trace.planProgress", { done, total: steps.length });
   view.sections = p.detail([{ kind: "steps", steps }]);
   return view;
 }

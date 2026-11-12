@@ -61,7 +61,7 @@ test("a web search lists the sources it read as links", () => {
   clearExpandedToolCalls();
 });
 
-test("a to-do snapshot splits into open and done segments", () => {
+test("a to-do snapshot renders as the Plan pattern", () => {
   const block = call("todo", {
     todos: [
       { content: "write the spec", status: "completed" },
@@ -70,10 +70,12 @@ test("a to-do snapshot splits into open and done segments", () => {
   });
   const html = renderRow(block, result("todo", "ok"));
 
-  assert.match(html, /data-activity="queue"/);
   assert.match(html, /data-activity-tool="todo"/);
-  assert.match(html, />render the rows</);
+  // The row names the task in progress, never the raw arguments (第 4.2 节).
+  assert.match(html, /Plan: render the rows/);
+  assert.match(html, /1 of 2 done/);
   assert.match(html, />write the spec</);
+  assert.doesNotMatch(html, /&quot;todos&quot;/);
 });
 
 test("a failed call shows the X icon and repeats the whole error", () => {

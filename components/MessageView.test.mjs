@@ -483,7 +483,7 @@ test("marks apply_patch returned failures as errors even when isError is unset",
   assert.doesNotMatch(html, /data-status="error"[\s\S]*text-success/);
 });
 
-test("collapses a displayed custom message from its header alone", () => {
+test("a custom message starts folded and opens from its header alone", () => {
   const custom = (props) => renderMessage({
     role: "custom",
     customType: "extension",
@@ -491,38 +491,33 @@ test("collapses a displayed custom message from its header alone", () => {
     timestamp: Date.now(),
     ...props,
   });
-  // The header is the card's first button and the only one holding the title.
+  // The header is the row's first button and the only one holding the title.
   const header = (html) => html.slice(0, html.indexOf("</button>"));
 
-  // The header is the toggle, so a message with no `details` can collapse too.
-  const shown = custom({ content: [{ type: "text", text: "a message with no details" }] });
-  assert.match(header(shown), /aria-expanded="true"/);
-  assert.match(header(shown), />extension</);
-  // The footer is for details only; it is not a second way to collapse.
-  assert.doesNotMatch(shown, /Show details|Hide details/);
-
-  // It starts expanded, as pi's TUI draws a displayed custom message in full.
-  assert.match(shown, /a message with no details/);
-  // A message with no text (images only) can collapse too.
-  assert.match(header(custom({ content: [] })), /aria-expanded="true"/);
-
-  // A message that does carry details keeps that button, for its details.
-  assert.match(
-    custom({ content: [{ type: "text", text: "a message with details" }], details: { files: ["a.ts"] } }),
-    /Show details/,
-  );
+  // 第 4.1 节: opening a session shows every custom event folded away.
+  const folded = custom({ content: [{ type: "text", text: "a message with no details" }] });
+  assert.match(header(folded), /aria-expanded="false"/);
+  assert.match(header(folded), />extension</);
+  assert.doesNotMatch(folded, /markdown-custom-message/);
+  // Details and copy are fold content too: neither is a second collapse toggle.
+  assert.doesNotMatch(folded, /Show details|Hide details/);
+  // A message with no text (images only) folds the same way.
+  assert.match(header(custom({ content: [] })), /aria-expanded="false"/);
 });
 
-test("renders custom-message images as buttons that open a larger preview", () => {
+test("custom-message images and details live inside the fold", () => {
   const html = renderMessage({
     role: "custom",
     customType: "extension",
     content: [{ type: "image", data: "YWJj", mimeType: "image/png" }],
+    details: { files: ["a.ts"] },
     timestamp: Date.now(),
   });
 
-  assert.match(html, /<button[^>]+aria-label="Preview image"[^>]*>/);
-  assert.match(html, /<img[^>]+src="data:image\/png;base64,YWJj"/);
+  // Nothing of the body leaks into the folded row.
+  assert.doesNotMatch(html, /<img/);
+  assert.match(activityRowsSource, /<TraceCollapsibleContent>[\s\S]*?<ImagePreview/);
+  assert.match(activityRowsSource, /<TraceCollapsibleContent>[\s\S]*?Show details|t\("i18n\.showDetails"\)/);
 });
 
 
@@ -695,7 +690,7 @@ test("each tool view kind reaches its pattern, and no card markup is left", () =
   // A search's sources, a to-do split, a failure's stack and a call's media each
   // have their own pattern: the view model computes them, the row renders them.
   assert.match(activityRowsSource, /<SourcesTrace sources=\{view\.sources\}/);
-  assert.match(activityRowsSource, /<QueueTrace[\s\S]*?open=\{steps\.filter/);
+  assert.match(activityRowsSource, /<PlanTrace steps=\{steps\}/);
   assert.match(activityRowsSource, /<StackTraceTrace[\s\S]*?text=\{resultText \?\? view\.error\}/);
   assert.match(activityRowsSource, /<MediaTrace images=\{view\.images\}/);
   // The old per-category card (argument table, paired result, two-column patch)

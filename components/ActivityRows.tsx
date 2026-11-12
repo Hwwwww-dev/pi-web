@@ -37,7 +37,7 @@ import { formatUsage, type ActivityItem, type TurnUsage, type UsageContextPart }
 import { UsageBar } from "./UsageBar";
 import { ReasoningTrace } from "./transcript/ReasoningTrace";
 import { SourcesTrace } from "./transcript/SourcesTrace";
-import { QueueTrace } from "./transcript/QueueTrace";
+import { PlanTrace } from "./transcript/PlanTrace";
 import { StackTraceTrace } from "./transcript/StackTraceTrace";
 import { MediaTrace } from "./transcript/MediaTrace";
 import { ToolSection } from "./transcript/ToolTrace";
@@ -198,17 +198,10 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
     return <TerminalTrace view={view} activityTool={block.toolName} trailing={durationNode} usage={usageNode} below={mediaNode} />;
   }
 
-  // A to-do list (第 5.7 节): open items and done items, never one flat list.
+  // A todo snapshot (第 4.2 节): the Plan pattern — what is running now, how far it got, the steps.
   if (view.kind === "queue") {
     const steps = view.sections.find((section) => section.kind === "steps")?.steps ?? [];
-    return (
-      <QueueTrace
-        open={steps.filter((step) => step.status !== "done")}
-        done={steps.filter((step) => step.status === "done")}
-        foldKey={view.foldKey}
-        activityTool={block.toolName}
-      />
-    );
+    return <PlanTrace steps={steps} foldKey={view.foldKey} activityTool={block.toolName} />;
   }
 
   // What a search read (第 5.8 节): one line per source, each a link.
@@ -303,7 +296,7 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
 // Custom message rows (compaction, subagent notifications, extension output)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function isSubagentToolDetails(value: unknown): value is SubagentToolDetails {
+function isSubagentToolDetails(value: unknown): value is SubagentToolDetails {
   if (!value || typeof value !== "object") return false;
   const details = value as Partial<SubagentToolDetails>;
   return details.kind === "pi-web-subagent" && typeof details.sessionId === "string";
@@ -356,7 +349,8 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
 }) {
   const { t } = useI18n();
   const isHiddenDisplay = message.display === false;
-  const [expanded, setExpanded] = useState(!isHiddenDisplay);
+  // 自定义事件默认收起（第 4.1 节）：打开会话时它们不该占版面。
+  const [expanded, setExpanded] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const text = getMessageText(message.content);
