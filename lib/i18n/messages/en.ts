@@ -796,7 +796,7 @@ export const enLocale: LocalePlugin = {
     "chat.trace.subagent": "Ran a sub-agent",
     "chat.trace.plan": "Plan",
     "chat.trace.planNamed": "Plan: {name}",
-    "chat.trace.planProgress": "{done} of {total} done",
+    "chat.trace.planProgress": "{done} / {total}",
     "chat.trace.context": "{percent}% context",
     "chat.trace.contextLabel": "Context",
     "chat.question.pager": "Question {index} of {total}",

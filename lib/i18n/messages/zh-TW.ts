@@ -796,7 +796,7 @@ export const zhTWLocale: LocalePlugin = {
     "chat.trace.subagent": "執行子代理",
     "chat.trace.plan": "計畫",
     "chat.trace.planNamed": "計畫：{name}",
-    "chat.trace.planProgress": "{done} / {total} 已完成",
+    "chat.trace.planProgress": "{done} / {total}",
     "chat.trace.context": "{percent}% 上下文",
     "chat.trace.contextLabel": "上下文",
     "chat.question.pager": "問題 {index}/{total}",
