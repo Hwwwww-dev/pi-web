@@ -50,14 +50,20 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  container,
+  overlayClassName,
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  // A dialog anchored to one panel (not the viewport) portals into that element
+  // and paints its backdrop there, so the rest of the app stays interactive.
+  container?: HTMLElement | null
+  overlayClassName?: string
   showCloseButton?: boolean
 }) {
   return (
-    <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
+    <DialogPortal container={container ?? undefined} data-slot="dialog-portal">
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(

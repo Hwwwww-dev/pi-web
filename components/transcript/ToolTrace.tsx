@@ -161,9 +161,10 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             key={path}
             type="button"
             variant="outline"
-            size="sm"
+            size="xs"
             disabled={!resolved}
-            className="max-w-[12rem] shrink-0 gap-1 rounded-full px-2 font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))]"
+            // 胶囊只包住文件名本身：宽度由名字决定，不设上限、不截断。
+            className="shrink-0 gap-1 rounded-full px-2 font-mono text-[length:calc(11px+var(--chat-font-size-offset,0px))]"
             title={resolved ?? path}
             aria-label={label}
             onClick={(event) => {
@@ -173,7 +174,7 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             }}
           >
             <FileTextIcon className="size-3 shrink-0" />
-            <span className="truncate">{label}</span>
+            <span>{label}</span>
           </Button>
         );
       })}

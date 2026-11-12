@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { parseUnifiedPatch } from "@/lib/patch";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
 import { SOURCE_HIGHLIGHT_MAX_LINES } from "./SourceCodeView";
 
@@ -164,8 +165,9 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
           // classes); the +/- marker stays an aligned column instead of the
           // variant's absolute ::after so wrapped text keeps clearing it, and
           // content-none drops that second marker.
+          // 增删行用官方 token 上色：新增走 --ok，删除走 destructive。
           const rowTone = line.type === "added"
-            ? "bg-foreground/5"
+            ? "bg-(--ok)/10"
             : line.type === "removed"
             ? "bg-destructive/10"
             : "";
@@ -179,7 +181,13 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
               <span style={lineNumberStyle}>
                 {line.type === "removed" ? line.oldLineNo : line.newLineNo}
               </span>
-              <span className="min-w-4 shrink-0 select-none px-1.5 font-semibold">
+              <span
+                className={cn(
+                  "min-w-4 shrink-0 select-none px-1.5 font-semibold",
+                  line.type === "added" && "text-(--ok)",
+                  line.type === "removed" && "text-destructive",
+                )}
+              >
                 {prefix}
               </span>
               <span

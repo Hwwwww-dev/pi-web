@@ -41,7 +41,7 @@ test("renders extension confirmation and options as markdown", () => {
 });
 
 test("preserves title newlines like pi's TUI and keeps long titles from hiding the body", () => {
-  const header = dialogSource.slice(dialogSource.indexOf('role="dialog"'), dialogSource.indexOf("{request.method === \"confirm\""));
+  const header = dialogSource.slice(dialogSource.indexOf("<DialogContent"), dialogSource.indexOf("{request.method === \"confirm\""));
   assert.match(header, /<ExtensionDialogTitle title=\{multiSelect \? stripAnsi\(multiSelect\.question \|\| request\.title\) : stripAnsi\(request\.title\)\} \/>/);
   // #890: a non-shrinkable header grows to its full text height, pushing the
   // option list and the footer past the dialog's overflow edge. The header has
@@ -83,8 +83,8 @@ test("select answers are two-step: click selects, confirm sends", () => {
 });
 
 test("shows how many extension requests wait behind the one on screen", () => {
-  const expandedHeader = dialogSource.slice(dialogSource.indexOf('role="dialog"'), dialogSource.indexOf("{request.method === \"confirm\""));
-  const collapsedButton = dialogSource.slice(dialogSource.indexOf("{collapsed ? ("), dialogSource.indexOf('role="dialog"'));
+  const expandedHeader = dialogSource.slice(dialogSource.indexOf("<DialogContent"), dialogSource.indexOf("{request.method === \"confirm\""));
+  const collapsedButton = dialogSource.slice(dialogSource.indexOf("{collapsed ? ("), dialogSource.indexOf("<DialogContent"));
   const customCollapsed = customSource.slice(customSource.indexOf("{collapsed ? ("), customSource.indexOf('role="dialog"'));
   const customExpanded = customSource.slice(customSource.indexOf('role="dialog"'));
   const waitingSource = source.slice(source.indexOf("function ExtensionWaitingCount"), source.indexOf("function ExtensionDialog("));
@@ -117,7 +117,7 @@ test("fits dialogs to their code blocks and lets the user maximize them (#947)",
   assert.match(dialogOnly, /new MutationObserver\(fit\)[\s\S]*?observe\(body, \{ childList: true, subtree: true, characterData: true \}\)/);
 
   // The maximize/restore button sits next to the collapse chevron and only affects this dialog.
-  const header = dialogOnly.slice(dialogOnly.indexOf('role="dialog"'), dialogOnly.indexOf("{request.method === \"confirm\""));
+  const header = dialogOnly.slice(dialogOnly.indexOf("<DialogContent"), dialogOnly.indexOf("{request.method === \"confirm\""));
   assert.match(header, /onClick=\{toggleFull\}[\s\S]*?t\("chat\.extensionMaximize"\)[\s\S]*?t\("chat\.extensionRestoreSize"\)[\s\S]*?<ExtensionSizeIcon expanded=\{full\} \/>[\s\S]*?onClick=\{\(\) => setCollapsed\(true\)\}/);
   assert.doesNotMatch(source, /localStorage|pi-extension-/);
 });

@@ -15,7 +15,7 @@ test("DiffView renders added/removed lines with the official CodeBlock line vari
   // layout, the tint carries the variant; the variant's absolute ::after marker
   // is dropped for the aligned marker column.
   assert.match(source, /-mx-4 px-4[^`]*file-diff-line flex min-w-full after:content-none/);
-  assert.match(source, /\? "bg-foreground\/5"/);
+  assert.match(source, /\? "bg-\(--ok\)\/10"/);
   assert.match(source, /\? "bg-destructive\/10"/);
   // Unchanged rows stay on the view's own background, no variant.
   assert.match(source, /rowTone = line\.type === "added"/);

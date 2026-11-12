@@ -220,17 +220,28 @@ function hostOf(url: string): string {
   }
 }
 
-/** A to-do tool's items, when its input carries them in the conventional shape. */
+/**
+ * A to-do tool's items, when its input carries them in one of the shapes the
+ * agents use: `todos[]` from the classic tool, `tasks[]` from pi's own `todo`
+ * tool (`subject`/`status`, with `deleted` as a tombstone that is not shown).
+ */
 function todoSteps(input: unknown): ToolViewStep[] | null {
-  if (!isRecord(input) || !Array.isArray(input.todos)) return null;
+  if (!isRecord(input)) return null;
+  const items = Array.isArray(input.todos) ? input.todos : Array.isArray(input.tasks) ? input.tasks : null;
+  if (!items) return null;
   const steps: ToolViewStep[] = [];
-  for (const item of input.todos) {
+  for (const item of items) {
     if (!isRecord(item)) return null;
-    const title = typeof item.content === "string" ? item.content : typeof item.title === "string" ? item.title : null;
+    const title = typeof item.content === "string"
+      ? item.content
+      : typeof item.title === "string"
+        ? item.title
+        : typeof item.subject === "string" ? item.subject : null;
     if (title === null) return null;
+    if (item.status === "deleted") continue;
     const status: ToolViewStatus = item.status === "completed"
       ? "done"
-      : item.status === "in_progress" ? "running" : "pending";
+      : item.status === "in_progress" || item.status === "running" ? "running" : "pending";
     steps.push({ title, status });
   }
   return steps.length > 0 ? steps : null;
