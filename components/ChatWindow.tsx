@@ -3,7 +3,7 @@ import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { isHiddenRelation } from "@/lib/session-family";
 import { ArrowDownIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from "lucide-react";
 import Image from "next/image";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { isValidElement, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage } from "@/lib/types";
 import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
@@ -31,6 +31,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
@@ -1646,17 +1654,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} waitingCount={waitingExtensionCustomUiCount} onInput={sendExtensionCustomInput} />
         )}
         {!isEmptyNew && <>
-        <div
+        <MessageScrollerProvider autoScroll>
+        <MessageScroller className="min-h-0 min-w-0 flex-1">
+        <MessageScrollerViewport
           ref={scrollContainerRef}
-          // The message list is the one place long output has to be dragged through,
-          // so it shows its scrollbar instead of hiding it behind an overlay (#788).
-          // A stable gutter keeps the centred column from shifting when a short
-          // session grows past one screen.
-          className={cn(
-            "scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-[22px] pb-2 max-sm:pt-4 [scrollbar-gutter:stable]",
-            pendingScrollRestore && "invisible",
-          )}
+          // 前插历史保位置由 lib/scroll-anchor 自己做：两边同时补偿会多跳一屏。
+          preserveScrollOnPrepend={false}
+          className={cn("pt-[22px] pb-2 max-sm:pt-4", pendingScrollRestore && "invisible")}
         >
+          <MessageScrollerContent>
           <div style={{ minWidth: 0, padding: `0 ${columnPadding}px` }}>
             <div
               ref={messageContentRef}
@@ -1668,7 +1674,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 {t("chat.loadEarlier")}
               </div>
             )}
-            {turnRendered.slice(startIndex)}
+            {turnRendered.slice(startIndex).map((node, index) => {
+              // 每条消息一个 Item：官方用它测量、锚定、记可视性；离屏行靠 content-visibility
+              // 跳过渲染，长会话只付可见部分的开销。不是元素的行（空渲染）原样放过。
+              if (!isValidElement<{ "data-entry-id"?: string }>(node)) return node;
+              const messageId = node.props["data-entry-id"] ?? `turn-${startIndex + index}`;
+              return (
+                <MessageScrollerItem key={node.key ?? messageId} messageId={messageId}>
+                  {node}
+                </MessageScrollerItem>
+              );
+            })}
             {streamState.isStreaming && hasStreamingContent && streamState.streamingMessage && (
               <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
             )}
@@ -1700,7 +1716,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             <div ref={promptAnchorSpacerRef} aria-hidden="true" />
             </div>
           </div>
-        </div>
+          </MessageScrollerContent>
+        </MessageScrollerViewport>
+        <MessageScrollerButton />
+        </MessageScroller>
+        </MessageScrollerProvider>
         {isMobile || pendingScrollRestore || !minimapPaneWide ? null : (
           <ChatMinimap
             messages={messages}
