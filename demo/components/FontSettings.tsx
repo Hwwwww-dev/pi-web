@@ -35,7 +35,7 @@ export function FontSettings() {
             key={kind}
             className="col-span-full grid grid-cols-subgrid items-center gap-y-1.5"
           >
-            <FieldLabel htmlFor={`settings-font-${kind}`} className="pr-1 text-[13px] font-normal">
+            <FieldLabel htmlFor={`settings-font-${kind}`} className="pr-1 text-sm font-normal">
               {t(label)}
             </FieldLabel>
             <Input

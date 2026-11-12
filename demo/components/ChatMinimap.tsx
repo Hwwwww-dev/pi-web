@@ -670,7 +670,7 @@ export const ChatMinimap = memo(function ChatMinimap({
                   // One hairline between turns keeps the card scannable without
                   // boxing every row.
                   "grid grid-cols-[22px_minmax(0,1fr)] gap-x-1 rounded-[10px] px-1.5 pt-[5px] pb-[3px] transition-colors duration-[120ms]",
-                  "[&:not(:first-child)]:border-t [&:not(:first-child)]:border-border/55",
+                  "",
                   isLocated && "bg-accent/10",
                 )}
                 data-minimap-preview-index={node.index}
@@ -679,7 +679,7 @@ export const ChatMinimap = memo(function ChatMinimap({
               >
                 <span
                   className={cn(
-                    "pt-1.5 text-center font-mono text-[10px] leading-[18px] tabular-nums",
+                    "pt-1.5 text-center font-mono text-xs leading-[18px] tabular-nums",
                     isLocated ? "text-primary" : "text-muted-foreground",
                   )}
                   aria-hidden="true"
@@ -691,7 +691,7 @@ export const ChatMinimap = memo(function ChatMinimap({
                     type="button"
                     variant="ghost"
                     className={cn(
-                      "block h-auto w-full overflow-hidden rounded-lg px-2 pt-[5px] pb-[3px] text-left text-[13px] font-semibold leading-[18px] tracking-normal transition-colors duration-100",
+                      "block h-auto w-full overflow-hidden rounded-lg px-2 pt-[5px] pb-[3px] text-left text-sm font-semibold leading-[18px] tracking-normal transition-colors duration-100",
                       isLocated ? "bg-foreground/[0.06] text-primary" : "bg-transparent text-foreground hover:bg-foreground/[0.06]",
                       "focus-visible:bg-foreground/[0.06] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-ring/60",
                     )}
@@ -708,7 +708,7 @@ export const ChatMinimap = memo(function ChatMinimap({
                   {metaParts.length > 0 && (
                     <div
                       className={cn(
-                        "ml-2 mt-px mb-[3px] truncate font-mono text-[10.5px] leading-[15px] tabular-nums",
+                        "ml-2 mt-px mb-[3px] truncate font-mono text-xs leading-[15px] tabular-nums",
                         isLocated
                           ? "text-primary/65"
                           : "text-muted-foreground",

@@ -265,7 +265,7 @@ export function ModelSelector({
           className="max-h-(--radix-dropdown-menu-content-available-height) min-w-(--radix-dropdown-menu-trigger-width) max-w-(--radix-dropdown-menu-content-available-width) overflow-y-auto scrollbar-thin"
         >
           {headerSlot && (
-            <div className="sticky top-0 z-10 border-b bg-popover px-1.5 pb-1.5 pt-1">{headerSlot}</div>
+            <div className="sticky top-0 z-10 bg-popover px-1.5 pb-1.5 pt-1">{headerSlot}</div>
           )}
           {onShowAll && (
             <div className="flex items-center gap-1 px-2 pb-0 pt-1.5 text-xs">
@@ -311,7 +311,7 @@ export function ModelSelector({
             <DropdownMenuGroup key={group.provider}>
               <DropdownMenuLabel className="flex w-full items-baseline justify-between gap-2 py-1 font-medium">
                 {modelsByProvider.length > 1 && (
-                  <span title={group.providerName === group.provider ? undefined : group.provider} className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">{group.providerName}</span>
+                  <span title={group.providerName === group.provider ? undefined : group.provider} className="min-w-0 truncate font-mono text-xs text-muted-foreground">{group.providerName}</span>
                 )}
                 {usagePercent[group.provider] !== undefined && (
                   <span

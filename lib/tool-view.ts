@@ -12,7 +12,7 @@ import { applyPatchPreviewToFiles, applyPatchResultHasFailures, getApplyPatchInp
 import { CODEMODE_TOOL_NAME, codemodeCalls, codemodeScript, stripCodemodeHeader, type CodemodeCallView } from "./codemode-view";
 import { getLanguage } from "./file-types";
 import { mcpToolLabel, prettyMcpResultText, type McpToolLabel } from "./mcp-tool-display";
-import type { SplitDiffFile } from "./patch";
+import { parseUnifiedPatch, type SplitDiffFile } from "./patch";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, isSubagentToolName } from "./tool-categories";
 import { EMPTY_FIELD_VALUE, toolFieldsOfInput, type ToolField } from "./tool-fields";
 import { isApplyPatchToolName, isEditToolName, isWriteToolName } from "./tool-names";
@@ -191,7 +191,17 @@ function fieldsSection(fields: ToolField[] | null): ToolViewSection[] {
 }
 
 function jsonSection(text: string, language: string): ToolViewSection[] {
-  return [{ kind: "code", label: "parameters", text, language }];
+  return [{ kind: "code", label: "parameters", text: prettyJsonText(text, language), language }];
+}
+
+/** 能解析的 JSON 一律缩进展开：原文里的 `\\n` 转义只会让人看到一行挤成一团的参数。 */
+function prettyJsonText(text: string, language: string): string {
+  if (language !== "json" || !/^\s*[[{]/.test(text)) return text;
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
 }
 
 /**
@@ -228,7 +238,11 @@ function hostOf(url: string): string {
  */
 function todoSteps(input: unknown): ToolViewStep[] | null {
   if (!isRecord(input)) return null;
-  const items = Array.isArray(input.todos) ? input.todos : Array.isArray(input.tasks) ? input.tasks : null;
+  const items = Array.isArray(input.todos)
+    ? input.todos
+    : Array.isArray(input.tasks)
+      ? input.tasks
+      : Array.isArray(input.updates) ? input.updates : null;
   if (!items) return null;
   const steps: ToolViewStep[] = [];
   for (const item of items) {
@@ -237,7 +251,9 @@ function todoSteps(input: unknown): ToolViewStep[] | null {
       ? item.content
       : typeof item.title === "string"
         ? item.title
-        : typeof item.subject === "string" ? item.subject : null;
+        : typeof item.subject === "string"
+          ? item.subject
+          : typeof item.task_id === "string" ? item.task_id : null;
     if (title === null) return null;
     if (item.status === "deleted") continue;
     const status: ToolViewStatus = item.status === "completed"
@@ -246,6 +262,12 @@ function todoSteps(input: unknown): ToolViewStep[] | null {
     steps.push({ title, status });
   }
   return steps.length > 0 ? steps : null;
+}
+
+/** The whole list a `todo` result reports back (`details.tasks`), not just this call's arguments. */
+function todoStepsFromDetails(details: unknown): ToolViewStep[] | null {
+  if (!isRecord(details) || !Array.isArray(details.tasks)) return null;
+  return todoSteps({ todos: details.tasks });
 }
 
 function codemodeSteps(calls: CodemodeCallView[]): ToolViewStep[] {
@@ -264,6 +286,11 @@ export function getPatchFiles(block: ToolCallContent, result?: ToolResultMessage
   if (fromInput) return fromInput;
   const details = result && !result.isError ? result.details : undefined;
   if (!isRecord(details)) return null;
+  // pi 的 edit 工具在 details.patch 里给出整段 unified diff（details.diff 是带行号的视图文本）。
+  if (typeof details.patch === "string") {
+    const files = parseUnifiedPatch(details.patch);
+    if (files && files.length > 0) return files;
+  }
   return applyPatchPreviewToFiles(details.preview);
 }
 
@@ -334,7 +361,10 @@ function prepare({ block, result, t }: ToolViewInput): Prepared {
   // A codemode result repeats the script as its leading text; the row shows the
   // calls instead, so the copy is dropped.
   const { text: rawText, images, media } = resultText(result, codemode !== null);
-  const patchFiles = isApplyPatchToolName(block.toolName) ? getPatchFiles(block, result) : null;
+  // edit 与 apply_patch 的结果都带补丁：只有解析成 files 才会按增删着色，否则只剩一段无颜色的纯文本。
+  const patchFiles = isApplyPatchToolName(block.toolName) || isEditToolName(block.toolName)
+    ? getPatchFiles(block, result)
+    : null;
   const writtenFileText = getWrittenFileText(block);
   const command = getToolCategory(block.toolName) === "terminal" && !streamingInput && typeof block.input.command === "string"
     ? block.input.command
@@ -382,7 +412,8 @@ function kindOf(p: Prepared): ToolViewKind {
   if (category === "view") return "file-read";
   if (category === "search") return "search";
   if (category === "web") return "web";
-  if (category === "plan" && todoSteps(p.block.input)) return "queue";
+  if (category === "plan" && (todoSteps(p.block.input) || todoStepsFromDetails(p.details))) return "queue";
+  if (questionSteps(p.block.input)) return "queue";
   if (category === "compact") return "compact";
   return "generic";
 }
@@ -396,8 +427,9 @@ export function isFailedResult(toolName: string, result: ToolResultMessage | und
 export function toToolView(input: ToolViewInput): ToolView {
   const p = prepare(input);
   // A title keeps its tense (硬规则 6): running says so, a failure says what failed.
+  // 但动作名是行的名字：编辑/读取这类 view 的 title 本身就是动作，不能被“正在运行”替掉。
   const view = createView(p);
-  if (view.target) {
+  if (view.target && view.title === "") {
     if (view.status === "running") view.title = p.t("chat.trace.running", { target: view.target });
     else if (view.status === "error") view.title = p.t("chat.trace.failed", { target: view.target });
   }
@@ -574,9 +606,41 @@ function webView(p: Prepared): ToolView {
   return view;
 }
 
+/** A question tool's prompts and choices as steps, so the card is not raw JSON. */
+function questionSteps(input: unknown): ToolViewStep[] | null {
+  if (!isRecord(input)) return null;
+  const questions = Array.isArray(input.questions) ? input.questions : null;
+  if (questions && questions.length > 0) {
+    const steps: ToolViewStep[] = [];
+    for (const question of questions) {
+      if (!isRecord(question)) return null;
+      const title = typeof question.question === "string"
+        ? question.question
+        : typeof question.header === "string" ? question.header : null;
+      if (!title) return null;
+      const options = Array.isArray(question.options) ? question.options : [];
+      const description = options
+        .map((option) => (isRecord(option) && typeof option.label === "string" ? option.label : null))
+        .filter((label): label is string => label !== null)
+        .join(" · ");
+      steps.push({ title, status: "pending", ...(description ? { description } : {}) });
+    }
+    return steps;
+  }
+  if (typeof input.question === "string" && Array.isArray(input.options)) {
+    const description = input.options
+      .map((option) => (isRecord(option) && typeof option.label === "string" ? option.label : null))
+      .filter((label): label is string => label !== null)
+      .join(" · ");
+    return [{ title: input.question, status: "pending", ...(description ? { description } : {}) }];
+  }
+  return null;
+}
+
 function queueView(p: Prepared): ToolView {
   const view = baseView(p);
-  const steps = todoSteps(p.block.input) ?? [];
+  // create 的参数带 tasks；update/list 的列表在结果的 details.tasks 里（用户要求：带出整份清单）。
+  const steps = todoSteps(p.block.input) ?? todoStepsFromDetails(p.details) ?? questionSteps(p.block.input) ?? [];
   const done = steps.filter((step) => step.status === "done").length;
   view.kind = "queue";
   // Plan pattern (第 4.2 节): the row names the task in progress, not the tool call.

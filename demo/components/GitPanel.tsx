@@ -156,7 +156,7 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
           {selected ? selected.primary : placeholder}
         </span>
         {selected?.secondary && (
-          <span className="max-w-[45%] shrink-0 truncate font-mono text-[10px] text-muted-foreground">{selected.secondary}</span>
+          <span className="max-w-[45%] shrink-0 truncate font-mono text-xs text-muted-foreground">{selected.secondary}</span>
         )}
         <ChevronDownIcon
           className={cn("size-[13px] shrink-0 transition-transform", open && "rotate-180")}
@@ -485,13 +485,13 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
 
   const renderDetailLayer = (commit: CommitSummary) => (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5">
+      <div className="flex shrink-0 items-center gap-2 px-2 py-1.5">
         <span className="min-w-0 break-words text-xs font-semibold">
           {commit.subject}
         </span>
       </div>
       <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto">
-        <div className="flex flex-col gap-[5px] border-b border-border px-3 py-2">
+        <div className="flex flex-col gap-[5px] px-3 py-2">
           <span className="break-all font-mono text-xs text-muted-foreground">
             {commit.hash}
           </span>
@@ -501,7 +501,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
               {formatRelativeTime(new Date(commit.timestamp * 1000), locale)}
             </span>
             <span className={cn(
-              "inline-flex h-4 shrink-0 items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold leading-none",
+              "inline-flex h-4 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold leading-none",
               commit.pushed ? "text-muted-foreground bg-muted" : "text-warning bg-warning/15",
             )}>
               {t(commit.pushed ? "gitPanel.pushed" : "gitPanel.notPushed")}
@@ -538,14 +538,14 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
             )}
           >
             <span className={cn(
-              "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-mono text-[10.5px] font-semibold leading-none",
+              "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold leading-none",
               STATUS_CLASSES[file.status] ?? STATUS_FALLBACK_CLASS,
             )}>
               {file.status}
             </span>
             <PathLabel text={file.previousPath ? `${file.previousPath} → ${file.path}` : file.path} className="min-w-0 flex-1 font-mono text-xs" />
             {file.additions !== null && file.deletions !== null && (
-              <span className="shrink-0 font-mono text-[10px]">
+              <span className="shrink-0 font-mono text-xs">
                 <span className="text-diff-add">+{file.additions}</span>{" "}
                 <span className="text-diff-del">−{file.deletions}</span>
               </span>
@@ -627,7 +627,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
       {/* The row that never scrolls away owns the one back affordance. */}
       <div
         data-gitpanel-toolbar
-        className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border p-2"
+        className="flex shrink-0 flex-wrap items-center gap-2 p-2"
       >
         {view.type !== "log" && (
           <Button
@@ -711,7 +711,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
                 </span>
                 {(index === 0 || commits[index - 1].pushed !== commit.pushed) && (
                   <span className={cn(
-                    "inline-flex h-4 shrink-0 items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold leading-none",
+                    "inline-flex h-4 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold leading-none",
                     commit.pushed ? "text-muted-foreground bg-muted" : "text-warning bg-warning/15",
                   )}>
                     {t(commit.pushed ? "gitPanel.pushed" : "gitPanel.notPushed")}
@@ -748,7 +748,7 @@ export function GitPanel({ cwd, fullWidth = false, onAtMention }: Props) {
       {/* Diff layer: desktop full-width splits list above patch, otherwise single column */}
       {view.type === "diff" && fullWidth && (
         <div data-gitpanel-split className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-border">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden ">
             {renderDetailLayer(view.commit)}
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

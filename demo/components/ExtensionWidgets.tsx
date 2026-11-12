@@ -6,6 +6,7 @@ import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
 import { AnsiText } from "@/components/AnsiText";
 import { stripAnsi } from "@/lib/ansi";
 import { Button } from "@/components/ui/button";
+import { displayLabel } from "@/lib/label-case";
 import type { ExtensionWidgetItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -131,6 +132,27 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
   // widget's content while it plays.
   const panelOpen = expandedWidgetKey !== null;
   const panelMounted = useDelayedUnmount(panelOpen);
+
+  // 面板靠点击开关，失焦/点外面/Escape 都不会自己收——底栏的弹出层曾因此挂着不走。
+  useEffect(() => {
+    if (!panelOpen) return;
+    const close = () => setExpandedWidgetKey(null);
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(`[id^="${idPrefix}-trigger-"]`) || target.closest(`[id^="${idPrefix}-panel-"]`)) return;
+      close();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [panelOpen, idPrefix]);
   const lastExpandedKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (expandedWidgetKey) lastExpandedKeyRef.current = expandedWidgetKey;
@@ -192,7 +214,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
                     className="size-1.5 shrink-0 rounded-full bg-warning motion-safe:animate-pulse"
                   />
                 )}
-                <span className="min-w-0 truncate">{extensionWidgetLabel(widget.key)}</span>
+                <span className="min-w-0 truncate">{displayLabel(extensionWidgetLabel(widget.key))}</span>
               </>
             );
 
@@ -203,7 +225,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
                 key={widget.key}
                 id={triggerId}
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="xs"
                 data-expanded={expanded || undefined}
                 className={triggerClass}
@@ -215,13 +237,18 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
                 {content}
               </Button>
             ) : (
-              <span
+              // 与旁边状态胶囊同一形状（outline / xs / mono）：裸文字夹在胶囊里永远对不齐。
+              <Button
                 key={widget.key}
-                className="inline-flex shrink-0 items-center font-mono text-xs text-muted-foreground"
+                type="button"
+                variant="outline"
+                size="xs"
+                disabled
+                className="shrink-0 gap-1.5 font-mono text-xs font-normal text-muted-foreground"
                 aria-label={`${placementLabel}: ${extensionWidgetLabel(widget.key)}, ${lineCountLabel}`}
               >
                 {content}
-              </span>
+              </Button>
             );
           })}
         </div>

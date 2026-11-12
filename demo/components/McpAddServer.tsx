@@ -569,7 +569,7 @@ function McpAddFieldInput({
   };
   return (
     <Field className="min-w-0 gap-1.5">
-      <FieldLabel className="text-[13px] font-medium text-muted-foreground">{label}</FieldLabel>
+      <FieldLabel className="text-sm font-medium text-muted-foreground">{label}</FieldLabel>
       {usesVariable ? (
         <Input
           className={ADD_INPUT_CLASS}

@@ -2572,7 +2572,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     // here); the sheet's narrower header inset wins over its own header rule.
     <div className="sidebar-menu-question px-1 pt-0.5 pb-1 [.sidebar-sheet_&]:py-1 [.sidebar-sheet_&]:px-4">
       <div
-        className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-1 pt-1.5 pb-1 text-[11px] [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs"
+        className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-1 pt-1.5 pb-1 text-xs [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs"
         title={headingTitle}
       >
         {heading}
@@ -3009,7 +3009,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           aria-controls={searchesFiles ? "file-search-input" : "session-search-input"}
           variant="ghost"
           size="icon-sm"
-          className={`sidebar-search-toggle rounded-full${(searchesFiles ? fileSearchOpen : sessionSearchOpen) ? " bg-accent text-accent-foreground" : ""}`}
+          className={`sidebar-search-toggle rounded-md${(searchesFiles ? fileSearchOpen : sessionSearchOpen) ? " bg-accent text-accent-foreground" : ""}`}
         >
           <SearchIcon size={16} className="size-4" />
         </Button>
@@ -3062,7 +3062,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         {sessionSearchOpen && (
           <div className="sidebar-search flex-none px-2 pt-2 pb-1">
             {/* The files' search field (FileExplorer), mirrored. */}
-            <InputGroup className="h-8 rounded-full bg-muted">
+            <InputGroup className="h-8 rounded-md bg-muted">
               <InputGroupInput
                 id="session-search-input"
                 type="search"
@@ -3114,7 +3114,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 inert={archiveMotion.archiveInert}
                 onAnimationEnd={(event) => { if (event.target === event.currentTarget) endArchiveMotion(); }}
               >
-                <div className="sidebar-archive-bar flex h-9 flex-none items-center border-b border-border px-1.5">
+                <div className="sidebar-archive-bar flex h-9 flex-none items-center px-1.5">
                   <Button
                     ref={archiveBackRef}
                     type="button"
@@ -3181,7 +3181,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         role="tabpanel"
         aria-labelledby="session-sidebar-tab-files"
         hidden={!filesBelow && sidebarTab !== "files"}
-        className={`sidebar-panel sidebar-files-panel flex min-h-0 min-w-0 flex-col overflow-hidden${filesBelow ? " h-[var(--sidebar-files-height,320px)] min-h-[29px] flex-[0_1_auto] border-t border-border [@media(pointer:coarse)]:min-h-[37px]" : " flex-1"}${filesBelow && filesCollapsed ? " h-[29px] [@media(pointer:coarse)]:h-[37px]" : ""}`}
+        className={`sidebar-panel sidebar-files-panel flex min-h-0 min-w-0 flex-col overflow-hidden${filesBelow ? " h-[var(--sidebar-files-height,320px)] min-h-[29px] flex-[0_1_auto] [@media(pointer:coarse)]:min-h-[37px]" : " flex-1"}${filesBelow && filesCollapsed ? " h-[29px] [@media(pointer:coarse)]:h-[37px]" : ""}`}
         onScrollCapture={rememberScroll}
         onTransitionEnd={(event) => { if (event.target === event.currentTarget && event.propertyName === "height") endFilesFold(); }}
       >
@@ -3195,7 +3195,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               type="button"
               variant="ghost"
               size="default"
-              className="sidebar-files-section-toggle flex h-full min-w-[17px] flex-[1_1_auto] flex-wrap items-center gap-[3px] overflow-hidden rounded-md px-[5px] py-0 text-left text-[11px] whitespace-nowrap text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:flex-[1_1_0]"
+              className="sidebar-files-section-toggle flex h-full min-w-[17px] flex-[1_1_auto] flex-wrap items-center gap-[3px] overflow-hidden rounded-md px-[5px] py-0 text-left text-xs whitespace-nowrap text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:flex-[1_1_0]"
               aria-expanded={!filesCollapsed}
               aria-controls="session-sidebar-files-body"
               title={changedFilesTitle}
@@ -3246,7 +3246,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               done with it; below the sessions the keys are the header row's.
               The buttons are the head's, not the picker's: its group names
               only the project and worktree. */}
-          <div className={`sidebar-files-head flex flex-none flex-col${filesBelow ? " border-b-0 pb-0.5 pt-0.5 pl-[15px] pr-(--sidebar-files-inset-right)" : " border-b border-border px-2.5 pt-2.5 pb-1"}`}>
+          <div className={`sidebar-files-head flex flex-none flex-col${filesBelow ? " border-b-0 pb-0.5 pt-0.5 pl-[15px] pr-(--sidebar-files-inset-right)" : " px-2.5 pt-2.5 pb-1"}`}>
             {/* The project and worktree in use: the same picker as the bar above a
                 fresh composer, as two boxes, side by side below the sessions,
                 one under the other in the files tab (the same instance: a
@@ -3307,7 +3307,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           </div>
 
           {explorerCwd && fileManagerErrorMessage && (
-            <div role="alert" className={`sidebar-files-error flex flex-none items-start gap-1.5 text-[10px] leading-[1.35] text-destructive${filesBelow ? " pb-1 pt-0.5 pl-[15px] pr-(--sidebar-files-inset-right)" : " px-2.5 pt-1.5"}`}>
+            <div role="alert" className={`sidebar-files-error flex flex-none items-start gap-1.5 text-xs leading-[1.35] text-destructive${filesBelow ? " pb-1 pt-0.5 pl-[15px] pr-(--sidebar-files-inset-right)" : " px-2.5 pt-1.5"}`}>
               <span className="sidebar-files-error-text min-w-0 flex-1 [overflow-wrap:anywhere]">{fileManagerErrorMessage}</span>
               <DismissButton onClick={() => setFileManagerError(null)} title={t("files.dismissError")} />
             </div>

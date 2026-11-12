@@ -659,7 +659,7 @@ function StatusSlot({ state, label }: { state: DebugStatusState; label: string }
 /** A column's bare state ("waiting", "no chat"): the Empty composition, kept dense for the panel. */
 function DebugEmpty({ children }: { children: ReactNode }) {
   return (
-    <Empty className="flex-none items-start gap-0 rounded-none border-0 p-0 text-left md:p-0">
+    <Empty className="flex-none items-start gap-0 border-0 p-0 text-left md:p-0">
       <EmptyHeader className="items-start text-left">
         <EmptyTitle className="text-xs font-normal text-muted-foreground">{children}</EmptyTitle>
       </EmptyHeader>

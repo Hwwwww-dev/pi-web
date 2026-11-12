@@ -23,7 +23,7 @@ import { pageId, trackEventSource } from "@/lib/page-debug";
 import { parseFrontmatter } from "@/lib/frontmatter";
 import { isExternalMarkdownHref, jumpToMarkdownFragment, markdownAppUrlTransform, markdownPreviewRehypePlugins, markdownPreviewRemarkPlugins, markdownUrlTransform, normalizeDisplayMath } from "@/lib/markdown";
 import { CodeBlock, MermaidBlock } from "./MermaidBlock";
-import { FILE_CODE_STYLE, FILE_LINE_NUMBER_STYLE, FILE_PINNED_LINE_NUMBER_STYLE } from "./DiffView";
+import { FILE_CODE_STYLE, lineNumberGutter } from "./DiffView";
 import { DelimitedTable } from "./DelimitedTable";
 import { PathLabel } from "./PathLabel";
 import { FILE_MODE_LABELS } from "./FileToolbar";
@@ -209,8 +209,8 @@ function DiffView({ patch, wrapLines }: { patch: string; wrapLines: boolean }) {
     }
   }
   const lineNumberStyle = visible.size <= SOURCE_HIGHLIGHT_MAX_LINES
-    ? FILE_PINNED_LINE_NUMBER_STYLE
-    : FILE_LINE_NUMBER_STYLE;
+    ? lineNumberGutter(diff.length, true)
+    : lineNumberGutter(diff.length);
 
   // Collapsed lines and the lines the patch leaves out between hunks share one
   // marker; its count is unknown when a gap's is.
@@ -1255,7 +1255,7 @@ function TextFileViewer({
         data-line-number={lineIndex + 1}
         key={`source-line-${lineIndex}`}
       >
-        <span aria-hidden="true" style={FILE_LINE_NUMBER_STYLE}>
+        <span aria-hidden="true" style={lineNumberGutter(sourceLines.length)}>
           {lineIndex + 1}
         </span>
         <span

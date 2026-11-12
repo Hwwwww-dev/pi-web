@@ -121,7 +121,7 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
   return (
     <section className="flex flex-col gap-2.5 pt-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[13px] leading-[1.35] font-semibold text-foreground">{t("providerUsage.usage")}</span>
+        <span className="text-sm leading-[1.35] font-semibold text-foreground">{t("providerUsage.usage")}</span>
         <Button
           type="button"
           variant="ghost"

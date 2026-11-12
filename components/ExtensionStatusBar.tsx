@@ -5,8 +5,7 @@ import { isPermissiveStatusText } from "@/lib/extension-status";
 import { displayLabel } from "@/lib/label-case";
 import type { ExtensionStatusItem, ExtensionWidgetItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
-import { ExtensionWidgets } from "./ExtensionWidgets";
-import { Badge } from "@/components/ui/badge";
+import { ExtensionWidgets, extensionWidgetLabel } from "./ExtensionWidgets";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -145,10 +144,19 @@ function StatusPill({
   }
   if (cell.kind === "text") {
     return (
-      <Badge variant="outline" className="max-w-full shrink-0 font-mono text-xs font-normal whitespace-pre text-muted-foreground">
+      // 与带列表的 chip 同一形状（outline / xs / mono）：否则 TODO、Goal 是裸文字，LSP 是胶囊，底栏永远对不齐。
+      <Button
+        type="button"
+        variant="outline"
+        size="xs"
+        disabled
+        title={stripAnsi(cell.text)}
+        aria-label={stripAnsi(cell.text)}
+        className="max-w-full shrink-0 font-mono text-xs font-normal text-muted-foreground"
+      >
         {/* Plain status text is a label like any other; ANSI text is the extension's own. */}
         {/\u001b/.test(cell.text) ? <AnsiText text={cell.text} /> : displayLabel(cell.text)}
-      </Badge>
+      </Button>
     );
   }
   return (
@@ -179,7 +187,15 @@ export function ExtensionStatusBar({
   onCommand?: (command: string) => void;
   commandsDisabled?: boolean;
 }) {
-  const cells = buildExtensionStatusCells(statuses);
+  // A status whose text repeats a widget's name is the same fact twice (pi-goal
+  // sets both); the widget owns the chip because it also opens its lines.
+  const widgetLabels = new Set(
+    widgets.map((widget) => displayLabel(extensionWidgetLabel(widget.key)).toLowerCase()),
+  );
+  const cells = buildExtensionStatusCells(statuses).filter((cell) => {
+    const label = cell.kind === "text" ? displayLabel(stripAnsi(cell.text)) : displayLabel(cell.label);
+    return !widgetLabels.has(label.toLowerCase());
+  });
   if (cells.length === 0 && widgets.length === 0) return null;
 
   const plainStatusLine = cells

@@ -658,28 +658,6 @@ function QueueActionButton({ title, onClick, children }: {
   );
 }
 
-/** One clipped line that scrolls its hidden remainder while hovered. The
- *  distance and duration are measured on the row's own text, so a short message
- *  never animates. */
-function useHoverScroll() {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [style, setStyle] = useState<React.CSSProperties | null>(null);
-  const start = useCallback(() => {
-    const element = ref.current;
-    if (!element) return;
-    const distance = element.scrollWidth - element.clientWidth;
-    if (distance <= 0) return;
-    // A steady read: ~90px per second, within sane bounds whatever the length.
-    const duration = Math.min(9000, Math.max(2600, distance * 11));
-    setStyle({
-      "--queued-scroll-distance": `${distance}px`,
-      "--queued-scroll-duration": `${duration}ms`,
-    } as React.CSSProperties);
-  }, []);
-  const stop = useCallback(() => setStyle(null), []);
-  return { ref, style, start, stop };
-}
-
 function QueuedMessageRow({
   item,
   onAction,
@@ -692,7 +670,6 @@ function QueuedMessageRow({
   canMoveDown?: boolean;
 }) {
   const { t } = useI18n();
-  const queuedScroll = useHoverScroll();
   const isSteer = item.behavior === "steer";
   const behaviorLabel = isSteer ? t("chat.queueBehaviorSteer") : t("chat.queueBehaviorFollowUp");
   const behaviorChipClass = cn(
@@ -745,15 +722,9 @@ function QueuedMessageRow({
         <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass}>{behaviorLabel}</Badge>
       )}
       {/* One clipped line, whatever the message holds: a long queued text used
-          to widen the pill past the composer and give the whole page a
-          horizontal scrollbar. Hovering scrolls the hidden rest into view. */}
-      <span
-        ref={queuedScroll.ref}
-        className={cn("min-w-0 flex-1 truncate", queuedScroll.style && "queued-text-scrolling")}
-        style={queuedScroll.style ?? undefined}
-        onMouseEnter={queuedScroll.start}
-        onMouseLeave={queuedScroll.stop}
-      >
+          to widen the pill past the composer. The full text is the row's title;
+          the hover marquee scrolled it out of the pill and is gone. */}
+      <span className="min-w-0 flex-1 truncate">
         {item.text}
       </span>
       <span className="ml-auto flex shrink-0 items-center gap-0.5">

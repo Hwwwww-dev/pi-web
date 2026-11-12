@@ -9,7 +9,7 @@ import {
 import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
-import { FILE_CODE_STYLE, FILE_LINE_NUMBER_STYLE, FILE_PINNED_LINE_NUMBER_STYLE } from "./DiffView";
+import { FILE_CODE_STYLE, lineNumberGutter } from "./DiffView";
 
 /** Above this line count the highlighter render is deferred one tick: the plain
  * line grid paints first, then the colored tree replaces it off the first paint. */
@@ -86,9 +86,7 @@ export function SourceCodeView({ content, language, wrapLines }: {
         showLineNumbers
         // react-syntax-highlighter configures its elements through inline-style
         // props (lineNumberStyle/customStyle/codeTagProps) — that API stays.
-        lineNumberStyle={{
-          ...FILE_PINNED_LINE_NUMBER_STYLE,
-        }}
+        lineNumberStyle={lineNumberGutter(sourceLines.length, true)}
         customStyle={{
           margin: 0,
           padding: 0,
@@ -125,7 +123,7 @@ export function SourceCodeView({ content, language, wrapLines }: {
       >
         {/* The gutter style is the shared DiffView constant (FileViewer's test
             reads it off this element as a literal style). */}
-        <span aria-hidden="true" style={FILE_LINE_NUMBER_STYLE}>
+        <span aria-hidden="true" style={lineNumberGutter(sourceLines.length)}>
           {lineIndex + 1}
         </span>
         <span

@@ -3,89 +3,97 @@
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
 import {
+  CodeBlock,
+  CodeBlockContent,
+  CodeBlockHeader,
+  CodeBlockLine,
+  CodeBlockTitle,
+} from "@/components/ui/code-block";
+import {
   diffGapLabel,
-  unifiedDiffLines,
   type SplitDiffCell,
   type SplitDiffFile,
   type SplitDiffGap,
-  type UnifiedDiffLine,
+  type SplitDiffRow,
 } from "@/lib/patch";
 
 export type PatchDiffLayout = "split" | "stacked";
 
+type LineVariant = "default" | "added" | "removed" | "highlighted";
+
+type DiffEntry =
+  | { key: string; gap: SplitDiffGap }
+  | { key: string; row: Extract<SplitDiffRow, { type: "line" }> };
+
+/** 行号列只占它实际需要的位数：固定宽度会让一位数右边空出一大截。 */
+const GUTTER_WIDTHS = ["w-[2ch]", "w-[3ch]", "w-[4ch]", "w-[5ch]", "w-[6ch]"];
+
+function gutterWidthClass(maxLineNo: number): string {
+  const digits = Math.max(2, String(Math.max(1, maxLineNo)).length);
+  return GUTTER_WIDTHS[Math.min(GUTTER_WIDTHS.length - 1, digits - 2)] ?? "w-[2ch]";
+}
+
+/** The largest line number a file's rows show, which decides the gutter width. */
+function fileMaxLineNo(file: SplitDiffFile): number {
+  let max = 1;
+  for (const row of file.rows) {
+    if (row.type !== "line") continue;
+    for (const cell of [row.left, row.right]) {
+      if (cell.lineNo !== null && cell.lineNo > max) max = cell.lineNo;
+    }
+  }
+  return max;
+}
+
+function cellVariant(cell: SplitDiffCell | null): LineVariant {
+  if (cell === null || cell.type === "empty") return "default";
+  if (cell.type === "added") return "added";
+  if (cell.type === "removed") return "removed";
+  return "default";
+}
+
 /**
- * The patch as the viewport can show it. Two columns need two code columns side
- * by side, which a phone does not have: there the same rows read as one column
- * — a removed line above the line that replaces it, each with its own number.
+ * A patch's own line: the number in a gutter sized to the file's largest line,
+ * then the text with the official code-block line variant doing the +/- marker
+ * and the tint. Nothing here has its own colors.
  */
-export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layout: PatchDiffLayout }) {
-  const { t } = useI18n();
-  const showFileHeaders = files.length > 1;
-
+function DiffLine({ cell, maxLineNo, muted = false }: {
+  cell: SplitDiffCell | null;
+  maxLineNo: number;
+  muted?: boolean;
+}) {
+  const lineNo = cell?.lineNo ?? null;
   return (
-    <div className="max-h-[var(--card-max-height)] overflow-x-hidden overflow-y-auto bg-background">
-      {files.map((file, fileIndex) => (
-        <div
-          key={fileIndex}
-          className={cn(
-            "min-w-0 font-mono text-[length:calc(12px+var(--chat-font-size-offset,0px))] leading-[1.55]",
-            fileIndex > 0 && "border-t border-border",
-          )}
-        >
-          {showFileHeaders && layout === "split" && (
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] border-b border-border bg-muted">
-              <SplitDiffHeader title={file.oldPath || t("i18n.before")} side="left" />
-              <SplitDiffHeader title={file.newPath || t("i18n.after")} side="right" />
-            </div>
-          )}
-
-          {showFileHeaders && layout === "stacked" && stackedFilePath(file) && (
-            <div
-              title={stackedFilePath(file)}
-              className="truncate border-b border-border bg-muted px-2.5 py-[5px] text-muted-foreground"
-            >
-              {stackedFilePath(file)}
-            </div>
-          )}
-
-          {layout === "split" && (
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              {file.rows.map((row, rowIndex) => {
-                if (row.type === "hunk") {
-                  return null;
-                }
-                if (row.type === "gap") {
-                  return <DiffGapRow key={rowIndex} gap={row} />;
-                }
-
-                return (
-                  <div key={rowIndex} className="contents">
-                    <SplitDiffCellView cell={row.left} side="left" />
-                    <SplitDiffCellView cell={row.right} side="right" />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {layout === "stacked" && unifiedDiffLines(file).map((line, lineIndex) => (
-            line.type === "gap"
-              ? <DiffGapRow key={lineIndex} gap={line} />
-              : <StackedDiffLineView key={lineIndex} line={line} />
-          ))}
-        </div>
-      ))}
-    </div>
+    <CodeBlockLine
+      variant={cellVariant(cell)}
+      className={cn(
+        "ps-5",
+        // 官方 added 变体是中性底色；增删需要能一眼分辨，所以覆盖成 success/10。
+        cell?.type === "added" && "bg-success/10",
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "me-3 inline-block shrink-0 select-none text-end tabular-nums text-muted-foreground",
+          gutterWidthClass(maxLineNo),
+        )}
+      >
+        {lineNo ?? ""}
+      </span>
+      <span className={cn("whitespace-pre", cell === null && "opacity-0", muted && "text-muted-foreground")}>
+        {cell?.text || "\u00a0"}
+      </span>
+    </CodeBlockLine>
   );
 }
 
-/** Unchanged lines the patch leaves out between two hunks, across the whole width. */
-function DiffGapRow({ gap }: { gap: SplitDiffGap }) {
+function GapLine({ gap }: { gap: SplitDiffGap }) {
   const { t } = useI18n();
   return (
-    <div className="col-span-full select-none border-y border-border bg-muted px-2.5 text-muted-foreground">
+    <CodeBlockLine variant="highlighted" className="ps-5 text-muted-foreground">
       {gap.count === null ? "⋯" : `⋯ ${diffGapLabel(gap.count, t)}`}
-    </div>
+    </CodeBlockLine>
   );
 }
 
@@ -95,60 +103,83 @@ function stackedFilePath(file: SplitDiffFile): string {
   return file.oldPath || file.newPath || "";
 }
 
-function StackedDiffLineView({ line }: { line: UnifiedDiffLine }) {
+function DiffHeader({ title }: { title: string }) {
   return (
-    <SplitDiffCellView
-      side="right"
-      cell={{
-        // One gutter, so a removed line keeps the old number and everything else the new one.
-        lineNo: line.type === "removed" ? line.oldLineNo : line.newLineNo,
-        text: line.text,
-        type: line.type,
-      }}
-    />
+    <CodeBlockHeader>
+      <CodeBlockTitle className="truncate font-mono text-xs font-normal">{title}</CodeBlockTitle>
+    </CodeBlockHeader>
   );
 }
 
-function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right" }) {
-  return (
-    <div
-      title={title}
-      className={cn("truncate px-2.5 py-[5px] text-muted-foreground", side === "left" && "border-r border-border")}
-    >
-      {title}
-    </div>
-  );
-}
+/**
+ * The patch as the viewport can show it. Two columns need two code columns side
+ * by side, which a phone does not have: there the same rows read as one column
+ * — a removed line above the line that replaces it, each with its own number.
+ * Both layouts are the same official `CodeBlock`; only the column count differs.
+ */
+export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layout: PatchDiffLayout }) {
+  const showFileHeaders = files.length > 1;
 
-function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" | "right" }) {
-  const marker = cell.type === "added" ? "+" : cell.type === "removed" ? "-" : " ";
   return (
-    <div
-      className={cn(
-        "flex min-w-0",
-        cell.type === "added" ? "bg-foreground/5" : cell.type === "removed" ? "bg-destructive/10" : cell.type === "empty" && "bg-muted",
-        side === "left" && "border-r border-border",
-      )}
-    >
-      <span className="w-[42px] shrink-0 select-none border-r border-border bg-card px-1.5 text-right text-muted-foreground">
-        {cell.lineNo ?? ""}
-      </span>
-      <span
-        className={cn(
-          "w-[18px] shrink-0 select-none px-[5px]",
-          cell.type === "added" ? "font-bold text-diff-add" : cell.type === "removed" ? "font-bold text-diff-del" : "font-normal text-muted-foreground",
-        )}
-      >
-        {marker}
-      </span>
-      <span
-        className={cn(
-          "min-w-0 flex-1 pr-2.5 whitespace-pre-wrap wrap-anywhere",
-          cell.type === "empty" ? "text-muted-foreground" : "text-foreground",
-        )}
-      >
-        {cell.text || "\u00a0"}
-      </span>
+    <div className="flex min-w-0 flex-col gap-2">
+      {files.map((file, fileIndex) => {
+        const maxLineNo = fileMaxLineNo(file);
+        const lines = file.rows.flatMap<DiffEntry>((row, rowIndex) => {
+          if (row.type === "hunk") return [];
+          if (row.type === "gap") return [{ key: `g${rowIndex}`, gap: row }];
+          return [{ key: `r${rowIndex}`, row }];
+        });
+
+        return (
+          <CodeBlock key={fileIndex} size="sm" data-diff-layout={layout}>
+            {showFileHeaders && layout === "stacked" && stackedFilePath(file) && (
+              <DiffHeader title={stackedFilePath(file)} />
+            )}
+            {layout === "split" ? (
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <CodeBlockContent wrap={false} className="pr-0 group-data-[size=sm]/code-block:pr-0">
+                  {showFileHeaders && <DiffHeader title={file.oldPath || "/dev/null"} />}
+                  {lines.map((entry) => (
+                    "gap" in entry
+                      ? <GapLine key={entry.key} gap={entry.gap} />
+                      : <DiffLine key={entry.key} cell={entry.row.left} maxLineNo={maxLineNo} />
+                  ))}
+                </CodeBlockContent>
+                <CodeBlockContent
+                  wrap={false}
+                  className="border-s border-border/60 pl-0 group-data-[size=sm]/code-block:pl-0"
+                >
+                  {showFileHeaders && <DiffHeader title={file.newPath || "/dev/null"} />}
+                  {lines.map((entry) => (
+                    "gap" in entry
+                      ? <GapLine key={entry.key} gap={entry.gap} />
+                      : <DiffLine key={entry.key} cell={entry.row.right} maxLineNo={maxLineNo} />
+                  ))}
+                </CodeBlockContent>
+              </div>
+            ) : (
+              <CodeBlockContent wrap={false}>
+                {lines.map((entry) => (
+                  "gap" in entry
+                    ? <GapLine key={entry.key} gap={entry.gap} />
+                    : (
+                      <DiffLine
+                        key={entry.key}
+                        maxLineNo={maxLineNo}
+                        cell={{
+                          // One gutter, so a removed line keeps the old number and everything else the new one.
+                          lineNo: entry.row.right.type === "removed" ? entry.row.left.lineNo : entry.row.right.lineNo,
+                          text: entry.row.right.type === "removed" ? entry.row.left.text : entry.row.right.text,
+                          type: entry.row.right.type === "removed" ? "removed" : entry.row.right.type,
+                        }}
+                      />
+                    )
+                ))}
+              </CodeBlockContent>
+            )}
+          </CodeBlock>
+        );
+      })}
     </div>
   );
 }

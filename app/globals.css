@@ -68,30 +68,6 @@
 /* A queued message shows one line; hovering it scrolls the hidden remainder
    into view and back. The distance and duration are measured per row
    (QueuedMessageRow), so a short message never animates. */
-@keyframes queued-text-scroll {
-  0%,
-  8% {
-    transform: translateX(0);
-  }
-  46%,
-  54% {
-    transform: translateX(calc(-1 * var(--queued-scroll-distance, 0px)));
-  }
-  92%,
-  100% {
-    transform: translateX(0);
-  }
-}
-.queued-text-scrolling {
-  text-overflow: clip;
-  animation: queued-text-scroll var(--queued-scroll-duration, 3s) ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .queued-text-scrolling {
-    animation: none;
-  }
-}
-
 /* An extension's question often arrives as a two-column markdown table
    (option | description). Auto layout hands the long first cell every pixel
    and squeezes the description to a character a line, so inside the ask drawer

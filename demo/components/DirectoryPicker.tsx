@@ -33,7 +33,7 @@ const panelSurfaceClass = "overflow-hidden rounded-lg border border-border bg-ba
 // 这里不叠加 focus-visible:ring，避免双环与被压制的死 utility。
 const textInputClass = "h-9 rounded-md border border-border bg-card px-2.5 font-mono text-xs text-foreground outline-none shadow-none";
 
-const actionButtonClass = "rounded-md px-4 py-1.5 text-[13px]";
+const actionButtonClass = "rounded-md px-4 py-1.5 text-sm";
 
 const primaryActionClass = cn(
   actionButtonClass,
@@ -176,9 +176,9 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
         )}
       >
         <DialogTitle className="sr-only">{t("directoryPicker.selectDirectory")}</DialogTitle>
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-[18px] py-3">
+        <div className="flex shrink-0 items-center justify-between px-[18px] py-3">
           <div className="min-w-0 flex-1">
-            <div className="text-[15px] font-bold text-foreground">{t("directoryPicker.selectDirectory")}</div>
+            <div className="text-base font-bold text-foreground">{t("directoryPicker.selectDirectory")}</div>
           </div>
           <Button
             type="button"
@@ -194,7 +194,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
           </Button>
         </div>
 
-        <form onSubmit={handlePathSubmit} className="flex shrink-0 items-center gap-2 border-b border-border px-3.5 py-2.5">
+        <form onSubmit={handlePathSubmit} className="flex shrink-0 items-center gap-2 px-3.5 py-2.5">
           <Button
             className="dark:bg-secondary directory-picker-back flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-secondary p-0 text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default disabled:opacity-50"
             type="button"
@@ -281,7 +281,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
           {(loadError || error) && <div className={cn(emptyNoticeClass, "text-destructive")}>{loadError ?? error}</div>}
         </div>
 
-        <div className="directory-picker-footer flex shrink-0 items-center justify-end gap-2.5 border-t border-border px-[18px] py-2.5">
+        <div className="directory-picker-footer flex shrink-0 items-center justify-end gap-2.5 px-[18px] py-2.5">
           <Button
             className={cn("h-auto font-normal dark:bg-transparent", "directory-picker-action mr-auto", secondaryActionClass)}
             type="button"
@@ -338,7 +338,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
               }}
               className={cn("w-[400px] max-w-full", panelSurfaceClass)}
             >
-              <div className="border-b border-border px-[18px] py-3 text-[15px] font-bold text-foreground">
+              <div className="px-[18px] py-3 text-base font-bold text-foreground">
                 {t("directoryPicker.createDirectory")}
               </div>
               <div className="px-[18px] py-3">

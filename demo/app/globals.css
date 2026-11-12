@@ -68,30 +68,6 @@
 /* A queued message shows one line; hovering it scrolls the hidden remainder
    into view and back. The distance and duration are measured per row
    (QueuedMessageRow), so a short message never animates. */
-@keyframes queued-text-scroll {
-  0%,
-  8% {
-    transform: translateX(0);
-  }
-  46%,
-  54% {
-    transform: translateX(calc(-1 * var(--queued-scroll-distance, 0px)));
-  }
-  92%,
-  100% {
-    transform: translateX(0);
-  }
-}
-.queued-text-scrolling {
-  text-overflow: clip;
-  animation: queued-text-scroll var(--queued-scroll-duration, 3s) ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .queued-text-scrolling {
-    animation: none;
-  }
-}
-
 /* An extension's question often arrives as a two-column markdown table
    (option | description). Auto layout hands the long first cell every pixel
    and squeezes the description to a character a line, so inside the ask drawer
@@ -766,19 +742,13 @@ pre, code {
   max-width: 100%;
   height: auto;
   margin: 8px 0;
-  border-radius: var(--radius-sm);
 }
-/* Firefox draws its audio controls without a background (bare buttons on the
-   page), Chrome inside a grey pill: both get the same frame from the theme. */
+/* Only the sizing: the player keeps the browser's own controls, so no frame. */
 .markdown-body audio {
   display: block;
   width: min(360px, 100%);
   height: 36px;
   margin: 8px 0;
-  background: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-2xl);
-  clip-path: inset(0 round 18px);
 }
 .markdown-body audio::-webkit-media-controls-enclosure {
   background: transparent;
@@ -788,7 +758,6 @@ pre, code {
   max-width: min(640px, 100%);
   max-height: 360px;
   margin: 8px 0;
-  border-radius: var(--radius-sm);
 }
 .markdown-body .markdown-inline-code {
   background: var(--muted);
@@ -848,8 +817,6 @@ pre, code {
   width: 100%;
   margin: 8px 0;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
 }
 .markdown-table-wrap {
   width: 100%;
@@ -1497,44 +1464,3 @@ span.token.table {
   }
 }
 
-/* t/s > 120 的徽章：文字恒白，背景是密排的流动彩虹渐变。参数来自用户的
-   调参器定稿：周期 70px · 亮度 0.70 · 饱和 0.25 · 每周期 8 色 · 基准
-   时长 0.30s。图层比徽章宽出一个周期、平移一个周期无缝循环，动画只动
-   transform（GPU 合成、零重paint）：background-position 每帧重paint，
-   在真机上一顿一顿。纯 oklch，不受主题 token 约束。组件按速度内联
-   animation-duration：50/tps 秒、0.3s 封底（≥166 t/s 恒为 0.3s，再快
-   不再加速）。reduced-motion 下保持静态彩虹。 */
-@keyframes tps-rainbow-slide {
-  from { transform: translateX(0); }
-  to { transform: translateX(-70px); }
-}
-.tps-rainbow {
-  /* Lightness and chroma are tokens because a dark surface turns the same
-     saturated gradient into a glare: 0.70/0.25 reads as neon there, so the
-     dark theme drops it to a calmer 0.55/0.22 while the white label still
-     clears 4.5:1. */
-  --tps-rainbow-l: 0.70;
-  --tps-rainbow-c: 0.25;
-  width: calc(100% + 70px);
-  background-image: repeating-linear-gradient(90deg,
-    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 0)   0px,
-    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 45)  8.8px,
-    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 90)  17.5px,
-    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 135) 26.3px,
-    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 180) 35px,
-    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 225) 43.8px,
-    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 270) 52.5px,
-    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 315) 61.3px,
-    oklch(var(--tps-rainbow-l) var(--tps-rainbow-c) 360) 70px);
-  animation: tps-rainbow-slide linear infinite;
-  will-change: transform;
-}
-[data-theme="dark"] .tps-rainbow {
-  --tps-rainbow-l: 0.55;
-  --tps-rainbow-c: 0.22;
-}
-@media (prefers-reduced-motion: reduce) {
-  .tps-rainbow {
-    animation: none;
-  }
-}

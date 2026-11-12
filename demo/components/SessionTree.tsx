@@ -524,7 +524,7 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
         // scroll box (useGroupDrag places it by its measured height).
         <div
           ref={ghostRef}
-          className="session-tree-drag-ghost pointer-events-none absolute z-[2] flex h-[22px] max-w-[70%] min-w-0 items-center rounded-full border border-border bg-sidebar px-2.5 text-xs font-semibold whitespace-nowrap text-foreground opacity-90 shadow-sm"
+          className="session-tree-drag-ghost pointer-events-none absolute z-[2] flex h-[22px] max-w-[70%] min-w-0 items-center rounded-md border border-border bg-sidebar px-2.5 text-xs font-semibold whitespace-nowrap text-foreground opacity-90 shadow-sm"
           aria-hidden="true"
         >
           <span className="session-tree-group-name min-w-0 truncate">{ghostProject.name}</span>
@@ -714,7 +714,7 @@ const SessionRowView = memo(function SessionRowView({
     "text-foreground",
     // Titles are the content: the item's 13px, a family's child a step
     // smaller (12.5px) and deeper.
-    context === "pinned" ? "text-[13px]" : "text-[12.5px]",
+    context === "pinned" ? "text-sm" : "text-xs",
     // The selected one a little heavier.
     status.selected ? "font-medium" : "",
     context === "archive" ? "text-muted-foreground" : "",
@@ -745,7 +745,7 @@ const SessionRowView = memo(function SessionRowView({
         </span>
       )}
       <span
-        className={`flex min-w-[26px] shrink-0 items-center justify-end text-right text-[11px] tabular-nums text-muted-foreground whitespace-nowrap${status.running ? " text-accent" : ""}${metaVisibility ? ` ${metaVisibility}` : ""}`}
+        className={`flex min-w-[26px] shrink-0 items-center justify-end text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap${status.running ? " text-accent" : ""}${metaVisibility ? ` ${metaVisibility}` : ""}`}
         title={metaTitle}
       >
         {meta}
@@ -957,7 +957,7 @@ export function DeleteConfirm({
 export function ActivitySummary({ running, awaiting = 0, unread, className, t }: { running: number; awaiting?: number; unread: number; className?: string; t: (key: string) => string }) {
   if (running === 0 && awaiting === 0 && unread === 0) return null;
   return (
-    <span className={`session-tree-summary ml-auto flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground${className ? ` ${className}` : ""}`}>
+    <span className={`session-tree-summary ml-auto flex shrink-0 items-center gap-2 text-xs tabular-nums text-muted-foreground${className ? ` ${className}` : ""}`}>
       {running > 0 && (
         <span
           className="session-tree-summary-running inline-flex items-center gap-[3px]"
@@ -1084,7 +1084,7 @@ const GroupRowView = memo(function GroupRowView({
       <Button
         type="button"
         variant="ghost"
-        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-0 text-left text-[13px] font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-0 text-left text-sm font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
         aria-expanded={expanded}
         title={project.root}
         onClick={(event) => handlers.current.onToggleGroup(project.key, event.altKey)}
@@ -1167,7 +1167,7 @@ const PlainRowView = memo(function PlainRowView({
           <Button
             type="button"
             variant="ghost"
-            className="session-tree-pinned-toggle h-auto min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[11px] pr-2 text-left text-[11px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
+            className="session-tree-pinned-toggle h-auto min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[11px] pr-2 text-left text-xs whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
             aria-expanded={!row.collapsed}
             onClick={() => handlers.current.onTogglePinned()}
           >
@@ -1209,7 +1209,7 @@ const PlainRowView = memo(function PlainRowView({
       // gives way so "Show less" is never clipped.
       const lone = (row.hidden > 0 ? 1 : 0) + (row.canShowLess ? 1 : 0) === 1;
       const toggleClass = (loneButton: boolean, marginLeft = false) => [
-        "session-tree-more-toggle h-full min-w-0 truncate rounded-md bg-transparent px-0 py-0 text-left text-[11px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground",
+        "session-tree-more-toggle h-full min-w-0 truncate rounded-md bg-transparent px-0 py-0 text-left text-xs whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground",
         loneButton ? "flex-1" : "shrink",
         marginLeft ? "ml-[14px]" : "",
       ].filter(Boolean).join(" ");
@@ -1244,12 +1244,12 @@ const PlainRowView = memo(function PlainRowView({
       // "No sessions yet" and an unpinned group's "Pin to keep" side by side.
       return (
         <div className={`session-tree-row session-tree-group-empty left-0 right-0 flex min-w-0 items-center ${TEXT_COLUMN} pr-1`} style={style} data-row-key={row.key}>
-          <span className="session-tree-group-empty-label min-w-0 flex-[0_1_auto] truncate text-[11px] text-muted-foreground">{t("sidebar.noLiveSessions")}</span>
+          <span className="session-tree-group-empty-label min-w-0 flex-[0_1_auto] truncate text-xs text-muted-foreground">{t("sidebar.noLiveSessions")}</span>
           {!row.project.pinned && (
             <Button
               type="button"
               variant="ghost"
-              className="session-tree-more-toggle ml-[14px] h-full min-w-0 flex-none truncate rounded-md bg-transparent px-0 py-0 text-left text-[11px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
+              className="session-tree-more-toggle ml-[14px] h-full min-w-0 flex-none truncate rounded-md bg-transparent px-0 py-0 text-left text-xs whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
               onClick={() => handlers.current.onPinEmptyGroup(row.project)}
             >
               {t("sidebar.pinToKeep")}
@@ -1265,7 +1265,7 @@ const PlainRowView = memo(function PlainRowView({
           <Button
             type="button"
             variant="ghost"
-            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-1 text-left text-[12px] text-muted-foreground hover:bg-accent hover:text-muted-foreground"
+            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-1 text-left text-xs text-muted-foreground hover:bg-accent hover:text-muted-foreground"
             onClick={(event) => handlers.current.onOpenOtherProject(event.currentTarget)}
           >
             <FolderPlusIcon size={12} className="size-3 shrink-0" />
@@ -1279,7 +1279,7 @@ const PlainRowView = memo(function PlainRowView({
           <Button
             type="button"
             variant="ghost"
-            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-1 text-left text-[12px] text-muted-foreground hover:bg-accent hover:text-muted-foreground"
+            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-1 text-left text-xs text-muted-foreground hover:bg-accent hover:text-muted-foreground"
             onClick={() => handlers.current.onOpenArchive()}
           >
             <ArchiveIcon size={12} className="size-3 shrink-0" />
@@ -1325,7 +1325,7 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
       <Button
         type="button"
         variant="ghost"
-        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-0 text-left text-[13px] font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-0 text-left text-sm font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
         aria-expanded={expanded}
         title={project.root}
         onClick={(event) => handlers.current.onToggleArchiveGroup?.(project.key, event.altKey)}

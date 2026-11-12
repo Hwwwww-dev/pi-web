@@ -115,6 +115,8 @@ interface Props {
   prevTimestamp?: number;
   sessionId?: string;
   showModelLabel?: boolean;
+  /** Turn-grouped final answers: the turn meta line already carries usage. */
+  hideUsage?: boolean;
   /** Turn-grouped final answers: the copy affordance lives on the turn meta line. */
   hideCopy?: boolean;
   /**
@@ -200,12 +202,12 @@ function haveSameRelevantToolResults(
   return true;
 }
 
-export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, modelNames, cwd, onOpenFile, onOpenSubagent, entryId, searchBlock, onFork, forking, onEditContent, onCancelEdit, isEditing, showTimestamp, prevTimestamp, sessionId, writtenFiles, turnDurationMs, showModelLabel, hideCopy, onCompact, isCompacting, compactError }: Props) {
+export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, modelNames, cwd, onOpenFile, onOpenSubagent, entryId, searchBlock, onFork, forking, onEditContent, onCancelEdit, isEditing, showTimestamp, prevTimestamp, sessionId, writtenFiles, turnDurationMs, showModelLabel, hideUsage, hideCopy, onCompact, isCompacting, compactError }: Props) {
   if (message.role === "user") {
     return <UserMessageView message={message as UserMessage} cwd={cwd} onOpenFile={onOpenFile} entryId={entryId} onFork={onFork} forking={forking} onEditContent={onEditContent} onCancelEdit={onCancelEdit} isEditing={isEditing} />;
   }
   if (message.role === "assistant") {
-    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} turnDurationMs={turnDurationMs} showModelLabel={showModelLabel} hideCopy={hideCopy} onCompact={onCompact} isCompacting={isCompacting} compactError={compactError} />;
+    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} turnDurationMs={turnDurationMs} showModelLabel={showModelLabel} hideUsage={hideUsage} hideCopy={hideCopy} onCompact={onCompact} isCompacting={isCompacting} compactError={compactError} />;
   }
   if (message.role === "toolResult") {
     // Rendered inline under its toolCall — skip standalone rendering if paired
@@ -247,6 +249,7 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
     && prev.turnDurationMs === next.turnDurationMs
     && prev.sessionId === next.sessionId
     && prev.showModelLabel === next.showModelLabel
+    && prev.hideUsage === next.hideUsage
     && prev.hideCopy === next.hideCopy
     && prev.onCompact === next.onCompact
     && prev.isCompacting === next.isCompacting
@@ -512,6 +515,7 @@ function AssistantMessageView({
   writtenFiles,
   turnDurationMs,
   showModelLabel,
+  hideUsage,
   hideCopy,
   onCompact,
   isCompacting,
@@ -532,6 +536,7 @@ function AssistantMessageView({
   writtenFiles?: WrittenFile[];
   turnDurationMs?: number;
   showModelLabel?: boolean;
+  hideUsage?: boolean;
   hideCopy?: boolean;
   onCompact?: () => void;
   isCompacting?: boolean;
@@ -604,7 +609,7 @@ function AssistantMessageView({
     .map((b) => b.text)
     .join("\n");
 
-  const stats = message.usage ? formatUsage(message.usage) : [];
+  const stats = message.usage && !hideUsage ? formatUsage(message.usage) : [];
   if (turnDurationMs !== undefined) {
     if (stats.length > 0) stats.push({ text: "\u00b7" });
     const time = formatTurnDuration(turnDurationMs);
@@ -741,9 +746,9 @@ function AssistantMessageView({
         <TurnWrittenFiles files={writtenFiles} onOpenFile={onOpenFile} />
       )}
 
-      {((message.usage && !isStreaming) || (turnDurationMs !== undefined && !isStreaming) || (textContent && !isStreaming && !hideCopy) || (time && !isStreaming)) && (
+      {((stats.length > 0 && !isStreaming) || (turnDurationMs !== undefined && !isStreaming) || (textContent && !isStreaming && !hideCopy) || (time && !isStreaming)) && (
         <MessageFooter className="mt-1.5 gap-2 px-0">
-          {(message.usage || turnDurationMs !== undefined) && !isStreaming && (
+          {(stats.length > 0 || turnDurationMs !== undefined) && !isStreaming && (
             // One item per count: a single space at 11px ran them together. The
             // spaces stay in the text for copying; the flex gap draws the room.
             <div className="flex flex-wrap gap-x-[7px] font-mono text-xs text-muted-foreground tabular-nums">

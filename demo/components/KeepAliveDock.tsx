@@ -120,11 +120,13 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
               <Button
                 ref={buttonRef}
                 type="button"
-                variant="ghost"
+                variant="outline"
+                size="xs"
                 className={cn(
-                  "h-9 gap-1 rounded-l-none rounded-r-lg border border-l-0 bg-sidebar px-[7px] text-muted-foreground shadow-sm select-none [touch-action:none]",
-                  "hover:bg-secondary hover:text-foreground",
-                  open && "bg-secondary text-foreground",
+                  // 官方 outline 胶囊（与扩展状态 pill 同一形状），不再自绘贴边标签。
+                  "h-7 gap-1 rounded-md bg-background px-2 text-xs font-normal text-muted-foreground shadow-xs select-none [touch-action:none]",
+                  "hover:bg-accent hover:text-accent-foreground",
+                  open && "bg-accent text-accent-foreground",
                 )}
                 aria-expanded={open}
                 aria-label={`${t("keepalive.title")} (${slots.length})`}
@@ -159,7 +161,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
           alignOffset={-18}
           role="menu"
           aria-label={t("keepalive.title")}
-          className="max-h-[min(440px,62vh)] w-[min(320px,calc(100vw-56px))] overflow-y-auto overscroll-contain rounded-xl border-border/75 bg-background p-1.5"
+          className="max-h-[min(440px,62vh)] w-[min(320px,calc(100vw-56px))] overflow-y-auto overscroll-contain rounded-lg p-1"
         >
           <div className="flex flex-col">
             {slots.map((slot) => {
@@ -199,7 +201,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                     </span>
                     <PathLabel
                       text={info.cwd}
-                      className="text-[10px] font-mono text-muted-foreground"
+                      className="text-xs font-mono text-muted-foreground"
                     />
                   </Button>
                   <Button
@@ -218,7 +220,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
             })}
           </div>
           {slots.some((slot) => slot.session.id !== selectedSessionId) && (
-            <div className="mt-1 border-t border-border px-1.5 pb-0.5 pt-1">
+            <div className="mt-1 px-1.5 pb-0.5 pt-1">
               <Button
                 type="button"
                 variant="ghost"

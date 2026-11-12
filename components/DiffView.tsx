@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { CodeBlockLine } from "@/components/ui/code-block";
 import { parseUnifiedPatch } from "@/lib/patch";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
@@ -17,13 +18,11 @@ export const FILE_CODE_STYLE: CSSProperties = {
   lineHeight: 1.6,
 };
 
-export const FILE_LINE_NUMBER_STYLE: CSSProperties = {
-  width: 48,
-  minWidth: 48,
-  padding: "0 10px",
+/** 行号列的宽度跟着位数走：固定 48px 让「2」「6」这种一位数右边空出一大截（用户报的“行号太空”）。 */
+const LINE_NUMBER_BASE: CSSProperties = {
+  padding: "0 8px",
   textAlign: "right",
   color: "var(--muted-foreground)",
-  
   borderRight: "1px solid var(--border)",
   fontFamily: "var(--font-mono)",
   fontWeight: "var(--font-mono-weight)",
@@ -36,15 +35,20 @@ export const FILE_LINE_NUMBER_STYLE: CSSProperties = {
   verticalAlign: "top",
 };
 
-// Only views of at most SOURCE_HIGHLIGHT_MAX_LINES rows pin it: a long plain
-// fallback or huge diff scrolled with 50-67 ms frames while pinned, so those
-// keep the plain gutter.
-export const FILE_PINNED_LINE_NUMBER_STYLE: CSSProperties = {
-  ...FILE_LINE_NUMBER_STYLE,
-  position: "sticky",
-  left: 0,
-  zIndex: 1,
-};
+/** Gutter width for a view whose largest line number is `lineCount`. */
+export function lineNumberGutter(lineCount: number, pinned = false): CSSProperties {
+  const digits = Math.max(2, String(Math.max(1, Math.floor(lineCount))).length);
+  const width = `calc(${digits}ch + 12px)`;
+  return {
+    ...LINE_NUMBER_BASE,
+    width,
+    minWidth: width,
+    // Only views of at most SOURCE_HIGHLIGHT_MAX_LINES rows pin it: a long plain
+    // fallback or huge diff scrolled with 50-67 ms frames while pinned, so those
+    // keep the plain gutter.
+    ...(pinned ? { position: "sticky" as const, left: 0, zIndex: 1 } : {}),
+  };
+}
 
 type DiffLine = {
   type: "unchanged" | "removed" | "added";
@@ -134,8 +138,8 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
   }
 
   const lineNumberStyle = diff.length <= SOURCE_HIGHLIGHT_MAX_LINES
-    ? FILE_PINNED_LINE_NUMBER_STYLE
-    : FILE_LINE_NUMBER_STYLE;
+    ? lineNumberGutter(diff.length, true)
+    : lineNumberGutter(diff.length);
   return (
     <div
       // FILE_CODE_STYLE is the shared code typography (see its declaration);
@@ -148,35 +152,25 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
           // Collapsed hunks take the CodeBlock highlighted row: muted band,
           // sans-serif note, no gutter columns of its own.
           return (
-            <span
+            <CodeBlockLine
               key={si}
-              data-slot="code-block-line"
-              className="-mx-4 px-4 group-data-[size=sm]/code-block:-mx-3 group-data-[size=sm]/code-block:px-3 bg-foreground/5 flex min-w-full items-center py-0.5 font-sans text-xs text-muted-foreground after:content-none"
+              variant="highlighted"
+              className="flex min-w-full items-center py-0.5 font-sans text-xs text-muted-foreground after:content-none"
             >
               <span aria-hidden="true" className="min-w-4 shrink-0 select-none px-1.5">⋯</span>
               <span className="shrink-0 px-1.5">{seg.count} unchanged lines</span>
-            </span>
+            </CodeBlockLine>
           );
         }
         const lines = seg.lines.map((line, li) => {
           const prefix =
             line.type === "added" ? "+" : line.type === "removed" ? "-" : " ";
-          // The rows are the official CodeBlock line variants (vendored nova
-          // classes); the +/- marker stays an aligned column instead of the
-          // variant's absolute ::after so wrapped text keeps clearing it, and
-          // content-none drops that second marker.
-          // 增删行用官方 token 上色：新增走 --ok，删除走 destructive。
-          const rowTone = line.type === "added"
-            ? "bg-(--ok)/10"
-            : line.type === "removed"
-            ? "bg-destructive/10"
-            : "";
-
+          // 增删行用官方 code-block 的行变体：底色与 +/- 标记由变体给，这里只摆行号与内容。
           return (
-            <span
+            <CodeBlockLine
               key={li}
-              data-slot="code-block-line"
-              className={`-mx-4 px-4 group-data-[size=sm]/code-block:-mx-3 group-data-[size=sm]/code-block:px-3 file-diff-line flex min-w-full after:content-none ${rowTone}`}
+              variant={line.type === "added" ? "added" : line.type === "removed" ? "removed" : "default"}
+              className="file-diff-line flex min-w-full"
             >
               <span style={lineNumberStyle}>
                 {line.type === "removed" ? line.oldLineNo : line.newLineNo}
@@ -184,7 +178,7 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
               <span
                 className={cn(
                   "min-w-4 shrink-0 select-none px-1.5 font-semibold",
-                  line.type === "added" && "text-(--ok)",
+                  line.type === "added" && "text-success",
                   line.type === "removed" && "text-destructive",
                 )}
               >
@@ -197,7 +191,7 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
               >
                 {line.text || "\u00a0"}
               </span>
-            </span>
+            </CodeBlockLine>
           );
         });
         return <div key={si}>{lines}</div>;

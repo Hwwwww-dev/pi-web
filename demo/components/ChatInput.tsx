@@ -27,6 +27,7 @@ import { quoteSeparator } from "@/lib/quoted-selection";
 import { isBareMcpCommand, isBuiltinMcpCommand } from "@/lib/mcp-command";
 import { BorderBeam } from "border-beam";
 import { ImagePreview } from "./ImagePreview";
+import { Attachment, AttachmentMedia } from "@/components/ui/attachment";
 import { DismissButton } from "./DismissButton";
 import { useCoarsePointer, useIsMobile } from "@/hooks/useIsMobile";
 import { useTheme } from "@/hooks/useTheme";
@@ -657,28 +658,6 @@ function QueueActionButton({ title, onClick, children }: {
   );
 }
 
-/** One clipped line that scrolls its hidden remainder while hovered. The
- *  distance and duration are measured on the row's own text, so a short message
- *  never animates. */
-function useHoverScroll() {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [style, setStyle] = useState<React.CSSProperties | null>(null);
-  const start = useCallback(() => {
-    const element = ref.current;
-    if (!element) return;
-    const distance = element.scrollWidth - element.clientWidth;
-    if (distance <= 0) return;
-    // A steady read: ~90px per second, within sane bounds whatever the length.
-    const duration = Math.min(9000, Math.max(2600, distance * 11));
-    setStyle({
-      "--queued-scroll-distance": `${distance}px`,
-      "--queued-scroll-duration": `${duration}ms`,
-    } as React.CSSProperties);
-  }, []);
-  const stop = useCallback(() => setStyle(null), []);
-  return { ref, style, start, stop };
-}
-
 function QueuedMessageRow({
   item,
   onAction,
@@ -691,18 +670,17 @@ function QueuedMessageRow({
   canMoveDown?: boolean;
 }) {
   const { t } = useI18n();
-  const queuedScroll = useHoverScroll();
   const isSteer = item.behavior === "steer";
   const behaviorLabel = isSteer ? t("chat.queueBehaviorSteer") : t("chat.queueBehaviorFollowUp");
   const behaviorChipClass = cn(
-    "shrink-0 whitespace-nowrap px-[7px] py-px text-[10.5px] font-semibold leading-[1.4]",
+    "shrink-0 whitespace-nowrap px-[7px] py-px text-xs font-semibold leading-[1.4]",
     !isSteer && "bg-muted text-muted-foreground",
   );
   return (
     <div
       title={item.text}
       className={cn(
-        "flex min-w-0 max-w-full items-center gap-2 self-start overflow-hidden rounded-full py-[5px] pl-1.5 pr-2 text-[12.5px]",
+        "flex min-w-0 max-w-full items-center gap-2 self-start overflow-hidden rounded-full py-[5px] pl-1.5 pr-2 text-xs",
         isSteer
           ? "border border-primary/45 bg-background text-foreground"
           : "bg-secondary text-secondary-foreground",
@@ -714,12 +692,12 @@ function QueuedMessageRow({
             const src = draftImageDataUrl(image);
             return (
               <ImagePreview key={`${item.id}-image-${index}`} src={src}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={src}
-                  alt=""
-                  className="block size-[22px] rounded-full border border-border/60 object-cover"
-                />
+                <Attachment size="xs" className="shrink-0 border-0 bg-transparent p-0">
+                  <AttachmentMedia variant="image">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt="" className="size-full object-cover" />
+                  </AttachmentMedia>
+                </Attachment>
               </ImagePreview>
             );
           })}
@@ -744,15 +722,9 @@ function QueuedMessageRow({
         <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass}>{behaviorLabel}</Badge>
       )}
       {/* One clipped line, whatever the message holds: a long queued text used
-          to widen the pill past the composer and give the whole page a
-          horizontal scrollbar. Hovering scrolls the hidden rest into view. */}
-      <span
-        ref={queuedScroll.ref}
-        className={cn("min-w-0 flex-1 truncate", queuedScroll.style && "queued-text-scrolling")}
-        style={queuedScroll.style ?? undefined}
-        onMouseEnter={queuedScroll.start}
-        onMouseLeave={queuedScroll.stop}
-      >
+          to widen the pill past the composer. The full text is the row's title;
+          the hover marquee scrolled it out of the pill and is gone. */}
+      <span className="min-w-0 flex-1 truncate">
         {item.text}
       </span>
       <span className="ml-auto flex shrink-0 items-center gap-0.5">
@@ -1997,7 +1969,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           <DropdownMenuRadioItem key={lvl} value={lvl}>
             <span className="min-w-0 flex-1">
               {displayLabel}
-              {showOriginal && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">({lvl})</span>}
+              {showOriginal && <span className="ml-1.5 font-mono text-xs text-muted-foreground">({lvl})</span>}
             </span>
             <span className="text-xs text-muted-foreground">{desc}</span>
             {onSetDefaultThinkingLevel && lvl !== "auto" && (
@@ -2244,7 +2216,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             >
               <div
                 title={t("chat.inputHistory")}
-                className="flex h-[30px] items-center border-b px-2.5 text-muted-foreground"
+                className="flex h-[30px] items-center px-2.5 text-muted-foreground"
               >
                 <HistoryIcon size={14} strokeWidth={1.8} aria-hidden="true" />
               </div>
@@ -2265,7 +2237,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       }}
                       onMouseEnter={() => setHistoryActiveIndex(index)}
                       className={cn(
-                        "flex h-auto w-full items-start justify-start rounded-sm px-2 py-[7px] text-left text-[12.5px] leading-[1.45] font-normal whitespace-normal text-foreground transition-colors",
+                        "flex h-auto w-full items-start justify-start rounded-sm px-2 py-[7px] text-left text-xs leading-[1.45] font-normal whitespace-normal text-foreground transition-colors",
                         active && "bg-accent",
                       )}
                     >
@@ -2292,7 +2264,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   : `min(72.8vh, 598px, ${slashMenuMaxHeight}px)`,
               }}
             >
-              <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2.5 py-2 text-xs text-muted-foreground">
+              <div className="flex shrink-0 items-center justify-between gap-2 px-2.5 py-2 text-xs text-muted-foreground">
                  <span>{slashCommandsLoading ? t("chat.loadingCommands") : t("chat.slashCommands", { label: slashCommandCountLabel })}</span>
                  <span className="font-mono">{t("chat.tabEnter")}</span>
               </div>
@@ -2304,7 +2276,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 ) : (
                   groupedSlashCommands.map((group) => (
                     <section key={group.source} className="mb-3">
-                      <div className="sticky -top-2.5 z-[1] flex items-center justify-between gap-2 bg-popover pb-1.5 pt-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                      <div className="sticky -top-2.5 z-[1] flex items-center justify-between gap-2 bg-popover pb-1.5 pt-1 text-xs font-semibold uppercase text-muted-foreground">
                            <span>{t(SLASH_SOURCE_GROUP_LABEL_KEYS[group.source])}</span>
                         <span className="font-mono font-medium">{group.items.length}</span>
                       </div>
@@ -2335,7 +2307,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                               <span className={cn("font-mono text-sm wrap-anywhere", dormant && "text-muted-foreground")}>
                                 /{command.name}
                                 {dormant && (
-                                  <span className="ml-1.5 whitespace-nowrap rounded-sm border border-border px-1 text-[10px] text-muted-foreground">
+                                  <span className="ml-1.5 whitespace-nowrap rounded-sm border border-border px-1 text-xs text-muted-foreground">
                                     {t("chat.dormant")}
                                   </span>
                                 )}
@@ -2374,7 +2346,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     : `min(48vh, 400px, ${atMenuMaxHeight}px)`,
                 }}
               >
-                <div className="flex shrink-0 items-center justify-between gap-2 border-b px-2.5 py-2 text-xs text-muted-foreground">
+                <div className="flex shrink-0 items-center justify-between gap-2 px-2.5 py-2 text-xs text-muted-foreground">
                   <span>
                     {indexLoading
                        ? t("chat.loadingFiles")
@@ -2406,7 +2378,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                           }}
                           onMouseEnter={() => setAtActiveIndex(index)}
                           className={cn(
-                            "flex h-auto w-full justify-start rounded-sm px-2 py-1.5 text-left font-mono text-[12.5px] font-normal text-foreground transition-colors",
+                            "flex h-auto w-full justify-start rounded-sm px-2 py-1.5 text-left font-mono text-xs font-normal text-foreground transition-colors",
                             active && "bg-accent",
                           )}
                         >
@@ -2459,12 +2431,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 {attachedImages.map((img, i) => (
                   <div key={i} className="relative shrink-0">
                     <ImagePreview key={img.previewUrl} src={img.previewUrl}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={img.previewUrl}
-                        alt=""
-                        className="block size-14 rounded-md border border-border object-cover"
-                      />
+                      <Attachment size="sm" className="border-0 bg-transparent p-0">
+                        <AttachmentMedia variant="image" className="size-14">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={img.previewUrl} alt="" className="size-full object-cover" />
+                        </AttachmentMedia>
+                      </Attachment>
                     </ImagePreview>
                     <Button
                       type="button"
@@ -2473,7 +2445,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       onClick={() => removeImage(i)}
                       title={t("chat.dismiss")}
                       aria-label={t("chat.dismiss")}
-                      className="absolute -right-1 -top-1 size-4 rounded-full border border-border bg-card p-0 text-muted-foreground"
+                      className="absolute -right-1 -top-1 size-4 rounded-full p-0 text-muted-foreground"
                     >
                       <XIcon className="size-2" strokeWidth={2.5} aria-hidden="true" />
                     </Button>

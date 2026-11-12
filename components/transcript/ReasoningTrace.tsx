@@ -9,11 +9,9 @@ import {
   TraceCollapsibleContent,
   TraceCollapsibleTrigger,
   TraceDescription,
-  TraceIcon,
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace";
-import { ThinkingIcon } from "@/components/ThinkingIcon";
 import { formatToolDuration } from "@/lib/tool-duration";
 import { useI18n } from "@/hooks/useI18n";
 import { COLLAPSIBLE_EXPANDED_EVENT } from "@/lib/tool-call-expansion";
@@ -185,9 +183,6 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
           title={t("i18n.thinking")}
         >
           <TraceLine status={active ? "running" : undefined}>
-            <TraceIcon className={cn(active && "text-warning")}>
-              <ThinkingIcon active={expanded || Boolean(active)} />
-            </TraceIcon>
             <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
             {!active && duration !== undefined && (
               <TraceDescription className="shrink-0 tabular-nums">

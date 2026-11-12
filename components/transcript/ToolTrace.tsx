@@ -2,33 +2,23 @@
 
 import { memo, type ReactNode } from "react";
 import {
-  BotIcon,
   CircleCheckIcon,
   CircleDotIcon,
   CircleIcon,
-  CodeIcon,
   FileTextIcon,
-  GlobeIcon,
-  ListTodoIcon,
-  PenIcon,
-  SearchIcon,
-  SquareTerminalIcon,
-  MinimizeIcon,
-  WrenchIcon,
 } from "lucide-react";
 import { AnsiText } from "@/components/AnsiText";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { Button } from "@/components/ui/button";
 import { isTuiText } from "@/lib/ansi";
 import { CodeBlock, CodeBlockContent, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
-import { Spinner } from "@/components/ui/spinner";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { PatchDiffFiles } from "@/components/PatchDiffFiles";
 import { SafeMarkdownBody } from "@/components/SafeMarkdownBody";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { resolveLocalFilePath } from "@/lib/file-links";
-import { baseName, type ToolView, type ToolViewKind, type ToolViewSection, type ToolViewStatus, type ToolViewStep } from "@/lib/tool-view";
+import { baseName, type ToolView, type ToolViewSection, type ToolViewStatus, type ToolViewStep } from "@/lib/tool-view";
 import { TraceRow } from "./TraceRow";
 
 /**
@@ -37,21 +27,6 @@ import { TraceRow } from "./TraceRow";
  * follow `ToolView.kind`; nothing about the layout is per-tool.
  */
 
-const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
-  terminal: <SquareTerminalIcon />,
-  "file-read": <FileTextIcon />,
-  "file-write": <PenIcon />,
-  "file-edit": <PenIcon />,
-  search: <SearchIcon />,
-  web: <GlobeIcon />,
-  codemode: <CodeIcon />,
-  subagent: <BotIcon />,
-  mcp: <WrenchIcon />,
-  queue: <ListTodoIcon />,
-  compact: <MinimizeIcon />,
-  generic: <WrenchIcon />,
-};
-
 const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
   running: <CircleDotIcon className="text-warning" />,
   done: <CircleCheckIcon />,
@@ -59,21 +34,14 @@ const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
   error: <CircleIcon className="text-destructive" />,
 };
 
-function CodeSection({ text, language, label, wrap = true }: {
+function CodeSection({ text, language, wrap = true }: {
   text: string;
   language?: string;
-  label?: ToolViewSection["label"];
   wrap?: boolean;
 }) {
-  const { t } = useI18n();
-  // 官方形状：标签是 CodeBlock 自己的 header，不是浮在卡片外的一行文字。
+  // 裸代码块：行里已经写了动作和文件，“参数/结果”这种标签只制造两层卡。
   return (
     <CodeBlock size="sm" data-language={language}>
-      {label && (
-        <CodeBlockHeader>
-          <CodeBlockTitle>{t(`chat.activity.${label}`)}</CodeBlockTitle>
-        </CodeBlockHeader>
-      )}
       <CodeBlockContent wrap={wrap} className="max-h-[var(--card-max-height)]" tabIndex={0}>
         <HighlightedCode code={text} language={language} />
       </CodeBlockContent>
@@ -126,13 +94,20 @@ export function ToolSection({ section }: { section: ToolViewSection }) {
   switch (section.kind) {
     case "code":
       // TUI 输出（ANSI 转义）只能按终端文本渲染，code block 会原样显示转义序列。
+      // 源文件结果与文件预览同一形态：行号 + 不折行（用户：各种不统一、完全割裂）。
       return isTuiText(section.text ?? "")
         ? <AnsiText text={section.text ?? ""} />
-        : <CodeSection text={section.text ?? ""} language={section.language} label={section.label} wrap={true} />;
+        : (
+          <CodeSection
+            text={section.text ?? ""}
+            language={section.language}
+            wrap={section.language === undefined || section.language === "text"}
+          />
+        );
     case "diff":
       return section.files
         ? <PatchDiffFiles files={section.files} layout={isMobile ? "stacked" : "split"} />
-        : <CodeSection text={section.text ?? ""} label={section.label} wrap={false} />;
+        : <CodeSection text={section.text ?? ""} wrap={false} />;
     case "markdown":
       return <SafeMarkdownBody>{section.text ?? ""}</SafeMarkdownBody>;
     case "fields":
@@ -205,18 +180,23 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, activi
   // The chip already carries the name; a description that repeats it is noise (第 4 节).
   const repeatsChip = view.filePaths.some((path) =>
     path === view.description || baseName(path) === view.description);
+  // 对象同样不能和 chip 说两遍（“编辑 tool-view.ts [tool-view.ts]”）。
+  const chipNamesObject = chips !== null && view.object !== undefined
+    && view.filePaths.some((path) => baseName(path) === view.object || path === view.object);
   const description = view.streamingInput
     ? t("chat.generatingToolInput")
     : chips && repeatsChip ? undefined : view.description;
-  const content = view.sections.length > 0
-    ? view.sections.map((section, index) => <ToolSection key={index} section={section} />)
+  // 读取/写入/编辑只给代码块：path、offset、limit 这些参数细节是工具的内部账，不是要读的东西。
+  const hideFields = view.kind === "file-read" || view.kind === "file-write" || view.kind === "file-edit";
+  const sections = hideFields ? view.sections.filter((section) => section.kind !== "fields") : view.sections;
+  const content = sections.length > 0
+    ? sections.map((section, index) => <ToolSection key={index} section={section} />)
     : undefined;
 
   return (
     <TraceRow
-      icon={view.status === "running" ? <Spinner className="size-3.5" /> : KIND_ICONS[view.kind]}
       title={view.title}
-      object={view.object}
+      object={chipNamesObject ? undefined : view.object}
       chips={chips}
       description={description}
       status={view.status}

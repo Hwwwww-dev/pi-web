@@ -280,7 +280,7 @@ export function ProjectTrustDialogBody({
       <div className="flex min-h-0 gap-3 overflow-auto px-[18px] pt-[18px] pb-3.5 [overscroll-behavior:contain]">
         <ShieldCheck aria-hidden="true" strokeWidth={2} className="mt-px size-5 shrink-0 text-warning" />
         <div className="min-w-0 flex-1">
-          <AlertDialogTitle id="project-trust-title" className="text-[15px] font-bold text-foreground">
+          <AlertDialogTitle id="project-trust-title" className="text-base font-bold text-foreground">
             {t("trust.dialogTitle")}
           </AlertDialogTitle>
           <AlertDialogDescription id="project-trust-description" className="mt-[7px] text-xs leading-[1.6] text-muted-foreground">
@@ -463,7 +463,7 @@ function McpServerItem({ server }: { server: McpServerInfo }) {
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="min-w-0 text-xs font-semibold text-foreground [overflow-wrap:anywhere]">{revealHiddenCharacters(server.name)}</span>
         {server.transport && (
-          <Badge variant="secondary" className="shrink-0 rounded-[3px] px-[5px] py-px text-[10px] text-muted-foreground">
+          <Badge variant="secondary" className="shrink-0 rounded-[3px] px-[5px] py-px text-xs text-muted-foreground">
             {t(`mcp.transport.${server.transport}`)}
           </Badge>
         )}

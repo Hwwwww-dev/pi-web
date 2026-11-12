@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, type ReactNode } from "react";
-import { SquareTerminalIcon, WrapTextIcon } from "lucide-react";
+import { WrapTextIcon } from "lucide-react";
 import {
   CodeBlock,
   CodeBlockActions,
@@ -11,7 +11,6 @@ import {
   CodeBlockTitle,
 } from "@/components/ui/code-block";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import { AnsiText } from "@/components/AnsiText";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { isTuiText } from "@/lib/ansi";
@@ -40,7 +39,6 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
 
   return (
     <TraceRow
-      icon={view.status === "running" ? <Spinner className="size-3.5" /> : <SquareTerminalIcon />}
       title={view.title}
       object={view.object}
       description={view.description}

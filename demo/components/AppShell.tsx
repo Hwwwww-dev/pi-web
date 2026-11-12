@@ -50,6 +50,7 @@ import { movePanelTab, orderPanelTabs } from "@/lib/panel-tab-order";
 import { openFileTab, saveFileViewerState, saveParkedFileViewerState, switchFileWorkspace, type ParkedFileWorkspace } from "./file-tab-state";
 import { SettingsPanel, SettingsSectionIcon } from "./SettingsPanel";
 import { Toaster } from "./ui/sonner";
+import { Progress } from "./ui/progress";
 import { ProjectTrustDialog, type ProjectTrustFailure } from "./ProjectTrustDialog";
 import { BranchNavigator, hasSessionBranches } from "./BranchNavigator";
 import { SystemPromptPanel } from "./SystemPromptPanel";
@@ -1951,7 +1952,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       />
       {/* The draft's footer: one settings row, the version at the row's end.
           Models and skills live in Settings alone. */}
-      <div className="flex shrink-0 items-center gap-1 border-t border-sidebar-border px-2.5 pb-2.5 pt-2">
+      <div className="flex shrink-0 items-center gap-1 px-2.5 pb-2.5 pt-2">
         <Button
           variant="ghost"
           size="sm"
@@ -1967,7 +1968,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           <span className="truncate">{translate("common.settings")}</span>
         </Button>
         <span
-          className="ml-auto shrink-0 font-mono text-[11px] leading-none tabular-nums text-muted-foreground opacity-70"
+          className="ml-auto shrink-0 font-mono text-xs leading-none tabular-nums text-muted-foreground opacity-70"
           title={`pi-web ${APP_VERSION} · pi ${PI_VERSION}`}
         >
           v{APP_VERSION}
@@ -1985,10 +1986,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         onClick={openProjectTrustDialog}
         aria-label={translate("trust.resourcesNotLoaded")}
         className={cn(
-          "shrink-0 gap-1.5 text-left text-[11px] font-normal leading-[1.35] text-warning hover:bg-warning/10 hover:text-warning",
+          "shrink-0 gap-1.5 text-left text-xs font-normal leading-[1.35] text-warning hover:bg-warning/10 hover:text-warning",
           mobileBanner
-            ? "h-auto min-h-8 w-full justify-start rounded-none border-b border-border bg-warning/10 px-3 py-1.5"
-            : "self-center justify-center rounded-full bg-warning/10 px-3",
+            ? "h-auto min-h-8 w-full justify-start rounded-md bg-warning/10 px-3 py-1.5"
+            : "self-center justify-center rounded-md bg-warning/10 px-3",
         )}
         data-mobile-trust-banner={mobileBanner ? "true" : undefined}
       >
@@ -2003,7 +2004,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
   const renderAgentsBadge = (badge: { count: number; running: boolean }) => (
     <span
       aria-hidden="true"
-      className="flex h-4 min-w-4 shrink-0 items-center justify-center gap-0.5 rounded-full bg-success/15 px-1 font-mono text-[10.5px] font-semibold leading-none tabular-nums text-success"
+      className="flex h-4 min-w-4 shrink-0 items-center justify-center gap-0.5 rounded-md bg-success/15 px-1 font-mono text-xs font-semibold leading-none tabular-nums text-success"
     >
       {badge.count}
       {badge.running && <span className="size-[5px] shrink-0 rounded-full bg-success motion-safe:animate-pulse" />}
@@ -2184,7 +2185,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               <span
                 title={translate("tools.mcpTooltip", { ready: mcpServers.ready, total: mcpServers.total })}
                 className={cn(
-                  "shrink-0 font-mono text-[10px] font-semibold tabular-nums",
+                  "shrink-0 font-mono text-xs font-semibold tabular-nums",
                   mcpServers.needsAuth > 0 ? "text-warning" : mcpServers.ready > 0 ? "text-primary" : "text-muted-foreground",
                 )}
               >
@@ -2301,12 +2302,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           {/* Fixed content: no width-driven reflow. */}
           <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
             {contextUsage?.contextWindow && contextUsage.percent !== null && (
-              <span className={cn("text-[11.5px]", contextTone)}>
+              <span className={cn("text-xs", contextTone)}>
                 <span className="opacity-75">ctx</span> {contextUsage.percent.toFixed(1)}%
               </span>
             )}
             {cost > 0 && (
-              <span className="font-mono text-[11.5px] font-medium text-foreground">{cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`}</span>
+              <span className="font-mono text-xs font-medium text-foreground">{cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`}</span>
             )}
           </span>
         </Button>
@@ -2344,17 +2345,18 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <span className={contextTone}>{contextUsage.percent !== null ? `${contextUsage.percent.toFixed(1)}%` : "?"}</span>
             <span aria-hidden="true" className="text-muted-foreground">/</span>
             <span>{formatCompactCount(contextUsage.contextWindow)}</span>
-            <span aria-hidden="true" className="h-1 w-10 overflow-hidden rounded-full bg-foreground/15">
-              <span
-                style={{ width: `${meterPercent}%` }}
-                className={cn(
-                  "block h-full rounded-full",
-                  contextUsage.percent !== null && contextUsage.percent > 90
-                    ? "bg-destructive/70"
-                    : contextUsage.percent !== null && contextUsage.percent > 70 ? "bg-warning/70" : "bg-foreground/70",
-                )}
-              />
-            </span>
+            <Progress
+              aria-hidden="true"
+              value={meterPercent}
+              className={cn(
+                "h-1 w-10 bg-foreground/15",
+                contextUsage.percent !== null && contextUsage.percent > 90
+                  ? "[&_[data-slot=progress-indicator]]:bg-destructive/70"
+                  : contextUsage.percent !== null && contextUsage.percent > 70
+                    ? "[&_[data-slot=progress-indicator]]:bg-warning/70"
+                    : "[&_[data-slot=progress-indicator]]:bg-foreground/70",
+              )}
+            />
           </span>
         )}
       </Button>
@@ -2458,7 +2460,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               >
                 <MenuIcon className="size-4.5" strokeWidth={2} />
               </Button>
-              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
                 {activeSessionTitle ?? "Pi Web"}
               </span>
               {renderSessionStats(true)}
@@ -2475,7 +2477,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   {activeSessionTitle ?? "Pi Web"}
                 </h1>
                 {selectedSession && (
-                  <span className="hidden min-[1240px]:inline-flex shrink-0 items-center gap-1 rounded-md border bg-muted/50 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                  <span className="hidden min-[1240px]:inline-flex shrink-0 items-center gap-1 rounded-md border bg-muted/50 px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                     <GitBranchIcon className="size-[11px] shrink-0" strokeWidth={2} />
                     {[
                       getFileName(selectedSession.projectRoot ?? selectedSession.cwd),
@@ -2521,7 +2523,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             onOpenChange={(next) => next ? setActiveTopPanel("system") : closeTopPanel("system")}
           >
             <PopoverAnchor virtualRef={topBarRef} />
-            {/* 工具面板是浮层卡片，不是贴顶抽屉：与顶栏留 8px，左右各 8px
+            {/* 系统提示与工具定义是同一张浮层卡：顶栏下方 8px，左右各 8px
                 （宽度减 16 + mx-2 让两侧边距对称），四角同为 rounded-xl。 */}
             <PopoverContent
               side="bottom"
@@ -2545,9 +2547,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <PopoverContent
               side="bottom"
               align="start"
-              sideOffset={0}
+              sideOffset={8}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-t-none rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              // Same floating card as the system prompt: inset from the trigger,
+              // rounded, bordered, with a shadow, so both panels frame alike.
+              className="z-[240] mx-2 w-[calc(var(--radix-popover-trigger-width)-16px)] min-w-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
             >
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
@@ -2566,7 +2570,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               side="bottom"
               align="end"
               sideOffset={0}
-              className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-t-none p-0"
+              className="session-info-popover z-[240] max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-1rem))] overflow-y-auto rounded-lg p-0"
             >
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
@@ -2641,13 +2645,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   valueAlign: "left" | "right" = "left",
                 ) => (
                     <div className="min-w-0">
-                      <div className="mb-1.5 text-[11px] font-bold text-foreground">{title}</div>
+                      <div className="mb-1.5 text-xs font-bold text-foreground">{title}</div>
                       <div className="grid grid-cols-[max-content_minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5">
                         {sectionRows.map((row) => (
                           <div key={`${title}:${row.label}`} className="contents">
-                            <div className="whitespace-nowrap text-[11px] text-muted-foreground">{row.label}</div>
+                            <div className="whitespace-nowrap text-xs text-muted-foreground">{row.label}</div>
                             <div className={cn(
-                              "min-w-0 font-mono text-[11.5px] text-muted-foreground [overflow-wrap:anywhere]",
+                              "min-w-0 font-mono text-xs text-muted-foreground [overflow-wrap:anywhere]",
                               valueAlign === "right" ? "whitespace-nowrap text-right" : "whitespace-normal text-left",
                             )}>{row.value}</div>
                             <div>{row.copyField ? copyButton(row.copyField, row.value) : null}</div>
@@ -2685,9 +2689,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <PopoverContent
               side="bottom"
               align="start"
-              sideOffset={0}
+              sideOffset={8}
               avoidCollisions={false}
-              className="z-[240] w-[var(--radix-popover-trigger-width)] min-w-0 overflow-hidden rounded-t-none rounded-b-lg border-0 border-b bg-card p-0 shadow-none"
+              // 与系统提示/工具定义同一张浮层卡：两侧各 8px、圆角、描边、阴影。
+              className="z-[240] mx-2 w-[calc(var(--radix-popover-trigger-width)-16px)] min-w-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
             >
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
@@ -2856,7 +2861,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             </div>
           ) : showPlaceholder ? (
             activeCwd ? (
-              <div className="flex h-full items-center justify-center text-[15px] text-muted-foreground">
+              <div className="flex h-full items-center justify-center text-base text-muted-foreground">
                  {translate("workspace.selectSession")}
               </div>
             ) : (

@@ -197,7 +197,7 @@ function GitStatusBadge({ status, t }: { status: GitFileStatus; t: Translate }) 
       title={t(GIT_STATUS_KEYS[status.status])}
       aria-label={t(GIT_STATUS_KEYS[status.status])}
       className={cn(
-        "h-4 border-transparent rounded-full px-1.5 text-[10.5px] font-semibold leading-none",
+        "h-4 border-transparent rounded-full px-1.5 text-xs font-semibold leading-none",
         GIT_STATUS_BADGE_CLASSES[status.status],
       )}
     >
@@ -384,7 +384,7 @@ export function TreeNode({
           onDropFiles?.(node.fullPath, droppedItems(event.dataTransfer));
         } : undefined}
         className={cn(
-          "relative flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg pr-2 text-[12.5px] text-foreground",
+          "relative flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg pr-2 text-xs text-foreground",
           // 拖拽目标虚线框优先于行悬停底色（hovered 态不触发于拖拽中，二者不冲突）
           isDropTarget &&
             "bg-accent/20 outline-1 outline-dashed outline-primary -outline-offset-1",
@@ -615,7 +615,7 @@ function ChangeRow({
       onMouseLeave={() => setHovered(false)}
       title={status.filePath}
       className={cn(
-        "relative flex h-8 cursor-pointer select-none items-center rounded-lg pr-2 text-[12.5px] text-foreground",
+        "relative flex h-8 cursor-pointer select-none items-center rounded-lg pr-2 text-xs text-foreground",
         treeMode ? "gap-2" : "gap-1.5",
         hovered && "bg-accent/50",
       )}
@@ -680,7 +680,7 @@ function ChangesFolderRow({
       onMouseLeave={() => setHovered(false)}
       title={node.path}
       className={cn(
-        "flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg pr-2 text-[12.5px] text-foreground",
+        "flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg pr-2 text-xs text-foreground",
         hovered && "bg-accent/50",
       )}
       style={{ paddingLeft: 4 + depth * 14 }} /* 树深度缩进为逐行计算值 */
@@ -1193,7 +1193,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
     >
       <input ref={uploadInputRef} type="file" multiple hidden onChange={handleUploadInput} />
       {showUploadFeedback && (
-        <div className="border-b border-border px-2 py-1.5">
+        <div className="px-2 py-1.5">
         {uploadBusy && (
           <div role="status" aria-live="polite" aria-label={uploadPhase === "checking" ? t("files.checking") : t("files.uploading", { progress: uploadProgress })}>
             <div className="flex min-h-[14px] items-center justify-between gap-2 text-muted-foreground">
@@ -1202,7 +1202,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
               ) : (
                 <UploadIcon size={13} strokeWidth={1.8} />
               )}
-              {uploadPhase === "uploading" && <span className="text-[10px]">{uploadProgress}%</span>}
+              {uploadPhase === "uploading" && <span className="text-xs">{uploadProgress}%</span>}
             </div>
             {uploadPhase === "uploading" && (
               <Progress value={uploadProgress} className="mt-1 h-[3px] rounded-[2px] bg-border" />
@@ -1216,7 +1216,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
               {t("files.conflictSummary", { count: pendingConflict.conflicts.length, countSuffix: pendingConflict.conflicts.length === 1 ? "" : "s", files: pendingConflict.conflicts.join(", ") })}
             </AlertDescription>
             {pendingConflict.nonReplaceable.length > 0 && (
-              <div className="mt-[3px] text-[10px] leading-[1.35] text-warning [overflow-wrap:anywhere]">
+              <div className="mt-[3px] text-xs leading-[1.35] text-warning [overflow-wrap:anywhere]">
                 {t("files.cannotReplace", { files: pendingConflict.nonReplaceable.join(", ") })}
               </div>
             )}
@@ -1284,7 +1284,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
               <DismissButton onClick={() => setUploadSummary(null)} title={t("files.dismissUploadResults")} />
             </div>
             {uploadSummary.errors.map((item) => (
-              <div key={item.name} title={item.error} className="mt-[3px] flex min-w-0 items-center gap-1 text-[10px] text-destructive">
+              <div key={item.name} title={item.error} className="mt-[3px] flex min-w-0 items-center gap-1 text-xs text-destructive">
                 <CircleAlertIcon size={13} strokeWidth={1.8} className="shrink-0" />
                 <span className="min-w-0 truncate">{item.name}</span>
               </div>
@@ -1296,7 +1296,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
 
       {fileSearchOpen && (
       <div className="px-2 pb-1.5 pt-0.5">
-        <InputGroup className="h-8 rounded-full bg-muted">
+        <InputGroup className="h-8 rounded-md bg-muted">
           <InputGroupInput
             ref={searchInputRef}
             id="file-search-input"
@@ -1329,9 +1329,9 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         </InputGroup>
         {hasSearchQuery && (
           <div className="pt-[3px]">
-            {searchLoading && <div role="status" className="px-[2px] py-1.5 text-[10px] text-muted-foreground">{t("sidebar.searchingFiles")}</div>}
-            {!searchLoading && searchError && <div role="alert" className="px-[2px] py-1.5 text-[10px] text-destructive">{t("i18n.networkError")}</div>}
-            {!searchLoading && !searchError && searchPaths.length === 0 && <div className="px-[2px] py-1.5 text-[10px] text-muted-foreground">{t("sidebar.noMatchingFiles")}</div>}
+            {searchLoading && <div role="status" className="px-[2px] py-1.5 text-xs text-muted-foreground">{t("sidebar.searchingFiles")}</div>}
+            {!searchLoading && searchError && <div role="alert" className="px-[2px] py-1.5 text-xs text-destructive">{t("i18n.networkError")}</div>}
+            {!searchLoading && !searchError && searchPaths.length === 0 && <div className="px-[2px] py-1.5 text-xs text-muted-foreground">{t("sidebar.noMatchingFiles")}</div>}
             {!searchLoading && !searchError && searchPaths.length > 0 && (
               <div>
                 {searchRoots.map((node) => (
@@ -1472,7 +1472,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         <div
           role="status"
           aria-live="polite"
-          className="pointer-events-none sticky bottom-0 z-[1] flex select-none items-center gap-1.5 border-t border-border bg-card px-2 py-1.5 text-xs text-primary"
+          className="pointer-events-none sticky bottom-0 z-[1] flex select-none items-center gap-1.5 bg-card px-2 py-1.5 text-xs text-primary"
         >
           <UploadIcon size={13} strokeWidth={1.8} className="shrink-0" />
           {t("files.dropToUpload", {

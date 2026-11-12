@@ -104,16 +104,16 @@ export function TraceRow({
 }) {
   const { open, onOpenChange } = useTraceFold(foldKey, defaultOpen);
   const line = (
-    // `!` 覆盖 trace.tsx 里 `*:has-[>[data-slot=trace-line]]:w-fit`：行必须占满内容区，
-    // 否则标题的 truncate 没有可收缩的宽度，长命令会溢出、箭头被挤到文字中间。
-    <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="w-full! min-w-0">
+    // 行宽跟随内容（官方 `w-fit max-w-full`）：箭头紧跟文字，不甩到行尾；
+    // 超宽时由对象/描述上的 `truncate` 收缩，箭头始终贴住最后一段文字。
+      <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0">
       {icon != null && <TraceIcon>{icon}</TraceIcon>}
       {/* The action is never elided: it is the row's name (用户要求：工具名称不可省略). */}
       <TraceTitle className={cn("shrink-0 whitespace-nowrap", titleClassName)}>{title}</TraceTitle>
       {object && <span className="min-w-0 truncate">{object}</span>}
       {chips}
       {description && <TraceDescription className="min-w-0 shrink truncate">{description}</TraceDescription>}
-      {trailing && <span className="ml-auto shrink-0 pl-2">{trailing}</span>}
+      {trailing && <span className="shrink-0 pl-2">{trailing}</span>}
     </TraceLine>
   );
 

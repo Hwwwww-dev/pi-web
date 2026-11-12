@@ -385,11 +385,11 @@ function itemClassName(item: ActionItem, mode: SurfaceMode, inRow: boolean): str
     item.danger ? "is-danger" : "",
     item.checked ? "is-checked" : "",
     mode.classic
-      ? "flex items-center gap-[7px] h-auto px-2.5 py-2 rounded-xs text-[11px] leading-[1.35] text-left"
+      ? "flex items-center gap-[7px] h-auto px-2.5 py-2 rounded-xs text-xs leading-[1.35] text-left"
       : mode.sheet
-        ? "flex items-center gap-3 h-12 px-4 rounded-none text-[15px] text-left"
+        ? "flex items-center gap-3 h-12 px-4 rounded-none text-base text-left"
         : "flex items-center gap-2 w-full h-7 px-2 rounded-(--radius-sm) text-left",
-    mode.classic && choice && !inRow ? "border-b border-(--border)" : "",
+    mode.classic && choice && !inRow ? "" : "",
     inRow ? "flex-1 min-w-0" : "",
     color,
     highlight,
@@ -413,7 +413,7 @@ function iconClassName(item: ActionItem, mode: SurfaceMode): string {
 }
 
 function labelClassName(item: ActionItem, mode: SurfaceMode): string {
-  const monoSize = mode.sheet ? "text-sm" : mode.classic ? "text-[11px]" : "text-[11.5px]";
+  const monoSize = mode.sheet ? "text-sm" : mode.classic ? "text-xs" : "text-xs";
   return [
     "sidebar-menu-label",
     item.mono ? "is-mono" : "",
@@ -428,12 +428,12 @@ function noteClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-note",
     "shrink-0 max-w-[45%] overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap",
-    mode.sheet ? "text-[13px]" : mode.classic ? "text-[10px]" : "text-[11px]",
+    mode.sheet ? "text-sm" : mode.classic ? "text-xs" : "text-xs",
   ].filter(Boolean).join(" ");
 }
 
 function shortcutClassName(sheet: boolean): string {
-  return ["sidebar-menu-shortcut", "shrink-0 text-muted-foreground font-mono text-[10.5px]", sheet ? "hidden" : ""].filter(Boolean).join(" ");
+  return ["sidebar-menu-shortcut", "shrink-0 text-muted-foreground font-mono text-xs", sheet ? "hidden" : ""].filter(Boolean).join(" ");
 }
 
 function separatorClassName(mode: SurfaceMode): string {
@@ -444,14 +444,14 @@ function headerClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-header",
     "overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap",
-    mode.sheet ? "px-4 pt-2 pb-1 text-xs" : "px-2 pt-1.5 pb-1 text-[11px]",
+    mode.sheet ? "px-4 pt-2 pb-1 text-xs" : "px-2 pt-1.5 pb-1 text-xs",
   ].filter(Boolean).join(" ");
 }
 
 function filterClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-filter",
-    "sticky z-[1] border-b border-(--border) bg-background",
+    "sticky z-[1] bg-background",
     mode.classic
       ? "top-0 m-0 px-2 py-1.5"
       : mode.sheet
@@ -473,7 +473,7 @@ function emptyClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-empty",
     "text-muted-foreground",
-    mode.classic ? "px-2.5 py-2 text-[11px]" : mode.sheet ? "px-4 py-3 text-[15px]" : "px-2 py-1.5 text-xs",
+    mode.classic ? "px-2.5 py-2 text-xs" : mode.sheet ? "px-4 py-3 text-base" : "px-2 py-1.5 text-xs",
   ].filter(Boolean).join(" ");
 }
 
@@ -495,10 +495,10 @@ function secondaryClassName(secondary: SidebarMenuSecondaryAction, mode: Surface
 
 const SHEET_LAYER_CLASS = "sidebar-sheet-layer fixed top-0 right-0 left-0 z-[410] flex flex-col justify-end pointer-events-none focus:outline-none";
 const SHEET_BACKDROP_CLASS = "sidebar-sheet-backdrop fixed inset-0 z-[410] bg-black/35 animate-in fade-in duration-[120ms] ease-out [touch-action:none] [-webkit-tap-highlight-color:transparent] motion-reduce:animate-none";
-const SHEET_CLASS = "sidebar-sheet relative z-[1] box-border max-h-[calc(var(--app-viewport-height,100dvh)-48px)] overflow-y-auto [overscroll-behavior:contain] pt-1 pb-[max(8px,env(safe-area-inset-bottom))] border-t border-(--border) rounded-t-(--radius-lg) bg-background text-foreground text-[15px] shadow-[0_-6px_20px_rgba(0,0,0,0.12)] animate-in fade-in slide-in-from-bottom-[16px] duration-[120ms] ease-out pointer-events-auto focus:outline-none motion-reduce:animate-none [html[data-keyboard-open]_&]:pb-2";
-const SHEET_TITLE_CLASS = "sidebar-sheet-title px-4 pt-[10px] pb-[9px] overflow-hidden border-b border-(--border) text-muted-foreground text-xs text-ellipsis whitespace-nowrap";
+const SHEET_CLASS = "sidebar-sheet relative z-[1] box-border max-h-[calc(var(--app-viewport-height,100dvh)-48px)] overflow-y-auto [overscroll-behavior:contain] pt-1 pb-[max(8px,env(safe-area-inset-bottom))] rounded-t-(--radius-lg) bg-background text-foreground text-base  animate-in fade-in slide-in-from-bottom-[16px] duration-[120ms] ease-out pointer-events-auto focus:outline-none motion-reduce:animate-none [html[data-keyboard-open]_&]:pb-2";
+const SHEET_TITLE_CLASS = "sidebar-sheet-title px-4 pt-[10px] pb-[9px] overflow-hidden text-muted-foreground text-xs text-ellipsis whitespace-nowrap";
 const SHEET_BODY_CLASS = "sidebar-sheet-body py-1";
-const SHEET_CANCEL_CLASS = ["sidebar-sheet-cancel", "flex items-center justify-center w-full h-12 px-4 border-0 border-t border-(--border) bg-transparent text-muted-foreground text-[15px] [font:inherit] cursor-pointer hover:bg-accent", "rounded-none font-normal focus-visible:ring-0 focus-visible:border-(--border)", FOCUS_RING].filter(Boolean).join(" ");
+const SHEET_CANCEL_CLASS = ["sidebar-sheet-cancel", "flex items-center justify-center w-full h-12 px-4 bg-transparent text-muted-foreground text-base [font:inherit] cursor-pointer hover:bg-accent", "rounded-none font-normal focus-visible:ring-0 focus-visible:border-(--border)", FOCUS_RING].filter(Boolean).join(" ");
 
 /** Enter is taken on the button rather than left to its click, which would not say whether Shift was held. */
 function activateOnEnter(action: MenuAction, onActivate: (action: MenuAction, shiftKey: boolean) => void) {
@@ -545,7 +545,7 @@ function MenuItemButton({ item, mode, inRow = false, onActivate }: { item: Actio
   if (!secondary) return button;
   return (
     <div
-      className={[choice ? "sidebar-menu-row is-choice" : "sidebar-menu-row", "flex items-center gap-0.5", mode.classic && choice ? "border-b border-(--border)" : ""].filter(Boolean).join(" ")}
+      className={[choice ? "sidebar-menu-row is-choice" : "sidebar-menu-row", "flex items-center gap-0.5", mode.classic && choice ? "" : ""].filter(Boolean).join(" ")}
       role="none"
     >
       {button}

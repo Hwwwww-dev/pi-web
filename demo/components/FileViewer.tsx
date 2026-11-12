@@ -23,7 +23,7 @@ import { pageId, trackEventSource } from "@/lib/page-debug";
 import { parseFrontmatter } from "@/lib/frontmatter";
 import { isExternalMarkdownHref, jumpToMarkdownFragment, markdownAppUrlTransform, markdownPreviewRehypePlugins, markdownPreviewRemarkPlugins, markdownUrlTransform, normalizeDisplayMath } from "@/lib/markdown";
 import { CodeBlock, MermaidBlock } from "./MermaidBlock";
-import { FILE_CODE_STYLE, FILE_LINE_NUMBER_STYLE, FILE_PINNED_LINE_NUMBER_STYLE } from "./DiffView";
+import { FILE_CODE_STYLE, lineNumberGutter } from "./DiffView";
 import { DelimitedTable } from "./DelimitedTable";
 import { PathLabel } from "./PathLabel";
 import { FILE_MODE_LABELS } from "./FileToolbar";
@@ -209,8 +209,8 @@ function DiffView({ patch, wrapLines }: { patch: string; wrapLines: boolean }) {
     }
   }
   const lineNumberStyle = visible.size <= SOURCE_HIGHLIGHT_MAX_LINES
-    ? FILE_PINNED_LINE_NUMBER_STYLE
-    : FILE_LINE_NUMBER_STYLE;
+    ? lineNumberGutter(diff.length, true)
+    : lineNumberGutter(diff.length);
 
   // Collapsed lines and the lines the patch leaves out between hunks share one
   // marker; its count is unknown when a gap's is.
@@ -398,7 +398,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-muted-foreground">
+      <div className="flex shrink-0 items-center gap-3 bg-background px-4 py-1 text-xs text-muted-foreground">
         <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} className="font-mono" />
         <span className="ml-auto">{ext || "image"}</span>
         {naturalSize && <span>{naturalSize.w} × {naturalSize.h}</span>}
@@ -420,7 +420,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
         className="flex flex-1 items-center justify-center overflow-auto bg-card p-4 bg-[image:linear-gradient(45deg,var(--background)_25%,transparent_25%),linear-gradient(-45deg,var(--background)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--background)_75%),linear-gradient(-45deg,transparent_75%,var(--background)_75%)] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0]"
       >
         {error ? (
-          <div className="text-[13px] text-destructive">{error}</div>
+          <div className="text-sm text-destructive">{error}</div>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -540,7 +540,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-muted-foreground">
+      <div className="flex shrink-0 items-center gap-3 bg-background px-4 py-1 text-xs text-muted-foreground">
         <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} className="font-mono" />
         <span className="ml-auto">{ext || "audio"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
@@ -559,7 +559,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
       <div className="flex flex-1 items-center justify-center bg-card p-6">
         <div className="w-full max-w-[680px]">
           {error && (
-            <div className="mb-3 text-center text-[13px] text-destructive">
+            <div className="mb-3 text-center text-sm text-destructive">
               {error}
             </div>
           )}
@@ -671,7 +671,7 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-muted-foreground">
+      <div className="flex shrink-0 items-center gap-3 bg-background px-4 py-1 text-xs text-muted-foreground">
         <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} className="font-mono" />
         <span className="ml-auto">{ext || "video"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
@@ -690,7 +690,7 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
       <div className="flex min-h-0 flex-1 items-center justify-center bg-card p-6">
         <div className="flex h-full w-full max-w-[960px] min-h-0 flex-col items-center justify-center">
           {error && (
-            <div className="mb-3 text-center text-[13px] text-destructive">
+            <div className="mb-3 text-center text-sm text-destructive">
               {error}
             </div>
           )}
@@ -836,7 +836,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-xs text-muted-foreground">
+      <div className="flex shrink-0 items-center gap-3 bg-background px-4 py-1 text-xs text-muted-foreground">
         <PathLabel text={getRelativeFilePath(filePath, cwd)} title={filePath} className="font-mono" />
         <span className="ml-auto">{ext === "docx" ? "docx preview" : "pdf"}</span>
         {size != null && <span>{formatFileSize(size)}</span>}
@@ -853,7 +853,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
       </div>
       <div className="min-h-0 flex-1 bg-card">
         {error ? (
-          <div className="flex h-full items-center justify-center p-6 text-center text-[13px] text-destructive">
+          <div className="flex h-full items-center justify-center p-6 text-center text-sm text-destructive">
             {error}
           </div>
         ) : (
@@ -1255,7 +1255,7 @@ function TextFileViewer({
         data-line-number={lineIndex + 1}
         key={`source-line-${lineIndex}`}
       >
-        <span aria-hidden="true" style={FILE_LINE_NUMBER_STYLE}>
+        <span aria-hidden="true" style={lineNumberGutter(sourceLines.length)}>
           {lineIndex + 1}
         </span>
         <span
@@ -1364,7 +1364,7 @@ function TextFileViewer({
 
   if (loading || (requestedInitialDisplayMode === "diff" && gitDiffLoading && !data)) {
     return (
-      <div className="flex h-full items-center justify-center text-[13px] text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         {t("i18n.loading")}
       </div>
     );
@@ -1372,7 +1372,7 @@ function TextFileViewer({
 
   if (error && !isDeletedDiff) {
     return (
-      <div className="flex h-full items-center justify-center text-[13px] text-destructive">
+      <div className="flex h-full items-center justify-center text-sm text-destructive">
         {error}
       </div>
     );
@@ -1406,12 +1406,12 @@ function TextFileViewer({
         {/* Everything that describes the file truncates inside this group, so the
             actions on the right can never sit on top of the path or the counts. */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <CodeBlockTitle className="flex min-w-0 shrink items-center gap-1.5 text-[13px]">
+          <CodeBlockTitle className="flex min-w-0 shrink items-center gap-1.5 text-sm">
             <FileIcon aria-hidden="true" strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
             <span className="truncate">{getFileName(filePath)}</span>
           </CodeBlockTitle>
-          <PathLabel className="min-w-0 shrink font-mono text-[11.5px]" text={getRelativeFilePath(filePath, cwd)} title={filePath} />
-          <span className="min-w-0 shrink truncate text-[11.5px] text-muted-foreground" title={metadata}>
+          <PathLabel className="min-w-0 shrink font-mono text-xs" text={getRelativeFilePath(filePath, cwd)} title={filePath} />
+          <span className="min-w-0 shrink truncate text-xs text-muted-foreground" title={metadata}>
             {metadata}
           </span>
           {isDeletedDiff ? undefined : (
@@ -1621,7 +1621,7 @@ function TextFileViewer({
           />
         ) : isBinary ? (
           // Decoded bytes are noise; opening a file never downloads it on its own (#1401).
-          <div className="flex h-full flex-col items-center justify-center gap-2.5 p-6 text-center text-[13px] text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-2.5 p-6 text-center text-sm text-muted-foreground">
             <span>{t("files.binaryNoPreview")}</span>
             <Button asChild variant="outline" size="xs">
               <a

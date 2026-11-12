@@ -204,7 +204,8 @@ export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSubagent }: {
   const isFailedCall = (call: ToolCallEntry) => call.result?.isError
     || (isApplyPatchToolName(call.block.toolName) && applyPatchResultHasFailures(call.result?.details));
   const isError = calls.some(isFailedCall);
-  // 组头一句话（官方 Whole Turn）：条数与失败数说在同一行。
+  // 组头一句话（官方 Whole Turn：「Ran 2 commands, 1 failed」）：条数与失败数
+  // 说在同一行，不再拆成「成功 x 次 · 失败 y 次」两段账。
   const failedCount = calls.filter(isFailedCall).length;
   const itemCount = allHaveFiles ? fileTotal : calls.length;
   const groupTitle = `${t(`chat.activity.group.${category}`, { count: itemCount })}${failedCount > 0 ? t("chat.activity.groupFailed", { count: failedCount }) : ""}`;

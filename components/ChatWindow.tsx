@@ -1186,7 +1186,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         if (idx === lastUserIdx) { (lastUserMsgRef as { current: HTMLDivElement | null }).current = el; }
       };
 
-      const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; showModelLabel?: boolean; hideCopy?: boolean } = {}): ReactNode => {
+      // The model name is said once per run: the same model on the next step is noise.
+      let labeledModel: string | null = null;
+      const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; showModelLabel?: boolean; hideUsage?: boolean; hideCopy?: boolean } = {}): ReactNode => {
         const msg = options.messageOverride ?? messages[idx];
         // pi's TUI never renders custom messages without a display payload; one
         // card per idle session restart flooded the chat (#1043).
@@ -1209,6 +1211,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           }
         }
         if (options.showTimestamp !== undefined) showTimestamp = options.showTimestamp;
+        const modelInfo = msg.role === "assistant" ? `${msg.provider ?? ""}/${msg.model ?? ""}` : null;
+        const labelModel = Boolean(options.showModelLabel) && modelInfo !== null && labeledModel !== modelInfo;
+        if (labelModel) labeledModel = modelInfo;
         const view = (
           <MessageView
             key={`${keyPrefix}-view-${messageKey}`}
@@ -1229,7 +1234,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
             sessionId={session?.id ?? sessionIdRef.current ?? undefined}
             writtenFiles={options.writtenFiles}
-            showModelLabel={options.showModelLabel}
+            showModelLabel={labelModel}
+            hideUsage={options.hideUsage}
             hideCopy={options.hideCopy}
           />
         );
@@ -1435,6 +1441,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             // The turn's timestamp lives on the TurnMetaLine right below; a
             // second copy in the message footer read like a rendering glitch.
             showTimestamp: false,
+            // The turn's usage/model line below carries the numbers; a second copy here read as noise.
+            hideUsage: true,
             // The copy affordance joins the TurnMetaLine instead of hanging
             // alone under the reply.
             hideCopy: true,

@@ -28,6 +28,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -1185,7 +1186,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         if (idx === lastUserIdx) { (lastUserMsgRef as { current: HTMLDivElement | null }).current = el; }
       };
 
-      const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; showModelLabel?: boolean; hideCopy?: boolean } = {}): ReactNode => {
+      // The model name is said once per run: the same model on the next step is noise.
+      let labeledModel: string | null = null;
+      const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; showModelLabel?: boolean; hideUsage?: boolean; hideCopy?: boolean } = {}): ReactNode => {
         const msg = options.messageOverride ?? messages[idx];
         // pi's TUI never renders custom messages without a display payload; one
         // card per idle session restart flooded the chat (#1043).
@@ -1208,6 +1211,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           }
         }
         if (options.showTimestamp !== undefined) showTimestamp = options.showTimestamp;
+        const modelInfo = msg.role === "assistant" ? `${msg.provider ?? ""}/${msg.model ?? ""}` : null;
+        const labelModel = Boolean(options.showModelLabel) && modelInfo !== null && labeledModel !== modelInfo;
+        if (labelModel) labeledModel = modelInfo;
         const view = (
           <MessageView
             key={`${keyPrefix}-view-${messageKey}`}
@@ -1228,7 +1234,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
             sessionId={session?.id ?? sessionIdRef.current ?? undefined}
             writtenFiles={options.writtenFiles}
-            showModelLabel={options.showModelLabel}
+            showModelLabel={labelModel}
+            hideUsage={options.hideUsage}
             hideCopy={options.hideCopy}
           />
         );
@@ -1387,7 +1394,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const categorySummary = [...categoryCounts.entries()]
           .map(([category, count]) => `${count} ${t(TOOL_CATEGORY_LABEL_KEYS[category])}`)
           .join(" · ");
-        // 一轮的折叠行说这一轮本身（官方 Whole Turn）；拿不到时长时才退回分类计数。
+        // 一轮的折叠行说这一轮本身（官方 Whole Turn：「Worked for 2m 4s, 1 command failed」）；
+        // 还没跑完、拿不到时长时才退回分类计数。
         const failedCalls = activityItems.filter((item) => item.kind === "tool" && item.result?.isError).length;
         const turnDurationMs = getTurnDurationMs(messages, userIdx, finalAssistantIdx + 1);
         const workedFor = turnDurationMs === undefined ? undefined : formatTurnDuration(turnDurationMs);
@@ -1433,6 +1441,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             // The turn's timestamp lives on the TurnMetaLine right below; a
             // second copy in the message footer read like a rendering glitch.
             showTimestamp: false,
+            // The turn's usage/model line below carries the numbers; a second copy here read as noise.
+            hideUsage: true,
             // The copy affordance joins the TurnMetaLine instead of hanging
             // alone under the reply.
             hideCopy: true,
@@ -1592,13 +1602,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             )}
 
             {(agentRunning || isCompacting) && !hasStreamingContent && (agentPhase || isCompacting) && !liveActivityRendered && (
-              <div className="break-words py-2 text-[13px] text-muted-foreground">
+              <div className="break-words py-2 text-sm text-muted-foreground">
                 <span className="animate-[pulse_1.5s_infinite] motion-reduce:animate-none">{phaseLabel(agentPhase, t, isCompacting, queuedSubmissions.length)}</span>
               </div>
             )}
 
             {bashRunning && !pendingBash && (
-              <div className="py-2 text-[13px] text-muted-foreground">
+              <div className="py-2 text-sm text-muted-foreground">
                  <span className="animate-[pulse_1.5s_infinite] motion-reduce:animate-none">{t("chat.runningCommand")}</span>
               </div>
             )}
@@ -1729,7 +1739,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                   // The ghost Button's transition-all fades opacity and flips
                   // visibility discretely, which is exactly the reveal/hide curve.
                   "absolute left-1/2 -translate-x-1/2 bottom-[14px] max-sm:bottom-[10px]",
-                  "size-[34px] cursor-pointer rounded-full border border-border bg-card p-0 text-muted-foreground shadow-sm duration-[160ms]",
+                  "size-8 cursor-pointer rounded-full p-0 text-muted-foreground duration-[160ms]",
                   // Reduced motion keeps the fade but drops the slide/scale.
                   "motion-reduce:translate-y-0 motion-reduce:scale-100",
                   showScrollToBottom && !pendingScrollRestore
@@ -1754,7 +1764,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               <div className="new-session-brand flex min-w-0 items-center gap-3 mb-5 max-[640px]:mb-4">
                 <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
                 <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
-                  <span className="new-session-brand-name text-[22px] font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
+                  <span className="new-session-brand-name text-xl font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
                   <span className="new-session-meta flex min-w-0 items-center gap-1.5 text-xs leading-[1.4] whitespace-nowrap text-muted-foreground [&>*]:flex-none">
                     <span>web v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
                     <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
@@ -1995,13 +2005,13 @@ function ExtensionDialogTitle({ title }: { title: string }) {
       {segments.map((segment, index) =>
         segment.kind === "preview" ? (
           <div key={index} className="mt-2.5">
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.4px] text-muted-foreground">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {segment.heading}
             </div>
             {isTuiText(segment.markdown) ? (
               <TuiText
                 text={segment.markdown}
-                className="rounded-sm border border-border bg-card px-2 py-1.5 text-[11px] leading-[1.4] text-muted-foreground"
+                className="rounded-md bg-muted px-2 py-1.5 text-xs leading-[1.4] text-muted-foreground"
               />
             ) : (
               <MarkdownBody>{segment.markdown}</MarkdownBody>
@@ -2047,7 +2057,7 @@ function ExtensionWaitingCount({ count }: { count: number }) {
   const { t } = useI18n();
   if (count <= 0) return null;
   return (
-    <Badge variant="ghost" className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-primary">
+    <Badge variant="ghost" className="shrink-0 whitespace-nowrap text-xs font-semibold text-primary">
       {t("chat.extensionMoreWaiting", { count })}
     </Badge>
   );
@@ -2108,6 +2118,9 @@ function ExtensionDialog({
     setReviewIndex((current) => current === null || current + 1 >= count ? null : current + 1);
   };
   const wrapperRef = useRef<HTMLDivElement>(null);
+  // The dialog is a Radix Dialog portaled into this panel, so it stays inside
+  // the chat area instead of covering the whole app.
+  const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
   // The panel this dialog is anchored in, not the visual viewport, is what
   // bounds it: on mobile the chat panel is far shorter than the viewport.
   const dialogMaxHeight = useDialogMaxHeight(wrapperRef);
@@ -2189,7 +2202,10 @@ function ExtensionDialog({
 
   return (
     <div
-      ref={wrapperRef}
+      ref={(node) => {
+        wrapperRef.current = node;
+        setPortalHost(node);
+      }}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
         event.preventDefault();
@@ -2215,7 +2231,7 @@ function ExtensionDialog({
           <span className="shrink-0 text-xs font-[650] text-primary">
             {t("chat.extensionPending")}
           </span>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
             {stripAnsi(request.title)}
           </span>
           {summary && (
@@ -2230,11 +2246,14 @@ function ExtensionDialog({
           </span>
         </Button>
       ) : (
-      <div
+      <Dialog open modal={false}>
+      <DialogContent
         ref={dialogRef}
-        role="dialog"
+        container={portalHost}
+        showCloseButton={false}
+        overlayClassName="hidden"
         aria-label={stripAnsi(request.title)}
-        className="pointer-events-auto relative mx-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl animate-[extension-drawer-in_0.22s_ease-out] motion-reduce:animate-none"
+        className="pointer-events-auto static top-auto left-auto mx-auto translate-x-0 translate-y-0 flex max-w-none flex-col gap-0 overflow-hidden rounded-lg border border-border bg-background p-0 shadow-2xl animate-[extension-drawer-in_0.22s_ease-out] duration-0 motion-reduce:animate-none"
         style={{
           // "Full" fills the content region above the composer: the overlay is inset:0 with
           // 20px padding, so 100% keeps that breathing room without covering the input.
@@ -2244,7 +2263,7 @@ function ExtensionDialog({
           maxHeight: full ? "100%" : dialogMaxHeight,
         }}
       >
-        <div className="flex shrink min-h-0 items-start gap-2 border-b border-border px-3.5 py-3 max-h-[180px] overflow-y-auto">
+        <div className="flex shrink min-h-0 items-start gap-2 px-3.5 py-3 max-h-[180px] overflow-y-auto">
           <div className="min-w-0 flex-1">
             {/* Pi's TUI shows the title verbatim, newlines included; select/input have no
                 separate message field, so extensions put multi-line text here. */}
@@ -2323,10 +2342,10 @@ function ExtensionDialog({
         >
           {reviewed ? (
             <div className="grid gap-2.5">
-              <div className="text-[13.5px] font-semibold leading-[1.55] text-foreground wrap-anywhere">
+              <div className="text-sm font-semibold leading-[1.55] text-foreground wrap-anywhere">
                 {`${(reviewIndex ?? 0) + 1}. ${reviewed.question}`}
               </div>
-              <div className="rounded-sm border border-border bg-card px-2.5 py-[9px] text-[13px] leading-[1.6] text-foreground wrap-anywhere whitespace-pre-wrap">
+              <div className="rounded-sm border border-border bg-card px-2.5 py-2 text-sm leading-[1.6] text-foreground wrap-anywhere whitespace-pre-wrap">
                 <span className="mb-1 block text-xs text-muted-foreground">
                   {reviewed.cancelled ? t("chat.question.answeredCancelled") : t("chat.question.answerLabel")}
                 </span>
@@ -2337,7 +2356,7 @@ function ExtensionDialog({
           ) : (
           <>
           {request.method === "confirm" && (
-            <div className="text-[13px] leading-[1.6]">
+            <div className="text-sm leading-[1.6]">
               <MarkdownBody>{stripAnsi(request.message)}</MarkdownBody>
             </div>
           )}
@@ -2367,7 +2386,7 @@ function ExtensionDialog({
                   tabIndex={0}
                   data-extension-option
                   className={cn(
-                    "extension-option w-full cursor-pointer rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere",
+                    "extension-option w-full cursor-pointer rounded-md border px-2.5 py-1.5 text-left text-xs wrap-anywhere",
                     // Match the scroller's padding so keyboard navigation never parks the
                     // option flush against the edge, where whole-pixel scroll snapping and
                     // overflow clipping cut off its focus ring.
@@ -2414,7 +2433,7 @@ function ExtensionDialog({
                   <label
                     key={option.id}
                     className={cn(
-                      "flex cursor-pointer select-none items-start gap-2 rounded-md border px-2.5 py-[7px] text-left text-[12.5px] wrap-anywhere scroll-m-[14px]",
+                      "flex cursor-pointer select-none items-start gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs wrap-anywhere scroll-m-[14px]",
                       "border-border hover:bg-secondary has-[[data-state=checked]]:border-ring has-[[data-state=checked]]:bg-accent",
                       "has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/40",
                     )}
@@ -2471,13 +2490,13 @@ function ExtensionDialog({
         </div>
 
         {reviewed ? (
-          <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-card px-3.5 py-2.5">
+          <div className="flex shrink-0 justify-end gap-2 bg-card px-3.5 py-2.5">
             <Button type="button" onClick={() => setReviewIndex(null)}>
               {t("chat.question.backToCurrent")}
             </Button>
           </div>
         ) : (
-        <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-card px-3.5 py-2.5">
+        <div className="flex shrink-0 justify-end gap-2 bg-card px-3.5 py-2.5">
           <Button
             type="button"
             variant="outline"
@@ -2507,7 +2526,8 @@ function ExtensionDialog({
           )}
         </div>
         )}
-      </div>
+      </DialogContent>
+      </Dialog>
       )}
     </div>
   );
@@ -2530,6 +2550,8 @@ function ExtensionCustomPanel({
   const composingRef = useRef(false);
   const [collapsed, setCollapsed] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  // Same panel-anchored official Dialog as the request drawer.
+  const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
   const dialogMaxHeight = useDialogMaxHeight(wrapperRef);
   const displayLines = normalizeCustomPanelLines(request.lines);
   const summary = displayLines.map(stripAnsi).find((line) => line.trim())?.trim();
@@ -2540,7 +2562,10 @@ function ExtensionCustomPanel({
 
   return (
     <div
-      ref={wrapperRef}
+      ref={(node) => {
+        wrapperRef.current = node;
+        setPortalHost(node);
+      }}
       className={cn("absolute inset-0 z-[95] flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-center")}
     >
       {collapsed ? (
@@ -2554,7 +2579,7 @@ function ExtensionCustomPanel({
           <span className="shrink-0 text-xs font-[650] text-primary">
             {t("chat.extensionPending")}
           </span>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
             {t("chat.extensionPanel")}
           </span>
           {summary && (
@@ -2568,14 +2593,18 @@ function ExtensionCustomPanel({
           </span>
         </Button>
       ) : (
-      <div
-        role="dialog"
+      <Dialog open modal={false}>
+      <DialogContent
+        container={portalHost}
+        showCloseButton={false}
+        overlayClassName="hidden"
+        aria-label={t("chat.extensionPanel")}
         onClick={(event) => {
           if (!(event.target as HTMLElement).closest("button")) inputRef.current?.focus();
         }}
         // The extension already wrapped its lines to the width it asked for; show them
         // whole when that is wider than the usual 920px instead of scrolling sideways.
-        className="pointer-events-auto relative flex w-max min-w-[min(920px,100%)] max-w-full flex-col overflow-hidden rounded-md border border-border bg-background shadow-2xl outline-none"
+        className="pointer-events-auto static top-auto left-auto mx-auto translate-x-0 translate-y-0 flex w-max min-w-[min(920px,100%)] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-lg border border-border bg-background shadow-2xl outline-none"
         style={{
           // Bounded by the panel that holds it, so a tall editor cannot push the
           // drawer past the chat area and clip its header.
@@ -2622,8 +2651,8 @@ function ExtensionCustomPanel({
           }}
           className="absolute h-px min-h-0 w-px border-0 p-0 opacity-0 shadow-none pointer-events-none"
         />
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2.5">
-           <div className="text-[13px] font-[650] text-foreground">{t("chat.extensionPanel")}</div>
+        <div className="flex shrink-0 items-center justify-between gap-3 px-3 py-2.5">
+           <div className="text-sm font-[650] text-foreground">{t("chat.extensionPanel")}</div>
           <div className="flex items-center gap-2">
             <ExtensionWaitingCount count={waitingCount} />
             <Button
@@ -2651,10 +2680,11 @@ function ExtensionCustomPanel({
             </Button>
           </div>
         </div>
-        <pre className="m-0 min-h-0 overflow-auto bg-card p-3.5 text-[13px] leading-[1.45] text-foreground font-mono whitespace-pre">
+        <pre className="m-0 min-h-0 overflow-auto bg-card p-3.5 text-sm leading-[1.45] text-foreground font-mono whitespace-pre">
           <AnsiText text={displayLines.join("\n")} />
         </pre>
-      </div>
+      </DialogContent>
+      </Dialog>
       )}
     </div>
   );
