@@ -198,7 +198,11 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
         showCloseButton={false}
         aria-describedby={undefined}
         aria-label={t("directoryPicker.selectDirectory")}
-        onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}
+        onEscapeKeyDown={(event) => {
+          // An IME's Escape confirms the composition, not the dialog (#1622).
+          if (event.isComposing || event.keyCode === 229) return;
+          if (busy) event.preventDefault();
+        }}
         onInteractOutside={(event) => { if (busy) event.preventDefault(); }}
         className={cn(
           // 不加 relative：与基类的 fixed 冲突（tailwind-merge 后者被吃），定位
@@ -359,6 +363,8 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
             }}
             onKeyDown={(event) => {
               event.stopPropagation();
+              // An IME's Escape confirms the composition, not the dialog (#1622).
+              if (event.nativeEvent.isComposing || event.keyCode === 229) return;
               if (event.key === "Escape") closeCreateDialog();
             }}
           >
