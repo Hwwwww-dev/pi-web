@@ -15,7 +15,7 @@ const themeSource = await readFile(new URL("../hooks/useTheme.ts", import.meta.u
 test("the trust dialog Settings › MCP opens stacks above Settings", () => {
   // Both surfaces sit above every in-page overlay; the trust dialog mounts
   // after and stacks one level higher (z-[1100] vs the panel's z-[1000]).
-  assert.match(panelSource, /"settings-phone-safe z-\[1000\] /);
+  assert.match(panelSource, /settings-card-safe z-\[1000\]/);
   assert.match(trustSource, /"settings-phone-safe z-\[1100\] /);
 });
 

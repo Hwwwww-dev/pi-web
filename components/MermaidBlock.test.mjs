@@ -131,15 +131,9 @@ test("CodeBlock owns the pre background without a competing shorthand", () => {
     const html = renderCode({ code: "const x = 1;", lang: "javascript", isStreaming });
     const pre = html.match(/<pre\b[^>]*>/)?.[0];
     assert.ok(pre);
-    if (isStreaming) {
-      // The streamed pre carries the block background as a utility class and
-      // keeps no inline background of its own.
-      assert.match(pre, /bg-\[color-mix\(in_srgb,var\(--background\)_92%,var\(--sidebar\)\)\]/);
-      assert.doesNotMatch(pre, /background(?:-color)?:/);
-    } else {
-      assert.match(pre, /background-color:color-mix/);
-      assert.doesNotMatch(pre, /(?:[;\"]|^)background:/);
-    }
+    // The official CodeBlock frame owns the background, so the <pre> it renders
+    // carries no competing inline background in either state.
+    assert.doesNotMatch(pre, /background(?:-color)?:/);
   }
 });
 
