@@ -61,7 +61,9 @@
 
 ### 3.3 需要新增的官方组件（仓库目前没有）
 
-`components/ui/item.tsx`、`attachment.tsx`、`message-scroller.tsx`、`marker.tsx`、`highlight.tsx` 从 `reg/*.base-rhea.json` 取源码落地（同样做 Base UI → Radix 语法等价）。
+`components/ui/item.tsx`、`attachment.tsx`、`marker.tsx` 从 `reg/*.base-rhea.json` 取源码落地（同样做 Base UI → Radix 语法等价：`render`/`useRender` → `asChild` + `Slot.Root`）。
+
+`message-scroller.tsx` **不纳入**：它 import `@shadcn/react/message-scroller`（仓库没有该包，方案禁止新增依赖），现有滚动逻辑保留。`highlight.tsx` 由 `SourceCodeView` 的高亮链承担，不单独引入。
 
 ### 3.4 需要删除的本地层
 
@@ -238,6 +240,8 @@ TraceCollapsible defaultOpen
 | `demo/components/` 镜像 | 与本轮改动同步；`demo/components/AppShell.tsx.orig` 已在上一轮删除 |
 | markdown / ANSI 自定义类 | 保留（prose 与终端语义），只清理布局类 |
 | 终端 xterm 调色板 | 保留，颜色取值收进 `--terminal-*` |
+| 官方 `scroll-fade-x/y` utility | 本仓未注册（`shadcn/tailwind.css` 未引入），`code-block` 内联类里省去，不加假类 |
+| `@shadcn/react/message-scroller` | 不引入依赖；消息列表滚动用现有实现 |
 | 用户字号偏好 | 改缩放根字号，不引入自定档位 |
 
 ## 12. 不做
