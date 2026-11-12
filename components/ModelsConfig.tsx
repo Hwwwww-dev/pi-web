@@ -30,12 +30,15 @@ import {
   modelSidebarLabel,
   moveModelEntry,
   parseCompleteModelCost,
+  providerRuntimeName,
   providerSidebarLabel,
   providerMatchesSearch,
   savedModelIds,
+  savedProviderNames,
   serializeHeaderRows,
   setCompatBool,
   setCompatFlag,
+  setProviderDisplayName,
   sortModelEntries,
   trackAddedModels,
   collectModelRenames,
@@ -334,8 +337,8 @@ function openExternalUrl(rawUrl: string | undefined): void {
   window.open(parsed.toString(), "_blank", "noopener,noreferrer");
 }
 
-function ProviderDetail({ name, editingName, provider, onChange, onEditingNameChange, onRename, onDelete, onAddModels, enabledModels, nameTaken }: {
-  name: string; editingName: string; provider: ProviderEntry;
+function ProviderDetail({ name, editingName, fallbackLabel, provider, onChange, onEditingNameChange, onRename, onDelete, onAddModels, enabledModels, nameTaken }: {
+  name: string; editingName: string; fallbackLabel: string; provider: ProviderEntry;
   onChange: (p: ProviderEntry) => void; onEditingNameChange: (n: string) => void;
   onRename: (n: string) => void; onDelete: () => void;
   onAddModels: (models: DiscoveredModel[]) => void; enabledModels: EnabledModelsController;
@@ -456,6 +459,12 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
               </Button>
             )}
           </Field>
+
+      {/* models.json `name`: the label the sidebar and the selector show (#1567). */}
+      <Field label={t("models.providerDisplayName")}>
+        <TextInput value={provider.name ?? ""} onChange={(v) => onChange(setProviderDisplayName(provider, v))}
+          placeholder={fallbackLabel} />
+      </Field>
 
           <Field label="Base URL">
             <TextInput value={provider.baseUrl ?? ""} onChange={(v) => set("baseUrl", v || undefined)}
@@ -1874,6 +1883,8 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
   const [apiKeyProviders, setApiKeyProviders] = useState<ApiKeyProvider[]>([]);
   /** Runtime display names of every provider, including ones with no chat models. */
   const [providerNames, setProviderNames] = useState<Record<string, string>>({});
+  /** Each provider's models.json `name` as saved, which pi also reports as its runtime name. */
+  const [savedNames, setSavedNames] = useState<Map<string, string>>(() => new Map());
   /** Set once the provider lists have answered; until then an overrides-only entry may be a managed provider's. */
   const [authListed, setAuthListed] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -1898,17 +1909,17 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
    */
   const [providerNameDraft, setProviderNameDraft] = useState<{ provider: string; name: string } | null>(null);
 
-  const refreshAuthProviders = useCallback(() => {
-    fetch("/api/auth/providers")
-      .then((r) => r.json())
-      .then((d: { oauthProviders?: OAuthProvider[]; apiKeyProviders?: ApiKeyProvider[]; providerNames?: Record<string, string> }) => {
-        if (Array.isArray(d.oauthProviders)) setOauthProviders(d.oauthProviders);
-        if (Array.isArray(d.apiKeyProviders)) setApiKeyProviders(d.apiKeyProviders);
-        setProviderNames(d.providerNames ?? {});
-      })
-      .catch(() => {})
-      .finally(() => setAuthListed(true));
-  }, []);
+  /** Resolves true once the lists and runtime names have been replaced. */
+  const refreshAuthProviders = useCallback(() => fetch("/api/auth/providers")
+    .then((r) => r.json())
+    .then((d: { oauthProviders?: OAuthProvider[]; apiKeyProviders?: ApiKeyProvider[]; providerNames?: Record<string, string> }) => {
+      if (Array.isArray(d.oauthProviders)) setOauthProviders(d.oauthProviders);
+      if (Array.isArray(d.apiKeyProviders)) setApiKeyProviders(d.apiKeyProviders);
+      setProviderNames(d.providerNames ?? {});
+      return true;
+    })
+    .catch(() => false)
+    .finally(() => setAuthListed(true)), []);
 
   useEffect(() => {
     fetch("/api/models-config")
@@ -1922,6 +1933,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
         setConfig(normalized);
         savedProvidersRef.current = new Set(Object.keys(normalized.providers ?? {}));
         savedModelIdsRef.current = savedModelIds(normalized);
+        setSavedNames(savedProviderNames(normalized));
         const keys = Object.keys(normalized.providers ?? {});
         setSelection((current) => current && customSelectionExists(normalized, current)
           ? current
@@ -1942,13 +1954,14 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
   useEffect(() => {
     if (selection?.type !== "provider") return;
     const entry = config.providers?.[selection.name];
-    if (!entry || !isOverridesOnly(entry)) return;
+    // Clearing a saved display name leaves only overrides: keep the panel until the name is saved away.
+    if (!entry || !isOverridesOnly(entry) || savedNames.has(selection.name)) return;
     if (oauthProviders.some((provider) => provider.id === selection.name)) {
       setSelection({ type: "oauth", providerId: selection.name });
     } else if (apiKeyProviders.some((provider) => provider.id === selection.name)) {
       setSelection({ type: "apikey", providerId: selection.name });
     }
-  }, [apiKeyProviders, config.providers, oauthProviders, selection]);
+  }, [apiKeyProviders, config.providers, oauthProviders, savedNames, selection]);
 
   const contextSettings = (providerId: string): ModelContextSettings => ({
     overrides: config.providers?.[providerId]?.modelOverrides,
@@ -2186,6 +2199,10 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
         savedModelIdsRef.current = savedModelIds(draft);
         renamesRef.current.clear();
         enabledModels.resync(renames, modelRenames);
+        // Runtime names follow the saved ids and `name`s. Until they arrive, the old runtime
+        // name still equals the old saved `name`, so both move together.
+        const nextSavedNames = savedProviderNames(draft);
+        void refreshAuthProviders().then((refreshed) => { if (refreshed) setSavedNames(nextSavedNames); });
       }
     } catch (e) {
       if (e instanceof ProviderEntryError) {
@@ -2197,13 +2214,21 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
     } finally {
       setSaving(false);
     }
-  }, [applyProviderRename, config, enabledModels, loadError, providerNameDraft, t]);
+  }, [applyProviderRename, config, enabledModels, loadError, providerNameDraft, refreshAuthProviders, t]);
 
   const providers = Object.entries(config.providers ?? {}).filter(([id, entry]) => {
-    if (!isOverridesOnly(entry)) return true;
+    if (!isOverridesOnly(entry) || savedNames.has(id)) return true;
     const managed = oauthProviders.some((provider) => provider.id === id) || apiKeyProviders.some((provider) => provider.id === id);
     return authListed && !managed;
   });
+  const customProviderLabel = (providerId: string, entry: ProviderEntry) => providerSidebarLabel(
+    providerId,
+    entry,
+    providerRuntimeName(
+      providerNames[providerId] ?? enabledModels.view?.providers.find((provider) => provider.id === providerId)?.name,
+      savedNames.get(providerId),
+    ),
+  );
   // `12/40` next to a provider makes a narrowed selector visible at a glance.
   const scopeBadge = (providerId: string) => {
     const label = providerBadgeLabel(enabledModels.view, providerId);
@@ -2234,6 +2259,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
           key={selection.name}
           name={selection.name}
           editingName={providerNameDraft?.provider === selection.name ? providerNameDraft.name : selection.name}
+          fallbackLabel={customProviderLabel(selection.name, {})}
           provider={provider}
           onChange={(p) => updateProvider(selection.name, p)}
           onEditingNameChange={(n) => setProviderNameDraft(n === selection.name ? null : { provider: selection.name, name: n })}
