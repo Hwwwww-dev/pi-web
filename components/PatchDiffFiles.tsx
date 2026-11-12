@@ -137,7 +137,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
             )}
             {layout === "split" ? (
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <CodeBlockContent wrap={false} className="pr-0 group-data-[size=sm]/code-block:pr-0">
+                <CodeBlockContent wrap={false} className="max-h-[var(--card-max-height)] pr-0 group-data-[size=sm]/code-block:pr-0">
                   {showFileHeaders && <DiffHeader title={file.oldPath || "/dev/null"} />}
                   {lines.map((entry) => (
                     "gap" in entry
@@ -147,7 +147,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
                 </CodeBlockContent>
                 <CodeBlockContent
                   wrap={false}
-                  className="border-s border-border/60 pl-0 group-data-[size=sm]/code-block:pl-0"
+                  className="max-h-[var(--card-max-height)] border-s border-border/60 pl-0 group-data-[size=sm]/code-block:pl-0"
                 >
                   {showFileHeaders && <DiffHeader title={file.newPath || "/dev/null"} />}
                   {lines.map((entry) => (
@@ -158,7 +158,7 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
                 </CodeBlockContent>
               </div>
             ) : (
-              <CodeBlockContent wrap={false}>
+              <CodeBlockContent wrap={false} className="max-h-[var(--card-max-height)]">
                 {lines.map((entry) => (
                   "gap" in entry
                     ? <GapLine key={entry.key} gap={entry.gap} />
