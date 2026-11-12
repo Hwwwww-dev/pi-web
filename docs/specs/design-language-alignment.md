@@ -9,7 +9,7 @@
 三条不变量：
 
 1. **样式只有一处真源**。`components/ui/*` 用官方源码；`app/globals.css` 不再有 `@layer components` 里的组件覆盖层（`cn-trace-*`、`cn-code-block-*`）。
-2. **信息不丢**。用量、成本、`stream-token-rate` 速率、压缩、cache-miss、扩展状态、chip、子代理、队列、plan、sources、上下文余量——全部保留，但载体必须是官方组件（`Badge` / `TraceDescription` / `Item` / `Tooltip` / `Progress` / `Alert`），不再有自造的小方块、胶囊、细条。
+2. **信息不丢**。用量、成本、`stream-token-rate` 速率、压缩、cache-miss、扩展状态、chip、子代理、队列、plan、sources、上下文余量——全部保留，但载体必须是官方样式（`TraceDescription` 那种行内小字 / `Item` / `Tooltip` / `Progress` / `Alert`），不再有自造的小方块与细条。**用量行不使用胶囊/`Badge`**：官方 trace 示例里 meta 就是图标加数字的行内文字。
 3. **对话正文不受高度限制**。上限只约束过程块与可折叠内容（见第 5 节）。
 
 ## 2. 真源
@@ -76,7 +76,7 @@
 
 | 自研信息 | 现在的位置 | 官方槽位 | 落法 |
 |---|---|---|---|
-| 用量 / 成本 / token（`lib/session-stats-format.ts`, `components/UsageBar.tsx`, `components/TranscriptNotices.tsx`） | 自绘统计条 + 自绘提示行 | `Progress` + `Badge variant="secondary"` + `Tooltip` | 余量走 `Progress`；数字走 `Badge`；公式与明细进 `Tooltip` |
+| 用量 / 成本 / token（`lib/session-stats-format.ts`, `components/UsageBar.tsx`, `components/TranscriptNotices.tsx`） | 自绘统计条 + 自绘提示行 | 行内小字（`text-xs text-muted-foreground tabular-nums`，官方 Trace 示例的 meta 形态）+ `HoverCard` 里的 `Progress` + `Alert` | 数字用图标加文字，**不套胶囊、不加底色**；余量明细进 `HoverCard` |
 | `lib/stream-token-rate.ts` 速率 | 与统计同行 | `TraceDescription`（运行中行内 meta）或 `Badge` | 运行中紧跟当前行标题，`tabular-nums`，`text-muted-foreground/70` |
 | 压缩（compaction） | `ActivityRows.CompactionRow` 自绘 | Chain of Thought：`TraceLine` + `TraceCollapsible` | 标题 `Compacted N messages`，摘要进折叠 |
 | cache-miss 提示（`lib/transcript-notices.ts`） | 自绘细条 | `Alert` | 一条 `Alert`，数字用 `Badge` |
@@ -247,6 +247,10 @@ TraceCollapsible defaultOpen
 | `Subagent` 行 | 本机官方语料没有 `agent.tsx` 源码，按 trace 槽位组合（标题+状态+折叠内容）实现，未自创子代理专属视觉 |
 | 行内 hex 保留项 | 主题色 `<meta>`/manifest（浏览器读不到 CSS 变量）、favicon 画布、xterm 调色板、`ModelsConfig` 六级思考强度色阶（无对应令牌）、设置里的主题预览色块；其余 hex 已清零 |
 | 扩展状态标签大小写 | 自由文本按 `lib/label-case.ts` 归一：单词首字母大写，纯辅音的缩写（mcp/ssh/lsp）全大写，已有大写与译文不动 |
+| 行标题的两段结构 | 动作（`Ran` / `Read` / `Thinking`）与对象（命令、文件名）分开渲染：动作 `shrink-0 whitespace-nowrap` **永不省略**，对象 `min-w-0 truncate` 承担省略；描述同样只做 `truncate`（用户要求：工具名称不得被省略） |
+| 详情块的标签 | 参数/结果的标签进官方 `CodeBlockHeader`/`CodeBlockTitle`，不再在卡片外另起一行 caption |
+| 行间距 | 不覆盖官方 `Trace` 的 `gap-2`；此前各处 `gap-1`/`gap-1.5` 覆盖让列表显得拥挤，已全部去掉 |
+| 活跃会话悬浮块 | 官方 `Button variant="outline" size="xs" rounded-full shadow-xs` 胶囊 + `Popover`（`rounded-lg p-1`），不再自绘贴边标签 |
 
 ## 12. 不做
 
@@ -260,4 +264,4 @@ TraceCollapsible defaultOpen
 - S1–S4 各阶段提交见第 9 节表格；每阶段自检 `tsc --noEmit`、`eslint`、该阶段测试。
 - 门禁：`lib/design-language.test.mjs`（第 6 节）扫描 `components/ app/ hooks/ lib/`，白名单逐条写在测试里并注明理由。
 - 标签大小写：`lib/label-case.ts` + `lib/label-case.test.mjs`，`ExtensionStatusBar` 的列表、纯文本、命令三类 pill 都过它。
-- 截图：桌面 1440 与 390px、浅深各一组，取自真实会话（dev 30221）。
+- 截图：桌面 1440 与 390px、浅深各一组，取自真实会话（dev 30221），行标题修复后重拍；比对结论见第 10 节逐项。

@@ -30,7 +30,7 @@ export const TaskTrace = memo(function TaskTrace({ title, description, status, f
       defaultOpen={defaultOpen}
       trailing={trailing}
       ariaLabel={title}
-      content={<Trace className="gap-1.5">{children}</Trace>}
+      content={<Trace>{children}</Trace>}
     />
   );
 });

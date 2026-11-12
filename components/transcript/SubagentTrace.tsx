@@ -50,7 +50,7 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
       content={hasBody ? (
         <>
           {steps && steps.length > 0 && (
-            <Trace className="gap-1">
+            <Trace>
               {steps.map((step, index) => (
                 <TraceLine key={index} status={step.status === "error" ? "error" : step.status === "pending" ? "pending" : step.status === "running" ? "running" : undefined}>
                   <TraceIcon>{STEP_ICONS[step.status]}</TraceIcon>

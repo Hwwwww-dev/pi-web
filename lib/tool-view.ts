@@ -63,6 +63,11 @@ export interface ToolView {
   status: ToolViewStatus;
   /** One sentence, on one line. */
   title: string;
+  /**
+   * The thing the action applies to, in the line's own color: a command, a file.
+   * It is what gets elided when the line is too narrow — never the action.
+   */
+  object?: string;
   /** Secondary text after the title: a path, a preview, a count. */
   description?: string;
   sections: ToolViewSection[];
@@ -463,7 +468,9 @@ function codemodeView(p: Prepared): ToolView {
 function terminalView(p: Prepared): ToolView {
   const view = baseView(p);
   view.kind = "terminal";
-  view.title = p.t("chat.trace.ran", { command: firstLine(p.command ?? "") });
+  // The action stays whole; only the command may be elided (第 4 节).
+  view.title = p.t("chat.trace.ranLabel");
+  view.object = firstLine(p.command ?? "");
   view.target = firstLine(p.command ?? "");
   view.sections = p.detail(isEmptyResult(p.text) ? [] : [{ kind: "code", text: p.text ?? "", language: "text" }]);
   return view;

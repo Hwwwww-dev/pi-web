@@ -42,7 +42,7 @@ export function TurnTrace({ summary, foldKey, defaultOpen, reveal = false, class
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="flex flex-col gap-2">
-          <Trace className="gap-1.5">{children}</Trace>
+          <Trace>{children}</Trace>
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>

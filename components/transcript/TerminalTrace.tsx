@@ -44,6 +44,7 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, usage
     <TraceRow
       icon={view.status === "running" ? <Spinner className="size-3.5" /> : <SquareTerminalIcon />}
       title={view.title}
+      object={view.object}
       description={view.description}
       status={view.status}
       foldKey={view.foldKey}
@@ -51,7 +52,7 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, usage
       usage={usage}
       below={below}
       activityTool={activityTool}
-      ariaLabel={view.title}
+      ariaLabel={view.object ? `${view.title} ${view.object}` : view.title}
       content={(
         <CodeBlock size="sm" variant={failed ? "destructive" : "default"} className="max-w-full">
           <CodeBlockHeader>

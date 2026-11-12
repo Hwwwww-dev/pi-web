@@ -771,6 +771,7 @@ export const zhCNLocale: LocalePlugin = {
     "chat.trace.wrap": "自动换行",
     "chat.trace.unwrap": "取消换行",
     "chat.trace.ran": "运行 {command}",
+    "chat.trace.ranLabel": "运行",
     "chat.trace.read": "读取 {path}",
     "chat.trace.wrote": "写入 {path}",
     "chat.trace.edited": "编辑 {path}",

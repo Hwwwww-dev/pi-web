@@ -41,7 +41,7 @@ export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trail
       activityTool={activityTool}
       ariaLabel={title}
       content={(
-        <Trace className="gap-1">
+        <Trace>
           {sources.map((source) => (
             <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
               <TraceLine>

@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Progress } from "@/components/ui/progress";
 import { useI18n } from "@/hooks/useI18n";
@@ -23,23 +22,24 @@ export function ContextBadge({ tokens, contextWindow, percent, color }: {
 }) {
   const { t } = useI18n();
   const label = (
-    <>
+    // 第 4 节：与用量行同一种行内小字，不是胶囊。
+    <span className="inline-flex items-center gap-1 text-muted-foreground">
       <span className="opacity-75">ctx</span>
       {/* ctxColor arrives as a token string from the caller — keep the injection. */}
       <span style={color ? { color } : undefined}>
         {`${percent.toFixed(1)}%${contextWindow ? ` / ${formatCompactTokens(contextWindow)}` : ""}`}
       </span>
-    </>
+    </span>
   );
 
   if (tokens === undefined || !contextWindow) {
-    return <Badge variant="secondary" className="gap-1 px-1.5 py-0 font-normal tabular-nums">{label}</Badge>;
+    return label;
   }
 
   return (
     <HoverCard>
       <HoverCardTrigger asChild>
-        <Badge variant="secondary" className="cursor-default gap-1 px-1.5 py-0 font-normal tabular-nums">{label}</Badge>
+        <span className="cursor-default">{label}</span>
       </HoverCardTrigger>
       <HoverCardContent className="flex w-56 flex-col gap-2">
         <div className="flex items-center justify-between gap-3 text-sm">

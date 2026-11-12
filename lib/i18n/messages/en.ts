@@ -771,6 +771,7 @@ export const enLocale: LocalePlugin = {
     "chat.trace.wrap": "Wrap lines",
     "chat.trace.unwrap": "Stop wrapping lines",
     "chat.trace.ran": "Ran {command}",
+    "chat.trace.ranLabel": "Ran",
     "chat.trace.read": "Read {path}",
     "chat.trace.wrote": "Wrote {path}",
     "chat.trace.edited": "Edited {path}",

@@ -41,7 +41,7 @@ export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool 
       defaultOpen
       ariaLabel={title}
       content={(
-        <Trace className="gap-1">
+        <Trace>
           {steps.map((step, index) => {
             const Icon = STEP_ICON[step.status];
             return (

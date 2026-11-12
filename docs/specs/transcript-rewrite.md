@@ -1030,3 +1030,5 @@ CodeBlockCopyButton, CodeBlockContent, CodeBlockLine, CodeBlockFooter
 - 扩展自定义消息默认折叠，正文不进折叠行；标题取消息首行。
 - `SafeMarkdownBody` 不再套 `max-h`/`overflow-auto`：正文不设高度上限，块内滚动只留给代码、终端、图片与展开的过程块（第 7.1 节）。
 - 扩展状态标签走 `lib/label-case.ts`：单词首字母大写、纯辅音缩写全大写、已有大小写与译文不动。
+- 行的标题分成两段：动作（`Ran`/`Read`/`Thinking`/`执行`…）与对象（命令、文件名）。动作永不省略，只有对象与描述会 `truncate`——工具名称被截成 `Th…` 是不可接受的。
+- 详情块（参数、结果、输出）的标签放在官方 `CodeBlockHeader`/`CodeBlockTitle` 里，不在卡片外另起 caption；`Trace` 的 `gap-2` 不覆盖。

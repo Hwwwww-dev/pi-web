@@ -19,7 +19,7 @@ import { AnsiText } from "@/components/AnsiText";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { Button } from "@/components/ui/button";
 import { isTuiText } from "@/lib/ansi";
-import { CodeBlock, CodeBlockContent, CodeBlockLine } from "@/components/ui/code-block";
+import { CodeBlock, CodeBlockContent, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
 import { Spinner } from "@/components/ui/spinner";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { PatchDiffFiles } from "@/components/PatchDiffFiles";
@@ -57,37 +57,38 @@ const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
   error: <CircleIcon className="text-destructive" />,
 };
 
-/** 参数/结果标签在详情块上方（第 4.1 节）；放进块内会压到卡片的圆角边框上。 */
-function SectionLabel({ label }: { label?: ToolViewSection["label"] }) {
-  const { t } = useI18n();
-  if (!label) return null;
-  return <div className="mb-1 text-[length:calc(11px+var(--chat-font-size-offset,0px))] text-muted-foreground">{t(`chat.activity.${label}`)}</div>;
-}
-
 function CodeSection({ text, language, label, wrap = true }: {
   text: string;
   language?: string;
   label?: ToolViewSection["label"];
   wrap?: boolean;
 }) {
+  const { t } = useI18n();
+  // 官方形状：标签是 CodeBlock 自己的 header，不是浮在卡片外的一行文字。
   return (
-    <div className="min-w-0">
-      <SectionLabel label={label} />
-      <CodeBlock size="sm" data-language={language}>
-        <CodeBlockContent wrap={wrap} className="max-h-[var(--card-max-height)]" tabIndex={0}>
-          <HighlightedCode code={text} language={language} />
-        </CodeBlockContent>
-      </CodeBlock>
-    </div>
+    <CodeBlock size="sm" data-language={language}>
+      {label && (
+        <CodeBlockHeader>
+          <CodeBlockTitle>{t(`chat.activity.${label}`)}</CodeBlockTitle>
+        </CodeBlockHeader>
+      )}
+      <CodeBlockContent wrap={wrap} className="max-h-[var(--card-max-height)]" tabIndex={0}>
+        <HighlightedCode code={text} language={language} />
+      </CodeBlockContent>
+    </CodeBlock>
   );
 }
 
 function FieldsSection({ section }: { section: ToolViewSection }) {
+  const { t } = useI18n();
   return (
-    <div className="min-w-0">
-      <SectionLabel label={section.label} />
-      <CodeBlock size="sm">
-        <CodeBlockContent wrap className="max-h-[var(--card-max-height)]">
+    <CodeBlock size="sm">
+      {section.label && (
+        <CodeBlockHeader>
+          <CodeBlockTitle>{t(`chat.activity.${section.label}`)}</CodeBlockTitle>
+        </CodeBlockHeader>
+      )}
+      <CodeBlockContent wrap className="max-h-[var(--card-max-height)]">
           {(section.fields ?? []).map((field) => (
             <CodeBlockLine key={field.key}>
               <span className="text-muted-foreground">{field.key}</span>
@@ -95,15 +96,14 @@ function FieldsSection({ section }: { section: ToolViewSection }) {
               {field.value}
             </CodeBlockLine>
           ))}
-        </CodeBlockContent>
-      </CodeBlock>
-    </div>
+      </CodeBlockContent>
+    </CodeBlock>
   );
 }
 
 function StepsSection({ steps }: { steps: ToolViewStep[] }) {
   return (
-    <Trace className="gap-1">
+    <Trace>
       {steps.map((step, index) => (
         <TraceLine key={index} status={step.status === "error" ? "error" : step.status === "pending" ? "pending" : step.status === "running" ? "running" : undefined}>
           <TraceIcon>{STEP_ICONS[step.status]}</TraceIcon>
@@ -215,6 +215,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below,
     <TraceRow
       icon={view.status === "running" ? <Spinner className="size-3.5" /> : KIND_ICONS[view.kind]}
       title={view.title}
+      object={view.object}
       chips={chips}
       description={description}
       status={view.status}
@@ -224,7 +225,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below,
       below={below}
       activityTool={activityTool}
       content={content}
-      ariaLabel={view.title}
+      ariaLabel={view.object ? `${view.title} ${view.object}` : view.title}
     />
   );
 });

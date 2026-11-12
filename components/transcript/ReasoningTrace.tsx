@@ -190,8 +190,8 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
             <TraceIcon className={cn(active && "text-warning")}>
               <ThinkingIcon active={expanded || Boolean(active)} />
             </TraceIcon>
-            <TraceTitle className="font-medium">{t("i18n.thinking")}</TraceTitle>
-            <TraceDescription className="min-w-0 flex-[0_1_auto] truncate [font-variant-numeric:normal]">
+            <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
+            <TraceDescription className="min-w-0 shrink truncate [font-variant-numeric:normal]">
               {preview}
             </TraceDescription>
             {!active && duration !== undefined && (
