@@ -38,7 +38,7 @@ import { TraceRow } from "./TraceRow";
  * follow `ToolView.kind`; nothing about the layout is per-tool.
  */
 
-const ICON_CLASS = "size-3.5";
+const ICON_CLASS = "size-3.5 fill-current";
 
 /** 一类工具一个图标，尺寸与颜色统一（颜色由行本身给）。 */
 const KIND_ICONS: Record<ToolViewKind, ReactNode> = {

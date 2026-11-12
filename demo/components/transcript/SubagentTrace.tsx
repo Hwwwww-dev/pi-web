@@ -39,7 +39,7 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
 
   return (
     <TraceRow
-      icon={<BotIcon className="size-3.5" />}
+      icon={<BotIcon className="size-3.5 fill-current" />}
       title={title}
       status={status}
       foldKey={foldKey}

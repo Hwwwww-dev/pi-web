@@ -39,7 +39,7 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
 
   return (
     <TraceRow
-      icon={<SquareTerminalIcon className="size-3.5" />}
+      icon={<SquareTerminalIcon className="size-3.5 fill-current" />}
       title={view.title}
       object={view.object}
       description={view.description}

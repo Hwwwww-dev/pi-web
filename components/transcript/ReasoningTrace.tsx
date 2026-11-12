@@ -74,7 +74,7 @@ function ReasoningText({ text, error, loading, className, onScroll, scrollRef }:
     <div
       ref={scrollRef}
       className={cn(
-        "max-h-[var(--card-max-height)] min-w-0 overflow-y-auto overscroll-contain whitespace-pre-wrap wrap-anywhere",
+        "max-h-[var(--card-max-height)] min-w-0 overflow-y-auto overscroll-contain whitespace-pre-wrap wrap-anywhere text-[length:calc(13px+var(--chat-font-size-offset,0px))]",
         error && "text-destructive",
         className,
       )}
@@ -186,7 +186,7 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
         >
           <TraceLine status={active ? "running" : undefined}>
             <TraceIcon>
-              <BrainIcon className="size-3.5" />
+              <BrainIcon className="size-3.5 fill-current" />
             </TraceIcon>
             <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
             {!active && duration !== undefined && (
