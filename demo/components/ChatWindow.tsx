@@ -52,14 +52,13 @@ import type { ToolEntry } from "@/lib/tool-presets";
 import type { SettingsSection } from "@/lib/settings-navigation";
 import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll-position";
 import {
-  captureScrollDistance,
   getNextVisibleCount,
   getPromptAnchorSpacerHeight,
   getVisibleRenderWindow,
   isScrollAtTail,
-  restoreScrollTop,
   VISIBLE_PAGE_SIZE,
 } from "@/lib/chat-lazy-load";
+import { SCROLL_ANCHOR_SETTLE_MS, applyScrollAnchor, captureScrollAnchor, type ScrollAnchor } from "@/lib/scroll-anchor";
 
 interface Props {
   session: SessionInfo | null;
@@ -595,7 +594,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // finished turn regrouped into more rows), and must get an observer then.
   const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
-  const prevScrollDistanceRef = useRef<number | null>(null);
+  const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
   const loadingOlderRef = useRef(false);
   const restoreStartedRef = useRef(false);
   const pendingScrollRestoreRef = useRef(pendingScrollRestore);
@@ -805,7 +804,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       if (!found && !sessionBusy && history.hasEarlierMessages && history.historyCursor && !loadingOlderRef.current) {
         loadingOlderRef.current = true;
         const container = scrollContainerRef.current;
-        if (container) prevScrollDistanceRef.current = captureScrollDistance(container.scrollHeight, container.scrollTop);
+        if (container) scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
         // ponytail: one extra page of 200 entries; deeper or other-branch hits just open the session.
         const context = await loadOlderPage(searchTarget.sessionId, history.historyCursor, { tail: 200, signal: controller.signal });
         loadingOlderRef.current = false;
@@ -813,7 +812,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       }
       if (controller.signal.aborted) return;
       if (found) {
-        prevScrollDistanceRef.current = null;
+        scrollAnchorRef.current = null;
         setVisibleCount((current) => Math.max(current, (searchHistoryRef.current.entryIds.length + 200) * 2));
         setPendingSearchScroll(searchTarget);
       } else {
@@ -854,7 +853,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           // more rows than the window holds (an answer and its thinking are
           // two), so widen the window. The observer is renewed with it, in case
           // the sentinel stays in view.
-          prevScrollDistanceRef.current = captureScrollDistance(container.scrollHeight, container.scrollTop);
+          scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
           setVisibleCount((current) => getNextVisibleCount(current));
           return;
         }
@@ -866,7 +865,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const sid = session?.id ?? sessionIdRef.current;
         if (!sid) return;
         loadingOlderRef.current = true;
-        prevScrollDistanceRef.current = captureScrollDistance(container.scrollHeight, container.scrollTop);
+        scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
         void loadOlderPage(sid, oldestId).finally(() => {
           loadingOlderRef.current = false;
         });
@@ -883,15 +882,25 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     setVisibleCount((current) => Math.max(current, messages.length));
   }, [messages.length]);
 
-  // After visibleCount increases (more messages prepended), restore the
-  // scroll position so the viewport doesn't jump.
-  useEffect(() => {
-    if (prevScrollDistanceRef.current == null) return;
+  // After visibleCount increases (older messages prepended) put the row the
+  // reader was looking at back where it was — and keep it there while the rows
+  // above settle (markdown, highlighting, images all report their height late).
+  useLayoutEffect(() => {
+    const anchor = scrollAnchorRef.current;
     const container = scrollContainerRef.current;
-    if (!container) return;
-    container.scrollTop = restoreScrollTop(container.scrollHeight, prevScrollDistanceRef.current);
-    prevScrollDistanceRef.current = null;
-  }, [visibleCount, scrollContainerRef]);
+    if (!anchor || !container) return;
+    scrollAnchorRef.current = null;
+    applyScrollAnchor(container, anchor);
+    const content = messageContentRef.current;
+    if (!content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => applyScrollAnchor(container, anchor));
+    observer.observe(content);
+    const stop = window.setTimeout(() => observer.disconnect(), SCROLL_ANCHOR_SETTLE_MS);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(stop);
+    };
+  }, [visibleCount, messages.length, scrollContainerRef]);
   // Push session stats up to AppShell for the top bar.
   // Compare scalar fields to avoid loops from new object identity each render.
   const statsKey = sessionStats
@@ -1255,9 +1264,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         );
         if (!isVisible || currentRefIdx === undefined) return view;
         return (
-          // 性能: 离屏消息块跳过布局与绘制；contain-intrinsic-size 的 auto 关键字
-          // 让浏览器记住渲染过的真实高度，占位估算随访问收敛。
-          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} className="[content-visibility:auto] [contain-intrinsic-size:auto_160px]" ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
+          // 不再用 content-visibility + 估算高度：估算值让滚动位置在行进出视口时跳。
+          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
             {view}
           </div>
         );
@@ -1426,7 +1434,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           rendered.push(
             <div
               key={`process-group-${processKey ?? userIdx}`}
-              className="[content-visibility:auto] [contain-intrinsic-size:auto_160px]"
               ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
             >
               <TurnTrace
