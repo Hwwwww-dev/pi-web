@@ -36,3 +36,31 @@ test("no background read of the whole branch", () => {
   // Older pages arrive only from the sentinel / "load earlier" request.
   assert.match(source, /observer\.observe\(sentinel\)/);
 });
+
+test("one page at a time: the next request waits for the last one to render", () => {
+  // The sentinel and the row are inert while a page is in flight *or* while the
+  // page that just landed has not been painted yet.
+  assert.match(source, /if \(loadingOlderRef\.current \|\| pageRenderingRef\.current\) return;/);
+  // Every path (sentinel, click, minimap, search) goes through this helper, so the
+  // wait lives here instead of in each caller.
+  assert.match(source, /if \(pageRenderingRef\.current\) \{\s*await new Promise<void>\(\(resolve\) => pageRenderWaitersRef\.current\.push\(resolve\)\);/);
+  assert.match(source, /if \(context\) \{\s*pageRenderingRef\.current = true;/);
+  // Released after the prepend is in the rendered window and a frame was painted.
+  assert.match(source, /if \(visibleCount < messages\.length\) return;\s*const frame = requestAnimationFrame\(\(\) => \{\s*pageRenderingRef\.current = false;/);
+  assert.match(source, /\}, \[visibleCount, messages\.length, olderPageState\]\);/);
+});
+
+test("the earlier-messages row is a real button", () => {
+  assert.match(source, /ref=\{setSentinel\}\s*type="button"\s*onClick=/);
+  assert.match(source, /disabled=\{olderPageState !== "idle"\}/);
+  assert.match(source, /t\("chat\.loadingEarlier"\)/);
+  // A div with the label was the old shape: not clickable, and it started a
+  // request merely by becoming visible.
+  assert.equal(source.includes('ref={setSentinel} className="py-3 text-center text-xs text-muted-foreground"'), false);
+});
+
+test("clearing the gate re-arms the sentinel without a scroll round-trip", () => {
+  // IntersectionObserver only reports a change; recreating it makes the initial
+  // report fire for a sentinel that is still on screen, so paging continues.
+  assert.match(source, /\}, \[sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState\]\);/);
+});

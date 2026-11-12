@@ -28,7 +28,8 @@ function mount({ hasEarlierMessages, landed = true }) {
   let observed = null;
   const context = createContext({
     sentinel: {}, scrollContainerRef: { current: { scrollHeight: 4000, scrollTop: 0 } },
-    loadingOlderRef: { current: false }, prevScrollDistanceRef: { current: null }, requestedCursorRef: { current: null },
+    loadingOlderRef: { current: false }, pageRenderingRef: { current: false }, pageRenderWaitersRef: { current: [] },
+    setOlderPageState: () => {}, prevScrollDistanceRef: { current: null }, requestedCursorRef: { current: null },
     scrollAnchorRef: { current: null }, messageContentRef: { current: null }, captureScrollAnchor: () => ({ top: 0, height: 0 }),
     hasEarlierMessages, historyCursor: "older", session: { id: "a" }, sessionIdRef: { current: "a" }, activeLeafId: "leaf",
     captureScrollDistance, getNextVisibleCount,
@@ -48,6 +49,8 @@ function mount({ hasEarlierMessages, landed = true }) {
     },
     render: (cursor) => {
       context.historyCursor = cursor;
+      // The prepend landed and was painted, so the next page may be asked for again.
+      context.pageRenderingRef.current = false;
       forgetCursor.runInContext(context)();
       run();
     },

@@ -598,11 +598,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [session?.id, activeLeafId]);
   // State, not a ref: the sentinel can appear with nothing else changing (a
   // finished turn regrouped into more rows), and must get an observer then.
-  const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
+  const [sentinel, setSentinel] = useState<HTMLElement | null>(null);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
-  /** 后台读完整分支时贴尾读者的意图：必须在提交后的布局阶段就用上，不能等下一帧。 */
+  /** 上一页请求还在路上。 */
   const loadingOlderRef = useRef(false);
+  /**
+   * 上一页已经落地、但还没渲染进窗口并画过一帧。读历史读到一半就再发一次请求，
+   * 会让两页的前插互相推，滚动锚点也跟着抖 —— 所以闸门比“HTTP 回来了”关得晚。
+   */
+  const pageRenderingRef = useRef(false);
+  const pageRenderWaitersRef = useRef<Array<() => void>>([]);
+  const [olderPageState, setOlderPageState] = useState<"idle" | "loading" | "rendering">("idle");
   const restoreStartedRef = useRef(false);
   const pendingScrollRestoreRef = useRef(pendingScrollRestore);
   pendingScrollRestoreRef.current = pendingScrollRestore;
@@ -620,11 +627,27 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // render, and an observer report in between still holds this cursor.
   const requestedCursorRef = useRef<string | null>(null);
   const loadOlderPage = useCallback(async (sid: string, before: string, options?: { tail?: number; signal?: AbortSignal }) => {
+    // 上一页还没画出来就先等它：哨兵、点击、小地图翻页、搜索定位都走这条路，
+    // 一处收口，就不会出现“两页同时在飞”。
+    if (pageRenderingRef.current) {
+      await new Promise<void>((resolve) => pageRenderWaitersRef.current.push(resolve));
+    }
     requestedCursorRef.current = before;
-    const context = await loadContext(sid, activeLeafId, before, options);
-    // Nothing landed, so the same page may be asked for again.
-    if (!context && requestedCursorRef.current === before) requestedCursorRef.current = null;
-    return context;
+    loadingOlderRef.current = true;
+    setOlderPageState("loading");
+    try {
+      const context = await loadContext(sid, activeLeafId, before, options);
+      // Nothing landed, so the same page may be asked for again.
+      if (!context && requestedCursorRef.current === before) requestedCursorRef.current = null;
+      if (context) {
+        pageRenderingRef.current = true;
+        setOlderPageState("rendering");
+      }
+      return context;
+    } finally {
+      loadingOlderRef.current = false;
+      if (!pageRenderingRef.current) setOlderPageState("idle");
+    }
   }, [activeLeafId, loadContext]);
   // Jump to a minimap turn: reveal everything already in memory, then page
   // ancestors in until the turn's anchor entry is loaded. Pages are small
@@ -813,8 +836,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
-        // Skip while a page is already loading.
-        if (loadingOlderRef.current) return;
+        // Skip while a page is loading or the last one is still rendering.
+        if (loadingOlderRef.current || pageRenderingRef.current) return;
         if (!hasEarlierMessages) {
           // Everything is loaded, yet the sentinel shows: the messages render as
           // more rows than the window holds (an answer and its thinking are
@@ -841,13 +864,34 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef]);
+    // `olderPageState` is a dependency on purpose: clearing the gate recreates the
+    // observer, whose first report fires for a sentinel still in view. Without it
+    // the reader would have to scroll away and back to get the next page.
+  }, [sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState]);
 
   // Keep the rendered window at least as large as what's loaded, so prepended
   // (older) pages stay visible instead of being sliced off the top.
   useEffect(() => {
     setVisibleCount((current) => Math.max(current, messages.length));
   }, [messages.length]);
+
+  // Clear the page gate once the prepended rows are in the rendered window and a
+  // frame has been painted. Until then the sentinel and the row stay inert, so
+  // two pages can never be in flight with one still half-rendered.
+  // `olderPageState` is in the deps so a page that prepended nothing (the server
+  // repeated the cursor) still releases the gate instead of wedging it shut.
+  useLayoutEffect(() => {
+    if (!pageRenderingRef.current) return;
+    if (visibleCount < messages.length) return;
+    const frame = requestAnimationFrame(() => {
+      pageRenderingRef.current = false;
+      setOlderPageState("idle");
+      const waiters = pageRenderWaitersRef.current;
+      pageRenderWaitersRef.current = [];
+      for (const resolve of waiters) resolve();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [visibleCount, messages.length, olderPageState]);
 
   // Read one more page only when the reader asks for it (the sentinel at the top
   // or the "load earlier" row). Reading the whole branch up front put dozens of
@@ -1585,9 +1629,22 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               className="mx-auto w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] max-sm:text-[length:calc(14px+var(--chat-font-size-offset,0px))]"
             >
             {hasMoreRendered && (
-              <div ref={setSentinel} className="py-3 text-center text-xs text-muted-foreground">
-                {t("chat.loadEarlier")}
-              </div>
+              // 手动入口：自动加载要等上一页渲染完成，这一行让读者随时能自己要一页。
+              <button
+                ref={setSentinel}
+                type="button"
+                onClick={() => {
+                  if (loadingOlderRef.current || pageRenderingRef.current) return;
+                  const sid = session?.id ?? sessionIdRef.current;
+                  if (!sid || !historyCursor) return;
+                  void loadOlderPage(sid, historyCursor);
+                }}
+                disabled={olderPageState !== "idle"}
+                data-state={olderPageState}
+                className="mx-auto block rounded-lg px-3 py-3 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+              >
+                {olderPageState === "idle" ? t("chat.loadEarlier") : t("chat.loadingEarlier")}
+              </button>
             )}
             {turnRendered.slice(startIndex).map((node, index) => {
               // 每条消息一个 Item：官方用它测量、锚定、记可视性；离屏行靠 content-visibility
