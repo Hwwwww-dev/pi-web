@@ -52,6 +52,10 @@ export function applyScrollAnchor(container: HTMLElement, anchor: ScrollAnchor):
 
 /** How long content above the anchor may keep changing height before we stop chasing it. */
 export const SCROLL_ANCHOR_SETTLE_MS = 800;
+/** 按住一行：连续这么久没再移动就算长完了。 */
+const HOLD_IDLE_MS = 400;
+/** 按住一行的硬上限：一直长不完（流式输出）也不能把读者铉住。 */
+const HOLD_MAX_MS = 4000;
 
 /**
  * Hold the reader's row in place while a prepend settles.
@@ -84,16 +88,20 @@ export function holdScrollAnchor(container: HTMLElement, content: HTMLElement | 
   const first = pick();
   const entryId = first?.getAttribute("data-entry-id");
   if (!first || !entryId) return () => {};
-  let baseline = first.getBoundingClientRect().top;
+  // 这一行原来的位置。每一帧都朝它校正，所以它本身不再变。
+  const baseline = first.getBoundingClientRect().top;
   let stopped = false;
   const stop = () => {
     if (stopped) return;
     stopped = true;
-    window.clearTimeout(timer);
     container.removeEventListener("wheel", stop);
     container.removeEventListener("touchstart", stop);
     container.removeEventListener("keydown", stop);
   };
+  // 追加的一页不是一帧就长完的：接着每帧重测这名行，直到它连续几帧不再移动。
+  // 固定时长的版本会在还没长完时就撒手，读者于是又漂回去一截。
+  const startedAt = Date.now();
+  let lastMove = startedAt;
   const keep = () => {
     if (stopped) return;
     const row = content?.querySelector<HTMLElement>(`[data-entry-id="${entryId}"]`);
@@ -101,15 +109,17 @@ export function holdScrollAnchor(container: HTMLElement, content: HTMLElement | 
       stop();
       return;
     }
-    const top = row.getBoundingClientRect().top;
-    const delta = top - baseline;
+    const delta = row.getBoundingClientRect().top - baseline;
     if (Math.abs(delta) > 0.5) {
       container.scrollTop += delta;
-      baseline = top - delta + (row.getBoundingClientRect().top - top);
+      lastMove = Date.now();
+    }
+    if (Date.now() - lastMove > HOLD_IDLE_MS || Date.now() - startedAt > HOLD_MAX_MS) {
+      stop();
+      return;
     }
     requestAnimationFrame(keep);
   };
-  const timer = window.setTimeout(stop, SCROLL_ANCHOR_SETTLE_MS);
   container.addEventListener("wheel", stop, { passive: true });
   container.addEventListener("touchstart", stop, { passive: true });
   container.addEventListener("keydown", stop);
