@@ -24,11 +24,9 @@ import { TraceRow } from "./TraceRow";
  * output is the block. Same 5.2 line, different content slot — the header is
  * what a terminal call has and a file read does not.
  */
-export const TerminalTrace = memo(function TerminalTrace({ view, trailing, usage, below, activityTool }: {
+export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below, activityTool }: {
   view: ToolView;
   trailing?: ReactNode;
-  /** A call's usage bars, above the command block. */
-  usage?: ReactNode;
   /** Media the call produced, below the line. */
   below?: ReactNode;
   /** The pi tool name, kept as `data-activity-tool`. */
@@ -44,14 +42,14 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, usage
     <TraceRow
       icon={view.status === "running" ? <Spinner className="size-3.5" /> : <SquareTerminalIcon />}
       title={view.title}
+      object={view.object}
       description={view.description}
       status={view.status}
       foldKey={view.foldKey}
       trailing={trailing}
-      usage={usage}
       below={below}
       activityTool={activityTool}
-      ariaLabel={view.title}
+      ariaLabel={view.object ? `${view.title} ${view.object}` : view.title}
       content={(
         <CodeBlock size="sm" variant={failed ? "destructive" : "default"} className="max-w-full">
           <CodeBlockHeader>

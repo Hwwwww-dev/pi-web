@@ -19,7 +19,7 @@ export interface TurnUsage {
 export type ActivityItem =
   | { kind: "thinking"; key: string; block: ThinkingContent; duration?: number; entryId?: string; blockIndex: number; searchTarget?: boolean }
   | { kind: "text"; key: string; block: TextContent; searchTarget?: boolean }
-  | { kind: "tool"; key: string; block: ToolCallContent; result?: ToolResultMessage; duration?: number; usage?: TurnUsage; ctxTokens?: number; searchTarget?: boolean }
+  | { kind: "tool"; key: string; block: ToolCallContent; result?: ToolResultMessage; duration?: number; searchTarget?: boolean }
   | { kind: "custom"; key: string; message: CustomMessage; searchTarget?: boolean };
 
 export function formatUsage(usage: TurnUsage): string {
@@ -30,19 +30,6 @@ export function formatUsage(usage: TurnUsage): string {
   if (usage.cacheWrite) parts.push(`${usage.cacheWrite.toLocaleString()} cache W`);
   if (usage.cost?.total) parts.push(`$${usage.cost.total.toFixed(4)}`);
   return parts.join(" · ");
-}
-
-export function usageOf(messageUsage: {
-  input?: number; output?: number; cacheRead?: number; cacheWrite?: number; cost?: { total?: number };
-} | null | undefined): TurnUsage | null {
-  if (!messageUsage) return null;
-  return {
-    input: messageUsage.input ?? 0,
-    output: messageUsage.output ?? 0,
-    cacheRead: messageUsage.cacheRead ?? 0,
-    cacheWrite: messageUsage.cacheWrite ?? 0,
-    cost: { total: messageUsage.cost?.total ?? 0 },
-  };
 }
 
 /** Prompt tokens a provider charged for one request: non-cached input plus cache reads/writes. */
@@ -92,15 +79,6 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
   processBlockLimitByIdx?: Map<number, number>;
 }): ActivityItem[] {
   const items: ActivityItem[] = [];
-  // nextPromptTokens[i] = prompt tokens of the nearest assistant request after
-  // index i — the context occupancy at that point of the conversation.
-  const nextPromptTokens: (number | undefined)[] = new Array(messages.length);
-  let accPromptTokens: number | undefined;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    nextPromptTokens[i] = accPromptTokens;
-    const messageUsage = (messages[i] as AssistantMessage | undefined)?.usage;
-    if (messages[i]?.role === "assistant" && messageUsage) accPromptTokens = promptTokensOf(messageUsage);
-  }
   for (let idx = startIdx; idx < endIdx; idx++) {
     const message = messages[idx];
     if (!message) continue;
@@ -151,8 +129,6 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
           block: toolCall,
           result,
           duration,
-          usage: usageOf(assistantMessage.usage) ?? undefined,
-          ctxTokens: nextPromptTokens[idx],
           searchTarget,
         });
         continue;

@@ -181,12 +181,10 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
   );
 }
 
-export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below, activityTool, cwd, onOpenFile }: {
+export const ToolTrace = memo(function ToolTrace({ view, trailing, below, activityTool, cwd, onOpenFile }: {
   view: ToolView;
-  /** Duration and usage belong to the turn, not the tool (第 8 节). */
+  /** Duration belongs to the turn, not the tool (第 8 节). */
   trailing?: ReactNode;
-  /** A call's usage bars, above the sections. */
-  usage?: ReactNode;
   /** Media the call produced, below the line. */
   below?: ReactNode;
   /** The pi tool name, kept as `data-activity-tool`. */
@@ -221,7 +219,6 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, usage, below,
       status={view.status}
       foldKey={view.foldKey}
       trailing={trailing}
-      usage={usage}
       below={below}
       activityTool={activityTool}
       content={content}

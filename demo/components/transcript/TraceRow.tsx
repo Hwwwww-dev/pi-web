@@ -61,6 +61,7 @@ export function useTraceFold(foldKey?: string, defaultOpen = false) {
 export function TraceRow({
   icon,
   title,
+  object,
   titleClassName,
   chips,
   description,
@@ -68,7 +69,6 @@ export function TraceRow({
   foldKey,
   defaultOpen = false,
   trailing,
-  usage,
   content,
   below,
   ariaLabel,
@@ -78,6 +78,8 @@ export function TraceRow({
 }: {
   icon: ReactNode;
   title: string;
+  /** The thing the action applies to: elided before the action ever is. */
+  object?: string;
   titleClassName?: string;
   /** File chips the call named, right after the title (第 4.1 节). */
   chips?: ReactNode;
@@ -88,8 +90,6 @@ export function TraceRow({
   defaultOpen?: boolean;
   /** Rendered after the description, before the chevron (duration, badges). */
   trailing?: ReactNode;
-  /** Rendered above the folding content (a call's usage bars). */
-  usage?: ReactNode;
   /** Folding content. Omitted = a plain line that cannot expand. */
   content?: ReactNode;
   /** Rendered inside the fold after `content`. */
@@ -108,9 +108,11 @@ export function TraceRow({
     // 否则标题的 truncate 没有可收缩的宽度，长命令会溢出、箭头被挤到文字中间。
     <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="w-full! min-w-0">
       <TraceIcon>{icon}</TraceIcon>
-      <TraceTitle className={cn("min-w-0 shrink truncate", titleClassName)}>{title}</TraceTitle>
+      {/* The action is never elided: it is the row's name (用户要求：工具名称不可省略). */}
+      <TraceTitle className={cn("shrink-0 whitespace-nowrap", titleClassName)}>{title}</TraceTitle>
+      {object && <span className="min-w-0 truncate">{object}</span>}
       {chips}
-      {description && <TraceDescription>{description}</TraceDescription>}
+      {description && <TraceDescription className="min-w-0 shrink truncate">{description}</TraceDescription>}
       {trailing && <span className="ml-auto shrink-0 pl-2">{trailing}</span>}
     </TraceLine>
   );
@@ -137,7 +139,6 @@ export function TraceRow({
           {line}
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="mt-1 flex flex-col gap-2">
-          {usage}
           {content}
           {children}
         </TraceCollapsibleContent>

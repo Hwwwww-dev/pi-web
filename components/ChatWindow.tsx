@@ -1265,7 +1265,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             <TurnActivityBody
               key="head-activity"
               items={headItems}
-              ctxWindow={ctxInfoRef.current?.contextWindow}
               cwd={messageCwd}
               onOpenFile={onOpenFile}
               onOpenSubagent={onOpenSubagent}
@@ -1321,7 +1320,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               <TurnActivityBody
                 key={`live-activity-${entryIds[userIdx] ?? userIdx}`}
                 items={liveItems}
-                ctxWindow={ctxInfoRef.current?.contextWindow}
                 cwd={messageCwd}
                 onOpenFile={onOpenFile}
                 onOpenSubagent={onOpenSubagent}
@@ -1409,7 +1407,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             >
                 <TurnActivityBody
                   items={activityItems}
-                  ctxWindow={ctxInfoRef.current?.contextWindow}
                   cwd={messageCwd}
                   onOpenFile={onOpenFile}
                   onOpenSubagent={onOpenSubagent}

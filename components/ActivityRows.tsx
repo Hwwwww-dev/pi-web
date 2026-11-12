@@ -85,22 +85,15 @@ export interface ToolCallEntry {
   block: ToolCallContent;
   result?: ToolResultMessage;
   duration?: number;
-  usage?: TurnUsage;
-  ctxTokens?: number;
 }
 
 
 
 
 
-export function ToolRow({ block, result, usage, ctxTokens, ctxWindow, cwd, onOpenFile, onOpenSubagent }: {
+export function ToolRow({ block, result, cwd, onOpenFile, onOpenSubagent }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
-  /** The request that issued this tool call (its own assistant message's usage). */
-  usage?: TurnUsage;
-  /** Prompt tokens of the next request — context occupancy after this call. */
-  ctxTokens?: number;
-  ctxWindow?: number;
   /** The session directory a chip's relative path resolves against. */
   cwd?: string;
   /** Opens one of the files the call named (its chips). */
@@ -112,14 +105,6 @@ export function ToolRow({ block, result, usage, ctxTokens, ctxWindow, cwd, onOpe
   const view = toToolView({ block, result, t });
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
 
-  const usageNode = usage ? (
-    <div className="text-[length:calc(11px+var(--chat-font-size-offset,0px))]">
-      <UsageBar
-        usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
-        ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
-      />
-    </div>
-  ) : undefined;
   // Images, video and audio the call produced: the viewers below the line, never
   // the bytes inside a code block.
   const mediaNode = view.images.length > 0 || view.media
@@ -151,7 +136,6 @@ export function ToolRow({ block, result, usage, ctxTokens, ctxWindow, cwd, onOpe
         trailing={trailing}
         below={mediaNode}
       >
-        {usageNode}
         {rest.map((section, index) => <ToolSection key={index} section={section} />)}
       </StackTraceTrace>
     );
@@ -184,7 +168,7 @@ export function ToolRow({ block, result, usage, ctxTokens, ctxWindow, cwd, onOpe
   }
 
   if (view.kind === "terminal") {
-    return <TerminalTrace view={view} activityTool={block.toolName} usage={usageNode} below={mediaNode} />;
+    return <TerminalTrace view={view} activityTool={block.toolName} below={mediaNode} />;
   }
 
   // A todo snapshot (第 4.2 节): the Plan pattern — what is running now, how far it got, the steps.
@@ -203,7 +187,6 @@ export function ToolRow({ block, result, usage, ctxTokens, ctxWindow, cwd, onOpe
       view={view}
       activityTool={block.toolName}
       trailing={trailing}
-      usage={usageNode}
       below={mediaNode}
       cwd={cwd}
       onOpenFile={onOpenFile}
@@ -211,9 +194,8 @@ export function ToolRow({ block, result, usage, ctxTokens, ctxWindow, cwd, onOpe
   );
 }
 
-export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent }: {
+export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSubagent }: {
   calls: ToolCallEntry[];
-  ctxWindow?: number;
   /** The session directory a chip's relative path resolves against. */
   cwd?: string;
   onOpenFile?: (filePath: string) => void;
@@ -262,9 +244,6 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
             key={call.block.toolCallId ?? index}
             block={call.block}
             result={call.result}
-            usage={call.usage}
-            ctxTokens={call.ctxTokens}
-            ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
@@ -644,10 +623,8 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
  * recomputes during streaming reuse the previous identity and finished turns
  * skip re-rendering their rows entirely.
  */
-export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindow, cwd, onOpenFile, onOpenSubagent, sessionId, live = false }: {
+export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onOpenFile, onOpenSubagent, sessionId, live = false }: {
   items: ActivityItem[];
-  /** Current model's context window, for the ctx % in per-call usage lines. */
-  ctxWindow?: number;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
@@ -680,9 +657,6 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
             key={item.key}
             block={only.block}
             result={only.result}
-            usage={only.usage}
-            ctxTokens={only.ctxTokens}
-            ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
@@ -696,10 +670,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
               block: entry.block,
               result: entry.result,
               duration: entry.duration,
-              usage: entry.usage,
-              ctxTokens: entry.ctxTokens,
             }))}
-            ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}

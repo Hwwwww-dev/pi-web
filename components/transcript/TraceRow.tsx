@@ -69,7 +69,6 @@ export function TraceRow({
   foldKey,
   defaultOpen = false,
   trailing,
-  usage,
   content,
   below,
   ariaLabel,
@@ -91,8 +90,6 @@ export function TraceRow({
   defaultOpen?: boolean;
   /** Rendered after the description, before the chevron (duration, badges). */
   trailing?: ReactNode;
-  /** Rendered above the folding content (a call's usage bars). */
-  usage?: ReactNode;
   /** Folding content. Omitted = a plain line that cannot expand. */
   content?: ReactNode;
   /** Rendered inside the fold after `content`. */
@@ -142,7 +139,6 @@ export function TraceRow({
           {line}
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="mt-1 flex flex-col gap-2">
-          {usage}
           {content}
           {children}
         </TraceCollapsibleContent>

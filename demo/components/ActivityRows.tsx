@@ -3,10 +3,9 @@
 import { memo, useMemo, useState, type ReactNode } from "react";
 import { BookOpenIcon, BotIcon, CheckIcon, CopyIcon, ExternalLinkIcon, GlobeIcon, ListChecksIcon, PenIcon, SearchIcon, ShrinkIcon, SquareTerminalIcon, WrenchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { CodeBlock, CodeBlockContent } from "./ui/code-block";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import { Separator } from "./ui/separator";
 import {
   Trace,
   TraceCollapsible,
@@ -86,63 +85,38 @@ export interface ToolCallEntry {
   block: ToolCallContent;
   result?: ToolResultMessage;
   duration?: number;
-  usage?: TurnUsage;
-  ctxTokens?: number;
 }
 
 
 
 
 
-export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, cwd, onOpenFile, onOpenSubagent, isStreaming }: {
+export function ToolRow({ block, result, cwd, onOpenFile, onOpenSubagent }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
-  /** Tool run time in milliseconds (pi 1.1's durationMs, else the timestamps' difference). */
-  duration?: number;
-  /** The request that issued this tool call (its own assistant message's usage). */
-  usage?: TurnUsage;
-  /** Prompt tokens of the next request — context occupancy after this call. */
-  ctxTokens?: number;
-  ctxWindow?: number;
   /** The session directory a chip's relative path resolves against. */
   cwd?: string;
   /** Opens one of the files the call named (its chips). */
   onOpenFile?: (filePath: string) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
-  isStreaming?: boolean;
 }) {
   const { t } = useI18n();
-  const active = Boolean(isStreaming) && !result;
+
   const view = toToolView({ block, result, t });
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
 
-  const durationNode = !active && duration !== undefined
-    ? <TraceDescription className="shrink-0 tabular-nums">{formatToolDuration(duration)}</TraceDescription>
-    : undefined;
-  const usageNode = usage ? (
-    <div className="text-[length:calc(11px+var(--chat-font-size-offset,0px))]">
-      <UsageBar
-        usage={{ input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total }}
-        ctx={ctxTokens !== undefined ? { tokens: ctxTokens, contextWindow: ctxWindow } : undefined}
-      />
-    </div>
-  ) : undefined;
   // Images, video and audio the call produced: the viewers below the line, never
   // the bytes inside a code block.
   const mediaNode = view.images.length > 0 || view.media
     ? <MediaTrace images={view.images} video={view.media?.video} audio={view.media?.audio} />
     : undefined;
 
-  // A patch's own +N −M sits beside the title; every other kind carries the duration alone.
-  const trailing = view.diffStat || durationNode ? (
-    <span className="flex items-center gap-1.5">
-      {view.diffStat && (
-        <>
-          <Badge variant="ghost" className="bg-success/15 text-success">+{view.diffStat.added}</Badge>
-          <Badge variant="ghost" className="bg-destructive/10 text-destructive">−{view.diffStat.removed}</Badge>
-        </>
-      )}
-      {durationNode}
+  // A patch's own +N −M sits beside the title as plain text（官方 Commit 示例）;
+  // 单行不再挂时长，时长只在折叠组与思考行出现。
+  const trailing = view.diffStat ? (
+    <span className="shrink-0 tabular-nums">
+      <span className="text-success">+{view.diffStat.added}</span>{" "}
+      <span className="text-destructive">−{view.diffStat.removed}</span>
     </span>
   ) : undefined;
 
@@ -162,7 +136,6 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
         trailing={trailing}
         below={mediaNode}
       >
-        {usageNode}
         {rest.map((section, index) => <ToolSection key={index} section={section} />)}
       </StackTraceTrace>
     );
@@ -195,7 +168,7 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   }
 
   if (view.kind === "terminal") {
-    return <TerminalTrace view={view} activityTool={block.toolName} trailing={durationNode} usage={usageNode} below={mediaNode} />;
+    return <TerminalTrace view={view} activityTool={block.toolName} below={mediaNode} />;
   }
 
   // A todo snapshot (第 4.2 节): the Plan pattern — what is running now, how far it got, the steps.
@@ -214,7 +187,6 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
       view={view}
       activityTool={block.toolName}
       trailing={trailing}
-      usage={usageNode}
       below={mediaNode}
       cwd={cwd}
       onOpenFile={onOpenFile}
@@ -222,9 +194,8 @@ export function ToolRow({ block, result, duration, usage, ctxTokens, ctxWindow, 
   );
 }
 
-export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent }: {
+export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSubagent }: {
   calls: ToolCallEntry[];
-  ctxWindow?: number;
   /** The session directory a chip's relative path resolves against. */
   cwd?: string;
   onOpenFile?: (filePath: string) => void;
@@ -273,10 +244,6 @@ export function ToolGroupRow({ calls, ctxWindow, cwd, onOpenFile, onOpenSubagent
             key={call.block.toolCallId ?? index}
             block={call.block}
             result={call.result}
-            duration={call.duration}
-            usage={call.usage}
-            ctxTokens={call.ctxTokens}
-            ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
@@ -483,13 +450,8 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
 
   return (
     <Trace data-activity-custom="compaction">
-      <TraceCollapsible
-        open={expanded}
-        onOpenChange={() => setExpanded((v) => !v)}
-        className="w-auto min-w-0 flex-[0_1_auto]"
-      >
-        <div className="w-full bg-background">
-          <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
+      <TraceCollapsible open={expanded} onOpenChange={() => setExpanded((v) => !v)}>
+        <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
           <TraceLine>
             <TraceIcon><ToolCategoryIcon category="compact" /></TraceIcon>
             <TraceTitle className="font-medium">{t("i18n.conversationCompacted")}</TraceTitle>
@@ -503,7 +465,6 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
             </TraceDescription>
           </TraceLine>
         </TraceCollapsibleTrigger>
-        </div>
         <TraceCollapsibleContent>
           <CompactionSummaryDetails summary={summary} cwd={cwd} onOpenFile={onOpenFile} />
         </TraceCollapsibleContent>
@@ -522,7 +483,7 @@ export function CompactionSummaryDetails({ summary, cwd, onOpenFile }: {
 
   return (
     <>
-      <div className="text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground">
+      <div className="text-sm leading-[1.65] text-foreground">
         {t("i18n.compactionDescription")}
       </div>
       {parsedSummary.body ? (
@@ -545,17 +506,24 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
   if (modifiedFiles.length > 0) parts.push(`${modifiedFiles.length} modified`);
 
   return (
-    <Collapsible className="mt-2.5 border-t border-border pt-2 text-xs text-muted-foreground">
-      <CollapsibleTrigger className="flex w-full cursor-pointer justify-start text-left font-semibold leading-[1.4]">
-        {t("i18n.fileContext", { details: parts.join(", ") })}
-      </CollapsibleTrigger>
-      {/* forceMount: the native <details> this replaces kept its lists in the
-          DOM while closed; the lists are tiny, so stay mounted and hidden. */}
-      <CollapsibleContent forceMount>
-        {modifiedFiles.length > 0 && <CompactionFileList title={t("i18n.modifiedFiles")} files={modifiedFiles} />}
-        {readFiles.length > 0 && <CompactionFileList title={t("i18n.readFiles")} files={readFiles} />}
-      </CollapsibleContent>
-    </Collapsible>
+    // 第 4 节：折叠仍走官方 TraceCollapsible，分隔线用 Separator。
+    <div className="mt-2.5 flex flex-col gap-2">
+      <Separator />
+      {/* 文件清单默认展开：摘要里最常被查的就是它。 */}
+      <TraceCollapsible defaultOpen>
+        <TraceCollapsibleTrigger>
+          <TraceLine>
+            <TraceTitle className="text-xs font-semibold text-muted-foreground">
+              {t("i18n.fileContext", { details: parts.join(", ") })}
+            </TraceTitle>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
+          {modifiedFiles.length > 0 && <CompactionFileList title={t("i18n.modifiedFiles")} files={modifiedFiles} />}
+          {readFiles.length > 0 && <CompactionFileList title={t("i18n.readFiles")} files={readFiles} />}
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </div>
   );
 }
 
@@ -563,7 +531,7 @@ function CompactionFileList({ title, files }: { title: string; files: string[] }
   return (
     <div className="mt-2">
       <div className="mb-1 text-xs font-semibold text-foreground">{title}</div>
-      <ul className="m-0 max-h-[var(--card-max-height)] list-none overflow-auto p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[3px] [&_li+li]:border-t [&_li+li]:border-border">
+      <ul className="m-0 mb-2 list-none p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[1px]">
         {files.map((file) => (
           <li key={file}>{file}</li>
         ))}
@@ -655,10 +623,8 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
  * recomputes during streaming reuse the previous identity and finished turns
  * skip re-rendering their rows entirely.
  */
-export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindow, cwd, onOpenFile, onOpenSubagent, sessionId, live = false }: {
+export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onOpenFile, onOpenSubagent, sessionId, live = false }: {
   items: ActivityItem[];
-  /** Current model's context window, for the ctx % in per-call usage lines. */
-  ctxWindow?: number;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
@@ -691,14 +657,9 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
             key={item.key}
             block={only.block}
             result={only.result}
-            duration={only.duration}
-            usage={only.usage}
-            ctxTokens={only.ctxTokens}
-            ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
-            isStreaming={live && !only.result}
           />,
         );
       } else {
@@ -709,10 +670,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, ctxWindo
               block: entry.block,
               result: entry.result,
               duration: entry.duration,
-              usage: entry.usage,
-              ctxTokens: entry.ctxTokens,
             }))}
-            ctxWindow={ctxWindow}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}

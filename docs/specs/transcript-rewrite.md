@@ -773,7 +773,7 @@ const [error, ...frames] = stack.split("\n").map((line) => line.trim())
 | 单次响应（已完成） | `usage.output` + `message.durationMs`（pi 1.1） | `output ÷ durationMs` | 未展示，这是真正的解码速率 |
 | 一轮 | `Σ usage.output` + `getTurnDurationMs()`（`lib/turn-duration.ts`） | `output ÷ 整轮耗时` | 未展示，含工具等待与思考 |
 
-**每个工具没有速率**：工具行的 `duration` 是工具自身运行时间，`usage` 是"发起这次调用的那条 assistant 消息的用量"，一次请求可并发多个工具调用，相除不是模型生成速度。工具行只显示 `formatToolDuration(duration)`。
+**每个工具没有速率**：工具行的 `duration` 是工具自身运行时间，`usage` 是"发起这次调用的那条 assistant 消息的用量"，一次请求可并发多个工具调用，相除不是模型生成速度。工具行不显示时长，合并组头显示该组总耗时（`formatToolDuration`）。
 
 ### 6.6 本次重构的边界
 
@@ -817,7 +817,7 @@ const [error, ...frames] = stack.split("\n").map((line) => line.trim())
 - **动作名称永不省略**（`shrink-0 whitespace-nowrap`），省略只发生在对象与描述上（`min-w-0 truncate`）。
 - 展开态不二次截断：不出现“…”结尾的业务文本，不出现只显示前 N 行且无提示的结果；限高只作用于代码/终端块（块内滚动）。
 - 收起态不得重复展开态已有的信息载体：文件名由 chip 承担时，标题不再重复文件名。
-- 每个 turn 的 usage 只有一行（行内小字），不挂在每行工具上。
+- 每个 turn 的 usage 只有一行（行内小字），不挂在每行工具上；逐次调用的 usage/ctx 也不再随行传给工具（`ActivityItem` 的 tool 变体只有 `duration`）。
 
 ### 7.2 展开记忆
 
