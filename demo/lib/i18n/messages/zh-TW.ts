@@ -1799,7 +1799,7 @@ export const zhTWLocale: LocalePlugin = {
     "i18n.testConnection": "測試模型連線",
     "i18n.provider": "Provider",
     "i18n.model": "模型",
-    "i18n.providerName": "Provider 名稱",
+    "i18n.providerId": "Provider ID",
     "i18n.rename": "重新命名",
     "modelsConfig.providerNameTaken": "已存在同名 Provider",
     "modelsConfig.groupSignedIn": "已登入 Provider",

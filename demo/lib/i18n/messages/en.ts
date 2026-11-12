@@ -1799,7 +1799,7 @@ export const enLocale: LocalePlugin = {
     "i18n.testConnection": "Test model connection",
     "i18n.provider": "Provider",
     "i18n.model": "Model",
-    "i18n.providerName": "Provider name",
+    "i18n.providerId": "Provider ID",
     "i18n.rename": "Rename",
     "modelsConfig.providerNameTaken": "A provider with this name already exists",
     "modelsConfig.groupSignedIn": "Signed-in providers",

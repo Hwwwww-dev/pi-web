@@ -445,8 +445,8 @@ function ProviderDetail({ name, editingName, fallbackLabel, provider, onChange, 
 
       <ConfigCard>
         <div className="flex flex-col gap-4">
-          <Field label={t("i18n.providerName")}>
-            <TextInput value={editingName} onChange={onEditingNameChange} placeholder="provider-name" mono />
+          <Field label={t("i18n.providerId")}>
+            <TextInput value={editingName} onChange={onEditingNameChange} placeholder="provider-id" mono />
             {renameConflict && (
               <span className="mt-1 block text-xs text-destructive">
                 {t("modelsConfig.providerNameTaken")}
@@ -2014,7 +2014,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
 
   const renameProvider = useCallback((oldName: string, newName: string) => {
     if (applyProviderRename(config, oldName, newName)) setSaveError(null);
-    else setSaveError(t("models.providerNameTaken", { name: newName }));
+    else setSaveError(t("models.providerIdTaken", { name: newName }));
   }, [applyProviderRename, config, t]);
 
   const deleteProvider = useCallback((name: string) => {
@@ -2170,7 +2170,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
     if (providerNameDraft && pendingName && config.providers?.[providerNameDraft.provider]) {
       const renamed = applyProviderRename(config, providerNameDraft.provider, pendingName);
       if (!renamed) {
-        setSaveError(t("models.providerNameTaken", { name: pendingName }));
+        setSaveError(t("models.providerIdTaken", { name: pendingName }));
         setSaving(false);
         return;
       }

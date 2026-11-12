@@ -442,8 +442,8 @@ function ProviderDetail({ name, editingName, provider, onChange, onEditingNameCh
 
       <ConfigCard>
         <div className="flex flex-col gap-4">
-          <Field label={t("i18n.providerName")}>
-            <TextInput value={editingName} onChange={onEditingNameChange} placeholder="provider-name" mono />
+          <Field label={t("i18n.providerId")}>
+            <TextInput value={editingName} onChange={onEditingNameChange} placeholder="provider-id" mono />
             {renameConflict && (
               <span className="mt-1 block text-xs text-destructive">
                 {t("modelsConfig.providerNameTaken")}
