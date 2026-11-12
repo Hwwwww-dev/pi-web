@@ -21,7 +21,7 @@ import { useTraceFold } from "./TraceRow";
 export function TurnTrace({ summary, foldKey, defaultOpen, reveal = false, className, children }: {
   /** "处理详情 · 8 终端 · 2 文件". */
   summary: string;
-  foldKey: string;
+  foldKey?: string;
   defaultOpen: boolean;
   /** A search hit sits inside: the fold opens and stays open while the hit is pending. */
   reveal?: boolean;

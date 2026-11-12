@@ -1422,16 +1422,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             : `${t("chat.processDetails")} · ${processMessageCount} ${t(processMessageCount === 1 ? "chat.message" : "chat.messages")}`;
 
         if (activityItems.length > 0) {
+          const processKey = entryIds[userIdx];
           rendered.push(
             <div
-              key={`process-group-${entryIds[userIdx] ?? userIdx}`}
+              key={`process-group-${processKey ?? userIdx}`}
               className="[content-visibility:auto] [contain-intrinsic-size:auto_160px]"
               ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
             >
               <TurnTrace
-              key={finalAnswerMessage ? "answered" : "unanswered"}
               summary={processSummary}
-              foldKey={`process:${entryIds[userIdx] ?? userIdx}`}
+              // 没有 entry id 时不传 foldKey：宁可不记忆，也不要索引做 key（prepend 一页就全错位）。
+              foldKey={processKey === undefined ? undefined : `process:${processKey}`}
               defaultOpen={!finalAnswerMessage}
               reveal={revealProcess}
               className="mb-5"

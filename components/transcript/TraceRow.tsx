@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/trace";
 import {
   COLLAPSIBLE_EXPANDED_EVENT,
-  isToolCallExpanded,
+  getFoldChoice,
   setToolCallExpanded,
 } from "@/lib/tool-call-expansion";
 import type { ToolViewStatus } from "@/lib/tool-view";
@@ -38,11 +38,17 @@ const STATUS_ATTR = {
  * way tool cards always have.
  */
 export function useTraceFold(foldKey?: string, defaultOpen = false) {
-  const [open, setOpen] = useState(() => isToolCallExpanded(foldKey) || defaultOpen);
+  // 三态：用户主动过就听用户的，没设置过才用 defaultOpen。旧实现的
+  // `setOpen(isToolCallExpanded(key))` 把「没记录」当成「已收起」，于是别处
+  // （一行工具）一展开，所有靠 defaultOpen 打开的大折叠都被强行关掉。
+  const [open, setOpen] = useState(() => getFoldChoice(foldKey) ?? defaultOpen);
 
   useEffect(() => {
     if (!foldKey) return;
-    const sync = () => setOpen(isToolCallExpanded(foldKey));
+    const sync = () => {
+      const choice = getFoldChoice(foldKey);
+      if (choice !== undefined) setOpen(choice);
+    };
     window.addEventListener(COLLAPSIBLE_EXPANDED_EVENT, sync);
     return () => window.removeEventListener(COLLAPSIBLE_EXPANDED_EVENT, sync);
   }, [foldKey]);
