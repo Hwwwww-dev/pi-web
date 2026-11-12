@@ -333,7 +333,7 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
         </div>
       </header>
       <div>
-        {error && <div role="alert" className="border-b bg-(--terminal-error-bg) px-3 py-[7px] font-mono text-xs text-(--terminal-error-text) border-(--terminal-error-border)">{error}</div>}
+        {error && <div role="alert" className="bg-(--terminal-error-bg) px-3 py-[7px] font-mono text-xs text-(--terminal-error-text)">{error}</div>}
         {status === "exited" && <div role="status" className="px-3 py-[7px] font-mono text-xs text-(--terminal-muted)">{exitCode === null ? t("terminal.exited") : t("terminal.exitCode", { code: exitCode })}</div>}
       </div>
       <div className="terminal-xterm min-h-0 min-w-0 overflow-hidden pt-2.5 pr-2 pb-[22px] pl-3 [grid-row:-2/-1]"><div ref={containerRef} className="terminal-xterm-host size-full" /></div>
