@@ -11,6 +11,7 @@ import {
   FileTextIcon,
   GlobeIcon,
   ListTodoIcon,
+  MessageCircleQuestionIcon,
   Minimize2Icon,
   NotebookPenIcon,
   PlugIcon,
@@ -53,6 +54,7 @@ export const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
   subagent: <BotIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
   mcp: <PlugIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
   queue: <ListTodoIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
+  question: <MessageCircleQuestionIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
   compact: <Minimize2Icon className={cn(ICON_CLASS, "text-muted-foreground")} />,
   generic: <WrenchIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
 };
@@ -69,6 +71,7 @@ export const KIND_ACTIVE_ICONS: Record<ToolViewKind, ReactNode> = {
   subagent: <BotIcon className={cn(ICON_CLASS, "text-primary/70")} />,
   mcp: <PlugIcon className={cn(ICON_CLASS, "text-primary/70")} />,
   queue: <ListTodoIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  question: <MessageCircleQuestionIcon className={cn(ICON_CLASS, "text-primary/70")} />,
   compact: <Minimize2Icon className={cn(ICON_CLASS, "text-primary/70")} />,
   generic: <WrenchIcon className={cn(ICON_CLASS, "text-primary/70")} />,
 };

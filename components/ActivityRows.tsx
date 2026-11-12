@@ -38,6 +38,7 @@ import { UsageBar } from "./UsageBar";
 import { ReasoningTrace } from "./transcript/ReasoningTrace";
 import { SourcesTrace } from "./transcript/SourcesTrace";
 import { PlanTrace } from "./transcript/PlanTrace";
+import { QuestionTrace } from "./transcript/QuestionTrace";
 import { StackTraceTrace } from "./transcript/StackTraceTrace";
 import { MediaTrace } from "./transcript/MediaTrace";
 import { ToolSection } from "./transcript/ToolTrace";
@@ -161,6 +162,10 @@ export function ToolRow({ block, result, cwd, onOpenFile, onOpenSubagent }: {
   }
 
   // A todo snapshot (第 4.2 节): the Plan pattern — what is running now, how far it got, the steps.
+  if (view.kind === "question") {
+    const steps = view.sections.find((section) => section.kind === "steps")?.steps ?? [];
+    return <QuestionTrace title={view.title} steps={steps} foldKey={view.foldKey} activityTool={block.toolName} />;
+  }
   if (view.kind === "queue") {
     const steps = view.sections.find((section) => section.kind === "steps")?.steps ?? [];
     return <PlanTrace steps={steps} foldKey={view.foldKey} activityTool={block.toolName} />;

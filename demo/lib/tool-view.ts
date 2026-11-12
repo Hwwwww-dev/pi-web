@@ -31,6 +31,7 @@ export type ToolViewKind =
   | "subagent"
   | "mcp"
   | "queue"
+  | "question"
   | "generic";
 
 export type ToolViewStatus = "running" | "error" | "pending" | "done";
@@ -415,7 +416,8 @@ function kindOf(p: Prepared): ToolViewKind {
   if (category === "search") return "search";
   if (category === "web") return "web";
   if (category === "plan" && (todoSteps(p.block.input) || todoStepsFromDetails(p.details))) return "queue";
-  if (questionSteps(p.block.input)) return "queue";
+  // 提问有自己的卡片：它既不是计划也不是清单，不能借计划卡的标题与进度。
+  if (questionSteps(p.block.input)) return "question";
   if (category === "compact") return "compact";
   return "generic";
 }
@@ -450,6 +452,7 @@ function createView(p: Prepared): ToolView {
     case "search": return searchView(p);
     case "web": return webView(p);
     case "queue": return queueView(p);
+    case "question": return questionView(p);
     case "compact": return compactView(p);
     default: return genericView(p);
   }
@@ -641,10 +644,41 @@ function questionSteps(input: unknown): ToolViewStep[] | null {
   return null;
 }
 
+/** `"question"="answer"` pairs in a question tool's result — how pi reports the picks. */
+function questionAnswers(text: string | null): Map<string, string> {
+  const answers = new Map<string, string>();
+  if (!text) return answers;
+  const pair = /"([^"]*)"\s*=\s*"([^"]*)"/g;
+  let match: RegExpExecArray | null;
+  while ((match = pair.exec(text)) !== null) answers.set(match[1], match[2]);
+  return answers;
+}
+
+/**
+ * A question put to the operator: the prompt is the row's name, its choices are
+ * the line's description, and the pick replaces them once the answer is in.
+ * Deliberately not the plan pattern — a question has no progress to report.
+ */
+function questionView(p: Prepared): ToolView {
+  const view = baseView(p);
+  const answers = questionAnswers(p.text);
+  const steps = (questionSteps(p.block.input) ?? []).map((step) => {
+    const answer = answers.get(step.title);
+    if (answer === undefined) return step;
+    return { ...step, status: "done" as const, description: p.t("chat.trace.questionAnswer", { answer }) };
+  });
+  view.kind = "question";
+  view.title = steps.length > 0
+    ? p.t("chat.trace.questionNamed", { name: steps[0].title })
+    : p.t("chat.trace.question");
+  view.sections = p.detail([{ kind: "steps", steps }]);
+  return view;
+}
+
 function queueView(p: Prepared): ToolView {
   const view = baseView(p);
   // create 的参数带 tasks；update/list 的列表在结果的 details.tasks 里（用户要求：带出整份清单）。
-  const steps = todoSteps(p.block.input) ?? todoStepsFromDetails(p.details) ?? questionSteps(p.block.input) ?? [];
+  const steps = todoSteps(p.block.input) ?? todoStepsFromDetails(p.details) ?? [];
   const done = steps.filter((step) => step.status === "done").length;
   view.kind = "queue";
   // Plan pattern (第 4.2 节): the row names the task in progress, not the tool call.
