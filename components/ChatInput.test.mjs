@@ -234,12 +234,14 @@ test("a plain-text paste the browser dropped is inserted from the event's own te
   }).outputText);
 
   // inputFollows: the browser's own insertion fired input (handleInput clears the ref).
-  function paste({ text, html = "", links = [], inputFollows = false, connected = true }) {
+  function paste({ text, html = "", links = [], inputFollows = false, connected = true, onPasteLargeText }) {
     const timers = [];
     const inserted = [];
     const pendingPasteRef = { current: null };
     const handler = script.runInNewContext({
       compact: false, processImageFiles() {}, pendingPasteRef,
+      onPasteLargeText,
+      PASTE_TEXT_TO_FILE_THRESHOLD: 10_000,
       setTimeout(callback, delay) { timers.push([callback, delay]); },
       replaceTextareaRange(_ta, start, end, value) { inserted.push([start, end, value]); },
       replaceLinksWithMarkdown,
@@ -279,6 +281,20 @@ test("a plain-text paste the browser dropped is inserted from the event's own te
   assert.deepEqual(paste({ text: "rich", html: "<a>rich</a>", links: [["rich", "https://example.com"]] }), { inserted: [], prevented: true, pending: null });
   assert.deepEqual(paste({ text: "", html: "" }).inserted, []);
   assert.deepEqual(paste({ text: "gone", connected: false }).inserted, []);
+  // 大文案粘贴（DeepSeek 同款）：超过 10k 字符阻止默认插入，整段转交上层转 TXT；
+  // 低于阈值不转交，照常插入。
+  let handedOff = null;
+  assert.deepEqual(
+    paste({ text: "x".repeat(10_001), onPasteLargeText: (value) => { handedOff = value; } }),
+    { inserted: [], prevented: true, pending: null },
+  );
+  assert.equal(handedOff.length, 10_001);
+  handedOff = null;
+  assert.deepEqual(
+    paste({ text: "short", onPasteLargeText: (value) => { handedOff = value; } }),
+    { inserted: [[2, 5, "short"]], prevented: false, pending: null },
+  );
+  assert.equal(handedOff, null);
 });
 
 test("file mention arrows wrap around the match list", () => {
