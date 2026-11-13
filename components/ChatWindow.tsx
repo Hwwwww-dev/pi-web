@@ -60,7 +60,6 @@ import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll
 import { shouldFollow } from "@/lib/chat-follow";
 import {
   getNextVisibleCount,
-  getPromptAnchorSpacerHeight,
   getVisibleRenderWindow,
   isScrollAtTail,
   VISIBLE_PAGE_SIZE,
@@ -164,9 +163,9 @@ interface Props {
 // `app/globals.css` 的 `--chat-*` 变量），组件内不写字面量。
 
 /**
- * 官方 scroller 的跟随模式（`following-bottom`）会被 wheel/touch/按键、scrollTop 变小、
- * 点击跳转等打断，仅挂载与其自身 `scrollToEnd` 能恢复。因此由本组件接管：`atTail` 为真
- * 期间内容长高即再次调用 `scrollToEnd`，读者上滑超过 8px 后 `atTail` 变假并停止干涉。
+ * 唯一的贴底跟随者：官方 scroller 以 `autoScroll={false}` 运行，内部跟随关闭。
+ * `atTail` 为真期间内容长高（流式追加、行展开、完成重组）即调用 `scrollToEnd`；
+ * 读者上滑后 `atTail` 变假并停止干涉。跟随与否由 `shouldFollow` 判定（含钳制识别）。
  */
 function FollowTailWhenAtTail({ atTail, contentRef }: {
   atTail: boolean;
@@ -272,12 +271,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     agentPhase,
     isNew,
     sessionIdRef, scrollContainerRef,
-    lastUserMsgRef, promptAnchorActive,
     handleSend, handleAbort, startSideChat, handleFork, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
     handleQueuedAction, handleEditContent, dismissCompactError, editEntryId, cancelEdit,
     handleBuiltinSlashCommand,
-    handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadSlashCommands, loadAllModels, scrollUserMsgToTop,
+    handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadSlashCommands, loadAllModels,
     loadContext, activeLeafId, scrollToBottom, scrollToMessage, jumpToEntry, loadNewerPage,
   } = useAgentSession({
     session, sessionRunning, newSessionCwd, newSessionDraftKey, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd: wrappedOnAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
@@ -603,6 +601,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
    * 前插整页时会被当作跟随而滑到底部，导致翻页时在底与顶之间跳动。
    */
   const [atTail, setAtTail] = useState(true);
+  // ↑ 唯一的跟随信号：官方 scroller 以 `autoScroll={false}` 运行（内部跟随会与
+  // 翻页的前插保位互相打架），贴底跟随全部由 `FollowTailWhenAtTail` 消费此状态。
   const foldTimerRef = useRef<number | undefined>(undefined);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
@@ -759,13 +759,14 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 监听器需读取当前可见状态，故用 ref 而非闭包中的旧 prop。
   const activeRef = useRef(active);
   activeRef.current = active;
-  // 跟随状态仅由滚动决定，判定交给 `shouldFollow`：8px 贴底容差只用于“回到最新”
-  // 按钮，跟随使用 48px，因触控板一次惯性可达数十像素。
+  // 跟随状态仅由滚动决定，判定交给 `shouldFollow`：方向优先于容差（上滑即脱离），
+  // 内容收缩导致的 scrollTop 钳制不算上滑。8px 贴底容差只用于“回到最新”按钮。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
     let following = true;
     let previousTop = container.scrollTop;
+    let previousHeight = container.scrollHeight;
     const update = () => {
       const next = shouldFollow(
         following,
@@ -773,9 +774,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         container.scrollTop,
         container.clientHeight,
         container.scrollHeight,
+        previousHeight,
       );
       following = next;
       previousTop = container.scrollTop;
+      previousHeight = container.scrollHeight;
       setAtTail(next);
     };
     update();
@@ -1068,7 +1071,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     };
     settle();
     return () => cancelAnimationFrame(frame);
-  }, [visibleCount, messages.length, olderPageState]);
+  }, [visibleCount, messages.length, olderPageState, scrollContainerRef]);
 
   // Read one more page only when the reader asks for it (the sentinel at the top
   // or the "load earlier" row). Reading the whole branch up front put dozens of
@@ -1212,105 +1215,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [messages]);
   const isEmptyNew = isNew && messages.length === 0 && !streamState.isStreaming && !sessionBusy;
   const messageCwd = session?.cwd ?? newSessionCwd ?? undefined;
-  const promptAnchorSpacerRef = useRef<HTMLDivElement | null>(null);
-  const promptAnchorSpacerHeightRef = useRef(0);
-  const promptAnchorMeasureFrameRef = useRef<number | null>(null);
-  const promptAnchorAdjustmentDoneRef = useRef(false);
-  const promptAnchorUpdateRef = useRef<(() => void) | null>(null);
-
-  useLayoutEffect(() => {
-    const spacer = promptAnchorSpacerRef.current;
-    if (!agentRunning || !promptAnchorActive) {
-      promptAnchorUpdateRef.current = null;
-      promptAnchorSpacerHeightRef.current = 0;
-      promptAnchorAdjustmentDoneRef.current = false;
-      if (spacer) spacer.style.height = "";
-      return;
-    }
-
-    const container = scrollContainerRef.current;
-    const messageContent = messageContentRef.current;
-    const userMessage = lastUserMsgRef.current;
-    if (!container || !messageContent || !userMessage || !spacer) return;
-
-    let disposed = false;
-    const updatePromptAnchorSpacer = () => {
-      if (
-        disposed
-        || scrollContainerRef.current !== container
-        || messageContentRef.current !== messageContent
-        || lastUserMsgRef.current !== userMessage
-        || promptAnchorSpacerRef.current !== spacer
-      ) return;
-
-      const containerTop = container.getBoundingClientRect().top;
-      const userMessageTop = userMessage.getBoundingClientRect().top
-        - containerTop
-        + container.scrollTop;
-      const targetTop = Math.max(0, userMessageTop - 16);
-      const contentEnd = spacer.getBoundingClientRect().top
-        - containerTop
-        + container.scrollTop;
-      const nextPromptAnchorSpacerHeight = getPromptAnchorSpacerHeight(
-        targetTop,
-        contentEnd,
-        container.clientHeight,
-      );
-
-      const isInitialMeasurement = !promptAnchorAdjustmentDoneRef.current;
-      const needsInitialAdjustment = isInitialMeasurement
-        && nextPromptAnchorSpacerHeight > 0;
-      if (isInitialMeasurement) promptAnchorAdjustmentDoneRef.current = true;
-      if (nextPromptAnchorSpacerHeight === promptAnchorSpacerHeightRef.current) return;
-
-      promptAnchorSpacerHeightRef.current = nextPromptAnchorSpacerHeight;
-      spacer.style.height = nextPromptAnchorSpacerHeight > 0
-        ? `${nextPromptAnchorSpacerHeight}px`
-        : "";
-      if (needsInitialAdjustment) scrollUserMsgToTop();
-    };
-
-    promptAnchorUpdateRef.current = updatePromptAnchorSpacer;
-    const schedulePromptAnchorMeasure = () => {
-      if (disposed || promptAnchorMeasureFrameRef.current !== null) return;
-      promptAnchorMeasureFrameRef.current = requestAnimationFrame(() => {
-        promptAnchorMeasureFrameRef.current = null;
-        updatePromptAnchorSpacer();
-      });
-    };
-
-    updatePromptAnchorSpacer();
-    const observer = typeof ResizeObserver === "undefined"
-      ? null
-      : new ResizeObserver(schedulePromptAnchorMeasure);
-    observer?.observe(container);
-    observer?.observe(messageContent);
-    observer?.observe(userMessage);
-    return () => {
-      disposed = true;
-      if (promptAnchorUpdateRef.current === updatePromptAnchorSpacer) {
-        promptAnchorUpdateRef.current = null;
-      }
-      observer?.disconnect();
-      if (promptAnchorMeasureFrameRef.current !== null) {
-        cancelAnimationFrame(promptAnchorMeasureFrameRef.current);
-        promptAnchorMeasureFrameRef.current = null;
-      }
-    };
-  }, [
-    agentRunning,
-    lastUserMsgRef,
-    messages.length,
-    promptAnchorActive,
-    scrollContainerRef,
-    scrollUserMsgToTop,
-  ]);
-
-  // Each streamed chunk StreamingReply commits, and the bubble coming and going.
-  const updatePromptAnchor = useCallback(() => {
-    promptAnchorUpdateRef.current?.();
-  }, []);
-  useLayoutEffect(updatePromptAnchor, [isStreaming, hasStreamingContent, updatePromptAnchor]);
 
   const availableThinkingLevels = displayModelValue
     ? (modelThinkingLevels[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
@@ -1380,13 +1284,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // search reveals, and run boundaries.
   const messageListView = useMemo(() => {
     let liveActivityRendered = false;
-      let lastUserIdx = -1;
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].role === "user") { lastUserIdx = i; break; }
-      }
       // Anchor for live-tail detection. A compaction summary or subagent
       // completion can sit after the last user message and own the
-      // still-streaming segment. lastUserIdx stays the scroll target.
+      // still-streaming segment.
       let lastAnchorIdx = -1;
       for (let i = messages.length - 1; i >= 0; i--) {
         if (isMessageGroupAnchor(messages[i])) { lastAnchorIdx = i; break; }
@@ -1402,7 +1302,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
       const attachVisibleRef = (idx: number, refIndex: number) => (el: HTMLDivElement | null) => {
         messageRefs.current[refIndex] = el;
-        if (idx === lastUserIdx) { (lastUserMsgRef as { current: HTMLDivElement | null }).current = el; }
       };
 
       // The model name is said once per run: the same model on the next step is noise.
@@ -1727,7 +1626,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [messages, entryIds, toolResultsMap, hasEarlierMessages, streamState.isStreaming, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
      sessionIdRef, forkFromMessage, handleEditContent, onOpenFile, onOpenSubagent,
-     isNew, messageRefs, lastUserMsgRef, bashRunning, editEntryId, cancelEdit]);
+     isNew, messageRefs, bashRunning, editEntryId, cancelEdit]);
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
   const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
   const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
@@ -1814,8 +1713,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} waitingCount={waitingExtensionCustomUiCount} onInput={sendExtensionCustomInput} />
         )}
         {!isEmptyNew && <>
-        <MessageScrollerProvider autoScroll={atTail && !foldInFlight} defaultScrollPosition="end">
-        <FollowTailWhenAtTail atTail={atTail} contentRef={messageContentRef} />
+        <MessageScrollerProvider autoScroll={false} defaultScrollPosition="end">
+        <FollowTailWhenAtTail atTail={atTail && !foldInFlight} contentRef={messageContentRef} />
         <MessageScroller className="min-h-0 min-w-0 flex-1">
         <MessageScrollerViewport
           ref={scrollContainerRef}
@@ -1899,7 +1798,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             )}
 
             </ChatRow>
-            <div ref={promptAnchorSpacerRef} aria-hidden="true" />
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <MessageScrollerButton className="text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100">

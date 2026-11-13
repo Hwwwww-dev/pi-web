@@ -72,10 +72,7 @@ import {
   upsertExtensionUiRequest,
 } from "@/lib/extension-ui-queue";
 import {
-  CHAT_SCROLL_REATTACH_TOLERANCE,
-  CHAT_SCROLL_TAIL_TOLERANCE,
   VISIBLE_PAGE_SIZE,
-  getLiveFollowAttached,
 } from "@/lib/chat-lazy-load";
 import {
   createStreamingStore,
@@ -564,7 +561,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [compactError, setCompactError] = useState<string | null>(null);
   const [compactResult, setCompactResult] = useState<CompactResultInfo | null>(null);
   const [agentPhase, setAgentPhase] = useState<AgentPhase>(null);
-  const [promptAnchorActive, setPromptAnchorActive] = useState(false);
   const [slashCommands, setSlashCommands] = useState<SlashCommandInfo[]>([]);
   const [slashCommandsLoading, setSlashCommandsLoading] = useState(false);
   const [noticeState, dispatchNotice] = useReducer(noticeReducer, { visible: [], pending: [] });
@@ -678,9 +674,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const bashRecoveryIdRef = useRef(0);
   const handleAgentEventRef = useRef<((event: AgentEvent) => void) | null>(null);
   const initialScrollDoneRef = useRef(Boolean(opts.deferInitialScroll));
-  const lastUserMsgRef = useRef<HTMLDivElement | null>(null);
-  const pendingScrollToUserRef = useRef(false);
-  const isNearBottomRef = useRef(true);
+  const pendingTailScrollRef = useRef(false);
   const previousScrollTopRef = useRef(0);
   const executeBashRef = useRef<(command: string, excludeFromContext: boolean) => Promise<void> | undefined>(undefined);
   const handleNavigateRef = useRef<((entryId: string) => Promise<boolean>) | undefined>(undefined);
@@ -2478,8 +2472,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     setAgentRunning(true);
     setAgentPhase(isSlashCommandPrompt ? { kind: "running_command" } : { kind: "waiting_model" });
     dispatch({ type: "start" });
-    pendingScrollToUserRef.current = true;
-    setPromptAnchorActive(true);
+    pendingTailScrollRef.current = true;
 
     // A queued prompt (parked behind compaction, or queued into a run) is not a
     // sent message yet: the queue rows show it, and the transcript shows it when
@@ -3428,9 +3421,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const container = scrollContainerRef.current;
     if (!container) return;
     initialScrollDoneRef.current = true;
-    pendingScrollToUserRef.current = false;
-    isNearBottomRef.current = false;
-    setPromptAnchorActive(false);
     container.scrollTo({
       top: element.getBoundingClientRect().top
         - container.getBoundingClientRect().top
@@ -3439,40 +3429,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       behavior: "instant",
     });
     previousScrollTopRef.current = container.scrollTop;
-  }, []);
-
-  const scrollUserMsgToTop = useCallback(() => {
-    const container = scrollContainerRef.current;
-    const el = lastUserMsgRef.current;
-    if (!container || !el) return;
-    const elAbsTop = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
-    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-    const targetTop = Math.min(Math.max(0, elAbsTop - 16), maxScrollTop);
-
-    isNearBottomRef.current = true;
-    previousScrollTopRef.current = targetTop;
-    container.scrollTo({ top: targetTop, behavior: "auto" });
-  }, []);
-
-  const handleScrollPositionChange = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (container) {
-      const { scrollTop, clientHeight, scrollHeight } = container;
-      const isAgentRunning = agentRunningRef.current;
-      const wasAttached = isNearBottomRef.current;
-      const isAttached = getLiveFollowAttached(
-        wasAttached,
-        previousScrollTopRef.current,
-        scrollTop,
-        clientHeight,
-        scrollHeight,
-        isAgentRunning
-          ? CHAT_SCROLL_REATTACH_TOLERANCE
-          : CHAT_SCROLL_TAIL_TOLERANCE,
-      );
-      isNearBottomRef.current = isAttached;
-      previousScrollTopRef.current = scrollTop;
-    }
   }, []);
 
   // What a session read with its state (`loadSession(…, includeState)`) says is
@@ -3725,30 +3681,20 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const container = scrollContainerRef.current;
     if (!container) return;
     previousScrollTopRef.current = container.scrollTop;
-    container.addEventListener("scroll", handleScrollPositionChange, { passive: true });
-    return () => {
-      container.removeEventListener("scroll", handleScrollPositionChange);
-    };
-  }, [messages.length, loading, handleScrollPositionChange]);
-
-  useEffect(() => {
-    if (!agentRunning) setPromptAnchorActive(false);
-  }, [agentRunning]);
+  }, [messages.length, loading]);
 
   useLayoutEffect(() => {
-    if (messages.length > 0) {
-      if (pendingScrollToUserRef.current) {
-        pendingScrollToUserRef.current = false;
-        initialScrollDoneRef.current = true;
-        scrollUserMsgToTop();
-      } else if (!initialScrollDoneRef.current) {
-        initialScrollDoneRef.current = true;
-        scrollToBottom("instant");
-      } else if (!agentRunningRef.current && isNearBottomRef.current) {
-        scrollToBottom("auto");
-      }
+    if (messages.length === 0) return;
+    if (pendingTailScrollRef.current) {
+      // 发送后贴底（WhatsApp 式）：乐观气泡落位即滚到底部。
+      pendingTailScrollRef.current = false;
+      initialScrollDoneRef.current = true;
+      scrollToBottom("instant");
+    } else if (!initialScrollDoneRef.current) {
+      initialScrollDoneRef.current = true;
+      scrollToBottom("instant");
     }
-  }, [messages.length, agentRunning, scrollToBottom, scrollUserMsgToTop]);
+  }, [messages.length, scrollToBottom]);
 
   // Load the model list with bounded retries; loadModels exposes each failure.
   useEffect(() => {
@@ -3850,10 +3796,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentPhase,
     isNew,
     editEntryId,
-    promptAnchorActive,
     // Refs
     sessionIdRef, scrollContainerRef,
-    lastUserMsgRef, pendingScrollToUserRef, initialScrollDoneRef,
+    pendingTailScrollRef, initialScrollDoneRef,
     // Actions
     handleSend, handleAbort, startSideChat, handleFork, handleNavigate, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
@@ -3867,7 +3812,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     setNoticePaused: setPausedNoticeId,
     handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadTools, loadSlashCommands, loadAllModels, setActiveLeafId, setData, setMessages, loadContext,
     jumpToEntry, loadNewerPage,
-    scrollToBottom, scrollUserMsgToTop, scrollToMessage,
+    scrollToBottom, scrollToMessage,
     dispatch, setAgentRunning, setForkingEntryId,
     bashRunning, pendingBash,
     // Subscriptions

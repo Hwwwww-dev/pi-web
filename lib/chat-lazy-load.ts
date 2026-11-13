@@ -1,9 +1,6 @@
-import { CHAT_REATTACH_TOLERANCE, CHAT_TAIL_TOLERANCE, isAtTail } from "./chat-follow";
+import { CHAT_TAIL_TOLERANCE, isAtTail } from "./chat-follow";
 
 export const VISIBLE_PAGE_SIZE = 50;
-// 数值定义在 `lib/chat-follow.ts`，此处仅作别名，容差只在一处维护。
-export const CHAT_SCROLL_TAIL_TOLERANCE = CHAT_TAIL_TOLERANCE;
-export const CHAT_SCROLL_REATTACH_TOLERANCE = CHAT_REATTACH_TOLERANCE;
 
 export function getVisibleRenderWindow(totalCount: number, visibleCount: number): {
   startIndex: number;
@@ -30,48 +27,7 @@ export function isScrollAtTail(
   scrollTop: number,
   clientHeight: number,
   scrollHeight: number,
-  tolerance = CHAT_SCROLL_TAIL_TOLERANCE,
+  tolerance = CHAT_TAIL_TOLERANCE,
 ): boolean {
   return isAtTail(scrollTop, clientHeight, scrollHeight, tolerance);
-}
-
-export function getLiveFollowAttached(
-  wasAttached: boolean,
-  previousScrollTop: number,
-  scrollTop: number,
-  clientHeight: number,
-  scrollHeight: number,
-  reattachTolerance = CHAT_SCROLL_REATTACH_TOLERANCE,
-): boolean {
-  if (isScrollAtTail(scrollTop, clientHeight, scrollHeight)) return true;
-  if (scrollTop < previousScrollTop) return false;
-  if (
-    !wasAttached
-    && scrollTop > previousScrollTop
-    && isScrollAtTail(scrollTop, clientHeight, scrollHeight, reattachTolerance)
-  ) return true;
-  return wasAttached;
-}
-
-export function shouldShowScrollToLatest(
-  scrollTop: number,
-  clientHeight: number,
-  scrollHeight: number,
-  tolerance = CHAT_SCROLL_TAIL_TOLERANCE,
-): boolean {
-  if (scrollHeight <= clientHeight) return false;
-  return !isScrollAtTail(scrollTop, clientHeight, scrollHeight, tolerance);
-}
-
-export function getPromptAnchorSpacerHeight(
-  targetTop: number,
-  contentEnd: number,
-  clientHeight: number,
-): number {
-  const clampedTargetTop = Math.max(0, targetTop);
-  if (clampedTargetTop === 0) return 0;
-
-  return Math.max(0, Math.ceil(
-    clampedTargetTop + clientHeight - Math.max(0, contentEnd),
-  ));
 }

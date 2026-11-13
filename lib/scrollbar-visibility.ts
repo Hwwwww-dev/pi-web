@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Overlay scrollbars: the thumb is transparent at rest and fades in while its
- * container is in use. WebKit's scrollbar pseudo-elements ignore transitions,
+ * Overlay scrollbars: the thumb is transparent at rest and fades in while the
+ * user actually scrolls (wheel/touch/scroll keys) or hovers its container.
+ * WebKit's scrollbar pseudo-elements ignore transitions,
  * so the fade is driven by hand: each visible container carries `--sb-alpha`,
  * which the thumb reads as its color strength, and one rAF loop ramps it
  * between 0 and 1. A container stays lit while it scrolls or sits under the
@@ -34,6 +35,9 @@ function fadeAlpha(element: HTMLElement): number {
   const value = element.style.getPropertyValue("--sb-alpha");
   return value === "" ? 0 : Number(value) || 0;
 }
+
+const isScrollableElement = (node: EventTarget | Element): node is Element =>
+  node instanceof Element && isScrollable(node);
 
 type Fade = {
   element: HTMLElement;
@@ -102,11 +106,35 @@ export function installGlobalScrollbarVisibility(): void {
     hideTimer = setTimeout(hideAll, HIDE_DELAY_MS);
   };
 
-  // Scroll events do not bubble; capture reaches every container.
+  // 只认真实用户手势，不监听 scroll：流式输出的 RO 贴尾跟随、发消息后的跳底
+  // 都是程序化滚动，会每个 tick 触发 reveal，把滚动条永远点亮（用户没滚，
+  // 滚动条却一直亮）。滚轮/触摸/翻页键/悬停才亮。
   document.addEventListener(
-    "scroll",
+    "wheel",
     (event) => {
-      if (event.target instanceof Element) reveal([event.target]);
+      if (event.target instanceof Element) reveal(event.composedPath().filter(isScrollableElement).slice(0, 3));
+    },
+    { capture: true, passive: true },
+  );
+
+  document.addEventListener(
+    "touchmove",
+    (event) => {
+      if (event.target instanceof Element) reveal(event.composedPath().filter(isScrollableElement).slice(0, 3));
+    },
+    { capture: true, passive: true },
+  );
+
+  // 键盘滚动容器（焦点内的方向键/翻页/空格）。主输入框打字不经过这里。
+  const SCROLL_KEYS = new Set([
+    "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+    "PageUp", "PageDown", "Home", "End", " ",
+  ]);
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (!SCROLL_KEYS.has(event.key) || !(event.target instanceof Element)) return;
+      reveal(event.composedPath().filter(isScrollableElement).slice(0, 3));
     },
     { capture: true, passive: true },
   );

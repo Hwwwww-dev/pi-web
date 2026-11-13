@@ -13,11 +13,14 @@ test("one scroll-to-latest control, and it is the official one", () => {
   assert.match(source, /<MessageScrollerButton[\s\S]*?chat\.scrollToLatest/);
 });
 
-test("the scroller keeps its official defaults for prepends and the initial anchor", () => {
-  assert.match(source, /<MessageScrollerProvider autoScroll=\{!foldInFlight && !keyboardClosing\} defaultScrollPosition="last-anchor">/);
+test("the scroller runs without internal following; FollowTailWhenAtTail is the only follower", () => {
+  // 官方内部跟随（following-bottom 会被状态提交强制回填、与翻页前插保位互拓）
+  // 已关闭；贴底跟随全部由 ChatWindow 的 atTail 信号经 FollowTailWhenAtTail 接管。
+  assert.match(source, /<MessageScrollerProvider autoScroll=\{false\} defaultScrollPosition="end">/);
+  assert.match(source, /<FollowTailWhenAtTail atTail=\{atTail && !foldInFlight\}/);
   // Hand-rolled compensation must not sit next to the official one.
   assert.equal(source.includes("preserveScrollOnPrepend={false}"), false);
-  // The last user message is the anchor the scroller opens at.
+  // A message row is the anchor the scroller opens at.
   assert.match(source, /scrollAnchor=\{anchorRole === "user"\}/);
 });
 
