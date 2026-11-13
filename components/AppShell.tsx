@@ -599,6 +599,21 @@ export function AppShell() {
     }
   }, [activeSessionFamily]);
 
+  // Agents 面板打开即进入装载态：强制刷一次会话目录，目录回到（或兑底超时）
+  // 才渲染列表元素——面板里永远是"装好后"的数据，不再先弹旧列表再补。
+  const [agentsPanelLoading, setAgentsPanelLoading] = useState(false);
+  const agentsPanelOpen = activeTopPanel === "agents";
+  useEffect(() => {
+    if (!agentsPanelOpen) return;
+    setAgentsPanelLoading(true);
+    setRefreshKey((key) => key + 1);
+    const fallback = window.setTimeout(() => setAgentsPanelLoading(false), 2000);
+    return () => window.clearTimeout(fallback);
+  }, [agentsPanelOpen]);
+  useEffect(() => {
+    if (agentsPanelLoading) setAgentsPanelLoading(false);
+  }, [agentsPanelLoading, sessionCatalog]);
+
   useEffect(() => {
     if (rightPanelFullWidth) setActiveTopPanel(null);
   }, [rightPanelFullWidth]);
@@ -2078,7 +2093,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         className="z-[500] mt-0 min-h-[300px] w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
         style={{ "--agent-panel-width": `${AGENT_PANEL_WIDTH}px` } as React.CSSProperties}
       >
-        {activeSessionFamily && selectedSession ? (
+        {agentsPanelLoading ? (
+          /* 打开即装载态：Spinner 包裹，目录刷新完成前不渲染列表元素。 */
+          <div className="flex min-h-[280px] items-center justify-center" aria-busy="true">
+            <Spinner className="size-5 text-muted-foreground" />
+          </div>
+        ) : activeSessionFamily && selectedSession ? (
           /* 真内容淡入，不硬切：骨架→内容的替换读作过渡而非炸开。 */
           <div className="animate-in fade-in-0 duration-200" key={selectedSession.id}>
           <AgentSessionPanel

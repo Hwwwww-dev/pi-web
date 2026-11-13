@@ -812,10 +812,32 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
+    // 手势压制：向上输入脱离后，带内几何事件不得重挂跟随——否则滚轮/触摸上滑的
+    // 前几帧被 update() 改回 true，effect 随 false→true 重挂立即 scrollToEnd 弹回
+    // 底部，与手势反复拉锯（贴底上滑抖几下、越近底越抖的根因）。只有从带外重新
+    // 进入带内（滚回底部、滚动条拖回）才解除压制恢复跟随；折叠保位、钳制等
+    // 程序化滚动仍按几何自愈，不受影响。
+    let suppressed = false;
+    let wasInBand = true;
     const update = () => {
-      setAtTail(isAtTail(container.scrollTop, container.clientHeight, container.scrollHeight));
+      const inBand = isAtTail(container.scrollTop, container.clientHeight, container.scrollHeight);
+      if (suppressed) {
+        if (inBand && !wasInBand) {
+          // 带外→带内跃迁 = 用户自己回到尾部，解除压制并重挂。
+          suppressed = false;
+          setAtTail(true);
+        } else {
+          setAtTail(false);
+        }
+      } else {
+        setAtTail(inBand);
+      }
+      wasInBand = inBand;
     };
-    const release = () => setAtTail(false);
+    const release = () => {
+      suppressed = true;
+      setAtTail(false);
+    };
     const onWheel = (event: WheelEvent) => {
       if (isUpwardGesture(event.deltaY)) release();
     };
