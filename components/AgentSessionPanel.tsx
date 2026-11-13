@@ -17,6 +17,7 @@ import {
   UserIcon,
 } from "lucide-react";
 import type { SessionUsageSummary } from "@/lib/session-stats";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatActiveDuration, formatCompactCount, formatCostShort } from "@/lib/session-stats-format";
 import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -50,10 +51,18 @@ const STATS_POLL_MS = 3000;
  * it. Read on open and whenever a run starts or ends; polled while one runs,
  * on a visible page, one request at a time.
  */
-function useAgentUsage(ids: readonly string[], runningKey: string): Record<string, SessionUsageSummary> {
+function useAgentUsage(ids: readonly string[], runningKey: string): { usage: Record<string, SessionUsageSummary>; loaded: boolean } {
   const [usage, setUsage] = useState<Record<string, SessionUsageSummary>>({});
+  // 首次 stats 到位前为 false：面板以此渲染骨架而不是缺用量的真实行（到位后突然长出）。
+  // 仅随家族（idsKey）变化重置——运行状态切换不闪骨架。
+  const [loaded, setLoaded] = useState(false);
+  const lastIdsKeyRef = useRef<string | null>(null);
   const idsKey = ids.join(",");
   useEffect(() => {
+    if (lastIdsKeyRef.current !== idsKey) {
+      lastIdsKeyRef.current = idsKey;
+      setLoaded(false);
+    }
     const requested = idsKey ? idsKey.split(",") : [];
     if (requested.length === 0) return;
     const controller = new AbortController();
@@ -71,7 +80,10 @@ function useAgentUsage(ids: readonly string[], runningKey: string): Record<strin
         });
         if (!res.ok) return;
         const data = await res.json() as { stats?: Record<string, SessionUsageSummary> };
-        if (!controller.signal.aborted && data.stats) setUsage(data.stats);
+        if (!controller.signal.aborted && data.stats) {
+          setUsage(data.stats);
+          setLoaded(true);
+        }
       } catch {
         /* best-effort: rows keep their last numbers */
       } finally {
@@ -88,7 +100,7 @@ function useAgentUsage(ids: readonly string[], runningKey: string): Record<strin
       controller.abort();
     };
   }, [idsKey, runningKey]);
-  return usage;
+  return { usage, loaded };
 }
 
 function usageTooltip(usage: SessionUsageSummary, t: (key: string) => string, locale: string): string {
@@ -177,6 +189,7 @@ function AgentRow({
   selected,
   running,
   usage,
+  usageLoading,
   onSelect,
   tabShown,
   onToggleTab,
@@ -193,6 +206,8 @@ function AgentRow({
   selected: boolean;
   running: boolean;
   usage?: SessionUsageSummary;
+  /** 首次 stats 未到位：用量位渲染骨架而不是缺行（到位后突然长出）。 */
+  usageLoading?: boolean;
   onSelect: () => void;
   tabShown?: boolean;
   onToggleTab?: () => void;
@@ -284,7 +299,9 @@ function AgentRow({
             </>}
             {!main && thinkingLevel && <span className="shrink-0">· {thinkingLevel}</span>}
           </span>
-          {hasUsage(usage) && <UsageLine usage={usage} className="mt-[3px]" />}
+          {usageLoading && !hasUsage(usage)
+            ? <Skeleton className="mt-[3px] h-4 w-44" />
+            : hasUsage(usage) && <UsageLine usage={usage} className="mt-[3px]" />}
         </span>
         <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs">
           {(main || side) && !running ? (
@@ -413,7 +430,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
   const runningCount = countRunningSubagents(subagents, runningSessionIds);
   const familyIds = useMemo(() => [rootSession.id, ...subagents.map((session) => session.id)], [rootSession.id, subagents]);
   const runningKey = familyIds.filter((id) => runningSessionIds.has(id)).join(",");
-  const usage = useAgentUsage(familyIds, runningKey);
+  const { usage, loaded: usageLoaded } = useAgentUsage(familyIds, runningKey);
   const familyUsage = useMemo(() => {
     const listed = familyIds.map((id) => usage[id]).filter(hasUsage);
     if (listed.length === 0) return null;
@@ -453,12 +470,15 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
           </span>
         )}
         <span className="ms-auto flex min-w-0 items-center gap-2.5">
-          {familyUsage && (
+          {familyUsage ? (
             <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
               <span className="whitespace-nowrap text-xs text-muted-foreground" title={t("agentSwitcher.totalUsageHint")}>{t("agentSwitcher.totalUsage")}</span>
               <UsageLine usage={familyUsage} />
             </span>
-          )}
+          ) : !usageLoaded ? (
+            /* 用量层骨架：首次 stats 前占位，与真实合计同高（h-4）。 */
+            <Skeleton className="h-4 w-44" />
+          ) : null}
           {runningCount > 0 && (
             <span className="whitespace-nowrap text-xs text-primary">
               {t("agentSwitcher.runningCount", { count: runningCount })}
@@ -485,6 +505,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
           selected={rootSession.id === selectedSessionId}
           running={runningSessionIds.has(rootSession.id)}
           usage={usage[rootSession.id]}
+          usageLoading={!usageLoaded}
           onSelect={() => onSelectSession(rootSession)}
           onNewSideChat={handleNewSideChat}
           newSideChatPending={newSideChatPending}
@@ -502,6 +523,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
             selected={session.id === selectedSessionId}
             running={runningSessionIds.has(session.id)}
             usage={usage[session.id]}
+            usageLoading={!usageLoaded}
             onSelect={() => onSelectSession(session)}
             tabShown={openSubagentTabIds.has(session.id)}
             onToggleTab={() => {
