@@ -67,11 +67,39 @@ import {
 } from "@/lib/chat-lazy-load";
 import { SCROLL_ANCHOR_SETTLE_MS, applyScrollAnchor, captureScrollAnchor, holdScrollAnchor, type ScrollAnchor } from "@/lib/scroll-anchor";
 
+/**
+ * 读者此刻停在哪：贴尾就是 atBottom，否则记下视口顶上那一行和它的偏移。
+ * 保存会话位置与保活槽隐藏前的快照共用这一份。
+ */
+function readScrollPosition(
+  container: HTMLElement,
+  content: HTMLElement | null,
+  oldestEntryId: string | null,
+): ChatScrollPosition | null {
+  if (isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)) return { atBottom: true };
+  if (!content) return null;
+  const viewportTop = container.getBoundingClientRect().top;
+  const candidates = Array.from(content.children).flatMap((element) => {
+    if (!(element instanceof HTMLElement) || !element.dataset.entryId) return [];
+    const rect = element.getBoundingClientRect();
+    return [{ entryId: element.dataset.entryId, top: rect.top, bottom: rect.bottom }];
+  });
+  const anchor = findChatScrollAnchor(candidates, viewportTop);
+  if (!anchor) return null;
+  return { atBottom: false, ...anchor, oldestEntryId };
+}
+
 interface Props {
   session: SessionInfo | null;
   searchTarget?: { sessionId: string; entryId: string; blockIndex?: number } | null;
   onSearchTargetHandled?: (target: { sessionId: string; entryId: string }) => void;
   initialScrollPosition?: ChatScrollPosition | null;
+  /**
+   * 这个实例是不是当前可见的会话。保活 dock 用 `display:none` 藏非当前槽位，
+   * 而隐藏会把 `scrollTop`/`scrollHeight` 一并清成 0 —— 切回时得先把读者的
+   * 位置还回去，顶部加载器才不会把那个 0 当成“贴顶”。
+   */
+  active?: boolean;
   onScrollPositionChange?: (sessionId: string, position: ChatScrollPosition) => void;
   sessionRunning?: boolean;
   newSessionCwd: string | null;
@@ -237,7 +265,7 @@ function getUserInputText(message: AgentMessage): string | null {
 
 
 // memo：后台 dock 常驻渲染，非流式内容变更不应触发重渲
-export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, panel = false, onSideSession, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onDebugSnapshotReaderChange, background = false, dormant = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
+export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, active = true, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, panel = false, onSideSession, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onDebugSnapshotReaderChange, background = false, dormant = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const columnPadding = isMobile ? CHAT_COLUMN_PADDING_MOBILE : CHAT_COLUMN_PADDING;
@@ -704,30 +732,67 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (!sessionId || !onScrollPositionChange || !container || !content) return;
     return () => {
       if (pendingScrollRestoreRef.current) return;
-      if (isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)) {
-        onScrollPositionChange(sessionId, { atBottom: true });
-        return;
-      }
-      const viewportTop = container.getBoundingClientRect().top;
-      const candidates = Array.from(content.children).flatMap((element) => {
-        if (!(element instanceof HTMLElement) || !element.dataset.entryId) return [];
-        const rect = element.getBoundingClientRect();
-        return [{ entryId: element.dataset.entryId, top: rect.top, bottom: rect.bottom }];
-      });
-      const anchor = findChatScrollAnchor(candidates, viewportTop);
-      if (!anchor) return;
-      onScrollPositionChange(sessionId, {
-        atBottom: false,
-        ...anchor,
-        oldestEntryId: searchHistoryRef.current.historyCursor,
-      });
+      const position = readScrollPosition(container, content, searchHistoryRef.current.historyCursor);
+      if (position) onScrollPositionChange(sessionId, position);
     };
   }, [loading, onScrollPositionChange, scrollContainerRef, session?.id]);
+
+  // 保活槽被 `display:none` 藏起来时，浏览器会把 scrollTop 与 scrollHeight 一起清成 0。
+  // 切回的第一帧就得把读者那一行写回去：顶部加载器只认 scrollTop，晚一帧就会把那个 0
+  // 当成“读者贴顶”，于是一页接一页地自动读到顶。
+  const savedScrollRef = useRef<ChatScrollPosition | null>(null);
+  const scrollRestoringRef = useRef(false);
+  const wasActiveRef = useRef(active);
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    const content = messageContentRef.current;
+    const wasActive = wasActiveRef.current;
+    wasActiveRef.current = active;
+    if (!container) return;
+    if (!active) {
+      if (!wasActive || pendingScrollRestoreRef.current) return;
+      // 这一帧容器多半已经 `display:none`（0/0/0 会被读成“贴尾”），
+      // 那就用滚动时记下的那一份；只有它还量得出高度时才现量。
+      const measured = container.clientHeight > 0
+        ? readScrollPosition(container, content, searchHistoryRef.current.historyCursor)
+        : null;
+      savedScrollRef.current = measured ?? liveScrollRef.current;
+      return;
+    }
+    if (wasActive) return;
+    const saved = savedScrollRef.current;
+    if (!saved) return;
+    liveScrollRef.current = saved;
+    // 还原期间别让顶部加载器插手，也别让贴底跟随把位置改掉。
+    scrollRestoringRef.current = true;
+    if (saved.atBottom || !content) {
+      container.scrollTop = container.scrollHeight;
+    } else {
+      const anchorEntryId = saved.anchorEntryId;
+      const anchorOffset = saved.anchorOffset;
+      const anchor = Array.from(content.children).find((child): child is HTMLElement => (
+        child instanceof HTMLElement && child.dataset.entryId === anchorEntryId
+      ));
+      if (anchor) {
+        container.scrollTop += (anchor.getBoundingClientRect().top - container.getBoundingClientRect().top) - anchorOffset;
+      } else {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+    const frame = requestAnimationFrame(() => { scrollRestoringRef.current = false; });
+    return () => cancelAnimationFrame(frame);
+  }, [active, scrollContainerRef]);
 
   useEffect(() => {
     if (searchTarget) setPendingScrollRestore(null);
   }, [searchTarget]);
 
+  // 保活槽用 `display:none` 藏起来时，浏览器会把 scrollTop 与 scrollHeight 一起清成 0。
+  // 所以得在它还可见时就知道读者停在哪 —— 每次滚动记一份，隐藏那一帧用记下的这份。
+  const liveScrollRef = useRef<ChatScrollPosition | null>(null);
+  // 监听器里要看到“此刻可见吗”，用 ref 而不是闭包里的旧 prop。
+  const activeRef = useRef(active);
+  activeRef.current = active;
   // 贴底与否只听滚动：官方 scroller 的跟随状态跟着它走。
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -738,6 +803,29 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     update();
     container.addEventListener("scroll", update, { passive: true });
     return () => container.removeEventListener("scroll", update);
+  }, [scrollContainerRef, session?.id, loading]);
+
+  // 同一批滚动事件里再记一份“读者停在哪”：保活槽一被 `display:none` 藏起，
+  // scrollTop 与 scrollHeight 会一起被清成 0，那时候再量就只能量到 0。
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    let frame = 0;
+    const remember = () => {
+      frame = 0;
+      if (!activeRef.current || container.clientHeight === 0) return;
+      liveScrollRef.current = readScrollPosition(container, messageContentRef.current, searchHistoryRef.current.historyCursor);
+    };
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(remember);
+    };
+    remember();
+    container.addEventListener("scroll", schedule, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", schedule);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [scrollContainerRef, session?.id, loading]);
 
   // Expanding a collapsed thinking row or tool card grows the content. While
@@ -925,6 +1013,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     /** 离顶多远仍算“贴顶”：触摸惯性带小数，滚不到绝对 0。 */
     const TOP_SLACK = 24;
     const attempt = () => {
+      // 隐藏的槽位，以及正在写回位置的这一帧，都不算读者贴顶。
+      if (scrollRestoringRef.current || !activeRef.current) return;
       if (container.scrollTop > TOP_SLACK) return;
       // Skip while a page is loading or the last one is still rendering.
       if (loadingOlderRef.current || pageRenderingRef.current) return;
@@ -1634,7 +1724,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return { rendered, liveActivityRendered };
   }, [messages, entryIds, toolResultsMap, hasEarlierMessages, streamState.isStreaming, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
-     sessionIdRef, handleFork, handleEditContent, onOpenFile, onOpenSubagent,
+     sessionIdRef, forkFromMessage, handleEditContent, onOpenFile, onOpenSubagent,
      isNew, messageRefs, lastUserMsgRef, bashRunning, editEntryId, cancelEdit]);
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
   const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);

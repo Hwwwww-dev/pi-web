@@ -107,7 +107,8 @@ interface Props {
   onOpenSubagent?: (sessionId: string, label: string) => void;
   entryId?: string;
   searchBlock?: AssistantContentBlock;
-  onFork?: (entryId: string) => void;
+  /** `message` 按输入框的方式取回：pi 的 /fork 把被 fork 的消息放进编辑器。 */
+  onFork?: (entryId: string, message: UserMessage) => void;
   forking?: boolean;
   onEditContent?: (message: UserMessage, entryId: string) => void;
   onCancelEdit?: () => void;
@@ -262,7 +263,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   entryId?: string;
-  onFork?: (entryId: string) => void;
+  onFork?: (entryId: string, message: UserMessage) => void;
   forking?: boolean;
   onEditContent?: (message: UserMessage, entryId: string) => void;
   onCancelEdit?: () => void;
@@ -446,7 +447,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               type="button"
               variant="ghost"
               size="icon-xs"
-              onClick={() => { onFork!(entryId!); }}
+              onClick={() => { onFork!(entryId!, editTarget); }}
               disabled={forking}
               title={forking ? t("i18n.creatingSession") : t("i18n.newSessionTitle")}
               aria-label={t("i18n.newSession")}

@@ -2736,6 +2736,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     <ChatWindow
                       key={`${slot.session.id}:${slot.epoch}`}
                       session={slot.session}
+                      active={isActive}
                       background={!isActive}
                       dormant={dormantSlotIds.has(slot.session.id)}
                       sessionRunning={runningSessionIds.has(slot.session.id)}

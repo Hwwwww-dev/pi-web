@@ -14,7 +14,9 @@ const hook = (name, includes) => nodes.find((node) => ts.isCallExpression(node)
   && node.expression.getText(source) === name
   && node.arguments[0].getText(source).includes(includes));
 const compile = (node) => new Script(ts.transpileModule(`(${node.getText(source)})`, { compilerOptions: { target: ts.ScriptTarget.ESNext } }).outputText);
-const effect = hook("useEffect", "addEventListener(\"scroll\"");
+// 顶部哨兵：它自己注册的 scroll 监听与 TOP_SLACK 是这段代码独有的标记（另有贴底跟随的
+// scroll 监听），只按 "addEventListener(\"scroll\"" 找会抓到那一段。
+const effect = hook("useEffect", "TOP_SLACK");
 assert.ok(effect, "missing the sentinel effect");
 const [body] = effect.arguments;
 const script = compile(body);
@@ -40,6 +42,12 @@ function mount({ hasEarlierMessages, landed = true }) {
     loadingOlderRef: { current: false }, pageRenderingRef: { current: false }, pageRenderWaitersRef: { current: [] },
     setOlderPageState: () => {}, prevScrollDistanceRef: { current: null }, requestedCursorRef: { current: null },
     scrollAnchorRef: { current: null }, messageContentRef: { current: null },
+    // 组件里这两个 ref 分别挡住“隐藏槽位”和“正在写回滚动位置的那一帧”，测试里默认都在可见、已还原的状态。
+    activeRef: { current: true }, scrollRestoringRef: { current: false },
+    liveScrollRef: { current: null },
+    readScrollPosition: () => ({ atBottom: true }),
+    isScrollAtTail: () => false,
+    setAtTail: () => {},
     captureScrollAnchor: () => ({ top: 0, height: 0 }), holdScrollAnchor: () => () => {},
     hasEarlierMessages, historyCursor: "older", session: { id: "a" }, sessionIdRef: { current: "a" }, activeLeafId: "leaf",
     captureScrollDistance, getNextVisibleCount,
