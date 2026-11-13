@@ -143,6 +143,21 @@ function hasUsage(usage: SessionUsageSummary | undefined): usage is SessionUsage
   return Boolean(usage && (usage.tokens.total > 0 || usage.totalActiveMs > 0));
 }
 
+/** 用量层装载期的整行骨架：头像/标题/副行/用量全部占位，右侧状态与行按钮
+ *  不渲染——stats 到位后整行真实内容一次性替换，不出现半真半假的中间态。 */
+function AgentRowSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex min-h-14 items-center gap-2.5 rounded-md px-2 py-2 pr-0.5">
+      <Skeleton className="size-6 shrink-0 rounded-full" />
+      <span className="min-w-0 flex-1">
+        <Skeleton className="block h-3 w-32" />
+        <Skeleton className="mt-1 block h-3 w-44" />
+        <Skeleton className="mt-[3px] block h-4 w-44" />
+      </span>
+    </div>
+  );
+}
+
 function sessionTitle(session: SessionInfo): string {
   return session.name || session.firstMessage || session.id.slice(0, 12);
 }
@@ -499,6 +514,13 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
         </div>
       )}
       <div className="max-h-[min(58dvh,480px)] overflow-y-auto p-1">
+        {/* 用量层装载期整行骨架；真实行（含运行中状态与行按钮）等 stats 到位后一起出现。 */}
+        {!usageLoaded ? (
+          Array.from({ length: 1 + visibleSubagents.length }, (_, i) => (
+            <AgentRowSkeleton key={i} />
+          ))
+        ) : (
+          <>
         <AgentRow
           session={rootSession}
           main
@@ -540,6 +562,8 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
             onDeleteCancel={() => setConfirmDeleteSideChatId(null)}
           />
         ))}
+          </>
+        )}
         {subagents.length > 0 && visibleSubagents.length === 0 && (
           <div className="px-3 py-[18px] text-center text-xs text-muted-foreground">
             {t("agentSwitcher.noMatches")}
