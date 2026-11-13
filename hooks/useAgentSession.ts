@@ -3268,7 +3268,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const wasRunning = statsWasRunningRef.current;
     statsWasRunningRef.current = agentRunning;
     if (agentRunning) {
-      const timer = setInterval(() => refreshStatsRef.current?.(), 3_000);
+      const timer = setInterval(() => {
+        // 后台标签页不轮询（子代理面板的 stats 轮询早有此守卫）；回到前台时
+        // 下一个 tick 或 agent_settled 的读数补上。
+        if (document.visibilityState === "visible") refreshStatsRef.current?.();
+      }, 3_000);
       return () => clearInterval(timer);
     }
     if (!wasRunning) return;

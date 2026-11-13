@@ -256,8 +256,8 @@
    the opaque status bar (statusBarStyle: "black") squeezes the layout down
    the same way. In standalone mode there is no browser toolbar to make vh
    unstable, and vh includes that missing strip.
-   The keyboard hook temporarily overrides this custom property with
-   visualViewport.height while an editor is focused. */@media (display-mode: standalone) {
+   The viewport hook never writes this custom property; it only maintains
+   html[data-keyboard-open] for the safe-area and extra-keys rules. */@media (display-mode: standalone) {
   :root {
     --app-viewport-height: 100dvh;
   }
