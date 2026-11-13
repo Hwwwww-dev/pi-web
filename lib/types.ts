@@ -90,6 +90,8 @@ export interface AssistantMessage {
   /** From `timestamp` until the response ended, measured by pi (pi 1.1); absent for older messages. */
   durationMs?: number;
   usage?: AgentUsage;
+  /** UI stamp（lib/session-reader.ts）：这条回复当时生效的思考等级（随 thinking_level_change 条目前向携带）。 */
+  thinkingLevel?: string;
 }
 
 export interface ToolResultMessage {

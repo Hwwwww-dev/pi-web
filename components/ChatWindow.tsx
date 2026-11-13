@@ -1667,7 +1667,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             <TurnMetaLine
               usage={turnUsage}
               model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
-              thinkingLevel={thinkingLevel}
+              thinkingLevel={turnLastAssistant?.thinkingLevel ?? thinkingLevel}
               time={formatTime(turnLastAssistant?.timestamp)}
               timestamp={turnLastAssistant?.timestamp}
               copySource={finalAnswerCopyText || undefined}

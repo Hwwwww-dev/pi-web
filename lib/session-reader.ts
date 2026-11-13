@@ -778,9 +778,14 @@ export function buildSessionContext(
   // Convert messages and their IDs together to keep fork/navigation targets aligned.
   const messages: AgentMessage[] = [];
   const entryIds: string[] = [];
+  // 前向携带思考等级（thinking_level_change 条目）：stamp 到助手消息上，
+  // UI 才能显示每回合当时跑的等级，而不是只有当前值。
+  let thinkingLevel: string | undefined;
   for (const entry of sliced) {
+    if (entry.type === "thinking_level_change") thinkingLevel = entry.thinkingLevel;
     const m = entryToUiMessage(entry, options);
     if (m) {
+      if (thinkingLevel !== undefined && m.role === "assistant") m.thinkingLevel = thinkingLevel;
       messages.push(m);
       entryIds.push(entry.id);
     }
