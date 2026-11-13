@@ -775,10 +775,13 @@ function HeaderListEditor({ headers, onChange }: {
       {rows.map((row) => (
         <div key={row.id} className="flex gap-1.5">
           <Input value={row.name} onChange={(e) => setEntry(row.id, { name: e.target.value })}
+            aria-label={t("models.headerName")}
             placeholder="Header-Name" className={cn(inputClass, "flex-1 font-mono")} />
           <Input value={row.value} onChange={(e) => setEntry(row.id, { value: e.target.value })}
+            aria-label={t("models.headerValue")}
             placeholder="value" className={cn(inputClass, "flex-1 font-mono")} />
           <Button variant="ghost" size="icon-xs"
+            aria-label={t("models.removeHeader")}
             onClick={() => removeEntry(row.id)}
             className="text-destructive hover:text-destructive">
             <XIcon size={12} strokeWidth={1.8} />
