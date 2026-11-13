@@ -83,69 +83,6 @@
   overflow-wrap: anywhere;
   padding: 3px 6px;
 }
-/* shadcn nova 风格类（vendor 自 ui 仓库 apps/v4/registry/styles/style-nova.css）：
-   仅 trace / code-block 使用该层。 */
-@layer components {
-  /* Trace */
-  .cn-trace {
-    @apply gap-2 *:has-[>[data-slot=trace-line]]:rounded-md *:has-[>[data-slot=trace-line]]:focus-visible:ring-3 *:has-[>[data-slot=trace-line]]:focus-visible:ring-ring/50;
-  }
-  .cn-trace-collapsible-trigger {
-    @apply gap-1 rounded-md focus-visible:ring-3 focus-visible:ring-ring/50;
-  }
-  .cn-trace-line {
-    @apply gap-2 text-sm;
-  }
-  .cn-trace-icon {
-    @apply size-4 [&_svg:not([class*='size-'])]:size-4 [[data-slot=trace-title]~&]:-ml-1;
-  }
-  .cn-trace-collapsible-content {
-    @apply duration-200;
-  }
-  .cn-trace-collapsible-content-inner {
-    @apply mt-2 mb-1 border-l pr-1 pl-4 leading-relaxed;
-    /* 写在此处而非 @apply 任意值：Tailwind 的 [] 内不能含空格，而 calc 运算符要求两侧空格。 */
-    margin-left: calc(var(--spacing) * 2 - 1px);
-  }
-
-  /* Code Block */
-  .cn-code-block {
-    @apply rounded-lg text-sm data-[size=sm]:text-xs has-[>[data-slot=code-block-content]:focus-visible]:ring-3 has-[>[data-slot=code-block-content]:focus-visible]:ring-ring/50;
-  }
-  .cn-code-block-variant-default {
-    @apply border border-input text-foreground dark:bg-input/30 has-[>[data-slot=code-block-content]:focus-visible]:border-ring;
-  }
-  .cn-code-block-variant-destructive {
-    @apply border border-destructive/30 text-destructive dark:border-destructive/40;
-  }
-  .cn-code-block-header {
-    @apply gap-2 px-3 pt-3 text-muted-foreground group-data-[variant=destructive]/code-block:text-destructive group-data-[size=sm]/code-block:px-2.5 group-data-[size=sm]/code-block:pt-2.5;
-  }
-  .cn-code-block-footer {
-    @apply gap-2 px-3 pb-3 text-muted-foreground group-data-[size=sm]/code-block:px-2.5 group-data-[size=sm]/code-block:pb-2.5;
-  }
-  .cn-code-block-title {
-    @apply font-sans text-sm font-medium text-foreground group-data-[variant=destructive]/code-block:text-destructive *:[svg]:me-1.5 [&_svg:not([class*='size-'])]:size-3.5 group-data-[size=sm]/code-block:text-xs;
-  }
-  .cn-code-block-actions {
-    @apply -my-1 -me-1.5 gap-1 [[data-slot=code-block]>&]:m-0 [[data-slot=code-block]>&]:top-2 [[data-slot=code-block]>&]:end-2 group-data-[size=sm]/code-block:[[data-slot=code-block]>&]:top-1.5 group-data-[size=sm]/code-block:[[data-slot=code-block]>&]:end-1.5 [[data-slot=code-block]>&]:*:[button]:bg-background [[data-slot=code-block]>&]:*:[button]:ring-1 [[data-slot=code-block]>&]:*:[button]:ring-foreground/10;
-  }
-  .cn-code-block-content {
-    @apply px-3 py-3 leading-relaxed group-has-data-[slot=code-block-header]/code-block:pt-2 group-has-data-[slot=code-block-footer]/code-block:pb-2 group-data-[size=sm]/code-block:px-2.5 group-data-[size=sm]/code-block:py-2.5 group-data-[size=sm]/code-block:group-has-data-[slot=code-block-header]/code-block:pt-1.5;
-  }
-  .cn-code-block-line {
-    @apply -mx-3 px-3 in-data-numbered:gap-x-3 before:min-w-6 before:text-end before:text-muted-foreground after:start-1 after:text-muted-foreground group-data-[size=sm]/code-block:-mx-2.5 group-data-[size=sm]/code-block:px-2.5;
-  }
-  .cn-code-block-line-variant-highlighted {
-    @apply bg-muted;
-  }
-  .cn-code-block-line-variant-added {
-    @apply bg-muted after:content-['+'];
-  }
-  .cn-code-block-line-variant-removed {
-    @apply bg-destructive/10 after:text-destructive after:content-['−'];
-  }
-}
 
 /* File viewer source rows: the row under the pointer takes a faint tint so a
    long line can be followed across the panel. The sticky gutter keeps its own
@@ -326,15 +263,6 @@
   }
 }
 
-.catppuccin-file-icon {
-  display: block;
-  flex-shrink: 0;
-  background: center / contain no-repeat var(--catppuccin-icon-light);
-}
-html.dark .catppuccin-file-icon {
-  background-image: var(--catppuccin-icon-dark);
-}
-
 /* iOS standalone PWA 的键盘会直接缩小 WKWebView 边界（clientHeight 844→508）。
    键盘期把 html/body/.app-shell 高度钉在全高水位（--keyboard-full-height，px 常量，
    hooks/useViewportHeight.ts 写入）：文档因此比缩小后的视口多出键盘那一截，iOS
@@ -361,21 +289,6 @@ html[data-keyboard-open] body {
 
 html[data-keyboard-open] .app-shell {
   height: var(--keyboard-full-height, 100dvh);
-}
-
-/* Use the SVG alpha channel as a mask so file icons follow the app's
-   restrained text palette instead of Catppuccin's language-specific colors. */
-@supports (mask-image: url("mask.svg")) or (-webkit-mask-image: url("mask.svg")) {
-  .catppuccin-file-icon {
-    background: var(--muted-foreground);
-    mask: center / contain no-repeat var(--catppuccin-icon-light);
-    -webkit-mask: center / contain no-repeat var(--catppuccin-icon-light);
-  }
-  html.dark .catppuccin-file-icon {
-    background: var(--muted-foreground);
-    mask-image: var(--catppuccin-icon-dark);
-    -webkit-mask-image: var(--catppuccin-icon-dark);
-  }
 }
 
 /* Theme toggle: circular wipe via View Transitions API.
@@ -1264,13 +1177,6 @@ pre, code {
   color: var(--primary);
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-/* syntax highlighter line numbers */
-.markdown-body span.linenumber,
-span.linenumber {
-  color: var(--muted-foreground) !important;
-  font-style: normal !important;
 }
 
 /* Prism's markdown table tokens collide with Tailwind's display utility. */
