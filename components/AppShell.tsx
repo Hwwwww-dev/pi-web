@@ -19,8 +19,8 @@ import {
   PanelRightIcon,
   PenLineIcon,
   ShieldAlertIcon,
+  SlidersHorizontalIcon,
   SunIcon,
-  WrenchIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Skeleton } from "./ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
@@ -2073,10 +2074,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         // 此处仅负责定位（贴触发钮右缘）、宽度（AGENT_PANEL_WIDTH）与 z-500（高于引用工具栏）。
         align="end"
         sideOffset={8}
-        className="z-[500] mt-0 w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
+        className="z-[500] mt-0 min-h-[300px] w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
         style={{ "--agent-panel-width": `${AGENT_PANEL_WIDTH}px` } as React.CSSProperties}
       >
-        {activeSessionFamily && selectedSession && (
+        {activeSessionFamily && selectedSession ? (
+          /* 真内容淡入，不硬切：骨架→内容的替换读作过渡而非炸开。 */
+          <div className="animate-in fade-in-0 duration-200" key={selectedSession.id}>
           <AgentSessionPanel
             rootSession={activeSessionFamily.root}
             subagents={activeSessionFamily.subagents}
@@ -2088,6 +2091,20 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             onNewSideChat={() => handleNewSideChat(activeSessionFamily.root.id)}
             onDeleteSideChat={(sessionId) => handleDeleteSideChat(sessionId, activeSessionFamily.root)}
           />
+          </div>
+        ) : (
+          /* 家族装载前的骨架行：此前弹层完全空白，数据到位后整块炸开。 */
+          <div className="flex flex-col gap-2 p-3" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="flex items-center gap-3">
+                <Skeleton className="size-8 shrink-0 rounded-full" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <Skeleton className="h-3.5 w-2/5" />
+                  <Skeleton className="h-3 w-1/4" />
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </PopoverContent>
     </Popover>
@@ -2196,7 +2213,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             className="gap-2"
             data-mobile-toolbar-action={mobile ? "tools" : undefined}
           >
-            <WrenchIcon
+            <SlidersHorizontalIcon
               className={cn(
                 "size-3.5 shrink-0",
                 systemTools?.some((tool) => tool.active) ? "text-primary" : "text-muted-foreground",
@@ -2281,12 +2298,23 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     const tokens = sessionStats?.tokens;
     const cost = sessionStats?.cost ?? 0;
 
-    // Same thresholds as the old contextColor, as tone classes.
+    // Same thresholds as the old contextColor, as tone classes. The neutral
+    // case sets nothing: the chip's own color applies (muted when closed,
+    // foreground once the session panel is open), so the ctx number lights up
+    // with the rest instead of staying pinned gray.
     const contextTone = contextUsage?.contextWindow && contextUsage.percent !== null
       ? (contextUsage.percent > 90
         ? "text-destructive"
-        : contextUsage.percent > 70 ? "text-warning" : "text-muted-foreground")
-      : "text-muted-foreground";
+        : contextUsage.percent > 70 ? "text-warning" : undefined)
+      : undefined;
+
+    // The ctx segment prints the actual prompt size, not a percent: 131.9k /
+    // 1.0M. Percent survives only as the fallback while tokens are unknown.
+    const ctxText = contextUsage?.contextWindow
+      ? contextUsage.tokens != null
+        ? formatCompactCount(contextUsage.tokens)
+        : contextUsage.percent !== null ? `${contextUsage.percent.toFixed(1)}%` : "?"
+      : "?";
 
     const tooltipParts: string[] = [];
     if (tokens) {
@@ -2326,7 +2354,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
             {contextUsage?.contextWindow && contextUsage.percent !== null && (
               <span className={cn("text-xs", contextTone)}>
-                <span className="opacity-75">ctx</span> {contextUsage.percent.toFixed(1)}%
+                <span className="opacity-75">ctx</span> {ctxText}
               </span>
             )}
             {cost > 0 && (
@@ -2365,7 +2393,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         {cost > 0 && <span>{`$${cost >= 0.01 ? cost.toFixed(2) : cost.toFixed(4)}`}</span>}
         {contextUsage?.contextWindow && (
           <span className="inline-flex items-center gap-1">
-            <span className={contextTone}>{contextUsage.percent !== null ? `${contextUsage.percent.toFixed(1)}%` : "?"}</span>
+            <span className={contextTone}>{ctxText}</span>
             <span aria-hidden="true" className="text-muted-foreground">/</span>
             <span>{formatCompactCount(contextUsage.contextWindow)}</span>
             <Progress
@@ -2448,7 +2476,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       </div>
     </Sidebar>
     <SidebarInset
-      className="h-full min-w-0 overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] min-[641px]:h-[calc(100dvh-16px)]"
+      className="h-full min-w-0 overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] min-[641px]:h-[calc(100dvh-16px)] min-[641px]:ring-1 min-[641px]:ring-border"
     >
         {/* Top bar with sidebar toggle */}
         {/* Verified 2026-09-23: without a sticky top bar iOS reinstates the

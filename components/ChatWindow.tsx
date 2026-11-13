@@ -799,9 +799,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 监听器需读取当前可见状态，故用 ref 而非闭包中的旧 prop。
   const activeRef = useRef(active);
   activeRef.current = active;
-  // 跟随状态仅由滚动决定，判定交给 `shouldFollow`：方向优先于容差（上滑超过
-  // 4px 抖动死区即脱离），内容收缩或视口长高导致的 scrollTop 钳制不算上滑。
-  // 16px 贴底容差只用于“回到最新”按钮。
+  // 跟随状态仅由滚动决定，判定交给 `shouldFollow`：同帧伴随高度变化的上移
+  // 是滚动锚定调整不算上滑，纯手势回拉立即脱离；16px 贴底容差只用于“回到最新”
+  // 按钮。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -1674,15 +1674,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
   const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
   const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
-  if (loading) {
-    return (
-      <div className="flex h-full flex-col justify-center gap-3 px-10">
-        <Skeleton className="h-4 w-2/5" />
-        <Skeleton className="h-4 w-3/5" />
-        <Skeleton className="h-4 w-1/2" />
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -1758,7 +1749,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         {extensionCustomUi && (
           <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} waitingCount={waitingExtensionCustomUiCount} onInput={sendExtensionCustomInput} />
         )}
-        {!isEmptyNew && <>
+        {!isEmptyNew && (loading ? (
+          // 加载骨架占据消息列表区：顶栏与输入框照常渲染（此前整个布局被三根
+          // 小条替换，用户反馈“小气而且不对”）。宽度参仿一段对话。
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-[var(--chat-column-padding,40px)] pt-[22px] max-sm:px-6 max-sm:pt-4">
+            <Skeleton className="h-4 w-[38%]" />
+            <Skeleton className="h-4 w-[55%]" />
+            <Skeleton className="h-4 w-[92%]" />
+            <Skeleton className="h-4 w-[80%]" />
+            <Skeleton className="h-4 w-[60%]" />
+            <Skeleton className="h-4 w-[45%]" />
+          </div>
+        ) : <>
         <MessageScrollerProvider autoScroll={false} defaultScrollPosition="end">
         <FollowTailWhenAtTail atTail={atTail && !foldInFlight} contentRef={messageContentRef} viewportRef={scrollContainerRef} />
         <MessageScroller className="min-h-0 min-w-0 flex-1">
@@ -1863,7 +1865,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             turnIndex={minimapTurnIndex}
           />
         )}
-        </>}
+        </>)}
       </div>
 
       {quoteSelectionEnabled && quotedSelection && createPortal(

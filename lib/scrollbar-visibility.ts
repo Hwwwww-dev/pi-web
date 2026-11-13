@@ -21,7 +21,9 @@
  * fresh. Programmatic scrolling carries no gesture stamp and never lights.
  */
 const HIDE_DELAY_MS = 700;
-const FADE_MS = 400;
+/** 亮起要快（手势即刻反馈）；淡出保留慢节奏。 */
+const FADE_IN_MS = 120;
+const FADE_OUT_MS = 400;
 /** Wheel/keys: momentumless, so a short window suffices. */
 const WHEEL_SCROLL_WINDOW_MS = 200;
 /** Touch: momentum scrolling continues after the last touchmove. */
@@ -53,7 +55,8 @@ export function installGlobalScrollbarVisibility(): void {
   const tick = (now: number) => {
     frame = 0;
     for (const [element, fade] of fades) {
-      const progress = Math.min(1, (now - fade.start) / FADE_MS);
+      const duration = fade.to === 0 ? FADE_OUT_MS : FADE_IN_MS;
+      const progress = Math.min(1, (now - fade.start) / duration);
       const alpha = fade.from + (fade.to - fade.from) * easeInOut(progress);
       if (progress >= 1) {
         if (fade.to === 0) {

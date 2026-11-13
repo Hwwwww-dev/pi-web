@@ -837,6 +837,12 @@ export const zhCNLocale: LocalePlugin = {
     "chat.queueBehaviorFollowUp": "排队",
     "chat.sideChat": "侧聊",
     "chat.sideChatHint": "在侧聊里问，不影响正在运行的任务",
+    "chat.actionSendNow": "立即发送",
+    "chat.actionSendNowHint": "打断当前回合，立即发送这条",
+    "chat.actionSteer": "引导",
+    "chat.actionSteerHint": "不打断，把这条注入当前回合",
+    "chat.actionQueue": "队列",
+    "chat.actionQueueHint": "排队，下一轮自动发出",
     "chat.steer": "引导",
 
     "chatMinimap.turnTokens": "{tokens} Token",

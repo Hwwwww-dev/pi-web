@@ -837,6 +837,12 @@ export const zhTWLocale: LocalePlugin = {
     "chat.queueBehaviorFollowUp": "排隊",
     "chat.sideChat": "側聊",
     "chat.sideChatHint": "在側聊裡問，不影響正在執行的任務",
+    "chat.actionSendNow": "立即發送",
+    "chat.actionSendNowHint": "打斷當前回合，立即發送這條",
+    "chat.actionSteer": "引導",
+    "chat.actionSteerHint": "不打斷，把這條注入當前回合",
+    "chat.actionQueue": "佇列",
+    "chat.actionQueueHint": "排隊，下一輪自動發出",
     "chat.steer": "引導",
 
     "chatMinimap.turnTokens": "{tokens} Token",

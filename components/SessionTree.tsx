@@ -1298,7 +1298,6 @@ const PlainRowView = memo(function PlainRowView({
           >
             <ArchiveIcon size={12} className="size-3 shrink-0" />
             <span className="session-tree-footer-label min-w-0 flex-1 truncate whitespace-nowrap">{t("sidebar.archivedCount", { count: row.count })}</span>
-            <ChevronRightIcon size={10} className="session-tree-footer-chevron size-2.5 shrink-0" />
           </Button>
         </div>
       );

@@ -837,6 +837,12 @@ export const enLocale: LocalePlugin = {
     "chat.queueBehaviorFollowUp": "Queued",
     "chat.sideChat": "Side chat",
     "chat.sideChatHint": "Ask this in a side chat. The run keeps going.",
+    "chat.actionSendNow": "Send now",
+    "chat.actionSendNowHint": "Abort the current run and send this immediately",
+    "chat.actionSteer": "Steer",
+    "chat.actionSteerHint": "Inject this into the running turn without aborting",
+    "chat.actionQueue": "Queue",
+    "chat.actionQueueHint": "Queue this for the next turn",
     "chat.steer": "Steer",
 
     "chatMinimap.turnTokens": "{tokens} tokens",

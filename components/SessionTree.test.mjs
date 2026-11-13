@@ -421,7 +421,8 @@ test("show more, empty groups, footer links and archive groups", () => {
   assert.doesNotMatch(archiveHeader, /New session/);
   assert.match(rowMarkup(html, "archive:/work/old"), /aria-expanded="false" title="\/work\/old"><svg[^>]*class="lucide[^"]*"/);
   assert.match(rowMarkup(html, "footer-open"), /<button [^>]*class="[^"]*session-tree-footer-button[^"]*"[^>]*><svg[^>]*>[\s\S]*?<\/svg><span class="[^"]*session-tree-footer-label[^"]*">Open another project…<\/span><\/button>/);
-  assert.match(rowMarkup(html, "footer-archived"), /<span class="[^"]*session-tree-footer-label[^"]*">Archived · 4<\/span><svg[^>]*class="lucide[^"]*session-tree-footer-chevron[^"]*"/);
+  assert.match(rowMarkup(html, "footer-archived"), /<span class="[^"]*session-tree-footer-label[^"]*">Archived · 4<\/span><\/button>/);
+  assert.doesNotMatch(rowMarkup(html, "footer-archived"), /session-tree-footer-chevron/);
 });
 
 test("loading replaces the rows; the empty label shows only without session, group or archive-group rows", () => {

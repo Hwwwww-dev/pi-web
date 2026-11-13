@@ -116,7 +116,7 @@ test("mobile statistics collapse to a context+cost chip with the rest in the pop
   assert.doesNotMatch(source, /@container \(max-width: 220px\)/);
   assert.doesNotMatch(source, /@container \(max-width: 158px\)/);
   assert.doesNotMatch(source, /@container \(max-width: 88px\)/);
-  assert.match(source, /<span className="opacity-75">ctx<\/span> \{contextUsage\.percent\.toFixed\(1\)\}%/);
+  assert.match(source, /<span className="opacity-75">ctx<\/span> \{ctxText\}/);
   assert.match(source, /cost >= 0\.01 \? `\$\$\{cost\.toFixed\(2\)\}`/);
   // Hover paint stays off touch devices: the hover: variant is media-gated
   // (@media (hover: hover)) now that the canHover JS guards went with the

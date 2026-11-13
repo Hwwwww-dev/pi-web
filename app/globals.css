@@ -1333,7 +1333,9 @@ span.token.table {
     height: calc(var(--app-viewport-height, 100dvh) - 16px);
     margin: 8px 8px 8px 0;
     border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-sm);
+    /* ring 细边在暗色下是主面板唯一的可见边缘：阴影在近黑背景上不可见（浅色
+       靠 shadow-sm 读出卡片边缘，暗色下完全消失）。 */
+    box-shadow: 0 0 0 1px var(--border), var(--shadow-sm);
   }
   .right-panel-container.right-panel-open {
     width: var(--right-panel-width, clamp(360px, 42vw, 640px));

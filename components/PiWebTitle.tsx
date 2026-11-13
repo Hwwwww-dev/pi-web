@@ -8,8 +8,8 @@ import { useI18n } from "@/hooks/useI18n";
  * The sidebar's brand with the files below the sessions (its toolbar row,
  * components/SessionSidebar.tsx; the tabs layout has its tabs there). It
  * shows the logo, not the name: a click swaps it for the versions (pi-web's,
- * a "p", pi's) in the accent, scrambled into place; they give way to the
- * logo again after VERSION_SHOWN_MS, or at once on a second click.
+ * a "p", pi's) in the foreground color, scrambled into place; they give way
+ * to the logo again after VERSION_SHOWN_MS, or at once on a second click.
  */
 
 export const BRAND_TEXT = "Pi Web";
@@ -121,7 +121,7 @@ export function PiWebTitle({ onWidthChange }: {
       type="button"
       variant="ghost"
       size="default"
-      className={`sidebar-brand ml-[7px] h-auto justify-start rounded-md px-1 py-0.5 text-left font-mono text-base font-bold tracking-[-0.01em] whitespace-nowrap cursor-default text-foreground${versionShown ? " min-w-[6ch] text-accent" : " min-w-0"}`}
+      className={`sidebar-brand ml-[7px] h-auto justify-start rounded-md px-1 py-0.5 text-left font-mono text-base font-bold tracking-[-0.01em] whitespace-nowrap cursor-default text-foreground${versionShown ? " min-w-[6ch]" : " min-w-0"}`}
       aria-label={t("sidebar.brandLabel", { app: appVersion ?? "0.0.0", pi: piVersion ?? "0.0.0" })}
       onClick={handleClick}
     >

@@ -130,7 +130,7 @@ test("a tool's context reading keeps its text and gains the hover card", () => {
   }));
 
   assert.match(html, /data-usage-seg="ctx"/);
-  assert.match(html, /ctx<\/span><span[^>]*>12\.3% \/ 200\.0k/);
+  assert.match(html, /ctx<\/span><span[^>]*>24\.5k \/ 200\.0k/);
   // The hover card's trigger is what carries the numbers; the card itself opens on hover.
   assert.match(html, /data-slot="hover-card-trigger"|href=""/, "");
 });
