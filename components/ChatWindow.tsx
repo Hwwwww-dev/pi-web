@@ -1228,11 +1228,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // upload into the working directory, never replacing a file already there,
   // and come back as @mentions. The composer's attach button takes the same
   // path, for phones that cannot drop files.
-  const uploadDroppedFiles = useCallback(async (files: File[]) => {
+  const uploadDroppedFiles = useCallback(async (files: File[]): Promise<boolean> => {
     const cwd = session?.cwd ?? newSessionCwd;
     if (!cwd) {
       addNotice({ type: "warning", message: t("chat.dropNeedsCwd") });
-      return;
+      return false;
     }
     try {
       const { status, data } = await uploadFiles(cwd, files, "skip");
@@ -1248,13 +1248,26 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       if (skipped.length > 0) {
         addNotice({ type: "warning", message: t("chat.dropAlreadyExists", { names: skipped.join(", ") }) });
       }
-      for (const failure of data.errors ?? []) {
-        addNotice({ type: "error", message: t("chat.dropFailed", { message: `${failure.name}: ${failure.error}` }) });
-      }
-    } catch (uploadError) {
-      addNotice({ type: "error", message: t("chat.dropFailed", { message: uploadError instanceof Error ? uploadError.message : String(uploadError) }) });
+                        for (const failure of data.errors ?? []) {
+                                addNotice({ type: "error", message: t("chat.dropFailed", { message: `${failure.name}: ${failure.error}` }) });
+                        }
+                        return true;
+                } catch (uploadError) {
+                        addNotice({ type: "error", message: t("chat.dropFailed", { message: uploadError instanceof Error ? uploadError.message : String(uploadError) }) });
+                        return false;
     }
-  }, [addNotice, chatInputRef, newSessionCwd, onFilesUploaded, session?.cwd, t]);
+        }, [addNotice, chatInputRef, newSessionCwd, onFilesUploaded, session?.cwd, t]);
+
+  // 大文案粘贴（DeepSeek 同款）：超过阈值的粘贴文本不进输入框，包成 TXT 走
+  // 同一条 drop 上传链（上传到工作目录 + @mention 引用）。上传失败把原文插回
+  // 输入框，文案不丢。
+  const onPasteLargeText = useCallback(async (text: string) => {
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const name = `pasted-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.txt`;
+    const ok = await uploadDroppedFiles([new File([text], name, { type: "text/plain" })]);
+    if (!ok) chatInputRef?.current?.insertText(text);
+  }, [chatInputRef, uploadDroppedFiles]);
 
   const onDrop = useCallback((items: DroppedItem[]) => {
     const { images, files, folders } = splitDroppedItems(items);
@@ -1314,6 +1327,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       onSideChat={onSideSession && !isHiddenRelation(session?.relation) ? askInSideChat : undefined}
       onFollowUp={agentRunning ? handleFollowUp : undefined}
       onSteer={agentRunning ? handleSteer : undefined}
+      onPasteLargeText={onPasteLargeText}
       onPromptWithStreamingBehavior={agentRunning ? handlePromptWithStreamingBehavior : undefined}
       isStreaming={sessionBusy}
       model={displayModelValue}
