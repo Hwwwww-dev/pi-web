@@ -19,7 +19,9 @@ import type { QueuedSnapshotEntry } from "./queued-submissions";
 import {
   createProjectCommandBashExtension,
   createProjectCommandBashOperations,
+  createProjectCommandPowerShellExtension,
   preferUserBashExtension,
+  preferUserPowerShellExtension,
 } from "./project-command-env";
 import { cacheSessionPath, catalogFirstMessage, getLatestModelChange, invalidateSessionListCache, invalidateSessionManagerCache, invalidateSessionPathCache, readLatestSessionEntryId, resolveSessionPath } from "./session-reader";
 import { computeLiveSessionTotalActiveMs } from "./session-timing";
@@ -3871,13 +3873,16 @@ export async function startRpcSession(
                 cwd: sessionCwd,
                 settings: settingsManager,
               }),
+              createProjectCommandPowerShellExtension({ cwd: sessionCwd }),
               createSubagentExtension(
                 SUBAGENT_CONTROLLER.extensionRuntime,
                 () => listSubagentProfiles(sessionCwd),
                 isBuiltInSubagentsEnabled,
               ),
             ],
-            extensionsOverride: (base) => preferUserBashExtension(preferPiWebSubagentExtension(base)),
+            extensionsOverride: (base) => preferUserPowerShellExtension(
+              preferUserBashExtension(preferPiWebSubagentExtension(base)),
+            ),
           },
       ...(trustReloadOptions ? { resourceLoaderReloadOptions: trustReloadOptions } : {}),
     });
