@@ -178,9 +178,9 @@ const GIT_STATUS_KEYS: Record<GitFileStatusKind, string> = {
   conflict: "files.conflict",
 };
 
-// Git 状态取色走 token 工具类（modified/amber→warning、added/untracked-green→success、
-// deleted/red→destructive、renamed/blue→primary），由状态键查类名，保持单一来源。
-// 徽标形态：10.5px/600 胶囊，底色 = 同色 15%（删除 10%），对齐草稿 .pm-git。
+// Git 状态取色统一走 token 工具类（modified→warning、added/untracked→success、
+// deleted→destructive、renamed→primary），按状态键查类名，保持单一来源。
+// 徽标形态：10.5px/600 胶囊，底色为同色 15%（删除 10%）。
 const GIT_STATUS_BADGE_CLASSES: Record<GitFileStatusKind, string> = {
   modified: "text-warning bg-warning/15",
   added: "text-success bg-success/15",
@@ -385,14 +385,14 @@ export function TreeNode({
         } : undefined}
         className={cn(
           "relative flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg pr-2 text-xs text-foreground",
-          // 拖拽目标虚线框优先于行悬停底色（hovered 态不触发于拖拽中，二者不冲突）
+          // 拖拽目标虚线框优先于行悬停底色；拖拽期间不触发 hovered，二者不冲突。
           isDropTarget &&
             "bg-accent/20 outline-1 outline-dashed outline-primary -outline-offset-1",
           !isDropTarget && hovered && "bg-sidebar-accent",
         )}
         style={{ paddingLeft: 4 + depth * 14 }} /* 树深度缩进为逐行计算值 */
       >
-        {/* 缩进线：每级一条 border-l，位置与行内缩进同一套树深度计算值 */}
+        {/* 缩进线：每级一条 border-l，位置与行内缩进共用同一树深度计算值 */}
         {Array.from({ length: depth }, (_, level) => (
           <span
             key={level}
@@ -1428,7 +1428,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
             <div aria-busy="true" className="flex flex-col gap-1.5 px-3 py-2">
               <span className="sr-only">{t("files.loading")}</span>
               {[0, 1, 2].map((row) => (
-                <Skeleton key={row} className="h-4 rounded-sm" style={{ width: `${72 - row * 16}%` }} /* 三行递减宽度示意树形 */ />
+                <Skeleton key={row} className="h-4 rounded-sm" style={{ width: `${72 - row * 16}%` }} /* 三行递减宽度以示意树形结构 */ />
               ))}
             </div>
           ) : error ? (

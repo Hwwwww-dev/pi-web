@@ -14,8 +14,8 @@ const hook = (name, includes) => nodes.find((node) => ts.isCallExpression(node)
   && node.expression.getText(source) === name
   && node.arguments[0].getText(source).includes(includes));
 const compile = (node) => new Script(ts.transpileModule(`(${node.getText(source)})`, { compilerOptions: { target: ts.ScriptTarget.ESNext } }).outputText);
-// 顶部哨兵：它自己注册的 scroll 监听与 TOP_SLACK 是这段代码独有的标记（另有贴底跟随的
-// scroll 监听），只按 "addEventListener(\"scroll\"" 找会抓到那一段。
+// 顶部哨兵：该 effect 的 scroll 监听与 TOP_SLACK 为这段代码独有的标记（另有贴底跟随的
+// scroll 监听），仅按 "addEventListener(\"scroll\"" 匹配会命中后者。
 const effect = hook("useEffect", "TOP_SLACK");
 assert.ok(effect, "missing the sentinel effect");
 const [body] = effect.arguments;
@@ -42,7 +42,7 @@ function mount({ hasEarlierMessages, landed = true }) {
     loadingOlderRef: { current: false }, pageRenderingRef: { current: false }, pageRenderWaitersRef: { current: [] },
     setOlderPageState: () => {}, prevScrollDistanceRef: { current: null }, requestedCursorRef: { current: null },
     scrollAnchorRef: { current: null }, messageContentRef: { current: null },
-    // 组件里这两个 ref 分别挡住“隐藏槽位”和“正在写回滚动位置的那一帧”，测试里默认都在可见、已还原的状态。
+    // 组件中这两个 ref 分别拦截“隐藏槽位”与“正在写回滚动位置的那一帧”；测试默认取可见且已还原的状态。
     activeRef: { current: true }, scrollRestoringRef: { current: false },
     liveScrollRef: { current: null },
     readScrollPosition: () => ({ atBottom: true }),
@@ -62,7 +62,7 @@ function mount({ hasEarlierMessages, landed = true }) {
     calls,
     context,
     reachTop: async () => {
-      // 贴顶：scrollTop 进 TOP_SLACK 内，滚动回调下一次就该读上一页。
+      // 贴顶：scrollTop 进入 TOP_SLACK 范围，下一次滚动回调应读取上一页。
       context.scrollContainerRef.current.scrollTop = 0;
       observed();
       await new Promise((resolve) => setImmediate(resolve));
@@ -70,7 +70,7 @@ function mount({ hasEarlierMessages, landed = true }) {
     render: (cursor) => {
       context.historyCursor = cursor;
       // The prepend landed and was painted, so the next page may be asked for again.
-      // 读者已经被新内容推到下面（不在顶部）：只验证游标更新，不附带“贴顶继续读”。
+      // 新内容已将视图推离顶部（不在顶部）：仅验证游标更新，不涉及“贴顶继续读”。
       context.scrollContainerRef.current.scrollTop = 2000;
       context.pageRenderingRef.current = false;
       forgetCursor.runInContext(context)();
@@ -82,7 +82,7 @@ function mount({ hasEarlierMessages, landed = true }) {
 async function reachTop(state) {
   const { calls, context, reachTop: report } = mount(state);
   await report();
-  // 分页只关心「要不要加宽/要不要拉上一页」；位置补偿记在 scrollAnchorRef（元素锚点），
+  // 分页只关注是否加宽或是否加载上一页；位置补偿记录在 scrollAnchorRef（元素锚点），
   // 由 ChatWindow 的 layout effect 消费。
   return { ...calls, anchored: context.scrollAnchorRef.current !== null };
 }

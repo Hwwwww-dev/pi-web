@@ -51,7 +51,7 @@ export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8,
       segments.push({
         id: "ctx",
         // The segment stays the same text; the hover card carries the exact
-        // used / limit numbers (第 14.3 节).
+        // used / limit numbers (§14.3).
         node: (
           <ContextBadge
             tokens={ctx.tokens}
@@ -73,7 +73,7 @@ export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8,
       style={{ columnGap: gap, ...style }}
     >
       {segments.map((segment) => (
-        // 第 4 节：用量是官方 Trace 示例里那种行内小字（图标 + 数字），不是胶囊。
+        // 第 4 节：用量采用官方 Trace 示例的行内小字（图标 + 数字），不使用胶囊。
         <span
           key={segment.id}
           data-usage-seg={segment.id}

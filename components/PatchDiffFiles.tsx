@@ -25,7 +25,7 @@ type DiffEntry =
   | { key: string; gap: SplitDiffGap }
   | { key: string; row: Extract<SplitDiffRow, { type: "line" }> };
 
-/** 行号列只占它实际需要的位数：固定宽度会让一位数右边空出一大截。 */
+/** 行号列按实际位数取宽；固定宽度会使一位数右侧空出过多。 */
 const GUTTER_WIDTHS = ["w-[2ch]", "w-[3ch]", "w-[4ch]", "w-[5ch]", "w-[6ch]"];
 
 function gutterWidthClass(maxLineNo: number): string {
@@ -68,7 +68,7 @@ function DiffLine({ cell, maxLineNo, muted = false }: {
       variant={cellVariant(cell)}
       className={cn(
         "ps-5",
-        // 官方 added 变体是中性底色；增删需要能一眼分辨，所以覆盖成 success/10。
+        // 官方 added 变体为中性底色；为区分增删，覆盖为 success/10。
         cell?.type === "added" && "bg-success/10",
       )}
     >
@@ -161,8 +161,8 @@ export function PatchDiffFiles({ files, layout }: { files: SplitDiffFile[]; layo
               <CodeBlockContent wrap={false} className="max-h-[var(--card-max-height)]">
                 {lines.flatMap((entry) => {
                   if ("gap" in entry) return [<GapLine key={entry.key} gap={entry.gap} />];
-                  // 一行里左边是删除、右边是新增：单栏要把两行都排出来，删除在上、
-                  // 新增在下，各自带自己文件的号码。只取 right 会把删除行整行吞掉。
+                  // 单栏布局需同时排出来自左侧的删除行与右侧的新增行（删除在上、
+                  // 新增在下），各自带所属文件的行号；只取 right 会丢失删除行。
                   const cells: SplitDiffCell[] = [];
                   if (entry.row.left.type === "removed") cells.push(entry.row.left);
                   if (entry.row.right.type === "added") cells.push(entry.row.right);

@@ -1868,7 +1868,7 @@ function McpStatusOutput({ error, stderr }: { error?: string; stderr?: string })
       {stderr && (
         <>
           <Line tone="dim">{t("mcp.test.stderr")}</Line>
-          <pre className="max-h-[160px] max-w-full overflow-auto whitespace-pre-wrap rounded-md bg-muted px-2 py-1.5 font-mono text-xs leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">{revealLines(stderr)}</pre>
+          <pre className="scroll-rounded-md max-h-[160px] max-w-full overflow-auto whitespace-pre-wrap rounded-md bg-muted px-2 py-1.5 font-mono text-xs leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">{revealLines(stderr)}</pre>
         </>
       )}
     </>

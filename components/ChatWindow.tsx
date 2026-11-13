@@ -5,8 +5,7 @@ import { ArrowDownIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from
 import Image from "next/image";
 import { isValidElement, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";
-import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
+import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
 import { splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
@@ -35,10 +34,12 @@ import {
   MessageScroller,
   MessageScrollerButton,
   MessageScrollerContent,
-  MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@/components/ui/message-scroller";
+import { ChatRow } from "@/components/chat/ChatRow";
+import { CHAT_COLUMN_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
@@ -51,13 +52,12 @@ import { publishStreamCharacters } from "@/lib/stream-beam";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useDialogMaxHeight } from "@/hooks/useDialogMaxHeight";
-import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import type { DebugClientSession } from "@/lib/debug-types";
-import type { AppUpdateResponse } from "@/lib/api-types";
 import type { ToolEntry } from "@/lib/tool-presets";
 import type { SettingsSection } from "@/lib/settings-navigation";
 import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll-position";
+import { shouldFollow } from "@/lib/chat-follow";
 import {
   getNextVisibleCount,
   getPromptAnchorSpacerHeight,
@@ -67,9 +67,16 @@ import {
 } from "@/lib/chat-lazy-load";
 import { SCROLL_ANCHOR_SETTLE_MS, applyScrollAnchor, captureScrollAnchor, holdScrollAnchor, type ScrollAnchor } from "@/lib/scroll-anchor";
 
+/** 判定贴顶的容差：触摸惯性下滚动值带小数，难以精确归零。 */
+const TOP_SLACK = 24;
+/** 前插一页后等待其落位的最长帧数；超时即放行，避免闸门卡死。 */
+const PREPEND_SETTLE_FRAMES = 12;
+/** 两次自动取页之间的最小间隔：连续滚动事件不应把多页挤进同一次操作。 */
+const AUTO_LOAD_MIN_INTERVAL_MS = 400;
+
 /**
- * 读者此刻停在哪：贴尾就是 atBottom，否则记下视口顶上那一行和它的偏移。
- * 保存会话位置与保活槽隐藏前的快照共用这一份。
+ * 读取当前滚动位置：贴尾记为 atBottom，否则记录视口顶部条目及其偏移。
+ * 保存会话位置与保活槽隐藏前的快照共用此实现。
  */
 function readScrollPosition(
   container: HTMLElement,
@@ -95,9 +102,8 @@ interface Props {
   onSearchTargetHandled?: (target: { sessionId: string; entryId: string }) => void;
   initialScrollPosition?: ChatScrollPosition | null;
   /**
-   * 这个实例是不是当前可见的会话。保活 dock 用 `display:none` 藏非当前槽位，
-   * 而隐藏会把 `scrollTop`/`scrollHeight` 一并清成 0 —— 切回时得先把读者的
-   * 位置还回去，顶部加载器才不会把那个 0 当成“贴顶”。
+   * 该实例是否为当前可见会话。保活 dock 以 `display:none` 隐藏非当前槽位，隐藏会使
+   * `scrollTop`/`scrollHeight` 归零；切回时须先还原位置，顶部加载器才不会把 0 视为贴顶。
    */
   active?: boolean;
   onScrollPositionChange?: (sessionId: string, position: ChatScrollPosition) => void;
@@ -154,82 +160,40 @@ interface Props {
   holdAudio?: () => () => void;
 }
 
-// The message column's page gutter and width, from the visual draft (§4.2):
-// 28px around a 700px column on desktop, half the gutter on phones. The
-// column's cap is min(--chat-content-max-width, 700px) — Settings' width
-// slider narrows it below 700 and never widens past the cap; messages, the
-// quote composer, the composer and the new-session hero all read one var.
-const CHAT_COLUMN_PADDING = 28;
-const CHAT_COLUMN_PADDING_MOBILE = 14;
+// 消息列的留白、宽度、字号、行距统一由 `lib/chat-layout.ts` 定义（数值见
+// `app/globals.css` 的 `--chat-*` 变量），组件内不写字面量。
 
-// One update check per page. Every fresh composer mounts the header again
-// (each move of the new-session bar does), and a link that turned up late
-// each time would lengthen the versions line under the reader's eyes; from
-// the second header on it is there in the first paint.
-let appUpdateCheck: Promise<AppUpdateResponse | null> | null = null;
-let appUpdateFound: AppUpdateResponse | null = null;
-
-function checkAppUpdate(): Promise<AppUpdateResponse | null> {
-  appUpdateCheck ??= fetch("/api/app-update")
-    .then(async (response) => {
-      if (!response.ok) return null;
-      const result = await response.json() as AppUpdateResponse;
-      return result.updateAvailable && result.latestVersion && result.releaseUrl ? result : null;
-    })
-    .then((result) => {
-      appUpdateFound = result;
-      return result;
-    })
-    .catch(() => {
-      // Update checks are best-effort and must not interrupt a new session;
-      // a later header asks again.
-      appUpdateCheck = null;
-      return null;
-    });
-  return appUpdateCheck;
-}
-
-function NewSessionUpdateLink({
-  label,
-}: {
-  label: (version: string) => string;
+/**
+ * 官方 scroller 的跟随模式（`following-bottom`）会被 wheel/touch/按键、scrollTop 变小、
+ * 点击跳转等打断，仅挂载与其自身 `scrollToEnd` 能恢复。因此由本组件接管：`atTail` 为真
+ * 期间内容长高即再次调用 `scrollToEnd`，读者上滑超过 8px 后 `atTail` 变假并停止干涉。
+ */
+function FollowTailWhenAtTail({ atTail, contentRef }: {
+  atTail: boolean;
+  contentRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  const [update, setUpdate] = useState<AppUpdateResponse | null>(() => appUpdateFound);
-
+  const { scrollToEnd } = useMessageScroller();
   useEffect(() => {
-    if (appUpdateFound) return;
-    let cancelled = false;
-    void checkAppUpdate().then((result) => {
-      if (!cancelled && result) setUpdate(result);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  if (!update) return null;
-  const accessibleLabel = label(update.latestVersion);
-
-  // In the versions line, after the version in use: "→ v<latest> ↗".
-  // The box's padding is offset by equal negative margins, so hover and focus
-  // never move the line; on a coarse pointer they grow the tap target instead.
-  return (
-    <>
-      <span aria-hidden="true">→</span>
-      <a
-        className="new-session-update inline-flex items-center gap-[3px] -mx-1 -my-[3px] px-1 py-[3px] rounded-(--radius-sm) font-semibold no-underline text-primary transition-colors duration-100 hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:flex-none pointer-coarse:-my-2 pointer-coarse:py-2"
-        href={update.releaseUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={accessibleLabel}
-        aria-label={accessibleLabel}
-      >
-        v{update.latestVersion}
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M7 17 17 7" />
-          <path d="M7 7h10v10" />
-        </svg>
-      </a>
-    </>
-  );
+    if (!atTail) return;
+    const content = contentRef.current;
+    if (!content) return;
+    let frame = 0;
+    const follow = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        scrollToEnd({ behavior: "instant" });
+      });
+    };
+    const observer = new ResizeObserver(follow);
+    observer.observe(content);
+    follow();
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [atTail, contentRef, scrollToEnd]);
+  return null;
 }
 
 function hasFinalAssistantAnswer(message: AgentMessage): boolean {
@@ -264,11 +228,10 @@ function getUserInputText(message: AgentMessage): string | null {
 }
 
 
-// memo：后台 dock 常驻渲染，非流式内容变更不应触发重渲
+// memo：后台 dock 常驻渲染，非流式内容变更不应触发重渲染
 export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, active = true, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, panel = false, onSideSession, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onDebugSnapshotReaderChange, background = false, dormant = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
-  const columnPadding = isMobile ? CHAT_COLUMN_PADDING_MOBILE : CHAT_COLUMN_PADDING;
   const completionNotificationsEnabled = !isHiddenRelation(session?.relation);
 
   // Wrap onAgentEnd to play the completion sound. This is more reliable than
@@ -296,7 +259,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const [restoreAnchorReady, setRestoreAnchorReady] = useState(false);
 
   const {
-    loading, error, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, earlierTurnCount, streamingStore,
+    loading, error, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, earlierTurnCount, hasNewerMessages, newestCursor, streamingStore,
     agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, missingCwd, modelScopeWarnings, isModelScopeActive, allModelList, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
@@ -315,7 +278,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     handleQueuedAction, handleEditContent, dismissCompactError, editEntryId, cancelEdit,
     handleBuiltinSlashCommand,
     handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadSlashCommands, loadAllModels, scrollUserMsgToTop,
-    loadContext, activeLeafId, scrollToBottom, scrollToMessage,
+    loadContext, activeLeafId, scrollToBottom, scrollToMessage, jumpToEntry, loadNewerPage,
   } = useAgentSession({
     session, sessionRunning, newSessionCwd, newSessionDraftKey, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd: wrappedOnAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
     modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen,
@@ -331,8 +294,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const streamingMessage = useStreamingSelector(streamingStore, selectStreamingMessage);
   // streamState shape kept from the dev hook contract; derived from the store selectors.
   const streamState = useMemo(() => ({ isStreaming, streamingMessage }), [isStreaming, streamingMessage]);
-  // 输入框边光的油门：当前流的字符数。发布给 `lib/stream-beam`，让被 memo 的
-  // 输入框自己订阅；一个 chunk 只多算一次减法，不必每 chunk 换一次 prop。
+  // 当前流的字符数，供输入框边光使用：发布到 `lib/stream-beam`，由被 memo 的输入框
+  // 自行订阅，避免每个 chunk 更换 prop。
   const streamCharacters = useMemo(() => {
     let total = 0;
     for (const block of streamingMessage?.content ?? []) {
@@ -342,11 +305,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return total;
   }, [streamingMessage]);
   useEffect(() => {
-    publishStreamCharacters(streamCharacters);
-  }, [streamCharacters]);
+    // 后台会话不写：计数器按会话隔离，它的字符数也只属于它自己。
+    if (background) return;
+    publishStreamCharacters(session?.id ?? newSessionDraftKey ?? "new", streamCharacters);
+  }, [streamCharacters, background, session?.id, newSessionDraftKey]);
   const getStreamingMessage = useCallback(() => streamingStore.getState().streamingMessage, [streamingStore]);
   const sessionBusy = agentRunning || bashRunning;
-  // 新会话的输入框带上被 fork 的这条消息：可以直接重发或改。
+  // 新会话输入框携带被 fork 的消息，便于直接重发或修改。
   const forkFromMessage = useCallback((entryId: string, message: UserMessage) => {
     void handleFork(entryId, { value: getUserMessageText(message), images: getUserMessageDraftImages(message) });
   }, [handleFork]);
@@ -537,7 +502,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
   const initialPromptSentRef = useRef(false);
 
-  // dev：引用选区到新会话提问（上游 v0.14 同一弹窗改成了侧聊入口，两个入口并存）
+  // dev：将选中文本引用到新会话提问；上游 v0.14 把同一弹窗改为侧聊入口，两个入口并存。
   const askSelectionInNewChat = useCallback(async (prompt: string) => {
     const sourceSessionId = sessionIdRef.current ?? session?.id;
     if (quoteSubmitting || !prompt.trim() || !quotedSelection?.sourceEntryId || !sourceSessionId || !onAskInNewChat) return;
@@ -631,24 +596,28 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // State, not a ref: the sentinel can appear with nothing else changing (a
   // finished turn regrouped into more rows), and must get an observer then.
   const [sentinel, setSentinel] = useState<HTMLElement | null>(null);
-  /** 展开/折叠一行的那几帧：不让 scroller 跟着内容贴底，否则行会被拉上去。 */
+  /** 展开/折叠行的若干帧内禁用贴底跟随，否则该行会被拉上去。 */
   const [foldInFlight, setFoldInFlight] = useState(false);
   /**
-   * 读者是否贴着底部。贴底跟随是官方 scroller 的状态，不是常量：给它一个恒为
-   * true 的 `autoScroll`，前插一整页时它会当作“跟随”而滑到底部，而读者明明在
-   * 中间看历史 —— 于是翻页时在底和顶之间来回跳。
+   * 读者是否贴底。贴底跟随是官方 scroller 的内部状态：若传入恒为 true 的 `autoScroll`，
+   * 前插整页时会被当作跟随而滑到底部，导致翻页时在底与顶之间跳动。
    */
   const [atTail, setAtTail] = useState(true);
-  /** 收键盘的那几帧：同上，让“滑回底部”自己演完，不跟 scroller 抢。 */
-  const [keyboardClosing, setKeyboardClosing] = useState(false);
   const foldTimerRef = useRef<number | undefined>(undefined);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
-  /** 上一页请求还在路上。 */
+  /** 上一页请求进行中。 */
   const loadingOlderRef = useRef(false);
   /**
-   * 上一页已经落地、但还没渲染进窗口并画过一帧。读历史读到一半就再发一次请求，
-   * 会让两页的前插互相推，滚动锚点也跟着抖 —— 所以闸门比“HTTP 回来了”关得晚。
+   * 自动加载是否可用。每取一页即用掉一次，只有读者真的滚动才重新武装：闸门放行后
+   * 若自行重试，前插还没落位的那几帧仍判为贴顶，会连续取页。
+   */
+  const autoLoadArmedRef = useRef(true);
+  /** 上一次自动取页的时刻，用于拦截同一串滚动事件里的连续取页。 */
+  const lastAutoLoadAtRef = useRef(0);
+  /**
+   * 上一页已落地但尚未渲染并绘制一帧。此时再次请求会使两页前插互相推动、滚动锚点抖动，
+   * 因此闸门比请求返回关闭得更晚。
    */
   const pageRenderingRef = useRef(false);
   const pageRenderWaitersRef = useRef<Array<() => void>>([]);
@@ -670,8 +639,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // render, and an observer report in between still holds this cursor.
   const requestedCursorRef = useRef<string | null>(null);
   const loadOlderPage = useCallback(async (sid: string, before: string, options?: { tail?: number; signal?: AbortSignal }) => {
-    // 上一页还没画出来就先等它：哨兵、点击、小地图翻页、搜索定位都走这条路，
-    // 一处收口，就不会出现“两页同时在飞”。
+    // 上一页未绘制完成时先等待：哨兵、点击、小地图翻页、搜索定位共用此入口，
+    // 避免两页并发加载。
     if (pageRenderingRef.current) {
       await new Promise<void>((resolve) => pageRenderWaitersRef.current.push(resolve));
     }
@@ -692,34 +661,26 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       if (!pageRenderingRef.current) setOlderPageState("idle");
     }
   }, [activeLeafId, loadContext]);
-  // Jump to a minimap turn: reveal what is already in memory, then page ancestors
-  // in one page at a time until the turn's anchor entry is loaded. Each step waits
-  // for the previous page to render (loadOlderPage), the page size is the same one
-  // scrolling uses, and the loop stops on the anchor — jumping never drags the rest
-  // of the branch in behind it.
+  // Jump to a minimap turn: one request fetches a window centred on that turn,
+  // so the jump does not drag the whole branch in behind it page by page.
   const revealTurnForMinimap = useCallback(async (turnNumber: number) => {
     const sid = session?.id;
     const target = minimapTurnIndex[turnNumber];
     if (!sid || !target) return;
-    // Already loaded: just show it. Nothing is read from disk.
-    if (searchHistoryRef.current.entryIds.includes(target.entryId)) {
-      setVisibleCount((current) => Math.max(current, messagesLenRef.current));
+    if (!searchHistoryRef.current.entryIds.includes(target.entryId)) {
+      const context = await jumpToEntry(sid, activeLeafId, target.entryId);
+      if (!context) return;
+      setVisibleCount((current) => Math.max(current, context.messages.length));
       return;
     }
-    let cursor = "";
-    for (let guard = 0; guard < 100; guard++) {
-      const snapshot = searchHistoryRef.current;
-      if (snapshot.entryIds.includes(target.entryId)) break;
-      // No older pages left: the turn is not on this branch, so nothing to load.
-      if (!snapshot.historyCursor || !snapshot.hasEarlierMessages) break;
-      // The cursor stopped moving — paging again would fetch the same page.
-      if (snapshot.historyCursor === cursor) break;
-      cursor = snapshot.historyCursor;
-      const page = await loadOlderPage(sid, snapshot.historyCursor);
-      if (!page) break;
-    }
     setVisibleCount((current) => Math.max(current, messagesLenRef.current));
-  }, [session?.id, minimapTurnIndex, loadOlderPage]);
+  }, [session?.id, minimapTurnIndex, activeLeafId, jumpToEntry]);
+  // 窗口位于中段时，到达底部即向下加载一页，直至回到叶子。
+  useEffect(() => {
+    const sid = session?.id;
+    if (!sid || !atTail || !hasNewerMessages || !newestCursor) return;
+    void loadNewerPage(sid, activeLeafId, newestCursor);
+  }, [atTail, hasNewerMessages, newestCursor, session?.id, activeLeafId, loadNewerPage]);
   useEffect(() => {
     // A reloaded history can come back to a cursor asked for before.
     if (historyCursor !== requestedCursorRef.current) requestedCursorRef.current = null;
@@ -737,9 +698,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     };
   }, [loading, onScrollPositionChange, scrollContainerRef, session?.id]);
 
-  // 保活槽被 `display:none` 藏起来时，浏览器会把 scrollTop 与 scrollHeight 一起清成 0。
-  // 切回的第一帧就得把读者那一行写回去：顶部加载器只认 scrollTop，晚一帧就会把那个 0
-  // 当成“读者贴顶”，于是一页接一页地自动读到顶。
+  // 保活槽以 `display:none` 隐藏时，scrollTop 与 scrollHeight 会被清为 0。切回的第一帧
+  // 必须还原位置：顶部加载器只读 scrollTop，晚一帧即会把 0 视为贴顶而连续加载至顶部。
   const savedScrollRef = useRef<ChatScrollPosition | null>(null);
   const scrollRestoringRef = useRef(false);
   const wasActiveRef = useRef(active);
@@ -751,8 +711,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (!container) return;
     if (!active) {
       if (!wasActive || pendingScrollRestoreRef.current) return;
-      // 这一帧容器多半已经 `display:none`（0/0/0 会被读成“贴尾”），
-      // 那就用滚动时记下的那一份；只有它还量得出高度时才现量。
+      // 此时容器多为 `display:none`（0/0/0 会被判为贴尾），改用滚动时记录的位置；
+      // 仅当容器仍可测高时才现量。
       const measured = container.clientHeight > 0
         ? readScrollPosition(container, content, searchHistoryRef.current.historyCursor)
         : null;
@@ -761,9 +721,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     }
     if (wasActive) return;
     const saved = savedScrollRef.current;
-    if (!saved) return;
+    if (!saved) {
+      // 挂载于隐藏槽位的会话：provider 的默认位置在 clientHeight 为 0 时已被消耗，
+      // 切回时既无默认位置也无记录，直接定位到最新一条。
+      container.scrollTop = container.scrollHeight;
+      liveScrollRef.current = { atBottom: true };
+      return;
+    }
     liveScrollRef.current = saved;
-    // 还原期间别让顶部加载器插手，也别让贴底跟随把位置改掉。
+    // 还原期间禁止顶部加载器介入，也禁止贴底跟随改写位置。
     scrollRestoringRef.current = true;
     if (saved.atBottom || !content) {
       container.scrollTop = container.scrollHeight;
@@ -787,26 +753,38 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (searchTarget) setPendingScrollRestore(null);
   }, [searchTarget]);
 
-  // 保活槽用 `display:none` 藏起来时，浏览器会把 scrollTop 与 scrollHeight 一起清成 0。
-  // 所以得在它还可见时就知道读者停在哪 —— 每次滚动记一份，隐藏那一帧用记下的这份。
+  // 保活槽以 `display:none` 隐藏时 scrollTop 与 scrollHeight 会被清为 0，故须在其可见时
+  // 记录读者位置：每次滚动记录一份，隐藏那一帧使用该记录。
   const liveScrollRef = useRef<ChatScrollPosition | null>(null);
-  // 监听器里要看到“此刻可见吗”，用 ref 而不是闭包里的旧 prop。
+  // 监听器需读取当前可见状态，故用 ref 而非闭包中的旧 prop。
   const activeRef = useRef(active);
   activeRef.current = active;
-  // 贴底与否只听滚动：官方 scroller 的跟随状态跟着它走。
+  // 跟随状态仅由滚动决定，判定交给 `shouldFollow`：8px 贴底容差只用于“回到最新”
+  // 按钮，跟随使用 48px，因触控板一次惯性可达数十像素。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
+    let following = true;
+    let previousTop = container.scrollTop;
     const update = () => {
-      setAtTail(isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight));
+      const next = shouldFollow(
+        following,
+        previousTop,
+        container.scrollTop,
+        container.clientHeight,
+        container.scrollHeight,
+      );
+      following = next;
+      previousTop = container.scrollTop;
+      setAtTail(next);
     };
     update();
     container.addEventListener("scroll", update, { passive: true });
     return () => container.removeEventListener("scroll", update);
   }, [scrollContainerRef, session?.id, loading]);
 
-  // 同一批滚动事件里再记一份“读者停在哪”：保活槽一被 `display:none` 藏起，
-  // scrollTop 与 scrollHeight 会一起被清成 0，那时候再量就只能量到 0。
+  // 在同一批滚动事件中记录读者位置：保活槽被 `display:none` 隐藏后 scrollTop 与
+  // scrollHeight 归零，届时无法测量。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -834,8 +812,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // keeps the toggled row's own top edge fixed across the change, so opening a card
   // grows it downward instead of scrolling the tail into view.
 
-  // 展开/折叠一行的这几帧关掉贴底跟随：行留在原地、内容向下长，而不是行被
-  // 拉上去再补内容（就是用户看到的“展开后闪一下、然后向上移”）。
+  // 展开/折叠行期间关闭贴底跟随：行保持在原位、内容向下增长，避免先上拉后补内容
+  // 造成的闪动。
   useEffect(() => {
     const onFold = () => {
       setFoldInFlight(true);
@@ -849,45 +827,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     };
   }, []);
 
-  // 收键盘时视口一下子长回来，列表要在那一帧贴回底部。以前直接 scrollTo(smooth)：
-  // iOS 的 visualViewport 会分好几帧长高，每帧都重启一次平滑滚动，后面再被官方
-  // scroller 的贴底抢一下——看到的就是闪。现在键盘收起期间先括住 scroller 的贴底，
-  // 等高度稳定了再滑一次，滑完再放开。
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-    let height = viewport.height;
-    let settle = 0;
-    const onResize = () => {
-      const next = viewport.height;
-      const keyboardClosed = next - height > 80;
-      height = next;
-      if (!keyboardClosed) return;
-      const container = scrollContainerRef.current;
-      if (!container) return;
-      // 读者本来就不在底部（在看历史）：视口长高只意味着多看到几行，不动。
-      const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
-      if (!atBottom) return;
-      setKeyboardClosing(true);
-      window.clearTimeout(settle);
-      settle = window.setTimeout(() => {
-        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        const target = scrollContainerRef.current;
-        target?.scrollTo({ top: target.scrollHeight, behavior: reduce ? "auto" : "smooth" });
-        // 动画期间不能让 scroller 提前抢着贴底，否则又回到一跳一闪。
-        settle = window.setTimeout(() => setKeyboardClosing(false), reduce ? 0 : 260);
-      }, 140);
-    };
-    viewport.addEventListener("resize", onResize);
-    return () => {
-      viewport.removeEventListener("resize", onResize);
-      window.clearTimeout(settle);
-    };
-  }, [scrollContainerRef]);
+  // 键盘收起由壳层整体位移实现（`.app-shell` 的 translate3d），列表布局高度不变，
+  // 贴底跟随自然停在原位；此处不再额外平滑滚动，以免与壳层位移争用同一帧。
 
-  // 键盘弹起时不去写回任何滚动位置：官方 scroller 自己知道谁在贴尾、谁在看历史，
-  // 而以前那个 focusin 手回写 scrollTop/window.scrollY，正好在视口缩高的那一帧
-  // 把列表拉回去——这就是“输入法上移、消息不跟着上移、还卡停跳一下”。
+  // 键盘弹起时不写回滚动位置：官方 scroller 自行区分贴尾与浏览历史，手动回写
+  // scrollTop/window.scrollY 会在视口缩高的那一帧把列表拉回。
 
   useEffect(() => {
     const position = pendingScrollRestore;
@@ -1003,29 +947,31 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     onSearchTargetHandled?.(pendingSearchScroll);
   }, [pendingSearchScroll, searchTarget, searchMessage, scrollContainerRef, scrollToMessage, onSearchTargetHandled]);
 
-  // 贴顶就自动读下一页。IntersectionObserver 只在交叉状态“变化”时回调：哨兵一直在
-  // 视口里（贴顶打开一个会话就是这样）便一次也不报，于是必须再往下滑一段、让它先
-  // 离开再回来才会加载。改成直接听 scroll：贴顶就试，试不成的事交给闸门释放后的
-  // 下一轮 effect。
+  // 贴顶时自动加载下一页。IntersectionObserver 仅在交叉状态变化时回调，哨兵持续可见
+  // 时不再上报，故改为监听 scroll：贴顶即尝试一次，且每次自动取页只允许由一次滚动
+  // 或首屏进入触发。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!sentinel || !container) return;
-    /** 离顶多远仍算“贴顶”：触摸惯性带小数，滚不到绝对 0。 */
-    const TOP_SLACK = 24;
     const attempt = () => {
-      // 隐藏的槽位，以及正在写回位置的这一帧，都不算读者贴顶。
-      if (scrollRestoringRef.current || !activeRef.current) return;
+      // 隐藏槽位、正在写回位置的帧、以及等待分页锚点落地的会话均不计为贴顶。
+      if (scrollRestoringRef.current || pendingScrollRestoreRef.current || !activeRef.current) return;
       if (container.scrollTop > TOP_SLACK) return;
       // Skip while a page is loading or the last one is still rendering.
       if (loadingOlderRef.current || pageRenderingRef.current) return;
+      if (performance.now() - lastAutoLoadAtRef.current < AUTO_LOAD_MIN_INTERVAL_MS) return;
       if (!hasEarlierMessages) {
         // Everything is loaded, yet the sentinel shows: the messages render as
         // more rows than the window holds (an answer and its thinking are
         // two), so widen the window.
         scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
+        autoLoadArmedRef.current = false;
+        lastAutoLoadAtRef.current = performance.now();
         setVisibleCount((current) => getNextVisibleCount(current));
         return;
       }
+      autoLoadArmedRef.current = false;
+      lastAutoLoadAtRef.current = performance.now();
       // Fetch the previous page from the server and prepend it (loadContext
       // handles prepend + scroll anchoring).
       const oldestId = historyCursor;
@@ -1034,13 +980,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       const sid = session?.id ?? sessionIdRef.current;
       if (!sid) return;
       loadingOlderRef.current = true;
-      // 用元素锚点，不用 scrollHeight 差：新插进来的那页里的 markdown、代码高亮和
-      // 图片会分几帧长高，高度差只补第一帧，之后读者就被留在接近顶部的位置——顶部
-      // 又贴着哨兵，于是一次上滑连读好几页。锚点在页面落地后每帧重测，长多高都不漂。
+      // 使用元素锚点而非 scrollHeight 差值：新页中的 markdown、代码高亮与图片分帧长高，
+      // 高度差只能补第一帧，读者会被留在近顶部；锚点在页面落地后每帧重测，不随高度漂移。
       scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
       void loadOlderPage(sid, oldestId).then(() => {
-        // 按住读者那一行：它让新页只长在下面，也把滚动位置从顶端挪开 ——
-        // 否则哨兵一直贴在视口里，一页接一页地自动读下去。
+        // 固定读者所在行：新页只向下增长，并使滚动位置离开顶端，否则哨兵持续可见会
+        // 连续加载。
         holdScrollAnchor(container, messageContentRef.current);
       }).finally(() => {
         loadingOlderRef.current = false;
@@ -1054,15 +999,29 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         attempt();
       });
     };
+    // 只在真实输入下重新武装：前插后的锚点写入、位置还原都会触发 scroll，若以 scroll
+    // 作为武装信号，一次手势即可连续取页。
+    const arm = () => {
+      autoLoadArmedRef.current = true;
+    };
     container.addEventListener("scroll", onScroll, { passive: true });
-    // 首次也试一次：贴顶打开的会话没有任何滚动事件。
-    attempt();
+    container.addEventListener("wheel", arm, { passive: true });
+    container.addEventListener("touchstart", arm, { passive: true });
+    container.addEventListener("pointerdown", arm, { passive: true });
+    container.addEventListener("keydown", arm);
+    // 首次也尝试一次（贴顶打开的会话不会触发滚动事件）；闸门放行导致的重建只有在
+    // 武装时才会再试，否则会连跳多页。
+    if (autoLoadArmedRef.current) attempt();
     return () => {
       container.removeEventListener("scroll", onScroll);
+      container.removeEventListener("wheel", arm);
+      container.removeEventListener("touchstart", arm);
+      container.removeEventListener("pointerdown", arm);
+      container.removeEventListener("keydown", arm);
       if (frame) cancelAnimationFrame(frame);
     };
-    // `olderPageState` 是刻意的依赖：上一页落地并画完后 effect 重建，reader 还在顶上
-    // 就继续读下一页，而不用再滑一下。
+    // `olderPageState` 为刻意依赖：上一页落地并绘制后 effect 重建，内容撑不满一屏
+    // 时闸门会重新武装并在此接续，无需再次滚动。
   }, [sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState]);
 
   // Keep the rendered window at least as large as what's loaded, so prepended
@@ -1079,13 +1038,35 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   useLayoutEffect(() => {
     if (!pageRenderingRef.current) return;
     if (visibleCount < messages.length) return;
-    const frame = requestAnimationFrame(() => {
+    const container = scrollContainerRef.current;
+    const notFull = () => !container || container.scrollHeight <= container.clientHeight + TOP_SLACK;
+    const release = () => {
       pageRenderingRef.current = false;
+      // 内容撑不满一屏时读者无法靠滚动再触发，放行后允许直接续取。
+      if (notFull()) autoLoadArmedRef.current = true;
       setOlderPageState("idle");
       const waiters = pageRenderWaitersRef.current;
       pageRenderWaitersRef.current = [];
       for (const resolve of waiters) resolve();
-    });
+    };
+    // 前插的一页要真的落位才放行：内容还没撑开时 scrollTop 仍在顶端，此时放行会被
+    // 贴顶判定当成"读者还在顶部"而立刻再取一页，读到的就是连续跳页。
+    let frame = 0;
+    let frames = 0;
+    const settle = () => {
+      frame = requestAnimationFrame(() => {
+        frames += 1;
+        const settled = !container
+          || container.scrollTop > TOP_SLACK
+          || notFull();
+        if (settled || frames >= PREPEND_SETTLE_FRAMES) {
+          release();
+          return;
+        }
+        settle();
+      });
+    };
+    settle();
     return () => cancelAnimationFrame(frame);
   }, [visibleCount, messages.length, olderPageState]);
 
@@ -1101,8 +1082,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // 新插入的一页把内容整体往下推，把读者按在自己的行上。两种来源都走同一份
-    // 元素锚点：读更早的一页，或者已经全读完、只是窗口要放宽。
+    // 新页会将内容整体下推，需把读者固定在原行。读更早一页与放宽窗口两种情况共用
+    // 同一份元素锚点。
     const anchor = scrollAnchorRef.current;
     if (!anchor) return;
     scrollAnchorRef.current = null;
@@ -1230,7 +1211,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return history.reverse();
   }, [messages]);
   const isEmptyNew = isNew && messages.length === 0 && !streamState.isStreaming && !sessionBusy;
-  useScrollbarVisibility(scrollContainerRef, Boolean(session?.id) || !isEmptyNew);
   const messageCwd = session?.cwd ?? newSessionCwd ?? undefined;
   const promptAnchorSpacerRef = useRef<HTMLDivElement | null>(null);
   const promptAnchorSpacerHeightRef = useRef(0);
@@ -1480,7 +1460,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         );
         if (!isVisible || currentRefIdx === undefined) return view;
         return (
-          // 不再用 content-visibility + 估算高度：估算值让滚动位置在行进出视口时跳。
+          // 行高固定：content-visibility 的估算高度会导致行进出视口时滚动位置跳动。
           <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
             {view}
           </div>
@@ -1632,8 +1612,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const categorySummary = [...categoryCounts.entries()]
           .map(([category, count]) => `${count} ${t(TOOL_CATEGORY_LABEL_KEYS[category])}`)
           .join(" · ");
-        // 一轮的折叠行说这一轮本身（官方 Whole Turn：「Worked for 2m 4s, 1 command failed」）；
-        // 还没跑完、拿不到时长时才退回分类计数。
+        // 折叠行描述整轮（官方 Whole Turn：「Worked for 2m 4s, 1 command failed」）；
+        // 未跑完、取不到时长时退回分类计数。
         const failedCalls = activityItems.filter((item) => item.kind === "tool" && item.result?.isError).length;
         const turnDurationMs = getTurnDurationMs(messages, userIdx, finalAssistantIdx + 1);
         const workedFor = turnDurationMs === undefined ? undefined : formatTurnDuration(turnDurationMs);
@@ -1654,11 +1634,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             >
               <TurnTrace
               summary={processSummary}
-              // 没有 entry id 时不传 foldKey：宁可不记忆，也不要索引做 key（prepend 一页就全错位）。
+              // 无 entry id 时不传 foldKey：索引作 key 会在前插一页后全部错位。
               foldKey={processKey === undefined ? undefined : `process:${processKey}`}
               defaultOpen={!finalAnswerMessage}
               reveal={revealProcess}
-              className="mb-5"
             >
                 <TurnActivityBody
                   items={activityItems}
@@ -1672,7 +1651,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           );
         }
 
-        if (finalAnswerMessage) {
+        if (finalAnswerMessage && hasFinalAssistantAnswer(finalAnswerMessage)) {
           rendered.push(renderMessage(finalAssistantIdx, {
             messageOverride: finalAnswerMessage,
             writtenFiles,
@@ -1702,21 +1681,44 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const liveCtx = turnView.nextPromptTokens === undefined && isConversationTail
           ? ctxInfoRef.current ?? null
           : null;
-        rendered.push(
-          <TurnMetaLine
-            key={`turn-meta-${entryIds[userIdx] ?? userIdx}`}
-            usage={turnUsage}
-            model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
-            time={formatTime(turnLastAssistant?.timestamp)}
-            copySource={finalAnswerCopyText || undefined}
-            ctxTokens={turnView.nextPromptTokens}
-            liveCtx={liveCtx}
-            ctxWindow={ctxInfoRef.current?.contextWindow}
-          />,
+        const metaNode = (
+          <div className="mb-2">
+            <TurnMetaLine
+              usage={turnUsage}
+              model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
+              time={formatTime(turnLastAssistant?.timestamp)}
+              copySource={finalAnswerCopyText || undefined}
+              ctxTokens={turnView.nextPromptTokens}
+              liveCtx={liveCtx}
+              ctxWindow={ctxInfoRef.current?.contextWindow}
+            />
+          </div>
         );
+        // 用量与本轮最后一块内容同属一行：跨行间距会被 content-visibility 的包含块吞掉，
+        // 负边距则会重叠，仅同行内的 gap 可靠。
+        const lastNode = rendered[rendered.length - 1];
+        // 提问本身是本轮最后一块内容时（回复尚未写入），合并会使用量贴到气泡上，
+        // 故仍单独成行，间距由行距提供。
+        const lastRole = isValidElement(lastNode)
+          ? (lastNode.props as { message?: { role?: string } }).message?.role
+          : undefined;
+        if (isValidElement<{ "data-entry-id"?: string }>(lastNode) && lastRole !== "user") {
+          rendered[rendered.length - 1] = (
+            <div
+              key={lastNode.key ?? `turn-body-${entryIds[userIdx] ?? userIdx}`}
+              data-entry-id={lastNode.props["data-entry-id"]}
+              className="flex min-w-0 flex-col gap-1.5"
+            >
+              {lastNode}
+              {metaNode}
+            </div>
+          );
+        } else {
+          rendered.push(metaNode);
+        }
 
         for (let renderIdx = finalAssistantIdx + 1; renderIdx < endIdx; renderIdx++) {
-          // 一轮只留 TurnMetaLine 那一条用量：中间的每一步都不再各带一行。
+          // 每轮仅保留 TurnMetaLine 一处用量，中间步骤不再各自成行。
           rendered.push(renderMessage(renderIdx, { showModelLabel: true, hideUsage: true }));
         }
         idx = endIdx;
@@ -1792,8 +1794,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       )}
 
       <div
-        className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-end"
-        style={{ padding: `0 ${columnPadding}px` }}
+        className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-end px-[var(--chat-column-padding)]"
       >
         <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} onDismiss={dismissNotice} />
       </div>
@@ -1813,23 +1814,25 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} waitingCount={waitingExtensionCustomUiCount} onInput={sendExtensionCustomInput} />
         )}
         {!isEmptyNew && <>
-        <MessageScrollerProvider autoScroll={atTail && !foldInFlight && !keyboardClosing} defaultScrollPosition="last-anchor">
+        <MessageScrollerProvider autoScroll={atTail && !foldInFlight} defaultScrollPosition="end">
+        <FollowTailWhenAtTail atTail={atTail} contentRef={messageContentRef} />
         <MessageScroller className="min-h-0 min-w-0 flex-1">
         <MessageScrollerViewport
           ref={scrollContainerRef}
-          className={cn("pt-[22px] pb-2 max-sm:pt-4", pendingScrollRestore && "invisible")}
+          className={cn(pendingScrollRestore && "invisible")}
         >
-          <MessageScrollerContent>
-          <div style={{ minWidth: 0, padding: `0 ${columnPadding}px` }}>
-            <div
-              ref={messageContentRef}
-              onPointerUp={captureQuotedSelection}
-              className="mx-auto w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] max-sm:text-[length:calc(14px+var(--chat-font-size-offset,0px))]"
-            >
+          {/* 每行必须是 MessageScrollerItem 的直接子节点：官方 scroller 仅扫描 Content 的 children
+              做测量、可见性、前插保位与贴底跟随，多包一层 div 会使这四项全部失效。纵向留白也放在
+              Content 上，官方按 computed padding 计算内容末端。 */}
+          <MessageScrollerContent
+            ref={messageContentRef}
+            onPointerUp={captureQuotedSelection}
+            className="pt-[22px] pb-2 max-sm:pt-4"
+          >
             {hasMoreRendered && (
-              // 手动入口：自动加载要等上一页渲染完成，这一行让读者随时能自己要一页。
+              // 手动入口：自动加载需等上一页渲染完成，此按钮允许随时请求一页。
               <button
-                // 这一行钉在内容顶部，翻页时它不动；滚动锚点必须跳过它。
+                // 该行固定在内容顶部，翻页时不移动，滚动锚点须跳过它。
                 data-scroll-anchor-ignore=""
                 ref={setSentinel}
                 type="button"
@@ -1847,19 +1850,26 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               </button>
             )}
             {turnRendered.slice(startIndex).map((node, index) => {
-              // 每条消息一个 Item：官方用它测量、锚定、记可视性；离屏行靠 content-visibility
-              // 跳过渲染，长会话只付可见部分的开销。不是元素的行（空渲染）原样放过。
+              // 每条消息一个 Item：官方据此测量、锚定并记录可视性；离屏行由 content-visibility
+              // 跳过渲染，长会话仅付出可见部分开销。非元素行（空渲染）原样返回。
               if (!isValidElement<{ "data-entry-id"?: string }>(node)) return node;
               const messageId = node.props["data-entry-id"] ?? `turn-${startIndex + index}`;
-              // 官方锚点：`defaultScrollPosition="last-anchor"` 把最后一条用户消息
-              // 顶到顶部（回复比一屏长时），否则直接贴尾。
+              // 官方锚点：`defaultScrollPosition="last-anchor"` 在回复超过一屏时把最后一条
+              // 用户消息顶到顶部，否则直接贴尾。
               const anchorRole = (node.props as { message?: { role?: string } }).message?.role;
               return (
-                <MessageScrollerItem key={node.key ?? messageId} messageId={messageId} scrollAnchor={anchorRole === "user"}>
+                <ChatRow
+                  key={node.key ?? messageId}
+                  messageId={messageId}
+                  scrollAnchor={anchorRole === "user"}
+                >
                   {node}
-                </MessageScrollerItem>
+                </ChatRow>
               );
             })}
+            {/* 非条目行（流式回复、阶段提示、待执行命令）不是 Item 的测量对象，
+                但仍需落在与行一致的列宽内。 */}
+            <ChatRow>
             {streamState.isStreaming && hasStreamingContent && streamState.streamingMessage && (
               <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
             )}
@@ -1888,9 +1898,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               />
             )}
 
+            </ChatRow>
             <div ref={promptAnchorSpacerRef} aria-hidden="true" />
-            </div>
-          </div>
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <MessageScrollerButton className="text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100">
@@ -1994,20 +2003,19 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         document.body,
       )}
 
-      <div className="relative flex min-h-0 flex-col shrink-0" style={{ padding: `0 ${columnPadding}px` }}>
+      <div className={cn("relative flex min-h-0 flex-col shrink-0", CHAT_PAGE_GUTTER_CLASS)}>
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the
             composer's left edge. */}
         {isEmptyNew && (
           <div className="new-session-hero max-md:px-4 md:px-4">
-            <div className="new-session-hero-inner mx-auto flex max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col items-start">
+            <div className={cn("new-session-hero-inner flex flex-col items-start", CHAT_COLUMN_CLASS)}>
               <div className="new-session-brand flex min-w-0 items-center gap-3 mb-5 max-[640px]:mb-4">
-                <Image src="/icons/apple-touch-icon.png" width={40} height={40} alt="" priority className="new-session-logo size-10 shrink-0 max-[640px]:size-8" />
+                <Image src="/icons/logo.svg" width={120} height={120} alt="" priority unoptimized className="new-session-logo size-30 shrink-0 max-[640px]:size-8" />
                 <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
                   <span className="new-session-brand-name text-xl font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
                   <span className="new-session-meta flex min-w-0 items-center gap-1.5 text-xs leading-[1.4] whitespace-nowrap text-muted-foreground [&>*]:flex-none">
                     <span>web v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
-                    <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
                     <span aria-hidden="true">·</span>
                     <span className="new-session-meta-pi min-w-0 overflow-hidden text-ellipsis">pi v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
                   </span>
@@ -2025,8 +2033,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           commandsDisabled={sessionBusy}
         />
       </div>
-      {/* 手机端底部留白吃到偏置的两份（顶部聊天列仍是一份），空态的
-          hero+composer 簇因此高于正中——簇保持完整，品牌块不与浮层抢位。 */}
+      {/* 手机端底部留白占偏置的两份（顶部聊天列仍为一份），使空态的 hero+composer
+          簇高于正中：保持簇完整，品牌块不与浮层重叠。 */}
       {isEmptyNew && <div className="min-h-0 flex-1 max-sm:flex-[2]" />}
     </div>
   );
@@ -2040,8 +2048,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 const NOTICE_MIN_HEIGHT_PX = 60;
 const NOTICE_LINE_BOX_PX = 21;
 const NOTICE_TEXT_PADDING_Y_PX = (NOTICE_MIN_HEIGHT_PX - 2 - NOTICE_LINE_BOX_PX) / 2;
-// Toast 整体高度上限；文本区高度上限 = 整体上限 - 上下边框（全局 box-sizing: border-box，
-// 文本区的 max-height 已包含它自己的上下 padding，不能再减一次）
+// Toast 整体高度上限；文本区高度上限 = 整体上限 − 2px 边框（全局 box-sizing: border-box，
+// 文本区的 max-height 已包含自身上下 padding，不再重复扣减）。
 const NOTICE_MAX_HEIGHT_PX = 500;
 const NOTICE_TEXT_MAX_HEIGHT_PX = NOTICE_MAX_HEIGHT_PX - 2;
 
@@ -2064,8 +2072,8 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
             }}
             style={{
               minHeight: NOTICE_MIN_HEIGHT_PX,
-              // 整体高度上限：超出后由文本区内部滚动承担（见下方 span 的 overflowY），
-              // 容器自身保持 hidden，小圆点固定在顶部不随文本滚动
+              // 整体高度上限：超出部分由文本区内部滚动承担（见下方 span 的 overflowY），
+              // 容器自身保持 hidden，小圆点固定在顶部不随文本滚动。
               maxHeight: NOTICE_MAX_HEIGHT_PX,
               marginBottom: index === notices.length - 1 ? 0 : 6,
               boxShadow: floating
@@ -2103,7 +2111,7 @@ function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { 
             ) : (
               <span
                 tabIndex={0}
-                className="min-w-0 max-w-full overflow-y-auto scrollbar-thin whitespace-pre-line break-words"
+                className="min-w-0 max-w-full overflow-y-auto whitespace-pre-line break-words"
                 style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
               >
                 {splitNoticeText(notice.message).map((part, partIndex) => part.kind === "art" ? (
@@ -2556,7 +2564,7 @@ function ExtensionDialog({
             onClick={toggleFull}
             title={full ? t("chat.extensionRestoreSize") : t("chat.extensionMaximize")}
             aria-label={full ? t("chat.extensionRestoreSize") : t("chat.extensionMaximize")}
-            className="size-7 shrink-0 rounded-sm"
+            className="size-7 shrink-0 rounded-md"
           >
             <ExtensionSizeIcon expanded={full} />
           </Button>
@@ -2568,7 +2576,7 @@ function ExtensionDialog({
             aria-expanded={true}
             title={t("chat.extensionCollapse")}
             aria-label={t("chat.extensionCollapse")}
-            className="size-7 shrink-0 rounded-sm"
+            className="size-7 shrink-0 rounded-md"
           >
             <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="2 3.5 5 6.5 8 3.5" />
@@ -2903,7 +2911,7 @@ function ExtensionCustomPanel({
               aria-expanded={true}
               title={t("chat.extensionCollapse")}
               aria-label={t("chat.extensionCollapse")}
-              className="size-7 shrink-0 rounded-sm"
+              className="size-7 shrink-0 rounded-md"
             >
               <svg className="size-2.5 shrink-0" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="2 3.5 5 6.5 8 3.5" />

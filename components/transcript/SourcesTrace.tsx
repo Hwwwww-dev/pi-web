@@ -45,17 +45,19 @@ export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trail
       stepUsage={stepUsage}
       ariaLabel={title}
       content={(
-        <Trace>
-          {sources.map((source) => (
-            <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
-              <TraceLine>
-                <TraceIcon><GlobeIcon /></TraceIcon>
-                <TraceTitle>{source.title || hostOf(source.url)}</TraceTitle>
-                <TraceIcon><ArrowUpRightIcon /></TraceIcon>
-              </TraceLine>
-            </a>
-          ))}
-        </Trace>
+        <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+          <Trace>
+            {sources.map((source) => (
+              <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+                <TraceLine>
+                  <TraceIcon><GlobeIcon /></TraceIcon>
+                  <TraceTitle className="text-ellipsis">{source.title || hostOf(source.url)}</TraceTitle>
+                  <TraceIcon><ArrowUpRightIcon /></TraceIcon>
+                </TraceLine>
+              </a>
+            ))}
+          </Trace>
+        </div>
       )}
     />
   );

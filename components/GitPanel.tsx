@@ -166,8 +166,8 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
       {open && (
         <div
           role="listbox"
-          // 定位锚定：自定义下拉（见 GitPanel.test：不用 native select / Radix），
-          // 面板锚在触发器正下方并随触发器宽度拉伸。
+          // 定位方式：自定义下拉（见 GitPanel.test：不使用 native select / Radix），
+          // 面板锚定于触发器正下方，宽度随触发器拉伸。
           className="absolute inset-x-0 top-[calc(100%+4px)] z-[100] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
         >
           <div className="max-h-[min(40vh,300px)] touch-pan-y overflow-y-auto">

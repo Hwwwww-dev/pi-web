@@ -6,6 +6,7 @@ import { isPermissiveStatusText } from "@/lib/extension-status";
 import { displayLabel } from "@/lib/label-case";
 import type { ExtensionStatusItem, ExtensionWidgetItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
+import { CHAT_COMPOSER_INSET_CLASS } from "@/lib/chat-layout";
 import { ExtensionWidgets, extensionWidgetLabel } from "./ExtensionWidgets";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -95,18 +96,20 @@ export function buildExtensionStatusCells(statuses: ExtensionStatusItem[]): Stat
       cells.push({ kind: "list", ...list });
       continue;
     }
-    // A status that only names itself plus "Inactive" reports nothing to act on:
-    // the name alone is the whole message, and the extra word made the row
-    // carry a state nobody could change from there.
+    // A status that only names itself plus a state word reports nothing to act on:
+    // 名称已含全部信息，额外的状态词只会增加底栏噪音（LSP Active → LSP）。
+    // 冒号后的条目清单同理：单条时 splitStatusList 不收录，胶囊只保留名称，全文仍在 title 中。
     const plainText = stripAnsi(text).replace(/\s+/g, " ").trim();
-    const named = plainText.replace(/\s+(?:inactive|disabled)\s*$/i, "");
+    const named = plainText
+      .replace(/\s*:\s*.*$/, "")
+      .replace(/\s+(?:inactive|disabled|active|idle|ready|running|stopped|working)\s*$/i, "");
     cells.push({ kind: "text", text: named && named !== plainText ? named : text });
   }
   return cells;
 }
 
 /**
- * 列表状态的胶囊。弹出层受控：焦点移出（Tab 走、点到别处）就收起，不等下一次点击。
+ * 列表状态胶囊。弹出层受控：焦点移出（Tab 离开或点击其他位置）即收起，不等下一次点击。
  */
 function StatusListChip({ title, items, label, full }: { title: string; items: string[]; label: string; full: string }) {
   const [open, setOpen] = useState(false);
@@ -160,7 +163,7 @@ function StatusPill({
   }
   if (cell.kind === "text") {
     return (
-      // 与带列表的 chip 同一形状（outline / xs / mono）：否则 TODO、Goal 是裸文字，LSP 是胶囊，底栏永远对不齐。
+      // 与带列表的 chip 保持同一形状（outline / xs / mono）：否则 TODO、Goal 为裸文字而 LSP 为胶囊，底栏无法对齐。
       <Button
         type="button"
         variant="outline"
@@ -268,12 +271,7 @@ export function ExtensionStatusBar({
     // row's pills. `relative` anchors an expanded widget's floating panel above
     // the row.
     //
-    // The row stands beside the composer shell, so it cannot inherit its
-    // padding: its inset is measured from the composer card's own content edge
-    // instead — `InputGroup` p-2 (8px) plus the control's px-3 (12px) = 20px,
-    // which is where the input's first glyph starts. A larger inset (the old
-    // 52px) left the pills floating under the middle of the card on desktop.
-    <div className="extension-status-bar relative mt-1 mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] shrink-0 items-stretch px-[20px] max-sm:px-[12px] pb-0.5">
+    <div className={`extension-status-bar relative ${CHAT_COMPOSER_INSET_CLASS} flex shrink-0 items-stretch pb-3`}>
       {widgets.length > 0 ? <ExtensionWidgets widgets={widgets}>{statusLine}</ExtensionWidgets> : statusLine}
     </div>
   );

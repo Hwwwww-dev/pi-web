@@ -34,7 +34,6 @@ import { formatRelativeTime, formatShortRelativeTime } from "@/lib/i18n/format";
 import { skillExpansionToCommand } from "@/lib/slash-display";
 import { useGroupDrag, type GroupDragHandlers } from "@/hooks/useGroupDrag";
 import { useI18n } from "@/hooks/useI18n";
-import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import type { SidebarMenuAnchor } from "./SidebarMenu";
 import {
   ArchiveIcon,
@@ -162,7 +161,7 @@ const DELETE_TITLE_MAX = 22;
  * vars live on the scroll box (app/sidebar.css, measured scrollbar room).
  */
 const ROW_INSETS = "left-(--session-tree-inset-left) right-(--session-tree-inset-right)";
-const TEXT_COLUMN = "pl-[26px]";
+const TEXT_COLUMN = "pl-[22px]";
 
 /**
  * A session's display title: its stored name, else its first message (an
@@ -206,7 +205,6 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
-  useScrollbarVisibility(scrollRef);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
@@ -536,8 +534,18 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
 
 type Handlers = RefObject<SessionTreeProps>;
 
+/**
+ * Rows are laid out edge to edge by the virtualizer's offsets (the canvas height
+ * is their sum), so the visual box is inset a pixel at the top and bottom:
+ * adjacent rows read as two rows instead of one filled block.
+ */
+const ROW_VERTICAL_INSET = 1;
+
 function rowStyle(top: number, height: number) {
-  return { top, height };
+  return {
+    top: top + ROW_VERTICAL_INSET,
+    height: Math.max(0, height - ROW_VERTICAL_INSET * 2),
+  };
 }
 
 const SessionRowView = memo(function SessionRowView({
@@ -650,54 +658,48 @@ const SessionRowView = memo(function SessionRowView({
   const details = root.detailsPending ? "…" : t("sidebar.messagesCount", { count: root.messageCount });
   const tooltip = `${title}\n${details} · ${formatRelativeTime(root.modified, locale, nowDate)}${branch ? ` · ⑂ ${branch}` : ""}`;
 
-  // The right column says the one thing worth knowing: awaiting input, else
-  // running, else unread, else when (a pinned row names its project instead).
-  // An archived row shows its family's time like every row, never the archive
-  // time: an old session archived today read as "just now" (#1351).
-  // Nothing sits before the title, so it gets the room.
-  let meta: ReactNode;
-  let metaTitle: string | undefined;
+  // 运行状态是行首的那颗点（在行缩进里，标题之前）：等待输入琥珀色，其次运行中绿色，
+  // 再次未读强调色。它不占标题的位置。右侧只说时间，固定行用项目名代替。
+  // 归档行显示的是家族的修改时间而不是归档时间：今天归档的旧会话不该读作“刚刚”
+  // （#1351）。
+  let statusDot: ReactNode = null;
+  let statusTitle: string | undefined;
   if (status.awaiting) {
-    // The run is parked on a dialog only the user can answer: the same slot as
-    // the spinner, in the unread dot's shape, in warning amber (the rule lives
-    // in app/sidebar.css: the Debug panel renders the same span outside the
-    // tree). The tooltip says which of the two it is, since the row keeps its
-    // running actions.
-    meta = <span className="session-tree-awaiting" role="img" aria-label={t("sidebar.agentAwaitingInput")} />;
-    metaTitle = t("sidebar.agentAwaitingInput");
+    // 这轮停在一个只有用户能答的对话框上：未读点的形状 + 警告琥珀色（规则在
+    // app/sidebar.css，Debug 面板在树外渲染同一个 span）。
+    statusDot = <span className="session-tree-awaiting" role="img" aria-label={t("sidebar.agentAwaitingInput")} />;
+    statusTitle = t("sidebar.agentAwaitingInput");
   } else if (status.running) {
-    // The draft's green breathing dot in the time's slot, the same ring
-    // pattern as unread.
-    meta = (
+    // 草稿的绿色呼吸点，与未读点同一套光环。
+    statusDot = (
       <span
-        className="relative size-1.5 shrink-0 rounded-full bg-success after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-success after:opacity-35 motion-reduce:after:animate-none"
+        className="relative size-1.5 shrink-0 rounded-full bg-status-unread after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-status-unread after:opacity-35 motion-reduce:after:animate-none"
         role="img"
         aria-label={t("sidebar.agentRunning")}
-        aria-hidden={false}
       />
     );
-    metaTitle = t("sidebar.agentRunning");
+    statusTitle = t("sidebar.agentRunning");
   } else if (status.unread) {
-    meta = (
+    statusDot = (
       <span
-        className="relative size-1.5 shrink-0 rounded-full bg-accent after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-accent after:opacity-35 motion-reduce:after:animate-none"
+        className="relative size-1.5 shrink-0 rounded-full bg-status-unread after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-status-unread after:opacity-35 motion-reduce:after:animate-none"
         role="img"
         aria-label={t("sidebar.newSessionActivity")}
       />
     );
-    metaTitle = t("sidebar.newActivity");
-  } else if (context === "pinned") {
-    meta = <span className="inline-block max-w-[70px] truncate align-bottom">{row.project.name}</span>;
-  } else {
-    meta = formatShortRelativeTime(family.latestModified, locale, nowDate);
+    statusTitle = t("sidebar.newActivity");
   }
+
+  const dotLeft = context === "pinned" ? "left-[10px]" : "left-[22px]";
+  const meta = context === "pinned"
+    ? <span className="inline-block max-w-[70px] truncate align-bottom">{row.project.name}</span>
+    : formatShortRelativeTime(family.latestModified, locale, nowDate);
 
   // Archive (or restore) one click away: desktop only, never for a running
   // family, which would come straight back.
   const quickAction = layout === "desktop" && (context === "archive" || !status.running);
-  // The actions take the time's place while they show (a phone keeps both;
-  // the running row keeps its dot beside ⋯), and the keyboard brings them
-  // up with :focus-visible on anything in the row.
+  // 动作按钮占着时间的格子（手机上两者并存；行首的状态点不受影响），键盘通过行内任一元素的
+  // :focus-visible 唤出。
   const actionVisibility = isMobile
     ? "flex"
     : "hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex";
@@ -705,7 +707,7 @@ const SessionRowView = memo(function SessionRowView({
     ? "flex"
     : // Touch screens wider than a phone have no hover: keep ⋯ reachable.
       "hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex [@media(hover:none)]:flex";
-  const metaVisibility = isMobile || status.running
+  const metaVisibility = isMobile
     ? ""
     : "group-hover/tree-row:hidden group-has-[:focus-visible]/tree-row:hidden";
 
@@ -714,7 +716,7 @@ const SessionRowView = memo(function SessionRowView({
     "text-foreground",
     // Titles are the content: the item's 13px, a family's child a step
     // smaller (12.5px) and deeper.
-    context === "pinned" ? "text-sm" : "text-xs",
+    "text-[13px]",
     // The selected one a little heavier.
     status.selected ? "font-medium" : "",
     context === "archive" ? "text-muted-foreground" : "",
@@ -745,8 +747,7 @@ const SessionRowView = memo(function SessionRowView({
         </span>
       )}
       <span
-        className={`flex min-w-[26px] shrink-0 items-center justify-end text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap${status.running ? " text-accent" : ""}${metaVisibility ? ` ${metaVisibility}` : ""}`}
-        title={metaTitle}
+        className={`flex min-w-[26px] shrink-0 items-center justify-end text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap${metaVisibility ? ` ${metaVisibility}` : ""}`}
       >
         {meta}
       </span>
@@ -761,6 +762,17 @@ const SessionRowView = memo(function SessionRowView({
       onClick={() => handlers.current.onSelectFamily(family)}
       onContextMenu={(event) => handlers.current.onRowContextMenu(row, event)}
     >
+      {statusDot && (
+        // 行首的状态点：落在行的缩进末端、标题前 4px（子会话/归档行缩进 32px →
+        // left 22px，固定行缩进 20px → left 10px），不占标题的宽度，子会话的点
+        // 也不跟着缩进漂移。
+        <span
+          className={`absolute top-1/2 ${dotLeft} z-10 -translate-y-1/2`}
+          title={statusTitle}
+        >
+          {statusDot}
+        </span>
+      )}
       {status.transient ? (
         // No file yet: a link would open a session no other tab can load.
         <Button
@@ -800,7 +812,7 @@ const SessionRowView = memo(function SessionRowView({
               type="button"
               variant="ghost"
               size="icon-xs"
-              className={`session-tree-action session-tree-quick-action ml-0.5 ${actionVisibility}${isMobile ? " size-8" : ""}`}
+              className={`session-tree-action session-tree-quick-action ml-0.5 rounded-md hover:bg-accent dark:hover:bg-accent ${actionVisibility}${isMobile ? " size-8" : ""}`}
               aria-label={t("sidebar.restore")}
               title={t("sidebar.restore")}
               onClick={(event) => {
@@ -815,7 +827,7 @@ const SessionRowView = memo(function SessionRowView({
               type="button"
               variant="ghost"
               size="icon-xs"
-              className={`session-tree-action session-tree-quick-action ml-0.5 ${actionVisibility}${isMobile ? " size-8" : ""}`}
+              className={`session-tree-action session-tree-quick-action ml-0.5 rounded-md hover:bg-accent dark:hover:bg-accent ${actionVisibility}${isMobile ? " size-8" : ""}`}
               aria-label={t("sidebar.archive")}
               title={t("sidebar.archive")}
               onClick={(event) => {
@@ -830,7 +842,7 @@ const SessionRowView = memo(function SessionRowView({
             type="button"
             variant="ghost"
             size="icon-xs"
-            className={`session-tree-action session-tree-more-action ml-0.5 ${moreVisibility}${isMobile ? " size-8" : ""}${menuOpen ? " is-active bg-accent text-accent-foreground" : ""}`}
+            className={`session-tree-action session-tree-more-action ml-0.5 rounded-md hover:bg-accent dark:hover:bg-accent ${moreVisibility}${isMobile ? " size-8" : ""}${menuOpen ? " is-active bg-accent text-accent-foreground" : ""}`}
             aria-label={t("sidebar.moreActions")}
             title={t("sidebar.moreActions")}
             aria-haspopup="menu"
@@ -965,7 +977,7 @@ export function ActivitySummary({ running, awaiting = 0, unread, className, t }:
           title={t("sidebar.agentRunning")}
           aria-label={`${t("sidebar.agentRunning")} (${running})`}
         >
-          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-success" />
+          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-status-unread" />
           {running}
         </span>
       )}
@@ -976,7 +988,7 @@ export function ActivitySummary({ running, awaiting = 0, unread, className, t }:
           title={t("sidebar.agentAwaitingInput")}
           aria-label={`${t("sidebar.agentAwaitingInput")} (${awaiting})`}
         >
-          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-warning" />
+          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-status-awaiting" />
           {awaiting}
         </span>
       )}
@@ -987,7 +999,7 @@ export function ActivitySummary({ running, awaiting = 0, unread, className, t }:
           title={t("sidebar.newSessionActivity")}
           aria-label={`${t("sidebar.newSessionActivity")} (${unread})`}
         >
-          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-accent" />
+          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-status-unread" />
           {unread}
         </span>
       )}
@@ -1084,7 +1096,7 @@ const GroupRowView = memo(function GroupRowView({
       <Button
         type="button"
         variant="ghost"
-        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-0 text-left text-sm font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[5px] rounded-md bg-transparent py-0 pl-1 pr-0 text-left text-sm font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
         aria-expanded={expanded}
         title={project.root}
         onClick={(event) => handlers.current.onToggleGroup(project.key, event.altKey)}
@@ -1092,7 +1104,7 @@ const GroupRowView = memo(function GroupRowView({
         {/* A section header, not one more row: the chevron leads in a
             column of its own, so the name starts where the session titles
             below it do and every header's chevron lines up. */}
-        <ChevronRightIcon size={12} strokeWidth={3} className={`size-3 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${expanded ? " rotate-90" : ""}`} />
+        <ChevronRightIcon size={13} strokeWidth={3} className={`size-[13px] shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${expanded ? " rotate-90" : ""}`} />
         <span className="session-tree-group-name min-w-0 truncate">{project.name}</span>
         {project.pinned && <PinIcon size={10} className="ml-0.5 size-2.5 shrink-0 text-muted-foreground" role="img" aria-label={t("sidebar.pinnedProject")} aria-hidden={false} />}
         {!expanded && (
@@ -1110,7 +1122,7 @@ const GroupRowView = memo(function GroupRowView({
           type="button"
           variant="ghost"
           size="icon-xs"
-          className={`session-tree-group-action cursor-pointer${isMobile ? " size-8" : " size-6"}`}
+          className={`session-tree-group-action cursor-pointer${isMobile ? " size-8" : " size-5"} rounded-md hover:bg-accent dark:hover:bg-accent`}
           aria-label={t("sidebar.newSessionInProject", { name: project.name })}
           title={t("sidebar.newSessionInProject", { name: project.name })}
           onClick={(event) => {
@@ -1124,7 +1136,7 @@ const GroupRowView = memo(function GroupRowView({
           type="button"
           variant="ghost"
           size="icon-xs"
-          className={`session-tree-group-action cursor-pointer${isMobile ? " size-8" : " size-6"}${menuOpen ? " is-active bg-accent text-accent-foreground" : ""}`}
+          className={`session-tree-group-action cursor-pointer${isMobile ? " size-8" : " size-5"} rounded-md hover:bg-accent dark:hover:bg-accent${menuOpen ? " is-active bg-accent text-accent-foreground" : ""}`}
           aria-label={t("sidebar.projectActions", { name: project.name })}
           title={t("sidebar.projectActions", { name: project.name })}
           aria-haspopup="menu"
@@ -1167,16 +1179,16 @@ const PlainRowView = memo(function PlainRowView({
           <Button
             type="button"
             variant="ghost"
-            className="session-tree-pinned-toggle h-auto min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[11px] pr-2 text-left text-xs whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
+            className="session-tree-pinned-toggle h-auto min-w-0 flex-1 items-center justify-start gap-[5px] rounded-md bg-transparent py-0 pl-1 pr-2 text-left text-[13px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
             aria-expanded={!row.collapsed}
             onClick={() => handlers.current.onTogglePinned()}
           >
-            <ChevronRightIcon size={12} strokeWidth={3} className={`size-3 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${row.collapsed ? "" : " rotate-90"}`} />
+            <ChevronRightIcon size={13} strokeWidth={3} className={`size-[13px] shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${row.collapsed ? "" : " rotate-90"}`} />
             <span className="session-tree-pinned-label min-w-0 truncate font-semibold tracking-[0.05em] uppercase">{t("sidebar.pinned")}</span>
             <span className="session-tree-pinned-count font-normal text-muted-foreground">· {row.count}</span>
             {row.collapsed && row.running > 0 && (
               <span
-                className="session-tree-pinned-dot is-running ml-0.5 size-1.5 shrink-0 rounded-full bg-success"
+                className="session-tree-pinned-dot is-running ml-0.5 size-1.5 shrink-0 rounded-full bg-status-unread"
                 role="img"
                 title={t("sidebar.agentRunning")}
                 aria-label={`${t("sidebar.agentRunning")} (${row.running})`}
@@ -1184,7 +1196,7 @@ const PlainRowView = memo(function PlainRowView({
             )}
             {row.collapsed && row.awaiting > 0 && (
               <span
-                className="session-tree-pinned-dot is-awaiting ml-0.5 size-1.5 shrink-0 rounded-full bg-warning"
+                className="session-tree-pinned-dot is-awaiting ml-0.5 size-1.5 shrink-0 rounded-full bg-status-awaiting"
                 role="img"
                 title={t("sidebar.agentAwaitingInput")}
                 aria-label={`${t("sidebar.agentAwaitingInput")} (${row.awaiting})`}
@@ -1192,7 +1204,7 @@ const PlainRowView = memo(function PlainRowView({
             )}
             {row.collapsed && row.unread > 0 && (
               <span
-                className="session-tree-pinned-dot is-unread ml-0.5 size-1.5 shrink-0 rounded-full bg-accent"
+                className="session-tree-pinned-dot is-unread ml-0.5 size-1.5 shrink-0 rounded-full bg-status-unread"
                 role="img"
                 title={t("sidebar.newSessionActivity")}
                 aria-label={`${t("sidebar.newSessionActivity")} (${row.unread})`}
@@ -1209,7 +1221,7 @@ const PlainRowView = memo(function PlainRowView({
       // gives way so "Show less" is never clipped.
       const lone = (row.hidden > 0 ? 1 : 0) + (row.canShowLess ? 1 : 0) === 1;
       const toggleClass = (loneButton: boolean, marginLeft = false) => [
-        "session-tree-more-toggle h-full min-w-0 truncate rounded-md bg-transparent px-0 py-0 text-left text-xs whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground",
+        "session-tree-more-toggle h-full min-w-0 truncate rounded-md bg-transparent px-0 py-0 text-left text-[13px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground",
         loneButton ? "flex-1" : "shrink",
         marginLeft ? "ml-[14px]" : "",
       ].filter(Boolean).join(" ");
@@ -1244,12 +1256,12 @@ const PlainRowView = memo(function PlainRowView({
       // "No sessions yet" and an unpinned group's "Pin to keep" side by side.
       return (
         <div className={`session-tree-row session-tree-group-empty left-0 right-0 flex min-w-0 items-center ${TEXT_COLUMN} pr-1`} style={style} data-row-key={row.key}>
-          <span className="session-tree-group-empty-label min-w-0 flex-[0_1_auto] truncate text-xs text-muted-foreground">{t("sidebar.noLiveSessions")}</span>
+          <span className="session-tree-group-empty-label min-w-0 flex-[0_1_auto] truncate text-[13px] text-muted-foreground">{t("sidebar.noLiveSessions")}</span>
           {!row.project.pinned && (
             <Button
               type="button"
               variant="ghost"
-              className="session-tree-more-toggle ml-[14px] h-full min-w-0 flex-none truncate rounded-md bg-transparent px-0 py-0 text-left text-xs whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
+              className="session-tree-more-toggle ml-[14px] h-full min-w-0 flex-none truncate rounded-md bg-transparent px-0 py-0 text-left text-[13px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
               onClick={() => handlers.current.onPinEmptyGroup(row.project)}
             >
               {t("sidebar.pinToKeep")}
@@ -1265,7 +1277,7 @@ const PlainRowView = memo(function PlainRowView({
           <Button
             type="button"
             variant="ghost"
-            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-1 text-left text-xs text-muted-foreground hover:bg-accent hover:text-muted-foreground"
+            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[7px] pr-1 text-left text-[13px] text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-muted-foreground"
             onClick={(event) => handlers.current.onOpenOtherProject(event.currentTarget)}
           >
             <FolderPlusIcon size={12} className="size-3 shrink-0" />
@@ -1279,7 +1291,7 @@ const PlainRowView = memo(function PlainRowView({
           <Button
             type="button"
             variant="ghost"
-            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-1 text-left text-xs text-muted-foreground hover:bg-accent hover:text-muted-foreground"
+            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[7px] pr-1 text-left text-[13px] text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-muted-foreground"
             onClick={() => handlers.current.onOpenArchive()}
           >
             <ArchiveIcon size={12} className="size-3 shrink-0" />
@@ -1325,12 +1337,12 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
       <Button
         type="button"
         variant="ghost"
-        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[5px] pr-0 text-left text-sm font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[5px] rounded-md bg-transparent py-0 pl-1 pr-0 text-left text-sm font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
         aria-expanded={expanded}
         title={project.root}
         onClick={(event) => handlers.current.onToggleArchiveGroup?.(project.key, event.altKey)}
       >
-        <ChevronRightIcon size={12} strokeWidth={3} className={`size-3 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${expanded ? " rotate-90" : ""}`} />
+        <ChevronRightIcon size={13} strokeWidth={3} className={`size-[13px] shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${expanded ? " rotate-90" : ""}`} />
         <span className="session-tree-group-name min-w-0 truncate">{project.name}</span>
         <span className="session-tree-archive-group-count ml-0.5 shrink-0 font-normal text-muted-foreground">· {row.count}</span>
       </Button>
@@ -1339,7 +1351,7 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
           type="button"
           variant="ghost"
           size="icon-xs"
-          className={`session-tree-group-action cursor-pointer${layout === "mobile" ? " size-8" : " size-6"}${menuOpen ? " is-active bg-accent text-accent-foreground" : ""}`}
+          className={`session-tree-group-action cursor-pointer${layout === "mobile" ? " size-8" : " size-5"} rounded-md hover:bg-accent dark:hover:bg-accent${menuOpen ? " is-active bg-accent text-accent-foreground" : ""}`}
           aria-label={t("sidebar.archivedProjectActions", { name: project.name })}
           title={t("sidebar.archivedProjectActions", { name: project.name })}
           aria-haspopup="menu"

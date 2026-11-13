@@ -18,7 +18,7 @@ export const FILE_CODE_STYLE: CSSProperties = {
   lineHeight: 1.6,
 };
 
-/** 行号列的宽度跟着位数走：固定 48px 让「2」「6」这种一位数右边空出一大截（用户报的“行号太空”）。 */
+/** 行号列宽度随位数变化：固定 48px 会使一位数（「2」「6」）右侧留出大量空白。 */
 const LINE_NUMBER_BASE: CSSProperties = {
   padding: "0 8px",
   textAlign: "right",
@@ -38,9 +38,8 @@ const LINE_NUMBER_BASE: CSSProperties = {
 /** Gutter width for a view whose largest line number is `lineCount`. */
 export function lineNumberGutter(lineCount: number, pinned = false): CSSProperties {
   const digits = Math.max(2, String(Math.max(1, Math.floor(lineCount))).length);
-  // 宽度 = 数字宽度 + 左右 padding + 余量。写成 width 而不是 minWidth 时，
-  // border-box 把 8px+8px 的 padding 算在那点宽度里，四位数直接把字挤到
-  // gutter 外面，+/− 标记就贴在行号后面了。
+  // 宽度 = 数字宽度 + 左右 padding + 余量。若写作 width 而非 minWidth，
+  // border-box 会将 16px padding 计入该宽度，四位数会把文字挤出 gutter，+/− 标记紧贴行号。
   const width = `calc(${digits}ch + 22px)`;
   return {
     ...LINE_NUMBER_BASE,
@@ -168,7 +167,7 @@ export function DiffView({ patch, wrapLines = false }: { patch: string; wrapLine
         const lines = seg.lines.map((line, li) => {
           const prefix =
             line.type === "added" ? "+" : line.type === "removed" ? "-" : " ";
-          // 增删行用官方 code-block 的行变体：底色与 +/- 标记由变体给，这里只摆行号与内容。
+          // 增删行使用 code-block 的行变体：底色与 +/- 标记由变体提供，此处只放置行号与内容。
           return (
             <CodeBlockLine
               key={li}

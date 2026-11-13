@@ -120,6 +120,15 @@ type RecalledPrompts = {
   steering: string[];
   followUp: string[];
   images?: Array<{ data: string; mimeType: string }>;
+  /** Stop only: every queued prompt in send order, which the client sends again once the run has unwound. */
+  queued?: StopQueueEntry[];
+};
+
+/** One queued prompt Stop hands back, with the behavior it was queued under. */
+type StopQueueEntry = {
+  text: string;
+  behavior: "steer" | "followUp";
+  images?: Array<{ data: string; mimeType: string }>;
 };
 /** `sessionName`: the live session's own title (its newest `session_info`), read without a disk scan. */
 type AgentRunCompleteListener = (sessionId: string, sessionName: string | undefined) => void;
@@ -700,6 +709,51 @@ export class AgentSessionWrapper {
     };
   }
 
+  /**
+   * Stop takes every queued prompt back before it aborts, pi's own queue and the
+   * ones parked behind a compaction alike: a steer left queued was sent at the
+   * stopped run's turn boundary or went out with the next prompt, and a parked
+   * one would go out when the compaction that Stop ends finishes. The client
+   * sends them again in arrival order once the run has unwound, so what was
+   * typed during the run still goes out.
+   */
+  private takeQueueForStop(): RecalledPrompts {
+    // Their attachments are readable only while the queue still holds them.
+    const withImages = this.inner.pendingMessageCount > 0 ? this.buildQueuedEntries() : [];
+    const imagesByText = new Map(withImages.map((entry) => [entry.text, entry.images]));
+    const cleared = this.inner.clearQueue();
+    const entryFor = (text: string, behavior: StopQueueEntry["behavior"]): StopQueueEntry => {
+      const images = imagesByText.get(text);
+      imagesByText.delete(text);
+      return { text, behavior, ...(images?.length ? { images: images.map(({ data, mimeType }) => ({ data, mimeType })) } : {}) };
+    };
+    const queued: StopQueueEntry[] = [
+      ...cleared.steering.map((text) => entryFor(text, "steer")),
+      ...cleared.followUp.map((text) => entryFor(text, "followUp")),
+    ];
+    const parked = this.parkedDuringCompaction;
+    this.parkedDuringCompaction = [];
+    for (const entry of parked) entry.settle();
+    for (const entry of parked) {
+      queued.push({
+        text: entry.message,
+        behavior: entry.streamingBehavior ?? "steer",
+        ...(entry.images?.length
+          ? { images: entry.images.map(({ data, mimeType }) => ({ data, mimeType })) }
+          : {}),
+      });
+    }
+    if (queued.length) this.emitQueueUpdate();
+    // A plain prompt's client waits for prompt_done; nothing ran under it, and what
+    // follows is sent as a new run.
+    if (parked.some((entry) => entry.streamingBehavior === undefined)) this.emit({ type: "prompt_done", aborted: true });
+    return {
+      steering: queued.filter((entry) => entry.behavior === "steer").map((entry) => entry.text),
+      followUp: queued.filter((entry) => entry.behavior === "followUp").map((entry) => entry.text),
+      ...(queued.length ? { queued } : {}),
+    };
+  }
+
   private emitQueueUpdate(): void {
     this.emit({ type: "queue_update", ...this.mergedQueuedMessages() });
   }
@@ -976,7 +1030,8 @@ export class AgentSessionWrapper {
   /** A copy of a side chat would be read as one, or show its parent's history as a new session. */
   private refuseForkOfSideChat(): void {
     // SAFETY: SDK entries mirror the app's SessionEntry shape (lib/pi-types.ts); hasSideMetadata only reads the pi-web:side metadata field.
-    if (hasSideMetadata(this.inner.sessionManager.getEntries() as unknown as SessionEntry[])) {
+    const entries = this.inner.sessionManager.getEntries() as unknown as SessionEntry[];
+    if (hasSideMetadata(entries)) {
       throw new Error("A side chat cannot be forked");
     }
   }
@@ -1333,10 +1388,10 @@ export class AgentSessionWrapper {
           // Stop answers without waiting for that preparation to unwind.
           void wait.done.catch(() => {});
         }
-        // Stop ends the compaction, whose end would send the parked prompts:
-        // they go back to the composer instead, as the TUI's abort restores
-        // queued messages to the editor.
-        const recalled = this.recallParkedPrompts();
+        // Stop ends the compaction, whose end would send the parked prompts: they go
+        // back with pi's queue instead, and the client sends all of them once the run
+        // has unwound (see takeQueueForStop).
+        const recalled = this.takeQueueForStop();
         // The SDK's abort() resolves only once the running tool call unwinds, so
         // awaiting it left the Stop request hanging — no reply for as long as the
         // tool ran. Ask for the stop, answer now, and let the unwind finish alone.
@@ -1347,7 +1402,7 @@ export class AgentSessionWrapper {
           .finally(() => {
             if (!this.isRunning()) this.forceShutdownOnIdle = false;
           });
-        return recalled.steering.length || recalled.followUp.length ? recalled : null;
+        return recalled.queued?.length ? recalled : null;
       }
 
       case "get_state": {
@@ -2827,7 +2882,8 @@ export async function setRpcSessionTools(
       throw new Error("Subagent tool selection is fixed by its profile");
     }
     // SAFETY: same SDK-entry-to-SessionEntry bridge; the reader only inspects side metadata.
-    if (hasSideMetadata(manager.getEntries() as unknown as SessionEntry[])) {
+    const entries = manager.getEntries() as unknown as SessionEntry[];
+    if (hasSideMetadata(entries)) {
       throw new Error("Side chat tools are fixed when it is forked");
     }
     if (toolNames === undefined) appendClearedSessionToolSelection(manager);
@@ -2842,7 +2898,8 @@ export async function setRpcSessionTools(
     throw new Error("Subagent tool selection is fixed by its profile");
   }
   // SAFETY: same SDK-entry-to-SessionEntry bridge; the reader only inspects side metadata.
-  if (hasSideMetadata(existing.inner.sessionManager.getEntries() as unknown as SessionEntry[])) {
+  const entries = existing.inner.sessionManager.getEntries() as unknown as SessionEntry[];
+  if (hasSideMetadata(entries)) {
     throw new Error("Side chat tools are fixed when it is forked");
   }
 
@@ -2940,9 +2997,10 @@ export function getRpcSessionInfos(options: { includeTransient?: boolean } = {})
     const sessionFile = manager.getSessionFile() ?? session.sessionFile;
     const persisted = Boolean(sessionFile && existsSync(sessionFile));
     // SAFETY: SDK raw entries mirror the app's SessionEntry shape (lib/pi-types.ts).
+    const sessionEntries = entries as unknown as SessionEntry[];
     // SAFETY: readSubagentRun reads only headers/parent chain, readSideRelation only the pi-web:side metadata.
-    const subagent = readSubagentRun(entries as unknown as SessionEntry[], header?.id ?? session.sessionId, sessionFile ?? "");
-    const side = subagent ? null : readSideRelation(entries as unknown as SessionEntry[]);
+    const subagent = readSubagentRun(sessionEntries, header?.id ?? session.sessionId, sessionFile ?? "");
+    const side = subagent ? null : readSideRelation(sessionEntries);
 
     // An ensure_session call creates an idle, empty runtime while the composer
     // loads commands. Do not leak it into history before a prompt is accepted.

@@ -12,17 +12,16 @@
   position: absolute;
 }
 
-/* Rows sit 6px in from the left edge in every browser: the grid the brand,
-   the files section's header, the picker and the file tree keep too
-   (chevron column 11px in, text column 26px). A classic scrollbar takes
+/* Rows run edge to edge inside the sidebar's own 6px padding, so their
+   highlights line up with the tab bar above them. A classic scrollbar takes
    its width from the right only (--session-tree-scrollbar, measured in
-   SessionTree), so the right inset shrinks by it: the rows end 6px in, or
-   on the gutter's edge where that is further in. The scrollbar's room is
-   kept while the list fits too, so rows do not narrow when it starts to
-   scroll; an overlay scrollbar reserves nothing. */
+   SessionTree), so the right inset gives that room back: nothing is lost
+   twice. The scrollbar's room is kept while the list fits too, so rows do
+   not narrow when it starts to scroll; an overlay scrollbar reserves
+   nothing. */
 .session-tree-scroll {
-  --session-tree-inset-left: 6px;
-  --session-tree-inset-right: max(0px, calc(6px - var(--session-tree-scrollbar, 0px)));
+  --session-tree-inset-left: 0px;
+  --session-tree-inset-right: max(0px, calc(0px - var(--session-tree-scrollbar, 0px)));
   scrollbar-gutter: stable;
 }
 
@@ -36,35 +35,17 @@
 }
 
 /* Below the sessions, the files' right edge is the session times': a
-   session row ends 6px in, or on the tree's classic scrollbar's gutter
-   where that is further in, and its time 4px inside the row. The header
-   row's keys and the picker's boxes end there. */
+   session row ends at the tree's classic scrollbar's gutter, and its time
+   4px inside the row. The header row's keys and the picker's boxes end
+   there. */
 .session-sidebar.is-files-below {
-  --sidebar-files-inset-right: max(10px, calc(var(--session-tree-scrollbar, 0px) + 4px));
+  --sidebar-files-inset-right: max(4px, calc(var(--session-tree-scrollbar, 0px) + 4px));
 }
 
-/* Where the header's labels do not fit (useHeaderFit measures them: their
-   widths change with the language): New keeps its + (fit 1), then the
-   brand's text takes the sidebar's meta size (fit 2, which only the
-   versions reach), and a hidden label leaves the layout for good. */
-.sidebar-header[data-fit="1"] .sidebar-new-button,
-.sidebar-header[data-fit="2"] .sidebar-new-button {
-  width: var(--top-bar-height);
-  padding: 0;
-}
-
+/* Where the brand's text does not fit (useHeaderFit measures it: its width
+   changes with the language), it takes the sidebar's meta size. */
 .sidebar-header[data-fit="2"] .sidebar-brand {
   font-size: 11px;
-}
-
-.sidebar-header[data-fit="1"] .sidebar-new-label,
-.sidebar-header[data-fit="2"] .sidebar-new-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
 }
 
 /* A fold or an unfold (only those: .is-files-folding is on the root while
@@ -134,21 +115,24 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--warning);
+  background: var(--status-awaiting);
 }
 
 .session-tree-awaiting::after {
   content: "";
   position: absolute;
   inset: -3px;
-  border: 1.4px solid var(--warning);
+  border: 1.4px solid var(--status-awaiting);
   border-radius: 50%;
   opacity: 0.35;
   animation: session-tree-status-pulse 1.6s ease-in-out infinite;
 }
 
+/* The ripple: the ring grows to 1.6x while fading out, then starts again —
+   without the fade it reads as a static hollow circle. */
 @keyframes session-tree-status-pulse {
   50% {
     transform: scale(1.6);
+    opacity: 0;
   }
 }

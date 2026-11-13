@@ -22,7 +22,7 @@ export function ContextBadge({ tokens, contextWindow, percent, color }: {
 }) {
   const { t } = useI18n();
   const label = (
-    // 第 4 节：与用量行同一种行内小字，不是胶囊。
+    // 第 4 节：与用量行一致的行内小字样式，不使用胶囊。
     <span className="inline-flex items-center gap-1 text-muted-foreground">
       <span className="opacity-75">ctx</span>
       {/* ctxColor arrives as a token string from the caller — keep the injection. */}

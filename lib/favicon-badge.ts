@@ -13,7 +13,7 @@ export interface FaviconBadge {
   count: number;
 }
 
-export const FAVICON_BASE_ICON_URL = "/icons/icon-192.png";
+export const FAVICON_BASE_ICON_URL = "/icons/logo.svg";
 export const FAVICON_BADGE_MAX_COUNT = 99;
 
 export const FAVICON_BADGE_COLORS = {

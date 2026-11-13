@@ -23,16 +23,16 @@ function render(props) {
 }
 
 test("renders the shadcn menu shape: radio items, provider labels, chevron trigger", async () => {
-  // 菜单只在打开时挂载,SSR 不产出内容,所以形状断言落在组件源码上。
+  // 菜单仅在打开时挂载，SSR 不产出内容，因此形状断言基于组件源码。
   const source = await readFile(new URL("./ModelSelector.tsx", import.meta.url), "utf8");
 
   assert.match(source, /DropdownMenuRadioGroup/);
   assert.match(source, /<DropdownMenuRadioItem/);
   assert.match(source, /<DropdownMenuLabel/);
   assert.match(source, /<DropdownMenuTrigger asChild>/);
-  // 参考实现没有搜索框:不再携带 Command/Popover。
+  // 参考实现无搜索框，故不引入 Command/Popover。
   assert.doesNotMatch(source, /CommandInput|<Popover/);
-  // 触发钮带下拉箭头(参考形态)。
+  // 触发钮带下拉箭头（与参考实现一致）。
   assert.match(source, /ChevronDownIcon className="size-3 shrink-0 text-muted-foreground"/);
 });
 

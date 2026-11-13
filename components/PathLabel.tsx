@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-// 批 4：globals 的 .path-label 规则迁入为本工具类集。
+// 由 globals 的 .path-label 规则迁入的工具类集合。
 const PATH_LABEL_CLASS = "path-label block min-w-0 overflow-hidden text-left [direction:rtl] [text-overflow:ellipsis] whitespace-nowrap leading-[1.35]";
 
 /**

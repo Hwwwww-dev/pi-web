@@ -85,7 +85,7 @@ export function TerminalExtraKeys({ modifiers, onKey, onToggleModifier }: Props)
   };
 
   return (
-    // 面板的末行网格（批 4 自 app/globals.css 迁入）：键盘打开时由该文件的
+    // 面板末行网格（由 app/globals.css 迁入）：键盘打开时由该文件的
     // html[data-keyboard-open] 覆写收起安全区内边距。
     <div
       className="terminal-extra-keys grid [grid-row:4] grid-cols-7 auto-rows-[36px] bg-(--terminal-header-bg) pb-[env(safe-area-inset-bottom)]"

@@ -14,7 +14,7 @@ import { LayersIcon } from "lucide-react";
 import { useTraceFold } from "./TraceRow";
 
 /**
- * A whole turn (官方 `trace` 文档「Whole Turn」): the folded line above the
+ * A whole turn (official `trace` doc, "Whole Turn"): the folded line above the
  * answer. It has no icon — the summary text is the whole line — and its content
  * is a `<Trace>` of the same rows the answer is made of.
  */

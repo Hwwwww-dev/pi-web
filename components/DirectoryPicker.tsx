@@ -29,8 +29,8 @@ interface CreateDirectoryResponse {
 
 const panelSurfaceClass = "overflow-hidden rounded-lg border border-border bg-background shadow-[0_8px_32px_rgba(0,0,0,0.18)]";
 
-// 焦点环由未分层 CSS 的 .directory-picker-path:focus-visible 提供（border + box-shadow），
-// 这里不叠加 focus-visible:ring，避免双环与被压制的死 utility。
+// 焦点环由未分层 CSS 的 .directory-picker-path:focus-visible 提供（border + box-shadow）；
+// 此处不叠加 focus-visible:ring，避免出现双环与失效的 utility。
 const textInputClass = "h-9 rounded-md border border-border bg-card px-2.5 font-mono text-xs text-foreground outline-none shadow-none";
 
 const actionButtonClass = "rounded-md px-4 py-1.5 text-sm";

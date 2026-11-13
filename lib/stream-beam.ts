@@ -1,29 +1,23 @@
 /**
- * How much of the current reply has arrived, in characters.
+ * How much of a session's current reply has arrived, in characters.
  *
- * The composer's beam uses it to work out how fast the reply is streaming, and
- * the chat publishes it rather than threading it through props: a chunk lands
- * dozens of times a second, and the composer is memoized so a new prop per
- * chunk would re-render the whole input bar.
+ * Keyed by session: keep-alive slots leave several chat windows mounted at once,
+ * and a background session's stream must not be read as this one's burst. The
+ * composer's beam uses it to work out how fast the reply is streaming, and the
+ * chat publishes it rather than threading it through props: a chunk lands dozens
+ * of times a second, and the composer is memoized so a new prop per chunk would
+ * re-render the whole input bar.
  */
-type Listener = () => void;
+const charactersBySession = new Map<string, number>();
 
-let characters = 0;
-const listeners = new Set<Listener>();
-
-export function getStreamCharacters(): number {
-  return characters;
+export function getStreamCharacters(sessionKey: string): number {
+  return charactersBySession.get(sessionKey) ?? 0;
 }
 
-export function publishStreamCharacters(next: number): void {
-  if (next === characters) return;
-  characters = next;
-  for (const listener of listeners) listener();
-}
-
-export function subscribeStreamCharacters(listener: Listener): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
+export function publishStreamCharacters(sessionKey: string, next: number): void {
+  if (next > 0) {
+    charactersBySession.set(sessionKey, next);
+    return;
+  }
+  charactersBySession.delete(sessionKey);
 }

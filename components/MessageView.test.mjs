@@ -220,7 +220,7 @@ test("a nested argument becomes rows, one per leaf: a row cannot hold a subtree"
     const html = renderMessage({ role: "assistant", provider: "anthropic", model: "claude-test", content: [block] });
     const text = textOf(html);
     assert.ok(!html.includes('flex min-w-0 flex-col gap-0.5 font-mono wrap-anywhere'));
-    // 叶子各自一行，路径写成 `filter.labels[0]`：表格的一行装不下子树。
+    // 叶子节点各占一行，路径写为 `filter.labels[0]`：表格单行容纳不下子树。
     assert.ok(text.includes("filter.labels[0]"));
     assert.ok(text.includes("filter.assignee"));
     assert.ok(!text.includes('"filter"'));
@@ -678,7 +678,7 @@ test("one column names a deleted file's section by its old path", () => {
   assert.ok(!html.includes("/dev/null"));
 });
 
-// The tool card's internals moved to the官方 pattern layer: `lib/tool-view.ts`
+// The tool card's internals moved to the official pattern layer: `lib/tool-view.ts`
 // decides what a call shows, `components/transcript/*` renders it. Its own view
 // model is covered by lib/tool-view.test.mjs; these keep the wiring in place.
 const activityRowsSource = await readFileSync(new URL("./ActivityRows.tsx", import.meta.url), "utf8");

@@ -123,7 +123,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                 variant="outline"
                 size="xs"
                 className={cn(
-                  // 官方 outline 胶囊（与扩展状态 pill 同一形状），不再自绘贴边标签。
+                  // 使用 outline 胶囊（与扩展状态 pill 同形状），不自绘贴边标签。
                   "h-7 gap-1 rounded-md bg-background px-2 text-xs font-normal text-muted-foreground shadow-xs select-none [touch-action:none]",
                   "hover:bg-accent hover:text-accent-foreground",
                   open && "bg-accent text-accent-foreground",
@@ -161,9 +161,10 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
           alignOffset={-18}
           role="menu"
           aria-label={t("keepalive.title")}
-          className="max-h-[min(440px,62vh)] w-[min(320px,calc(100vw-56px))] overflow-y-auto overscroll-contain rounded-lg p-1"
+          className="w-[min(320px,calc(100vw-56px))] overflow-hidden rounded-lg p-1"
         >
-          <div className="flex flex-col">
+          {/* 滚动条放在内层：外层圆角 + 裁切，滚动条才不会在圆角外侧露出方角。 */}
+          <div className="flex max-h-[calc(min(440px,62vh)-8px)] flex-col overflow-y-auto overscroll-contain">
             {slots.map((slot) => {
               // Counts and timing come from the live catalogue so this panel and
               // the session tree never disagree; the slot snapshot is only the

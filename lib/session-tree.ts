@@ -32,12 +32,14 @@ export type SidebarRowKind =
  * project's, the archive's projects) are one height, 34px — the draft
  * item's (.pm-item) — with the pinned section's label, the empty group's
  * note and the footer a step shorter at 28px; only "show more" is shorter
- * still. On a phone every row the finger touches is 40px (the draft's ≤640
- * .pm-item); a spacer opens the list and parts the pinned section from the
- * groups, one group from the next and the groups from the footer.
+ * still. Project headers follow the file tree's 22px rows instead, so the
+ * projects read as tightly as the files below them. On a phone every row the
+ * finger touches is 40px (the draft's ≤640 .pm-item); a spacer opens the list
+ * and parts the pinned section from the groups, one group from the next and
+ * the groups from the footer.
  */
 export const SIDEBAR_ROW_HEIGHTS: Record<SidebarLayout, Record<SidebarRowKind, number>> = {
-  desktop: { "pinned-header": 28, session: 34, "pinned-more": 26, group: 34, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 34 },
+  desktop: { "pinned-header": 28, session: 34, "pinned-more": 26, group: 26, "group-more": 24, "group-empty": 24, spacer: 4, "footer-open": 28, "footer-archived": 28, "archive-group": 26 },
   mobile: { "pinned-header": 40, session: 40, "pinned-more": 36, group: 40, "group-more": 36, "group-empty": 40, spacer: 8, "footer-open": 40, "footer-archived": 40, "archive-group": 40 },
 };
 

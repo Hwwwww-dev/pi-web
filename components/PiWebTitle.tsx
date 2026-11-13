@@ -6,10 +6,10 @@ import { useI18n } from "@/hooks/useI18n";
 
 /**
  * The sidebar's brand with the files below the sessions (its toolbar row,
- * components/SessionSidebar.tsx; the tabs layout has its tabs there), with
- * the old sidebar's easter egg: a click scrambles "Pi Web" into the versions
- * (pi-web's, a "p", pi's) in the accent; they scramble back after
- * VERSION_SHOWN_MS, or at once on a second click.
+ * components/SessionSidebar.tsx; the tabs layout has its tabs there). It
+ * shows the logo, not the name: a click swaps it for the versions (pi-web's,
+ * a "p", pi's) in the accent, scrambled into place; they give way to the
+ * logo again after VERSION_SHOWN_MS, or at once on a second click.
  */
 
 export const BRAND_TEXT = "Pi Web";
@@ -121,11 +121,16 @@ export function PiWebTitle({ onWidthChange }: {
       type="button"
       variant="ghost"
       size="default"
-      className={`sidebar-brand ml-[7px] h-auto min-w-[6ch] justify-start rounded-md px-1 py-0.5 text-left font-mono text-base font-bold tracking-[-0.01em] whitespace-nowrap cursor-default text-foreground${versionShown ? " text-accent" : ""}`}
+      className={`sidebar-brand ml-[7px] h-auto justify-start rounded-md px-1 py-0.5 text-left font-mono text-base font-bold tracking-[-0.01em] whitespace-nowrap cursor-default text-foreground${versionShown ? " min-w-[6ch] text-accent" : " min-w-0"}`}
       aria-label={t("sidebar.brandLabel", { app: appVersion ?? "0.0.0", pi: piVersion ?? "0.0.0" })}
       onClick={handleClick}
     >
-      {text}
+      {versionShown ? text : (
+        // A static SVG at its own size: next/image buys nothing here and does
+        // not render under the tests' JSX runtime.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src="/icons/logo.svg" alt="" width={32} height={32} className="size-8 shrink-0" />
+      )}
     </Button>
   );
 }

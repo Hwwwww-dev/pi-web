@@ -279,3 +279,19 @@ Files: `lib/markdown.ts` (`markdownClobberPrefix`, `rehypeMatchClobberedIds`, `j
 - `lib/session-view-cache.ts` measures a snapshot (its `JSON.stringify` length) once, when it is stored, and evicts by the stored sizes: snapshots are never mutated in place. Re-serializing every cached session on each store took 7.7 ms with eight 0.8 MB snapshots (1.3 ms now), at every run's end, compaction and session switch. The unmount check for a wider cached window is `snapshotCoversLoadedEntries()` (a `Set`), not nested `includes`.
 - Code fences (`CodeBlock`, `components/MermaidBlock.tsx`): Prism tokenizes in the render, about 5-10 ms per 1,000 characters of TypeScript on a desktop. Within one task the first 2,000 characters of fences are highlighted at once (`takeHighlightBudget()`); the others render through the same `SyntaxHighlighter` as `text` (same lines, numbers and box, no tokens) and take their language one per idle slice, newest first (`waitForHighlight()`; Safari has no `requestIdleCallback` and waits 50 ms). Opening a session with 86 fences at 4x CPU throttling, the commit that shows the messages went from 1.1 s to 0.66 s; the end of a streamed reply gets the same budget. `codeTagProps` sets no class, so tell a highlighted fence by its `span.token` elements other than `.linenumber`, not by a `language-*` class. Fences wrap long lines, as pi's TUI does (no toggle; #1360): `renderCodeLines()` makes each line a flex row of its number and its text (`.markdown-code-line`, `overflow-wrap: anywhere` for URLs and paths), so a wrapped line goes on under its text, the text keeping the row's classes (the later lines of a block comment take their color from them), and an extension dialog measures its fences unwrapped (`.extension-dialog-measuring`) so it still widens to show them whole where the screen allows (#947).
 - Prism languages load on demand (`lib/prism-languages.ts`, `hooks/usePrismLanguages.ts`). `CodeBlock` and `FileViewer` render with `react-syntax-highlighter/dist/esm/prism-light` (refractor's core), never the package index: its `Prism` imports `refractor/all`, which registers about 300 languages when evaluated, ~650 ms of the first `AppShell` render at 4x CPU throttling on every page load, code on screen or not. The first highlighter to mount imports `refractor/all` as a chunk of its own; it registers into the same core instance, so every language and alias works as before. Until then fences render as `text` and files as `plaintext` (same lines, numbers and box). A page with no code never loads it. Client code imports only types from `react-syntax-highlighter` itself.
+
+## Session file layout
+
+Location: `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`
+
+```jsonl
+{"type":"session","version":3,"id":"<uuid>","timestamp":"...","cwd":"/path","parentSession":"/abs/path/to/parent.jsonl"}
+{"type":"model_change","id":"<8hex>","parentId":null,"provider":"zenmux","modelId":"claude-sonnet-4-6","timestamp":"..."}
+{"type":"message","id":"<8hex>","parentId":"<8hex>","message":{"role":"user","content":"..."}}
+{"type":"message","id":"<8hex>","parentId":"<8hex>","message":{"role":"assistant","content":[...],...}}
+{"type":"message","id":"<8hex>","parentId":"<8hex>","message":{"role":"toolResult","toolCallId":"...","content":[...]}}
+{"type":"compaction","id":"<8hex>","parentId":"<8hex>","summary":"...","firstKeptEntryId":"<8hex>","tokensBefore":N}
+{"type":"session_info","id":"...","parentId":"...","name":"user-defined name"}
+```
+
+`SessionContext.entryIds[]` parallels `messages[]`: each displayed message's `.jsonl` entry id, used for fork and navigate_tree.

@@ -2,30 +2,57 @@
 
 import { useEffect } from "react";
 
-interface ViewportHeightState {
-  hasFocusedEditable: boolean;
-  /** Tallest on-screen viewport height seen so far, i.e. the no-keyboard height. */
-  fullHeight: number;
-  /** Current on-screen viewport height. */
-  visibleHeight: number;
-  viewportScale: number;
+/**
+ * How far the shell has to slide up for its bottom edge to sit on the visible
+ * viewport: the rendered shell height minus what the keyboard hides. The pan
+ * counts separately: `visualViewport.offsetTop` grows when iOS shifts the
+ * visible part down to reveal the focused field, and that shift already moved
+ * the shell, so counting it twice would overshoot. Measuring the shell itself
+ * keeps every platform correct — iOS standalone keeps 100dvh at the full
+ * height while the keyboard covers it, Android's resizes-content already
+ * shrank both, and an installed app's bottom bar leaves a few pixels.
+ */
+export function viewportInset({ shellHeight, visibleHeight, pan = 0 }: { shellHeight: number; visibleHeight: number; pan?: number }): number {
+  return Math.max(0, Math.round(shellHeight - visibleHeight - pan));
 }
 
-export function shouldUseVisualViewportHeight({
-  hasFocusedEditable,
-  fullHeight,
-  visibleHeight,
-  viewportScale,
-}: ViewportHeightState): boolean {
-  const isUnscaled = Math.abs(viewportScale - 1) < 0.01;
-  // iOS PWAs shrink window.innerHeight, documentElement.clientHeight, and
-  // visualViewport.height together when the keyboard opens, so a live delta
-  // between any two of them is always ~0 and never fires. Comparing against
-  // the tallest height observed with no keyboard open is the only signal that
-  // survives. Android with interactive-widget=resizes-content shrinks the
-  // layout viewport itself and needs no override; its visible height equals
-  // its full height there, so this check stays false as well.
-  return hasFocusedEditable && isUnscaled && fullHeight - visibleHeight > 1;
+/** Below this the visual viewport moved for its own reasons — collapsing
+ * browser chrome, a scroll gesture — not because a keyboard opened. */
+const KEYBOARD_MIN_INSET = 80;
+
+interface KeyboardLayoutState {
+  open: boolean;
+  inset: number;
+  pan: number;
+  visibleHeight: number;
+}
+
+/**
+ * Writes the keyboard layout onto :root, skipping writes that change nothing:
+ * the keyboard animation streams one resize event per frame, and each write
+ * invalidates style.
+ */
+function writeKeyboardLayout(root: HTMLElement, state: KeyboardLayoutState, next: KeyboardLayoutState): void {
+  if (next.inset !== state.inset) {
+    state.inset = next.inset;
+    if (next.inset === 0) root.style.removeProperty("--keyboard-inset");
+    else root.style.setProperty("--keyboard-inset", `${next.inset}px`);
+  }
+  if (next.pan !== state.pan) {
+    state.pan = next.pan;
+    if (next.pan === 0) root.style.removeProperty("--keyboard-pan");
+    else root.style.setProperty("--keyboard-pan", `${next.pan}px`);
+  }
+  if (next.visibleHeight !== state.visibleHeight) {
+    state.visibleHeight = next.visibleHeight;
+    if (next.visibleHeight === 0) root.style.removeProperty("--app-viewport-height");
+    else root.style.setProperty("--app-viewport-height", `${next.visibleHeight}px`);
+  }
+  if (next.open !== state.open) {
+    state.open = next.open;
+    if (next.open) root.dataset.keyboardOpen = "true";
+    else delete root.dataset.keyboardOpen;
+  }
 }
 
 function hasFocusedEditableElement(): boolean {
@@ -58,26 +85,29 @@ export function useViewportHeight(): void {
     const root = document.documentElement;
     let frameId: number | null = null;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
-    // High-water mark of the on-screen viewport height: the no-keyboard height.
-    let fullHeight = 0;
+    // Last written values, so a per-frame resize pass does not invalidate style
+    // when nothing changed.
+    const layoutState: KeyboardLayoutState = { open: false, inset: 0, pan: 0, visibleHeight: 0 };
 
     const update = () => {
       frameId = null;
       const visibleHeight = Math.min(document.documentElement.clientHeight, viewport.height);
-      if (visibleHeight > fullHeight) fullHeight = visibleHeight;
-      const keyboardOpen = shouldUseVisualViewportHeight({
-        hasFocusedEditable: hasFocusedEditableElement(),
-        fullHeight,
+      // 采用壳层实际渲染高度而非 100dvh / clientHeight：壳层高度即布局真值，
+      // 位移量为壳层高度与可视高度之差。键盘、底部工具条、PWA 状态栏均由该值覆盖。
+      const shell = document.querySelector<HTMLElement>(".app-shell");
+      const shellHeight = shell?.getBoundingClientRect().height ?? document.documentElement.clientHeight;
+      const typing = hasFocusedEditableElement() && Math.abs(viewport.scale - 1) < 0.01;
+      // iOS reports a short height mid-animation while it pans further down to
+      // reveal the focused field; the pan cancels that dip, so the inset tracks
+      // the keyboard instead of dipping and snapping back.
+      const covered = viewportInset({ shellHeight, visibleHeight, pan: viewport.offsetTop });
+      const inset = typing && covered > KEYBOARD_MIN_INSET ? covered : 0;
+      writeKeyboardLayout(root, layoutState, {
+        open: inset > 0,
+        inset,
+        pan: inset > 0 ? Math.round(viewport.offsetTop) : 0,
         visibleHeight,
-        viewportScale: viewport.scale,
       });
-      if (keyboardOpen) {
-        root.style.setProperty("--app-viewport-height", `${visibleHeight}px`);
-        root.dataset.keyboardOpen = "true";
-      } else {
-        root.style.removeProperty("--app-viewport-height");
-        delete root.dataset.keyboardOpen;
-      }
 
       const pageWasShifted = window.scrollX !== 0 || window.scrollY !== 0;
       const isUnscaled = Math.abs(viewport.scale - 1) < 0.01;
@@ -89,8 +119,12 @@ export function useViewportHeight(): void {
     // WebKit can dispatch the resize event before visualViewport.height has
     // settled, especially when an installed PWA dismisses the keyboard. Reading
     // it on the next animation frame prevents the keyboard-height CSS value
-    // from remaining after the keyboard has closed.
+    // from remaining after the keyboard has closed. The keyboard's own animation
+    // streams resize events frame by frame, so each one also applies straight
+    // away: waiting for a frame would lag a frame behind the keyboard all the
+    // way down, which reads as judder.
     const scheduleUpdate = () => {
+      update();
       if (frameId !== null) window.cancelAnimationFrame(frameId);
       frameId = window.requestAnimationFrame(update);
     };
@@ -158,6 +192,8 @@ export function useViewportHeight(): void {
       stopKeyboardPoll();
       if (frameId !== null) window.cancelAnimationFrame(frameId);
       root.style.removeProperty("--app-viewport-height");
+      root.style.removeProperty("--keyboard-inset");
+      root.style.removeProperty("--keyboard-pan");
     };
   }, []);
 }

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { TraceRow } from "./TraceRow";
 
 /**
- * A failure (官方 `pattern_stack-trace.md`): the first line is the error, the
+ * A failure (official `pattern_stack-trace.md`): the first line is the error, the
  * rest are frames. `node_modules` frames stay muted so the reader's own code
  * stands out.
  */

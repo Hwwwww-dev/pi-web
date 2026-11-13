@@ -6,15 +6,15 @@ import type { Locale, LocalePlugin } from "./types";
 const localePlugins: LocalePlugin[] = [enLocale, zhCNLocale, zhTWLocale];
 
 /**
- * 根据标识获取已注册的语言包。
- * @param id 要查询的语言标识
- * @returns 已注册的语言包，不存在时返回 undefined
+ * 按标识获取已注册语言包。
+ * @param id 语言标识
+ * @returns 已注册语言包；不存在时返回 undefined
  */
 export function getLocalePlugin(id: string): LocalePlugin | undefined {
   return localePlugins.find((plugin) => plugin.id === id);
 }
 
-/** 获取当前已注册语言的稳定顺序列表。 */
+/** 获取已注册语言的稳定顺序列表。 */
 export function getSupportedLocales(): string[] {
   return localePlugins.map((plugin) => plugin.id);
 }
@@ -22,7 +22,7 @@ export function getSupportedLocales(): string[] {
 /**
  * 将浏览器语言列表解析为 Pi Web 内置语言。
  * @param languages 浏览器按优先级排列的语言列表
- * @returns 匹配的内置语言，无法匹配时返回英语
+ * @returns 匹配的内置语言；无法匹配时返回英语
  */
 export function resolveBrowserLocale(languages: readonly string[]): Locale {
   for (const language of languages) {

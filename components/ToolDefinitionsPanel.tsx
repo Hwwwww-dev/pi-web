@@ -142,9 +142,12 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
   const fields = selectedTool ? getToolParameterFields(selectedTool.parameters) : [];
 
   return (
-    <div className="grid h-[min(640px,70dvh)] min-h-60 grid-cols-[clamp(140px,26%,220px)_minmax(0,1fr)] overflow-hidden bg-card max-[640px]:grid-cols-[136px_minmax(0,1fr)]">
+    // 高度随内容，超过 min(640px,70dvh) 时封顶。外层 flex 必需：其封顶后内层 grid 才有确定高度，
+    // 两列各自的 overflow-auto 才能滚动（grid 行不会自行收缩）。
+    <div className="flex max-h-[min(640px,70dvh)] min-h-0 flex-col overflow-hidden bg-card">
+      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] grid-cols-[clamp(140px,26%,220px)_minmax(0,1fr)] max-[640px]:grid-cols-[136px_minmax(0,1fr)]">
       <nav aria-label={translate("tools.title")} className="flex min-h-0 min-w-0 flex-col bg-muted/40">
-        {/* 名称行永远换行，横向不出列：x 轴锁死，行 min-w-0，长名拆到第二行。 */}
+        {/* 名称行始终折行，不横向溢出：x 轴锁定，行 min-w-0，超长名称折至第二行。 */}
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-1.5">
           {declaredTools && declaredTools.length > 0 ? (
             <ItemGroup className="gap-0.5">
@@ -259,6 +262,7 @@ export function ToolDefinitionsPanel({ loading, tools, translate }: Props) {
           <EmptyState>{translate("tools.load")}</EmptyState>
         )}
       </section>
+      </div>
     </div>
   );
 }

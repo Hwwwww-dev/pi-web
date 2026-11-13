@@ -52,9 +52,9 @@ export function applyScrollAnchor(container: HTMLElement, anchor: ScrollAnchor):
 
 /** How long content above the anchor may keep changing height before we stop chasing it. */
 export const SCROLL_ANCHOR_SETTLE_MS = 800;
-/** 按住一行：连续这么久没再移动就算长完了。 */
+/** 锚定行的空闲判定：连续该时长未移动即视为渲染完成。 */
 const HOLD_IDLE_MS = 400;
-/** 按住一行的硬上限：一直长不完（流式输出）也不能把读者铉住。 */
+/** 锚定行的硬上限：流式输出可能持续增长，仍须在此时限内释放。 */
 const HOLD_MAX_MS = 4000;
 
 /**
@@ -91,7 +91,7 @@ export function holdScrollAnchor(container: HTMLElement, content: HTMLElement | 
     onSettle?.();
     return () => {};
   }
-  // 这一行原来的位置。每一帧都朝它校正，所以它本身不再变。
+  // 锚定行的原始位置；每帧据此校正，该基准值保持不变。
   const baseline = first.getBoundingClientRect().top;
   let stopped = false;
   const stop = () => {
@@ -102,8 +102,8 @@ export function holdScrollAnchor(container: HTMLElement, content: HTMLElement | 
     container.removeEventListener("keydown", stop);
     onSettle?.();
   };
-  // 追加的一页不是一帧就长完的：接着每帧重测这名行，直到它连续几帧不再移动。
-  // 固定时长的版本会在还没长完时就撒手，读者于是又漂回去一截。
+  // 追加的一页分多帧增长：每帧重测锚定行，直到连续数帧不再移动。固定时长会在
+  // 渲染完成前释放，导致读者位置回漂。
   const startedAt = Date.now();
   let lastMove = startedAt;
   const keep = () => {

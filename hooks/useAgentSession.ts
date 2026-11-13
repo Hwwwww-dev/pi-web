@@ -74,6 +74,7 @@ import {
 import {
   CHAT_SCROLL_REATTACH_TOLERANCE,
   CHAT_SCROLL_TAIL_TOLERANCE,
+  VISIBLE_PAGE_SIZE,
   getLiveFollowAttached,
 } from "@/lib/chat-lazy-load";
 import {
@@ -98,6 +99,8 @@ export interface SessionData {
     oldestEntryId: string | null;
     hasMore: boolean;
     turnsBefore: number;
+    newestEntryId?: string | null;
+    hasNewer?: boolean;
     thinkingLevel: string;
     model: { provider: string; modelId: string } | null;
   };
@@ -302,6 +305,9 @@ const IDLE_FOLLOW_BACKGROUND_POLL_MS = 20_000;
 const IDLE_FOLLOW_BACKGROUND_BACKOFF_MS = 60_000;
 const IDLE_FOLLOW_BACKGROUND_BACKOFF_AFTER_MS = 5 * 60_000;
 const BASH_STATE_RECONCILE_MS = 1_000;
+/** Stop hands its queue back to be sent again; the stopped run has to unwind first, or a prompt rides it. */
+const STOP_RESEND_SETTLE_TIMEOUT_MS = 5_000;
+const STOP_RESEND_POLL_MS = 50;
 const EVENT_STREAM_READY_TIMEOUT_MS = 60_000;
 const EVENT_STREAM_RECONNECT_DELAY_MS = 1_000;
 const SESSION_LEASE_RENEW_INTERVAL_MS = 30_000;
@@ -424,7 +430,19 @@ type UnconfirmedSend = {
   command: boolean;
 };
 /** `clear_queue` and `abort`: queued texts, plus the images of prompts parked behind a compaction. */
-type RecalledPrompts = { steering?: string[]; followUp?: string[]; images?: Array<{ data: string; mimeType: string }> };
+type RecalledPrompts = {
+  steering?: string[];
+  followUp?: string[];
+  images?: Array<{ data: string; mimeType: string }>;
+  /** Stop hands back every queued prompt in send order, to be sent again once the run has unwound. */
+  queued?: StopQueueEntry[];
+};
+/** One queued prompt Stop hands back, with the behavior it was queued under. */
+type StopQueueEntry = {
+  text: string;
+  behavior: "steer" | "followUp";
+  images?: Array<{ data: string; mimeType: string }>;
+};
 type ModelEntry = { id: string; name: string; provider: string; providerName: string };
 type ModelsResponse = {
   models: Record<string, string>;
@@ -445,8 +463,8 @@ type SlashCommandsResponse = {
 };
 
 /**
- * 一页里已经在列表中的条目不再上一遍。重发的一页、与上页重叠的一页都会把
- * 同一条消息插进列表两次，阅读位置和“已加载多少条”也跟着错。
+ * 过滤一页中已在列表内的条目。重复下发的页以及与上一页重叠的页均会将同一消息插入两次，
+ * 并影响阅读位置与已加载条数。
  */
 function dedupePage(ids: readonly string[], messages: readonly AgentMessage[], existing: readonly string[]) {
   const seen = new Set(existing);
@@ -487,6 +505,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [hasEarlierMessages, setHasEarlierMessages] = useState(false);
   const [earlierTurnCount, setEarlierTurnCount] = useState(0);
+  // Tail of the loaded page: null-or-equal to the leaf when the page reaches it.
+  const [newestCursor, setNewestCursor] = useState<string | null>(null);
+  const [hasNewerMessages, setHasNewerMessages] = useState(false);
   // Outside React state: a streamed chunk must not re-render the whole chat (see StreamingStore).
   const [streamingStore] = useState(createStreamingStore);
   const dispatch = streamingStore.dispatch;
@@ -703,12 +724,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const dataRef = useRef<SessionData | null>(null);
   const messagesRef = useRef<AgentMessage[]>([]);
   const entryIdsRef = useRef<string[]>([]);
-  /** 正在路上的更早一页的游标：同一页只发一次。 */
+  /** 正在请求中的更早一页游标，保证同一页只请求一次。 */
   const loadingBeforeRef = useRef<string | null>(null);
   const activeLeafIdRef = useRef<string | null>(null);
   const historyCursorRef = useRef<string | null>(null);
   const hasEarlierMessagesRef = useRef(false);
   const earlierTurnCountRef = useRef(0);
+  const newestCursorRef = useRef<string | null>(null);
+  const hasNewerMessagesRef = useRef(false);
+  /** 正在请求中的后一页游标。 */
+  const loadingAfterRef = useRef<string | null>(null);
 
   sessionPropIdRef.current = session?.id ?? null;
   dataRef.current = data;
@@ -718,6 +743,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   historyCursorRef.current = historyCursor;
   hasEarlierMessagesRef.current = hasEarlierMessages;
   earlierTurnCountRef.current = earlierTurnCount;
+  newestCursorRef.current = newestCursor;
+  hasNewerMessagesRef.current = hasNewerMessages;
   isCompactingRef.current = isCompacting;
   extensionUiCountRef.current = extensionDialogs.length + extensionCustomUis.length;
 
@@ -1095,7 +1122,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { tail?: number; signal?: AbortSignal }) => {
     try {
-      // 同一页正在路上：滚到顶与预取会同时要它，两次都回来就会把这一页 prepend 两通。
+      // 同一页正在请求中：滚动到顶部与预取可能并发触发，重复返回会导致该页被 prepend 两次。
       if (before) {
         if (loadingBeforeRef.current === before) return;
         loadingBeforeRef.current = before;
@@ -1114,8 +1141,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // switches would otherwise let A's late response overwrite B's tree.
       if (sessionIdRef.current !== sid || options?.signal?.aborted || !sessionHookMountedRef.current) return;
       if (leafId && activeLeafIdRef.current !== leafId) return;
-      // 同一页第二次到达（游标没前进）：再 prepend 一次会让同一批消息在列表里
-      // 出现两遍，下面那些“已加载多少条”的游标也会跟着错位。
+      // 该页再次返回（游标未前进）：再次 prepend 会使同一批消息重复出现，
+      // 已加载条数游标随之错位。
       if (before && d.context.oldestEntryId === before && d.context.messages.length > 0) return d.context;
       setHistoryCursor(d.context.oldestEntryId);
       setHasEarlierMessages(d.context.hasMore);
@@ -1139,14 +1166,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (before) {
         // Older page: prepend so scroll position stays anchored.
         browsingHistoryRef.current = true;
-        // 已加载过的条目不再上一次：重发的一页、与上页重叠的一页都会让同一条消息
-        // 在列表里出现两遍，阅读位置和“已加载多少条”也跟着错。
+        // 过滤已加载条目：重复下发或与上一页重叠的条目会使同一消息出现两次，
+        // 并影响阅读位置与已加载条数。
         const page = dedupePage(d.context.entryIds, d.context.messages, entryIdsRef.current);
         setMessages((prev) => [...page.messages, ...prev]);
         setEntryIds((prev) => [...page.entryIds, ...prev]);
       } else {
         setMessages(d.context.messages);
         setEntryIds(d.context.entryIds ?? []);
+        // A tail page reaches the leaf, so nothing newer can be paged in.
+        setNewestCursor(d.context.newestEntryId ?? null);
+        setHasNewerMessages(Boolean(d.context.hasNewer));
       }
       return d.context;
     } catch (e) {
@@ -1155,6 +1185,70 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (before) loadingBeforeRef.current = null;
     }
   }, []);
+
+  /**
+   * 请求一页历史窗口：`anchor` 以指定轮次为中心（小地图跳转），`newerThan` 从已加载末尾向下续接。
+   * 两者均不直接修改视图，由调用方决定替换或续接。
+   */
+  const fetchWindow = useCallback(async (
+    sid: string,
+    leafId: string | null,
+    window: { anchor?: string; newerThan?: string; tail: number; after?: number },
+  ) => {
+    const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1", tail: String(window.tail) });
+    if (leafId) params.set("leafId", leafId);
+    if (window.anchor) params.set("anchor", window.anchor);
+    if (window.newerThan) params.set("newerThan", window.newerThan);
+    if (window.after) params.set("after", String(window.after));
+    const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}/context?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json() as { context: SessionData["context"] };
+    if (sessionIdRef.current !== sid || !sessionHookMountedRef.current) return null;
+    if (leafId && activeLeafIdRef.current !== leafId) return null;
+    return d.context;
+  }, []);
+
+  /** 小地图跳转：单次请求获取目标轮附近的窗口，不逐页向上拉取。 */
+  const jumpToEntry = useCallback(async (sid: string, leafId: string | null, anchorId: string) => {
+    try {
+      const context = await fetchWindow(sid, leafId, { anchor: anchorId, tail: VISIBLE_PAGE_SIZE, after: VISIBLE_PAGE_SIZE });
+      if (!context) return null;
+      browsingHistoryRef.current = true;
+      setMessages(context.messages);
+      setEntryIds(context.entryIds ?? []);
+      setHistoryCursor(context.oldestEntryId);
+      setHasEarlierMessages(context.hasMore);
+      setEarlierTurnCount(context.turnsBefore ?? 0);
+      setNewestCursor(context.newestEntryId ?? null);
+      setHasNewerMessages(Boolean(context.hasNewer));
+      setData((prev) => (prev && prev.sessionId === sid ? { ...prev, context } : prev));
+      return context;
+    } catch (e) {
+      console.error("Failed to load history window:", e);
+      return null;
+    }
+  }, [fetchWindow]);
+
+  /** 向下续接一页：窗口未到达叶子时，滚动到底部才拉取。 */
+  const loadNewerPage = useCallback(async (sid: string, leafId: string | null, newerThan: string) => {
+    if (loadingAfterRef.current === newerThan) return null;
+    loadingAfterRef.current = newerThan;
+    try {
+      const context = await fetchWindow(sid, leafId, { newerThan, tail: VISIBLE_PAGE_SIZE });
+      if (!context) return null;
+      const page = dedupePage(context.entryIds, context.messages, entryIdsRef.current);
+      setMessages((prev) => [...prev, ...page.messages]);
+      setEntryIds((prev) => [...prev, ...page.entryIds]);
+      setNewestCursor(context.newestEntryId ?? null);
+      setHasNewerMessages(Boolean(context.hasNewer));
+      return context;
+    } catch (e) {
+      console.error("Failed to load newer history:", e);
+      return null;
+    } finally {
+      loadingAfterRef.current = null;
+    }
+  }, [fetchWindow]);
 
   const loadTools = useCallback(async (sid: string) => {
     try {
@@ -1934,12 +2028,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // tree=summary (entryIds live in context; the summary tree drops bodies) and
   // only reload on a changed latest entry id; ?force=1 reuses the server's
   // evictIfDiskAhead() so a live wrapper lagging behind disk is rebuilt.
-  // Runs only while the tab is visible and no web-side run owns the session
-  // (SSE/reconcile covers that); paused while the user pages back through
-  // history so a reload cannot yank the viewport to the leaf path.
+  // 运行中的会话同样需要探测：SSE 无重放，iOS 挂起页面会断开连接，期间产生的
+  // message_end 永久丢失（reconcile 仅在空闲时补状态，不重读消息）。仅在 latest entry id
+  // 与本地末条不一致时重读，正常流式下两者相等，不会额外请求。
+  // 仅在页面可见且未回翻历史时执行，否则重载会把视口拉回叶径。
   useEffect(() => {
     // Dormant slots have no message list to keep warm; reactivation reloads everything.
-    if (!session || agentRunning || dormant) return;
+    if (!session || dormant) return;
     const sid = session.id;
     const startedAt = Date.now();
     const becameActive = prevBackgroundRef.current === true && background;
@@ -1960,7 +2055,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         const latest = ids[ids.length - 1];
         const current = entryIdsRef.current;
         if (!latest || latest === current[current.length - 1]) return;
-        await loadSession(sid);
+        // 重读 tail 以补回后台期间丢失的条目。
+        await loadSession(sid, false, false, { force: true });
       } catch {
         // Transient fetch failure; the next tick retries.
       } finally {
@@ -2170,6 +2266,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         // appending it again would duplicate it.
         if (!agentRunningRef.current) break;
         if (isSystemMessageEvent(event)) break;
+        // 视图处于中段窗口时，本轮实时消息不在该窗口内，追加到窗口末尾会错位；
+        // 返回尾页时由历史接口一次性补齐。
+        if (hasNewerMessagesRef.current) break;
         const completed = event.message as AgentMessage | undefined;
         if (completed && completed.role === "user") {
           // Delivered steering/follow-up messages surface here as user
@@ -2366,6 +2465,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const lastEntryIdAtSend = savedViewIds.at(-1) ?? null;
     const sameTextAfterSend = countUserMessages(messagesRef.current.slice(savedViewIds.length), userKey);
     setMessages((prev) => [...prev, userMsg]);
+    // 从历史窗口发出提问时先回到叶子，使新消息有正确落点。
+    if (hasNewerMessagesRef.current) {
+      hasNewerMessagesRef.current = false;
+      setHasNewerMessages(false);
+      newestCursorRef.current = null;
+      setNewestCursor(null);
+    }
     optimisticUserMessageKeyRef.current = userKey;
     promptRunIdRef.current = promptRunId;
     agentRunningRef.current = true;
@@ -2522,6 +2628,36 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     else if (text) opts.chatInputRef?.current?.prependText(text);
   }, [composerDraftKey, opts.chatInputRef, restoreSubmission]);
 
+  /**
+   * Stop hands the queue back: send it in arrival order once the stopped run has
+   * unwound, so a message typed during that run still goes out. The first opens a
+   * new run; the rest join it under the behavior they were queued with.
+   */
+  const resendStopQueue = useCallback(async (sid: string, entries: StopQueueEntry[]) => {
+    const deadline = Date.now() + STOP_RESEND_SETTLE_TIMEOUT_MS;
+    while (agentRunningRef.current && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, STOP_RESEND_POLL_MS));
+    }
+    for (const [index, entry] of entries.entries()) {
+      if (sessionIdRef.current !== sid) return;
+      const images = entry.images?.map((img) => ({ type: "image" as const, data: img.data, mimeType: img.mimeType }));
+      try {
+        await sendAgentCommand(sid, {
+          type: "prompt",
+          message: entry.text,
+          ...(index > 0 ? { streamingBehavior: entry.behavior } : {}),
+          ...(images?.length ? { images } : {}),
+        });
+      } catch (e) {
+        console.error("Failed to resend a stopped run's queue:", e);
+        const rest = entries.slice(index);
+        restoreSubmission(rest.map((entry) => entry.text).join("\n\n"), entry.images, composerDraftKey);
+        addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+    }
+  }, [addNotice, composerDraftKey, restoreSubmission]);
+
   const handleAbort = useCallback(async () => {
     const sid = sessionIdRef.current;
     if (!sid) return;
@@ -2530,7 +2666,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // the click entirely, so the agent kept running.
     const stopBash = bashRunningRef.current;
     try {
-      // Prompts parked behind a compaction come back for the composer, as Recall's do.
+      // Prompts parked behind a compaction come back with pi's queue; Stop hands
+      // all of them back to be sent again rather than put into the composer.
       const [recalled] = await Promise.all([
         sendAgentCommand<RecalledPrompts | null>(sid, { type: "abort" }),
         stopBash ? sendAgentCommand(sid, { type: "abort_bash" }).catch(() => null) : Promise.resolve(null),
@@ -2540,11 +2677,15 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setBashRunning(false);
         setPendingBash(null);
       }
-      restoreRecalledPrompts(recalled);
+      const queued = recalled?.queued ?? [];
+      if (queued.length) {
+        applyQueuedRecords(emptyQueuedMessages(), []);
+        void resendStopQueue(sid, queued);
+      } else restoreRecalledPrompts(recalled);
     } catch (e) {
       console.error("Failed to abort:", e);
     }
-  }, [restoreRecalledPrompts]);
+  }, [applyQueuedRecords, resendStopQueue, restoreRecalledPrompts]);
 
   /** `draft` is what the new session's composer starts with: the forked message, as pi's /fork leaves it in the editor. */
   const handleFork = useCallback(async (entryId: string, draft?: ChatDraft) => {
@@ -3142,7 +3283,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return () => timers.forEach(clearTimeout);
   }, [agentRunning, session?.id]);
 
-  const handleQueuedAction = useCallback(async (id: string, action: "toggle" | "edit" | "moveUp" | "moveDown") => {
+  const handleQueuedAction = useCallback(async (id: string, action: "toggle" | "edit" | "moveUp" | "moveDown" | "delete") => {
     const sid = sessionIdRef.current;
     if (!sid) return;
     const records = queuedSubmissionsRef.current;
@@ -3163,7 +3304,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // second click cannot act on the queue this one just replaced. pi's lists
     // are authoritative: entries consumed mid-run must not be resurrected, so
     // the rebuild starts from `cleared`, not from the local records.
-    const remaining = splitClearedQueue(cleared, records, action === "edit" ? id : undefined);
+    // 取回编辑与删除均将目标从待发列表中移除：前者内容回到输入框，后者直接丢弃。
+    const remaining = splitClearedQueue(cleared, records, action === "edit" || action === "delete" ? id : undefined);
     const toggledBehavior: QueuedBehavior = target.behavior === "steer" ? "followUp" : "steer";
     let nextRecords = remaining.map((item) => createQueuedSubmission(
       item.text,
@@ -3696,15 +3838,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   return {
     // State
-    data, loading, error, activeLeafId, messages, activeToolResults, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, streamingStore,
+    data, loading, error, activeLeafId, messages, activeToolResults, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, newestCursor, hasNewerMessages, streamingStore,
     agentRunning, modelNames, modelList, modelError, missingCwd, modelScopeWarnings, isModelScopeActive, allModelList, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage: displayContextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats, autoCompactionEnabled,
     slashCommands, slashCommandsLoading, queuedSubmissions,
     notices: noticeState.visible, extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, dismissNotice,
     isAutoModelSelection: isNew && newSessionModel === null,
-    isAutoThinkingSelection: isNew && newSessionThinkingLevel === null,
-    defaultModel: newSessionDefaultModel,
+    isAutoThinkingSelection: isNew && newSessionThinkingLevel === null,    defaultModel: newSessionDefaultModel,
     savedDefaultThinkingLevel,
     agentPhase,
     isNew,
@@ -3725,6 +3866,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     addNotice,
     setNoticePaused: setPausedNoticeId,
     handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadTools, loadSlashCommands, loadAllModels, setActiveLeafId, setData, setMessages, loadContext,
+    jumpToEntry, loadNewerPage,
     scrollToBottom, scrollUserMsgToTop, scrollToMessage,
     dispatch, setAgentRunning, setForkingEntryId,
     bashRunning, pendingBash,

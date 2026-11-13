@@ -409,6 +409,10 @@ export interface SessionContext {
   entryIds: string[]; // parallel to messages — the session entry id for each message
   oldestEntryId: string | null;
   hasMore: boolean;
+  /** Last loaded entry; set when the window is a page inside the branch. */
+  newestEntryId?: string | null;
+  /** Entries after `newestEntryId` are not loaded (the window stopped short of the leaf). */
+  hasNewer?: boolean;
   /** Turns on the branch before `oldestEntryId`, not loaded (the minimap numbers from it). */
   turnsBefore: number;
   thinkingLevel: string;

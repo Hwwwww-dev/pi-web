@@ -105,12 +105,17 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
     const assistantMessage = message as AssistantMessage;
     const content = assistantMessage.content ?? [];
     const limit = processBlockLimitByIdx?.get(idx) ?? content.length;
-    // Same file-timestamp estimate AssistantMessageView used: time from the
-    // previous message to this one approximates the thinking block's duration.
+    // pi 1.1 records the response's own generation time (`durationMs`, from the
+    // request's start); the timestamps only give the gap from the previous
+    // message, i.e. how long the request waited before it was answered.
     const prevMessage = messages[idx - 1] as (AgentMessage & { timestamp?: number }) | undefined;
     let thinkingDuration: number | undefined;
-    if (assistantMessage.timestamp && prevMessage?.timestamp) {
-      // 保留小数：先取整秒会把 0.4s 的思考抹成 0 而完全不显示（用户要求 0.1s 以上都要显示）。
+    const recorded = assistantMessage.durationMs;
+    if (recorded !== undefined) {
+      const secs = recorded / 1000;
+      if (secs >= 0.1) thinkingDuration = secs;
+    } else if (assistantMessage.timestamp && prevMessage?.timestamp) {
+      // 保留小数：先取整会将 0.4s 的思考时长抹为 0 而不显示（要求 0.1s 以上均需显示）。
       const secs = (assistantMessage.timestamp - prevMessage.timestamp) / 1000;
       if (secs >= 0.1) thinkingDuration = secs;
     }
@@ -158,7 +163,9 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
         continue;
       }
       if (block.type === "text") {
-        items.push({ kind: "text", key: `text-${entryId ?? idx}-${blockIdx}`, block: block as TextContent, searchTarget });
+        if (searchTarget || (block as TextContent).text.trim().length > 0) {
+          items.push({ kind: "text", key: `text-${entryId ?? idx}-${blockIdx}`, block: block as TextContent, searchTarget });
+        }
       }
     }
   }

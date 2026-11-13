@@ -7,7 +7,7 @@ import { TraceRow } from "./TraceRow";
 import type { ToolViewStatus } from "@/lib/tool-view";
 
 /**
- * Consecutive calls of one category (官方 `pattern_task.md`): a counted line
+ * Consecutive calls of one category (official `pattern_task.md`): a counted line
  * whose content is the same rows the group holds — not a second kind of row.
  */
 export const TaskTrace = memo(function TaskTrace({ title, description, status, foldKey, defaultOpen, children, trailing, duration, icon, activeIcon }: {
@@ -20,9 +20,9 @@ export const TaskTrace = memo(function TaskTrace({ title, description, status, f
   defaultOpen?: boolean;
   children: ReactNode;
   trailing?: ReactNode;
-  /** 这一组花了多久，画在箭头里面（与思考行同一位置）。 */
+  /** 该组耗时，绘制在箭头内（与思考行位置一致）。 */
   duration?: ReactNode;
-  /** 组头的图标：同类聚合时用这一类自己的图标，混合或未知才用通用清单图标。 */
+  /** 组头图标：同类聚合时使用该类别图标，混合或未知类型才使用通用清单图标。 */
   icon?: ReactNode;
   activeIcon?: ReactNode;
 }) {

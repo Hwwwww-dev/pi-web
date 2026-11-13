@@ -463,7 +463,7 @@ export function EnabledModelsSection({
         />
       )}
       {contextSettings && <div id={contextNoteId} className="text-xs leading-relaxed text-muted-foreground">{t("models.contextOverrideHelp")}</div>}
-      <div className="max-h-[360px] overflow-y-auto rounded-lg bg-sidebar p-1">
+      <div className="scroll-rounded-lg max-h-[360px] overflow-y-auto rounded-lg bg-sidebar p-1">
         {shown.length === 0 ? (
           <div className="p-3 text-xs text-muted-foreground">{(provider.models.length === 0 && emptyCatalogHint) || t("models.enabledNoMatches")}</div>
         ) : (

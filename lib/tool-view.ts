@@ -11,9 +11,9 @@
 import { applyPatchPreviewToFiles, applyPatchResultHasFailures, getApplyPatchInputText, parseApplyPatchInput } from "./apply-patch";
 import { CODEMODE_TOOL_NAME, codemodeCalls, codemodeScript, stripCodemodeHeader, type CodemodeCallView } from "./codemode-view";
 import { getLanguage } from "./file-types";
-import { mcpToolLabel, prettyMcpResultText, type McpToolLabel } from "./mcp-tool-display";
+import { mcpToolLabel, mcpToolNameLabel, prettyMcpResultText, type McpToolLabel } from "./mcp-tool-display";
 import { parseUnifiedPatch, type SplitDiffFile } from "./patch";
-import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, isSubagentToolName } from "./tool-categories";
+import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, isQuestionToolName, isSubagentToolName } from "./tool-categories";
 import { EMPTY_FIELD_VALUE, toolFieldsOfInput, type ToolField } from "./tool-fields";
 import { isApplyPatchToolName, isEditToolName, isWriteToolName } from "./tool-names";
 import type { ImageContent, ToolCallContent, ToolResultMessage } from "./types";
@@ -195,7 +195,7 @@ function jsonSection(text: string, language: string): ToolViewSection[] {
   return [{ kind: "code", label: "parameters", text: prettyJsonText(text, language), language }];
 }
 
-/** 能解析的 JSON 一律缩进展开：原文里的 `\\n` 转义只会让人看到一行挤成一团的参数。 */
+/** 可解析的 JSON 一律缩进展开：原文中的 `\\n` 转义会使参数挤在一行。 */
 function prettyJsonText(text: string, language: string): string {
   if (language !== "json" || !/^\s*[[{]/.test(text)) return text;
   try {
@@ -207,7 +207,9 @@ function prettyJsonText(text: string, language: string): string {
 
 /**
  * The URLs a search's result text names: Markdown links first, then bare
- * addresses. Deduplicated by address, in the order the text gave them.
+ * addresses, whose title is the line that introduced them — search output
+ * prints `1. Title` above the address. Deduplicated by address, in the order
+ * the text gave them.
  */
 export function resultSources(text: string | null): ToolViewSource[] {
   if (!text) return [];
@@ -219,9 +221,38 @@ export function resultSources(text: string | null): ToolViewSource[] {
     seen.add(clean);
     sources.push({ title: title.trim() || hostOf(clean), url: clean });
   };
-  for (const match of text.matchAll(/\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g)) push(match[1] ?? "", match[2] ?? "");
-  for (const match of text.matchAll(/https?:\/\/[^\s<>()\]]+/g)) push("", match[0]);
+
+  let introducedBy = "";
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    const links = [...line.matchAll(/\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g)];
+    if (links.length > 0) {
+      for (const match of links) push(match[1] ?? "", match[2] ?? "");
+      introducedBy = "";
+      continue;
+    }
+    const addresses = [...line.matchAll(/https?:\/\/[^\s<>()\]]+/g)];
+    if (addresses.length === 0) {
+      introducedBy = listItemText(line);
+      continue;
+    }
+    addresses.forEach((match, index) => push(index === 0 ? introducedBy : "", match[0]));
+    introducedBy = "";
+  }
   return sources.slice(0, 20);
+}
+
+/** A line's text with numbering, bullets and bold markers removed, when it
+ * reads as a title rather than a heading or another address. */
+function listItemText(line: string): string {
+  const text = line
+    .replace(/^\s*\d+[.)]\s*/, "")
+    .replace(/^\s*[-*+•]\s*/, "")
+    .replace(/\*\*/g, "")
+    .trim();
+  if (text.length < 2 || /^https?:\/\//i.test(text)) return "";
+  if (/^(sources?|results?|links?)\b[\s:：]*\d*[\s:：]*$/i.test(text)) return "";
+  return text;
 }
 
 function hostOf(url: string): string {
@@ -287,7 +318,7 @@ export function getPatchFiles(block: ToolCallContent, result?: ToolResultMessage
   if (fromInput) return fromInput;
   const details = result && !result.isError ? result.details : undefined;
   if (!isRecord(details)) return null;
-  // pi 的 edit 工具在 details.patch 里给出整段 unified diff（details.diff 是带行号的视图文本）。
+  // pi 的 edit 工具在 details.patch 中给出完整 unified diff；details.diff 是带行号的视图文本。
   if (typeof details.patch === "string") {
     const files = parseUnifiedPatch(details.patch);
     if (files && files.length > 0) return files;
@@ -356,13 +387,13 @@ interface Prepared {
 function prepare({ block, result, t }: ToolViewInput): Prepared {
   const inputStr = block.rawInput ?? JSON.stringify(block.input, null, 2);
   const streamingInput = block.rawInput !== undefined;
-  const mcp = mcpToolLabel(block.toolName, result?.details);
+  const mcp = mcpToolLabel(block.toolName, result?.details) ?? mcpToolNameLabel(block.toolName);
   const script = block.toolName === CODEMODE_TOOL_NAME && !streamingInput ? codemodeScript(block.input) : null;
   const codemode = script === null ? null : { code: script, ...codemodeCalls(result?.details) };
   // A codemode result repeats the script as its leading text; the row shows the
   // calls instead, so the copy is dropped.
   const { text: rawText, images, media } = resultText(result, codemode !== null);
-  // edit 与 apply_patch 的结果都带补丁：只有解析成 files 才会按增删着色，否则只剩一段无颜色的纯文本。
+  // edit 与 apply_patch 的结果均带补丁：解析为 files 后才按增删着色，否则按纯文本渲染。
   const patchFiles = isApplyPatchToolName(block.toolName) || isEditToolName(block.toolName)
     ? getPatchFiles(block, result)
     : null;
@@ -406,8 +437,8 @@ function kindOf(p: Prepared): ToolViewKind {
   if (p.mcp) return "mcp";
   if (isSubagentToolName(name)) return "subagent";
   if (p.codemode) return "codemode";
-  // 只看工具名，不看已解析的 command：还在流式输入参数时 command 还没成形，
-  // 按命令判会让 bash 行在运行中先显示成通用扳手、跑完又变成终端图标。
+  // 仅依据工具名，不看已解析的 command：参数流式输入期间 command 尚未成形，
+  // 按命令判断会使 bash 行在运行中显示通用图标、结束后变为终端图标。
   if (getToolCategory(name) === "terminal") return "terminal";
   if (isWriteToolName(name)) return "file-write";
   if (isEditToolName(name) || isApplyPatchToolName(name)) return "file-edit";
@@ -415,9 +446,10 @@ function kindOf(p: Prepared): ToolViewKind {
   if (category === "view") return "file-read";
   if (category === "search") return "search";
   if (category === "web") return "web";
-  if (category === "plan" && (todoSteps(p.block.input) || todoStepsFromDetails(p.details))) return "queue";
-  // 提问有自己的卡片：它既不是计划也不是清单，不能借计划卡的标题与进度。
-  if (questionSteps(p.block.input)) return "question";
+  if (category === "plan") return "queue";
+  // 提问与计划按工具名判定：参数仍在流式输入时 `todoSteps`/`questionSteps` 解析不出，
+  // 行会在运行中退回通用图标与原始工具名，完成后再变样。
+  if (questionSteps(p.block.input) || isQuestionToolName(name)) return "question";
   if (category === "compact") return "compact";
   return "generic";
 }
@@ -431,7 +463,7 @@ export function isFailedResult(toolName: string, result: ToolResultMessage | und
 export function toToolView(input: ToolViewInput): ToolView {
   const p = prepare(input);
   // A title keeps its tense (硬规则 6): running says so, a failure says what failed.
-  // 但动作名是行的名字：编辑/读取这类 view 的 title 本身就是动作，不能被“正在运行”替掉。
+  // 动作名构成行的名称：编辑/读取等 view 的 title 本身即动作，不能被“正在运行”替换。
   const view = createView(p);
   if (view.target && view.title === "") {
     if (view.status === "running") view.title = p.t("chat.trace.running", { target: view.target });
@@ -569,7 +601,7 @@ function editView(p: Prepared): ToolView {
 function readView(p: Prepared): ToolView {
   const view = baseView(p);
   view.kind = "file-read";
-  // 文件名由行内的 chip 承担（chip 可点、能跳转），标题只写动作，避免同一个名字出现两次。
+  // 文件名由行内 chip 承担（可点击跳转），标题只写动作，避免同一名称重复出现。
   view.title = p.t(TOOL_CATEGORY_LABEL_KEYS.view);
   view.target = p.filePaths[0] ? baseName(p.filePaths[0]) : undefined;
   const structured = p.fields ? null : structuredArgSections(p.block.input);
@@ -586,7 +618,7 @@ function searchView(p: Prepared): ToolView {
     ? p.block.input.pattern
     : typeof p.block.input.query === "string" ? p.block.input.query : "";
   view.kind = "search";
-  // 动作是标题，搜索词是对象：对象可以截断，动作永远完整。
+  // 动作为标题，搜索词为对象：对象可截断，动作始终完整。
   view.title = p.t(TOOL_CATEGORY_LABEL_KEYS.search);
   view.object = query || p.preview || undefined;
   view.target = query || p.preview || undefined;
@@ -598,7 +630,7 @@ function webView(p: Prepared): ToolView {
   const view = baseView(p);
   const sources = /search/i.test(p.block.toolName) ? resultSources(p.text) : [];
   view.kind = "web";
-  // 同上：动作单独成词，来源数/地址放在对象位。
+  // 同上：动作单独成词，来源数量与地址置于对象位。
   view.title = sources.length > 0
     ? p.t("chat.trace.sources", { count: sources.length })
     : p.t(TOOL_CATEGORY_LABEL_KEYS.web);
@@ -677,7 +709,7 @@ function questionView(p: Prepared): ToolView {
 
 function queueView(p: Prepared): ToolView {
   const view = baseView(p);
-  // create 的参数带 tasks；update/list 的列表在结果的 details.tasks 里（用户要求：带出整份清单）。
+  // create 的参数包含 tasks；update/list 的列表位于结果的 details.tasks 中，需展示完整清单。
   const steps = todoSteps(p.block.input) ?? todoStepsFromDetails(p.details) ?? [];
   const done = steps.filter((step) => step.status === "done").length;
   view.kind = "queue";
@@ -785,8 +817,8 @@ function structuredArgSections(input: unknown): ToolViewSection[] | null {
 function genericView(p: Prepared): ToolView {
   const view = baseView(p);
   view.kind = "generic";
-  // 行上只写工具名：名字永远完整显示，参数/正文一律进展开的内容。
-  // （以前把输入的首行预览放在名字后面，长文本会把这一行占满。）
+  // 行上只写工具名，名称始终完整显示；参数与正文放入展开内容，
+  // 避免输入首行预览占满整行。
   view.title = humanizeToolName(p.block.toolName);
   view.sections = p.detail([
     ...(p.fields ? fieldsSection(p.fields) : jsonSection(p.inputStr, "json")),

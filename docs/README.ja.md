@@ -4,8 +4,6 @@
 
 [pi コーディングエージェント](https://github.com/earendil-works/pi) のローカルブラウザー UI です。Pi Web は pi と同じローカル設定とセッションファイルを使用し、ブラウザーから会話の検索と再開、エージェントの実行、モデルやリソースの設定、プロジェクトファイルの確認を行えます。
 
-**[インタラクティブデモを試す →](https://agegr.github.io/pi-web/)**：実際の Pi Web UI がブラウザー内だけで動作し、サンプルのセッション、ファイル、モデルを確認できます。インストールは不要です。返信はあらかじめ用意された内容で、モデルは呼び出しません。
-
 ![構造化された Markdown、ツール呼び出し、プロジェクトナビゲーションとともに pi セッションを表示する Pi Web](https://raw.githubusercontent.com/agegr/pi-web/main/docs/screenshot2.png)
 
 ## 機能
@@ -127,7 +125,7 @@ npm run lint
 
 新機能に取りかかる前に、[Contributing](../CONTRIBUTING.md) で対象範囲とプルリクエスト前のチェック項目を確認してください。
 
-コントリビューター向けガイド：[Internationalization](./i18n.md) と [Release process](./release.md)。
+コントリビューター向けガイド：[Internationalization](./i18n.md)。
 
 ## リポジトリ構成
 
@@ -139,7 +137,6 @@ lib/             セッション、エージェント、モデル、ファイル
 public/          静的アセットと PWA ファイル
 bin/             npm CLI エントリポイントと起動オプションの解析
 docs/            ユーザーおよびコントリビューター向けの個別ガイド
-demo/            GitHub Pages で公開する静的デモ（demo/README.md を参照）
 ```
 
 アーキテクチャの説明と詳細なファイルマップについては [AGENTS.md](../AGENTS.md) を参照してください。

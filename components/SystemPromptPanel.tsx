@@ -12,7 +12,7 @@ export function SystemPromptPanel({ loading, prompt, translate }: Props) {
   return (
     <section
       aria-label={translate("system.prompt")}
-      className="flex h-[min(600px,50dvh)] min-h-55 flex-col"
+      className="flex max-h-[min(600px,50dvh)] min-h-0 flex-col"
     >
       <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
         {prompt ? (

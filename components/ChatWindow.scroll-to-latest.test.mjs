@@ -61,8 +61,8 @@ test("the earlier-messages row is a real button", () => {
 });
 
 test("clearing the gate re-arms the sentinel without a scroll round-trip", () => {
-  // 监听 scroll 的 effect 重建后自己先试一次：上一页落地时读者还在顶上，就接着读，
-  // 不用再滑一下让它“重新进入”。
+  // 监听 scroll 的 effect 重建后会自行先试一次：上一页落地时读者仍在顶部即继续加载，
+  // 无需再次滚动。
   assert.match(source, /\}, \[sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState\]\);/);
 });
 

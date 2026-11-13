@@ -49,13 +49,13 @@ function LoginForm() {
     }
   };
 
-  // shadcn 登录页：Card 原语承载品牌与表单，安全区内边距留给独立模式（PWA）。
+  // shadcn 登录页：品牌与表单由 Card 原语承载，安全区内边距用于独立模式（PWA）。
   return (
     <main className="grid min-h-dvh place-items-center bg-background p-[max(24px,env(safe-area-inset-top))_max(24px,env(safe-area-inset-right))_max(24px,env(safe-area-inset-bottom))_max(24px,env(safe-area-inset-left))]">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <Image src="/icons/apple-touch-icon.png" width={48} height={48} alt="" priority className="shrink-0 rounded-lg" />
+            <Image src="/icons/logo.svg" width={48} height={48} alt="" priority unoptimized className="shrink-0 rounded-lg" />
             <div className="flex min-w-0 flex-col gap-0.5">
               <CardTitle>Pi Web</CardTitle>
               <CardDescription>{t("auth.prompt")}</CardDescription>

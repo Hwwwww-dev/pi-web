@@ -43,7 +43,7 @@ import type {
 // CJK chars ~1 token each (GLM/DeepSeek/GPT-o200k); other chars ~4 chars/token.
 const CJK_PATTERN = /[\u3000-\u30ff\u3400-\u9fff\uf900-\ufaff\u{20000}-\u{2fa1f}\uac00-\ud7af]/u;
 
-// 流束结束后，「token 数 + 速度」在消息上停留的时长。
+// 流式结束后「token 数 + 速度」在消息上的停留时长。
 const RATE_HOLD_MS = 6000;
 function estimateTokens(text: string): number {
   let cjk = 0;
@@ -107,7 +107,7 @@ interface Props {
   onOpenSubagent?: (sessionId: string, label: string) => void;
   entryId?: string;
   searchBlock?: AssistantContentBlock;
-  /** `message` 按输入框的方式取回：pi 的 /fork 把被 fork 的消息放进编辑器。 */
+  /** `message` 按输入框的方式取回：pi 的 /fork 将被 fork 的消息放入编辑器。 */
   onFork?: (entryId: string, message: UserMessage) => void;
   forking?: boolean;
   onEditContent?: (message: UserMessage, entryId: string) => void;
@@ -220,7 +220,7 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
     // spacing of their own; inside grouped activity bodies the rows are spaced
     // by the activity container.
     return (
-      <div className="mb-5">
+      <div>
         {(message as CustomMessage).customType === "compaction"
           ? <CompactionRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} />
           : <CustomRow message={message as CustomMessage} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />}
@@ -348,10 +348,11 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   };
 
   return (
-    <Message align="end" className="group mb-5 flex flex-col! items-end gap-1">
-      <Bubble variant="muted" align="end" className="max-w-[82%] max-sm:max-w-[86%]">
-        {/* 官方 BubbleContent 管底色与圆角；长消息只在气泡这一层限高滚动，
-            内部不再套第二个滚动容器（代码块自身的横向滚动除外）。 */}
+    <Message align="end" className="group flex flex-col! items-end gap-1">
+      <Bubble variant="muted" align="end" className="max-w-[82%] max-sm:max-w-[86%] overflow-hidden rounded-3xl">
+        {/* 底色与圆角由官方 BubbleContent 提供；长消息仅在气泡层限高滚动，
+            内部不再嵌套第二个滚动容器（代码块自身的横向滚动除外）。外层 Bubble
+            同一圆角加裁切，滚动条才收在圆角里，不会方着顶出卡片。 */}
         <BubbleContent
           className={cn(
             "max-h-[min(70vh,32rem)] overflow-y-auto overscroll-contain text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
@@ -490,9 +491,9 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
             <span>{estimatedTokens}</span>
           </span>
           {tps !== null && (
-            // 速率分五档，像转速表一样从红到蓝：<15 红、15–30 黄、30–50 绿、
-            // 50–120 蓝、>120 彩虹。彩虹同样是个胶囊，只是底层是密排的流动彩虹（文字
-            // 恒白，≥166 t/s 后固定 0.3s 一圈，再快不再加速）。
+            // 速率分五档，按阈值切换颜色：<15 红、15–30 黄、30–50 绿、
+            // 50–120 蓝、>120 彩虹。彩虹档同为胶囊样式，底层为密排流动彩虹（文字
+            // 恒白，≥166 t/s 后固定为 0.3s 一圈，不再加速）。
             <span
               className={cn(
                 "inline-flex shrink-0 items-center rounded-md px-1.5 text-xs leading-tight font-medium tabular-nums",
@@ -578,8 +579,8 @@ function AssistantMessageView({
   const streamRateKeyRef = useRef(rateKey);
   streamRateKeyRef.current = rateKey;
   const [tps, setTps] = useState<number | null>(null);
-  // 流束结束后把最后一帧「token 数 + 速度」在消息上停留一会儿（RATE_HOLD_MS），
-  // 而不是随 isStreaming=false 瞬间消失；出现也提前：速率库 0.25s 即出首帧。
+  // 流式结束后最后一帧「token 数 + 速度」在消息上停留 RATE_HOLD_MS，
+  // 而非随 isStreaming=false 立即消失；速率库 0.25s 即输出首帧。
   const lastRateRef = useRef<{ tokens: number; tps: number } | null>(null);
   const [holdRate, setHoldRate] = useState(false);
   const blockItemsRef = useRef(blockItems);
@@ -607,7 +608,7 @@ function AssistantMessageView({
   if (isStreaming && tps !== null) {
     lastRateRef.current = { tokens: Math.round(estimatedTokens), tps };
   }
-  // 结束后的停留期（holdRate）展示最后一帧读数。
+  // 停留期（holdRate）展示最后一帧读数。
   const heldRate = !isStreaming && holdRate ? lastRateRef.current : null;
 
   // Streaming-based timing for thinking blocks
@@ -621,7 +622,7 @@ function AssistantMessageView({
   const thinkingDurationFromFile = useMemo<number | undefined>(() => {
     const ms = messageDurationMs ?? (message.timestamp && prevTimestamp ? message.timestamp - prevTimestamp : undefined);
     if (ms === undefined) return undefined;
-    // 保留小数：整秒化会把 0.4s 变成 0，于是 0.1s 以上的思考反而不显示时长。
+    // 保留小数：取整会使 0.4s 变为 0，导致 0.1s 以上的思考不显示时长。
     const secs = ms / 1000;
     return secs >= 0.1 ? secs : undefined;
   }, [messageDurationMs, message.timestamp, prevTimestamp]);
@@ -648,9 +649,9 @@ function AssistantMessageView({
 
   useEffect(() => {
     if (!isStreaming) {
-      // 只有真流过的那条消息才有未结算的块。从文件读出来的消息块开始时间表是空的，
-      // 这条分支就不该再 setState：一次挂载上百条消息，每条都排一个状态更新，
-      // React 的嵌套更新上限会被顶穿（“Maximum update depth exceeded”），整页变空。
+      // 仅真正流式过的消息存在未结算的块；从文件读取的消息块开始时间表为空，
+      // 该分支不再 setState：一次挂载上百条消息会各排一次状态更新，触发 React
+      // 嵌套更新上限（“Maximum update depth exceeded”），导致整页空白。
       if (blockStartTimesRef.current.size > 0) {
         const now = new Date().getTime();
         setStreamingDurations((prev: Map<number, number>) => {
@@ -668,7 +669,7 @@ function AssistantMessageView({
       }
       streamStartRef.current = null;
       setTps(null);
-      // 结束后停留一帧的最终读数，到点再撤（撤时行随 estimatedTokens=0 收起）。
+      // 结束后停留最后一帧读数，超时撤销（撤销时该行随 estimatedTokens=0 收起）。
       if (lastRateRef.current) {
         setHoldRate(true);
         const holdTimer = setTimeout(() => setHoldRate(false), RATE_HOLD_MS);
@@ -719,7 +720,7 @@ function AssistantMessageView({
     <Message
       data-message-role="assistant"
       data-entry-id={entryId}
-      className="group mb-5"
+      className="group"
     >
       <MessageContent>
       {/* Streaming status (estimated tokens + throughput); the model name lives
@@ -963,7 +964,7 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
       };
 
   return (
-    <div className="mb-5">
+    <div>
       <ToolRow block={block} result={result} />
       {message.truncated && fullOutputUrl && (
         <div className="-mt-px px-1 py-1 text-xs">

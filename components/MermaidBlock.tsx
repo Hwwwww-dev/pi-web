@@ -315,7 +315,7 @@ export function DiagramZoomDialog({ title, label, onClose, children }: {
         </DialogHeader>
         <div className="mermaid-zoom-viewport min-h-0 min-w-0 overflow-auto p-6 [-webkit-overflow-scrolling:touch] max-[480px]:p-3">
           {/* The zoom factor is a computed width, not a static presentation.
-              mermaid 生成的 svg 的块级铺满规则留在 globals（.mermaid-zoom-canvas svg）。 */}
+              mermaid 生成的 svg 的块级铺满规则保留在 globals（.mermaid-zoom-canvas svg）。 */}
           <div className="mermaid-zoom-canvas mx-auto transition-[width] duration-150 ease-[ease]" style={{ width: `${zoom * 100}%` }}>
             {children}
           </div>
@@ -393,7 +393,7 @@ function renderCodeLines({ rows, stylesheet, useInlineStyles }: CodeLinesProps) 
  * box, no tokens) until an idle slice lets it take its language.
  */
 export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isStreaming }: CodeBlockProps) {
-  // 末尾的空行不算内容：它只在卡片底部多出一条线的空白。
+  // 末尾空行不计入内容：它只会在卡片底部多出一行空白。
   const body = code.replace(/\n+$/, "");
   const { isDark } = useTheme();
   const { t } = useI18n();

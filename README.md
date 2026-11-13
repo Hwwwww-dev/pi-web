@@ -4,8 +4,6 @@
 
 Local browser UI for the [pi coding agent](https://github.com/earendil-works/pi). Pi Web uses the same local configuration and session files as pi, so you can browse and resume conversations, run agent turns, configure models and resources, and inspect project files from a browser.
 
-**[Try the interactive demo →](https://agegr.github.io/pi-web/)** The real Pi Web UI runs entirely in your browser, with sample sessions, files and models. There is nothing to install; replies are pre-written and no model is called.
-
 ![Pi Web displaying a pi session with structured Markdown, tool calls, and project navigation](https://raw.githubusercontent.com/agegr/pi-web/main/docs/screenshot2.png)
 
 ## Features
@@ -87,7 +85,7 @@ Password authentication does not encrypt the connection. Do not expose Pi Web ov
 
 ### Docker
 
-Each release publishes an image to `ghcr.io/agegr/pi-web`. See [Running Pi Web in Docker](./docs/docker.md) for it, the Compose example and which volumes to keep.
+Build the image yourself: see [Running Pi Web in Docker](./docs/docker.md) for the Compose example and which volumes to keep. This fork publishes no image.
 
 ### HTTP Proxy
 
@@ -190,7 +188,7 @@ Do not run `next build` or `npm run build` during normal development. It writes 
 
 Before starting on a feature, read [Contributing](./CONTRIBUTING.md) for what is in scope and the pull request checklist.
 
-Contributor guides: [Internationalization](./docs/i18n.md) and [Release process](./docs/release.md).
+Contributor guides: [Internationalization](./docs/i18n.md).
 
 ## Repository Layout
 
@@ -202,7 +200,6 @@ lib/             Session, agent, model, file, Git, and security logic
 public/          Static assets and PWA files
 bin/             npm CLI entrypoint and launch option parsing
 docs/            Focused user and contributor guides
-demo/            Static browser demo published to GitHub Pages (see demo/README.md)
 ```
 
 See [AGENTS.md](./AGENTS.md) for the architecture notes and detailed file map.

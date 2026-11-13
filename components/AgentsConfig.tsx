@@ -85,9 +85,9 @@ const EMPTY_PROFILE: EditableProfile = {
 };
 
 /**
- * 各控件共享的观感：禁用时退到面板底色并弱化文字；高度用官方档位
- * （字段 h-9，提示词 textarea 更高）。边框、焦点环、禁用手势交给 ui/
- * 原语，这里只加禁用态。
+ * 各控件共享的样式：禁用态退至面板底色并弱化文字；高度沿用官方档位
+ * （字段 h-9，提示词 textarea 更高）。边框、焦点环与禁用手势由 ui/ 原语提供，
+ * 此处仅补充禁用态样式。
  */
 const controlClassName =
   "min-w-0 rounded-md border border-border bg-background dark:bg-background px-2.5 text-xs md:text-xs text-foreground disabled:bg-card disabled:text-muted-foreground disabled:cursor-default";
@@ -170,7 +170,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Toggle({ checked, disabled, label, onChange }: { checked: boolean; disabled: boolean; label: string; onChange: (checked: boolean) => void }) {
   return (
-    // label 包裹 Checkbox：点击文字仍转发为一次切换。
+    // label 包裹 Checkbox，点击文字同样触发一次切换。
     <label className={disabled
       ? "flex cursor-default items-center gap-2 text-xs text-muted-foreground"
       : "flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"}
@@ -694,7 +694,7 @@ export function AgentsConfig({
 
                   <Field label={t("agents.codemode")}>
                     <div className="flex flex-col gap-1.5">
-                      {/* 弹层挂 body，z 必须压过设置对话框的 z-[1000]。 */}
+                      {/* 弹层挂载到 body，层级需高于设置对话框的 z-[1000]。 */}
                       <Select
                         value={draft.codemode ?? "off"}
                         onValueChange={(value) => update("codemode", value as EditableProfile["codemode"])}

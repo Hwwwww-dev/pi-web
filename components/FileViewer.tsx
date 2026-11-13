@@ -1412,7 +1412,7 @@ function TextFileViewer({
         {/* Everything that describes the file truncates inside this group, so the
             actions on the right can never sit on top of the path or the counts. */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {/* 文件名是第一信息：不压缩、不省略；路径和元信息让位，由路径自己截断。 */}
+          {/* 文件名为首要信息，不压缩、不省略；路径与元信息让位，由路径自行截断。 */}
           <CodeBlockTitle className="flex shrink-0 items-center gap-1.5 text-sm font-medium">
             <FileIcon aria-hidden="true" strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
             <span className="whitespace-nowrap">{getFileName(filePath)}</span>
@@ -1435,7 +1435,7 @@ function TextFileViewer({
             metadata, and revealing it also made the header jump. */}
         <CodeBlockActions className="static! shrink-0 opacity-100!">
           {displayModes.length > 1 && (() => {
-            // 两个视图合成一个钮：显示下一个模式，点它就切过去。
+            // 多个视图合并为单个按钮：显示下一个模式，点击即切换。
             const currentIndex = displayModes.indexOf(effectiveDisplayMode as (typeof displayModes)[number]);
             const nextMode = displayModes[(currentIndex + 1) % displayModes.length] ?? displayModes[0];
             return (
