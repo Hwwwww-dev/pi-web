@@ -3,11 +3,10 @@
 import { useEffect } from "react";
 
 /**
- * 水位跟随规则：未聚焦且 1s 内无焦点变化时跟随当前布局高。否则冻结——
- * 聚焦期布局可能被键盘缩小；失焦后 1s 内是边界回涨的收起动画窗口。
- * 必须有这条跟随：启动瞬间可能读到虚高的 clientHeight（如状态栏挤占生效前），
- * 虚高水位会让"布局 < 水位"永远成立，键盘期永远退不出来——高度钉住摘不掉、
- * 文档多出一段滚动量，顶栏被推走回不来、输入框沉底。
+ * 水位跟随规则（只服务 data-keyboard-open 标志位）：未聚焦且 1s 内无焦点变化时
+ * 跟随当前布局高。否则冻结——聚焦期布局可能被键盘缩小；失焦后 1s 内是边界回涨
+ * 的收起动画窗口。必须有这条跟随：启动瞬间可能读到虚高的 clientHeight（如状态
+ * 栏挤占生效前），虚高水位会让"布局 < 水位"永远成立，标志位永不消退。
  */
 export function nextFullHeight({
   fullHeight,
@@ -53,15 +52,16 @@ function isEditableElement(element: Element | null): boolean {
 }
 
 /**
- * iOS standalone PWA 的键盘会直接缩小 WKWebView 边界（clientHeight 844→508）。
- * 本钩子只做一件事：把全高水位写进 --keyboard-full-height，CSS 在键盘期
- * （data-keyboard-open）把 html/body/.app-shell 钉在这个 px 常量上——文档因此
- * 比缩小后的视口多出键盘那一截，iOS 会按它自己的键盘动画原生滚动 scrollView
- * 把聚焦输入框滚到键盘上沿，整个页面（含页头）被原生推上去、原生滑回。
+ * iOS standalone PWA 的键盘直接缩小 WKWebView 布局视口（clientHeight 844→508），
+ * CSS 的 dvh 逐帧跟随：文档与视口恒等高，页头不动、composer 随视口底上移，
+ * 零位移，无需 JS 参与高度。
  *
- * 绝不要加 transform/位移去"帮忙"：iOS 按未变换的布局位置算滚动量，壳层一旦
- * 被移走，滚到的窗口下半就是空的——那就是白屏。也绝不要让高度跟随 dvh 缩小
- * （文档与视口等高，iOS 无处可滚，页头永远钉在顶部）。
+ * 本钩子只维护一个标志：data-keyboard-open。键盘期安全区 padding 切换
+ * （globals.css）、终端附加键、新会话项目栏隐藏都消费它。
+ * 水位只服务这个标志位：记住上次全高，布局仍矮于水位即视为键盘期（覆盖
+ * 收起动画窗口，避免 padding 提前回归造成 composer 小跳）；键盘缩小的布局
+ * 永不学为水位（收缩 ~55%，虚高噪声 ~7%），焦点事件与转屏后强制重学，
+ * 静止期 1Hz 兑底自愈（挂载瞬间可能读到虚高值且无事件）。
  *
  * Safari 普通标签页与桌面端布局不缩：水位恒等于当前高，属性只在聚焦时短暂
  * 存在，无任何视觉效果。
@@ -90,7 +90,6 @@ export function useViewportHeight(): void {
         focused,
         recentlyFocused,
       });
-      root.style.setProperty("--keyboard-full-height", `${fullHeight}px`);
       if (keyboardPeriod || focused) root.dataset.keyboardOpen = "true";
       else delete root.dataset.keyboardOpen;
     };
@@ -131,7 +130,6 @@ export function useViewportHeight(): void {
       window.removeEventListener("orientationchange", handleOrientationChange);
       window.removeEventListener("pageshow", scheduleSync);
       window.clearInterval(restHealTimer);
-      root.style.removeProperty("--keyboard-full-height");
       delete root.dataset.keyboardOpen;
     };
   }, []);

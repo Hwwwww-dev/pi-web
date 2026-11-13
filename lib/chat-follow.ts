@@ -14,12 +14,12 @@ export const CHAT_TAIL_TOLERANCE = 8;
 export const CHAT_FOLLOW_TOLERANCE = 96;
 
 /**
- * 内容变化或滚动后是否继续跟随尾部。
- * - 内容收缩把 scrollTop 钳到新的最大值：落点必在新底的贴底容差内，这不是读者
- *   上滑，维持跟随，而不是误判为“回到底部”。
- * - 读者上滑（内容高度未缩）即脱离，先于容差判定。
- * - 贴底，或向下滚动进入跟随容差，则跟随。
- * - 其余情况维持原状。
+ * 内容或视口变化后是否继续跟随尾部。
+ * - 内容收缩（完成时列表重组、行折叠收起）把 scrollTop 钳到新的最大值：落点必在
+ *   新底的贴底容差内，这不是读者上滑，维持跟随。
+ * - 视口长高（键盘收起动画、窗口变大）把 scrollTop 往回钳：同理不是读者上滑。
+ * - 读者上滑（内容与视口高度都没变）即脱离，先于容差判定。
+ * - 贴底，或向下滚动进入跟随容差，则跟随；其余维持原状。
  */
 export function shouldFollow(
   wasFollowing: boolean,
@@ -28,10 +28,16 @@ export function shouldFollow(
   clientHeight: number,
   scrollHeight: number,
   previousScrollHeight = scrollHeight,
+  previousClientHeight = clientHeight,
 ): boolean {
   if (
     scrollTop < previousScrollTop
     && scrollHeight < previousScrollHeight
+    && isAtTail(scrollTop, clientHeight, scrollHeight)
+  ) return true;
+  if (
+    scrollTop < previousScrollTop
+    && clientHeight > previousClientHeight
     && isAtTail(scrollTop, clientHeight, scrollHeight)
   ) return true;
   if (scrollTop < previousScrollTop) return false;

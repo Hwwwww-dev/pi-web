@@ -44,32 +44,35 @@ test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(appShellSource, /flex min-h-\(--header-height\) shrink-0 items-center gap-2 border-b pt-\[env\(safe-area-inset-top\)\] transition-\[width,height\] ease-linear/);
   // Right panel tab bar: the draft's 46px bar with its safe-area compensation.
   assert.match(appShellSource, /h-\[calc\(46px_\+_\env\(safe-area-inset-top\)\)\] shrink-0/);
-  // 主列/右列用 h-full（百分比链到壳层），不再写死 dvh：键盘期 dvh 缩到 383，
-  // 内容不跟着钉高走，iOS 原生滚动滚到的下半截就是空白（白屏）。
+  // 主列/右列用 h-full（百分比链到壳层）：键盘期视口缩矮，列表窗口整体变矮，
+  // composer 随视口底上移，零位移。
   assert.match(appShellSource, /flex h-full flex-col bg-background/);
   assert.match(appShellSource, /h-full min-w-0 overflow-hidden/);
   assert.doesNotMatch(appShellSource, /h-\[100dvh\] min-w-0/);
-  assert.match(cssSource, /@media \(max-width: 640px\) \{[^@]*?\.app-shell \{[^}]*?height: 100dvh/);
+  assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{[^@]*?\.app-shell \{[^}]*?height: 100dvh;[^}]*?min-height: 0;/);
+  // 壳层的 min-h-svh（svh 不随键盘缩小）必须在移动端被压掉，否则键盘期壳层比
+  // 视口高、零位移静默失效。
+  assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{[^@]*?\.app-shell \{[^}]*?min-height: 0;/);
   assert.match(appShellSource, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}/);
   assert.match(viewportHookSource, /window\.visualViewport/);
   assert.match(viewportHookSource, /window\.addEventListener\("focusout", scheduleSync\)/);
   assert.match(viewportHookSource, /data-keyboard-open|dataset\.keyboardOpen/);
   assert.match(viewportHookSource, /isKeyboardPeriod/);
-  // 位移与过渡已全部废弃：iOS 会原生滚动 scrollView 推页头，任何 transform 都会
-  // 让滚到的窗口下半变成空白（白屏）。断言壳层上不存在任何位移与过渡，防止再犯。
+  // 位移与过渡已全部废弃：零位移模式下文档与视口等高、无滚动量，任何 transform
+  // 或钉高都会把位移带回来。断言防止再犯。
   assert.doesNotMatch(cssSource, /\.app-shell \{[^}]*transform/);
   assert.doesNotMatch(cssSource, /\.app-shell \{[^}]*transition: transform/);
   assert.doesNotMatch(viewportHookSource, /--keyboard-lift/);
   assert.doesNotMatch(viewportHookSource, /translate3d/);
   assert.doesNotMatch(viewportHookSource, /--app-viewport-height/);
   assert.doesNotMatch(viewportHookSource, /scrollTo\(/);
-  assert.match(viewportHookSource, /--keyboard-full-height/);
+  // 高度不再钉 px：hook 只维护 data-keyboard-open 标志位，dvh 自己逐帧跟随键盘。
+  assert.doesNotMatch(viewportHookSource, /--keyboard-full-height/);
+  assert.doesNotMatch(cssSource, /--keyboard-full-height/);
   assert.match(cssSource, /html, body \{[\s\S]*?height: 100dvh;[\s\S]*?\}/);
   assert.doesNotMatch(cssSource, /html, body \{[\s\S]*?height: var\(--app-viewport-height/);
-  // 键盘期高度钉在 px 全高上：文档比缩小后的视口多出键盘那一截，iOS 才有原生
-  // 滚动余地推页头；绝不能让高度跟随 dvh 缩（无处可滚，页头永远钉顶）。
-  assert.match(cssSource, /html\[data-keyboard-open\] body \{[^}]*height: var\(--keyboard-full-height/);
-  assert.match(cssSource, /html\[data-keyboard-open\] \.app-shell \{[^}]*height: var\(--keyboard-full-height/);
+  // 键盘期不再有任何钉高规则：文档与视口等高，零滚动零位移。
+  assert.doesNotMatch(cssSource, /html\[data-keyboard-open\][^{]*\{[^}]*height: var/);
   assert.doesNotMatch(cssSource, /\.app-chat-shift/);
   // 推上去靠 iOS 原生滚动，不动页头本身（收高度/位移都不许）。
   assert.doesNotMatch(cssSource, /html\[data-keyboard-open\] \.app-top-bar/);
