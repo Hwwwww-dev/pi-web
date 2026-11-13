@@ -52,13 +52,18 @@ function isEditableElement(element: Element | null): boolean {
 }
 
 /**
- * iOS standalone PWA 的键盘直接缩小 WKWebView 布局视口（clientHeight 844→508），
- * CSS 的 dvh 逐帧跟随：文档与视口恒等高，页头不动、composer 随视口底上移，
- * 零位移，无需 JS 参与高度。
+ * iOS standalone PWA 的键盘会直接缩小 WKWebView 边界（clientHeight 844→508）。
+ * 本钩子把全高水位写进 --keyboard-full-height，CSS 在键盘期（data-keyboard-open）
+ * 把 html/body/.app-shell 钉在这个 px 常量上——文档因此比缩小后的视口多出键盘
+ * 那一截，iOS 会按它自己的键盘动画原生滚动 scrollView 把聚焦输入框滚到键盘
+ * 上沿，整个页面（含页头）被原生推上去、原生滑回，无任何 JS 动画。
  *
- * 本钩子只维护一个标志：data-keyboard-open。键盘期安全区 padding 切换
- * （globals.css）、终端附加键、新会话项目栏隐藏都消费它。
- * 水位只服务这个标志位：记住上次全高，布局仍矮于水位即视为键盘期（覆盖
+ * 绝不要加 transform/位移去"帮忙"：iOS 按未变换的布局位置算滚动量，壳层一旦
+ * 被移走，滚到的窗口下半就是空的——那正是白屏。也绝不要让高度跟随 dvh 缩小：
+ * 文档与视口等高，iOS 无处可滚，页头永远钉在顶部。
+ *
+ * data-keyboard-open 另供键盘期安全区 padding 切换（globals.css）、终端附加键、
+ * 新会话项目栏隐藏消费。水位规则：记住上次全高，布局仍矮于水位即视为键盘期（覆盖
  * 收起动画窗口，避免 padding 提前回归造成 composer 小跳）；键盘缩小的布局
  * 永不学为水位（收缩 ~55%，虚高噪声 ~7%），焦点事件与转屏后强制重学，
  * 静止期 1Hz 兑底自愈（挂载瞬间可能读到虚高值且无事件）。
@@ -90,6 +95,7 @@ export function useViewportHeight(): void {
         focused,
         recentlyFocused,
       });
+      root.style.setProperty("--keyboard-full-height", `${fullHeight}px`);
       if (keyboardPeriod || focused) root.dataset.keyboardOpen = "true";
       else delete root.dataset.keyboardOpen;
     };
@@ -130,6 +136,7 @@ export function useViewportHeight(): void {
       window.removeEventListener("orientationchange", handleOrientationChange);
       window.removeEventListener("pageshow", scheduleSync);
       window.clearInterval(restHealTimer);
+      root.style.removeProperty("--keyboard-full-height");
       delete root.dataset.keyboardOpen;
     };
   }, []);
