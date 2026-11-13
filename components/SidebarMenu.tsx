@@ -1072,9 +1072,9 @@ export function SidebarMenu({
         <DialogPrimitive.Portal>
           <div className={SHEET_BACKDROP_CLASS} aria-hidden="true" {...isolateEvents} />
           {/* The layer spans the visible area the way the drawer does, from
-              the top of the screen down to --app-viewport-height, which
-              hooks/useViewportHeight.ts shrinks to the visual viewport while
-              the software keyboard is up. The layer lets taps through
+              the top of the screen down to --app-viewport-height (100dvh, the
+              only value anything writes it to now that the keyboard no longer
+              takes the layout height over). The layer lets taps through
               (`pointer-events-none`): they land on the backdrop, which Radix
               reads as a press outside the layer. */}
           <DialogPrimitive.Content

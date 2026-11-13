@@ -32,6 +32,7 @@ export function SafeMarkdownBody({ children, className, ...props }: React.Compon
         type="button"
         variant="outline"
         onClick={() => setShowRaw(true)}
+        style={{ whiteSpace: "normal" }}
         className="my-1 h-auto w-full justify-start px-2.5 py-[7px] text-left text-xs font-normal text-muted-foreground"
       >
         <TriangleAlertIcon aria-hidden className="mr-1.5 size-3.5 shrink-0" />
