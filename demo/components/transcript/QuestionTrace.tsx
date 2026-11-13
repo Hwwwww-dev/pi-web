@@ -4,6 +4,7 @@ import { memo } from "react";
 import { CircleIcon, CircleCheckIcon, MessageCircleQuestionIcon } from "lucide-react";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import type { ToolViewStep } from "@/lib/tool-view";
+import type { StepUsage } from "@/lib/turn-view";
 import { TraceRow } from "./TraceRow";
 
 const STEP_ICON = {
@@ -18,12 +19,14 @@ const STEP_ICON = {
  * prompt, the choices below it, the pick replacing them once answered. No
  * progress count — a question is not a to-do list.
  */
-export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey, activityTool }: {
+export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey, activityTool, stepUsage }: {
   title: string;
   steps: ToolViewStep[];
   foldKey: string;
   /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
   activityTool?: string;
+  /** The issuing request's usage: the expanded card's first line (TraceRow draws it). */
+  stepUsage?: StepUsage;
 }) {
   const answered = steps.filter((step) => step.status === "done").length;
 
@@ -33,6 +36,7 @@ export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey
       title={title}
       foldKey={foldKey}
       activityTool={activityTool}
+      stepUsage={stepUsage}
       defaultOpen
       status={steps.length > 0 && answered === steps.length ? "done" : undefined}
       ariaLabel={title}

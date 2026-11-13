@@ -5,6 +5,7 @@ import { CircleCheckIcon, CircleDotIcon, CircleIcon, RouteIcon } from "lucide-re
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { useI18n } from "@/hooks/useI18n";
 import type { ToolViewStep } from "@/lib/tool-view";
+import type { StepUsage } from "@/lib/turn-view";
 import { TraceRow } from "./TraceRow";
 
 const STEP_ICON = {
@@ -18,11 +19,13 @@ const STEP_ICON = {
  * A todo snapshot (官方 `pattern_plan.md`): one collapsible line naming the
  * task in progress, its progress in the description, the steps below it.
  */
-export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool }: {
+export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool, stepUsage }: {
   steps: ToolViewStep[];
   foldKey: string;
   /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
   activityTool?: string;
+  /** The issuing request's usage: the expanded card's first line (TraceRow draws it). */
+  stepUsage?: StepUsage;
 }) {
   const { t } = useI18n();
   const current = steps.find((step) => step.status === "running") ?? steps.find((step) => step.status !== "done");
@@ -38,6 +41,7 @@ export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool 
       description={t("chat.trace.planProgress", { done, total: steps.length })}
       foldKey={foldKey}
       activityTool={activityTool}
+      stepUsage={stepUsage}
       defaultOpen
       ariaLabel={title}
       content={(

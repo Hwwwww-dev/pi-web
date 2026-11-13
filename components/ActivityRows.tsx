@@ -33,7 +33,7 @@ import { formatToolDurationIfShown } from "@/lib/tool-duration";
 
 import { getToolCategory, getToolFilePaths, type ToolCategory } from "@/lib/tool-categories";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
-import { formatUsage, type ActivityItem, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
+import { formatUsage, type ActivityItem, type StepUsage, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
 import { UsageBar } from "./UsageBar";
 import { ReasoningTrace } from "./transcript/ReasoningTrace";
 import { SourcesTrace } from "./transcript/SourcesTrace";
@@ -85,15 +85,18 @@ export interface ToolCallEntry {
   block: ToolCallContent;
   result?: ToolResultMessage;
   duration?: number;
+  stepUsage?: StepUsage;
 }
 
 
 
 
 
-export function ToolRow({ block, result, cwd, onOpenFile, onOpenSubagent }: {
+export function ToolRow({ block, result, stepUsage, cwd, onOpenFile, onOpenSubagent }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
+  /** The issuing request's usage, shown as the expanded card's first line. */
+  stepUsage?: StepUsage;
   /** The session directory a chip's relative path resolves against. */
   cwd?: string;
   /** Opens one of the files the call named (its chips). */
@@ -152,28 +155,29 @@ export function ToolRow({ block, result, cwd, onOpenFile, onOpenSubagent }: {
             <ExternalLinkIcon strokeWidth={2} />
           </Button>
         ) : undefined}
+        stepUsage={stepUsage}
         below={mediaNode}
       />
     );
   }
 
   if (view.kind === "terminal") {
-    return <TerminalTrace view={view} activityTool={block.toolName} below={mediaNode} />;
+    return <TerminalTrace view={view} activityTool={block.toolName} stepUsage={stepUsage} below={mediaNode} />;
   }
 
   // A todo snapshot (第 4.2 节): the Plan pattern — what is running now, how far it got, the steps.
   if (view.kind === "question") {
     const steps = view.sections.find((section) => section.kind === "steps")?.steps ?? [];
-    return <QuestionTrace title={view.title} steps={steps} foldKey={view.foldKey} activityTool={block.toolName} />;
+    return <QuestionTrace title={view.title} steps={steps} foldKey={view.foldKey} activityTool={block.toolName} stepUsage={stepUsage} />;
   }
   if (view.kind === "queue") {
     const steps = view.sections.find((section) => section.kind === "steps")?.steps ?? [];
-    return <PlanTrace steps={steps} foldKey={view.foldKey} activityTool={block.toolName} />;
+    return <PlanTrace steps={steps} foldKey={view.foldKey} activityTool={block.toolName} stepUsage={stepUsage} />;
   }
 
   // What a search read (第 5.8 节): one line per source, each a link.
   if (view.sources && view.sources.length > 0) {
-    return <SourcesTrace sources={view.sources} foldKey={view.foldKey} activityTool={block.toolName} below={mediaNode} />;
+    return <SourcesTrace sources={view.sources} foldKey={view.foldKey} activityTool={block.toolName} stepUsage={stepUsage} below={mediaNode} />;
   }
 
   const changeCounts = (view.kind === "file-edit" || view.kind === "file-write")
@@ -194,6 +198,7 @@ export function ToolRow({ block, result, cwd, onOpenFile, onOpenSubagent }: {
       activityTool={block.toolName}
       below={mediaNode}
       trailing={changeTrailing}
+      stepUsage={stepUsage}
       cwd={cwd}
       onOpenFile={onOpenFile}
     />
@@ -259,6 +264,7 @@ export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSubagent }: {
             key={call.block.toolCallId ?? index}
             block={call.block}
             result={call.result}
+            stepUsage={call.stepUsage}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
@@ -674,6 +680,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
             key={item.key}
             block={only.block}
             result={only.result}
+            stepUsage={only.stepUsage}
             cwd={cwd}
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
@@ -687,6 +694,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
               block: entry.block,
               result: entry.result,
               duration: entry.duration,
+              stepUsage: entry.stepUsage,
             }))}
             cwd={cwd}
             onOpenFile={onOpenFile}

@@ -5,6 +5,7 @@ import { ArrowUpRightIcon, GlobeIcon } from "lucide-react";
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { useI18n } from "@/hooks/useI18n";
 import type { ToolViewSource } from "@/lib/tool-view";
+import type { StepUsage } from "@/lib/turn-view";
 import { TraceRow } from "./TraceRow";
 
 /** A URL's host, or the URL itself when it will not parse. */
@@ -20,11 +21,13 @@ function hostOf(url: string): string {
  * What a web search read (官方 `pattern_sources.md`): one line per source, the
  * whole row a link, the arrow saying it leaves the app.
  */
-export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trailing, below, activityTool }: {
+export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trailing, below, activityTool, stepUsage }: {
   sources: ToolViewSource[];
   foldKey: string;
   /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
   activityTool?: string;
+  /** The issuing request's usage: the expanded card's first line (TraceRow draws it). */
+  stepUsage?: StepUsage;
   trailing?: ReactNode;
   below?: ReactNode;
 }) {
@@ -39,6 +42,7 @@ export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trail
       trailing={trailing}
       below={below}
       activityTool={activityTool}
+      stepUsage={stepUsage}
       ariaLabel={title}
       content={(
         <Trace>

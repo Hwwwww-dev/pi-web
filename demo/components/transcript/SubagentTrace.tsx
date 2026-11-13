@@ -6,6 +6,7 @@ import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/com
 import { SafeMarkdownBody } from "@/components/SafeMarkdownBody";
 import { useI18n } from "@/hooks/useI18n";
 import type { ToolViewStatus, ToolViewStep } from "@/lib/tool-view";
+import type { StepUsage } from "@/lib/turn-view";
 import { TraceRow } from "./TraceRow";
 
 const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
@@ -20,7 +21,7 @@ const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
  * `<Trace>`, the report below them. A run still in the background is the line
  * alone — there is nothing to show yet.
  */
-export const SubagentTrace = memo(function SubagentTrace({ label, status, steps, report, foldKey, action, below }: {
+export const SubagentTrace = memo(function SubagentTrace({ label, status, steps, report, foldKey, action, stepUsage, below }: {
   /** The profile or agent name; omitted for the generic line. */
   label?: string;
   status: ToolViewStatus;
@@ -30,6 +31,8 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
   foldKey: string;
   /** Row-end action (opening the subagent's tab). */
   action?: ReactNode;
+  /** The issuing request's usage: the expanded card's first line (TraceRow draws it). */
+  stepUsage?: StepUsage;
   /** Media the run produced, below the line. */
   below?: ReactNode;
 }) {
@@ -48,6 +51,7 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
       trailing={undefined}
       actions={action}
       ariaLabel={title}
+      stepUsage={stepUsage}
       below={below}
       content={hasBody ? (
         <>

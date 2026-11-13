@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { AnsiText } from "@/components/AnsiText";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { Button } from "@/components/ui/button";
+import type { StepUsage } from "@/lib/turn-view";
 import { isTuiText } from "@/lib/ansi";
 import { CodeBlock, CodeBlockContent, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
@@ -232,9 +233,11 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
   );
 }
 
-export const ToolTrace = memo(function ToolTrace({ view, trailing, below, activityTool, cwd, onOpenFile }: {
+export const ToolTrace = memo(function ToolTrace({ view, trailing, below, stepUsage, activityTool, cwd, onOpenFile }: {
   view: ToolView;
   /** Duration belongs to the turn, not the tool (第 8 节). */
+  /** The issuing request's usage: the expanded card's first line, in the same shape as the turn's meta line. */
+  stepUsage?: StepUsage;
   trailing?: ReactNode;
   /** Media the call produced, below the line. */
   below?: ReactNode;
@@ -279,6 +282,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, activi
       trailing={trailing}
       below={below}
       activityTool={activityTool}
+      stepUsage={stepUsage}
       content={content}
       ariaLabel={view.object ? `${view.title} ${view.object}` : view.title}
     />

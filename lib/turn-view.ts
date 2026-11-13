@@ -16,10 +16,23 @@ export interface TurnUsage {
   cost: { total: number };
 }
 
+/**
+ * One request's usage — the request that issued a tool call.
+ *
+ * A tool result carries none of its own, so the number belongs to "the request
+ * behind this step", not to "this tool".
+ */
+export interface StepUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cost: number;
+}
+
 export type ActivityItem =
   | { kind: "thinking"; key: string; block: ThinkingContent; duration?: number; entryId?: string; blockIndex: number; searchTarget?: boolean }
   | { kind: "text"; key: string; block: TextContent; searchTarget?: boolean }
-  | { kind: "tool"; key: string; block: ToolCallContent; result?: ToolResultMessage; duration?: number; searchTarget?: boolean }
+  | { kind: "tool"; key: string; block: ToolCallContent; result?: ToolResultMessage; duration?: number; stepUsage?: StepUsage; searchTarget?: boolean }
   | { kind: "custom"; key: string; message: CustomMessage; searchTarget?: boolean };
 
 export function formatUsage(usage: TurnUsage): string {
@@ -130,6 +143,16 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
           block: toolCall,
           result,
           duration,
+          // Parallel calls in one assistant message show the same numbers: that
+          // request is the step's cost, and it is what was asked for.
+          stepUsage: assistantMessage.usage
+            ? {
+              input: assistantMessage.usage.input ?? 0,
+              output: assistantMessage.usage.output ?? 0,
+              cacheRead: assistantMessage.usage.cacheRead ?? 0,
+              cost: assistantMessage.usage.cost?.total ?? 0,
+            }
+            : undefined,
           searchTarget,
         });
         continue;

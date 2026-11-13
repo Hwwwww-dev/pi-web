@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { UsageBar } from "@/components/UsageBar";
+import type { StepUsage } from "@/lib/turn-view";
 import {
   Trace,
   TraceCollapsible,
@@ -92,6 +94,7 @@ export function TraceRow({
   defaultOpen = false,
   trailing,
   content,
+  stepUsage,
   below,
   ariaLabel,
   href,
@@ -123,6 +126,8 @@ export function TraceRow({
   trailing?: ReactNode;
   /** Folding content. Omitted = a plain line that cannot expand. */
   content?: ReactNode;
+  /** The issuing request's usage: the expanded card's first line, whatever kind of call it is. */
+  stepUsage?: StepUsage;
   /** Rendered inside the fold after `content`. */
   children?: ReactNode;
   /** Rendered inside the same `Trace` below the line (media the call produced). */
@@ -237,6 +242,11 @@ export function TraceRow({
         {/* 展开区统一封顶：markdown（子代理报告、web 结果）以前是唯一没有上限的，
             长内容会把整张卡无限拉高；代码块自己也封顶，同值叠加无害。 */}
         <TraceCollapsibleContent className="mt-1 max-h-[var(--card-max-height)] overflow-auto [&>*]:min-w-0">
+          {stepUsage && (
+            <div className="mb-1 text-xs">
+              <UsageBar usage={stepUsage} gap={10} />
+            </div>
+          )}
           {content}
           {children}
         </TraceCollapsibleContent>

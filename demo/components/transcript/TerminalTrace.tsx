@@ -17,6 +17,7 @@ import { HighlightedCode } from "@/components/HighlightedCode";
 import { isTuiText } from "@/lib/ansi";
 import { useI18n } from "@/hooks/useI18n";
 import type { ToolView } from "@/lib/tool-view";
+import type { StepUsage } from "@/lib/turn-view";
 import { TraceRow } from "./TraceRow";
 
 /**
@@ -24,13 +25,15 @@ import { TraceRow } from "./TraceRow";
  * output is the block. Same 5.2 line, different content slot — the header is
  * what a terminal call has and a file read does not.
  */
-export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below, activityTool }: {
+export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below, activityTool, stepUsage }: {
   view: ToolView;
   trailing?: ReactNode;
   /** Media the call produced, below the line. */
   below?: ReactNode;
   /** The pi tool name, kept as `data-activity-tool`. */
   activityTool?: string;
+  /** The issuing request's usage: the expanded card's first line (TraceRow draws it). */
+  stepUsage?: StepUsage;
 }) {
   const { t } = useI18n();
   const [wrap, setWrap] = useState(true);
@@ -49,6 +52,7 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
       trailing={trailing}
       below={below}
       activityTool={activityTool}
+      stepUsage={stepUsage}
       ariaLabel={view.object ? `${view.title} ${view.object}` : view.title}
       content={(
         <CodeBlock size="sm" variant={failed ? "destructive" : "default"} className="max-w-full">
