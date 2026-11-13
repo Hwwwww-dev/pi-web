@@ -164,18 +164,21 @@ interface Props {
 
 /**
  * 唯一的贴底跟随者：官方 scroller 以 `autoScroll={false}` 运行，内部跟随关闭。
- * `atTail` 为真期间内容长高（流式追加、行展开、完成重组）即调用 `scrollToEnd`；
- * 读者上滑后 `atTail` 变假并停止干涉。跟随与否由 `shouldFollow` 判定（含钳制识别）。
+ * `atTail` 为真期间内容或视口长高（流式追加、行展开、完成重组、键盘收起）即
+ * 调用 `scrollToEnd`；读者上滑后 `atTail` 变假并停止干涉。跟随与否由
+ * `shouldFollow` 判定（含钳制识别）。
  */
-function FollowTailWhenAtTail({ atTail, contentRef }: {
+function FollowTailWhenAtTail({ atTail, contentRef, viewportRef }: {
   atTail: boolean;
   contentRef: React.RefObject<HTMLDivElement | null>;
+  viewportRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const { scrollToEnd } = useMessageScroller();
   useEffect(() => {
     if (!atTail) return;
     const content = contentRef.current;
-    if (!content) return;
+    const viewport = viewportRef.current;
+    if (!content || !viewport) return;
     let frame = 0;
     const follow = () => {
       if (frame) return;
@@ -186,12 +189,15 @@ function FollowTailWhenAtTail({ atTail, contentRef }: {
     };
     const observer = new ResizeObserver(follow);
     observer.observe(content);
+    // 视口也在观察内：键盘开合缩放 dvh 视口时列表容器跟着变矮/变高，
+    // 贴底时保持尾端可见（零位移模式下 composer 随视口底上下移动）。
+    observer.observe(viewport);
     follow();
     return () => {
       if (frame) cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [atTail, contentRef, scrollToEnd]);
+  }, [atTail, contentRef, viewportRef, scrollToEnd]);
   return null;
 }
 
@@ -760,13 +766,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const activeRef = useRef(active);
   activeRef.current = active;
   // 跟随状态仅由滚动决定，判定交给 `shouldFollow`：方向优先于容差（上滑即脱离），
-  // 内容收缩导致的 scrollTop 钳制不算上滑。8px 贴底容差只用于“回到最新”按钮。
+  // 内容收缩或视口长高导致的 scrollTop 钳制不算上滑。8px 贴底容差只用于“回到最新”
+  // 按钮。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
     let following = true;
     let previousTop = container.scrollTop;
     let previousHeight = container.scrollHeight;
+    let previousClient = container.clientHeight;
     const update = () => {
       const next = shouldFollow(
         following,
@@ -775,10 +783,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         container.clientHeight,
         container.scrollHeight,
         previousHeight,
+        previousClient,
       );
       following = next;
       previousTop = container.scrollTop;
       previousHeight = container.scrollHeight;
+      previousClient = container.clientHeight;
       setAtTail(next);
     };
     update();
@@ -1714,7 +1724,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         )}
         {!isEmptyNew && <>
         <MessageScrollerProvider autoScroll={false} defaultScrollPosition="end">
-        <FollowTailWhenAtTail atTail={atTail && !foldInFlight} contentRef={messageContentRef} />
+        <FollowTailWhenAtTail atTail={atTail && !foldInFlight} contentRef={messageContentRef} viewportRef={scrollContainerRef} />
         <MessageScroller className="min-h-0 min-w-0 flex-1">
         <MessageScrollerViewport
           ref={scrollContainerRef}

@@ -263,32 +263,25 @@
   }
 }
 
-/* iOS standalone PWA 的键盘会直接缩小 WKWebView 边界（clientHeight 844→508）。
-   键盘期把 html/body/.app-shell 高度钉在全高水位（--keyboard-full-height，px 常量，
-   hooks/useViewportHeight.ts 写入）：文档因此比缩小后的视口多出键盘那一截，iOS
-   会按它自己的键盘动画原生滚动 scrollView 把聚焦输入框滚到键盘上沿——整个页面
-   （含页头）被原生推上去、原生滑回，无任何 JS 动画。
-   绝不要加 transform/位移去"帮忙"：iOS 按未变换的布局位置算滚动量，壳层一旦被
-   移走，滚到的窗口下半就是空的——那正是白屏（9330e20d）。也绝不要让高度跟随
-   dvh 缩小：文档与视口等高，iOS 无处可滚，页头永远钉在顶部。
+/* iOS standalone PWA 的键盘会直接缩小 WKWebView 布局视口（clientHeight 844→508），
+   CSS 的 dvh 逐帧跟随缩小后的视口：文档与视口恒等高、滚动量为零——页头不动、
+   列表窗口整体变矮、composer 随视口底上移（智谱式零位移）。贴底跟随由
+   FollowTailWhenAtTail 的 ResizeObserver（同时观察内容与视口）接管。
+   绝不要加 transform/位移去"帮忙"，也不要再把高度钉回 px 常量：那会让文档
+   多出一截滚动量，iOS 原生滚动 scrollView 把整个页面（含页头）推上去——
+   正是要消灭的位移（9330e20d 白屏旧账同样源于给壳层加位移）。
    `data-keyboard-open` 供底部安全区相关规则使用（.chat-content、.chat-input-shell、
    .terminal-extra-keys、侧栏 Sheet）。 */
-html[data-keyboard-open],
-html[data-keyboard-open] body {
-  height: var(--keyboard-full-height, 100dvh);
-}
 
-/* 移动端给壳层定高：主列/右列改为 h-full 后，百分比需要可解析的父高（键盘期
-   由上面的 px 钉高接管，静止时是 100dvh）。桌面 inset 形态由
-   min-[641px]:h-[calc(100dvh-16px)] 自带高度，不走这条。 */
-@media (max-width: 640px) {
+/* 移动端给壳层定高：主列/右列改为 h-full 后，百分比需要可解析的父高。同时压掉
+   SidebarProvider 的 min-h-svh（svh 不随键盘缩小，不压掉则壳层在键盘期比视口高，
+   零位移静默失效）。手机横屏超过 640px 宽但高度最小，与键盘规则同一查询加入；
+   桌面 inset 形态由 min-[641px]:h-[calc(100dvh-16px)] 自带高度，不走这条。 */
+@media (max-width: 640px), (pointer: coarse) and (max-height: 500px) {
   .app-shell {
     height: 100dvh;
+    min-height: 0;
   }
-}
-
-html[data-keyboard-open] .app-shell {
-  height: var(--keyboard-full-height, 100dvh);
 }
 
 /* Theme toggle: circular wipe via View Transitions API.

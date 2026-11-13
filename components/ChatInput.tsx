@@ -2546,7 +2546,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               <InputGroupAddon align="block-end" className="min-w-0 items-center justify-end gap-2 px-1 pb-0.5">
                 {/* One pill row: the pills scroll horizontally instead of wrapping,
                     and the send button is a sibling so it can never be squeezed
-                    out. chat-input-controls keeps the keyboard-open collapse. */}
+                    out. */}
                 <div className="chat-input-controls flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
                   <Tooltip>
