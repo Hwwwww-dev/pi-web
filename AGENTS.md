@@ -34,6 +34,7 @@ pi's packages up to 1.2.0 depend on each other with `^` ranges (1.3.0 pins them 
 - **Extensions written for the pi CLI must behave the same here.** Fix display problems in the web client; never add pi-web-only options or fields to `ctx.ui.*` options or `extension_ui_request`. pi's TUI is the reference for what an extension is asking for.
 - **pi packages stay pinned exactly.** `lib/pi-packages.test.mjs` fails on any `@earendil-works/*` package not installed with `--save-exact` (see Upgrading pi).
 - **CI runs on `main` and pull requests only** (`.github/workflows/ci.yml`). A push to `dev` is not checked, so run `npm test`, `node_modules/.bin/tsc --noEmit` and `npm run lint` yourself before building production.
+- **iOS PWA 键盘机制是钉高，不是跟随。** 键盘期必须把 html/body/.app-shell 钉在全高水位（`--keyboard-full-height`，`hooks/useViewportHeight.ts` 写入），让文档比缩小后的视口多出键盘一截，iOS 才会原生滚动 scrollView 推走页头。绝不让高度跟随 dvh 缩（文档与视口等高，无处可滚，页头永远钉顶）；绝不给壳层加 transform/位移/过渡（iOS 按未变换位置算滚动量，滚到的下半截是空白）。改键盘机制必须真机复验（完全重开 PWA）；细节读 `docs/agents/client-platform.md`。
 
 ## Fork workflow (production)
 
