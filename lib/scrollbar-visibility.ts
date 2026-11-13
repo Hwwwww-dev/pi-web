@@ -2,42 +2,37 @@
 
 /**
  * Overlay scrollbars: the thumb is transparent at rest and fades in while the
- * user actually scrolls (wheel/touch/scroll keys) or hovers its container.
- * WebKit's scrollbar pseudo-elements ignore transitions,
- * so the fade is driven by hand: each visible container carries `--sb-alpha`,
- * which the thumb reads as its color strength, and one rAF loop ramps it
- * between 0 and 1. A container stays lit while it scrolls or sits under the
- * pointer, and dims shortly after the last of either, over 400ms.
+ * user actually scrolls, out again shortly after. WebKit's scrollbar
+ * pseudo-elements ignore transitions, so the fade is driven by hand: each lit
+ * container carries `--sb-alpha`, which the thumb reads as its color strength,
+ * and one rAF loop ramps it between 0 and 1 over 400ms.
+ *
+ * macOS semantics: a bar lights only when a real user gesture scrolls THAT
+ * container. Two failed designs fixed here:
+ * 1) revealing on scroll events alone — streaming's resize-observer tail
+ *    follow and jump-to-bottom are programmatic scrolls whose events fire
+ *    every tick, so bars never dimmed;
+ * 2) revealing gesture event paths (plus hover) — sweeping the mouse across
+ *    the page lit every scrollable it crossed and one wheel tick lit a whole
+ *    nested chain: "everything shows".
+ *
+ * The gesture listeners only stamp a timestamp; the scroll listener reveals
+ * `event.target` — exactly the container that moved — when the stamp is
+ * fresh. Programmatic scrolling carries no gesture stamp and never lights.
  */
 const HIDE_DELAY_MS = 700;
 const FADE_MS = 400;
+/** Wheel/keys: momentumless, so a short window suffices. */
+const WHEEL_SCROLL_WINDOW_MS = 200;
+/** Touch: momentum scrolling continues after the last touchmove. */
+const TOUCH_SCROLL_WINDOW_MS = 1200;
 
 let installed = false;
-
-const scrollableCache = new WeakSet<Element>();
-
-function isScrollable(element: Element): boolean {
-  if (scrollableCache.has(element)) return true;
-  let result = false;
-  if (element instanceof HTMLElement) {
-    const style = getComputedStyle(element);
-    const scrollsY = style.overflowY === "auto" || style.overflowY === "scroll" || style.overflowY === "overlay";
-    const scrollsX = style.overflowX === "auto" || style.overflowX === "scroll" || style.overflowX === "overlay";
-    result =
-      (scrollsY && element.scrollHeight > element.clientHeight + 1) ||
-      (scrollsX && element.scrollWidth > element.clientWidth + 1);
-  }
-  if (result) scrollableCache.add(element);
-  return result;
-}
 
 function fadeAlpha(element: HTMLElement): number {
   const value = element.style.getPropertyValue("--sb-alpha");
   return value === "" ? 0 : Number(value) || 0;
 }
-
-const isScrollableElement = (node: EventTarget | Element): node is Element =>
-  node instanceof Element && isScrollable(node);
 
 type Fade = {
   element: HTMLElement;
@@ -106,24 +101,15 @@ export function installGlobalScrollbarVisibility(): void {
     hideTimer = setTimeout(hideAll, HIDE_DELAY_MS);
   };
 
-  // 只认真实用户手势，不监听 scroll：流式输出的 RO 贴尾跟随、发消息后的跳底
-  // 都是程序化滚动，会每个 tick 触发 reveal，把滚动条永远点亮（用户没滚，
-  // 滚动条却一直亮）。滚轮/触摸/翻页键/悬停才亮。
-  document.addEventListener(
-    "wheel",
-    (event) => {
-      if (event.target instanceof Element) reveal(event.composedPath().filter(isScrollableElement).slice(0, 3));
-    },
-    { capture: true, passive: true },
-  );
+  let lastGestureAt = 0;
+  let gestureWindowMs = WHEEL_SCROLL_WINDOW_MS;
+  const markGesture = (windowMs: number) => {
+    lastGestureAt = performance.now();
+    gestureWindowMs = windowMs;
+  };
 
-  document.addEventListener(
-    "touchmove",
-    (event) => {
-      if (event.target instanceof Element) reveal(event.composedPath().filter(isScrollableElement).slice(0, 3));
-    },
-    { capture: true, passive: true },
-  );
+  document.addEventListener("wheel", () => markGesture(WHEEL_SCROLL_WINDOW_MS), { capture: true, passive: true });
+  document.addEventListener("touchmove", () => markGesture(TOUCH_SCROLL_WINDOW_MS), { capture: true, passive: true });
 
   // 键盘滚动容器（焦点内的方向键/翻页/空格）。主输入框打字不经过这里。
   const SCROLL_KEYS = new Set([
@@ -133,23 +119,18 @@ export function installGlobalScrollbarVisibility(): void {
   document.addEventListener(
     "keydown",
     (event) => {
-      if (!SCROLL_KEYS.has(event.key) || !(event.target instanceof Element)) return;
-      reveal(event.composedPath().filter(isScrollableElement).slice(0, 3));
+      if (SCROLL_KEYS.has(event.key)) markGesture(WHEEL_SCROLL_WINDOW_MS);
     },
     { capture: true, passive: true },
   );
 
-  // Hover keeps a container's bar up without waiting for a scroll. pointerover
-  // fires on element-boundary crossings, so this costs a few style reads per
-  // crossing rather than one per pixel of movement.
+  // scroll 事件的 target 就是真正滚动的那一个容器；只有伴随真实手势才点亮。
   document.addEventListener(
-    "pointerover",
+    "scroll",
     (event) => {
-      const scrollable = event
-        .composedPath()
-        .filter((node): node is Element => node instanceof Element && isScrollable(node))
-        .slice(0, 3);
-      reveal(scrollable);
+      if (performance.now() - lastGestureAt > gestureWindowMs) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) reveal([target]);
     },
     { capture: true, passive: true },
   );

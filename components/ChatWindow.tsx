@@ -5,7 +5,7 @@ import { ArrowDownIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from
 import Image from "next/image";
 import { isValidElement, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
+import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";import type { StreamingStore } from "@/lib/streaming-message";import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
 import { splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
@@ -201,6 +201,56 @@ function FollowTailWhenAtTail({ atTail, contentRef, viewportRef }: {
   return null;
 }
 
+/**
+ * 流式回复气泡：唯一随 chunk 重渲染的组件。消息本体从 StreamingStore 订阅，
+ * ChatWindow 只订阅 isStreaming/hasStreamingContent 两个布尔——chunk 不再
+ * 触发整容器重渲染（文档一直声称的容器级隔离，此处落地）。
+ */
+function StreamingReply({ store, toolResults, modelNames, cwd, onOpenFile, onOpenSubagent }: {
+  store: StreamingStore;
+  toolResults: Map<string, ToolResultMessage>;
+  modelNames: React.ComponentProps<typeof MessageView>["modelNames"];
+  cwd: React.ComponentProps<typeof MessageView>["cwd"];
+  onOpenFile: React.ComponentProps<typeof MessageView>["onOpenFile"];
+  onOpenSubagent: React.ComponentProps<typeof MessageView>["onOpenSubagent"];
+}) {
+  const streamingMessage = useStreamingSelector(store, selectStreamingMessage);
+  if (!streamingMessage) return null;
+  return (
+    <MessageView
+      message={streamingMessage as AgentMessage}
+      toolResults={toolResults}
+      isStreaming
+      modelNames={modelNames}
+      cwd={cwd}
+      onOpenFile={onOpenFile}
+      onOpenSubagent={onOpenSubagent}
+    />
+  );
+}
+
+/**
+ * 输入框边光的字符数发布者：订阅 store 自行发布，chunk 只重渲染这一个小节点。
+ * 后台会话不写：计数器按会话隔离，它的字符数也只属于它自己。
+ */
+function StreamBeamPublisher({ store, channel, background }: {
+  store: StreamingStore;
+  channel: string;
+  background: boolean;
+}) {
+  const streamingMessage = useStreamingSelector(store, selectStreamingMessage);
+  useEffect(() => {
+    if (background) return;
+    let total = 0;
+    for (const block of streamingMessage?.content ?? []) {
+      if (block.type === "text") total += block.text.length;
+      else if (block.type === "thinking") total += block.thinking.length;
+    }
+    publishStreamCharacters(channel, total);
+  }, [streamingMessage, channel, background]);
+  return null;
+}
+
 function hasFinalAssistantAnswer(message: AgentMessage): boolean {
   if (message.role !== "assistant") return false;
   return splitFinalAssistantBlocks(message as AssistantMessage).answerBlocks.some((block) => (
@@ -264,7 +314,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const [restoreAnchorReady, setRestoreAnchorReady] = useState(false);
 
   const {
-    loading, error, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, earlierTurnCount, hasNewerMessages, newestCursor, streamingStore,
+    loading, error, messages, activeToolResults, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, hasNewerMessages, newestCursor, streamingStore,
     agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, missingCwd, modelScopeWarnings, isModelScopeActive, allModelList, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
@@ -295,24 +345,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // re-render StreamingReply alone.
   const isStreaming = useStreamingSelector(streamingStore, selectIsStreaming);
   const hasStreamingContent = useStreamingSelector(streamingStore, selectHasStreamingContent);
-  const streamingMessage = useStreamingSelector(streamingStore, selectStreamingMessage);
-  // streamState shape kept from the dev hook contract; derived from the store selectors.
-  const streamState = useMemo(() => ({ isStreaming, streamingMessage }), [isStreaming, streamingMessage]);
-  // 当前流的字符数，供输入框边光使用：发布到 `lib/stream-beam`，由被 memo 的输入框
-  // 自行订阅，避免每个 chunk 更换 prop。
-  const streamCharacters = useMemo(() => {
-    let total = 0;
-    for (const block of streamingMessage?.content ?? []) {
-      if (block.type === "text") total += block.text.length;
-      else if (block.type === "thinking") total += block.thinking.length;
-    }
-    return total;
-  }, [streamingMessage]);
-  useEffect(() => {
-    // 后台会话不写：计数器按会话隔离，它的字符数也只属于它自己。
-    if (background) return;
-    publishStreamCharacters(session?.id ?? newSessionDraftKey ?? "new", streamCharacters);
-  }, [streamCharacters, background, session?.id, newSessionDraftKey]);
+  // chunk 不再进入 ChatWindow 的渲染：流式气泡与边光字符数各自作为叶子组件
+  // 订阅 store（见 StreamingReply / StreamBeamPublisher），这里只订阅两个布尔。
   const getStreamingMessage = useCallback(() => streamingStore.getState().streamingMessage, [streamingStore]);
   const sessionBusy = agentRunning || bashRunning;
   // 新会话输入框携带被 fork 的消息，便于直接重发或修改。
@@ -1223,7 +1257,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     }
     return history.reverse();
   }, [messages]);
-  const isEmptyNew = isNew && messages.length === 0 && !streamState.isStreaming && !sessionBusy;
+  const isEmptyNew = isNew && messages.length === 0 && !isStreaming && !sessionBusy;
   const messageCwd = session?.cwd ?? newSessionCwd ?? undefined;
 
   const availableThinkingLevels = displayModelValue
@@ -1310,7 +1344,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         }
       });
 
-      const attachVisibleRef = (idx: number, refIndex: number) => (el: HTMLDivElement | null) => {
+      const attachVisibleRef = (_idx: number, refIndex: number) => (el: HTMLDivElement | null) => {
         messageRefs.current[refIndex] = el;
       };
 
@@ -1324,7 +1358,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const isVisible = isMessageGroupAnchor(msg) || msg.role === "assistant";
         const currentRefIdx = visibleRefIndexByMessage.get(idx);
         const keyPrefix = options.keyPrefix ?? "message";
-        const messageKey = entryIds[idx] ?? idx;
+        const messageKey = messageKeys[idx] ?? entryIds[idx] ?? idx;
         let showTimestamp = false;
         if (msg.role === "assistant") {
           showTimestamp = true;
@@ -1334,7 +1368,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             if (r === "assistant") { showTimestamp = false; break; }
           }
           // Hide on the currently-streaming tail (the streaming bubble owns the live timestamp)
-          if (showTimestamp && streamState.isStreaming && idx === messages.length - 1) {
+          if (showTimestamp && isStreaming && idx === messages.length - 1) {
             showTimestamp = false;
           }
         }
@@ -1435,7 +1469,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           continue;
         }
 
-        const isLiveTail = (sessionBusy || streamState.isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
+        const isLiveTail = (sessionBusy || isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
         if (isLiveTail) {
           // A running turn streams as flat activity rows (no wrapper, no
           // final-answer split); once settled the turn regroups below.
@@ -1633,7 +1667,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         idx = endIdx;
       }
     return { rendered, liveActivityRendered };
-  }, [messages, entryIds, toolResultsMap, hasEarlierMessages, streamState.isStreaming, sessionBusy,
+  }, [messages, entryIds, messageKeys, toolResultsMap, hasEarlierMessages, isStreaming, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
      sessionIdRef, forkFromMessage, handleEditContent, onOpenFile, onOpenSubagent,
      isNew, messageRefs, bashRunning, editEntryId, cancelEdit]);
@@ -1671,6 +1705,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* 始终挂载：流结束时（streamingMessage 为 null）发布 0，复位边光。 */}
+      <StreamBeamPublisher store={streamingStore} channel={session?.id ?? newSessionDraftKey ?? "new"} background={background} />
       {isDragOver && (
         <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] motion-reduce:animate-none items-center justify-center bg-primary/[0.06] backdrop-blur-[1px]">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -1779,8 +1815,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             {/* 非条目行（流式回复、阶段提示、待执行命令）不是 Item 的测量对象，
                 但仍需落在与行一致的列宽内。 */}
             <ChatRow>
-            {streamState.isStreaming && hasStreamingContent && streamState.streamingMessage && (
-              <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
+            {isStreaming && hasStreamingContent && (
+              <StreamingReply store={streamingStore} toolResults={toolResultsMap} modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
             )}
 
             {(agentRunning || isCompacting) && !hasStreamingContent && (agentPhase || isCompacting) && !liveActivityRendered && (

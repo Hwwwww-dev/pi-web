@@ -201,9 +201,9 @@ export function AppShell() {
     if (Notification.permission !== "granted") return;
     void setupPushSubscription(locale);
   }, [locale]);
-  // 全局滚动条可见性：滚轮/触摸/翻页键/悬停时给容器挂 .scrollbar-visible 并点亮，
-  // 700ms 后摘除；条形本身由 globals.css 的 overlay 规则淡入淡出。不监听 scroll：
-  // 程序化滚动（流式贴尾、跳底）不该点亮滚动条。
+  // 全局滚动条可见性：macOS 语义——只有真实手势（滚轮/触摸/滚动键）滚动了
+  // 某个容器，才点亮它的条，700ms 后淡出；条形本身由 globals.css 的 overlay
+  // 规则淡入淡出。悬停不点亮；程序化滚动（流式贴尾、跳底）永不点亮。
   useEffect(() => {
     installGlobalScrollbarVisibility();
   }, []);

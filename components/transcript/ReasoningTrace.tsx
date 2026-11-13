@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { splitThinkingPieces } from "@/lib/message-display";
 import { BrainIcon } from "lucide-react";
 import {
   Trace,
@@ -87,6 +88,24 @@ function ReasoningText({ text, error, loading, className, onScroll, scrollRef }:
   onScroll?: () => void;
   scrollRef?: React.RefObject<HTMLDivElement | null>;
 }) {
+  // 分片渲染：单个文本节点会在每个流式 chunk 上整段重排（循环 thinking 可达
+  // 数 MB，#1196）。切点只取决于其前的文本，流式期间只有最后一片变化；
+  // lineBreak:true 的切点吞掉了一个换行，由块边界补回；硬切（无换行）的
+  // 相邻片留在同一行内连排。行数与 innerText 与单节点渲染一致。
+  const pieceGroups = useMemo(() => {
+    if (loading || error) return null;
+    const groups: string[][] = [];
+    let line: string[] = [];
+    for (const piece of splitThinkingPieces(text)) {
+      line.push(piece.text);
+      if (piece.lineBreak) {
+        groups.push(line);
+        line = [];
+      }
+    }
+    if (line.length > 0) groups.push(line);
+    return groups;
+  }, [loading, error, text]);
   return (
     <div
       ref={scrollRef}
@@ -97,7 +116,9 @@ function ReasoningText({ text, error, loading, className, onScroll, scrollRef }:
       )}
       onScroll={onScroll}
     >
-      {loading ? <Skeleton className="h-3 w-1/2" /> : error ?? text}
+      {loading ? <Skeleton className="h-3 w-1/2" /> : error ?? (pieceGroups ?? [text]).map((line, index) => (
+        <div key={index}>{line}</div>
+      ))}
     </div>
   );
 }
