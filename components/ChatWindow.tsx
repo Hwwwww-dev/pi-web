@@ -799,9 +799,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 监听器需读取当前可见状态，故用 ref 而非闭包中的旧 prop。
   const activeRef = useRef(active);
   activeRef.current = active;
-  // 跟随状态仅由滚动决定，判定交给 `shouldFollow`：方向优先于容差（上滑即脱离），
-  // 内容收缩或视口长高导致的 scrollTop 钳制不算上滑。8px 贴底容差只用于“回到最新”
-  // 按钮。
+  // 跟随状态仅由滚动决定，判定交给 `shouldFollow`：方向优先于容差（上滑超过
+  // 4px 抖动死区即脱离），内容收缩或视口长高导致的 scrollTop 钳制不算上滑。
+  // 16px 贴底容差只用于“回到最新”按钮。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;

@@ -690,9 +690,10 @@ const SessionRowView = memo(function SessionRowView({
     statusTitle = t("sidebar.newActivity");
   }
 
-  // 行首的状态点：横向与分组标题的展开箭头同一条中心线（箭头 13px、位于行内 4px，
-  // 中心 10.5px；点 6px，left 7px 即中心 10px），所以固定行与会话行共用一个值。
-  const dotLeft = "left-[7px]";
+  // 行首的状态点：横向与分组标题的展开箭头中心线附近（箭头中心 10.5px；
+  // 点 7px，left 12px 即中心 15.5px——用户目视定值，右移让开行首），
+  // 固定行与会话行共用一个值。
+  const dotLeft = "left-[12px]";
   const meta = context === "pinned"
     ? <span className="inline-block max-w-[70px] truncate align-bottom">{row.project.name}</span>
     : formatShortRelativeTime(family.latestModified, locale, nowDate);
