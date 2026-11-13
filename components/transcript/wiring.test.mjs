@@ -161,10 +161,10 @@ test("a grouped call's chip resolves against the session cwd too", () => {
     live: false,
   }));
 
-  // 分组行也必须拿到 cwd，否则 chip 退化成不可点击的静态文本。
+  // 分组行同样需要 cwd，否则 chip 退化为不可点击的静态文本。
   assert.match(html, /title="\/repo\/pi-web\/lib\/a\.ts"/);
   assert.match(html, /title="\/repo\/pi-web\/lib\/b\.ts"/);
-  // chip 是官方胶囊按钮（第 4 节），不是自绘 span。
+  // chip 使用官方胶囊按钮（第 4 节），非自绘 span。
   assert.match(html, /data-slot="button"[^>]*rounded-full/);
   clearExpandedToolCalls();
 });
@@ -214,7 +214,7 @@ test("a running command says it is running", () => {
 
 test("a relative path chip resolves against the session cwd", () => {
   clearExpandedToolCalls();
-  // 一个标题里没有文件名的工具，chip 才有存在的意义。
+  // 仅当标题不含文件名时，chip 才有存在意义。
   const block = call("custom_tool", { file_path: "lib/tool-view.ts" });
   const html = renderRow(block, result("custom_tool", "x"), { cwd: "/repo/pi-web", onOpenFile: () => {} });
 
@@ -227,11 +227,11 @@ test("a file row shows the name once, in the chip that opens it", () => {
   const block = call("read", { file_path: "probe-label.png" });
   const html = renderRow(block, result("read", "x"), { cwd: "/repo/pi-web", onOpenFile: () => {} });
 
-  // 标题只说动作（Read），文件名由 chip 承担且可点（文件跳转）。
+  // 标题只写动作（Read），文件名由 chip 承担，且可点击跳转。
   assert.match(html, /aria-label="Read"/);
   assert.match(html, /data-slot="button"[^>]*rounded-full/);
   assert.match(html, /title="\/repo\/pi-web\/probe-label\.png"/);
-  // 标题与描述都不再重复文件名，只有 chip 承担它。
+  // 标题与描述均不重复文件名，仅由 chip 承担。
   assert.doesNotMatch(html, /data-slot="trace-title"[^>]*>probe-label\.png/);
   assert.doesNotMatch(html, /data-slot="trace-description"[^>]*>probe-label\.png/);
 });
@@ -267,7 +267,7 @@ test("terminal output keeps its own line breaks", () => {
   setToolCallExpanded(block.toolCallId, true);
   const html = renderRow(block, { ...result("bash", "line one\nline two"), isError: true });
 
-  // 第 8 节第 8 条：终端输出不 reflow，所以它的内容块没有 wrap 属性。
+  // 第 8 节第 8 条：终端输出不 reflow，其内容块未设置 wrap 属性。
   assert.equal((html.match(/data-wrap=""/g) ?? []).length, 0);
   assert.match(html, /line one/);
   clearExpandedToolCalls();

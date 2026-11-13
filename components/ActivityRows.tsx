@@ -49,11 +49,7 @@ import type { CustomMessage, TextContent, ToolCallContent, ToolResultMessage } f
 // ─────────────────────────────────────────────────────────────────────────────
 
 
-/**
- * 一类的图标：直接复用工具行那套 `KIND_ICONS`，同一件事只有一套图标。
- * 以前分类行自备一套（BookOpen/Pen/Shrink），同一次编辑在组头和行里是两个
- * 不同的笔，同一个 bash 又是两种终端。
- */
+/** 类别图标：复用工具行的 `KIND_ICONS`，组头与行内使用同一套图标。 */
 const CATEGORY_KIND: Record<ToolCategory, ToolViewKind> = {
   view: "file-read",
   search: "search",
@@ -242,8 +238,8 @@ export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSubagent }: {
   const isFailedCall = (call: ToolCallEntry) => call.result?.isError
     || (isApplyPatchToolName(call.block.toolName) && applyPatchResultHasFailures(call.result?.details));
   const isError = calls.some(isFailedCall);
-  // 组头一句话（官方 Whole Turn：「Ran 2 commands, 1 failed」）：条数与失败数
-  // 说在同一行，不再拆成「成功 x 次 · 失败 y 次」两段账。
+  // 组头单行呈现（Whole Turn：「Ran 2 commands, 1 failed」）：条数与失败数同行显示，
+  // 不拆分为成功/失败两段。
   const failedCount = calls.filter(isFailedCall).length;
   const itemCount = allHaveFiles ? fileTotal : calls.length;
   const groupTitle = `${t(`chat.activity.group.${category}`, { count: itemCount })}${failedCount > 0 ? t("chat.activity.groupFailed", { count: failedCount }) : ""}`;
@@ -316,7 +312,7 @@ function safeJson(value: unknown): string {
 }
 
 function previewText(text: string, limit = 140): string {
-  // 一行预览里的代码栅栏记号（```json）只占位置，没有信息。
+  // 单行预览中的代码围栏标记（```json）不携带信息。
   const normalized = text.replace(/```[a-zA-Z0-9]*/g, " ").replace(/\s+/g, " ").trim();
   if (!normalized) return "";
   return normalized.length > limit ? `${normalized.slice(0, limit)}...` : normalized;
@@ -337,7 +333,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
 }) {
   const { t } = useI18n();
   const isHiddenDisplay = message.display === false;
-  // 自定义事件默认收起（第 4.1 节）：打开会话时它们不该占版面。
+  // 自定义事件默认收起（第 4.1 节）：打开会话时不占用版面。
   const [expanded, setExpanded] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -345,7 +341,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
   const images = getMessageImages(message.content);
   const hasDetails = message.details !== undefined;
   const detailsText = hasDetails ? safeJson(message.details) : "";
-  // 正文本来就是这段 JSON 时（扩展把 details 也写进正文），详情卡只会重复一遍。
+  // 正文本身即该段 JSON 时（扩展将 details 也写入正文），详情卡会重复显示。
   const detailsRepeatBody = hasDetails && sameJson(text.replace(/```[a-zA-Z0-9]*/g, ""), detailsText);
   const subagent = isSubagentToolDetails(message.details) ? message.details : null;
   const { label, dim } = customRowLabel(message, t);
@@ -370,14 +366,14 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
           <TraceCollapsibleTrigger>
             <TraceLine>
               <TraceIcon><ToolCategoryIcon category={subagent ? "subagent" : "other"} active={expanded} /></TraceIcon>
-              {/* 名字不可收缩：以前没有 `shrink-0`，`plugin-hook-context` 被压成 `plugin`。 */}
+              {/* 名称不可收缩：缺少 `shrink-0` 时 `plugin-hook-context` 会被压缩为 `plugin`。 */}
               <TraceTitle className={cn("shrink-0 whitespace-nowrap font-medium", dim && "font-normal")}>{label}</TraceTitle>
               <TraceDescription className="min-w-0 flex-1 truncate [font-variant-numeric:normal]">
                 {preview || (isHiddenDisplay ? t("i18n.showExtensionMessage") : null)}
               </TraceDescription>
             </TraceLine>
           </TraceCollapsibleTrigger>
-          {/* 扩展消息的内容以前不限高：一条长 markdown（插件注入的规范文档）能把整页顶开。 */}
+          {/* 扩展消息内容以卡片高度封顶：过长的 markdown（如插件注入的规范文档）否则会把页面撑开。 */}
           <TraceCollapsibleContent className="max-h-[var(--card-max-height)] overflow-auto">
             <div className="flex flex-col gap-2">
               {images.length > 0 && (
@@ -417,7 +413,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
                     </Button>
                   </div>
                   {detailsExpanded && (
-                    // 详情占满一行；不 reflow，长 id 靠横向滚动看，不被拆成两截。
+                    // 详情占满一行；不重排，超长 id 通过横向滚动查看，不折成两行。
                     <CodeBlock size="sm">
                       <CodeBlockContent wrap={false} className="max-h-[var(--card-max-height)]">{detailsText}</CodeBlockContent>
                     </CodeBlock>
@@ -529,10 +525,10 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
   if (modifiedFiles.length > 0) parts.push(`${modifiedFiles.length} modified`);
 
   return (
-    // 第 4 节：折叠仍走官方 TraceCollapsible，分隔线用 Separator。
+    // 第 4 节：折叠沿用 TraceCollapsible，分隔线使用 Separator。
     <div className="mt-2.5 flex flex-col gap-2">
       <Separator />
-      {/* 文件清单默认展开：摘要里最常被查的就是它。 */}
+      {/* 文件清单默认展开：摘要中最常查看的部分。 */}
       <TraceCollapsible defaultOpen>
         <TraceCollapsibleTrigger>
           <TraceLine>
@@ -591,11 +587,8 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
   const hasCtx = Boolean(ctx && (ctx.tokens !== undefined || ctx.percent !== undefined || ctx.contextWindow));
   if (!hasUsage && !hasCtx && !model && !time && !copySource) return null;
   return (
-    // Room above the next turn's user message: the meta line is the visual
-    // boundary between turns, so it needs the same breathing room as the
-    // messages themselves (the assistant above contributes its own 12px).
     <div
-      className="mt-1 mb-3 flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground/60 [font-variant-numeric:tabular-nums]"
+      className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground/60 [font-variant-numeric:tabular-nums]"
       title={usage ? formatUsage(usage) : undefined}
     >
       {model && <span>{model}</span>}

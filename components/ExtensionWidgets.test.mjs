@@ -9,7 +9,6 @@ const jiti = createJiti(import.meta.url, {
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const {
-  DEFAULT_EXPANDED_WIDGET_LINES,
   ExtensionWidgets,
   formatExtensionWidgetContent,
   getNextExpandedWidgetKey,
@@ -28,14 +27,14 @@ function renderWidgets(props) {
   );
 }
 
-test("renders short extension widgets without a truncation marker", () => {
+test("renders a short extension widget as a collapsed chip", () => {
   const html = renderWidgets({
     widgets: [{ key: "short", lines: ["first", "second"], placement: "aboveEditor" }],
   });
 
-  assert.match(html, /first\nsecond/);
   assert.doesNotMatch(html, /widget truncated/);
-  assert.match(html, /aria-expanded="true"/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.doesNotMatch(html, /<pre/);
   // A chip names the widget; the terminal's placement chevron is not on it.
   assert.doesNotMatch(html, /lucide-chevron-(up|down)/);
   // The chip is an official ghost Button, not a hand-painted pill.
@@ -53,7 +52,7 @@ test("collapses long widgets by default", () => {
     widgets: [{ key: "long", lines, placement: "belowEditor" }],
   });
 
-  assert.ok(lines.length > DEFAULT_EXPANDED_WIDGET_LINES);
+  assert.ok(lines.length > 3);
   assert.match(html, /aria-expanded="false"/);
   assert.doesNotMatch(html, /lucide-chevron-(up|down)/);
   assert.doesNotMatch(html, /<pre/);
@@ -74,20 +73,7 @@ test("keeps all widget lines available for the scrollable expanded panel", () =>
   assert.doesNotMatch(content, /widget truncated/);
 });
 
-test("keeps compact widgets expanded by default", () => {
-  const lines = Array.from(
-    { length: DEFAULT_EXPANDED_WIDGET_LINES },
-    (_, index) => `line-${index + 1}`,
-  );
-  const html = renderWidgets({
-    widgets: [{ key: "compact", lines, placement: "aboveEditor" }],
-  });
-
-  assert.match(html, /aria-expanded="true"/);
-  assert.match(html, /<pre/);
-});
-
-test("expands at most one compact widget", () => {
+test("opens no widget on mount, however short it is", () => {
   const html = renderWidgets({
     widgets: [
       { key: "first", lines: ["one", "two"], placement: "aboveEditor" },
@@ -95,10 +81,10 @@ test("expands at most one compact widget", () => {
     ],
   });
 
-  assert.equal((html.match(/aria-expanded="true"/g) ?? []).length, 1);
-  assert.equal((html.match(/<section/g) ?? []).length, 1);
-  assert.match(html, /aria-labelledby="[^"]*trigger-0"/);
-  assert.doesNotMatch(html, /aria-labelledby="[^"]*trigger-1"/);
+  // 切换会话或 agent 均会重新挂载；自动展开会使底栏自行弹出。
+  assert.equal((html.match(/aria-expanded="true"/g) ?? []).length, 0);
+  assert.equal((html.match(/<section/g) ?? []).length, 0);
+  assert.doesNotMatch(html, /<pre/);
 });
 
 test("switching widgets closes the previously expanded widget", () => {

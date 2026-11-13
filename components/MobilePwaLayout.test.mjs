@@ -44,15 +44,24 @@ test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(appShellSource, /flex min-h-\(--header-height\) shrink-0 items-center gap-2 border-b pt-\[env\(safe-area-inset-top\)\] transition-\[width,height\] ease-linear/);
   // Right panel tab bar: the draft's 46px bar with its safe-area compensation.
   assert.match(appShellSource, /h-\[calc\(46px_\+_\env\(safe-area-inset-top\)\)\] shrink-0/);
-  assert.match(appShellSource, /h-\[var\(--app-viewport-height,100dvh\)\]/);
+  assert.match(appShellSource, /flex h-\[100dvh\] flex-col bg-background/);
   assert.match(appShellSource, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}/);
   assert.match(viewportHookSource, /window\.visualViewport/);
   assert.match(viewportHookSource, /window\.requestAnimationFrame\(update\)/);
   assert.match(viewportHookSource, /window\.addEventListener\("resize", scheduleUpdate\)/);
   assert.match(viewportHookSource, /window\.addEventListener\("focusout", handleFocusOut\)/);
   assert.match(viewportHookSource, /--app-viewport-height/);
+  assert.match(viewportHookSource, /--keyboard-inset/);
   assert.match(viewportHookSource, /window\.scrollTo\(0, 0\)/);
-  assert.match(cssSource, /height: var\(--app-viewport-height, 100dvh\)/);
+  // 键盘弹出期间壳层保持满高并整体上移（transform 仅提交合成层），不使用高度动画：
+  // 高度逐帧变化会导致上千条消息的滚动容器重新布局，键盘动画期间持续掉帧。
+  assert.match(cssSource, /\.app-shell \{\s*transform: translate3d\(0, calc\(-1 \* var\(--keyboard-inset, 0px\)\), 0\);/);
+  // 页头抵消该位移以保持在屏幕顶部，topBarRef 的 client rect 才能继续作为 Popover 锚点。
+  assert.match(cssSource, /\.app-top-bar \{\s*transform: translate3d\(0, var\(--keyboard-inset, 0px\), 0\);/);
+  // body 不随可视高度收缩：壳层位移后，缩短的 body 会在底部留出空隙。
+  assert.doesNotMatch(cssSource, /html, body \{[\s\S]*?height: var\(--app-viewport-height, 100dvh\);[\s\S]*?\}/);
+  assert.match(appShellSource, /className="app-shell overflow-hidden"/);
+  assert.match(appShellSource, /className="app-top-bar sticky top-0/);
   // The self-drawn drawer's `left: env(safe-area-inset-left)` went with it;
   // the sidebar is the ui Sidebar primitive's Sheet now, and the main area
   // carries the safe-area utilities asserted above. The chat content reserves

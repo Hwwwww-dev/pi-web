@@ -400,7 +400,7 @@ function ProviderDetail({ name, editingName, fallbackLabel, provider, onChange, 
   const selectedCount = selectedModelIds.filter((id) => !existingModelIds.has(id)).length;
   const allShownSelected = selectableShownIds.length > 0
     && selectableShownIds.every((id) => selectedModelIds.includes(id));
-  // Radix Checkbox 的三态：部分选中以 indeterminate 呈现，不再手写 DOM 属性。
+  // Radix Checkbox 的三态：部分选中以 indeterminate 呈现，无需手写 DOM 属性。
   const selectShownState: boolean | "indeterminate" = allShownSelected
     ? true
     : selectableShownIds.some((id) => selectedModelIds.includes(id))
@@ -512,7 +512,7 @@ function ProviderDetail({ name, editingName, fallbackLabel, provider, onChange, 
               className={cn(inputClass, "min-w-0")}
             />
 
-            <div className="max-h-[220px] overflow-y-auto rounded-lg bg-muted/40">
+            <div className="scroll-rounded-lg max-h-[220px] overflow-y-auto rounded-lg bg-muted/40">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow className="hover:bg-transparent">

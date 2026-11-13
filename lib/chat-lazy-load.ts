@@ -1,6 +1,9 @@
+import { CHAT_REATTACH_TOLERANCE, CHAT_TAIL_TOLERANCE, isAtTail } from "./chat-follow";
+
 export const VISIBLE_PAGE_SIZE = 50;
-export const CHAT_SCROLL_TAIL_TOLERANCE = 8;
-export const CHAT_SCROLL_REATTACH_TOLERANCE = 96;
+// 数值定义在 `lib/chat-follow.ts`，此处仅作别名，容差只在一处维护。
+export const CHAT_SCROLL_TAIL_TOLERANCE = CHAT_TAIL_TOLERANCE;
+export const CHAT_SCROLL_REATTACH_TOLERANCE = CHAT_REATTACH_TOLERANCE;
 
 export function getVisibleRenderWindow(totalCount: number, visibleCount: number): {
   startIndex: number;
@@ -29,7 +32,7 @@ export function isScrollAtTail(
   scrollHeight: number,
   tolerance = CHAT_SCROLL_TAIL_TOLERANCE,
 ): boolean {
-  return scrollTop + clientHeight >= scrollHeight - tolerance;
+  return isAtTail(scrollTop, clientHeight, scrollHeight, tolerance);
 }
 
 export function getLiveFollowAttached(

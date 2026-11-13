@@ -37,7 +37,7 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
   below?: ReactNode;
 }) {
   const { t } = useI18n();
-  // 行上的名字只有「子代」：profile/描述可长，放在会截断的描述位，不挤占名字。
+  // 行标题仅显示「子代」；profile 与描述可能较长，置于可截断的描述位，不挤占标题。
   const title = t("chat.trace.subagent");
   const hasBody = Boolean((steps && steps.length > 0) || report);
 

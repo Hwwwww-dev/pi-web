@@ -95,7 +95,6 @@ import { useFilesPlacement } from "@/hooks/useFilesPlacement";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useResizablePanel } from "@/hooks/useResizablePanel";
-import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import { useSessionUiState } from "@/hooks/useSessionUiState";
 import { archiveViewState, filesFoldState, useSidebarMotion } from "@/hooks/useSidebarMotion";
 import { DirectoryPicker } from "./DirectoryPicker";
@@ -200,7 +199,7 @@ function ToolbarIconButton({
       aria-controls={controls}
       variant="ghost"
       size="icon-sm"
-      className={`sidebar-tool-button flex-[0_1_32px] min-w-[21px] disabled:pointer-events-auto disabled:opacity-40 [@media(pointer:coarse)]:flex-[0_1_36px] [@media(pointer:coarse)]:size-9 ${pressed || expanded ? "bg-accent text-accent-foreground" : ""}${done ? " text-accent" : ""}${className ? ` ${className}` : ""}`}
+      className={`sidebar-tool-button flex-[0_1_32px] min-w-[21px] hover:bg-accent dark:hover:bg-accent disabled:pointer-events-auto disabled:opacity-40 [@media(pointer:coarse)]:flex-[0_1_36px] [@media(pointer:coarse)]:size-9 ${pressed || expanded ? "bg-accent text-accent-foreground" : ""}${done ? " text-accent" : ""}${className ? ` ${className}` : ""}`}
     >
       {children}
     </Button>
@@ -815,7 +814,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   // so the scrollbar hook stays bound to the element that is on the page.
   const headerRef = useRef<HTMLDivElement>(null);
   const explorerScrollRef = useRef<HTMLDivElement>(null);
-  useScrollbarVisibility(explorerScrollRef);
   // The toolbar row's search button: always there and enabled, so focus has
   // somewhere to go when there are no tabs (selectedTabButton).
   const searchButtonRef = useRef<HTMLButtonElement>(null);
@@ -3050,7 +3048,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   return (
     <div
       ref={setSidebarRoot}
-      className={`session-sidebar relative flex h-full min-h-0 flex-col overflow-hidden p-2.5${filesBelow ? " is-files-below" : ""}${filesBelow && filesFold.moving ? " is-files-folding" : ""}`}
+      className={`session-sidebar relative flex h-full min-h-0 flex-col overflow-hidden p-1.5${filesBelow ? " is-files-below" : ""}${filesBelow && filesFold.moving ? " is-files-folding" : ""}`}
       style={{ "--sidebar-files-height": `${filesSizer.width}px` } as CSSProperties}
       onFocus={(event) => { sidebarFocusRef.current = event.target; }}
       onBlur={(event) => { if (event.relatedTarget === null && !document.hasFocus()) return; if (!event.currentTarget.contains(event.relatedTarget)) sidebarFocusRef.current = null; }}
@@ -3083,15 +3081,15 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         <span className="sidebar-header-spacer min-w-0 flex-1" />
         <Button
           type="button"
-          variant="default"
-          size="default"
+          variant="ghost"
+          size="icon-sm"
           onClick={handleNewSession}
           disabled={!selectedCwd}
           title={selectedCwd ? t("sidebar.newSessionTitle", { path: selectedCwd }) : t("sidebar.selectProject")}
-          className="sidebar-new-button h-8 gap-1.5 rounded-full px-3.5 text-xs disabled:pointer-events-auto"
+          aria-label={t("sidebar.new")}
+          className="sidebar-new-button rounded-md hover:bg-accent dark:hover:bg-accent disabled:pointer-events-auto"
         >
-          <PlusIcon size={12} className="size-3" />
-          <span className="sidebar-new-label">{t("sidebar.new")}</span>
+          <PlusIcon size={16} className="size-4" />
         </Button>
         <Button
           ref={searchButtonRef}
@@ -3116,7 +3114,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           aria-controls={searchesFiles ? "file-search-input" : "session-search-input"}
           variant="ghost"
           size="icon-sm"
-          className={`sidebar-search-toggle rounded-md${(searchesFiles ? fileSearchOpen : sessionSearchOpen) ? " bg-accent text-accent-foreground" : ""}`}
+          className={`sidebar-search-toggle rounded-md hover:bg-accent dark:hover:bg-accent${(searchesFiles ? fileSearchOpen : sessionSearchOpen) ? " bg-accent text-accent-foreground" : ""}`}
         >
           <SearchIcon size={16} className="size-4" />
         </Button>
@@ -3124,7 +3122,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       {/* The segmented control: Radix's roving focus owns the arrows and
           Home/End, activating the tab it lands on. */}
       <Tabs value={sidebarTab} onValueChange={(value) => switchTab(value as SidebarTab)} className="flex-none">
-        <TabsList aria-label={t("sidebar.tabsLabel")} className="sidebar-tabs-list mb-1 mt-0.5 h-auto w-full gap-0.5 rounded-full p-[3px]">
+        <TabsList aria-label={t("sidebar.tabsLabel")} className="sidebar-tabs-list mb-1 ml-2 mt-0.5 h-auto w-[calc(100%-0.5rem)] gap-0.5 rounded-full p-[3px]">
           <TabsTrigger
             ref={sessionsTabRef}
             id="session-sidebar-tab-sessions"
@@ -3241,7 +3239,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    className={`disabled:pointer-events-auto sidebar-archive-menu-button ml-auto${menu?.kind === "archive" ? " bg-accent text-accent-foreground" : ""}`}
+                    className={`disabled:pointer-events-auto sidebar-archive-menu-button ml-auto hover:bg-accent dark:hover:bg-accent${menu?.kind === "archive" ? " bg-accent text-accent-foreground" : ""}`}
                     title={t("sidebar.archiveActions")}
                     aria-label={t("sidebar.archiveActions")}
                     aria-haspopup="menu"
@@ -3354,7 +3352,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               done with it; below the sessions the keys are the header row's.
               The buttons are the head's, not the picker's: its group names
               only the project and worktree. */}
-          <div className={`sidebar-files-head flex flex-none flex-col${filesBelow ? " border-b-0 pb-0.5 pt-0.5 pl-[15px] pr-(--sidebar-files-inset-right)" : " px-2.5 pt-2.5 pb-1"}`}>
+          <div className={`sidebar-files-head flex flex-none flex-col${filesBelow ? " border-b-0 pb-0.5 pt-0.5 pl-[11px] pr-(--sidebar-files-inset-right)" : " px-2.5 pt-2.5 pb-1"}`}>
             {/* The project and worktree in use: the same picker as the bar above a
                 fresh composer, as two boxes, side by side below the sessions,
                 one under the other in the files tab (the same instance: a

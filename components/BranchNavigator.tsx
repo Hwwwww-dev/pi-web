@@ -273,8 +273,8 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   const [openInternal, setOpenInternal] = useState(false);
   const open = openProp !== undefined ? openProp : openInternal;
 
-  // 受控（AppShell 的面板状态机）时开合都是对当前面板的一次 toggle；
-  // 非受控时直接落到新值。
+  // 受控时（AppShell 面板状态机）开合均为对当前面板的一次 toggle；
+  // 非受控时直接写入新值。
   const handleOpenChange = useCallback((next: boolean) => {
     if (openProp !== undefined) onToggle?.();
     else setOpenInternal(next);
@@ -332,7 +332,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
     return (
       <Popover open={open} onOpenChange={handleOpenChange}>
         {hideInlineButton ? (
-          // 触发钮在别处（顶栏 ⋯ 菜单），弹层锚定 AppShell 给的容器。
+          // 触发按钮位于顶栏 ⋯ 菜单，弹层锚定 AppShell 提供的容器。
           <PopoverAnchor virtualRef={containerRef} />
         ) : (
           <PopoverTrigger asChild>

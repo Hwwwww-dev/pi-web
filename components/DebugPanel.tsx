@@ -343,7 +343,7 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
     // in it, each a heading plus official components, never a card inside a card.
     <section
       ref={sectionRef}
-      className="debug-panel flex h-[min(600px,50dvh)] min-h-0 flex-col bg-card text-foreground"
+      className="debug-panel flex max-h-[min(600px,50dvh)] min-h-0 flex-col bg-card text-foreground"
       aria-label={t("debug.panelLabel")}
     >
       <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2 px-4 py-2">

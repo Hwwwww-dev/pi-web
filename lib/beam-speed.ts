@@ -46,6 +46,19 @@ export const BEAM_FALL_PER_SECOND = 6;
 export const BEAM_FALL_CAP_SHARE = 0.02;
 
 /**
+ * How far one sample may lift the rate above the current one, as a factor.
+ *
+ * Chunks are batched: a render hiccup hands one 250ms bucket several chunks at
+ * once, and reading that bucket as the rate pins the beam at its fastest for as
+ * long as the slow fall takes to bleed it off. A reply that really speeds up
+ * still climbs — it just cannot do it in a single sample.
+ */
+export const BEAM_RISE_CAP_FACTOR = 3;
+
+/** What that cap becomes from a standing start, where a factor of zero stays zero. */
+export const BEAM_RISE_FLOOR = 30;
+
+/**
  * What a pause asks for: this share of the current rate, not zero.
  *
  * A reply that stops arriving for a second is a pause, not the end — the beam
@@ -71,6 +84,12 @@ export function beamPlaybackRate(rate: number): number {
 export function beamTargetRate(measured: number, current: number): number {
   if (!Number.isFinite(measured) || measured <= 0) return current * BEAM_IDLE_SHARE;
   return measured;
+}
+
+/** The rate a sample is allowed to ask for, given where the rate already is. */
+export function clampBeamRise(target: number, current: number): number {
+  const ceiling = Math.max(current * BEAM_RISE_CAP_FACTOR, BEAM_RISE_FLOOR);
+  return Math.min(target, ceiling);
 }
 
 /** Move `current` toward `target` by at most one slew step for `elapsedMs`. */

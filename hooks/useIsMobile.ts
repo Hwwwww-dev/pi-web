@@ -8,6 +8,8 @@ const MOBILE_QUERY = "(max-width: 640px)";
 const NARROW_MOBILE_QUERY = "(max-width: 480px)";
 // Touch screens have no hover: hover-gated actions need a persistent fallback.
 const COARSE_POINTER_QUERY = "(pointer: coarse)";
+// 宽屏：文件面板与对话并排分割；更窄时文件面板占满整行（与 globals.css 的 961px 对齐）。
+const WIDE_LAYOUT_QUERY = "(min-width: 961px)";
 
 function subscribeToQuery(query: string, cb: () => void): () => void {
   if (typeof window === "undefined" || !window.matchMedia) return () => {};
@@ -27,6 +29,8 @@ const subscribeNarrowMobile = (cb: () => void) => subscribeToQuery(NARROW_MOBILE
 const getNarrowMobileSnapshot = () => queryMatches(NARROW_MOBILE_QUERY);
 const subscribeCoarsePointer = (cb: () => void) => subscribeToQuery(COARSE_POINTER_QUERY, cb);
 const getCoarsePointerSnapshot = () => queryMatches(COARSE_POINTER_QUERY);
+const subscribeWideLayout = (cb: () => void) => subscribeToQuery(WIDE_LAYOUT_QUERY, cb);
+const getWideLayoutSnapshot = () => queryMatches(WIDE_LAYOUT_QUERY);
 
 function getServerSnapshot(): boolean {
   return false;
@@ -49,4 +53,9 @@ export function useIsNarrowMobile(): boolean {
 /** Returns true on touch-primary devices (no reliable hover). */
 export function useCoarsePointer(): boolean {
   return useSyncExternalStore(subscribeCoarsePointer, getCoarsePointerSnapshot, getServerSnapshot);
+}
+
+/** 宽屏（≥961px）时文件面板与对话并排，更窄时文件面板占满整行。 */
+export function useIsWideLayout(): boolean {
+  return useSyncExternalStore(subscribeWideLayout, getWideLayoutSnapshot, getServerSnapshot);
 }

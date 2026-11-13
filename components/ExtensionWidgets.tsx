@@ -10,7 +10,6 @@ import { displayLabel } from "@/lib/label-case";
 import type { ExtensionWidgetItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export const DEFAULT_EXPANDED_WIDGET_LINES = 3;
 export const WIDGET_UPDATE_IDLE_MS = 1100;
 
 export function formatExtensionWidgetContent(lines: string[]): string {
@@ -44,14 +43,6 @@ function hasVisibleWidgetLines(lines: string[]): boolean {
   return lines.some((line) => stripAnsi(line).trim().length > 0);
 }
 
-function getDefaultExpandedWidgetKey(widgets: ExtensionWidgetItem[]): string | null {
-  return widgets.find((widget) => {
-    const lineCount = widget.lines.length;
-    return lineCount > 1 && lineCount <= DEFAULT_EXPANDED_WIDGET_LINES
-      && hasVisibleWidgetLines(widget.lines);
-  })?.key ?? null;
-}
-
 export function getNextExpandedWidgetKey(
   currentKey: string | null,
   requestedKey: string,
@@ -76,9 +67,9 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
   const idPrefix = useId();
   const previousContentsRef = useRef<Map<string, string[]> | null>(null);
   const updateClearTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  const [expandedWidgetKey, setExpandedWidgetKey] = useState<string | null>(
-    () => getDefaultExpandedWidgetKey(widgets),
-  );
+  // 一律收起：面板仅在点击时展开。短 widget 挂载即展开会使底栏在切换会话或 agent 时
+  // 自行弹出面板。
+  const [expandedWidgetKey, setExpandedWidgetKey] = useState<string | null>(null);
   const [updatingWidgetKeys, setUpdatingWidgetKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -133,7 +124,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
   const panelOpen = expandedWidgetKey !== null;
   const panelMounted = useDelayedUnmount(panelOpen);
 
-  // 面板靠点击开关，失焦/点外面/Escape 都不会自己收——底栏的弹出层曾因此挂着不走。
+  // 面板仅由点击开关，失焦、点击外部与 Escape 均不自动收起。
   useEffect(() => {
     if (!panelOpen) return;
     const close = () => setExpandedWidgetKey(null);
@@ -237,7 +228,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
                 {content}
               </Button>
             ) : (
-              // 与旁边状态胶囊同一形状（outline / xs / mono）：裸文字夹在胶囊里永远对不齐。
+              // 与相邻状态胶囊形状一致（outline / xs / mono），否则无法对齐。
               <Button
                 key={widget.key}
                 type="button"
@@ -276,16 +267,15 @@ export function ExtensionWidgetPanel({ widget, triggerId, panelId, closing = fal
       id={panelId}
       aria-labelledby={triggerId}
       data-state={closing ? "closed" : "open"}
-      // fill-mode-forwards：退场动画播完到 useDelayedUnmount 真正卸载之间
-      // 有一帧以上的空档，缺省 fill-mode none 会让面板弹回可见（同抽屉
-      // 关闭闪烁的根因）， forwards 把终态钉在透明/缩小上。
+      // fill-mode-forwards：退场动画结束到 useDelayedUnmount 真正卸载之间存在一帧以上空档，
+      // 默认 fill-mode none 会使面板弹回可见；forwards 将终态固定为透明与缩小。
       className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:fill-mode-forwards"
     >
       <div className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{widget.key}</div>
       {/* Extension widgets render TUI output: tables, progress bars and box drawing
           only line up while the monospace grid survives, so the panel scrolls
           sideways rather than wrapping a line into a broken row. */}
-      <pre className="max-h-40 overflow-auto px-3 py-2 font-mono text-xs/relaxed [font-size:calc(12px+var(--chat-font-size-offset,0px))] scrollbar-thin [overflow-wrap:normal] whitespace-pre">
+      <pre className="max-h-40 overflow-auto px-3 py-2 font-mono text-xs/relaxed [font-size:calc(12px+var(--chat-font-size-offset,0px))] [overflow-wrap:normal] whitespace-pre">
         <AnsiText text={formatExtensionWidgetContent(widget.lines)} />
       </pre>
     </section>

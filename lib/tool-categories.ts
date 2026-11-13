@@ -63,6 +63,10 @@ export function isPlanToolName(toolName: string): boolean {
   return matchesToolName(toolName, "todo_write") || matchesToolName(toolName, "todowrite") || matchesToolName(toolName, "todo");
 }
 
+export function isQuestionToolName(toolName: string): boolean {
+  return matchesToolName(toolName, "ask_user_question") || matchesToolName(toolName, "askuserquestion") || matchesToolName(toolName, "question");
+}
+
 export function isCompactToolName(toolName: string): boolean {
   return matchesToolName(toolName, "compress") || matchesToolName(toolName, "compact");
 }

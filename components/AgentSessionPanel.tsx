@@ -229,7 +229,7 @@ function AgentRow({
       // The sidebar's confirmation, in a row as tall as the one it replaces.
       <div
         className="flex min-h-14 items-center gap-[5px] rounded-md bg-destructive/10 px-3 py-[7px]"
-        style={{ height: confirmHeight /* 测量值：Delete 时记录的行高，确认框与被替换行等高，列表不跳动 */ }}
+        style={{ height: confirmHeight /* 测量值：Delete 时记录的行高，使确认框与被替换行等高，列表不跳动 */ }}
         onKeyDown={(event) => {
           if (event.key !== "Escape") return;
           event.preventDefault();
@@ -437,7 +437,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
   }, [familyIds, usage]);
 
   return (
-    // 本体不再自带卡片描边/投影：外壳由标准 PopoverContent 给出，这里只是清单。
+    // 自身不带卡片描边与投影：外壳由标准 PopoverContent 提供，此处仅为清单。
     <div
       role="listbox"
       aria-label={t("agentSwitcher.title")}

@@ -63,7 +63,7 @@ export const TranscriptNoticeLines = memo(function TranscriptNoticeLines({ notic
   if (shown.length === 0) return null;
   const warned = shown.some((notice) => notice.kind !== "cache_warm");
   return (
-    // 第 4 节：提示线落在官方 `Alert` 槽位，不再是一条自绘细条。
+    // 第 4 节：提示线使用官方 `Alert` 槽位。
     <Alert
       variant={warned ? "warning" : "default"}
       className="transcript-notices -mt-1.5 mb-3 w-auto px-3 py-2 text-xs leading-normal"

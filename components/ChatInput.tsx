@@ -23,6 +23,7 @@ import {
   type AtQueryMatch, type FileIndexEntry,
 } from "@/lib/file-fuzzy";
 import { getMarkdownListContinuation } from "@/lib/markdown-list-continuation";
+import { CHAT_COLUMN_CLASS } from "@/lib/chat-layout";
 import { quoteSeparator } from "@/lib/quoted-selection";
 import { isBareMcpCommand, isBuiltinMcpCommand } from "@/lib/mcp-command";
 import { BorderBeam } from "border-beam";
@@ -54,6 +55,7 @@ import {
   PlusIcon,
   RotateCcwIcon,
   SquareIcon,
+  Trash2Icon,
   TriangleAlertIcon,
   Volume2Icon,
   VolumeXIcon,
@@ -134,7 +136,7 @@ interface Props {
   queuedSubmissions?: QueuedSubmission[];
   inputHistory?: string[];
   /** Steer a pending message into the running turn, or take it back for editing. */
-  onQueuedAction?: (id: string, action: "toggle" | "edit" | "moveUp" | "moveDown") => void;
+  onQueuedAction?: (id: string, action: "toggle" | "edit" | "moveUp" | "moveDown" | "delete") => void;
   slashCommands?: SlashCommandInfo[];
   slashCommandsLoading?: boolean;
   onLoadSlashCommands?: () => Promise<SlashCommandInfo[]> | SlashCommandInfo[];
@@ -667,7 +669,7 @@ function QueuedMessageRow({
   canMoveDown,
 }: {
   item: QueuedSubmission;
-  onAction?: (id: string, action: "toggle" | "edit" | "moveUp" | "moveDown") => void;
+  onAction?: (id: string, action: "toggle" | "edit" | "moveUp" | "moveDown" | "delete") => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
 }) {
@@ -675,14 +677,14 @@ function QueuedMessageRow({
   const isSteer = item.behavior === "steer";
   const behaviorLabel = isSteer ? t("chat.queueBehaviorSteer") : t("chat.queueBehaviorFollowUp");
   const behaviorChipClass = cn(
-    "shrink-0 whitespace-nowrap px-[7px] py-px text-xs font-semibold leading-[1.4]",
+    "shrink-0 whitespace-nowrap px-[6px] py-px text-[11px] font-semibold leading-[1.4]",
     !isSteer && "bg-muted text-muted-foreground",
   );
   return (
     <div
       title={item.text}
       className={cn(
-        "flex min-w-0 max-w-full items-center gap-2 self-start overflow-hidden rounded-full py-[5px] pl-1.5 pr-2 text-xs",
+        "flex min-w-0 max-w-full items-center gap-1.5 self-start overflow-hidden rounded-full py-0.5 pl-1 pr-1.5 text-[11px] leading-[1.35]",
         isSteer
           ? "border border-primary/45 bg-background text-foreground"
           : "bg-secondary text-secondary-foreground",
@@ -694,12 +696,10 @@ function QueuedMessageRow({
             const src = draftImageDataUrl(image);
             return (
               <ImagePreview key={`${item.id}-image-${index}`} src={src}>
-                <Attachment size="xs" className="shrink-0 border-0 bg-transparent p-0">
-                  <AttachmentMedia variant="image">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="" className="size-full object-cover" />
-                  </AttachmentMedia>
-                </Attachment>
+                <span className="block size-[18px] shrink-0 overflow-hidden rounded-full bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" className="size-full object-cover" />
+                </span>
               </ImagePreview>
             );
           })}
@@ -745,6 +745,11 @@ function QueuedMessageRow({
             <PencilIcon strokeWidth={2} aria-hidden="true" />
           </QueueActionButton>
         )}
+        {onAction && (
+          <QueueActionButton title={t("chat.deleteQueuedTitle")} onClick={() => onAction(item.id, "delete")}>
+            <Trash2Icon strokeWidth={2} aria-hidden="true" />
+          </QueueActionButton>
+        )}
       </span>
     </div>
   );
@@ -757,7 +762,7 @@ function ModelNoticeBanner({ tone, title, body, onClose }: { tone: "error" | "wa
       role="alert"
       variant={tone === "error" ? "destructive" : "warning"}
       className={cn(
-        "max-h-[120px] items-start gap-x-2 overflow-y-auto rounded-md px-2.5 py-1.5 text-xs leading-[1.45]",
+        "scroll-rounded-md max-h-[120px] items-start gap-x-2 overflow-y-auto rounded-md px-2.5 py-1.5 text-xs leading-[1.45]",
         tone === "error" && "border-destructive/30 bg-destructive/[0.07]",
       )}
     >
@@ -849,23 +854,22 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   // desktop shortcut instead of inheriting the phone's Ctrl/Cmd+Enter.
   const touchKeyboard = useCoarsePointer();
   const enterSendMode = useEnterSendMode();
-  // 边光的油门：速率连续积分，只改播放速率（改 duration 会重启动画，那才是“跳”）。
-  const beamPlaybackRate = useStreamBeamPlaybackRate(isStreaming && !compact);
+  // 边光播放速率：速率连续积分，仅调整 playbackRate（修改 duration 会重启动画）。
+  const beamPlaybackRate = useStreamBeamPlaybackRate(isStreaming && !compact, draftKey ?? "new");
   const beamRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const root = beamRef.current;
     if (!root || typeof Animation === "undefined") return;
-    // 边光组件会把动画挂在自己的子树（`[data-beam]`，有的版本还带 bloom 层），
-    // 名字也带实例后缀（`beam-spin-<id>`）。别靠名字或层级去挑：把整棵子树里
-    // 的动画都按商品站点的方式同步播放速率，更不会漏。
+    // 边光组件将动画挂在自己的子树（`[data-beam]`，部分版本还含 bloom 层），
+    // 名称也带实例后缀（`beam-spin-<id>`）。不按名称或层级挑选，而是同步整棵子树的动画播放速率，避免遗漏。
     const apply = () => {
       for (const animation of root.getAnimations({ subtree: true })) {
         if (animation.playbackRate !== beamPlaybackRate) animation.updatePlaybackRate(beamPlaybackRate);
       }
     };
     apply();
-    // 动画可能在激活后的下一帧才挂上，也可能被组件的重新渲染重建（重置为 1x）。
-    // 一个静态的 interval 比任何一次性的 effect 都可靠，而它只在播放期间运行。
+    // 动画可能在激活后的下一帧才挂上，也可能因组件重渲染被重建（速率重置为 1x）。
+    // 固定 interval 比一次性 effect 可靠，且仅在播放期间运行。
     const frame = requestAnimationFrame(apply);
     const timer = isStreaming && !compact ? window.setInterval(apply, 400) : 0;
     return () => {
@@ -2138,7 +2142,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         // min-w-0: as a column flex item its `min-width: auto` resolves to
         // min-content, so one long unbreakable queue row stretched the whole
         // composer past the viewport instead of truncating inside it.
-        : "chat-input-shell flex min-h-0 min-w-0 flex-col px-7 pb-3.5 pt-1.5 max-sm:px-2.5 max-sm:pb-3",
+        : "chat-input-shell flex min-h-0 min-w-0 flex-col pb-3.5 pt-1.5 max-sm:pb-3",
         builtinCommandPending && "opacity-50 transition-opacity duration-150",
       )}
     >
@@ -2151,8 +2155,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         className="hidden"
         onChange={handleFilePick}
       />}
-      {/* Column width matches the message column: min(--chat-content-max-width, 700px). */}
-      <div className="mx-auto flex w-full min-w-0 max-w-[min(var(--chat-content-max-width,820px),700px)] flex-col gap-2">
+      {/* 列宽与留白同消息列一致：`lib/chat-layout.ts`。 */}
+      <div className={`${CHAT_COLUMN_CLASS} flex flex-col gap-2`}>
         <MissingCwdBanner cwd={missingCwd} />
         <ModelErrorBanner error={modelError} />
         <ModelScopeWarningBanner warnings={modelScopeWarnings} />
@@ -2537,8 +2541,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             />
 
             {compact ? sendCluster : (
-              // justify-end：发送/停止钮钉在行尾。 pill 行占 flex-1 时看不出差别，
-              // 但它一旦不在（隐藏/缺省），justify-start 会让按钮掉到行首。
+              // justify-end：发送/停止钮固定在行尾。pill 行占据 flex-1 时无差异，
+              // 但该行缺失（隐藏或省略）时，justify-start 会使按钮移至行首。
               <InputGroupAddon align="block-end" className="min-w-0 items-center justify-end gap-2 px-1 pb-0.5">
                 {/* One pill row: the pills scroll horizontally instead of wrapping,
                     and the send button is a sibling so it can never be squeezed
@@ -2759,7 +2763,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
 
         {/* Bash mode status label */}
         {bashMode && (
-          // pl-6：与卡片圆角切点（rounded-[24px]）对齐，不再贴着卡片外沿。
+          // pl-6：与卡片圆角切点（rounded-[24px]）对齐，不再紧贴卡片外沿。
           <div className={cn("mt-1 pl-6 pr-1 text-xs", bashExcluded ? "text-muted-foreground" : "text-primary")}>
              {t("chat.shell")} · {bashExcluded ? t("chat.outputLocal") : t("chat.outputModel")}
           </div>

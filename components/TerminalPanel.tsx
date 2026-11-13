@@ -294,14 +294,14 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
     // The CodeBlock sm container, kept on the section so the terminal grid,
     // data-terminal-theme and its own xterm palette stay untouched.
     <Card
-      // 面板壳的网格布局（38px 头行 / 状态行 / 终端行）来自批 4；外壳是官方
+      // 面板壳的网格布局为 38px 头行 / 状态行 / 终端行；外壳使用官方
       // `Card`，--terminal-* 调色板仍由 globals 的 .terminal-panel 按主题注入。
       className="terminal-panel group/code-block relative grid h-full min-h-0 w-full min-w-0 grid-rows-[38px_auto_minmax(0,1fr)] gap-0 overflow-hidden rounded-lg border-input bg-(--terminal-bg) py-0 text-xs dark:bg-input/30"
       data-terminal-theme={theme}
       aria-label={t("terminal.title")}
     >
       <header className="flex min-w-0 shrink-0 items-center gap-2 px-2.5 text-muted-foreground">
-        {/* 第 4 节：状态点走官方 Badge，不自绘圆点。 */}
+        {/* 第 4 节：状态点使用官方 Badge，不自行绘制圆点。 */}
         <Badge
           variant="outline"
           aria-hidden={false}

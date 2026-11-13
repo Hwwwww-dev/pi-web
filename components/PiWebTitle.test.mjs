@@ -59,13 +59,13 @@ test("the scramble keeps the length and the spaces and settles left to right", (
   assert.equal(scrambleFrameCount(versions), versions.length * 4);
 });
 
-test("the brand is a button named for what its click shows, with the brand's text", () => {
+test("the brand is a button named for what its click shows, showing the logo", () => {
   const html = renderToStaticMarkup(React.createElement(I18nProvider, null, React.createElement(PiWebTitle)));
   const app = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0";
   const pi = process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0";
   assert.match(
     html,
-    new RegExp(`<button [^>]*class="[^"]*sidebar-brand[^"]*"[^>]*aria-label="Pi Web, versions: web ${app}, pi ${pi}"[^>]*>Pi Web</button>`),
+    new RegExp(`<button [^>]*class="[^"]*sidebar-brand[^"]*"[^>]*aria-label="Pi Web, versions: web ${app}, pi ${pi}"[^>]*><img [^>]*src="/icons/logo.svg"[^>]*></button>`),
   );
   assert.doesNotMatch(html, /style=/, "no inline styles: its look is its own classes");
   // In every language, with the visible name in it.

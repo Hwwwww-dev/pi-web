@@ -21,7 +21,7 @@ import type { StepUsage } from "@/lib/turn-view";
 import { TraceRow } from "./TraceRow";
 
 /**
- * A shell command (官方 `pattern_terminal.md`): the command is the header, the
+ * A shell command (official `pattern_terminal.md`): the command is the header, the
  * output is the block. Same 5.2 line, different content slot — the header is
  * what a terminal call has and a file read does not.
  */
@@ -56,11 +56,10 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
       ariaLabel={view.object ? `${view.title} ${view.object}` : view.title}
       content={(
         <CodeBlock size="sm" variant={failed ? "destructive" : "default"} className="max-w-full">
-          {/* 标签和右侧按钮在一条居中行里，行底下留一点空，否则看着像贴着代码。 */}
-          <CodeBlockHeader className="min-h-9 items-center">
+          <CodeBlockHeader className="min-h-9 items-center pt-1.5 pb-1.5 group-data-[size=sm]/code-block:pt-1.5 group-data-[size=sm]/code-block:pb-1.5">
             <CodeBlockTitle className="text-muted-foreground">{t("chat.trace.command")}</CodeBlockTitle>
             <CodeBlockActions>
-              {/* 默认不换行（高度可控），需要看完整命令时再换行。 */}
+              {/* 默认不换行（高度可控），需查看完整命令时再切换换行。 */}
               <Button
                 type="button"
                 variant="ghost"
@@ -76,9 +75,9 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
               <CodeBlockCopyButton value={command} />
             </CodeBlockActions>
           </CodeBlockHeader>
-          {/* 总数封顶在 --card-max-height 内：命令占 6 份、结果占 4 份，各自超出就自己滚。
-              百分比 max-height 需要一个有确定高度的父元素，而这个盒子只有 max-height，
-              百分比解析不出来等于没写，命令就把整张卡吃掉了——所以按总上限算长度。 */}
+          {/* 高度总计封顶于 --card-max-height：命令占 6 份、结果占 4 份，超出部分各自滚动。
+              百分比 max-height 需要确定高度的父元素，而此盒子仅有 max-height，
+              百分比无法解析，命令会占据整张卡，故按总上限计算长度。 */}
           <div className="flex max-h-[var(--card-max-height)] min-h-0 flex-col">
             <div className="max-h-[calc(var(--card-max-height)*0.6)] min-h-0 overflow-auto p-2.5">
               <span className={cn(
@@ -88,9 +87,9 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
             </div>
             <Separator className="bg-border/60" />
             <div className="max-h-[calc(var(--card-max-height)*0.4)] min-h-0 overflow-auto p-2.5">
-              {/* 结果的行内换行是内容的一部分（图、表格、对齐都是拿空格和换行拍的），
-                  所以最内层必须自带 whitespace-pre*：HighlightedCode 只吐 token,
-                  本身不带 <pre>，少了这一层换行会被折叠成一段。 */}
+              {/* 结果的行内换行属于内容本身（图形、表格与对齐依赖空格与换行），
+                  故最内层须自带 whitespace-pre*：HighlightedCode 仅输出 token，
+                  不含 <pre>，缺少该层会被折叠为一段。 */}
               <div className={cn(
                 "font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground",
                 wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre",

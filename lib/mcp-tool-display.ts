@@ -28,6 +28,18 @@ export function mcpToolLabel(toolName: string, details?: unknown): McpToolLabel 
 }
 
 /**
+ * A running MCP call has no result yet, so it is labelled from the registered
+ * name `mcp__<server>__<tool>`. That name is sanitized, so the split is best
+ * effort: it applies only when the name has exactly three segments.
+ */
+export function mcpToolNameLabel(toolName: string): McpToolLabel | null {
+  if (!toolName.startsWith(MCP_TOOL_PREFIX)) return null;
+  const parts = toolName.slice(MCP_TOOL_PREFIX.length).split("__");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  return { server: parts[0], tool: parts[1] };
+}
+
+/**
  * MCP servers often answer with one JSON document as text, compacted. Show it
  * indented; anything else, including JSON surrounded by other text, as sent.
  */

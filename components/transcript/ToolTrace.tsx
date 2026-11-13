@@ -36,7 +36,7 @@ import { baseName, type ToolView, type ToolViewKind, type ToolViewSection, type 
 import { TraceRow } from "./TraceRow";
 
 /**
- * One tool call as a trace line (官方 `pattern_tool.md`): icon + title, the
+ * One tool call as a trace line (official `pattern_tool.md`): icon + title, the
  * arguments and the result inside the fold. The icon, title and content slot
  * follow `ToolView.kind`; nothing about the layout is per-tool.
  */
@@ -60,7 +60,7 @@ export const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
   generic: <WrenchIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
 };
 
-/** 展开时换成这一类自己的颜色，不填黑、不加粗。 */
+/** 展开态使用该类别自身的颜色，不加粗、不用纯黑。 */
 export const KIND_ACTIVE_ICONS: Record<ToolViewKind, ReactNode> = {
   terminal: <SquareTerminalIcon className={cn(ICON_CLASS, "text-primary/70")} />,
   "file-read": <FileTextIcon className={cn(ICON_CLASS, "text-primary/70")} />,
@@ -88,14 +88,14 @@ function CodeSection({ text, language, wrap = true, lineNumbers = true }: {
   text: string;
   language?: string;
   wrap?: boolean;
-  /** 代码文件的每一块都要有行号（用户要求）；行号与内容同一行高，所以带行号时不折行。 */
+  /** 代码段一律显示行号；行号与内容行高一致，故带行号时不折行。 */
   lineNumbers?: boolean;
 }) {
   const body = text.replace(/\n$/, "");
   const lineCount = body.split("\n").length;
   const gutter = Array.from({ length: lineCount }, (_, index) => String(index + 1)).join("\n");
   const wrapped = lineNumbers ? false : wrap;
-  // 裸代码块：行里已经写了动作和文件，“参数/结果”这种标签只制造两层卡。
+  // 裸代码块：行内已包含动作与文件，「参数/结果」标签只会叠加一层容器。
   return (
     <CodeBlock size="sm" data-language={language}>
       <CodeBlockContent wrap={wrapped} className="max-h-[var(--card-max-height)]" tabIndex={0}>
@@ -156,17 +156,22 @@ function StepsSection({ steps }: { steps: ToolViewStep[] }) {
 }
 
 /**
- * A section's content slot. Each kind picks an existing底座 — `CodeBlock`,
+ * A section's content slot. Each kind reuses an existing block — `CodeBlock`,
  * the patch view, Markdown — instead of a transcript-only look.
  */
 export function ToolSection({ section }: { section: ToolViewSection }) {
   const isMobile = useIsMobile();
   switch (section.kind) {
     case "code":
-      // TUI 输出（ANSI 转义）只能按终端文本渲染，code block 会原样显示转义序列。
-      // 源文件结果与文件预览同一形态：行号 + 不折行（用户：各种不统一、完全割裂）。
+      // TUI 输出（含 ANSI 转义）只能按终端文本渲染，code block 会原样显示转义序列。
+      // 源文件结果与文件预览形态一致：行号 + 不折行。
       return isTuiText(section.text ?? "")
-        ? <AnsiText text={section.text ?? ""} />
+        ? (
+            // 与 code 段同一限高：TUI 文本没有自己的滚动容器，长输出直接撑开卡片。
+            <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+              <AnsiText text={section.text ?? ""} />
+            </div>
+          )
         : (
           <CodeSection
             text={section.text ?? ""}
@@ -179,7 +184,12 @@ export function ToolSection({ section }: { section: ToolViewSection }) {
         ? <PatchDiffFiles files={section.files} layout={isMobile ? "stacked" : "split"} />
         : <CodeSection text={section.text ?? ""} wrap={false} />;
     case "markdown":
-      return <SafeMarkdownBody>{section.text ?? ""}</SafeMarkdownBody>;
+      // 与 code/fields 段同一限高：fetch/web 的正文过去不封顶，长结果把整轮撑出视野。
+      return (
+        <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+          <SafeMarkdownBody>{section.text ?? ""}</SafeMarkdownBody>
+        </div>
+      );
     case "fields":
       return <FieldsSection section={section} />;
     case "steps":
@@ -198,9 +208,8 @@ const MAX_FILE_CHIPS = 4;
  */
 function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; onOpenFile: (path: string) => void }) {
   return (
-    // 胶囊组不 grow：行是 `w-fit`，grow 子项会把行的固有宽度按 0 参与计算，
-    // 于是行比内容窄、胶囊明明还有空位就先省略了。``flex: 0 1 auto`` 让行先按
-    // 完整文件名撑到 `max-w-full`，真的排不下才缩。
+    // 胶囊组不参与 grow：行是 `w-fit`，grow 子项会把行的固有宽度按 0 计算，
+    // 导致行宽小于内容、胶囊提前省略。`flex: 0 1 auto` 先按完整文件名撑到 `max-w-full`，排不下才收缩。
     <span className="flex min-w-0 items-center gap-1.5">
       {paths.slice(0, MAX_FILE_CHIPS).map((path) => {
         // A call names files relative to the session cwd; the viewer needs the absolute path.
@@ -213,8 +222,8 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             variant="outline"
             size="xs"
             disabled={!resolved}
-            // 胶囊给名字留一个上限：手机上更窄（半个屏），超长文件名自己省略号，
-            // 而不能把前面的动作名和后面的 +N/-N 挤出可见区。
+            // 胶囊为文件名设定上限：手机端更窄（约半屏），超长文件名自身省略，
+            // 避免将前置动作名与后置 +N/-N 挤出可见区。
             className="min-w-0 shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
             title={resolved ?? path}
             aria-label={label}
@@ -235,7 +244,6 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
 
 export const ToolTrace = memo(function ToolTrace({ view, trailing, below, stepUsage, activityTool, cwd, onOpenFile }: {
   view: ToolView;
-  /** Duration belongs to the turn, not the tool (第 8 节). */
   /** The issuing request's usage: the expanded card's first line, in the same shape as the turn's meta line. */
   stepUsage?: StepUsage;
   trailing?: ReactNode;
@@ -249,20 +257,20 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, stepUs
   onOpenFile?: (path: string) => void;
 }) {
   const { t } = useI18n();
-  // chip 就是文件名本身（标题只说动作），点它打开文件。
+  // chip 内容即文件名（标题只描述动作），点击打开对应文件。
   const chips = onOpenFile && view.filePaths.length > 0
     ? <FileChips paths={view.filePaths} cwd={cwd} onOpenFile={onOpenFile} />
     : null;
   // The chip already carries the name; a description that repeats it is noise (第 4 节).
   const repeatsChip = view.filePaths.some((path) =>
     path === view.description || baseName(path) === view.description);
-  // 对象同样不能和 chip 说两遍（“编辑 tool-view.ts [tool-view.ts]”）。
+  // object 同样不得与 chip 重复（例如“编辑 tool-view.ts [tool-view.ts]”）。
   const chipNamesObject = chips !== null && view.object !== undefined
     && view.filePaths.some((path) => baseName(path) === view.object || path === view.object);
   const description = view.streamingInput
     ? t("chat.generatingToolInput")
     : chips && repeatsChip ? undefined : view.description;
-  // 读取/写入/编辑只给代码块：path、offset、limit 这些参数细节是工具的内部账，不是要读的东西。
+  // 读取/写入/编辑仅显示代码块：path、offset、limit 属于工具内部参数，不是阅读内容。
   const hideFields = view.kind === "file-read" || view.kind === "file-write" || view.kind === "file-edit";
   const sections = hideFields ? view.sections.filter((section) => section.kind !== "fields") : view.sections;
   const content = sections.length > 0

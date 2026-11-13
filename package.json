@@ -1,6 +1,6 @@
 {
   "name": "@agegr/pi-web",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Web UI for the pi coding agent",
   "homepage": "https://github.com/agegr/pi-web#readme",
   "repository": {
@@ -72,6 +72,7 @@
     "radix-ui": "^1.8.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-resizable-panels": "^4.22.0",
     "semver": "7.8.5",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",

@@ -3,60 +3,32 @@ import test from "node:test";
 import { createJiti } from "jiti";
 
 const jiti = createJiti(import.meta.url);
-const { shouldUseVisualViewportHeight } = await jiti.import("./useViewportHeight.ts");
+const { viewportInset } = await jiti.import("./useViewportHeight.ts");
 
-test("uses the visual viewport for a focused editor when the keyboard shrinks it", () => {
-  assert.equal(shouldUseVisualViewportHeight({
-    hasFocusedEditable: true,
-    fullHeight: 844,
-    visibleHeight: 510,
-    viewportScale: 1,
-  }), true);
+test("slides the shell up by exactly what the keyboard covers", () => {
+  assert.equal(viewportInset({ shellHeight: 844, visibleHeight: 510 }), 334);
 });
 
-test("detects the keyboard when the whole layout viewport shrinks with it (iOS PWA)", () => {
-  // innerHeight, clientHeight, and visualViewport.height all shrink together,
-  // so only the no-keyboard high-water mark makes the delta visible.
-  assert.equal(shouldUseVisualViewportHeight({
-    hasFocusedEditable: true,
-    fullHeight: 844,
-    visibleHeight: 510,
-    viewportScale: 1,
-  }), true);
+test("stays at zero when the shell already ends at the visible viewport (Android resizes-content)", () => {
+  assert.equal(viewportInset({ shellHeight: 510, visibleHeight: 510 }), 0);
 });
 
-test("does not keep the keyboard height after the visual viewport restores", () => {
-  assert.equal(shouldUseVisualViewportHeight({
-    hasFocusedEditable: true,
-    fullHeight: 844,
-    visibleHeight: 844,
-    viewportScale: 1,
-  }), false);
+test("never returns a negative inset when the visual viewport reports taller than the shell", () => {
+  assert.equal(viewportInset({ shellHeight: 844, visibleHeight: 845 }), 0);
 });
 
-test("restores the dynamic height as soon as the editor loses focus", () => {
-  assert.equal(shouldUseVisualViewportHeight({
-    hasFocusedEditable: false,
-    fullHeight: 844,
-    visibleHeight: 510,
-    viewportScale: 1,
-  }), false);
+test("rounds fractional visual viewport heights so the composer does not sit a pixel low", () => {
+  assert.equal(viewportInset({ shellHeight: 844, visibleHeight: 543.6 }), 300);
 });
 
-test("does not mistake pinch zoom for an open keyboard", () => {
-  assert.equal(shouldUseVisualViewportHeight({
-    hasFocusedEditable: true,
-    fullHeight: 844,
-    visibleHeight: 422,
-    viewportScale: 2,
-  }), false);
+test("keeps a bottom bar's gap out of the viewport instead of leaving it blank", () => {
+  assert.equal(viewportInset({ shellHeight: 844, visibleHeight: 810 }), 34);
 });
 
-test("does not override Android resizes-content, where the visible height equals the full height", () => {
-  assert.equal(shouldUseVisualViewportHeight({
-    hasFocusedEditable: true,
-    fullHeight: 844,
-    visibleHeight: 844,
-    viewportScale: 1,
-  }), false);
+// iOS pans the visible viewport down to reveal the focused field; that pan
+// already moved the shell, so only what the pan leaves covered counts.
+test("takes the visible viewport's own pan out of the inset", () => {
+  assert.equal(viewportInset({ shellHeight: 844, visibleHeight: 510, pan: 44 }), 290);
+  assert.equal(viewportInset({ shellHeight: 844, visibleHeight: 800, pan: 44 }), 0);
+  assert.equal(viewportInset({ shellHeight: 844, visibleHeight: 444, pan: 64 }), 336);
 });

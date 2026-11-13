@@ -260,3 +260,11 @@ test("a status that only names itself plus Inactive keeps the name alone", () =>
   // A status carrying something to act on keeps every word.
   assert.match(html, /git main/);
 });
+
+test("a short entry list still drops the state word and the list from the pill", () => {
+  // 单条服务器时长度不足以收成 chip，胶囊只显示名称，全文放入 title。
+  const html = renderStatusBar({ statuses: [{ key: "pi-lens-lsp", text: "LSP Active: typescript" }] });
+
+  assert.match(html, />LSP</);
+  assert.doesNotMatch(html, /Active/);
+});

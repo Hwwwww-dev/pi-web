@@ -629,18 +629,18 @@ export function ProjectWorktreePicker({
     ([key, { running, unread }]) => key !== project?.key && (running > 0 || unread > 0),
   );
 
-  // 盒子与文字的样式批 4 自 app/globals.css 迁入。交互面对齐 shadcn：files 的
-  // 灰盒沿用 ghost 的 hover:bg-accent，inline 的页面文字按钮 hover 到 secondary；
-  // aria-expanded 与 hover 同面（菜单开着时保持高亮）；焦点环是 Button 自带的
-  // focus-visible ring。尾部类经 cn/twMerge 覆盖 ghost 的同名面。
+  // 盒子与文字样式由 app/globals.css 迁入。交互状态对齐 shadcn：files 的灰盒使用
+  // ghost 的 hover:bg-accent，inline 的页面文字按钮 hover 到 secondary；aria-expanded 与
+  // hover 同面（菜单展开时保持高亮）；焦点环来自 Button 自带的 focus-visible ring。
+  // 尾部类通过 cn/twMerge 覆盖 ghost 的同名类。
   const boxClass = inline
     ? "inline-flex shrink min-w-0 items-center gap-1 h-[26px] px-1.5 rounded-(--radius-sm) text-left text-xs font-normal text-muted-foreground transition-colors hover:bg-secondary aria-expanded:bg-secondary dark:hover:bg-secondary dark:aria-expanded:bg-secondary pointer-coarse:min-h-9"
     : "inline-flex shrink min-w-0 items-center gap-1.5 h-[29px] px-2.5 border border-border rounded-(--radius-sm) bg-secondary text-left text-xs font-normal text-muted-foreground transition-colors aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:aria-expanded:bg-accent pointer-coarse:min-h-9";
-  // 每个布局里盒子的伸缩：inline 的两个按钮只缩到自己的最小宽度（一个百万
-  // 倍的 shrink 系数让分支先让路），files 的行里路径/分支吃满剩下的空间。
+  // 各布局中盒子的伸缩：inline 的两个按钮仅缩至自身最小宽度（分支的 shrink 系数极大，
+  // 优先收缩）；files 的行布局中路径/分支占据剩余空间。
   const projectBoxFlex = inline ? "min-w-14" : layout === "row" ? "grow basis-0" : "w-full";
   const worktreeBoxFlex = inline ? "min-w-18 shrink-[1000000]" : layout === "row" ? "max-w-[55%]" : "w-full";
-  // 路径/名字文本：files 的两种布局吃满盒子，inline 截到定长。
+  // 路径/名称文本：files 的两种布局占满盒子，inline 截断到固定宽度。
   const pathFlex = stacked ? "flex-1" : "flex-[0_1_auto] max-w-[32ch]";
   const labelFlex = stacked ? "flex-1" : "";
 

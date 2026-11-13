@@ -148,17 +148,19 @@ function TraceCollapsibleContent({
   return (
     <CollapsibleContent
       data-slot="trace-collapsible-content"
-      className="min-w-0 overflow-hidden data-[state=open]:animate-[trace-fold-down_180ms_ease-out] data-[state=closed]:animate-[trace-fold-up_160ms_ease-in] motion-reduce:data-[state=open]:animate-none motion-reduce:data-[state=closed]:animate-none"
+      className="grid min-w-0 grid-rows-[0fr] data-[state=open]:grid-rows-[1fr] data-[state=open]:animate-[trace-fold-down_180ms_ease-out] data-[state=closed]:animate-[trace-fold-up_160ms_ease-in] motion-reduce:data-[state=open]:animate-none motion-reduce:data-[state=closed]:animate-none"
       {...props}
     >
-      <div
-        data-slot="trace-collapsible-content-inner"
-        className={cn(
-          "mt-2 mb-1 ml-[calc(--spacing(2)-1px)] min-w-0 border-l pr-1 pl-4 leading-relaxed wrap-break-word text-muted-foreground",
-          className
-        )}
-      >
-        {children}
+      <div data-slot="trace-collapsible-content-clip" className="min-h-0 min-w-0 overflow-hidden">
+        <div
+          data-slot="trace-collapsible-content-inner"
+          className={cn(
+            "mt-2 mb-1 ml-[calc(--spacing(2)-1px)] min-w-0 border-l pr-1 pl-4 leading-relaxed wrap-break-word text-muted-foreground",
+            className
+          )}
+        >
+          {children}
+        </div>
       </div>
     </CollapsibleContent>
   )

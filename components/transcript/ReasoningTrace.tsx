@@ -21,7 +21,7 @@ import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thin
 import type { ThinkingContent } from "@/lib/types";
 
 /**
- * A thought (官方 `pattern_reasoning.md`): one line, the text inside the fold.
+ * A thought (official `pattern_reasoning.md`): one line, the text inside the fold.
  * The running state comes from `TraceLine status="running"` (the shimmer),
  * never from a per-row animation.
  */
@@ -29,9 +29,21 @@ import type { ThinkingContent } from "@/lib/types";
 /** Deferred history content, cached per block so a reopened fold does not refetch. */
 const MAX_THINKING_CACHE_ENTRIES = 100;
 const thinkingContentCache = new Map<string, Promise<string>>();
+/** The same texts once they arrived: a fold reopened after a remount starts with its text instead of a skeleton. */
+const loadedThinkingContentCache = new Map<string, string>();
+
+function thinkingContentKey(sessionId: string, entryId: string, blockIndex: number): string {
+  return `${sessionId}:${entryId}:${blockIndex}`;
+}
+
+/** A deferred block's text, when this page already fetched it. */
+export function cachedThinkingContent(sessionId: string | undefined, entryId: string | undefined, blockIndex: number): string | undefined {
+  if (!sessionId || !entryId) return undefined;
+  return loadedThinkingContentCache.get(thinkingContentKey(sessionId, entryId, blockIndex));
+}
 
 export function loadThinkingContent(sessionId: string, entryId: string, blockIndex: number): Promise<string> {
-  const key = `${sessionId}:${entryId}:${blockIndex}`;
+  const key = thinkingContentKey(sessionId, entryId, blockIndex);
   const cached = thinkingContentCache.get(key);
   if (cached) {
     thinkingContentCache.delete(key);
@@ -45,6 +57,11 @@ export function loadThinkingContent(sessionId: string, entryId: string, blockInd
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json() as { thinking?: unknown };
     if (typeof data.thinking !== "string") throw new Error("Invalid thinking response");
+    loadedThinkingContentCache.set(key, data.thinking);
+    if (loadedThinkingContentCache.size > MAX_THINKING_CACHE_ENTRIES) {
+      const oldest = loadedThinkingContentCache.keys().next().value;
+      if (oldest) loadedThinkingContentCache.delete(oldest);
+    }
     return data.thinking;
   }).catch((error) => {
     thinkingContentCache.delete(key);
@@ -123,6 +140,11 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
   // Load deferred history content whenever the block is expanded.
   useEffect(() => {
     if (!expanded || !block.deferred || content !== null) return;
+    const cached = cachedThinkingContent(sessionId, entryId, blockIndex);
+    if (cached !== undefined) {
+      setContent(cached);
+      return;
+    }
     if (!sessionId || !entryId) {
       setError(tRef.current("i18n.thinkingUnavailable"));
       return;

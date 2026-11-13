@@ -464,7 +464,7 @@ function filterInputClassName(mode: SurfaceMode): string {
   return [
     "sidebar-menu-filter-input",
     "block w-full px-2 box-border border border-(--border) rounded-(--radius-sm) outline-none bg-background text-foreground [user-select:text] [-webkit-user-select:text] focus:border-(--accent) focus-visible:border-(--accent) focus-visible:ring-0",
-    // 字号统一交给输入框原语（--field-font-size），这里只留各模式自己的高度。
+    // 字号统一由输入框原语（--field-font-size）提供，此处仅保留各模式自身高度。
     mode.classic ? "h-auto py-[5px] font-mono" : mode.sheet ? "h-10" : "h-7",
   ].filter(Boolean).join(" ");
 }

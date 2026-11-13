@@ -46,9 +46,13 @@ export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey
             const Icon = STEP_ICON[step.status];
             return (
               <TraceLine key={index} status={step.status === "pending" ? "pending" : undefined}>
-                <TraceIcon><Icon /></TraceIcon>
-                <TraceTitle>{step.title}</TraceTitle>
-                {step.description ? <TraceDescription>{step.description}</TraceDescription> : null}
+                {/* 图标与问题首行对齐，不居中于两行之间。 */}
+                <TraceIcon className="mt-[2px] self-start"><Icon /></TraceIcon>
+                {/* 问题与答案分行：同排会把答案挤在问题后面被截掉。 */}
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <TraceTitle>{step.title}</TraceTitle>
+                  {step.description ? <TraceDescription className="whitespace-normal">{step.description}</TraceDescription> : null}
+                </span>
               </TraceLine>
             );
           })}

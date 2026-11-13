@@ -143,17 +143,20 @@ test("with the files below the sessions, both are in view under the track", () =
   // The fixture pins the below placement (the desktop setting's one choice;
   // useIsMobile's server snapshot is a desktop): the stacked layout.
   const html = render({ selectedCwd: "/work/alpha", onOpenTerminal: noop });
-  assert.match(html, /^<div class="session-sidebar[^"]*is-files-below[^"]*" style="--sidebar-files-height:320px">/);
+  assert.match(html, /^(?:<link [^>]*\/>)?<div class="session-sidebar[^"]*is-files-below[^"]*" style="--sidebar-files-height:320px">/);
   // The brand row (its name says the versions a click shows), then New and
   // the search; under it the track, in every layout. No view options.
-  assert.match(html, /<div class="[^"]*sidebar-header[^"]*"><button [^>]*class="[^"]*sidebar-brand[^"]*"[^>]*aria-label="Pi Web, versions: web [^",]+, pi [^",]+"[^>]*>Pi Web<\/button><span class="[^"]*sidebar-header-spacer[^"]*"><\/span><button [^>]*class="[^"]*sidebar-new-button[^"]*"/);
+  assert.match(html, /<div class="[^"]*sidebar-header[^"]*"><button [^>]*class="[^"]*sidebar-brand[^"]*"[^>]*aria-label="Pi Web, versions: web [^",]+, pi [^",]+"><img [^>]*\/><\/button><span class="[^"]*sidebar-header-spacer[^"]*"><\/span><button [^>]*class="[^"]*sidebar-new-button[^"]*"/);
   assert.match(html, /<div dir="ltr" data-orientation="horizontal" data-slot="tabs" class="[^"]*"><div role="tablist" aria-orientation="horizontal" data-slot="tabs-list" data-variant="default" class="[^"]*sidebar-tabs-list[^"]*" aria-label="Sidebar view"/);
   assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
   // The chosen tab is active and owns its panel; the other is inactive.
   assert.match(html, /<button type="button" role="tab" aria-selected="true" aria-controls="session-sidebar-panel-sessions" data-state="active" id="session-sidebar-tab-sessions"/);
   assert.match(html, /<button type="button" role="tab" aria-selected="false" aria-controls="session-sidebar-panel-files" data-state="inactive" id="session-sidebar-tab-files"/);
   assert.doesNotMatch(html, /View options|sidebar-title/);
-  assert.match(html, /<span class="sidebar-new-label">New<\/span><\/button><button [^>]*class="[^"]*sidebar-search-toggle[^"]*" type="button" title="Search conversations" aria-label="Search conversations" aria-expanded="false" aria-controls="session-search-input">/);
+  // New is an icon-only ghost button: no label, its name only in the a11y tree.
+  assert.doesNotMatch(html, /sidebar-new-label/);
+  assert.match(html, /class="[^"]*sidebar-new-button[^"]*"[^>]*aria-label="New"/);
+  assert.match(html, /<\/button><button [^>]*class="[^"]*sidebar-search-toggle[^"]*" type="button" title="Search conversations" aria-label="Search conversations" aria-expanded="false" aria-controls="session-search-input">/);
   // Both tab panels shown: the sessions (its tab selected), the separator,
   // the files section under the tree.
   const sessions = openingTag(html, "session-sidebar-panel-sessions");
@@ -417,15 +420,15 @@ test("below the sessions the picker is one row under the header row, lined up wi
   const scrollTop = 0;
   const treeTop = Number(explorerSource.match(/\(changesCollapsed \|\| gitFiles\.length === 0\) && \(!fileSearchOpen \|\| !hasSearchQuery\) && \(\s*<div className="px-1 py-\[(\d+)px\]">/)[1]);
   assert.equal(headBottom + scrollTop + treeTop, 4, "the tree's first row 4px under the boxes");
-  // The paths start in the text column (the chevron column's 6px + 5px, the
-  // 12px chevron, a 3px gap), after the box's 1px line and 10px padding —
+  // The paths start in the text column (4px in, the 13px chevron, a 5px gap),
+  // after the box's 1px line and 10px padding —
   // the picker's below-sessions box classes (ProjectWorktreePicker's
   // non-inline box: `border border-border` is the 1px line, px-2.5 the 10px).
   const belowBox = pickerSource.match(/px-([\d.]+) border border-border/);
   assert.ok(belowBox, "the below-sessions box's line and padding are its own classes");
   const boxLine = 1;
   const boxPadding = Number(belowBox[1]) * 4;
-  const textColumn = 6 + 5 + 12 + 3;
+  const textColumn = 4 + 13 + 5;
   assert.equal(headLeft + boxLine + boxPadding, textColumn, "the paths in the text column");
   // The boxes end where the keys end and where a session row's time does,
   // whatever room the session tree's scrollbar takes (none for an overlay
@@ -464,7 +467,7 @@ test("the layout, the tab and the fold chosen last never change the first render
   // The hydrating render must match the server's HTML: the files open below
   // the sessions, whatever the browser saved.
   assert.equal(clientHtml, serverHtml);
-  assert.match(clientHtml, /^<div class="session-sidebar[^"]*is-files-below[^"]*" style="--sidebar-files-height:320px">/);
+  assert.match(clientHtml, /^(?:<link [^>]*\/>)?<div class="session-sidebar[^"]*is-files-below[^"]*" style="--sidebar-files-height:320px">/);
   // Not the hidden attribute (the panel is shown): the class list's own
   // overflow-hidden is no fold.
   assert.doesNotMatch(openingTag(clientHtml, "session-sidebar-panel-files"), /\shidden(?:=""|>[ ]|$)/);

@@ -16,7 +16,7 @@ const STEP_ICON = {
 } as const;
 
 /**
- * A todo snapshot (官方 `pattern_plan.md`): one collapsible line naming the
+ * A todo snapshot (official `pattern_plan.md`): one collapsible line naming the
  * task in progress, its progress in the description, the steps below it.
  */
 export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool, stepUsage }: {
@@ -45,17 +45,19 @@ export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool,
       defaultOpen
       ariaLabel={title}
       content={(
-        <Trace>
-          {steps.map((step, index) => {
-            const Icon = STEP_ICON[step.status];
-            return (
-              <TraceLine key={index} status={step.status === "pending" ? "pending" : undefined}>
-                <TraceIcon><Icon /></TraceIcon>
-                <TraceTitle>{step.title}</TraceTitle>
-              </TraceLine>
-            );
-          })}
-        </Trace>
+        <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+          <Trace>
+            {steps.map((step, index) => {
+              const Icon = STEP_ICON[step.status];
+              return (
+                <TraceLine key={index} status={step.status === "pending" ? "pending" : undefined}>
+                  <TraceIcon><Icon /></TraceIcon>
+                  <TraceTitle>{step.title}</TraceTitle>
+                </TraceLine>
+              );
+            })}
+          </Trace>
+        </div>
       )}
     />
   );

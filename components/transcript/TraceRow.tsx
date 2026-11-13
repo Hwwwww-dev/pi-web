@@ -52,9 +52,8 @@ function scrollParentOf(element: HTMLElement): HTMLElement | null {
  * way tool cards always have.
  */
 export function useTraceFold(foldKey?: string, defaultOpen = false) {
-  // 三态：用户主动过就听用户的，没设置过才用 defaultOpen。旧实现的
-  // `setOpen(isToolCallExpanded(key))` 把「没记录」当成「已收起」，于是别处
-  // （一行工具）一展开，所有靠 defaultOpen 打开的大折叠都被强行关掉。
+  // 三态：用户已记录选择则以其为准，未记录时使用 defaultOpen。不可将“未记录”
+  // 等同于“已收起”，否则任一处展开都会关闭所有依赖 defaultOpen 的折叠区。
   const [open, setOpen] = useState(() => getFoldChoice(foldKey) ?? defaultOpen);
 
   useEffect(() => {
@@ -110,12 +109,12 @@ export function TraceRow({
   titleClassName?: string;
   /** File chips the call named, right after the title (第 4.1 节). */
   chips?: ReactNode;
-  /** 胶囊后面的定量（编辑的 +N/−N）：胶囊指哪个文件、改了多少，读起来是一句。 */
+  /** 胶囊后的定量信息（编辑的 +N/−N）：同时说明目标文件与改动量。 */
   suffix?: ReactNode;
-  /** 这一行花了多久。和思考行一样放在箭头**里面**，不能一半在里面一半在外面。 */
+  /** 本行耗时。与思考行一致，置于箭头**内侧**，不可跨内外边界。 */
   duration?: ReactNode;
-  /** 行尾的动作按钮（比如打开子代理面板）：放在折叠触发按钮之外，
-      因为按钮不能嵌按钮，而触发按钮里只能有那一行文字。 */
+  /** 行尾动作按钮（如打开子代理面板）：置于折叠触发按钮之外，
+      因按钮不可嵌套，而触发按钮内只容纳该行文字。 */
   actions?: ReactNode;
   description?: string;
   status?: ToolViewStatus;
@@ -139,8 +138,8 @@ export function TraceRow({
   activityTool?: string;
 }) {
   const { open, onOpenChange } = useTraceFold(foldKey, defaultOpen);
-  // 展开/收起时行不动，下方内容长在它下面：否则列表会整块上跳（收起）或滑到底
-  // （展开），看着就是“闪一下”。锚定的是这一行自己的顶边，量在布局阶段、画之前。
+  // 展开/收起时行保持原位，内容在其下方增长：否则列表在收起时上跳、展开时滑到底部。
+  // 锚定的是本行顶边，在布局阶段测量、绘制之前应用。
   const rowRef = useRef<HTMLDivElement>(null);
   const pinRef = useRef<{ container: HTMLElement; top: number } | null>(null);
   const toggleFold = useCallback(
@@ -148,7 +147,7 @@ export function TraceRow({
       const row = rowRef.current;
       const container = row ? scrollParentOf(row) : null;
       if (row && container) pinRef.current = { container, top: row.getBoundingClientRect().top };
-      // 告诉列表“这一行正在折叠”：这几帧不要贴底跟随，否则展开的行会被拉上去。
+      // 通知列表本行正在折叠：这几帧禁用贴底跟随，否则展开的行会被拉上去。
       window.dispatchEvent(new Event("pi-web:trace-fold"));
       onOpenChange(next);
     },
@@ -162,19 +161,18 @@ export function TraceRow({
     const delta = row.getBoundingClientRect().top - pin.top;
     if (delta !== 0) pin.container.scrollTop += delta;
   }, [open]);
-  // 文件胶囊是真正的按钮，行本身是折叠触发按钮：按钮不能嵌按钮，否则 HTML 结构
-  // 非法、点击事件在移动端也会被里层吃掉。所以有展开内容时，行按钮只放文字，
-  // 胶囊作为它的兄弟摆在行尾（同一行对齐）。
+  // 文件胶囊与行本身均为按钮，HTML 不允许按钮嵌套（移动端内层还会截获点击）。
+  // 因此有展开内容时，行按钮只承载文字，胶囊作为其兄弟节点置于行尾并对齐。
   const line = (withChips: boolean, withTrailing = true) => (
-    // 行宽跟随内容（官方 `w-fit max-w-full`）：箭头紧跟文字，不甩到行尾；
-    // 超宽时由对象/描述上的 `truncate` 收缩，箭头始终贴住最后一段文字。
+    // 行宽跟随内容（官方 `w-fit max-w-full`）：箭头紧跟文字；超宽时由对象/描述上的
+    // `truncate` 收缩，箭头始终贴住最后一段文字。
       <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0 overflow-hidden" data-expanded={open || undefined}>
       {(icon != null || activeIcon != null) && (
         <TraceIcon>{open && activeIcon != null ? activeIcon : icon}</TraceIcon>
       )}
-      {/* The action is never elided: it is the row's name (用户要求：工具名称不可省略). */}
+      {/* The action is never elided: it is the row's name (工具名称为必要信息，不可省略). */}
       <TraceTitle className={cn("shrink-0 whitespace-nowrap", titleClassName)}>{title}</TraceTitle>
-      {/* 对象是唯一能让步的一段：名字、胶囊、行尾都不收缩。 */}
+      {/* 对象是唯一可让步的片段：名称、胶囊、行尾均不收缩。 */}
       {object && <span className="min-w-0 flex-1 truncate">{object}</span>}
       {withChips && chips}
       {withChips && suffix != null && <span className="shrink-0 whitespace-nowrap">{suffix}</span>}
@@ -203,12 +201,10 @@ export function TraceRow({
   return (
     <Trace ref={rowRef} data-activity="trace-row" data-activity-tool={activityTool}>
       <TraceCollapsible open={open} onOpenChange={toggleFold}>
-        {/* 行内间距与触发区同一个值（gap-1）：有胶囊的行和只有文字的行，箭头前的
-            留白必须一样，否则一排看下去箭头忽远忽近。 */}
+        {/* 行内间距与触发区一致（gap-1）：有无胶囊的行，箭头前留白必须相同。 */}
         <div className="flex w-full max-w-full items-center gap-1">
-          {/* 触发区只盖文字：胶囊紧跟在动作名后面，不被 flex-1 推到行尾。
-              胶囊是按钮，不能嵌进触发按钮里，所以触发区自己不再画箭头，
-              箭头改成跟在胶囊后面的兄弟按钮（同样调 toggleFold）。 */}
+          {/* 触发区仅覆盖文字：胶囊紧跟动作名，不被 flex-1 推到行尾。胶囊为按钮，不可
+              嵌套于触发按钮内，故触发区不绘制箭头，箭头改为胶囊后的兄弟按钮（同样调 toggleFold）。 */}
           <TraceCollapsibleTrigger
             aria-label={ariaLabel}
             className="min-w-0 max-w-full"
@@ -220,7 +216,7 @@ export function TraceRow({
           {suffix != null && (
             <span className="shrink-0 whitespace-nowrap">{suffix}</span>
           )}
-          {/* 行尾计数（编辑的 +N/−N）跟在胶囊后面：“哪个文件、改了多少”一句话读完。 */}
+          {/* 行尾计数（编辑的 +N/−N）位于胶囊之后，一次读完目标文件与改动量。 */}
           {trailing && <span className="shrink-0 pl-2">{trailing}</span>}
           {chips != null && (
             <button
@@ -235,15 +231,14 @@ export function TraceRow({
               </TraceIcon>
             </button>
           )}
-          {/* 行尾留白，把折叠箭头和 ··· 留在右边缘（胶囊是链接，不能嵌进按钮）。 */}
+          {/* 行尾留白，将折叠箭头与 ··· 推至右边缘（胶囊为链接，不可嵌入按钮）。 */}
           <span className="min-w-0 flex-1" aria-hidden="true" />
           {actions}
         </div>
-        {/* 展开区统一封顶：markdown（子代理报告、web 结果）以前是唯一没有上限的，
-            长内容会把整张卡无限拉高；代码块自己也封顶，同值叠加无害。 */}
-        <TraceCollapsibleContent className="mt-1 max-h-[var(--card-max-height)] overflow-auto [&>*]:min-w-0">
+        {/* 展开区不设高度上限：代码块、思考块各自限高即可，两层同时限高会出现两个滚动条。 */}
+        <TraceCollapsibleContent className="mt-1 flex flex-col gap-2 [&>*]:min-w-0">
           {stepUsage && (
-            <div className="mb-1 text-xs">
+            <div className="text-xs">
               <UsageBar usage={stepUsage} gap={10} />
             </div>
           )}

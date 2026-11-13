@@ -42,7 +42,7 @@ export function translateMessage(
  * @param date 要格式化的时间
  * @param locale 当前语言
  * @param now 用于测试或特殊场景的当前时间
- * @returns locale-aware 的相对时间文本
+ * @returns 与语言环境匹配的相对时间文本
  */
 export function formatRelativeTime(date: Date | string, locale: Locale, now = new Date()): string {
   const target = date instanceof Date ? date : new Date(date);
@@ -60,7 +60,7 @@ export function formatRelativeTime(date: Date | string, locale: Locale, now = ne
 }
 
 /**
- * 今天只显示时刻；更早的时间和会话列表一样用相对时间。
+ * 今天显示时刻；更早的时间与会话列表一致，使用相对时间。
  * @param timestamp 毫秒时间戳
  * @param locale 当前语言
  * @param now 用于测试或特殊场景的当前时间
@@ -83,7 +83,7 @@ const SHORT_TIME_UNITS: Record<Locale, { now: string; minute: string; hour: stri
 };
 
 /**
- * 侧边栏右侧一列使用的紧凑相对时间（"5m"、"3小时"）。
+ * 侧边栏右侧列使用的紧凑相对时间（"5m"、"3小时"）。
  * @param date 要格式化的时间
  * @param locale 当前语言（未知语言按英语）
  * @param now 用于测试或特殊场景的当前时间

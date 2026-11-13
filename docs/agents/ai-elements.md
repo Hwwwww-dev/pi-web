@@ -120,7 +120,6 @@ pi-web 的消息列表（过程区、工具卡、思考块、用量行）按 sha
   `MessageView.tsx` 只负责消息级别的组装。
 - 不动的：`components/ui/*` 官方组件（除按需补 `data-slot` 主题）、
   `MarkdownBody`、`DiffView`、`CodemodeToolView`、`SessionChatPanel`、`AnsiText`。
-- `demo/components/` 镜像必须与 `components/` 逐字节同步（源码断言测试依赖它）。
 
 ## 7. 陷阱
 

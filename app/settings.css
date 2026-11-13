@@ -252,8 +252,8 @@
    fallback insets with device sizes; +8px mirrors the edge margins. */
 @media (max-width: 640px) {
   .settings-card-safe {
-    /* 位置交给官方 DialogContent 的居中（translate 由它的入场动画控制，覆盖不掉）；
-       这里只把尺寸收到手机可用区域，卡片就回到屏幕中间。 */
+    /* 位置交由官方 DialogContent 居中（translate 由其入场动画占用，无法覆盖）；
+       此处仅将尺寸收至手机可用区域，使卡片位于屏幕中央。 */
     width: calc(100vw - 16px);
     /* 高度固定为视口 80%，居中后四周留白一致。 */
     height: 80dvh;
@@ -261,8 +261,8 @@
   }
 }
 
-/* 官方 DialogContent 用 translate 居中，入场动画也占着同一个属性，任何 inset 写法都会把卡片推掉半个身位。
-   所以手机/独立安装态只调尺寸（可用区域扣掉安全区），位置始终交给居中。 */
+/* 官方 DialogContent 以 translate 居中，入场动画占用同一属性，任何 inset 写法都会使卡片偏移半个身位。
+   因此手机与独立安装态仅调整尺寸（可用区域扣除安全区），位置始终交由居中。 */
 @supports (-webkit-touch-callout: none) {
   @media (display-mode: standalone) {
     .settings-card-safe {

@@ -20,7 +20,7 @@ export interface ToolField {
 /** What an empty argument is worth in a table: something the eye can find. */
 export const EMPTY_FIELD_VALUE = "(empty)";
 
-/** 嵌套值展平成带路径的键（`tasks[0].subject`），数组下标进键名。 */
+/** 将嵌套值展平为带路径的键（`tasks[0].subject`），数组下标计入键名。 */
 function flattenInto(fields: ToolField[], path: string, value: unknown): boolean {
   if (Array.isArray(value)) {
     if (value.length === 0) {
@@ -46,8 +46,8 @@ function flattenInto(fields: ToolField[], path: string, value: unknown): boolean
  * The arguments as rows, in the order the tool received them, or `null` when
  * this call is not a record at all (streamed or not an object).
  *
- * 嵌套对象与数组也展开成行（`tasks[0].subject`），所以 JSON 参数不再以一行
- * 原始串出现；只有键值对本身的结构会变，值始终是字符串。
+ * 嵌套对象与数组同样展开为行（`tasks[0].subject`），JSON 参数不再以单行
+ * 原始串出现；仅键值对结构发生变化，值始终为字符串。
  */
 export function toolFieldsOfInput(input: unknown): ToolField[] | null {
   if (input === null || typeof input !== "object" || Array.isArray(input)) return null;

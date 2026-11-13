@@ -262,7 +262,7 @@ export function ModelSelector({
           align="start"
           collisionPadding={8}
           aria-label={ariaLabel}
-          className="max-h-(--radix-dropdown-menu-content-available-height) min-w-(--radix-dropdown-menu-trigger-width) max-w-(--radix-dropdown-menu-content-available-width) overflow-y-auto scrollbar-thin"
+          className="max-h-(--radix-dropdown-menu-content-available-height) min-w-(--radix-dropdown-menu-trigger-width) max-w-(--radix-dropdown-menu-content-available-width) overflow-y-auto"
         >
           {headerSlot && (
             <div className="sticky top-0 z-10 bg-popover px-1.5 pb-1.5 pt-1">{headerSlot}</div>

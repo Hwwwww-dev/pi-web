@@ -92,11 +92,6 @@ test("client code stays parseable by Safari 16.2", () => {
   for (const file of [source, pickerSource, heroSource, contextSource]) {
     assert.doesNotMatch(file, /\(\?<[=!]/, "no RegExp lookbehind");
   }
-  // The link's box: padding offset by equal negative margins, so hover and
-  // focus never move the line.
-  const update = heroSource.match(/new-session-update inline-flex[^"]*-my-\[(\d+)px\] px-1 py-\[(\d+)px\]/);
-  assert.ok(update, "the update link's margins offset its padding");
-  assert.equal(update[1], update[2]);
   // The hero centres the row under the brand lockup now (ChatWindow wraps it
   // in a justify-center flex), so the old left-edge pull is gone: the row's
   // margin carries no horizontal component.

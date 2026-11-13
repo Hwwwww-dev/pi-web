@@ -89,13 +89,3 @@ Refer to the Configuration section of the main README for option defaults and va
 Pi Web can invoke tools, run shell commands, edit project files, and access the agent credentials in its mounted agent directory. Treat the service as a trusted local application, not a public website. Compose binds the published port to `127.0.0.1`; for remote access, use a trusted HTTPS reverse proxy or VPN, keep password authentication enabled, and configure `PI_WEB_ALLOWED_HOSTS` for the forwarded hostname. Do not expose plain HTTP to the public internet.
 
 The mounted workspace is writable by the agent. Only mount directories you intend Pi Web to access. Keep the writable agent directory and provider credentials private.
-
-## Released images
-
-Pushing a `v*` release tag makes the Release workflow (`.github/workflows/publish.yml`) publish `linux/amd64` and `linux/arm64` images to GHCR, next to the npm package: `ghcr.io/agegr/pi-web:<version>`, `:<major>.<minor>` and `:latest`. It uses the built-in `GITHUB_TOKEN`, so no registry secret is needed.
-
-To run a released image instead of building one, replace the `build:` section in `compose.yaml` with:
-
-```yaml
-    image: ghcr.io/agegr/pi-web:latest
-```

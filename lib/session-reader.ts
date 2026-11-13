@@ -701,6 +701,22 @@ export function getSessionSettings(entries: SessionEntry[], leafId?: string | nu
   };
 }
 
+/**
+ * The active branch from its root to `leafId`, oldest first. Unlike
+ * sliceActiveBranch() this takes no cap: callers slice the window they need.
+ */
+function activeBranchChain(entries: SessionEntry[], leafId: string | null): SessionEntry[] {
+  const byId = new Map<string, SessionEntry>();
+  for (const e of entries) byId.set(e.id, e);
+  let current = leafId ? byId.get(leafId) : entries[entries.length - 1];
+  const chain: SessionEntry[] = [];
+  while (current) {
+    chain.push(current);
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+  return chain.reverse();
+}
+
 export interface BuildSessionContextOptions {
   deferThinking?: boolean;
   deferToolResultImages?: boolean;
@@ -708,6 +724,47 @@ export interface BuildSessionContextOptions {
   excludeLeaf?: boolean;
   /** Session id used to build lazy URLs for historical tool-result images. */
   sessionId?: string;
+  /** Center the window on this entry: minimap jumps read one page around it. */
+  anchor?: string;
+  /** Entries newer than `anchor` to include with it (the page's downward half). */
+  after?: number;
+  /** Page downward: the `tail` entries following this one. */
+  newerThan?: string;
+}
+
+/**
+ * The page of the active branch a request asks for. No window start means the
+ * usual tail page; `anchor` centers a page on an entry (minimap jump), and
+ * `newerThan` continues downward from the last loaded entry.
+ */
+function resolveContextWindow(
+  entries: SessionEntry[],
+  leafId: string | null | undefined,
+  options: BuildSessionContextOptions,
+): { sliced: SessionEntry[]; hasMore: boolean; hasNewer: boolean } {
+  const { tail, excludeLeaf, anchor, after, newerThan } = options;
+  const pageSize = tail && tail > 0 ? tail : entries.length;
+  // History pages retain the original branch order, including compacted messages.
+  // SDK context filtering can drop a page's messages when firstKeptEntryId is outside it.
+  const tailPage = () => (leafId === null
+    ? []
+    : sliceActiveBranch(entries, leafId ?? null, pageSize, excludeLeaf));
+  const windowStart = anchor ?? newerThan;
+  if (!windowStart) {
+    const sliced = tailPage();
+    return { sliced, hasMore: Boolean(sliced[0]?.parentId), hasNewer: false };
+  }
+  const chain = activeBranchChain(entries, leafId ?? null);
+  const index = chain.findIndex((entry) => entry.id === windowStart);
+  if (index < 0) {
+    const sliced = tailPage();
+    return { sliced, hasMore: Boolean(sliced[0]?.parentId), hasNewer: false };
+  }
+  const start = anchor ? Math.max(0, index - pageSize + 1) : index + 1;
+  const end = anchor
+    ? Math.min(chain.length, index + 1 + Math.max(0, after ?? 0))
+    : Math.min(chain.length, start + pageSize);
+  return { sliced: chain.slice(start, end), hasMore: start > 0, hasNewer: end < chain.length };
 }
 
 export function buildSessionContext(
@@ -715,13 +772,7 @@ export function buildSessionContext(
   leafId?: string | null,
   options: BuildSessionContextOptions = {},
 ): SessionContext {
-  const { tail, excludeLeaf } = options;
-  // History pages retain the original branch order, including compacted messages.
-  // SDK context filtering can drop a page's messages when firstKeptEntryId is outside it.
-  const sliced = leafId === null ? [] : sliceActiveBranch(
-    entries, leafId ?? null, tail && tail > 0 ? tail : entries.length, excludeLeaf,
-  );
-  const hasMore = Boolean(tail && tail > 0 && sliced[0]?.parentId);
+  const { sliced, hasMore, hasNewer } = resolveContextWindow(entries, leafId, options);
   const turnsBefore = hasMore ? countTurnsBefore(entries, sliced[0]) : 0;
 
   // Convert messages and their IDs together to keep fork/navigation targets aligned.
@@ -741,6 +792,8 @@ export function buildSessionContext(
     oldestEntryId: sliced[0]?.id ?? null,
     hasMore,
     turnsBefore,
+    newestEntryId: sliced[sliced.length - 1]?.id ?? null,
+    hasNewer,
     ...getSessionSettings(entries, leafId),
   };
 }
