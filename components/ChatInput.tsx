@@ -87,8 +87,13 @@ export interface AttachedImage {
   previewUrl: string; // object URL for display
 }
 
+/** 粘贴文本超过该字符数时不再插入输入框，转成 TXT 文件上传（DeepSeek 同款行为）。 */
+export const PASTE_TEXT_TO_FILE_THRESHOLD = 10_000;
+
 interface Props {
   onSend: (message: string, images?: AttachedImage[]) => void;
+  /** 超过 PASTE_TEXT_TO_FILE_THRESHOLD 的粘贴文本转交上层：包成 TXT 上传并以 @mention 引用。 */
+  onPasteLargeText?: (text: string) => void;
   onAbort: () => void;
   /** Sends the draft to a new side chat instead of the running agent. */
   onSideChat?: (message: string) => void;
@@ -843,6 +848,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   draftKey,
   cwd,
   onAttachFiles,
+  onPasteLargeText,
   compact = false,
 }: Props, ref) {
   const { t } = useI18n();
@@ -1857,6 +1863,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
 
     const html = e.clipboardData.getData("text/html");
     const text = e.clipboardData.getData("text/plain");
+    // 大文案粘贴不再灌进输入框：转成 TXT 文件走同一条上传链（上传到工作目录 +
+    // @mention 引用），DeepSeek 网页版同款行为；上传失败时上层把原文插回输入框。
+    if (onPasteLargeText && text.length > PASTE_TEXT_TO_FILE_THRESHOLD) {
+      e.preventDefault();
+      onPasteLargeText(text);
+      return;
+    }
     if (text) {
       // A dictation tool that pastes and then restores the clipboard can write
       // it during this event; Chrome then drops its own insertion (#1513). When
@@ -1901,7 +1914,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       ta.focus();
       ta.setSelectionRange(start + markdown.length, start + markdown.length);
     });
-  }, [compact, processImageFiles, updateAtQuery]);
+  }, [compact, onPasteLargeText, processImageFiles, updateAtQuery]);
 
   useEffect(() => {
     if (slashQuery === null) {
