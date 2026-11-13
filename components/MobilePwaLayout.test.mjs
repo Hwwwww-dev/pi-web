@@ -44,22 +44,35 @@ test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(appShellSource, /flex min-h-\(--header-height\) shrink-0 items-center gap-2 border-b pt-\[env\(safe-area-inset-top\)\] transition-\[width,height\] ease-linear/);
   // Right panel tab bar: the draft's 46px bar with its safe-area compensation.
   assert.match(appShellSource, /h-\[calc\(46px_\+_\env\(safe-area-inset-top\)\)\] shrink-0/);
-  assert.match(appShellSource, /flex h-\[100dvh\] flex-col bg-background/);
+  // 主列/右列用 h-full（百分比链到壳层），不再写死 dvh：键盘期 dvh 缩到 383，
+  // 内容不跟着钉高走，iOS 原生滚动滚到的下半截就是空白（白屏）。
+  assert.match(appShellSource, /flex h-full flex-col bg-background/);
+  assert.match(appShellSource, /h-full min-w-0 overflow-hidden/);
+  assert.doesNotMatch(appShellSource, /h-\[100dvh\] min-w-0/);
+  assert.match(cssSource, /@media \(max-width: 640px\) \{[^@]*?\.app-shell \{[^}]*?height: 100dvh/);
   assert.match(appShellSource, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}/);
   assert.match(viewportHookSource, /window\.visualViewport/);
-  assert.match(viewportHookSource, /window\.requestAnimationFrame\(update\)/);
-  assert.match(viewportHookSource, /window\.addEventListener\("resize", scheduleUpdate\)/);
-  assert.match(viewportHookSource, /window\.addEventListener\("focusout", handleFocusOut\)/);
-  assert.match(viewportHookSource, /--app-viewport-height/);
-  assert.match(viewportHookSource, /--keyboard-inset/);
-  assert.match(viewportHookSource, /window\.scrollTo\(0, 0\)/);
-  // 键盘弹出期间壳层保持满高并整体上移（transform 仅提交合成层），不使用高度动画：
-  // 高度逐帧变化会导致上千条消息的滚动容器重新布局，键盘动画期间持续掉帧。
-  assert.match(cssSource, /\.app-shell \{\s*transform: translate3d\(0, calc\(-1 \* var\(--keyboard-inset, 0px\)\), 0\);/);
-  // 页头抵消该位移以保持在屏幕顶部，topBarRef 的 client rect 才能继续作为 Popover 锚点。
-  assert.match(cssSource, /\.app-top-bar \{\s*transform: translate3d\(0, var\(--keyboard-inset, 0px\), 0\);/);
-  // body 不随可视高度收缩：壳层位移后，缩短的 body 会在底部留出空隙。
-  assert.doesNotMatch(cssSource, /html, body \{[\s\S]*?height: var\(--app-viewport-height, 100dvh\);[\s\S]*?\}/);
+  assert.match(viewportHookSource, /window\.addEventListener\("focusout", scheduleSync\)/);
+  assert.match(viewportHookSource, /data-keyboard-open|dataset\.keyboardOpen/);
+  assert.match(viewportHookSource, /isKeyboardPeriod/);
+  // 位移与过渡已全部废弃：iOS 会原生滚动 scrollView 推页头，任何 transform 都会
+  // 让滚到的窗口下半变成空白（白屏）。断言壳层上不存在任何位移与过渡，防止再犯。
+  assert.doesNotMatch(cssSource, /\.app-shell \{[^}]*transform/);
+  assert.doesNotMatch(cssSource, /\.app-shell \{[^}]*transition: transform/);
+  assert.doesNotMatch(viewportHookSource, /--keyboard-lift/);
+  assert.doesNotMatch(viewportHookSource, /translate3d/);
+  assert.doesNotMatch(viewportHookSource, /--app-viewport-height/);
+  assert.doesNotMatch(viewportHookSource, /scrollTo\(/);
+  assert.match(viewportHookSource, /--keyboard-full-height/);
+  assert.match(cssSource, /html, body \{[\s\S]*?height: 100dvh;[\s\S]*?\}/);
+  assert.doesNotMatch(cssSource, /html, body \{[\s\S]*?height: var\(--app-viewport-height/);
+  // 键盘期高度钉在 px 全高上：文档比缩小后的视口多出键盘那一截，iOS 才有原生
+  // 滚动余地推页头；绝不能让高度跟随 dvh 缩（无处可滚，页头永远钉顶）。
+  assert.match(cssSource, /html\[data-keyboard-open\] body \{[^}]*height: var\(--keyboard-full-height/);
+  assert.match(cssSource, /html\[data-keyboard-open\] \.app-shell \{[^}]*height: var\(--keyboard-full-height/);
+  assert.doesNotMatch(cssSource, /\.app-chat-shift/);
+  // 推上去靠 iOS 原生滚动，不动页头本身（收高度/位移都不许）。
+  assert.doesNotMatch(cssSource, /html\[data-keyboard-open\] \.app-top-bar/);
   assert.match(appShellSource, /className="app-shell overflow-hidden"/);
   assert.match(appShellSource, /className="app-top-bar sticky top-0/);
   // The self-drawn drawer's `left: env(safe-area-inset-left)` went with it;

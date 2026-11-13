@@ -25,7 +25,6 @@ import {
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
 import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger } from "./ui/sidebar";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "./ui/empty";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -38,7 +37,6 @@ import {
 } from "./ui/dropdown-menu";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { cn } from "@/lib/utils";
-import { installGlobalScrollbarVisibility } from "@/lib/scrollbar-visibility";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
 import { KeepAliveDock } from "./KeepAliveDock";
@@ -66,8 +64,10 @@ import { appendSideTab, restoreSideTabs, sideTabsKey } from "./side-tab-state";
 import { useTheme } from "@/hooks/useTheme";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { useI18n } from "@/hooks/useI18n";
-import { useIsMobile, useIsNarrowMobile, useIsWideLayout } from "@/hooks/useIsMobile";
+import { installGlobalScrollbarVisibility } from "@/lib/scrollbar-visibility";
+import { useIsMobile, useIsNarrowMobile } from "@/hooks/useIsMobile";
 import { useViewportHeight } from "@/hooks/useViewportHeight";
+import { useResizablePanel } from "@/hooks/useResizablePanel";
 import { useAudio } from "@/hooks/useAudio";
 import { copyText } from "@/lib/clipboard";
 import { sendAgentCommand } from "@/lib/agent-client";
@@ -105,9 +105,17 @@ import {
   type KeepAliveSlot,
 } from "@/lib/chat-keepalive";
 import { clearLastOpen, getLastOpenSession, setLastOpenSession, workspaceKeyOf } from "@/lib/workspace-memory";
-import { readPanelLayout, writePanelLayout } from "@/lib/panel-layout";
-import { COLUMN_RESIZE_HANDLE_CLASS } from "@/lib/resize-handles";
-import type { GroupImperativeHandle, PanelImperativeHandle } from "react-resizable-panels";
+import {
+  getDefaultRightPanelWidth,
+  getRightPanelMaxWidth,
+  getSidebarMaxWidth,
+  RIGHT_PANEL_FALLBACK_WIDTH,
+  RIGHT_PANEL_MAX_WIDTH,
+  RIGHT_PANEL_MIN_WIDTH,
+  SIDEBAR_DEFAULT_WIDTH,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+} from "@/lib/panel-layout";
 import { skillExpansionToCommand } from "@/lib/slash-display";
 import type { BlockingExtensionUiRequest, SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { McpErrorResponse, ProjectTrustStatus } from "@/lib/api-types";
@@ -404,59 +412,59 @@ export function AppShell() {
   }, [rightPanelOpen, isMobile]);
   const [mobileToolbarMoreOpen, setMobileToolbarMoreOpen] = useState(false);
   const moreControlsLabel = mobileToolbarMoreOpen ? translate("chat.close") : translate("chat.moreControls");
-  const isWideLayout = useIsWideLayout();
-  // 三列比例只属于「桌面三栏都展开」这一种状态：手机/窄屏把对话列收掉、文件面板
-  // 占整行，全宽时也一样。这些布局不该写进存储，否则回到桌面时对话列会被恢复成 0。
-  const panelLayoutPersistable = isWideLayout && !isMobile && sidebarOpen && rightPanelOpen && !rightPanelFullWidth;
-  const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
-  const chatPanelRef = useRef<PanelImperativeHandle | null>(null);
-  const filesPanelRef = useRef<PanelImperativeHandle | null>(null);
-  const layoutGroupRef = useRef<GroupImperativeHandle | null>(null);
-  // 三列的开合由面板的 collapse/expand 表达：侧栏跟开关，文件面板跟自身开关；
-  // 窄屏与全宽把对话列收起，让文件面板占满整行。
-  useEffect(() => {
-    const sidebar = sidebarPanelRef.current;
-    const chat = chatPanelRef.current;
-    const files = filesPanelRef.current;
-    if (!sidebar || !chat || !files) return;
-    if (!isMobile && sidebarOpen && !rightPanelFullWidth) sidebar.expand();
-    else sidebar.collapse();
-    if (!rightPanelOpen) {
-      // 先让对话列回到原位，再收文件面板：顺序反了时 chat.expand() 会按文件面板的
-      // minSize="18%" 重新分配宽度，右侧留下 18% 的空白列。
-      chat.expand();
-      files.collapse();
-      if (!isWideLayout) chat.resize("100%");
-      return;
-    }
-    files.expand();
-    if (!isWideLayout || rightPanelFullWidth) {
-      chat.collapse();
-      files.resize("100%");
-      return;
-    }
-    chat.expand();
-    // expand() 直接回到收起前那一档比例（默认 32%，用户拖过的则是他拖到的值），
-    // 不再用 resize，避免把 0 当成记住的宽度。
-    files.expand();
-  }, [isMobile, isWideLayout, rightPanelFullWidth, rightPanelOpen, sidebarOpen]);
-  // 拖过的比例只在桌面三栏都展开时恢复：服务端渲染读不到 localStorage，而窄屏与
-  // 全宽下的布局（对话列收起）不是用户拖出来的那一份。挂载时恢复还会把手机上刚收好的
-  // 对话列重新撑开，于是出现三栏分栏。
-  useEffect(() => {
-    if (!panelLayoutPersistable) return;
-    const stored = readPanelLayout();
-    if (stored) layoutGroupRef.current?.setLayout(stored);
-  }, [panelLayoutPersistable]);
-  // 窄屏与全宽时文件面板盖住整行，Esc 是它唯一的退出口。
-  useEffect(() => {
-    if (!rightPanelOpen || isWideLayout) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setRightPanelOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isWideLayout, rightPanelOpen]);
+  const sidebarWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH);
+  const rightPanelWidthRef = useRef(RIGHT_PANEL_FALLBACK_WIDTH);
+  const getResponsiveRightPanelWidth = useCallback(
+    () => typeof window === "undefined"
+      ? RIGHT_PANEL_FALLBACK_WIDTH
+      : getDefaultRightPanelWidth(window.innerWidth),
+    [],
+  );
+  const getResponsiveSidebarMaxWidth = useCallback(
+    () => typeof window === "undefined"
+      ? SIDEBAR_MAX_WIDTH
+      : getSidebarMaxWidth({
+        viewportWidth: window.innerWidth,
+        rightPanelOpen,
+        rightPanelWidth: rightPanelWidthRef.current,
+      }),
+    [rightPanelOpen],
+  );
+  const getResponsiveRightPanelMaxWidth = useCallback(
+    () => typeof window === "undefined"
+      ? RIGHT_PANEL_MAX_WIDTH
+      : getRightPanelMaxWidth({
+        viewportWidth: window.innerWidth,
+        sidebarOpen,
+        sidebarWidth: sidebarWidthRef.current,
+      }),
+    [sidebarOpen],
+  );
+  const sidebarResizer = useResizablePanel({
+    ariaLabel: translate("layout.resizeSidebar"),
+    cssVariable: "--sidebar-width",
+    defaultWidth: SIDEBAR_DEFAULT_WIDTH,
+    getMaxWidth: getResponsiveSidebarMaxWidth,
+    growthDirection: "right",
+    maxWidth: SIDEBAR_MAX_WIDTH,
+    minWidth: SIDEBAR_MIN_WIDTH,
+    storageKey: "pi-sidebar-width",
+    widthRef: sidebarWidthRef,
+  });
+  const rightPanelResizer = useResizablePanel({
+    ariaLabel: translate("layout.resizeFilePanel"),
+    cssVariable: "--right-panel-width",
+    defaultWidth: RIGHT_PANEL_FALLBACK_WIDTH,
+    getDefaultWidth: getResponsiveRightPanelWidth,
+    getMaxWidth: getResponsiveRightPanelMaxWidth,
+    growthDirection: "left",
+    maxWidth: RIGHT_PANEL_MAX_WIDTH,
+    minWidth: RIGHT_PANEL_MIN_WIDTH,
+    storageKey: "pi-right-panel-width",
+    widthRef: rightPanelWidthRef,
+  });
+  const reclampSidebarWidth = sidebarResizer.reclampWidth;
+  const reclampRightPanelWidth = rightPanelResizer.reclampWidth;
   // On mobile the sidebar is an overlay drawer; hide it by default so the chat
   // is visible on load. Runs once the breakpoint resolves after hydration.
   // Mobile drawer actions must not change the remembered desktop preference.
@@ -469,6 +477,17 @@ export function AppShell() {
   useEffect(() => {
     if (isMobile && !sidebarOpen) toast.dismiss();
   }, [isMobile, sidebarOpen]);
+  // 两列宽度随视口与开关状态重新钳制：面板为 flex-shrink:0，窗口变窄或展开侧栏后
+  // 若不重钳，旧宽度会把聊天列挤成细条（聊天列始终保留 DESKTOP_CHAT_MIN_WIDTH）。
+  useEffect(() => {
+    const reclamp = () => {
+      reclampSidebarWidth();
+      reclampRightPanelWidth();
+    };
+    reclamp();
+    window.addEventListener("resize", reclamp);
+    return () => window.removeEventListener("resize", reclamp);
+  }, [reclampRightPanelWidth, reclampSidebarWidth, rightPanelOpen, sidebarOpen]);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   // `/side <prompt>`: the text that seeds the side chat's composer, until its panel consumes it.
   const [pendingQuotePrompt, setPendingQuotePrompt] = useState<{ sessionId: string; text: string } | null>(null);
@@ -2396,68 +2415,39 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         the body, at the viewport's bottom-right, outside the drawer's
         transform below. */}
     <Toaster />
-    {/* 壳层：一大片页面底色，侧栏浮在上面（透明背景），中间与右边各是一张
-        圆角卡片。三列的宽度与开合由 Resizable 组承担。 */}
+    {/* dashboard-01 壳层组合：SidebarProvider 供 SidebarTrigger 使用，开关状态仍由本组件受控；
+        可拖拽宽度通过 --sidebar-width 注入。 */}
     <SidebarProvider
+      ref={sidebarResizer.panelRef}
       className="app-shell overflow-hidden"
+      style={{ "--sidebar-width": `${sidebarResizer.width}px` } as React.CSSProperties}
       open={sidebarOpen}
       onOpenChange={(next: boolean) => { if (next !== sidebarOpen) handleSidebarToggle(); }}
     >
-    <ResizablePanelGroup
-      id="app-shell-layout"
-      groupRef={layoutGroupRef}
-      orientation="horizontal"
-      onLayoutChanged={(layout) => {
-        if (panelLayoutPersistable) writePanelLayout(layout);
-      }}
-      className="h-[100dvh] w-full"
-    >
-    <ResizablePanel
-      id="sidebar"
-      panelRef={sidebarPanelRef}
-      defaultSize="20%"
-      minSize="14%"
-      maxSize="32%"
-      collapsible
-      collapsedSize="0%"
-      className="min-w-0"
-      style={{ height: "100%", overflow: "hidden" }}
-    >
+    {/* dashboard-01 壳层：Sidebar（inset 浮动形态）承载会话侧栏，手机端由原语的 Sheet 抽屉接管；
+        可拖拽宽度通过 --sidebar-width 注入，panelRef 位于 provider 根，拖拽直接写变量，不经过 React 状态。 */}
     {/* 全宽文件面板时侧栏整体不可见：面板 z-250 低于侧栏内的部分元素（品牌圆标、浮层），
         inert 只阻止交互不阻止绘制，需以 visibility 隐藏才无残留绘制。 */}
     {/* 桌面侧栏透明，浮在壳层底色上；手机抽屉是 fixed 浮层，透明就会露出下面的
-        聊天页，必须留原语的 bg-sidebar 底色——className 会落到 Sheet 的 Content 上，
-        twMerge 让 bg-transparent 盖掉那里的底色，故只在桌面传。 */}
-    <Sidebar
-      side="left"
-      collapsible={isMobile ? "offcanvas" : "none"}
-      id="session-sidebar"
-      inert={rightPanelFullWidth}
-      className={cn("h-full w-full min-w-0", !isMobile && "bg-transparent", rightPanelFullWidth && "invisible")}
-    >
+        聊天页，必须留原语的 bg-sidebar 底色。className 会落到侧栏容器上，加 w-full
+        会把 w-(--sidebar-width) 盖掉（侧栏铺满整屏），故只传透明与隐藏。 */}
+    <Sidebar side="left" variant="inset" collapsible="offcanvas" id="session-sidebar" inert={rightPanelFullWidth} className={cn(!isMobile && "bg-transparent", rightPanelFullWidth && "invisible")}>
       {sidebarContent}
+      {/* 桌面拖拽手柄横跨侧栏右缘：panel-resize-handle 的基础规则为无层 CSS（position: relative），
+          故外层包工具类定位；手机端由 Sheet 接管，不渲染。 */}
+      <div className="absolute inset-y-0 -right-1.5 z-20 hidden w-3 min-[641px]:block">
+        <div
+          {...sidebarResizer.separatorProps}
+          inert={rightPanelFullWidth}
+          aria-controls="session-sidebar"
+          className={`panel-resize-handle sidebar-resize-handle h-full w-full${sidebarResizer.isResizing ? " is-resizing" : ""}`}
+          data-resize-handle="sidebar"
+          title={`${translate("layout.resizeSidebar")}: ${translate("layout.resizeHint")}`}
+        />
+      </div>
     </Sidebar>
-    </ResizablePanel>
-    <ResizableHandle
-      aria-label={translate("layout.resizeSidebar")}
-      title={`${translate("layout.resizeSidebar")}: ${translate("layout.resizeHint")}`}
-      className={cn(COLUMN_RESIZE_HANDLE_CLASS, (isMobile || !sidebarOpen || rightPanelFullWidth) && "hidden")}
-    />
-    {/* 中间：桌面留白 + 圆角卡片；手机整屏铺满，不加留白与卡片外框。
-        面板必须可折叠：手机/窄屏与文件面板全宽时靠 collapse() 把对话列收成 0，
-        非 collapsible 的面板 collapse() 是空操作，会剩下一条 30%（minSize）的分栏。 */}
-    <ResizablePanel
-      id="chat"
-      panelRef={chatPanelRef}
-      minSize="30%"
-      collapsible
-      collapsedSize="0%"
-      className="min-w-0"
-      style={{ height: "100%", overflow: "hidden" }}
-    >
-    <div className={cn("h-full min-h-0", !isMobile && "p-2")}>
     <SidebarInset
-      className={cn("h-full w-full min-w-0 overflow-hidden bg-background", !isMobile && "rounded-xl border border-border shadow-sm")}
+      className="h-full min-w-0 overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] min-[641px]:h-[calc(100dvh-16px)]"
     >
         {/* Top bar with sidebar toggle */}
         {/* Verified 2026-09-23: without a sticky top bar iOS reinstates the
@@ -2883,28 +2873,35 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
 
     </div>
     </SidebarInset>
-    </div>
-    </ResizablePanel>
-    <ResizableHandle
-      aria-label={translate("layout.resizeFilePanel")}
-      title={`${translate("layout.resizeFilePanel")}: ${translate("layout.resizeHint")}`}
-      className={cn(COLUMN_RESIZE_HANDLE_CLASS, rightPanelOpen && isWideLayout && !rightPanelFullWidth ? "" : "hidden")}
-    />
-    {/* 右边：与中间同样的桌面留白 + 圆角卡片；手机同样整屏铺满。 */}
-    <ResizablePanel
-      id="files"
-      panelRef={filesPanelRef}
-      defaultSize="32%"
-      minSize="18%"
-      collapsible
-      collapsedSize="0%"
-      className="min-w-0"
-      style={{ height: "100%", overflow: "hidden" }}
-    >
-      <div className={cn("h-full min-h-0", !isMobile && "p-2 pl-0")}>
       <div
+        aria-hidden="true"
+        className={`right-panel-overlay-backdrop${rightPanelOpen ? " is-open" : ""}`}
+        onClick={() => setRightPanelOpen(false)}
+      />
+      {rightPanelOpen && (
+        <div
+          {...rightPanelResizer.separatorProps}
+          inert={rightPanelFullWidth}
+          aria-controls="file-panel"
+          className={`panel-resize-handle right-panel-resize-handle${rightPanelResizer.isResizing ? " is-resizing" : ""}`}
+          data-resize-handle="right-panel"
+          title={`${translate("layout.resizeFilePanel")}: ${translate("layout.resizeHint")}`}
+        />
+      )}
+
+      {/* Right panel: file viewer — a floating card like the chat page (same
+          inset + radius + shadow come from the .right-panel-container rules),
+          a sibling of SidebarInset at full height. Always mounted; width
+          animated via CSS. */}
+      <div
+        ref={rightPanelResizer.panelRef}
         id="file-panel"
-        className={cn("flex h-full min-h-0 flex-col overflow-hidden bg-background", !isMobile && "rounded-xl border border-border shadow-sm")}
+        className={cn(
+          `right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelFullWidth ? " right-panel-full-width" : ""}${rightPanelResizer.isResizing ? " right-panel-resizing" : ""}`,
+          "flex h-full flex-col bg-background",
+        )}
+        // 可拖拽宽度通过 CSS 变量注入（useResizablePanel 写 --right-panel-width），故保留 inline style。
+        style={{ "--right-panel-width": `${rightPanelResizer.width}px` } as React.CSSProperties}
       >
         {/* Right panel tab bar — the draft's 46px bar with pill tabs. */}
         <div className="flex h-[calc(46px_+_env(safe-area-inset-top))] shrink-0 items-center border-b border-border bg-background pt-[env(safe-area-inset-top)]">
@@ -3052,9 +3049,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           )}
         </div>
       </div>
-      </div>
-    </ResizablePanel>
-    </ResizablePanelGroup>
     </SidebarProvider>
     {settingsSection && (
       <SettingsPanel

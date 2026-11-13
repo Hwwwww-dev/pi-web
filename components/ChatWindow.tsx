@@ -827,8 +827,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     };
   }, []);
 
-  // 键盘收起由壳层整体位移实现（`.app-shell` 的 translate3d），列表布局高度不变，
-  // 贴底跟随自然停在原位；此处不再额外平滑滚动，以免与壳层位移争用同一帧。
+  // 键盘升起时 html/body 不缩高：由 iOS 自己 pan visual viewport，整个界面连带页头
+  // 一起上移。这里不插手滚动，避免与浏览器自己的贴底争同一帧。
 
   // 键盘弹起时不写回滚动位置：官方 scroller 自行区分贴尾与浏览历史，手动回写
   // scrollTop/window.scrollY 会在视口缩高的那一帧把列表拉回。
@@ -2003,6 +2003,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         document.body,
       )}
 
+      {/* 底部停靠区：扩展状态行、排队条与输入框。 */}
       <div className={cn("relative flex min-h-0 flex-col shrink-0", CHAT_PAGE_GUTTER_CLASS)}>
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the

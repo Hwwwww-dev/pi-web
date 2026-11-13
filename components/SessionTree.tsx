@@ -673,7 +673,7 @@ const SessionRowView = memo(function SessionRowView({
     // 草稿的绿色呼吸点，与未读点同一套光环。
     statusDot = (
       <span
-        className="relative size-1.5 shrink-0 rounded-full bg-status-unread after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-status-unread after:opacity-35 motion-reduce:after:animate-none"
+        className="relative inline-block size-[7px] shrink-0 rounded-full bg-success after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-success after:opacity-35 motion-reduce:after:animate-none"
         role="img"
         aria-label={t("sidebar.agentRunning")}
       />
@@ -682,7 +682,7 @@ const SessionRowView = memo(function SessionRowView({
   } else if (status.unread) {
     statusDot = (
       <span
-        className="relative size-1.5 shrink-0 rounded-full bg-status-unread after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-status-unread after:opacity-35 motion-reduce:after:animate-none"
+        className="relative inline-block size-[7px] shrink-0 rounded-full bg-status-unread after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-status-unread after:opacity-35 motion-reduce:after:animate-none"
         role="img"
         aria-label={t("sidebar.newSessionActivity")}
       />
@@ -690,7 +690,9 @@ const SessionRowView = memo(function SessionRowView({
     statusTitle = t("sidebar.newActivity");
   }
 
-  const dotLeft = context === "pinned" ? "left-[10px]" : "left-[22px]";
+  // 行首的状态点：横向与分组标题的展开箭头同一条中心线（箭头 13px、位于行内 4px，
+  // 中心 10.5px；点 6px，left 7px 即中心 10px），所以固定行与会话行共用一个值。
+  const dotLeft = "left-[7px]";
   const meta = context === "pinned"
     ? <span className="inline-block max-w-[70px] truncate align-bottom">{row.project.name}</span>
     : formatShortRelativeTime(family.latestModified, locale, nowDate);
@@ -763,11 +765,10 @@ const SessionRowView = memo(function SessionRowView({
       onContextMenu={(event) => handlers.current.onRowContextMenu(row, event)}
     >
       {statusDot && (
-        // 行首的状态点：落在行的缩进末端、标题前 4px（子会话/归档行缩进 32px →
-        // left 22px，固定行缩进 20px → left 10px），不占标题的宽度，子会话的点
-        // 也不跟着缩进漂移。
+        // 行首的状态点：落在行的缩进末端、标题前，不占标题的宽度，子会话的点
+        // 也不跟着缩进漂移。垂直方向比行中线高 1px，压住笔画的那点视觉重量。
         <span
-          className={`absolute top-1/2 ${dotLeft} z-10 -translate-y-1/2`}
+          className={`absolute top-[calc(50%-1px)] ${dotLeft} z-10 -translate-y-1/2`}
           title={statusTitle}
         >
           {statusDot}

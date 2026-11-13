@@ -335,20 +335,32 @@ html.dark .catppuccin-file-icon {
   background-image: var(--catppuccin-icon-dark);
 }
 
-/* 键盘动画期间不使用高度动画：高度逐帧变化会使整条消息列表重排（上千条消息），叠加
-   ChatMinimap 的 content ResizeObserver 即掉帧。故改为整体位移：壳层保持满高，transform
-   只提交合成层、零重排，--keyboard-inset 由 hooks/useViewportHeight.ts 逐帧写入；portal
-   到 body 的弹层仍按 --app-viewport-height 的实时值定尺。 */
-.app-shell {
-  transform: translate3d(0, calc(-1 * var(--keyboard-inset, 0px)), 0);
+/* iOS standalone PWA 的键盘会直接缩小 WKWebView 边界（clientHeight 844→508）。
+   键盘期把 html/body/.app-shell 高度钉在全高水位（--keyboard-full-height，px 常量，
+   hooks/useViewportHeight.ts 写入）：文档因此比缩小后的视口多出键盘那一截，iOS
+   会按它自己的键盘动画原生滚动 scrollView 把聚焦输入框滚到键盘上沿——整个页面
+   （含页头）被原生推上去、原生滑回，无任何 JS 动画。
+   绝不要加 transform/位移去"帮忙"：iOS 按未变换的布局位置算滚动量，壳层一旦被
+   移走，滚到的窗口下半就是空的——那正是白屏（9330e20d）。也绝不要让高度跟随
+   dvh 缩小：文档与视口等高，iOS 无处可滚，页头永远钉在顶部。
+   `data-keyboard-open` 供底部安全区相关规则使用（.chat-content、.chat-input-shell、
+   .terminal-extra-keys、侧栏 Sheet）。 */
+html[data-keyboard-open],
+html[data-keyboard-open] body {
+  height: var(--keyboard-full-height, 100dvh);
 }
 
-/* 壳层上移时抵消页头位移：页头保留在屏幕顶部，消息列表从其下方穿过，
-   同时保持 topBarRef 的 client rect（Popover 锚点依赖它定位）。iOS 为了让
-   输入框可见会把可视视口整体下移（--keyboard-pan = visualViewport.offsetTop），
-   这段位移同样作用在页头上，故一并抵消。 */
-.app-top-bar {
-  transform: translate3d(0, calc(var(--keyboard-inset, 0px) + var(--keyboard-pan, 0px)), 0);
+/* 移动端给壳层定高：主列/右列改为 h-full 后，百分比需要可解析的父高（键盘期
+   由上面的 px 钉高接管，静止时是 100dvh）。桌面 inset 形态由
+   min-[641px]:h-[calc(100dvh-16px)] 自带高度，不走这条。 */
+@media (max-width: 640px) {
+  .app-shell {
+    height: 100dvh;
+  }
+}
+
+html[data-keyboard-open] .app-shell {
+  height: var(--keyboard-full-height, 100dvh);
 }
 
 /* Use the SVG alpha channel as a mask so file icons follow the app's
@@ -636,6 +648,13 @@ html[data-keyboard-open] .terminal-extra-keys {
  * fade is driven by --sb-alpha, a number lib/scrollbar-visibility.ts ramps
  * between 0 and 1 on the container each animation frame.
  */
+/* --sb-alpha is set inline per lit container, and custom properties inherit;
+   a direct declaration beats inheritance, so this reset keeps a lit
+   ancestor's value from lighting every nested scroller below it. The lit
+   container itself keeps its inline value: inline styles win over this rule. */
+* {
+  --sb-alpha: 0;
+}
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -1347,13 +1366,17 @@ span.token.table {
   touch-action: none;
   outline: none;
 }
+/* The visible mark is a short centred segment, not a full-length rule: it reads
+   as a grab handle at the panel's edge instead of a second separator. */
 .panel-resize-handle::after {
   content: "";
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: 50%;
   left: 5px;
   width: 2px;
+  height: 40px;
+  transform: translateY(-50%);
+  border-radius: 1px;
   pointer-events: none;
   background: transparent;
   transition: background 0.12s ease;
@@ -1377,12 +1400,25 @@ span.token.table {
 }
 
 .panel-resize-handle.sidebar-files-resize-handle::after {
-  top: 5px;
-  right: 0;
-  bottom: auto;
-  left: 0;
-  width: auto;
+  top: 50%;
+  left: 50%;
+  width: 40px;
   height: 2px;
+  transform: translate(-50%, -50%);
+}
+
+/* The file panel's handle belongs to the wide split layout only; between 641 and
+   959 the panel floats over the chat, so there is nothing to drag. Written here
+   because Tailwind does not generate the `min-[961px]:block` arbitrary variant
+   this element used to rely on, which left it display:none at every width. */
+.right-panel-resize-handle {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .right-panel-resize-handle {
+    display: block;
+  }
 }
 .right-panel-overlay-backdrop {
   display: none;
@@ -1395,7 +1431,7 @@ span.token.table {
     overflow: hidden;
     transition: width 0.2s ease, min-width 0.2s ease, margin-right 0.2s ease;
     flex-shrink: 0;
-    height: calc(100dvh - 16px);
+    height: calc(var(--app-viewport-height, 100dvh) - 16px);
     margin: 8px 8px 8px 0;
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
@@ -1492,7 +1528,7 @@ span.token.table {
   .right-panel-container {
     position: fixed;
     inset: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
-    height: 100dvh;
+    height: var(--app-viewport-height, 100dvh);
     z-index: 250;
     overflow: hidden;
     transition: transform 0.2s ease;
@@ -1626,6 +1662,7 @@ span.token.table {
     display: none !important;
   }
 }
+
 
 
 /* t/s > 120 的徽章：文字恒白，背景为密排的流动彩虹渐变。周期 70px、亮度 0.70、饱和 0.25、

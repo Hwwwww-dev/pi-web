@@ -53,34 +53,3 @@ export function getRightPanelMaxWidth(options: {
     viewportWidth - DESKTOP_CHAT_MIN_WIDTH - visibleSidebarWidth - DESKTOP_SCROLLBAR_ALLOWANCE,
   );
 }
-
-/** Panel id → share of the split, as react-resizable-panels reports it. */
-export type PanelLayout = Record<string, number>;
-
-const PANEL_LAYOUT_STORAGE_KEY = "pi-web:panel-layout";
-
-export function readPanelLayout(): PanelLayout | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const stored = window.localStorage.getItem(PANEL_LAYOUT_STORAGE_KEY);
-    if (!stored) return null;
-    const parsed: unknown = JSON.parse(stored);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const layout: PanelLayout = {};
-    for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof value === "number" && Number.isFinite(value)) layout[id] = value;
-    }
-    return Object.keys(layout).length > 0 ? layout : null;
-  } catch {
-    return null;
-  }
-}
-
-export function writePanelLayout(layout: PanelLayout): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(PANEL_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
-  } catch {
-    // Resizing stays available when storage is unavailable.
-  }
-}

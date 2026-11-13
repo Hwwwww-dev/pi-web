@@ -3,197 +3,136 @@
 import { useEffect } from "react";
 
 /**
- * How far the shell has to slide up for its bottom edge to sit on the visible
- * viewport: the rendered shell height minus what the keyboard hides. The pan
- * counts separately: `visualViewport.offsetTop` grows when iOS shifts the
- * visible part down to reveal the focused field, and that shift already moved
- * the shell, so counting it twice would overshoot. Measuring the shell itself
- * keeps every platform correct — iOS standalone keeps 100dvh at the full
- * height while the keyboard covers it, Android's resizes-content already
- * shrank both, and an installed app's bottom bar leaves a few pixels.
+ * 水位跟随规则：未聚焦且 1s 内无焦点变化时跟随当前布局高。否则冻结——
+ * 聚焦期布局可能被键盘缩小；失焦后 1s 内是边界回涨的收起动画窗口。
+ * 必须有这条跟随：启动瞬间可能读到虚高的 clientHeight（如状态栏挤占生效前），
+ * 虚高水位会让"布局 < 水位"永远成立，键盘期永远退不出来——高度钉住摘不掉、
+ * 文档多出一段滚动量，顶栏被推走回不来、输入框沉底。
  */
-export function viewportInset({ shellHeight, visibleHeight, pan = 0 }: { shellHeight: number; visibleHeight: number; pan?: number }): number {
-  return Math.max(0, Math.round(shellHeight - visibleHeight - pan));
+export function nextFullHeight({
+  fullHeight,
+  layoutHeight,
+  focused,
+  recentlyFocused,
+}: {
+  fullHeight: number;
+  layoutHeight: number;
+  focused: boolean;
+  recentlyFocused: boolean;
+}): number {
+  // 0 = 未知（首次/转屏后重学）：无条件采用当前布局高。
+  if (fullHeight === 0) return layoutHeight;
+  // 键盘缩小的布局永远不配当水位：键盘收缩幅度 ~55%，虚高噪声 ~7%。若把缩小的
+  // 383 学成水位，钉高塌到 383，滚动量归零——顶栏推不出去且闪（焦点被 IME/附件
+  // 栏瞬时吃掉时真的会发生）。只跟随“未聚焦 + 1s 内无焦点事件 + 幅度 <30%”的静止变化。
+  if (!focused && !recentlyFocused && layoutHeight >= Math.round(fullHeight * 0.7)) {
+    return layoutHeight;
+  }
+  return fullHeight;
 }
 
-/** Below this the visual viewport moved for its own reasons — collapsing
- * browser chrome, a scroll gesture — not because a keyboard opened. */
-const KEYBOARD_MIN_INSET = 80;
+/** 键盘期判定：聚焦中，或布局仍比全高水位矮（收起动画未结束）。 */
+export function isKeyboardPeriod({
+  layoutHeight,
+  fullHeight,
+  focused,
+}: {
+  layoutHeight: number;
+  fullHeight: number;
+  focused: boolean;
+}): boolean {
+  return focused || layoutHeight < fullHeight - 1;
+}
 
-interface KeyboardLayoutState {
-  open: boolean;
-  inset: number;
-  pan: number;
-  visibleHeight: number;
+function isEditableElement(element: Element | null): boolean {
+  return element instanceof HTMLElement
+    && (element.isContentEditable
+      || element.tagName === "INPUT"
+      || element.tagName === "TEXTAREA"
+      || element.tagName === "SELECT");
 }
 
 /**
- * Writes the keyboard layout onto :root, skipping writes that change nothing:
- * the keyboard animation streams one resize event per frame, and each write
- * invalidates style.
- */
-function writeKeyboardLayout(root: HTMLElement, state: KeyboardLayoutState, next: KeyboardLayoutState): void {
-  if (next.inset !== state.inset) {
-    state.inset = next.inset;
-    if (next.inset === 0) root.style.removeProperty("--keyboard-inset");
-    else root.style.setProperty("--keyboard-inset", `${next.inset}px`);
-  }
-  if (next.pan !== state.pan) {
-    state.pan = next.pan;
-    if (next.pan === 0) root.style.removeProperty("--keyboard-pan");
-    else root.style.setProperty("--keyboard-pan", `${next.pan}px`);
-  }
-  if (next.visibleHeight !== state.visibleHeight) {
-    state.visibleHeight = next.visibleHeight;
-    if (next.visibleHeight === 0) root.style.removeProperty("--app-viewport-height");
-    else root.style.setProperty("--app-viewport-height", `${next.visibleHeight}px`);
-  }
-  if (next.open !== state.open) {
-    state.open = next.open;
-    if (next.open) root.dataset.keyboardOpen = "true";
-    else delete root.dataset.keyboardOpen;
-  }
-}
-
-function hasFocusedEditableElement(): boolean {
-  const activeElement = document.activeElement;
-  if (!(activeElement instanceof HTMLElement)) return false;
-
-  return activeElement.isContentEditable
-    || activeElement.tagName === "INPUT"
-    || activeElement.tagName === "SELECT"
-    || activeElement.tagName === "TEXTAREA";
-}
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement
-    && (target.isContentEditable
-      || target.tagName === "INPUT"
-      || target.tagName === "TEXTAREA");
-}
-
-/**
- * Keep the app height aligned with the visual viewport while a mobile keyboard
- * is open. iOS standalone PWAs can leave 100dvh at the layout viewport height,
- * which puts the composer behind the keyboard and may scroll the page itself.
+ * iOS standalone PWA 的键盘会直接缩小 WKWebView 边界（clientHeight 844→508）。
+ * 本钩子只做一件事：把全高水位写进 --keyboard-full-height，CSS 在键盘期
+ * （data-keyboard-open）把 html/body/.app-shell 钉在这个 px 常量上——文档因此
+ * 比缩小后的视口多出键盘那一截，iOS 会按它自己的键盘动画原生滚动 scrollView
+ * 把聚焦输入框滚到键盘上沿，整个页面（含页头）被原生推上去、原生滑回。
+ *
+ * 绝不要加 transform/位移去"帮忙"：iOS 按未变换的布局位置算滚动量，壳层一旦
+ * 被移走，滚到的窗口下半就是空的——那就是白屏。也绝不要让高度跟随 dvh 缩小
+ * （文档与视口等高，iOS 无处可滚，页头永远钉在顶部）。
+ *
+ * Safari 普通标签页与桌面端布局不缩：水位恒等于当前高，属性只在聚焦时短暂
+ * 存在，无任何视觉效果。
  */
 export function useViewportHeight(): void {
   useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-
     const root = document.documentElement;
-    let frameId: number | null = null;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
-    // Last written values, so a per-frame resize pass does not invalidate style
-    // when nothing changed.
-    const layoutState: KeyboardLayoutState = { open: false, inset: 0, pan: 0, visibleHeight: 0 };
+    // 0 = 未知：第一次静止同步立即跟随真实布局高，不用挂载瞬间的可能虚高值。
+    let fullHeight = 0;
+    let lastFocusAt = -Infinity;
+    let frame = 0;
 
-    const update = () => {
-      frameId = null;
-      const visibleHeight = Math.min(document.documentElement.clientHeight, viewport.height);
-      // 采用壳层实际渲染高度而非 100dvh / clientHeight：壳层高度即布局真值，
-      // 位移量为壳层高度与可视高度之差。键盘、底部工具条、PWA 状态栏均由该值覆盖。
-      const shell = document.querySelector<HTMLElement>(".app-shell");
-      const shellHeight = shell?.getBoundingClientRect().height ?? document.documentElement.clientHeight;
-      const typing = hasFocusedEditableElement() && Math.abs(viewport.scale - 1) < 0.01;
-      // iOS reports a short height mid-animation while it pans further down to
-      // reveal the focused field; the pan cancels that dip, so the inset tracks
-      // the keyboard instead of dipping and snapping back.
-      const covered = viewportInset({ shellHeight, visibleHeight, pan: viewport.offsetTop });
-      const inset = typing && covered > KEYBOARD_MIN_INSET ? covered : 0;
-      writeKeyboardLayout(root, layoutState, {
-        open: inset > 0,
-        inset,
-        pan: inset > 0 ? Math.round(viewport.offsetTop) : 0,
-        visibleHeight,
+    const sync = () => {
+      frame = 0;
+      const layoutHeight = root.clientHeight;
+      const focused = isEditableElement(document.activeElement);
+      const recentlyFocused = Date.now() - lastFocusAt < 1000;
+      const keyboardPeriod = isKeyboardPeriod({
+        layoutHeight,
+        fullHeight,
+        focused,
       });
-
-      const pageWasShifted = window.scrollX !== 0 || window.scrollY !== 0;
-      const isUnscaled = Math.abs(viewport.scale - 1) < 0.01;
-      if (pageWasShifted && isUnscaled) {
-        window.scrollTo(0, 0);
-      }
+      fullHeight = nextFullHeight({
+        fullHeight,
+        layoutHeight,
+        focused,
+        recentlyFocused,
+      });
+      root.style.setProperty("--keyboard-full-height", `${fullHeight}px`);
+      if (keyboardPeriod || focused) root.dataset.keyboardOpen = "true";
+      else delete root.dataset.keyboardOpen;
     };
 
-    // WebKit can dispatch the resize event before visualViewport.height has
-    // settled, especially when an installed PWA dismisses the keyboard. Reading
-    // it on the next animation frame prevents the keyboard-height CSS value
-    // from remaining after the keyboard has closed. The keyboard's own animation
-    // streams resize events frame by frame, so each one also applies straight
-    // away: waiting for a frame would lag a frame behind the keyboard all the
-    // way down, which reads as judder.
-    const scheduleUpdate = () => {
-      update();
-      if (frameId !== null) window.cancelAnimationFrame(frameId);
-      frameId = window.requestAnimationFrame(update);
+    const scheduleSync = () => {
+      if (!frame) frame = requestAnimationFrame(sync);
     };
 
-    // iOS PWAs can settle the keyboard layout without ever dispatching the
-    // trailing visualViewport events, so nothing recomputes until the next
-    // user gesture shifts the viewport. Poll briefly after an editable gains
-    // focus: the keyboard animation finishes within ~300ms, so a few checks
-    // catch the shrunken viewport without waiting for events that may never come.
-    const stopKeyboardPoll = () => {
-      if (pollTimer !== null) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
+    const handleFocusChange = () => {
+      lastFocusAt = Date.now();
+      scheduleSync();
     };
-    const startKeyboardPoll = () => {
-      stopKeyboardPoll();
-      let checks = 0;
-      pollTimer = setInterval(() => {
-        scheduleUpdate();
-        if (++checks >= 12) stopKeyboardPoll();
-      }, 50);
+    const handleOrientationChange = () => {
+      // 转屏后旧水位必然失真，置 0 强制重学（键盘开着转屏也走这里）。
+      fullHeight = 0;
+      scheduleSync();
     };
 
-    // IME candidate bars can resize the keyboard without any visualViewport
-    // event; restarting the focus poll from input activity covers those.
-    const onEditableActivity = () => {
-      if (!hasFocusedEditableElement()) return;
-      startKeyboardPoll();
-    };
-    const handleFocusIn = (event: FocusEvent) => {
-      if (isEditableTarget(event.target)) startKeyboardPoll();
-      scheduleUpdate();
-    };
-    const handleFocusOut = () => {
-      stopKeyboardPoll();
-      scheduleUpdate();
-    };
-
-    scheduleUpdate();
-    viewport.addEventListener("resize", scheduleUpdate);
-    viewport.addEventListener("scroll", scheduleUpdate);
-    window.addEventListener("resize", scheduleUpdate);
-    window.addEventListener("focusin", handleFocusIn);
-    window.addEventListener("focusout", handleFocusOut);
-    window.addEventListener("pageshow", scheduleUpdate);
-    document.addEventListener("compositionstart", onEditableActivity);
-    document.addEventListener("compositionupdate", onEditableActivity);
-    document.addEventListener("compositionend", onEditableActivity);
-    document.addEventListener("input", onEditableActivity);
-    document.addEventListener("keyup", onEditableActivity);
+    sync();
+    window.addEventListener("resize", scheduleSync);
+    window.visualViewport?.addEventListener("resize", scheduleSync);
+    window.visualViewport?.addEventListener("scroll", scheduleSync);
+    window.addEventListener("focusin", handleFocusChange);
+    window.addEventListener("focusout", handleFocusChange);
+    window.addEventListener("orientationchange", handleOrientationChange);
+    window.addEventListener("pageshow", scheduleSync);
+    // 静止期水位自愈：启动早期布局变化（状态栏挤占生效前后）不发 resize 事件，
+    // 没有事件就不重测——虚高水位会卡到下次聚焦为止。1Hz 兑底，rAF 去重 + 死区，代价可忽略。
+    const restHealTimer = window.setInterval(scheduleSync, 1000);
 
     return () => {
-      viewport.removeEventListener("resize", scheduleUpdate);
-      viewport.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize", scheduleUpdate);
-      window.removeEventListener("focusin", handleFocusIn);
-      window.removeEventListener("focusout", handleFocusOut);
-      window.removeEventListener("pageshow", scheduleUpdate);
-      document.removeEventListener("compositionstart", onEditableActivity);
-      document.removeEventListener("compositionupdate", onEditableActivity);
-      document.removeEventListener("compositionend", onEditableActivity);
-      document.removeEventListener("input", onEditableActivity);
-      document.removeEventListener("keyup", onEditableActivity);
-      stopKeyboardPoll();
-      if (frameId !== null) window.cancelAnimationFrame(frameId);
-      root.style.removeProperty("--app-viewport-height");
-      root.style.removeProperty("--keyboard-inset");
-      root.style.removeProperty("--keyboard-pan");
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", scheduleSync);
+      window.visualViewport?.removeEventListener("resize", scheduleSync);
+      window.visualViewport?.removeEventListener("scroll", scheduleSync);
+      window.removeEventListener("focusin", handleFocusChange);
+      window.removeEventListener("focusout", handleFocusChange);
+      window.removeEventListener("orientationchange", handleOrientationChange);
+      window.removeEventListener("pageshow", scheduleSync);
+      window.clearInterval(restHealTimer);
+      root.style.removeProperty("--keyboard-full-height");
+      delete root.dataset.keyboardOpen;
     };
   }, []);
 }
