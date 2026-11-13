@@ -293,6 +293,13 @@ export const ChatMinimap = memo(function ChatMinimap({
       const minimapEl = containerRef.current;
       if (!scrollEl || !minimapEl) return;
 
+      // 流式期间内容每 chunk 都在长，RO 会持续触发到这里；全量测量（逐 anchor
+      // getBoundingClientRect + 全消息遍历）纯属烧 CPU，跳过（活动节点由 scroll
+      // 事件按上次测量继续同步，流结束后自然会再测）。跳转导航除外：用户明确
+      // 动作，一次性成本换准确定位。
+      const streamingMessage = getStreamingMessage();
+      if (streamingMessage && !pendingNavigationRef.current) return;
+
       const refs = messageRefs.current;
       const containerRect = scrollEl.getBoundingClientRect();
       // Turns listed from the whole-branch index sit ahead of the loaded
@@ -314,7 +321,6 @@ export const ChatMinimap = memo(function ChatMinimap({
       let currentTurn: TurnInfo | null = null;
       let compactionPending = false;
 
-      const streamingMessage = getStreamingMessage();
       const allMessages: (AgentMessage | Partial<AgentMessage>)[] = streamingMessage
         ? [...messagesRef.current, streamingMessage]
         : messagesRef.current;

@@ -18,9 +18,10 @@ import {
   MoonIcon,
   PanelRightIcon,
   PenLineIcon,
+  SettingsIcon,
   ShieldAlertIcon,
+  SlidersHorizontalIcon,
   SunIcon,
-  WrenchIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
@@ -36,6 +37,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Spinner } from "./ui/spinner";
 import { cn } from "@/lib/utils";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
@@ -48,7 +50,7 @@ import { GitPanel } from "./GitPanel";
 import { TabBar, type Tab } from "./TabBar";
 import { movePanelTab, orderPanelTabs } from "@/lib/panel-tab-order";
 import { openFileTab, saveFileViewerState, saveParkedFileViewerState, switchFileWorkspace, type ParkedFileWorkspace } from "./file-tab-state";
-import { SettingsPanel, SettingsSectionIcon } from "./SettingsPanel";
+import { SettingsPanel } from "./SettingsPanel";
 import { Toaster } from "./ui/sonner";
 import { Progress } from "./ui/progress";
 import { ProjectTrustDialog, type ProjectTrustFailure } from "./ProjectTrustDialog";
@@ -201,9 +203,9 @@ export function AppShell() {
     if (Notification.permission !== "granted") return;
     void setupPushSubscription(locale);
   }, [locale]);
-  // 全局滚动条可见性：滚轮/触摸/翻页键/悬停时给容器挂 .scrollbar-visible 并点亮，
-  // 700ms 后摘除；条形本身由 globals.css 的 overlay 规则淡入淡出。不监听 scroll：
-  // 程序化滚动（流式贴尾、跳底）不该点亮滚动条。
+  // 全局滚动条可见性：macOS 语义——只有真实手势（滚轮/触摸/滚动键）滚动了
+  // 某个容器，才点亮它的条，700ms 后淡出；条形本身由 globals.css 的 overlay
+  // 规则淡入淡出。悬停不点亮；程序化滚动（流式贴尾、跳底）永不点亮。
   useEffect(() => {
     installGlobalScrollbarVisibility();
   }, []);
@@ -596,6 +598,21 @@ export function AppShell() {
       setActiveTopPanel((panel) => panel === "agents" ? null : panel);
     }
   }, [activeSessionFamily]);
+
+  // Agents 面板打开即进入装载态：强制刷一次会话目录，目录回到（或兑底超时）
+  // 才渲染列表元素——面板里永远是"装好后"的数据，不再先弹旧列表再补。
+  const [agentsPanelLoading, setAgentsPanelLoading] = useState(false);
+  const agentsPanelOpen = activeTopPanel === "agents";
+  useEffect(() => {
+    if (!agentsPanelOpen) return;
+    setAgentsPanelLoading(true);
+    setRefreshKey((key) => key + 1);
+    const fallback = window.setTimeout(() => setAgentsPanelLoading(false), 2000);
+    return () => window.clearTimeout(fallback);
+  }, [agentsPanelOpen]);
+  useEffect(() => {
+    if (agentsPanelLoading) setAgentsPanelLoading(false);
+  }, [agentsPanelLoading, sessionCatalog]);
 
   useEffect(() => {
     if (rightPanelFullWidth) setActiveTopPanel(null);
@@ -1990,7 +2007,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           aria-label={translate("common.settings")}
           className="min-w-0 shrink justify-start gap-1.5 rounded-md px-2.5 font-medium text-muted-foreground"
         >
-          <SettingsSectionIcon section="general" size={14} strokeWidth={2} />
+          <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
           <span className="truncate">{translate("common.settings")}</span>
         </Button>
         <span
@@ -2073,10 +2090,17 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         // 此处仅负责定位（贴触发钮右缘）、宽度（AGENT_PANEL_WIDTH）与 z-500（高于引用工具栏）。
         align="end"
         sideOffset={8}
-        className="z-[500] mt-0 w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
+        className="z-[500] mt-0 min-h-[300px] w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
         style={{ "--agent-panel-width": `${AGENT_PANEL_WIDTH}px` } as React.CSSProperties}
       >
-        {activeSessionFamily && selectedSession && (
+        {agentsPanelLoading ? (
+          /* 打开即装载态：Spinner 包裹，目录刷新完成前不渲染列表元素。 */
+          <div className="flex min-h-[280px] items-center justify-center" aria-busy="true">
+            <Spinner className="size-5 text-muted-foreground" />
+          </div>
+        ) : activeSessionFamily && selectedSession ? (
+          /* 真内容淡入，不硬切：骨架→内容的替换读作过渡而非炸开。 */
+          <div className="animate-in fade-in-0 duration-200" key={selectedSession.id}>
           <AgentSessionPanel
             rootSession={activeSessionFamily.root}
             subagents={activeSessionFamily.subagents}
@@ -2088,6 +2112,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             onNewSideChat={() => handleNewSideChat(activeSessionFamily.root.id)}
             onDeleteSideChat={(sessionId) => handleDeleteSideChat(sessionId, activeSessionFamily.root)}
           />
+          </div>
+        ) : (
+          /* 家族装载前的加载态：官方 base Spinner 居中，不手搓骨架行。 */
+          <div className="flex min-h-[280px] items-center justify-center" aria-busy="true">
+            <Spinner className="size-5 text-muted-foreground" />
+          </div>
         )}
       </PopoverContent>
     </Popover>
@@ -2196,7 +2226,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             className="gap-2"
             data-mobile-toolbar-action={mobile ? "tools" : undefined}
           >
-            <WrenchIcon
+            <SlidersHorizontalIcon
               className={cn(
                 "size-3.5 shrink-0",
                 systemTools?.some((tool) => tool.active) ? "text-primary" : "text-muted-foreground",
@@ -2281,12 +2311,23 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
     const tokens = sessionStats?.tokens;
     const cost = sessionStats?.cost ?? 0;
 
-    // Same thresholds as the old contextColor, as tone classes.
+    // Same thresholds as the old contextColor, as tone classes. The neutral
+    // case sets nothing: the chip's own color applies (muted when closed,
+    // foreground once the session panel is open), so the ctx number lights up
+    // with the rest instead of staying pinned gray.
     const contextTone = contextUsage?.contextWindow && contextUsage.percent !== null
       ? (contextUsage.percent > 90
         ? "text-destructive"
-        : contextUsage.percent > 70 ? "text-warning" : "text-muted-foreground")
-      : "text-muted-foreground";
+        : contextUsage.percent > 70 ? "text-warning" : undefined)
+      : undefined;
+
+    // The ctx segment prints the actual prompt size, not a percent: 131.9k /
+    // 1.0M. Percent survives only as the fallback while tokens are unknown.
+    const ctxText = contextUsage?.contextWindow
+      ? contextUsage.tokens != null
+        ? formatCompactCount(contextUsage.tokens)
+        : contextUsage.percent !== null ? `${contextUsage.percent.toFixed(1)}%` : "?"
+      : "?";
 
     const tooltipParts: string[] = [];
     if (tokens) {
@@ -2326,7 +2367,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
             {contextUsage?.contextWindow && contextUsage.percent !== null && (
               <span className={cn("text-xs", contextTone)}>
-                <span className="opacity-75">ctx</span> {contextUsage.percent.toFixed(1)}%
+                <span className="opacity-75">ctx</span> {ctxText}
               </span>
             )}
             {cost > 0 && (
@@ -2365,7 +2406,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         {cost > 0 && <span>{`$${cost >= 0.01 ? cost.toFixed(2) : cost.toFixed(4)}`}</span>}
         {contextUsage?.contextWindow && (
           <span className="inline-flex items-center gap-1">
-            <span className={contextTone}>{contextUsage.percent !== null ? `${contextUsage.percent.toFixed(1)}%` : "?"}</span>
+            <span className={contextTone}>{ctxText}</span>
             <span aria-hidden="true" className="text-muted-foreground">/</span>
             <span>{formatCompactCount(contextUsage.contextWindow)}</span>
             <Progress
@@ -2448,7 +2489,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       </div>
     </Sidebar>
     <SidebarInset
-      className="h-full min-w-0 overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] min-[641px]:h-[calc(100dvh-16px)]"
+      className="h-full min-w-0 overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] min-[641px]:h-[calc(100dvh-16px)] min-[641px]:ring-1 min-[641px]:ring-border"
     >
         {/* Top bar with sidebar toggle */}
         {/* Verified 2026-09-23: without a sticky top bar iOS reinstates the

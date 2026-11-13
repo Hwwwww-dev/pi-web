@@ -11,7 +11,7 @@ import { ContextBadge } from "@/components/transcript/ContextBadge";
 
 const ICON_PROPS = { size: 11, strokeWidth: 2 } as const;
 
-export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8, style, className }: {
+export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8, style, className, title }: {
   usage?: { input?: number; output?: number; cacheRead?: number; cost?: number } | null;
   ctx?: UsageContextPart | null;
   /** Toolbar look: cost emphasized against the dimmer token segments. */
@@ -21,6 +21,8 @@ export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8,
   gap?: number;
   style?: CSSProperties;
   className?: string;
+  /** 整段用量的悬浮说明（如 formatUsage）；用量说明只挂用量段，不进整行。 */
+  title?: string;
 }) {
   const input = usage?.input ?? 0;
   const output = usage?.output ?? 0;
@@ -67,6 +69,7 @@ export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8,
 
   return (
     <span
+      title={title}
       className={cn("inline-flex flex-wrap items-center row-gap-0.5 tabular-nums", className)}
       // columnGap is the caller's `gap` prop (toolbar 10 / chat 8) and `style`
       // is the component's own API — both stay dynamic.

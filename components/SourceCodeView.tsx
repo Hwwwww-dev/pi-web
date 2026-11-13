@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Prism as SyntaxHighlighter,
   createElement as renderSyntaxNode,
@@ -11,9 +11,16 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
 import { FILE_CODE_STYLE, lineNumberGutter } from "./DiffView";
 
-/** Above this line count the highlighter render is deferred one tick: the plain
- * line grid paints first, then the colored tree replaces it off the first paint. */
+/** Above this line count the plain line grid renders instead of the tokenized
+ * tree: one SyntaxHighlighter render must stay bounded, and a grid this plain
+ * is cheap enough to keep for the whole file — there is no deferred swap to
+ * the highlighter later. */
 export const SOURCE_HIGHLIGHT_MAX_LINES = 3_000;
+
+/** The same cap in characters, for files that are few lines of very long
+ * lines (minified bundles): tokenizing 256 KB of one-liner is the same
+ * multi-frame stall the line cap exists to prevent. */
+export const SOURCE_HIGHLIGHT_MAX_CHARS = 64_000;
 
 type SourceCodeRendererProps = Parameters<NonNullable<SyntaxHighlighterProps["renderer"]>>[0] & {
   wrapLines: boolean;
@@ -66,14 +73,8 @@ export function SourceCodeView({ content, language, wrapLines }: {
 }) {
   const { isDark } = useTheme();
   const sourceLines = useMemo(() => content.split("\n"), [content]);
-  const useLightweightSource = sourceLines.length > SOURCE_HIGHLIGHT_MAX_LINES;
-  const [deferredHighlightReady, setDeferredHighlightReady] = useState(false);
-  useEffect(() => {
-    setDeferredHighlightReady(false);
-    if (!useLightweightSource) return;
-    const timer = setTimeout(() => setDeferredHighlightReady(true), 0);
-    return () => clearTimeout(timer);
-  }, [useLightweightSource, content, language]);
+  const useLightweightSource = sourceLines.length > SOURCE_HIGHLIGHT_MAX_LINES
+    || content.length > SOURCE_HIGHLIGHT_MAX_CHARS;
   // react-syntax-highlighter rebuilds every token element on each render, which
   // costs hundreds of milliseconds on large files. Cache the rendered trees so
   // unrelated re-renders (panel open/close, selection changes) reuse them as-is.
@@ -136,13 +137,12 @@ export function SourceCodeView({ content, language, wrapLines }: {
     [sourceLines, useLightweightSource, wrapLines],
   );
 
-  if (!useLightweightSource) return highlightedSource;
-  if (!deferredHighlightReady) {
+  if (useLightweightSource) {
     return (
       // FILE_CODE_STYLE is the shared code typography (DiffView constant);
       // the sizing wraps it as plain utilities.
       <div
-        className={`file-source-view is-lightweight min-h-full min-w-full bg-background ${wrapLines ? "w-full" : "w-max"}`}
+        className="file-source-view is-lightweight min-h-full min-w-full bg-background"
         style={FILE_CODE_STYLE}
       >
         {lightweightSourceLines}

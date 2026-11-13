@@ -110,6 +110,9 @@
    panel's sessions list (components/DebugPanel.tsx) renders the same span
    outside the tree, so the rule stays here. */
 .session-tree-awaiting {
+  /* inline 元素宽高不生效，本体雅缩成零尺寸只剩 ::after 呼吸环——琥珀“只有
+     环没有点”的根因；绿色/青色点有 Tailwind 的 inline-block 类所以正常。 */
+  display: inline-block;
   position: relative;
   flex: none;
   width: 6px;

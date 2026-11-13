@@ -1,10 +1,10 @@
 // Client-safe display of session usage: the toolbar's stats button and
 // popover, and the agent switcher's per-agent rows.
 
-/** 950 · 18k · 1.2M */
+/** 950 · 18.4k · 1.2M */
 export function formatCompactCount(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return String(value);
 }
 

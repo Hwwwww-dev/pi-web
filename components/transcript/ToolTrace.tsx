@@ -155,48 +155,77 @@ function StepsSection({ steps }: { steps: ToolViewStep[] }) {
   );
 }
 
+/** Tool outputs can reach hundreds of KB (browse or shell dumps). Feeding
+ * that through ansi_up or the markdown parser stalls the frame the section
+ * renders in, so the view shows head and tail around an omission notice. */
+const SECTION_TEXT_HEAD_CHARS = 60_000;
+const SECTION_TEXT_TAIL_CHARS = 20_000;
+
+function clampSectionText(text: string): { text: string; omittedChars: number } {
+  if (text.length <= SECTION_TEXT_HEAD_CHARS + SECTION_TEXT_TAIL_CHARS) return { text, omittedChars: 0 };
+  const omittedChars = text.length - SECTION_TEXT_HEAD_CHARS - SECTION_TEXT_TAIL_CHARS;
+  return {
+    text: `${text.slice(0, SECTION_TEXT_HEAD_CHARS)}\n\n${text.slice(-SECTION_TEXT_TAIL_CHARS)}`,
+    omittedChars,
+  };
+}
+
 /**
  * A section's content slot. Each kind reuses an existing block — `CodeBlock`,
  * the patch view, Markdown — instead of a transcript-only look.
  */
 export function ToolSection({ section }: { section: ToolViewSection }) {
   const isMobile = useIsMobile();
-  switch (section.kind) {
-    case "code":
-      // TUI 输出（含 ANSI 转义）只能按终端文本渲染，code block 会原样显示转义序列。
-      // 源文件结果与文件预览形态一致：行号 + 不折行。
-      return isTuiText(section.text ?? "")
-        ? (
-            // 与 code 段同一限高：TUI 文本没有自己的滚动容器，长输出直接撑开卡片。
-            <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
-              <AnsiText text={section.text ?? ""} />
-            </div>
-          )
-        : (
-          <CodeSection
-            text={section.text ?? ""}
-            language={section.language}
-            wrap={section.language === undefined || section.language === "text"}
-          />
+  const { t } = useI18n();
+  const { text, omittedChars } = clampSectionText(section.text ?? "");
+  const body = (() => {
+    switch (section.kind) {
+      case "code":
+        // TUI 输出（含 ANSI 转义）只能按终端文本渲染，code block 会原样显示转义序列。
+        // 源文件结果与文件预览形态一致：行号 + 不折行。
+        return isTuiText(text)
+          ? (
+              // 与 code 段同一限高：TUI 文本没有自己的滚动容器，长输出直接撑开卡片。
+              <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+                <AnsiText text={text} />
+              </div>
+            )
+          : (
+            <CodeSection
+              text={text}
+              language={section.language}
+              wrap={section.language === undefined || section.language === "text"}
+            />
+          );
+      case "diff":
+        return section.files
+          ? <PatchDiffFiles files={section.files} layout={isMobile ? "stacked" : "split"} />
+          : <CodeSection text={text} wrap={false} />;
+      case "markdown":
+        // 与 code/fields 段同一限高：fetch/web 的正文过去不封顶，长结果把整轮撑出视野。
+        return (
+          <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+            <SafeMarkdownBody>{text}</SafeMarkdownBody>
+          </div>
         );
-    case "diff":
-      return section.files
-        ? <PatchDiffFiles files={section.files} layout={isMobile ? "stacked" : "split"} />
-        : <CodeSection text={section.text ?? ""} wrap={false} />;
-    case "markdown":
-      // 与 code/fields 段同一限高：fetch/web 的正文过去不封顶，长结果把整轮撑出视野。
-      return (
-        <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
-          <SafeMarkdownBody>{section.text ?? ""}</SafeMarkdownBody>
-        </div>
-      );
-    case "fields":
-      return <FieldsSection section={section} />;
-    case "steps":
-      return <StepsSection steps={section.steps ?? []} />;
-    default:
-      return null;
-  }
+      case "fields":
+        return <FieldsSection section={section} />;
+      case "steps":
+        return <StepsSection steps={section.steps ?? []} />;
+      default:
+        return null;
+    }
+  })();
+  return (
+    <>
+      {body}
+      {omittedChars > 0 && (
+        <p className="px-[13px] pb-2 text-xs text-muted-foreground">
+          {t("i18n.toolOutputTruncated", { count: omittedChars })}
+        </p>
+      )}
+    </>
+  );
 }
 
 /** A row names at most this many files: a call that touches fifty would bury its own title. */

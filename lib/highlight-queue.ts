@@ -5,8 +5,16 @@
 // HIGHLIGHT_TASK_BUDGET characters are still highlighted at once; the other
 // fences render without colors first and get them one per idle slice, newest
 // first (the end of a chat is what is on screen).
+//
+// No budget scheme helps a single oversized fence, so a body above
+// MAX_HIGHLIGHT_CHARS stays plain monospace for good — tokenizing it would
+// eat a whole frame no matter which idle slice renders it.
 
 const HIGHLIGHT_TASK_BUDGET = 2_000;
+
+/** Above this size a code body renders as plain monospace, in the chat
+ * fences (`CodeBlock`) and tool cards (`HighlightedCode`) alike. */
+export const MAX_HIGHLIGHT_CHARS = 16_000;
 const FALLBACK_IDLE_DELAY_MS = 50;
 
 let taskBudget = HIGHLIGHT_TASK_BUDGET;

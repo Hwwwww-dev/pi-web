@@ -717,8 +717,8 @@ test("one tail-follower signal, owned by ChatWindow", () => {
     source.indexOf("const currentModel"),
   );
 
-  // ChatWindow 的 `atTail`（含钳制识别的 `shouldFollow`）是唯一跟随信号：hook 侧
-  // 不再维护第二套贴底判定，官方 scroller 以 autoScroll=false 运行。
+  // ChatWindow 的 `atTail`（几何贴底 100px + 用户向上输入脱离）是唯一跟随信号：
+  // hook 侧不再维护第二套贴底判定，官方 scroller 以 autoScroll=false 运行。
   assert.doesNotMatch(source, /liveFollowFrameRef|isNearBottomRef|handleScrollPositionChange|getLiveFollowAttached/);
   assert.match(source, /const previousScrollTopRef = useRef\(0\)/);
   assert.match(scrollToBottomSource, /const container = scrollContainerRef\.current;\s*if \(!container\) return;/);
@@ -726,7 +726,9 @@ test("one tail-follower signal, owned by ChatWindow", () => {
   assert.doesNotMatch(scrollToBottomSource, /scrollIntoView/);
   assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll=\{false\} defaultScrollPosition="end">/);
   assert.match(chatWindowSource, /<FollowTailWhenAtTail atTail=\{atTail && !foldInFlight\} contentRef=\{messageContentRef\} \/>/);
-  assert.match(chatWindowSource, /shouldFollow\(\s*following,\s*previousTop,\s*container\.scrollTop,\s*container\.clientHeight,\s*container\.scrollHeight,\s*previousHeight,/);
+  assert.match(chatWindowSource, /isAtTail\(container\.scrollTop, container\.clientHeight, container\.scrollHeight\)/);
+  assert.match(chatWindowSource, /addEventListener\("wheel", onWheel/);
+  assert.doesNotMatch(chatWindowSource, /shouldFollow\(/);
   assert.doesNotMatch(source, /SCROLL_BOTTOM_THRESHOLD|completionScrollAllowedRef|ignoreProgrammaticScrollUntilRef/);
   assert.doesNotMatch(streamUpdateSource, /scrollToBottom/);
 });

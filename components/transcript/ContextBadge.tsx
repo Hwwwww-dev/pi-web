@@ -6,16 +6,18 @@ import { useI18n } from "@/hooks/useI18n";
 import { formatCompactTokens } from "@/lib/turn-view";
 
 /**
- * Context used (官方 `pattern_context.md`): the same "ctx 12.3% / 200k" segment
- * the usage line always showed, and — when the turn knows both numbers — a
- * hover card with used / limit and the bar. It asks for no data of its own.
+ * Context used (官方 `pattern_context.md`): the same segment the usage line
+ * always showed, now as the actual next-request prompt size — "ctx 24.5k /
+ * 200k" (percent only while tokens are unknown, i.e. the live reading lacks
+ * them) — and, when the turn knows both numbers, a hover card with used /
+ * limit and the bar. It asks for no data of its own.
  */
 export function ContextBadge({ tokens, contextWindow, percent, color }: {
   /** Prompt size of the next request. */
   tokens?: number;
   /** The model's window; without it the card has no limit to show. */
   contextWindow?: number;
-  /** The percentage the segment prints. */
+  /** Percent fallback printed while tokens are unknown. */
   percent: number;
   /** The caller's own highlight (warn/danger). */
   color?: string;
@@ -27,7 +29,7 @@ export function ContextBadge({ tokens, contextWindow, percent, color }: {
       <span className="opacity-75">ctx</span>
       {/* ctxColor arrives as a token string from the caller — keep the injection. */}
       <span style={color ? { color } : undefined}>
-        {`${percent.toFixed(1)}%${contextWindow ? ` / ${formatCompactTokens(contextWindow)}` : ""}`}
+        {`${tokens !== undefined ? formatCompactTokens(tokens) : `${percent.toFixed(1)}%`}${contextWindow ? ` / ${formatCompactTokens(contextWindow)}` : ""}`}
       </span>
     </span>
   );

@@ -50,17 +50,20 @@ import {
   FolderClosedIcon,
   HistoryIcon,
   ImageIcon,
+  ListPlusIcon,
   MessagesSquareIcon,
+  MergeIcon,
   PencilIcon,
   PlusIcon,
   RotateCcwIcon,
   SquareIcon,
   Trash2Icon,
   TriangleAlertIcon,
+  SlidersHorizontalIcon,
   Volume2Icon,
   VolumeXIcon,
-  WrenchIcon,
   XIcon,
+  ZapIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -1347,9 +1350,20 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     onSend(msg, images);
   }, [value, attachedImages, isStreaming, runBuiltinCommand, onSend, clearInput, onAudioUnlock]);
 
-  const slashQuery = !compact && value.startsWith("/") && !/\s/.test(value.slice(1))
-    ? value.slice(1).toLowerCase()
+  // 斜杠令牌：行首或前一个字符是空格的最后一个 "/" 唤起面板；查询内不得再
+  // 有空白。tokenStart 供补全时只替换从 "/" 起的片段（保留前缀文本）。
+  const slashTokenStart = (() => {
+    if (compact) return -1;
+    const idx = value.lastIndexOf("/");
+    if (idx === -1) return -1;
+    if (idx > 0 && value[idx - 1] !== " ") return -1;
+    return idx;
+  })();
+  const slashQuery = slashTokenStart !== -1 && !/\s/.test(value.slice(slashTokenStart + 1))
+    ? value.slice(slashTokenStart + 1).toLowerCase()
     : null;
+  const slashTokenStartRef = useRef(slashTokenStart);
+  slashTokenStartRef.current = slashTokenStart;
 
   const filteredSlashCommands = (() => {
     if (slashQuery === null) return [];
@@ -1534,7 +1548,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   }, []);
 
   const applySlashCommand = useCallback((command: SlashCommandPaletteItem) => {
-    const nextValue = `/${command.name} `;
+    // 中段唤起时保留 "/" 前的前缀文本，只替换令牌片段。
+    const prefix = slashTokenStartRef.current > 0 ? valueRef.current.slice(0, slashTokenStartRef.current) : "";
+    const nextValue = `${prefix}/${command.name} `;
     setValue(nextValue);
     setSlashMenuOpen(false);
     setSlashActiveIndex(0);
@@ -1557,6 +1573,36 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     onSideChat(msg);
   }, [value, attachedImages, onSideChat, clearInput]);
 
+  // 发送键动作菜单：流式且有可发送内容时点击发送键弹出标准 Dropdown
+  // （立即发送/引导/队列/侧聊）。
+  const sendNowAfterAbortRef = useRef(false);
+  // 立即发送：先打断，本轮真正空闲后把当前输入发出去（handleSend 在流式期间
+  // 直接拒绝，因此借 effect 等待空闲；若打断后排队的消息接续开跑，旗标保留
+  // 到下一次空闲时再发送）。
+  useEffect(() => {
+    if (isStreaming || !sendNowAfterAbortRef.current) return;
+    sendNowAfterAbortRef.current = false;
+    void handleSend();
+  }, [isStreaming, handleSend]);
+  const sendActions = (() => {
+    if (compact || !isStreaming || !canSubmit) return [];
+    const items: { key: string; label: string; hint: string; Icon: typeof ZapIcon; run: () => void }[] = [];
+    // onSend/onAbort 是必选 prop：流式且有可发送内容时“立即发送”恒可用。
+    items.push({
+      key: "send-now",
+      label: t("chat.actionSendNow"),
+      hint: t("chat.actionSendNowHint"),
+      Icon: ZapIcon,
+      run: () => {
+        sendNowAfterAbortRef.current = true;
+        onAbort();
+      },
+    });
+    if (onSteer) items.push({ key: "steer", label: t("chat.actionSteer"), hint: t("chat.actionSteerHint"), Icon: MergeIcon, run: () => void queueFollowUp("steer") });
+    if (onFollowUp) items.push({ key: "queue", label: t("chat.actionQueue"), hint: t("chat.actionQueueHint"), Icon: ListPlusIcon, run: () => void queueFollowUp("followup") });
+    if (onSideChat) items.push({ key: "side", label: t("chat.sideChat"), hint: t("chat.sideChatHint"), Icon: MessagesSquareIcon, run: sendToSideChat });
+    return items;
+  })();
   const queueFollowUp = useCallback(async (mode: "steer" | "followup" = "followup") => {
     const msg = value.trim();
     if (!msg && !attachedImages.length) return;
@@ -2086,44 +2132,49 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       </TooltipTrigger>
       <TooltipContent>{t("chat.stopAgent")}</TooltipContent>
     </Tooltip>
+  ) : sendActions.length > 0 ? (
+    // 发送键动作菜单：流式且有可发送内容时点击发送键弹出
+    // （立即发送/引导/队列/侧聊）。
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={t("chat.send")}
+          className="size-9 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          <ArrowUpIcon data-icon strokeWidth={2.2} aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="end" className="w-60">
+        {sendActions.map((action) => (
+          <DropdownMenuItem key={action.key} onSelect={action.run}>
+            <action.Icon strokeWidth={1.9} aria-hidden="true" />
+            <div className="flex min-w-0 flex-col">
+              <span>{action.label}</span>
+              <span className="text-xs text-muted-foreground">{action.hint}</span>
+            </div>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   ) : (
-    <div className="flex shrink-0 items-center gap-1">
-      {isStreaming && onSideChat && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={sendToSideChat}
-              disabled={!value.trim() || attachedImages.length > 0}
-              aria-label={t("chat.sideChat")}
-              className="size-9 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              <MessagesSquareIcon data-icon strokeWidth={1.8} aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("chat.sideChatHint")}</TooltipContent>
-        </Tooltip>
-      )}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            onClick={isStreaming ? () => queueFollowUp() : handleSend}
-            disabled={!canSubmit}
-            aria-label={t("chat.send")}
-            className={cn(
-              "size-9 shrink-0 rounded-full",
-              canSubmit || isStreaming
-                ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                : "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
-            )}
-          >
-            <ArrowUpIcon data-icon strokeWidth={2.2} aria-hidden="true" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{t("chat.send")}</TooltipContent>
-      </Tooltip>
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          onClick={() => void handleSend()}
+          disabled={!canSubmit}
+          aria-label={t("chat.send")}
+          className={cn(
+            "size-9 shrink-0 touch-none rounded-full",
+            canSubmit
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+              : "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
+          )}
+        >
+          <ArrowUpIcon data-icon strokeWidth={2.2} aria-hidden="true" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{t("chat.send")}</TooltipContent>
+    </Tooltip>
   );
 
   return (
@@ -2192,19 +2243,22 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   />
                 </div>
               ))}
+              {/* 展开/收起作为列表的最后一行左对齐，不再居中悬浮——与胶囊
+                  连读成一个整体（用户反馈“整体太割裂”）。 */}
+              {queuedSubmissions.length > QUEUE_PREVIEW_ROWS && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setQueueExpanded((prev) => !prev)}
+                  className="h-6 self-start gap-1 rounded-full px-2.5 text-[length:calc(12px+var(--chat-font-size-offset,0px))] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                >
+                  {queueExpanded ? <ChevronUpIcon className="size-3" aria-hidden="true" /> : <ChevronDownIcon className="size-3" aria-hidden="true" />}
+                  {queueExpanded
+                    ? t("chat.queueShowLess")
+                    : t("chat.queueMore", { count: queuedSubmissions.length - QUEUE_PREVIEW_ROWS })}
+                </Button>
+              )}
             </div>
-            {queuedSubmissions.length > QUEUE_PREVIEW_ROWS && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setQueueExpanded((prev) => !prev)}
-                className="h-6 self-center rounded-full px-2.5 text-[length:calc(12px+var(--chat-font-size-offset,0px))] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              >
-                {queueExpanded
-                  ? t("chat.queueShowLess")
-                  : t("chat.queueMore", { count: queuedSubmissions.length - QUEUE_PREVIEW_ROWS })}
-              </Button>
-            )}
           </div>
         )}
         {/* Retry banner */}
@@ -2618,7 +2672,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       aria-label={`${t("chat.changeToolPreset")}: ${toolPresetLabel}`}
                       className="shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     >
-                      <WrenchIcon strokeWidth={1.8} aria-hidden="true" />
+                      <SlidersHorizontalIcon strokeWidth={1.8} aria-hidden="true" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent side="top" align="start" sideOffset={6} className="min-w-[160px] max-w-[calc(100vw-16px)]">
@@ -2658,7 +2712,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     >
                       {isCompacting
                         ? <SquareIcon className="size-4 fill-current" aria-hidden="true" />
-                        : <WrenchIcon strokeWidth={1.8} aria-hidden="true" />}
+                        : <SlidersHorizontalIcon strokeWidth={1.8} aria-hidden="true" />}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent side="top" align="end" sideOffset={6} className="min-w-[120px]">

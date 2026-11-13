@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, type ReactNode } from "react";
+import { memo, useCallback, useState, type ReactNode } from "react";
 import { SquareTerminalIcon, WrapTextIcon } from "lucide-react";
 import {
   CodeBlock,
@@ -19,6 +19,7 @@ import { useI18n } from "@/hooks/useI18n";
 import type { ToolView } from "@/lib/tool-view";
 import type { StepUsage } from "@/lib/turn-view";
 import { TraceRow } from "./TraceRow";
+import { getFoldChoice, setToolCallExpanded } from "@/lib/tool-call-expansion";
 
 /**
  * A shell command (official `pattern_terminal.md`): the command is the header, the
@@ -36,7 +37,15 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
   stepUsage?: StepUsage;
 }) {
   const { t } = useI18n();
-  const [wrap, setWrap] = useState(true);
+  // 换行选择持久化到折叠选择 store（键用 TraceRow 同款 foldKey 加前缀）：
+  // 回合完成的消息重读会重挂载本组件，仅靠本地 state 会把读者的选择拍回默认。
+  const wrapKey = view.foldKey ? `terminal-wrap:${view.foldKey}` : undefined;
+  const [wrap, setWrap] = useState(() => getFoldChoice(wrapKey) ?? true);
+  const toggleWrap = useCallback(() => {
+    const next = !wrap;
+    setWrap(next);
+    setToolCallExpanded(wrapKey, next);
+  }, [wrap, wrapKey]);
   const command = view.command ?? "";
   const output = view.sections.find((section) => section.kind === "code")?.text ?? "";
   const failed = view.status === "error";
@@ -68,7 +77,7 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
                 title={wrap ? t("chat.trace.unwrap") : t("chat.trace.wrap")}
                 aria-pressed={wrap}
                 data-active={wrap || undefined}
-                onClick={() => setWrap((value) => !value)}
+                onClick={toggleWrap}
               >
                 <WrapTextIcon />
               </Button>
