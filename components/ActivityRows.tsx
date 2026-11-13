@@ -594,7 +594,6 @@ export function TurnMetaLine({ usage, model, thinkingLevel, time, timestamp, cop
   return (
     <div
       className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground [font-variant-numeric:tabular-nums]"
-      title={formatFullTimestamp(timestamp) ?? undefined}
     >
       {model && <span>{model}{thinkingLevel && thinkingLevel !== "off" ? ` · ${thinkingLevel}` : ""}</span>}
       {(hasUsage || hasCtx) && (
@@ -604,7 +603,7 @@ export function TurnMetaLine({ usage, model, thinkingLevel, time, timestamp, cop
           ctx={ctx}
         />
       )}
-      {time && <span>{time}</span>}
+      {time && <span title={formatFullTimestamp(timestamp) ?? undefined}>{time}</span>}
       {copySource && (
         <span aria-hidden="true" className="h-3 w-px shrink-0 bg-border/70" />
       )}
