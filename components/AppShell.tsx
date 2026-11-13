@@ -18,6 +18,7 @@ import {
   MoonIcon,
   PanelRightIcon,
   PenLineIcon,
+  SettingsIcon,
   ShieldAlertIcon,
   SlidersHorizontalIcon,
   SunIcon,
@@ -36,7 +37,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Skeleton } from "./ui/skeleton";
+import { Spinner } from "./ui/spinner";
 import { cn } from "@/lib/utils";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
@@ -49,7 +50,7 @@ import { GitPanel } from "./GitPanel";
 import { TabBar, type Tab } from "./TabBar";
 import { movePanelTab, orderPanelTabs } from "@/lib/panel-tab-order";
 import { openFileTab, saveFileViewerState, saveParkedFileViewerState, switchFileWorkspace, type ParkedFileWorkspace } from "./file-tab-state";
-import { SettingsPanel, SettingsSectionIcon } from "./SettingsPanel";
+import { SettingsPanel } from "./SettingsPanel";
 import { Toaster } from "./ui/sonner";
 import { Progress } from "./ui/progress";
 import { ProjectTrustDialog, type ProjectTrustFailure } from "./ProjectTrustDialog";
@@ -1991,7 +1992,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           aria-label={translate("common.settings")}
           className="min-w-0 shrink justify-start gap-1.5 rounded-md px-2.5 font-medium text-muted-foreground"
         >
-          <SettingsSectionIcon section="general" size={14} strokeWidth={2} />
+          <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
           <span className="truncate">{translate("common.settings")}</span>
         </Button>
         <span
@@ -2093,17 +2094,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           />
           </div>
         ) : (
-          /* 家族装载前的骨架行：此前弹层完全空白，数据到位后整块炸开。 */
-          <div className="flex flex-col gap-2 p-3" aria-hidden="true">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="flex items-center gap-3">
-                <Skeleton className="size-8 shrink-0 rounded-full" />
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <Skeleton className="h-3.5 w-2/5" />
-                  <Skeleton className="h-3 w-1/4" />
-                </div>
-              </div>
-            ))}
+          /* 家族装载前的加载态：官方 base Spinner 居中，不手搓骨架行。 */
+          <div className="flex min-h-[280px] items-center justify-center" aria-busy="true">
+            <Spinner className="size-5 text-muted-foreground" />
           </div>
         )}
       </PopoverContent>

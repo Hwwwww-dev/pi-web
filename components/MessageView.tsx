@@ -9,6 +9,7 @@ import { Button } from "./ui/button";
 import { Message, MessageContent, MessageFooter } from "./ui/message";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
+import { getImageSize, rememberImageSize } from "@/lib/image-size-cache";
 import {
   CompactionRow,
   CustomRow,
@@ -306,8 +307,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
   const imageBlocksNode = imageBlocks.length > 0 && (
     <div className={cn("flex flex-wrap gap-1.5", content && "mb-2")}>
-      {imageBlocks.map((img, i) => {
-        // SAFETY: pi-ai's on-disk format stores images flat ({data, mimeType}) while
+      {imageBlocks.map((img, i) => {        // SAFETY: pi-ai's on-disk format stores images flat ({data, mimeType}) while
         // lib/types.ts ImageContent nests them under {source:{type,data,media_type,url}};
         // the fields are read defensively below, so the cast only relaxes the shape.
         const flat = img as unknown as { data?: string; mimeType?: string };
@@ -318,6 +318,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
           : flat.data
             ? `data:${flat.mimeType};base64,${flat.data}`
             : "";
+        const cachedSize = src ? getImageSize(src) : undefined;
         return (
           <ImagePreview key={i} src={src}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -326,6 +327,11 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               alt=""
               loading="lazy"
               decoding="async"
+              width={cachedSize?.width}
+              height={cachedSize?.height}
+              onLoad={(event) => {
+                if (src) rememberImageSize(src, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
+              }}
               className="block min-h-16 min-w-16 max-h-60 max-w-60 object-contain"
             />
           </ImagePreview>

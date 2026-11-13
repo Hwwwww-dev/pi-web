@@ -33,7 +33,7 @@ import { formatToolDurationIfShown } from "@/lib/tool-duration";
 
 import { getToolCategory, getToolFilePaths, type ToolCategory } from "@/lib/tool-categories";
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
-import { formatUsage, type ActivityItem, type StepUsage, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
+import { formatFullTimestamp, formatUsage, type ActivityItem, type StepUsage, type TurnUsage, type UsageContextPart } from "@/lib/turn-view";
 import { UsageBar } from "./UsageBar";
 import { ReasoningTrace } from "./transcript/ReasoningTrace";
 import { SourcesTrace } from "./transcript/SourcesTrace";
@@ -566,14 +566,19 @@ function CompactionFileList({ title, files }: { title: string; files: string[] }
 /** One quiet line per turn: model · usage (top-bar format) · time · copy.
  *  ctx = context occupancy after this turn: the next request's prompt size, or
  *  the live reading while this is still the conversation tail. */
-export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCtx, ctxWindow }: {
+export function TurnMetaLine({ usage, model, thinkingLevel, time, timestamp, copySource, ctxTokens, liveCtx, ctxWindow }: {
   usage?: TurnUsage | null;
   model?: string;
+  /** 会话尾行附当前思考等级（该轮就是用它跑的）；历史行不声称等级。 */
+  thinkingLevel?: string;
   time?: string | null;
+  /** 原始时间戳：时间的悬浮说明用完整年月日时分秒。 */
+  timestamp?: number | null;
   /** Final answer text — renders an icon-only copy button at the line end. */
   copySource?: string;
   ctxTokens?: number;
-  liveCtx?: { percent: number | null; contextWindow: number } | null;
+  /** Live tail reading while the next request doesn't exist yet; carries tokens when the poll provides them. */
+  liveCtx?: { percent: number | null; contextWindow: number; tokens?: number | null } | null;
   ctxWindow?: number;
 }) {
   const { t } = useI18n();
@@ -581,24 +586,28 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
   const ctx: UsageContextPart | undefined = ctxTokens !== undefined
     ? { tokens: ctxTokens, contextWindow: ctxWindow }
     : liveCtx
-      ? { percent: liveCtx.percent, contextWindow: liveCtx.contextWindow }
+      ? { percent: liveCtx.percent, contextWindow: liveCtx.contextWindow, tokens: liveCtx.tokens ?? undefined }
       : undefined;
   const hasUsage = Boolean(usage && (usage.input > 0 || usage.output > 0 || usage.cacheRead > 0 || usage.cost.total > 0));
   const hasCtx = Boolean(ctx && (ctx.tokens !== undefined || ctx.percent !== undefined || ctx.contextWindow));
   if (!hasUsage && !hasCtx && !model && !time && !copySource) return null;
   return (
     <div
-      className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground/60 [font-variant-numeric:tabular-nums]"
-      title={usage ? formatUsage(usage) : undefined}
+      className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground [font-variant-numeric:tabular-nums]"
+      title={formatFullTimestamp(timestamp) ?? undefined}
     >
-      {model && <span>{model}</span>}
+      {model && <span>{model}{thinkingLevel && thinkingLevel !== "off" ? ` · ${thinkingLevel}` : ""}</span>}
       {(hasUsage || hasCtx) && (
         <UsageBar
+          title={usage ? formatUsage(usage) : undefined}
           usage={usage ? { input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cost: usage.cost.total } : null}
           ctx={ctx}
         />
       )}
       {time && <span>{time}</span>}
+      {copySource && (
+        <span aria-hidden="true" className="h-3 w-px shrink-0 bg-border/70" />
+      )}
       {copySource && (
         <Button
           type="button"
@@ -614,7 +623,7 @@ export function TurnMetaLine({ usage, model, time, copySource, ctxTokens, liveCt
           title={t("i18n.copyMessage")}
           aria-label={t("i18n.copyMessage")}
           className={cn(
-            "ml-auto size-4 rounded-sm p-0.5",
+            "size-4 rounded-sm p-0.5",
             copied ? "text-primary" : "text-muted-foreground",
           )}
         >

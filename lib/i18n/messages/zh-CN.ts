@@ -972,6 +972,7 @@ export const zhCNLocale: LocalePlugin = {
     "i18n.close": "关闭",
     "i18n.copy": "复制",
     "i18n.copied": "已复制",
+    "i18n.toolOutputTruncated": "输出过长已截断：仅显示首尾部分，省略 {count} 字符",
     "i18n.cancel": "取消",
     "i18n.save": "保存",
     "i18n.saving": "保存中…",

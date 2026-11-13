@@ -26,7 +26,6 @@ import { TurnTrace } from "./transcript/TurnTrace";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,6 +37,13 @@ import {
   MessageScrollerViewport,
   useMessageScroller,
 } from "@/components/ui/message-scroller";
+import {
+  Questionnaire,
+  QuestionnaireChoice,
+  QuestionnaireChoices,
+  QuestionnaireInput,
+  QuestionnaireItem,
+} from "@/components/ui/questionnaire";
 import { ChatRow } from "@/components/chat/ChatRow";
 import { CHAT_COLUMN_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,7 +63,7 @@ import type { DebugClientSession } from "@/lib/debug-types";
 import type { ToolEntry } from "@/lib/tool-presets";
 import type { SettingsSection } from "@/lib/settings-navigation";
 import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll-position";
-import { shouldFollow } from "@/lib/chat-follow";
+import { isAtTail, isUpwardGesture } from "@/lib/chat-follow";
 import {
   getNextVisibleCount,
   getVisibleRenderWindow,
@@ -165,8 +171,8 @@ interface Props {
 /**
  * 唯一的贴底跟随者：官方 scroller 以 `autoScroll={false}` 运行，内部跟随关闭。
  * `atTail` 为真期间内容或视口长高（流式追加、行展开、完成重组、键盘收起）即
- * 调用 `scrollToEnd`；读者上滑后 `atTail` 变假并停止干涉。跟随与否由
- * `shouldFollow` 判定（含钳制识别）。
+ * 调用 `scrollToEnd`；读者上滑后 `atTail` 变假并停止干涉。跟随与否由几何贴底
+ * （100px 距离带）与用户向上输入共同决定，见 `lib/chat-follow.ts`。
  */
 function FollowTailWhenAtTail({ atTail, contentRef, viewportRef }: {
   atTail: boolean;
@@ -799,35 +805,45 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 监听器需读取当前可见状态，故用 ref 而非闭包中的旧 prop。
   const activeRef = useRef(active);
   activeRef.current = active;
-  // 跟随状态仅由滚动决定，判定交给 `shouldFollow`：同帧伴随高度变化的上移
-  // 是滚动锚定调整不算上滑，纯手势回拉立即脱离；16px 贴底容差只用于“回到最新”
-  // 按钮。
+  // 跟随状态由几何位置与用户输入共同决定（业界标准契约，见 lib/chat-follow.ts）：
+  // 距底 100px 内即贴底；滚轮上滚/触摸上滑/向上翻页键立即脱离；程序化滚动
+  // （跟随回写、折叠保位、浏览器钳制）不参与意图判定，行折叠/图片加载后按
+  // 几何位置自愈，不会像差值启发式那样把保位误判成用户上拉。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    let following = true;
-    let previousTop = container.scrollTop;
-    let previousHeight = container.scrollHeight;
-    let previousClient = container.clientHeight;
     const update = () => {
-      const next = shouldFollow(
-        following,
-        previousTop,
-        container.scrollTop,
-        container.clientHeight,
-        container.scrollHeight,
-        previousHeight,
-        previousClient,
-      );
-      following = next;
-      previousTop = container.scrollTop;
-      previousHeight = container.scrollHeight;
-      previousClient = container.clientHeight;
-      setAtTail(next);
+      setAtTail(isAtTail(container.scrollTop, container.clientHeight, container.scrollHeight));
+    };
+    const release = () => setAtTail(false);
+    const onWheel = (event: WheelEvent) => {
+      if (isUpwardGesture(event.deltaY)) release();
+    };
+    let touchStartY: number | null = null;
+    const onTouchStart = (event: TouchEvent) => {
+      touchStartY = event.touches[0]?.clientY ?? null;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY;
+      // 手指下移（clientY 变大）= 内容上滚看历史 = 离开跟随。
+      if (touchStartY !== null && y !== undefined && y > touchStartY) release();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Home") release();
     };
     update();
     container.addEventListener("scroll", update, { passive: true });
-    return () => container.removeEventListener("scroll", update);
+    container.addEventListener("wheel", onWheel, { passive: true });
+    container.addEventListener("touchstart", onTouchStart, { passive: true });
+    container.addEventListener("touchmove", onTouchMove, { passive: true });
+    container.addEventListener("keydown", onKeyDown);
+    return () => {
+      container.removeEventListener("scroll", update);
+      container.removeEventListener("wheel", onWheel);
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("keydown", onKeyDown);
+    };
   }, [scrollContainerRef, session?.id, loading]);
 
   // 在同一批滚动事件中记录读者位置：保活槽被 `display:none` 隐藏后 scrollTop 与
@@ -1629,7 +1645,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             <TurnMetaLine
               usage={turnUsage}
               model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
+              thinkingLevel={isConversationTail ? thinkingLevel : undefined}
               time={formatTime(turnLastAssistant?.timestamp)}
+              timestamp={turnLastAssistant?.timestamp}
               copySource={finalAnswerCopyText || undefined}
               ctxTokens={turnView.nextPromptTokens}
               liveCtx={liveCtx}
@@ -1670,7 +1688,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [messages, entryIds, messageKeys, toolResultsMap, hasEarlierMessages, isStreaming, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
      sessionIdRef, forkFromMessage, handleEditContent, onOpenFile, onOpenSubagent,
-     isNew, messageRefs, bashRunning, editEntryId, cancelEdit]);
+     isNew, messageRefs, bashRunning, editEntryId, cancelEdit, thinkingLevel]);
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
   const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
   const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
@@ -1752,13 +1770,16 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         {!isEmptyNew && (loading ? (
           // 加载骨架占据消息列表区：顶栏与输入框照常渲染（此前整个布局被三根
           // 小条替换，用户反馈“小气而且不对”）。宽度参仿一段对话。
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-[var(--chat-column-padding,40px)] pt-[22px] max-sm:px-6 max-sm:pt-4">
-            <Skeleton className="h-4 w-[38%]" />
-            <Skeleton className="h-4 w-[55%]" />
-            <Skeleton className="h-4 w-[92%]" />
-            <Skeleton className="h-4 w-[80%]" />
-            <Skeleton className="h-4 w-[60%]" />
-            <Skeleton className="h-4 w-[45%]" />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col px-[var(--chat-column-padding,40px)] pt-[22px] max-sm:px-6 max-sm:pt-4">
+            {/* 与消息列同一条居中列（CHAT_COLUMN_CLASS）：骨架不再通铺全宽。 */}
+            <div className={cn(CHAT_COLUMN_CLASS, "flex flex-col gap-3")}>
+              <Skeleton className="h-4 w-[38%]" />
+              <Skeleton className="h-4 w-[55%]" />
+              <Skeleton className="h-4 w-[92%]" />
+              <Skeleton className="h-4 w-[80%]" />
+              <Skeleton className="h-4 w-[60%]" />
+              <Skeleton className="h-4 w-[45%]" />
+            </div>
           </div>
         ) : <>
         <MessageScrollerProvider autoScroll={false} defaultScrollPosition="end">
@@ -2287,14 +2308,9 @@ function ExtensionDialog({
   const { t } = useI18n();
   const [value, setValue] = useState(request.method === "editor" ? request.prefill ?? "" : "");
   const multiSelect = request.method === "input" ? parseMultiSelectPrompt(request.title) : null;
-  const [checkedIds, setCheckedIds] = useState<readonly string[]>([]);
-  const [customAnswer, setCustomAnswer] = useState("");
-  // Select is two-step: a click only marks the choice; the Confirm button (or
-  // double-click) sends it, so a stray click can be revised before it counts.
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const toggleMultiOption = (id: string) => {
-    setCheckedIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
-  };
+  // 选项型提问（select / multiSelect）用 shadcn base Questionnaire：radio/checkbox
+  // 原生语义（方向键、空格内置），答案走 form 提交；底部确认按钮通过 form 属性
+  // 关联回来。
   const [collapsed, setCollapsed] = useState(false);
   // Multi-question asks page: ‹ › steps back through the answers already sent
   // (read-only review — those responses are with the agent) and forward to the
@@ -2328,7 +2344,6 @@ function ExtensionDialog({
   const [full, setFull] = useState(false);
   const toggleFull = useCallback(() => setFull((prev) => !prev), []);
   const [now, setNow] = useState(() => Date.now());
-  const focusFirstOption = useCallback((element: HTMLElement | null) => element?.focus(), []);
 
   const summary = getExtensionDialogSummary(request);
   const remainingSeconds = request.expiresAt === undefined
@@ -2383,16 +2398,23 @@ function ExtensionDialog({
   const submitValue = () => {
     if (request.method === "confirm") {
       onRespond(request, { confirmed: true });
-    } else if (request.method === "select") {
-      if (selectedOption !== null) onRespond(request, { value: selectedOption });
-    } else if (multiSelect) {
-      const value = checkedIds.length > 0
-        ? checkedIds.slice().sort((a, b) => Number(a) - Number(b)).join(",")
-        : customAnswer;
-      onRespond(request, { value });
     } else {
       onRespond(request, { value });
     }
+  };
+  // 单选提交：FormData 里唯一选中值即回复全文。
+  const submitSelectForm = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const selected = Array.from(new FormData(event.currentTarget).values()).map(String).find((v) => v.length > 0);
+    if (selected !== undefined) onRespond(request, { value: selected });
+  };
+  // 多选提交：选中的序号按数值排序逗号连接；一个都没选时用自由输入文本。
+  const submitMultiForm = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const values = Array.from(new FormData(event.currentTarget).values()).map(String);
+    const ids = values.filter((v) => multiSelect?.options.some((option) => option.id === v)).sort((a, b) => Number(a) - Number(b));
+    const text = values.find((v) => !multiSelect?.options.some((option) => option.id === v)) ?? "";
+    onRespond(request, { value: ids.length > 0 ? ids.join(",") : text });
   };
 
   return (
@@ -2556,107 +2578,64 @@ function ExtensionDialog({
             </div>
           )}
           {request.method === "select" && (
-            <div
-              onKeyDown={(event) => {
-                if (!["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"].includes(event.key)) return;
-                const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("[data-extension-option]"));
-                const index = buttons.indexOf(event.target as HTMLElement);
-                if (index < 0) return;
-                event.preventDefault();
-                const next = event.key === "Home" ? 0
-                  : event.key === "End" ? buttons.length - 1
-                  : (index + (event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
-                buttons[next].focus({ preventScroll: true });
-                buttons[next].scrollIntoView({ block: "nearest" });
-              }}
-              className="grid gap-1.5"
+            <Questionnaire
+              id="extension-ask-form"
+              className="gap-3"
+              items={[{ name: "answer", required: true, choices: request.options.map((option) => ({ value: option })) }]}
+              onSubmit={submitSelectForm}
             >
-              {request.options.map((option, index) => {
-                const tone = extensionOptionTone(option);
-                const selected = selectedOption === option;
-                return (
-                <div
-                  key={option}
-                  role="button"
-                  tabIndex={0}
-                  data-extension-option
-                  className={cn(
-                    "extension-option w-full cursor-pointer rounded-md border px-2.5 py-1.5 text-left text-xs wrap-anywhere",
-                    // Match the scroller's padding so keyboard navigation never parks the
-                    // option flush against the edge, where whole-pixel scroll snapping and
-                    // overflow clipping cut off its focus ring.
-                    "scroll-m-[14px]",
-                    selected ? "border-ring bg-accent" : cn(
-                      "border-border",
-                      // Permission-style tints stay readable through hover; the
-                      // selected option keeps its accent surface instead.
-                      tone === "affirmative" ? "bg-success/[0.12] hover:bg-success/[0.22] text-success"
-                        : tone === "negative" ? "bg-destructive/10 hover:bg-destructive/20 text-destructive"
-                          : "bg-sidebar hover:bg-secondary text-foreground",
-                    ),
-                    tone !== "neutral" && "font-semibold",
-                  )}
-                  aria-label={stripAnsi(option)}
-                  aria-pressed={selected}
-                  ref={index === 0 ? focusFirstOption : undefined}
-                  onClick={() => setSelectedOption((current) => current === option ? null : option)}
-                  onDoubleClick={() => {
-                    setSelectedOption(option);
-                    onRespond(request, { value: option });
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.preventDefault();
-                    setSelectedOption((current) => current === option ? null : option);
-                  }}
-                >
-                  <div inert>
-                    <MarkdownBody>{stripAnsi(option)}</MarkdownBody>
-                  </div>
-                </div>
-                );
-              })}
-            </div>
+              <QuestionnaireItem name="answer" required>
+                <QuestionnaireChoices className="gap-1.5">
+                  {request.options.map((option) => {
+                    const tone = extensionOptionTone(option);
+                    return (
+                      <QuestionnaireChoice
+                        key={option}
+                        value={option}
+                        className={cn(
+                          "min-h-9 rounded-md px-2.5 py-1.5 text-xs wrap-anywhere scroll-m-[14px]",
+                          tone === "affirmative" && "data-checked:border-success/40 data-checked:bg-success/[0.12] data-checked:text-success",
+                          tone === "negative" && "data-checked:border-destructive/40 data-checked:bg-destructive/10 data-checked:text-destructive",
+                          tone !== "neutral" && "font-semibold",
+                        )}
+                        onDoubleClick={() => onRespond(request, { value: option })}
+                      >
+                        <div inert>
+                          <MarkdownBody>{stripAnsi(option)}</MarkdownBody>
+                        </div>
+                      </QuestionnaireChoice>
+                    );
+                  })}
+                </QuestionnaireChoices>
+              </QuestionnaireItem>
+            </Questionnaire>
           )}
           {request.method === "input" && (multiSelect ? (
-            <div className="grid gap-1.5">
-              {multiSelect.options.map((option, index) => {
-                const checked = checkedIds.includes(option.id);
-                return (
-                  // The official Checkbox carries the semantics and the Space
-                  // key; the palette card stays the label wrapping it.
-                  <label
-                    key={option.id}
-                    className={cn(
-                      "flex cursor-pointer select-none items-start gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs wrap-anywhere scroll-m-[14px]",
-                      "border-border hover:bg-secondary has-[[data-state=checked]]:border-ring has-[[data-state=checked]]:bg-accent",
-                      "has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/40",
-                    )}
-                  >
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={() => toggleMultiOption(option.id)}
-                      aria-label={option.label}
-                      ref={index === 0 ? focusFirstOption : undefined}
-                      className="mt-[1px] size-[15px] shrink-0 rounded-[4px]"
-                    />
-                    <span className="min-w-0 flex-1">
+            <Questionnaire
+              id="extension-ask-form"
+              className="gap-3"
+              items={[{ name: "answer", choices: multiSelect.options.map((option) => ({ value: option.id })) }]}
+              onSubmit={submitMultiForm}
+            >
+              <QuestionnaireItem name="answer" multiple>
+                <QuestionnaireChoices className="gap-1.5">
+                  {multiSelect.options.map((option) => (
+                    <QuestionnaireChoice
+                      key={option.id}
+                      value={option.id}
+                      className="min-h-9 rounded-md px-2.5 py-1.5 text-xs wrap-anywhere scroll-m-[14px]"
+                    >
                       <span className="mr-1.5 font-semibold">{option.id}.</span>
                       {option.label}
-                    </span>
-                  </label>
-                );
-              })}
-              <Input
-                value={customAnswer}
-                placeholder={t("chat.extensionCustomAnswer")}
-                onChange={(e) => setCustomAnswer(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
-                }}
-                className="rounded-sm border-border bg-card px-2.5"
-              />
-            </div>
+                    </QuestionnaireChoice>
+                  ))}
+                  <QuestionnaireInput
+                    placeholder={t("chat.extensionCustomAnswer")}
+                    className="h-9 min-h-9 rounded-md bg-card px-2.5 text-xs"
+                  />
+                </QuestionnaireChoices>
+              </QuestionnaireItem>
+            </Questionnaire>
           ) : (
             <Input
               autoFocus
@@ -2705,12 +2684,11 @@ function ExtensionDialog({
             <Button type="button" onClick={submitValue}>
                {t("chat.confirm")}
             </Button>
-          ) : request.method === "select" ? (
+          ) : request.method === "select" || multiSelect ? (
             <Button
-              type="button"
-              onClick={submitValue}
-              disabled={selectedOption === null}
-              autoFocus={request.options.length === 0}
+              type="submit"
+              form="extension-ask-form"
+              autoFocus={request.method === "select" && request.options.length === 0}
             >
                {t("chat.confirm")}
             </Button>

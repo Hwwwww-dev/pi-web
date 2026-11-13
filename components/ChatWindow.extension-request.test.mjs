@@ -36,8 +36,9 @@ test("renders extension confirmation and options as markdown", () => {
   // Dialog and option texts are stripped of ANSI codes before markdown
   // rendering (the styled header keeps its TUI rendering elsewhere).
   assert.match(dialogSource, /<MarkdownBody>\{stripAnsi\(request\.message\)\}<\/MarkdownBody>/);
-  assert.match(dialogSource, /role="button"[\s\S]*?data-extension-option[\s\S]*?<div inert>[\s\S]*?<MarkdownBody>\{stripAnsi\(option\)\}<\/MarkdownBody>/);
-  assert.match(dialogSource, /ref=\{index === 0 \? focusFirstOption : undefined\}/);
+  // Options render inside the shadcn base QuestionnaireChoice with the same
+  // inert wrapper and ANSI stripping as the old hand-rolled buttons.
+  assert.match(dialogSource, /<QuestionnaireChoice[\s\S]*?<div inert>\s*<MarkdownBody>\{stripAnsi\(option\)\}<\/MarkdownBody>/);
 });
 
 test("preserves title newlines like pi's TUI and keeps long titles from hiding the body", () => {
@@ -76,10 +77,14 @@ test("queues concurrent requests and pages over pending ones", () => {
 });
 
 test("select answers are two-step: click selects, confirm sends", () => {
-  assert.match(dialogSource, /const \[selectedOption, setSelectedOption\] = useState<string \| null>\(null\)/);
-  assert.match(dialogSource, /onClick=\{\(\) => setSelectedOption\(\(current\) => current === option \? null : option\)\}/);
-  assert.match(dialogSource, /onDoubleClick=\{\(\) => \{\s*\n\s*setSelectedOption\(option\);\s*\n\s*onRespond\(request, \{ value: option \}\);\s*\n\s*\}\}/);
-  assert.match(dialogSource, /request\.method === "select" \? \([\s\S]{0,400}disabled=\{selectedOption === null\}/);
+  // shadcn base Questionnaire：点击仅选中（radio），表单提交才发送；双击选项直接发送。
+  assert.match(dialogSource, /<Questionnaire\s+id="extension-ask-form"[\s\S]*?items=\{\[\{ name: "answer", required: true,[\s\S]*?onSubmit=\{submitSelectForm\}/);
+  assert.match(dialogSource, /<QuestionnaireItem name="answer" required>/);
+  assert.match(dialogSource, /<QuestionnaireChoice[\s\S]*?onDoubleClick=\{\(\) => onRespond\(request, \{ value: option \}\)\}/);
+  assert.match(
+    dialogSource,
+    /const selected = Array\.from\(new FormData\(event\.currentTarget\)\.values\(\)\)\.map\(String\)\.find\(\(v\) => v\.length > 0\);\s*\n\s*if \(selected !== undefined\) onRespond\(request, \{ value: selected \}\);/,
+  );
 });
 
 test("shows how many extension requests wait behind the one on screen", () => {

@@ -2,46 +2,18 @@
  * 会话列表贴底判定的唯一定义处。
  * `ChatWindow` 的 `atTail` 是唯一的跟随信号：官方 scroller 以 `autoScroll={false}`
  * 运行，贴底跟随、完成时刻的保持都只消费这一个状态。
+
+ * 业界标准契约（chat-scroll stick-to-bottom、ChatGPT-Next-Web 等的共同做法）：
+ * - 贴底与重进跟随共用一个距离带（100px，业界默认 40–100 的通用上限值）。
+ * - 跟随的脱离只认用户输入：滚轮上滚、触摸上滑、ArrowUp/PageUp/Home 到达即
+ *   脱离。不从 scrollTop 差值反推意图——折叠保位、浏览器钳制、图片加载引起的
+ *   程序化滚动都会被差值启发式误判成"用户离开"（思考行折叠后跟随脱死的根因）。
+ * - 滚动条拖拽没有输入事件，由几何兜底：距底超出距离带即脱离。
+ * - 内容高度变化（行折叠、图片加载、流式追加）后按几何位置重算，状态自愈。
  */
 
-/** 贴底容差：距内容末端不超过该像素值即视为贴底。 */
-export const CHAT_TAIL_TOLERANCE = 16;
-
-/**
- * 跟随容差：向下滚动进入该范围即恢复跟随。容差服务的是“停住的手”
- * （惯性滚动停在新底附近），不是“回拉的手”。
- */
-export const CHAT_FOLLOW_TOLERANCE = 96;
-
-/**
- * 内容或视口变化后是否继续跟随尾部。
- * - 同帧伴随内容/视口高度变化的上移是滚动锚定调整（图片加载、行折叠、键盘
- *   收起等把 scrollTop 微调回去），不是回拉的手，维持原状态——锚定必然伴随
- *   高度变化，纯手势回拉高度不变；这比像素死区可靠：像素阈值会被跟随循环
- *   的回拽不断清零，脱离不了（用户上滑抖动几秒的根因）。
- * - 纯手势回拉（高度都没变）立即脱离。
- * - 贴底，或向下滚动进入跟随容差，则跟随；其余维持原状。
- */
-export function shouldFollow(
-  wasFollowing: boolean,
-  previousScrollTop: number,
-  scrollTop: number,
-  clientHeight: number,
-  scrollHeight: number,
-  previousScrollHeight = scrollHeight,
-  previousClientHeight = clientHeight,
-): boolean {
-  if (scrollTop < previousScrollTop) {
-    // 同帧高度变化：锚定调整，不算上滑。落到新底附近则跟随（完成时列表重组、
-    // 行折叠收起、视口长高的钳制落点都在新底贴底容差内）。
-    if (scrollHeight !== previousScrollHeight || clientHeight !== previousClientHeight) {
-      return isAtTail(scrollTop, clientHeight, scrollHeight) ? true : wasFollowing;
-    }
-    return false;
-  }
-  if (isAtTail(scrollTop, clientHeight, scrollHeight, CHAT_FOLLOW_TOLERANCE)) return true;
-  return wasFollowing;
-}
+/** 贴底/重进跟随共用距离带（px）：距内容末端不超过该值即视为贴底。 */
+export const CHAT_TAIL_TOLERANCE = 100;
 
 export function isAtTail(
   scrollTop: number,
@@ -50,4 +22,9 @@ export function isAtTail(
   tolerance = CHAT_TAIL_TOLERANCE,
 ): boolean {
   return scrollTop + clientHeight >= scrollHeight - tolerance;
+}
+
+/** 用户输入是否为"向上离开"意图：滚轮/触摸事件的向上分量。 */
+export function isUpwardGesture(deltaY: number): boolean {
+  return deltaY < 0;
 }

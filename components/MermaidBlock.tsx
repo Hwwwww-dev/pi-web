@@ -27,7 +27,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useI18n } from "@/hooks/useI18n";
 import { usePrismLanguages } from "@/hooks/usePrismLanguages";
 import { copyText } from "@/lib/clipboard";
-import { takeHighlightBudget, waitForHighlight } from "@/lib/highlight-queue";
+import { takeHighlightBudget, waitForHighlight, MAX_HIGHLIGHT_CHARS } from "@/lib/highlight-queue";
 import { prismLanguagesLoaded } from "@/lib/prism-languages";
 
 interface MermaidBlockProps {
@@ -390,7 +390,9 @@ function renderCodeLines({ rows, stylesheet, useInlineStyles }: CodeLinesProps) 
  * A finished block past this task's highlight budget (lib/highlight-queue.ts),
  * or mounted before the Prism languages have loaded (lib/prism-languages.ts),
  * renders through the same highlighter as `text` (same lines, numbers and
- * box, no tokens) until an idle slice lets it take its language.
+ * box, no tokens) until an idle slice lets it take its language. A body over
+ * MAX_HIGHLIGHT_CHARS never takes colors: tokenizing it would eat a whole
+ * frame.
  */
 export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isStreaming }: CodeBlockProps) {
   // 末尾空行不计入内容：它只会在卡片底部多出一行空白。
@@ -401,14 +403,15 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
   // Loading starts with the first block, streaming or not, so a streamed
   // reply usually finds the languages ready when it ends.
   const languagesReady = usePrismLanguages();
+  const highlightable = code.length <= MAX_HIGHLIGHT_CHARS;
   const [highlighted, setHighlighted] = useState(
-    () => !isStreaming && prismLanguagesLoaded() && takeHighlightBudget(code.length),
+    () => highlightable && !isStreaming && prismLanguagesLoaded() && takeHighlightBudget(code.length),
   );
 
   useEffect(() => {
-    if (isStreaming || highlighted || !languagesReady) return;
+    if (!highlightable || isStreaming || highlighted || !languagesReady) return;
     return waitForHighlight(() => setHighlighted(true));
-  }, [isStreaming, highlighted, languagesReady]);
+  }, [highlightable, isStreaming, highlighted, languagesReady]);
 
   const copy = () => {
     copyText(code).then((copied) => {

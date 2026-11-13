@@ -440,9 +440,6 @@ export function isExactSlashCommand(message: string, command: SlashCommandPalett
 /** Queued pills the composer shows before it folds the rest behind a toggle. */
 const QUEUE_PREVIEW_ROWS = 2;
 
-/** 发送键动作菜单：按住多久弹出（快速点击仍是默认动作）。 */
-const SEND_HOLD_MS = 260;
-
 export function submitsSlashCommandOnEnter(message: string, command: SlashCommandPaletteItem, isStreaming: boolean): boolean {
   if (command.source === "builtin") {
     return isExactSlashCommand(message, command) && (!isStreaming || command.availableWhileStreaming === true);
@@ -1576,12 +1573,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     onSideChat(msg);
   }, [value, attachedImages, onSideChat, clearInput]);
 
-  // 发送键动作菜单：流式且有可发送内容时按住母键弹出标准 shadcn 菜单
-  // （立即发送/引导/队列/侧聊）；快速点击仍是默认动作。pointerdown
-  // preventDefault 接管按下手势，Radix 不会在按下时自行打开。
-  const [sendMenuOpen, setSendMenuOpen] = useState(false);
-  const sendHoldTimerRef = useRef<number | null>(null);
-  const sendSuppressClickRef = useRef(false);
+  // 发送键动作菜单：流式且有可发送内容时点击发送键弹出标准 Dropdown
+  // （立即发送/引导/队列/侧聊）。
   const sendNowAfterAbortRef = useRef(false);
   // 立即发送：先打断，本轮真正空闲后把当前输入发出去（handleSend 在流式期间
   // 直接拒绝，因此借 effect 等待空闲；若打断后排队的消息接续开跑，旗标保留
@@ -1610,25 +1603,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     if (onSideChat) items.push({ key: "side", label: t("chat.sideChat"), hint: t("chat.sideChatHint"), Icon: MessagesSquareIcon, run: sendToSideChat });
     return items;
   })();
-  const handleSendOrbPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (sendActions.length === 0) return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    sendHoldTimerRef.current = window.setTimeout(() => {
-      sendHoldTimerRef.current = null;
-      // 按住打开菜单后的合成 click 不能再触发默认动作。
-      sendSuppressClickRef.current = true;
-      setSendMenuOpen(true);
-    }, SEND_HOLD_MS);
-  };
-  const handleSendOrbPointerUp = () => {
-    if (sendHoldTimerRef.current !== null) {
-      window.clearTimeout(sendHoldTimerRef.current);
-      sendHoldTimerRef.current = null;
-    }
-  };
-  const handleSendOrbPointerCancel = handleSendOrbPointerUp;
-
   const queueFollowUp = useCallback(async (mode: "steer" | "followup" = "followup") => {
     const msg = value.trim();
     if (!msg && !attachedImages.length) return;
@@ -2158,52 +2132,49 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       </TooltipTrigger>
       <TooltipContent>{t("chat.stopAgent")}</TooltipContent>
     </Tooltip>
-  ) : (
-    <DropdownMenu open={sendMenuOpen} onOpenChange={setSendMenuOpen}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <Button
-              onClick={(e) => {
-                // 按住打开菜单后的合成 click 不能再触发默认动作。
-                if (sendSuppressClickRef.current) {
-                  sendSuppressClickRef.current = false;
-                  e.preventDefault();
-                  return;
-                }
-                if (isStreaming) void queueFollowUp();
-                else void handleSend();
-              }}
-              onPointerDown={handleSendOrbPointerDown}
-              onPointerUp={handleSendOrbPointerUp}
-              onPointerCancel={handleSendOrbPointerCancel}
-              disabled={!canSubmit}
-              aria-label={t("chat.send")}
-              className={cn(
-                "size-9 shrink-0 touch-none rounded-full",
-                canSubmit || isStreaming
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                  : "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
-              )}
-            >
-              <ArrowUpIcon data-icon strokeWidth={2.2} aria-hidden="true" />
-            </Button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent>{t("chat.send")}</TooltipContent>
-      </Tooltip>
-      <DropdownMenuContent side="top" align="end" sideOffset={8} className="min-w-[210px]">
+  ) : sendActions.length > 0 ? (
+    // 发送键动作菜单：流式且有可发送内容时点击发送键弹出
+    // （立即发送/引导/队列/侧聊）。
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={t("chat.send")}
+          className="size-9 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          <ArrowUpIcon data-icon strokeWidth={2.2} aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="end" className="w-60">
         {sendActions.map((action) => (
-          <DropdownMenuItem key={action.key} className="gap-2.5" onSelect={action.run}>
-            <action.Icon data-icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.9} aria-hidden="true" />
-            <span className="flex min-w-0 flex-col">
-              <span className="text-[13px] leading-tight">{action.label}</span>
-              <span className="text-[11px] leading-tight text-muted-foreground">{action.hint}</span>
-            </span>
+          <DropdownMenuItem key={action.key} onSelect={action.run}>
+            <action.Icon strokeWidth={1.9} aria-hidden="true" />
+            <div className="flex min-w-0 flex-col">
+              <span>{action.label}</span>
+              <span className="text-xs text-muted-foreground">{action.hint}</span>
+            </div>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  ) : (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          onClick={() => void handleSend()}
+          disabled={!canSubmit}
+          aria-label={t("chat.send")}
+          className={cn(
+            "size-9 shrink-0 touch-none rounded-full",
+            canSubmit
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+              : "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
+          )}
+        >
+          <ArrowUpIcon data-icon strokeWidth={2.2} aria-hidden="true" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{t("chat.send")}</TooltipContent>
+    </Tooltip>
   );
 
   return (

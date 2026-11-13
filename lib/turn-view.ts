@@ -45,6 +45,14 @@ export function formatUsage(usage: TurnUsage): string {
   return parts.join(" · ");
 }
 
+/** 完整时间戳（本地时区 YYYY-MM-DD HH:mm:ss），回合行的悬浮说明用。 */
+export function formatFullTimestamp(ts?: number | null): string | null {
+  if (!ts) return null;
+  const d = new Date(ts);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 /** Prompt tokens a provider charged for one request: non-cached input plus cache reads/writes. */
 export function promptTokensOf(usage: { input?: number; cacheRead?: number; cacheWrite?: number }): number {
   return (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);

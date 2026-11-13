@@ -972,6 +972,7 @@ export const enLocale: LocalePlugin = {
     "i18n.close": "Close",
     "i18n.copy": "Copy",
     "i18n.copied": "Copied",
+    "i18n.toolOutputTruncated": "Output truncated: showing head and tail only, {count} characters omitted",
     "i18n.cancel": "Cancel",
     "i18n.save": "Save",
     "i18n.saving": "Saving…",

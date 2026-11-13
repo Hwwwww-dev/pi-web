@@ -7,7 +7,7 @@ import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
 import { usePrismLanguages } from "@/hooks/usePrismLanguages";
-import { takeHighlightBudget, waitForHighlight } from "@/lib/highlight-queue";
+import { takeHighlightBudget, waitForHighlight, MAX_HIGHLIGHT_CHARS } from "@/lib/highlight-queue";
 import { prismLanguagesLoaded } from "@/lib/prism-languages";
 
 /**
@@ -16,8 +16,9 @@ import { prismLanguagesLoaded } from "@/lib/prism-languages";
  * typography and only gains colors.
  *
  * Same rules as CodeBlock's fences: the languages load once in a chunk of their
- * own (`lib/prism-languages.ts`), and a block past this task's highlight budget
- * stays plain monospace until an idle slice lets it take its language.
+ * own (`lib/prism-languages.ts`), a block past this task's highlight budget
+ * stays plain monospace until an idle slice lets it take its language, and a
+ * body over `MAX_HIGHLIGHT_CHARS` stays plain for good.
  */
 export const HighlightedCode = memo(function HighlightedCode({ code, language }: {
   code: string;
@@ -26,13 +27,14 @@ export const HighlightedCode = memo(function HighlightedCode({ code, language }:
   const { isDark } = useTheme();
   const languagesReady = usePrismLanguages();
   const plain = !language || language === "text" || language === "plaintext";
+  const highlightable = code.length <= MAX_HIGHLIGHT_CHARS;
   const [highlighted, setHighlighted] = useState(
-    () => !plain && prismLanguagesLoaded() && takeHighlightBudget(code.length),
+    () => highlightable && !plain && prismLanguagesLoaded() && takeHighlightBudget(code.length),
   );
   useEffect(() => {
-    if (plain || highlighted || !languagesReady) return;
+    if (plain || !highlightable || highlighted || !languagesReady) return;
     return waitForHighlight(() => setHighlighted(true));
-  }, [plain, highlighted, languagesReady]);
+  }, [plain, highlightable, highlighted, languagesReady]);
 
   const tokens = useMemo(() => {
     if (!highlighted || !language) return null;

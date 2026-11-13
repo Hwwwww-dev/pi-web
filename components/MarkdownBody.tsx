@@ -11,6 +11,7 @@ import { inlineCodeFilePath, inlineCodeLineSuffix, isExternalMarkdownHref, jumpT
 import { isAudioPath, isVideoPath } from "@/lib/file-types";
 import { splitMarkdownBlocks } from "@/lib/markdown-blocks";
 import { ImagePreview } from "./ImagePreview";
+import { getImageSize, rememberImageSize } from "@/lib/image-size-cache";
 import { MermaidBlock, CodeBlock } from "./MermaidBlock";
 import { SvgBlock } from "./SvgBlock";
 
@@ -54,8 +55,25 @@ function MarkdownImage({
     return <video controls playsInline preload="metadata" src={mediaSrc} aria-label={label} />;
   }
   // Dynamic local paths are served directly by the file API.
-  // eslint-disable-next-line @next/next/no-img-element
-  const image = <img src={mediaSrc} alt={alt ?? ""} loading="lazy" {...props} />;
+  // 尺寸缓存：重挂载（回合完成的消息重读）时按首次加载的自然尺寸预留
+  // 盒子，避免图片重复跳动。{...props} 在后，作者手写的尺寸优先。
+  const cachedSize = mediaSrc ? getImageSize(mediaSrc) : undefined;
+  const image = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={mediaSrc}
+      alt={alt ?? ""}
+      loading="lazy"
+      width={cachedSize?.width}
+      height={cachedSize?.height}
+      onLoad={(event) => {
+        if (!mediaSrc) return;
+        const el = event.currentTarget;
+        rememberImageSize(mediaSrc, el.naturalWidth, el.naturalHeight);
+      }}
+      {...props}
+    />
+  );
   if (!mediaSrc || insideLink) return image;
   return (
     <ImagePreview src={mediaSrc} alt={alt ?? ""} className="markdown-image">
