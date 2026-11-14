@@ -200,9 +200,11 @@
   --chat-content-font-size: 14px;
   /* 会话列的唯一定义处：消息行、新会话 hero、输入框、扩展状态行均从这里取值，组件内不写字面量。
      --chat-column-padding：消息列左右留白。
-     --chat-composer-inset：输入框文字起点（InputGroup p-2 + 控件 px-3 = 20），扩展状态行胶囊据此对齐。 */
+     --chat-composer-inset：输入框文字起点（InputGroup p-2 + 控件 px-3 = 20），扩展状态行胶囊据此对齐。
+     --chat-row-gap：行间距，由滚动容器的 gap 统一施加。 */
   --chat-column-padding: 28px;
   --chat-composer-inset: 20px;
+  --chat-row-gap: 16px;
 }
 
 @media (max-width: 640px) {

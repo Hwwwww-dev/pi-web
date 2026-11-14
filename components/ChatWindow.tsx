@@ -1349,9 +1349,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       // Anchor for live-tail detection. A compaction summary or subagent
       // completion can sit after the last user message and own the
       // still-streaming segment.
-      // 流式中的助手消息是分段所有者：它之后入列的消息（排队用户、后台子代理
-      // 完成通知）不得切开流式段，否则流式回合被按已结束回合拆分渲染，随每个
-      // 分块重排。仅运行期降级；回合结束后恢复完整锚点语义。
+      // 流式中的回合不得被回合锚点切开（否则被按已结束回合拆分渲染）。只降级
+      // 流式助手之后的非用户锚点（子代理完成通知等 custom）：新提问的乐观气泡
+      // 入列时流式助手多半还没进 messages，streamingAssistantIdx 会指向上一回
+      // 合的助手，把用户消息一并降级会吞掉新回合（用量栏消失、气泡错位）。
       let streamingAssistantIdx = -1;
       if (sessionBusy || isStreaming) {
         for (let i = messages.length - 1; i >= 0; i--) {
@@ -1359,8 +1360,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         }
       }
       const isTurnAnchor = (i: number) => {
-        if (!isMessageGroupAnchor(messages[i])) return false;
-        return streamingAssistantIdx === -1 || i < streamingAssistantIdx;
+        const anchorMsg = messages[i];
+        if (!isMessageGroupAnchor(anchorMsg)) return false;
+        if (streamingAssistantIdx === -1 || i < streamingAssistantIdx) return true;
+        return anchorMsg.role !== "user";
       };
       let lastAnchorIdx = -1;
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -1816,7 +1819,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <MessageScrollerContent
             ref={messageContentRef}
             onPointerUp={captureQuotedSelection}
-            className="pt-[22px] pb-2 max-sm:pt-4"
+            className="gap-[var(--chat-row-gap)] pt-[22px] pb-2 max-sm:pt-4"
           >
             {hasMoreRendered && (
               // 手动入口：自动加载需等上一页渲染完成，此按钮允许随时请求一页。

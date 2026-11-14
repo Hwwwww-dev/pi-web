@@ -2141,6 +2141,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           // down must not stay listed.
           setAgentPhase({ kind: "waiting_model" });
         }
+        // 断线窗口内完成的消息不会重放：重连时本端仍在运行（流式中，或阻塞在
+        // 工具调用上）就整载一次会话文件回填，否则这些消息要等回合结束才出现。
+        if ((event.isStreaming === true || agentRunningRef.current) && sessionIdRef.current) {
+          void loadSession(sessionIdRef.current);
+        }
         // Opening the stream is what resumes an idle-reaped session, so the
         // mount's state read may have found no runtime and no usage to show.
         if (sessionIdRef.current) void refreshContextUsage(sessionIdRef.current);
