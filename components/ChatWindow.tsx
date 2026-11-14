@@ -1363,7 +1363,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const anchorMsg = messages[i];
         if (!isMessageGroupAnchor(anchorMsg)) return false;
         if (streamingAssistantIdx === -1 || i < streamingAssistantIdx) return true;
-        return anchorMsg.role !== "user";
+        // 流式助手之后的锚点：用户新回合永远生效（含流式启动竞态——新提问入列
+        // 时 streamingAssistantIdx 还指向上一回合的助手）；仅 custom 通知降级，
+        // 不切开流式回合。
+        return anchorMsg.role === "user";
       };
       let lastAnchorIdx = -1;
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -2018,14 +2021,14 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         <ExtensionStatusBar
           statuses={extensionStatuses}
           widgets={extensionWidgets}
-          trailing={<StreamStatusPill store={streamingStore} />}
+          leading={<StreamStatusPill store={streamingStore} />}
           onCommand={handleSend}
           commandsDisabled={sessionBusy}
         />
-        {/* 状态条不在时，胶囊浮在同一条带右端（包裹层 relative）：绝对定位不占布局，
+        {/* 状态条不在时，胶囊浮在同一条带左端（包裹层 relative）：绝对定位不占布局，
             消息列表与队列 pills 都不会因它出现/消失而移动。 */}
         {!hasExtensionStatusBarContent(extensionStatuses, extensionWidgets) && (
-          <div className={`pointer-events-none absolute inset-x-0 bottom-1 flex justify-end ${CHAT_COMPOSER_INSET_CLASS}`}>
+          <div className={`pointer-events-none absolute inset-x-0 bottom-1 flex justify-start ${CHAT_COMPOSER_INSET_CLASS}`}>
             <StreamStatusPill store={streamingStore} />
           </div>
         )}
