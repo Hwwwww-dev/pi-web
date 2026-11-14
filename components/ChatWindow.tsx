@@ -1607,7 +1607,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               .join("\n")
           : "";
         const metaNode = (
-          <div className="mb-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+          <div key={`turn-meta-${entryIds[userIdx] ?? userIdx}`} className="mb-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
             <TurnMetaLine
               usage={turnUsage}
               model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
@@ -1796,7 +1796,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               // 每条消息一个 Item：官方据此测量、锚定并记录可视性。
               // 离屏行不做 `content-visibility` 跳过：估算高度会让新行先矮再撑开。非元素行（空渲染）原样返回。
               if (!isValidElement<{ "data-entry-id"?: string }>(node)) return node;
-              const messageId = node.props["data-entry-id"] ?? `turn-${index}`;
+              // messageId 是官方 scroller 的 Item 身份（可见性、前插保位、锚定都按它
+              // 跟踪），必须跨前插/追加稳定：优先 entryId，其次行自身的稳定 key
+              //（entryId 或 live: 键），绝不回退到会随前插漂移的数组下标。
+              const messageId = node.props["data-entry-id"]
+                ?? (typeof node.key === "string" && node.key ? node.key : `turn-${index}`);
               // 不传 scrollAnchor：官方 scroller 会在追加含 scrollAnchor 行时把该行
               // align-start 置顶并在列表尾垫隐形 spacer（anchored-to-message 模式
               // 持续钉住），与贴底跟随打架：发送后“底”分裂成真底与 spacer 假底，
