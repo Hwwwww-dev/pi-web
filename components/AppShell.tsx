@@ -2072,7 +2072,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         // 统一浮层壳（HeaderFlyout）；清单由 AgentSessionPanel 渲染，此处仅负责
         // 定位（贴触发钮右缘）、宽度（AGENT_PANEL_WIDTH）与 z-500（高于引用工具栏）。
         align="end"
-        sideOffset={8}
+        sideOffset={14}
         z="z-[500]"
         width="w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)]"
         className="mt-0 min-h-[300px]"
@@ -2565,7 +2565,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <PopoverAnchor virtualRef={moreButtonRef} />
             {/* 系统提示与工具定义共用同一浮层卡：⋯ 按钮下方 8px，右对齐向左展开
                 （面板比按钮宽得多）；圆角 rounded-xl。 */}
-            <HeaderFlyout width="w-[560px] max-w-[calc(100vw-16px)]" align="end" sideOffset={8} collisionPadding={8}>
+            <HeaderFlyout width="w-[560px] max-w-[calc(100vw-16px)]" align="end" sideOffset={14} collisionPadding={8}>
               <SystemPromptPanel
                 loading={systemInfoLoading}
                 prompt={systemPrompt}
@@ -2578,7 +2578,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             onOpenChange={(next) => next ? setActiveFlyout("tools") : closeFlyout("tools")}
           >
             <PopoverAnchor virtualRef={moreButtonRef} />
-            <HeaderFlyout width="w-[720px] max-w-[calc(100vw-16px)]" align="end" sideOffset={8} collisionPadding={8}>
+            <HeaderFlyout width="w-[720px] max-w-[calc(100vw-16px)]" align="end" sideOffset={14} collisionPadding={8}>
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
                 tools={systemTools}
@@ -2595,7 +2595,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 展开；与系统提示、工具定义、调试共用同一浮层卡（同宽、同圆角、同
                 描边阴影）；session-info-popover 类名保留作为 e2e 定位锚，内容滚动
                 发生在面板内部。 */}
-            <HeaderFlyout className="session-info-popover" width="w-[560px] max-w-[calc(100vw-16px)]" align="end" sideOffset={8} collisionPadding={8}>
+            <HeaderFlyout className="session-info-popover" width="w-[560px] max-w-[calc(100vw-16px)]" align="end" sideOffset={14} collisionPadding={8}>
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
                 const ws = selectedSession;
@@ -2716,7 +2716,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               : setActiveFlyout((cur) => cur === "debug" ? null : cur)}
           >
             <PopoverAnchor virtualRef={moreButtonRef} />
-            <HeaderFlyout width="w-[560px] max-w-[calc(100vw-16px)]" align="end" sideOffset={8} collisionPadding={8}>
+            <HeaderFlyout width="w-[560px] max-w-[calc(100vw-16px)]" align="end" sideOffset={14} collisionPadding={8}>
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
                   readerRef={debugSnapshotReaderRef}

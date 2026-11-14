@@ -40,7 +40,7 @@ export function messageRenderKeys(entryIds: readonly string[], count: number, al
 
 // The file holds pi's own message, except for the prompt, sent with the
 // browser's timestamp, and a custom message, stamped when its entry was written.
-function sameMessage(live: AgentMessage, loaded: AgentMessage): boolean {
+export function sameMessage(live: AgentMessage, loaded: AgentMessage): boolean {
   if (live.role !== loaded.role) return false;
   if (live.role === "user") return userMessageKey(live) === userMessageKey(loaded);
   if (live.role === "custom") return live.customType === (loaded as CustomMessage).customType;

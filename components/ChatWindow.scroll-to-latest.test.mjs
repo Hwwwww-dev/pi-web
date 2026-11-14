@@ -13,16 +13,24 @@ test("one scroll-to-latest control, and it is the official one", () => {
   assert.match(source, /<MessageScrollerButton[\s\S]*?chat\.scrollToLatest/);
 });
 
-test("the scroller runs without internal following; the follow state machine is the only follower", () => {
-  // 官方内部跟随（following-bottom 会被状态提交强制回填、与翻页前插保位互拓）
-  // 已关闭；贴底跟随全部由 hooks/useChatFollow 驱动的 lib/chat-follow.ts 状态机
-  // 接管，ChatWindow 不再有跟随组件，也没有"滚到末端"的调用。
-  assert.match(source, /<MessageScrollerProvider autoScroll=\{false\} defaultScrollPosition="end" scrollEdgeThreshold=\{0\}>/);
-  assert.doesNotMatch(source, /FollowTailWhenAtTail|scrollToEnd|CHAT_TAIL_TOLERANCE/);
+test("the official scroller owns following, prepend anchoring and the bottom edge", () => {
+  // autoScroll 打开：贴底时跟随、向上滚动即脱开、程序滚动期间由它自己标记
+  // （data-autoscrolling）。行窗口与手工前插保位都已删除，因此这里不能再有
+  // 自己的跟随状态机。
+  assert.match(source, /<MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  assert.doesNotMatch(source, /autoScroll=\{false\}/);
+  assert.doesNotMatch(source, /useChatFollow|chat-follow|lib\/scroll-anchor/);
   // Hand-rolled compensation must not sit next to the official one.
   assert.equal(source.includes("preserveScrollOnPrepend={false}"), false);
-  // 消息行不传 scrollAnchor：原语会趁追加把该行对齐到顶。
-  assert.equal(source.includes('scrollAnchor={anchorRole === "user"}'), false);
+  // 不传 scrollAnchor：官方给锚点行 align-start 置顶并在尾部垫 spacer，
+  // 与贴底跟随互抢（"底"分裂成真底与假底）。
+  assert.doesNotMatch(source, /scrollAnchor=/);
+});
+
+test("no render window: every loaded row stays mounted", () => {
+  // 渲染行窗口一裁，翻页读进来的历史就真的不在 DOM 里了（这正是"丢消息"的来源）。
+  // 离屏行不做 content-visibility 跳过：它们仍在 DOM 里，只是不参与绘制优化。
+  assert.doesNotMatch(source, /visibleCount|getVisibleRenderWindow|VISIBLE_PAGE_SIZE/);
 });
 
 test("nothing else writes the reader's scroll position", () => {
@@ -32,6 +40,10 @@ test("nothing else writes the reader's scroll position", () => {
   // A per-chunk rAF scroll fought the provider's own autoScroll.
   assert.equal(hookSource.includes("liveFollowFrameRef"), false);
   assert.equal(hookSource.includes("showScrollToBottom"), false);
+  // 程序化跳转一律走官方命令（它会把模式置为 settling-jump 并抑制跟随）；
+  // 只剩“官方 api 还没挂上”时的到底兜底。
+  assert.doesNotMatch(source, /container\.scrollTop \+=/);
+  assert.match(source, /scrollerApiRef\.current\?\.scrollToMessage\(/);
 });
 
 test("no background read of the whole branch", () => {
@@ -50,9 +62,6 @@ test("one page at a time: the next request waits for the last one to render", ()
   // wait lives here instead of in each caller.
   assert.match(source, /if \(pageRenderingRef\.current\) \{\s*await new Promise<void>\(\(resolve\) => pageRenderWaitersRef\.current\.push\(resolve\)\);/);
   assert.match(source, /if \(context\) \{\s*pageRenderingRef\.current = true;/);
-  // Released after the prepend is in the rendered window and a frame was painted.
-  assert.match(source, /if \(visibleCount < messages\.length\) return;\s*const frame = requestAnimationFrame\(\(\) => \{\s*pageRenderingRef\.current = false;/);
-  assert.match(source, /\}, \[visibleCount, messages\.length, olderPageState\]\);/);
 });
 
 test("the earlier-messages row is a real button", () => {
@@ -67,22 +76,16 @@ test("the earlier-messages row is a real button", () => {
 test("clearing the gate re-arms the sentinel without a scroll round-trip", () => {
   // 监听 scroll 的 effect 重建后会自行先试一次：上一页落地时读者仍在顶部即继续加载，
   // 无需再次滚动。
-  assert.match(source, /\}, \[sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState\]\);/);
+  assert.match(source, /\}, \[sentinel, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState\]\);/);
 });
 
-test("a minimap jump reads one page at a time, never the whole branch", () => {
+test("a minimap jump reads one window, never the whole branch", () => {
   const jump = source.slice(
     source.indexOf("const revealTurnForMinimap"),
-    source.indexOf("const revealTurnForMinimap") + 2000,
+    source.indexOf("const revealTurnForMinimap") + 1200,
   );
-  // No bulk window widening: the prepend sync effect keeps the window at the
-  // loaded count, so a jump cannot render a second copy of everything at once.
-  assert.doesNotMatch(jump, /messagesLenRef\.current \* 2/);
-  // Same page size as scrolling; the anchor stops the loop.
+  // 目标不在窗口里就取一窗（该轮居中），落地后按 entryId 定位。
+  assert.match(jump, /await jumpToEntry\(sid, activeLeafId, target\.entryId\)/);
+  assert.match(jump, /setPendingRevealEntryId\(target\.entryId\)/);
   assert.doesNotMatch(jump, /tail: 100|tail: 200/);
-  assert.match(jump, /await loadOlderPage\(sid, snapshot\.historyCursor\)/);
-  // A cursor that stopped moving would fetch the same page again.
-  assert.match(jump, /if \(snapshot\.historyCursor === cursor\) break;/);
-  // A turn that is not on this branch is not chased further.
-  assert.match(jump, /if \(!snapshot\.historyCursor \|\| !snapshot\.hasEarlierMessages\) break;/);
 });

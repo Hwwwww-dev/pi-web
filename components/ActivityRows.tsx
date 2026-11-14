@@ -747,10 +747,10 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
     <div className="flex min-w-0 flex-col gap-1.5 [&_[data-message-text]]:my-1">
       {nodes.map((node, index) =>
         isValidElement(node) ? (
-          // 高度展开式进场：行的占位高度从 0fr 逐帧长到 1fr（复用 trace-fold-down），
-          // 贴底跟随逐帧同步，列表上移连续平滑；只动画绘制（fade/slide）时高度仍是
-          // 一帧跳变，读作硬挤。motion-reduce 退回瞬时出现。
-          <div key={node.key ?? index} className="grid min-w-0 grid-rows-[1fr] animate-[trace-fold-down_200ms_ease-out] motion-reduce:animate-none">
+          // 不加入场动画：这一层的 `animate-[trace-fold-down]` 只在**重挂载**时重播，
+          // 而行的 key 不保证稳定（`node.key ?? index`，插入/替换后 index 会漂移），
+          // 于是已完成的行走一次内部更新也会平滑上滑一次。
+          <div key={node.key ?? index} className="grid min-w-0 grid-rows-[1fr]">
             <div className="min-h-0 min-w-0 overflow-hidden">{node}</div>
           </div>
         ) : (

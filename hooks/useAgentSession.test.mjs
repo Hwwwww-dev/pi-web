@@ -10,8 +10,6 @@ const phaseLabelSource = await jitiSource(new URL("../lib/chat-phase-label.ts", 
 const chatInputSource = await jitiSource(new URL("../components/ChatInput.tsx", import.meta.url));
 const messageViewSource = await jitiSource(new URL("../components/MessageView.tsx", import.meta.url));
 const appShellSource = await jitiSource(new URL("../components/AppShell.tsx", import.meta.url));
-const chatFollowSource = await jitiSource(new URL("./useChatFollow.ts", import.meta.url));
-const chatFollowRulesSource = await jitiSource(new URL("../lib/chat-follow.ts", import.meta.url));
 
 test("keeps the session event stream open through the idle grace window", () => {
   const finishSource = source.slice(
@@ -96,8 +94,8 @@ test("opening System or Tools lazily starts a dormant session without sending a 
   assert.match(loaderEffectSource, /if \(background\) return;/);
   assert.match(loaderEffectSource, /onSystemInfoLoaderChange\?\.\(loadSystemInfo\)/);
   assert.match(loaderEffectSource, /onSystemInfoLoaderChange\?\.\(null\)/);
-  assert.match(appShellSource, /onSelect=\{\(\) => openTopPanelFromMenu\(\(\) => handleSystemInfoToggle\("system"\)\)\}/);
-  assert.match(appShellSource, /onSelect=\{\(\) => openTopPanelFromMenu\(\(\) => handleSystemInfoToggle\("tools"\)\)\}/);
+  assert.match(appShellSource, /onSelect=\{\(\) => openFlyoutFromMenu\(\(\) => handleSystemInfoToggle\("system"\)\)\}/);
+  assert.match(appShellSource, /onSelect=\{\(\) => openFlyoutFromMenu\(\(\) => handleSystemInfoToggle\("tools"\)\)\}/);
   assert.match(appShellSource, /systemInfoLoaderRef\.current/);
   assert.doesNotMatch(appShellSource, /systemPrompt !== null \|\| systemInfoLoading/);
   assert.match(appShellSource, /const loadId = \+\+systemInfoLoadIdRef\.current/);
@@ -202,7 +200,7 @@ test("sessions the user never overrode follow pi's configured defaultTools (#700
   );
 });
 
-test("only the session-mount load probes disk for external appends", () => {
+test("session mount, idle follow, and late appends are the only forced disk reads", () => {
   const loadSessionSource = source.slice(
     source.indexOf("  const loadSession = useCallback"),
     source.indexOf("  const loadContext = useCallback"),
@@ -211,12 +209,23 @@ test("only the session-mount load probes disk for external appends", () => {
     source.indexOf("// Load session on mount"),
     source.indexOf("sessionHookMountedRef.current = false"),
   );
+  const idleFollowSource = source.slice(
+    source.indexOf("  // Idle follow: a read-only open session must track appends"),
+    source.indexOf("  useEffect(() => {\n    agentRunningRef.current = agentRunning;"),
+  );
+  const lateAppendSource = source.slice(
+    source.indexOf('case "message_end":'),
+    source.indexOf('case "tool_execution_start"'),
+  );
   assert.match(loadSessionSource, /options\?: \{ force\?: boolean \}/);
   assert.match(loadSessionSource, /if \(options\?\.force\) params\.set\("force", "1"\)/);
   assert.match(loadSessionSource, /d\.wrapperRebuilt[\s\S]*?eventConnectionRef\.current\?\.close\("rebuilt"\)[\s\S]*?maintain\(sid\)/);
   assert.match(mountSource, /loadSession\(session\.id, !cached, true, \{ force: true \}\)/);
+  assert.match(idleFollowSource, /force=1&tree=summary/);
+  assert.match(idleFollowSource, /await loadSession\(sid, false, false, \{ force: true \}\)/);
+  assert.match(lateAppendSource, /void loadSession\(sid, false, false, \{ force: true \}\)/);
   assert.match(source, /await loadSession\(sid\)/);
-  assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 1);
+  assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 3);
 });
 
 test("forking stays available during a run while in-session branch switches wait for it", () => {
@@ -231,7 +240,7 @@ test("forking stays available during a run while in-session branch switches wait
 
   // Fork copies into a new file, so only a shell command blocks it; the
   // in-session edit still waits because pi refuses navigate_tree mid-run.
-  assert.match(chatWindowSource, /onFork=\{bashRunning \|\| isNew \? undefined : handleFork\}/);
+  assert.match(chatWindowSource, /onFork=\{bashRunning \|\| isNew \? undefined : forkFromMessage\}/);
   assert.match(chatWindowSource, /onEditContent=\{sessionBusy \? undefined : handleEditContent\}/);
   assert.match(chatWindowSource, /onAskInNewChat && \(\s*<Button/);
   assert.match(chatWindowSource, /!quotedSelection\?\.sourceEntryId \|\| !sourceSessionId \|\| !onAskInNewChat/);
@@ -250,7 +259,7 @@ test("first user messages expose both branch actions and edit before their own e
     source.indexOf("  const handleLeafChange = useCallback"),
   );
 
-  assert.match(chatWindowSource, /onFork=\{bashRunning \|\| isNew \? undefined : handleFork\}/);
+  assert.match(chatWindowSource, /onFork=\{bashRunning \|\| isNew \? undefined : forkFromMessage\}/);
   assert.doesNotMatch(chatWindowSource, /idx === 0 && msg\.role === "user"/);
   assert.doesNotMatch(chatWindowSource, /prevAssistantEntryId/);
   assert.match(navigateSource, /type: "navigate_tree",\s*targetId: entryId/);
@@ -408,7 +417,8 @@ test("delegates event stream readiness and hides an empty agent phase", () => {
   assert.match(ensureSource, /eventConnectionRef\.current!\.ensureConnected\(sid\)/);
   assert.match(ensureSource, /eventConnectionRef\.current!\.maintain\(sid\)/);
   assert.match(chatWindowSource, /const hasStreamingContent = useStreamingSelector\(streamingStore, selectHasStreamingContent\)/);
-  assert.match(chatWindowSource, /streamState\.isStreaming && hasStreamingContent && streamState\.streamingMessage/);
+  assert.match(chatWindowSource, /isStreaming && hasStreamingContent && \(\s*<StreamingReply store=\{streamingStore\}/);
+  assert.match(chatWindowSource, /if \(!streamingMessage\) return null;/);
   assert.match(chatWindowSource, /\(agentRunning \|\| isCompacting\) && !hasStreamingContent && \(agentPhase \|\| isCompacting\)/);
   // Compaction is what the user needs to know while a turn is being compacted, so it is
   // forwarded to the label instead of letting the stream phase read as a hang.
@@ -432,10 +442,9 @@ test("uses server pagination state instead of guessing from rendered rows", () =
   assert.match(loadContextSource, /setData\(\(prev\) => \{[\s\S]*messages: \[\.\.\.page\.messages, \.\.\.prev\.context\.messages\]/);
   assert.match(chatWindowSource, /const oldestId = historyCursor/);
   assert.doesNotMatch(chatWindowSource, /const oldestId = entryIds\[0\]/);
-  // Nothing older on the server: the sentinel only widens the window over loaded rows.
-  assert.match(chatWindowSource, /if \(!hasEarlierMessages\) \{[\s\S]*?setVisibleCount\(\(current\) => getNextVisibleCount\(current\)\);\s*return;\s*\}/);
-  assert.match(chatWindowSource, /const hasMoreRendered = startIndex > 0 \|\| hasEarlierMessages/);
-  assert.doesNotMatch(chatWindowSource, /rendered\.length >= visibleCount/);
+  // 渲染窗口已删除：已加载的行全部留在 DOM 里。
+  assert.doesNotMatch(chatWindowSource, /setVisibleCount|getNextVisibleCount|VISIBLE_PAGE_SIZE/);
+  assert.match(chatWindowSource, /const hasMoreRendered = hasEarlierMessages/);
 });
 
 test("keeps the selected session warm while idle and renews its lease", () => {
@@ -559,7 +568,8 @@ test("reconnects active shell output to its streaming tool call", () => {
   assert.match(updateSource, /content,/);
   assert.match(endSource, /setActiveToolResults[\s\S]*next\.delete\(id\)/);
   assert.match(chatWindowSource, /const map = new Map\(activeToolResults\)/);
-  assert.match(chatWindowSource, /<MessageView message=\{streamState\.streamingMessage as AgentMessage\} toolResults=\{toolResultsMap\}/);
+  assert.match(chatWindowSource, /<StreamingReply store=\{streamingStore\}[^>]*toolResults=\{toolResultsMap\}/);
+  assert.match(chatWindowSource, /message=\{streamingMessage as AgentMessage\}\s+toolResults=\{toolResults\}/);
 });
 
 test("reports a running script's newest call as its progress", () => {
@@ -726,22 +736,12 @@ test("one tail-follower signal, owned by ChatWindow", () => {
   assert.match(scrollToBottomSource, /const container = scrollContainerRef\.current;\s*if \(!container\) return;/);
   assert.match(scrollToBottomSource, /container\.scrollTo\(\{ top: container\.scrollHeight, behavior \}\);/);
   assert.doesNotMatch(scrollToBottomSource, /scrollIntoView/);
-  // 官方 scroller 只负责测量与前插保位：跟随关闭，按钮可见阈值与贴底容差同一个数
-  // （距底 >0 即出现），不在两者之间留"既不跟、也没按钮"的死区。
-  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll=\{false\} defaultScrollPosition="end" scrollEdgeThreshold=\{0\}>/);
-  // ChatWindow 不再自己贴底：没有跟随组件、没有"滚到末端"的调用。
-  assert.doesNotMatch(chatWindowSource, /FollowTailWhenAtTail|scrollToEnd|CHAT_TAIL_TOLERANCE/);
-  assert.doesNotMatch(chatWindowSource, /shouldFollow\(/);
-  // 判定与动作都归状态机：贴底/脱离/补位/收缩保位在 lib/chat-follow.ts，DOM 翻译在 hook。
-  assert.match(chatFollowRulesSource, /export function nextFollowState/);
-  assert.match(chatFollowRulesSource, /export const CHAT_TAIL_EPSILON = 1;/);
-  assert.match(chatFollowRulesSource, /action: "pin-bottom"/);
-  assert.doesNotMatch(chatFollowRulesSource, /CHAT_TAIL_TOLERANCE/);
-  assert.match(chatFollowSource, /addEventListener\("wheel", onWheel/);
-  assert.match(chatFollowSource, /kind: "reach-bottom"/);
-  // 读者滚动先看高度是否同时变化：布局钳制不是读者动作。
-  assert.match(chatFollowSource, /if \(container\.scrollHeight !== stateRef\.current\.lastHeight\) return;/);
-  assert.doesNotMatch(source, /SCROLL_BOTTOM_THRESHOLD|completionScrollAllowedRef|ignoreProgrammaticScrollUntilRef/);
+  // 跟随、前插保位与底部边界全部交回官方 scroller（autoScroll 默认关闭，必须显式打开）；
+  // ChatWindow 不再有自己的跟随状态机，也不再自己写读者的滚动位置。
+  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  assert.doesNotMatch(chatWindowSource, /autoScroll=\{false\}|useChatFollow|FollowTailWhenAtTail/);
+  // 程序化滚动只经官方命令（它会把模式置为 settling-jump 并抑制跟随）。
+  assert.match(chatWindowSource, /scrollerApiRef\.current\?\.scrollTo(?:End|Message)\(/);
   assert.doesNotMatch(streamUpdateSource, /scrollToBottom/);
 });
 
@@ -754,19 +754,17 @@ test("restores an in-page session viewport without the default tail jump", () =>
   assert.match(chatWindowSource, /findChatScrollAnchor\(/);
   assert.match(chatWindowSource, /while \(hasMore && before && !controller\.signal\.aborted\)/);
   assert.match(chatWindowSource, /context\.oldestEntryId === position\.oldestEntryId/);
-  assert.match(chatWindowSource, /if \(!context\) \{\s*scrollToBottom\("instant"\);\s*setPendingScrollRestore\(null\);/);
-  assert.match(chatWindowSource, /scrollToMessage\(element, position\.anchorOffset\)/);
+  assert.match(chatWindowSource, /if \(!context\) \{\s*(?:\/\/[^\n]*\n\s*)?scrollerApiRef\.current\?\.scrollToEnd\(\{ behavior: "instant" \}\);\s*setPendingScrollRestore\(null\);/);
+  assert.match(chatWindowSource, /api\?\.scrollToMessage\(position\.anchorEntryId, \{[\s\S]*?scrollMargin: position\.anchorOffset/);
   assert.match(chatWindowSource, /pendingScrollRestore && "invisible"/);
 });
 
-test("a newly sent message lands at the bottom, not pinned to the top", () => {
-  const scrollEffectSource = source.slice(
-    source.indexOf("useLayoutEffect(() => {\n    if (messages.length === 0) return;"),
-    source.indexOf("// Load model list"),
-  );
-
-  assert.match(source, /pendingTailScrollRef\.current = true;/);
-  assert.match(scrollEffectSource, /pendingTailScrollRef\.current = false;\s*initialScrollDoneRef\.current = true;(?:\s*reattachToTail\?\.\(\);)?\s*scrollToBottom\("instant"\);/);
+test("a new turn does not anchor its user row to the top of the viewport", () => {
+  // 不传 scrollAnchor：官方会给锚点行 align-start 置顶并在尾部垫 spacer，与贴底
+  // 跟随互抢，"底"分裂成真底与假底，读者没有操作也会被推到别的消息上。
+  assert.doesNotMatch(source, /pendingTailScrollRef|reattachToTail/);
+  assert.doesNotMatch(chatWindowSource, /scrollAnchor=/);
+  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
   // prompt-anchor 机制已全部拆除。
   assert.doesNotMatch(source, /promptAnchor|scrollUserMsgToTop|lastUserMsgRef/);
   assert.doesNotMatch(chatWindowSource, /promptAnchor|scrollUserMsgToTop/);
@@ -807,7 +805,7 @@ test("auto-compact slash command toggles session auto-compaction", () => {
   assert.match(source, /setAutoCompactionEnabled\(liveState\.autoCompactionEnabled \?\? true\)/);
 });
 
-test("queued rows toggle behavior in place and edit through the authoritative cleared queue", async () => {
+test("queued rows toggle behavior in place and edit or delete through the authoritative cleared queue", async () => {
   const actionSource = source.slice(
     source.indexOf("  const handleQueuedAction = useCallback"),
     source.indexOf("  const handleThinkingLevelChange"),
@@ -816,8 +814,8 @@ test("queued rows toggle behavior in place and edit through the authoritative cl
 
   assert.match(actionSource, /action: "toggle" \| "edit"/);
   assert.match(actionSource, /type: "clear_queue"/);
-  // pi's lists are authoritative; edit takes one entry out, toggle takes none.
-  assert.match(actionSource, /splitClearedQueue\(cleared, records, action === "edit" \? id : undefined\)/);
+  // pi's lists are authoritative; edit/delete take one entry out, toggle takes none.
+  assert.match(actionSource, /splitClearedQueue\(cleared, records, action === "edit" \|\| action === "delete" \? id : undefined\)/);
   assert.match(actionSource, /target\.behavior === "steer" \? "followUp" : "steer"/);
   // The requeue replays the rebuilt rows, so the flip reaches pi too.
   assert.match(actionSource, /for \(const item of nextRecords\)/);
@@ -841,7 +839,7 @@ test("top-bar session stats follow the run instead of the panel being open", () 
   assert.doesNotMatch(refreshSource, /sendAgentCommand/);
   // One snapshot feeds the top bar and the panel, and the running session is
   // what keeps it current — the panel opening no longer decides that.
-  assert.match(refreshSource, /const timer = setInterval\(\(\) => refreshStatsRef\.current\?\.\(\), 3_000\);/);
+  assert.match(refreshSource, /const timer = setInterval\(\(\) => \{[\s\S]*?if \(document\.visibilityState === "visible"\) refreshStatsRef\.current\?\.\(\);\s*\}, 3_000\);/);
   assert.match(refreshSource, /const timers = \[1_500, 5_000, 12_000\]\.map\(/);
   assert.match(refreshSource, /\}, \[agentRunning, session\?\.id\]\);/);
   assert.match(source, /handleQueuedAction, refreshSessionStats,/);
@@ -882,7 +880,7 @@ test("stale queue reads cannot overwrite fresher SSE snapshots", () => {
   );
 
   assert.match(applySource, /queueSnapshotGateRef\.current\.observe\(\);\s*\n\s*applyQueuedRecords\(snapshot, entries\);/);
-  assert.match(applySource, /if \(!gate\.isFresh\(token\)\) return;\s*\n\s*gate\.observe\(\);\s*\n\s*applyQueuedRecords\(snapshot, entries\);/);
+  assert.match(applySource, /if \(!gate\.isFresh\(token\)\) return;[\s\S]*?if \(hasUnconfirmedQueuedRecord\(queuedSubmissionsRef\.current, snapshot\)\) return;[\s\S]*?gate\.observe\(\);\s*\n\s*applyQueuedRecords\(snapshot, entries\);/);
   assert.match(reconcileSource, /const queueToken = queueSnapshotGateRef\.current\.capture\(\);/);
   assert.match(reconcileSource, /applyRecordedQueueSnapshot\(normalizeQueuedMessages\(state\?\.queuedMessages\), queueToken, state\?\.queuedEntries\)/);
   assert.match(loadStateSource, /applyRecordedQueueSnapshot\(normalizeQueuedMessages\(liveState\.queuedMessages\), queueToken, liveState\.queuedEntries\)/);

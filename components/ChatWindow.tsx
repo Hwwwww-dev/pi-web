@@ -35,6 +35,8 @@ import {
   MessageScrollerContent,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
+  useMessageScrollerScrollable,
 } from "@/components/ui/message-scroller";
 import {
   Questionnaire,
@@ -49,7 +51,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
-import { useChatFollow } from "@/hooks/useChatFollow";
 import { formatTurnDuration, getTurnDurationMs } from "@/lib/turn-duration";
 import { phaseLabel } from "@/lib/chat-phase-label";
 import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
@@ -65,12 +66,8 @@ import type { SettingsSection } from "@/lib/settings-navigation";
 import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll-position";
 import { streamingMessageKey } from "@/lib/message-keys";
 import {
-  getNextVisibleCount,
-  getVisibleRenderWindow,
   isScrollAtTail,
-  VISIBLE_PAGE_SIZE,
 } from "@/lib/chat-lazy-load";
-import { SCROLL_ANCHOR_SETTLE_MS, applyScrollAnchor, captureScrollAnchor, holdScrollAnchor, type ScrollAnchor } from "@/lib/scroll-anchor";
 
 /** 判定贴顶的容差：触摸惯性下滚动值带小数，难以精确归零。 */
 const TOP_SLACK = 24;
@@ -169,25 +166,31 @@ interface Props {
 // `app/globals.css` 的 `--chat-*` 变量），组件内不写字面量。
 
 /**
- * 回底按钮：唯一允许"跳到底"的入口——它是读者的显式命令（state machine 的
- * reach-bottom），落点直接写 scrollTop = scrollHeight，instant。不做 smooth：
- * 跟随会逐帧校正落点，飞行会被打断，落地反而不准。
+ * 官方 scroller 的命令面。ChatWindow 渲染 Provider，自己就处于 Provider 之外，
+ * 拿不到 `useMessageScroller`；这个空节点在 Provider 里把命令和贴底信号引出来。
+ * 所有程序化滚动都走它——官方据此进入 `settling-jump` 并抑制跟随，自己写
+ * scrollTop 会和跟随抢同一个帧。
  */
-function ScrollToTailButton({ reattachToTail }: { reattachToTail: () => void }) {
-  const { t } = useI18n();
-  return (
-    <MessageScrollerButton
-      className="text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100"
-      onClick={(event) => {
-        // 接管原语默认行为（一次性 smooth scrollTo）：跟随全权负责落点。
-        event.preventDefault();
-        reattachToTail();
-      }}
-    >
-      <ArrowDownIcon className="size-4" aria-hidden="true" />
-      <span className="sr-only">{t("chat.scrollToLatest")}</span>
-    </MessageScrollerButton>
-  );
+type ScrollerApi = {
+  scrollToEnd: (options?: { behavior?: ScrollBehavior }) => boolean;
+  scrollToMessage: (messageId: string, options?: {
+    align?: "start" | "center" | "end" | "nearest";
+    behavior?: ScrollBehavior;
+    scrollMargin?: number;
+  }) => boolean;
+};
+
+function ScrollerBridge({ apiRef, onAtTailChange }: {
+  apiRef: React.MutableRefObject<ScrollerApi | null>;
+  onAtTailChange: (atTail: boolean) => void;
+}) {
+  const { scrollToEnd, scrollToMessage } = useMessageScroller();
+  const scrollable = useMessageScrollerScrollable();
+  apiRef.current = { scrollToEnd, scrollToMessage };
+  useEffect(() => {
+    onAtTailChange(!scrollable.end);
+  }, [scrollable.end, onAtTailChange]);
+  return null;
 }
 
 /**
@@ -305,13 +308,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   });
   const [restoreAnchorReady, setRestoreAnchorReady] = useState(false);
 
-  // 发送后贴底（useAgentSession 内）需要解除手势压制重挂跟随；useChatFollow 在
-  // 本 hook 之后才创建 reattachToTail，用 ref 桥接（同 pendingScrollRestoreRef
-  // 的 render 期写 ref 模式）。
-  const tailReattachRef = useRef<() => void>(() => {});
-  const reattachToTailForSend = useCallback(() => {
-    tailReattachRef.current();
-  }, []);
+  // 发送后回底：官方的跟随在几何贴底时自动接管，这里只需把位置写到底。
 
   const {
     loading, error, messages, activeToolResults, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, hasNewerMessages, newestCursor, headTurn, streamingStore,
@@ -332,7 +329,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     handleQueuedAction, handleEditContent, dismissCompactError, editEntryId, cancelEdit,
     handleBuiltinSlashCommand,
     handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadSlashCommands, loadAllModels,
-    loadContext, activeLeafId, scrollToBottom, scrollToMessage, jumpToEntry, loadNewerPage,
+    loadContext, activeLeafId, scrollToMessage, jumpToEntry, loadNewerPage,
   } = useAgentSession({
     session, sessionRunning, newSessionCwd, newSessionDraftKey, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd: wrappedOnAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
     modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen,
@@ -340,7 +337,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     dormant,
     onOpenSettings, onDebugSnapshotReaderChange, t,
     deferInitialScroll: Boolean(pendingScrollRestore),
-    reattachToTail: reattachToTailForSend,
   });
   // Only whether a reply is streaming and has content yet: the chunks themselves
   // re-render StreamingReply alone.
@@ -585,9 +581,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [panel, sessionBusy, handleAbort]);
 
   // --- Lazy-load historical messages ---
-  // Only render the last N messages initially. When the user scrolls to the
-  // top, load another page while keeping the scroll position stable.
-  const [visibleCount, setVisibleCount] = useState(VISIBLE_PAGE_SIZE);
+  // 已加载的每一行都在 DOM 里，没有渲染行窗口：窗口一裁，翻页读进来的历史就真的
+  // 不存在了。
   const messageRefs = useMessageRefs(messages.length);
   const messagesLenRef = useRef(0);
   messagesLenRef.current = messages.length;
@@ -636,23 +631,22 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // finished turn regrouped into more rows), and must get an observer then.
   const [sentinel, setSentinel] = useState<HTMLElement | null>(null);
   /**
-   * 读者是否贴底（唯一的跟随信号，状态机在 hooks/useChatFollow.ts）。贴底跟随是官方
-   * scroller 的内部状态：若传入恒为 true 的 `autoScroll`，前插整页时会被当作跟随而
-   * 滑到底部，导致翻页时在底与顶之间跳动——因此官方以 `autoScroll={false}` 运行
-   * （内部跟随会与翻页的前插保位互相打架），贴底跟随全部由 `hooks/useChatFollow`
-   * 的状态机接管（贴底判定、补位、收缩保位都在那里）。
+   * 读者是否贴底：由官方 `MessageScrollerScrollable` 的反面给出（阈值
+   * `scrollEdgeThreshold`，默认 8px）。只用于“贴底时向下加载更新页”，
+   * 跟随本身由官方 `autoScroll` 负责，不再有自带状态机。
    */
+  const [atTail, setAtTail] = useState(true);
+  const [pendingRevealEntryId, setPendingRevealEntryId] = useState<string | null>(null);
+  const scrollerApiRef = useRef<ScrollerApi | null>(null);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
-  const { atTail, reattachToTail, resyncFollow } = useChatFollow(scrollContainerRef, messageContentRef, session?.id, loading);
-  tailReattachRef.current = reattachToTail;
-  const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
   /** 上一页请求进行中。 */
   const loadingOlderRef = useRef(false);
   /**
    * 自动加载是否可用。每取一页即用掉一次，只有读者真的滚动才重新武装：闸门放行后
    * 若自行重试，前插还没落位的那几帧仍判为贴顶，会连续取页。
    */
-  const autoLoadArmedRef = useRef(true);
+  // 必须由真实手势重新武装：初值 false，打开会话不会自己取页。
+  const autoLoadArmedRef = useRef(false);
   /** 上一次自动取页的时刻，用于拦截同一串滚动事件里的连续取页。 */
   const lastAutoLoadAtRef = useRef(0);
   /**
@@ -707,14 +701,22 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     const sid = session?.id;
     const target = minimapTurnIndex[turnNumber];
     if (!sid || !target) return;
+    // 目标不在当前窗口时只取一窗（该轮居中），不拖整条分支；落地后由下面的
+    // effect 按 entryId 定位，滚动交给官方 `scrollToMessage`。
     if (!searchHistoryRef.current.entryIds.includes(target.entryId)) {
       const context = await jumpToEntry(sid, activeLeafId, target.entryId);
       if (!context) return;
-      setVisibleCount((current) => Math.max(current, context.messages.length));
-      return;
     }
-    setVisibleCount((current) => Math.max(current, messagesLenRef.current));
+    setPendingRevealEntryId(target.entryId);
   }, [session?.id, minimapTurnIndex, activeLeafId, jumpToEntry]);
+
+  // 小地图跳转的落位：行已经在 DOM 里就滚过去（官方命令会抑制跟随）。
+  useLayoutEffect(() => {
+    if (!pendingRevealEntryId) return;
+    if (scrollerApiRef.current?.scrollToMessage(pendingRevealEntryId, { align: "center", behavior: "instant" })) {
+      setPendingRevealEntryId(null);
+    }
+  }, [pendingRevealEntryId, entryIds]);
   // 窗口位于中段时，到达底部即向下加载一页，直至回到叶子。
   useEffect(() => {
     const sid = session?.id;
@@ -768,31 +770,25 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       liveScrollRef.current = { atBottom: true };
     } else {
       liveScrollRef.current = saved;
-      // 还原期间禁止顶部加载器介入，并让跟随状态机知道这次改写不是读者动作。
+      // 还原期间禁止顶部加载器介入。落点交给官方 `scrollToMessage`：它把滚动模式
+      // 置为 `settling-jump` 并抑制跟随；自己写 scrollTop 会在下一帧被跟随补位覆盖。
       scrollRestoringRef.current = true;
+      const api = scrollerApiRef.current;
       if (saved.atBottom || !content) {
+        if (!api?.scrollToEnd({ behavior: "instant" })) container.scrollTop = container.scrollHeight;
+      } else if (!api?.scrollToMessage(saved.anchorEntryId, {
+        align: "start",
+        scrollMargin: saved.anchorOffset,
+        behavior: "instant",
+      })) {
         container.scrollTop = container.scrollHeight;
-      } else {
-        const anchorEntryId = saved.anchorEntryId;
-        const anchorOffset = saved.anchorOffset;
-        const anchor = Array.from(content.children).find((child): child is HTMLElement => (
-          child instanceof HTMLElement && child.dataset.entryId === anchorEntryId
-        ));
-        if (anchor) {
-          container.scrollTop += (anchor.getBoundingClientRect().top - container.getBoundingClientRect().top) - anchorOffset;
-        } else {
-          container.scrollTop = container.scrollHeight;
-        }
       }
     }
-    // 隐藏期间容器几何为 0，跟随状态机已被钉成"贴底"；不重算就会在下一帧补位，把刚
-    // 还原的位置覆盖成最底。还原写完再重读一次几何，只重算基准不滚动。
     const frame = requestAnimationFrame(() => {
       scrollRestoringRef.current = false;
-      resyncFollow();
     });
     return () => cancelAnimationFrame(frame);
-  }, [active, scrollContainerRef, messageContentRef, resyncFollow]);
+  }, [active, scrollContainerRef, messageContentRef]);
 
   useEffect(() => {
     if (searchTarget) setPendingScrollRestore(null);
@@ -850,7 +846,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     const locate = async () => {
       const initialHistory = searchHistoryRef.current;
       if (initialHistory.entryIds.includes(position.anchorEntryId)) {
-        setVisibleCount((current) => Math.max(current, initialHistory.entryIds.length * 2));
         setRestoreAnchorReady(true);
         return;
       }
@@ -863,11 +858,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           const context = await loadOlderPage(sessionId, before, { signal: controller.signal });
           if (controller.signal.aborted) return;
           if (!context) {
-            scrollToBottom("instant");
+            // 到底走官方命令（进入 settling-jump 并抑制跟随），不再自己改 scrollTop。
+            scrollerApiRef.current?.scrollToEnd({ behavior: "instant" });
             setPendingScrollRestore(null);
             return;
           }
-          setVisibleCount((current) => current + Math.max(VISIBLE_PAGE_SIZE, context.messages.length * 2));
           if (context.entryIds.includes(position.anchorEntryId)) {
             setRestoreAnchorReady(true);
             return;
@@ -877,7 +872,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           hasMore = context.hasMore;
         }
         if (!controller.signal.aborted) {
-          scrollToBottom("instant");
+          scrollerApiRef.current?.scrollToEnd({ behavior: "instant" });
           setPendingScrollRestore(null);
         }
       } finally {
@@ -891,25 +886,25 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       // A branch change cancels restoration and must reveal the new context.
       setPendingScrollRestore(null);
     };
-  }, [activeLeafId, loadOlderPage, loading, pendingScrollRestore, scrollToBottom, searchTarget, session?.id]);
+  }, [activeLeafId, loadOlderPage, loading, pendingScrollRestore, searchTarget, session?.id]);
 
   useLayoutEffect(() => {
     const position = pendingScrollRestore;
-    const content = messageContentRef.current;
-    if (!position || !content || searchTarget) return;
-    const element = Array.from(content.children).find((candidate) => (
-      candidate instanceof HTMLElement && candidate.dataset.entryId === position.anchorEntryId
-    ));
-    if (element instanceof HTMLElement) {
-      scrollToMessage(element, position.anchorOffset);
+    if (!position || searchTarget) return;
+    const api = scrollerApiRef.current;
+    if (api?.scrollToMessage(position.anchorEntryId, {
+      align: "start",
+      scrollMargin: position.anchorOffset,
+      behavior: "instant",
+    })) {
       setPendingScrollRestore(null);
       return;
     }
     if (restoreAnchorReady) {
-      scrollToBottom("instant");
+      api?.scrollToEnd({ behavior: "instant" });
       setPendingScrollRestore(null);
     }
-  }, [entryIds, pendingScrollRestore, restoreAnchorReady, scrollToBottom, scrollToMessage, searchTarget, visibleCount]);
+  }, [entryIds, pendingScrollRestore, restoreAnchorReady, searchTarget]);
 
   useEffect(() => {
     if (!searchTarget || loading) return;
@@ -919,8 +914,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       let found = history.entryIds.includes(searchTarget.entryId);
       if (!found && !sessionBusy && history.hasEarlierMessages && history.historyCursor && !loadingOlderRef.current) {
         loadingOlderRef.current = true;
-        const container = scrollContainerRef.current;
-        if (container) scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
         // ponytail: one extra page, the same size scrolling reads; an older or other-branch hit just opens the session.
         const context = await loadOlderPage(searchTarget.sessionId, history.historyCursor, { signal: controller.signal });
         loadingOlderRef.current = false;
@@ -928,8 +921,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       }
       if (controller.signal.aborted) return;
       if (found) {
-        scrollAnchorRef.current = null;
-        setVisibleCount((current) => Math.max(current, (searchHistoryRef.current.entryIds.length + 200) * 2));
         setPendingSearchScroll(searchTarget);
       } else {
         onSearchTargetHandled?.(searchTarget);
@@ -967,34 +958,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       // Skip while a page is loading or the last one is still rendering.
       if (loadingOlderRef.current || pageRenderingRef.current) return;
       if (performance.now() - lastAutoLoadAtRef.current < AUTO_LOAD_MIN_INTERVAL_MS) return;
-      if (!hasEarlierMessages) {
-        // Everything is loaded, yet the sentinel shows: the messages render as
-        // more rows than the window holds (an answer and its thinking are
-        // two), so widen the window.
-        scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
-        autoLoadArmedRef.current = false;
-        lastAutoLoadAtRef.current = performance.now();
-        setVisibleCount((current) => getNextVisibleCount(current));
-        return;
-      }
       autoLoadArmedRef.current = false;
       lastAutoLoadAtRef.current = performance.now();
-      // Fetch the previous page from the server and prepend it (loadContext
-      // handles prepend + scroll anchoring).
+      // Fetch the previous page from the server and prepend it. 前插保位由官方 scroller
+      // 的 `preserveScrollOnPrepend` 负责：它按 `messageId` 记住视口边缘那一行，
+      // 新页落地后把同一行放回原位，并跟随后续长高。
       const oldestId = historyCursor;
       // Its page already landed; the next cursor has not rendered yet.
       if (!oldestId || oldestId === requestedCursorRef.current) return;
       const sid = session?.id ?? sessionIdRef.current;
       if (!sid) return;
       loadingOlderRef.current = true;
-      // 使用元素锚点而非 scrollHeight 差值：新页中的 markdown、代码高亮与图片分帧长高，
-      // 高度差只能补第一帧，读者会被留在近顶部；锚点在页面落地后每帧重测，不随高度漂移。
-      scrollAnchorRef.current = captureScrollAnchor(container, messageContentRef.current);
-      void loadOlderPage(sid, oldestId).then(() => {
-        // 固定读者所在行：新页只向下增长，并使滚动位置离开顶端，否则哨兵持续可见会
-        // 连续加载。
-        holdScrollAnchor(container, messageContentRef.current);
-      }).finally(() => {
+      void loadOlderPage(sid, oldestId).finally(() => {
         loadingOlderRef.current = false;
       });
     };
@@ -1018,7 +993,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     container.addEventListener("keydown", arm);
     // 首次也尝试一次（贴顶打开的会话不会触发滚动事件）；闸门放行导致的重建只有在
     // 武装时才会再试，否则会连跳多页。
-    if (autoLoadArmedRef.current) attempt();
+    // 挂载时不自动取页：贴顶打开的会话应当就停在首屏那几轮，往上滑才续。
+    // （之前这里会 attempt 一次，effect 每次重建又重复，打开就被拉成十几轮。）
     return () => {
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("wheel", arm);
@@ -1029,28 +1005,22 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     };
     // `olderPageState` 为刻意依赖：上一页落地并绘制后 effect 重建，内容撑不满一屏
     // 时闸门会重新武装并在此接续，无需再次滚动。
-  }, [sentinel, visibleCount, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState]);
+  }, [sentinel, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState]);
 
-  // Keep the rendered window at least as large as what's loaded, so prepended
-  // (older) pages stay visible instead of being sliced off the top.
-  useEffect(() => {
-    setVisibleCount((current) => Math.max(current, messages.length));
-  }, [messages.length]);
-
-  // Clear the page gate once the prepended rows are in the rendered window and a
-  // frame has been painted. Until then the sentinel and the row stay inert, so
-  // two pages can never be in flight with one still half-rendered.
+  // Clear the page gate once the prepended rows have painted a frame. Until then
+  // the sentinel and the row stay inert, so two pages can never be in flight with
+  // one still half-rendered.
   // `olderPageState` is in the deps so a page that prepended nothing (the server
   // repeated the cursor) still releases the gate instead of wedging it shut.
   useLayoutEffect(() => {
     if (!pageRenderingRef.current) return;
-    if (visibleCount < messages.length) return;
     const container = scrollContainerRef.current;
+    // 内容撑不满一屏时没有可滚的余量，前插后 scrollTop 会停在顶部。
     const notFull = () => !container || container.scrollHeight <= container.clientHeight + TOP_SLACK;
     const release = () => {
       pageRenderingRef.current = false;
-      // 内容撑不满一屏时读者无法靠滚动再触发，放行后允许直接续取。
-      if (notFull()) autoLoadArmedRef.current = true;
+      // 不为“内容撑不满一屏”自动续取：那会让列表在读者没动手时一页页自己长出来。
+      // 顶部的手动入口（加载更早）仍可随时请求一页。
       setOlderPageState("idle");
       const waiters = pageRenderWaitersRef.current;
       pageRenderWaitersRef.current = [];
@@ -1075,36 +1045,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     };
     settle();
     return () => cancelAnimationFrame(frame);
-  }, [visibleCount, messages.length, olderPageState, scrollContainerRef]);
+  }, [messages.length, olderPageState, scrollContainerRef]);
 
   // Read one more page only when the reader asks for it (the sentinel at the top
   // or the "load earlier" row). Reading the whole branch up front put dozens of
   // page-sized prepends on screen while the reader was still at the tail, which
   // is what made loading look like it was jumping around.
-
-  // After visibleCount increases (older messages prepended) put the row the
-  // reader was looking at back where it was — and keep it there while the rows
-  // above settle (markdown, highlighting, images all report their height late).
-  useLayoutEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    // 新页会将内容整体下推，需把读者固定在原行。读更早一页与放宽窗口两种情况共用
-    // 同一份元素锚点。
-    const anchor = scrollAnchorRef.current;
-    if (!anchor) return;
-    scrollAnchorRef.current = null;
-    applyScrollAnchor(container, anchor);
-    const content = messageContentRef.current;
-    if (!content || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => applyScrollAnchor(container, anchor));
-    observer.observe(content);
-    const stop = window.setTimeout(() => observer.disconnect(), SCROLL_ANCHOR_SETTLE_MS);
-    return () => {
-      observer.disconnect();
-      window.clearTimeout(stop);
-    };
-  }, [visibleCount, messages.length, scrollContainerRef, scrollToBottom]);
   // Push session stats up to AppShell for the top bar.
   // Compare scalar fields to avoid loops from new object identity each render.
   const statsKey = sessionStats
@@ -1718,8 +1664,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       : (agentRunning || isCompacting) && !hasStreamingContent && (agentPhase || isCompacting)
         ? phaseLabel(agentPhase, t, isCompacting, queuedSubmissions.length)
         : null;
-  const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
-  const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
+  // 每一行都已加载的消息都在 DOM 里，只由服务端是否还有更早的页决定顶部入口。
+  const hasMoreRendered = hasEarlierMessages;
 
   if (error) {
     return (
@@ -1810,7 +1756,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </div>
           </div>
         ) : <>
-        <MessageScrollerProvider autoScroll={false} defaultScrollPosition="end" scrollEdgeThreshold={0}>
+        {/* `autoScroll` 官方默认为 false：不显式打开，内容增长时视图不会自己贴底。
+            `scrollEdgeThreshold` 默认 8px 太窄，手指一动就脱离跟随；放宽到 120px（约一行半）。 */}
+        <MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold={120}>
+        <ScrollerBridge apiRef={scrollerApiRef} onAtTailChange={setAtTail} />
         <MessageScroller className="min-h-0 min-w-0 flex-1 animate-in fade-in duration-150">
         <MessageScrollerViewport
           ref={scrollContainerRef}
@@ -1827,8 +1776,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             {hasMoreRendered && (
               // 手动入口：自动加载需等上一页渲染完成，此按钮允许随时请求一页。
               <button
-                // 该行固定在内容顶部，翻页时不移动，滚动锚点须跳过它。
-                data-scroll-anchor-ignore=""
+                // 该行固定在内容顶部，翻页时不移动。
                 ref={setSentinel}
                 type="button"
                 onClick={() => {
@@ -1844,16 +1792,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 {olderPageState === "idle" ? t("chat.loadEarlier") : t("chat.loadingEarlier")}
               </button>
             )}
-            {turnRendered.slice(startIndex).map((node, index) => {
-              // 每条消息一个 Item：官方据此测量、锚定并记录可视性；离屏行由 content-visibility
-              // 跳过渲染，长会话仅付出可见部分开销。非元素行（空渲染）原样返回。
+            {turnRendered.map((node, index) => {
+              // 每条消息一个 Item：官方据此测量、锚定并记录可视性。
+              // 离屏行不做 `content-visibility` 跳过：估算高度会让新行先矮再撑开。非元素行（空渲染）原样返回。
               if (!isValidElement<{ "data-entry-id"?: string }>(node)) return node;
-              const messageId = node.props["data-entry-id"] ?? `turn-${startIndex + index}`;
+              const messageId = node.props["data-entry-id"] ?? `turn-${index}`;
               // 不传 scrollAnchor：官方 scroller 会在追加含 scrollAnchor 行时把该行
               // align-start 置顶并在列表尾垫隐形 spacer（anchored-to-message 模式
               // 持续钉住），与贴底跟随打架：发送后“底”分裂成真底与 spacer 假底，
               // 跟随判定（scrollHeight 含 spacer）与回底按钮（不含）各自为政；
-              // 搜索定位、向下翻页也会被它的抢滚。发送后的定位由贴底跟随全权负责。
+              // 搜索定位、向下翻页也会被它的抢滚，表现为“没操作却跳到别的消息”。
+              // 贴底跟随改由 provider 的 autoScroll 全权负责。
               return (
                 <ChatRow
                   key={node.key ?? messageId}
@@ -1889,7 +1838,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </ChatRow>
           </MessageScrollerContent>
         </MessageScrollerViewport>
-        <ScrollToTailButton reattachToTail={reattachToTail} />
+        <MessageScrollerButton
+          behavior="instant"
+          className="text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100"
+        >
+          <ArrowDownIcon className="size-4" aria-hidden="true" />
+          <span className="sr-only">{t("chat.scrollToLatest")}</span>
+        </MessageScrollerButton>
         </MessageScroller>
         </MessageScrollerProvider>
         {isMobile || pendingScrollRestore || !minimapPaneWide ? null : (

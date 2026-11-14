@@ -274,6 +274,35 @@ export function reconcileQueuedSubmissions(
   return next;
 }
 
+/**
+ * True while a locally recorded submission is still waiting for pi to echo it
+ * back (no matching entry in `queue`, and younger than the grace window). The
+ * state poll reads point-in-time snapshots, so applying one while such a record
+ * exists would delete the row before its echo arrives — the message blinks out
+ * and back in. Callers skip that round instead.
+ */
+export function hasUnconfirmedQueuedRecord(
+  records: QueuedSubmission[],
+  queue: QueuedMessages,
+  now: number = Date.now(),
+): boolean {
+  const pending: Record<QueuedBehavior, string[]> = {
+    steer: [...queue.steering],
+    followUp: [...queue.followUp],
+  };
+  for (const record of records) {
+    if (!record.text) continue;
+    const texts = pending[record.behavior];
+    const index = texts.indexOf(record.text);
+    if (index >= 0) {
+      texts.splice(index, 1);
+      continue;
+    }
+    if (now - record.createdAt < QUEUE_SUBMISSION_GRACE_MS) return true;
+  }
+  return false;
+}
+
 export interface RequeuedSubmission {
   text: string;
   behavior: QueuedBehavior;

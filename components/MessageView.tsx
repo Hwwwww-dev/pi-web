@@ -513,7 +513,11 @@ function AssistantMessageView({
 
   // Thinking duration of a completed message: the whole response's generation time, which pi
   // records since 1.1 (`durationMs`, from the request's start). Older messages only have
-  // timestamps: the time since the previous message.
+  // timestamps: the time since the previous message. This is a per-message fallback and it
+  // grows while the reply is still streaming, so it is only ever handed to a block once the
+  // message has stopped: feeding it to a live block both makes its seconds tick and, through
+  // `active={isStreaming && streamingDuration === undefined}` below, marks the block finished
+  // mid-stream — which folds the thinking content away while it is being written.
   const messageDurationMs = message.role === "assistant" ? recordedDurationMs(message.durationMs) : undefined;
   const thinkingDurationFromFile = useMemo<number | undefined>(() => {
     const ms = messageDurationMs ?? (message.timestamp && prevTimestamp ? message.timestamp - prevTimestamp : undefined);
@@ -620,7 +624,7 @@ function AssistantMessageView({
       {/* Not keyed by the entry id: a message of this run gets one when the file is
           read again, and its blocks keep their state across that read (#1184). */}
       {blockItems.map(({ block, originalIndex }) => (
-        <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? measuredThinkingDuration(thinkingDurationKey(messageKey, originalIndex)) ?? thinkingDurationFromFile : undefined)} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} messageKey={messageKey} blockIndex={originalIndex} />
+        <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? measuredThinkingDuration(thinkingDurationKey(messageKey, originalIndex)) ?? (isStreaming ? undefined : thinkingDurationFromFile) : undefined)} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} messageKey={messageKey} blockIndex={originalIndex} />
       ))}
 
       <Reveal open={Boolean(providerError)} className={blocks.length > 0 ? "mt-2" : "mt-0"}>

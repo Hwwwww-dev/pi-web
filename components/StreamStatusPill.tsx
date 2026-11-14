@@ -137,8 +137,14 @@ export function StreamStatusPill({ store }: { store: StreamingStore }) {
   // 静态口径：流式中实时读数；结束后停留最后一帧（RATE_HOLD_MS）；空闲/无数据 0.0。
   const shownTokens = held?.tokens ?? (active ? tokens : 0);
   const shownTps = held ? held.tps : active ? tps : null;
-  // 空闲（无流式、无停留读数）不渲染：那一格留给左侧的运行阶段文案。
-  if (!active && !held) return null;
+  // 空闲时也占位：显示一个无色的 0，槽位不随流式开始/结束改变宽度。
+  if (!active && !held) {
+    return (
+      <div className="pointer-events-none flex shrink-0 items-center font-mono text-xs leading-none text-muted-foreground [font-variant-numeric:tabular-nums]">
+        0.0 t/s
+      </div>
+    );
+  }
   return (
     <div className="pointer-events-none flex items-center gap-1.5 font-mono text-xs leading-none text-muted-foreground [font-variant-numeric:tabular-nums]">
       <StreamRateBadge tokens={shownTokens} tps={shownTps} streaming={active} />

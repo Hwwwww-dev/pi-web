@@ -37,6 +37,7 @@ import {
   createQueuedSubmission,
   emptyQueuedMessages,
   queuedGraceDeadline,
+  hasUnconfirmedQueuedRecord,
   queuedImageRecall,
   reconcileQueuedSubmissions,
   splitClearedQueue,
@@ -46,7 +47,7 @@ import {
   type QueuedSnapshotEntry,
   type QueuedSubmission,
 } from "@/lib/queued-submissions";
-import { carryMessageKeys, messageRenderKeys } from "@/lib/message-keys";
+import { carryMessageKeys, messageRenderKeys, sameMessage } from "@/lib/message-keys";
 import {
   AgentEventConnection,
   canReleaseHiddenEventStream,
@@ -74,7 +75,6 @@ import {
 } from "@/lib/extension-ui-queue";
 import {
   OLDER_PAGE_TURNS,
-  VISIBLE_PAGE_SIZE,
   VISIBLE_PAGE_TURNS,
 } from "@/lib/chat-lazy-load";
 import {
@@ -256,9 +256,6 @@ export interface UseAgentSessionOptions {
   /** Registers the debug panel's reader of this page's stream and lease: it reads refs only, never a request. */
   onDebugSnapshotReaderChange?: (reader: (() => DebugClientSession) | null) => void;
   onSessionStatsPanelOpen?: () => void;
-  /** 发送后贴底时解除手势压制重挂跟随（hooks/useChatFollow 的 reattach）。
-   *  只滚不重挂的话，带内脱离状态下发送后压制仍在，流式输出无人跟随。 */
-  reattachToTail?: () => void;
   /** Opens Settings on a section; a bare `/mcp` the built-in MCP extension owns opens Settings › MCP. */
   onOpenSettings?: (section: SettingsSection) => void;
   setToolPreset?: (preset: ToolPreset) => void;
@@ -312,6 +309,8 @@ const IDLE_FOLLOW_BACKGROUND_BACKOFF_AFTER_MS = 5 * 60_000;
 const BASH_STATE_RECONCILE_MS = 1_000;
 /** 晚到的 `message_end` 补读延迟：等这一次落盘完成，再按会话文件整载一次。 */
 const LATE_APPEND_REFETCH_MS = 400;
+/** 整载窗口的下限（条）：首屏与小地图跳转的轮数大致对应这个量级。 */
+const MIN_LOAD_TAIL = 50;
 /** Stop hands its queue back to be sent again; the stopped run has to unwind first, or a prompt rides it. */
 const STOP_RESEND_SETTLE_TIMEOUT_MS = 5_000;
 const STOP_RESEND_POLL_MS = 50;
@@ -490,11 +489,58 @@ function dedupePage(ids: readonly string[], messages: readonly AgentMessage[], e
   return { entryIds, messages: kept };
 }
 
+/**
+ * 尾部合并：回合结束时（agent_settled / prompt_done / 晚到 message_end / 重连
+ * onopen）的整载不再整体替换列表——那会把流式行的 `live:` 键全部换成 entryId，
+ * carryMessageKeys 对不上的行从第一个 mismatch 起整体重挂载，一轮回复超过首屏
+ * 窗口时就是一次全列表重绘。改为保留已加载的行（含翻页历史），只把文件里新出现
+ * 的尾部条目接上去；流式行与落盘条目按 `sameMessage` 逐位对齐，对上的行原地
+ * 换成持久身份（entryId），key 通过别名迁移保持不变，React 不重挂载。
+ *
+ * 已加载条目必须是服务端窗口的前缀，合并才成立；否则（分叉、被 TUI 截断、
+ * 跨叶切换）返回 null，调用方回退整载替换。
+ */
+function mergeLoadedTail(
+  prevIds: readonly string[],
+  prevMessages: readonly AgentMessage[],
+  nextIds: readonly string[],
+  nextMessages: readonly AgentMessage[],
+): { entryIds: string[]; messages: AgentMessage[] } | null {
+  // 前缀校验：已加载的每个 id 必须与窗口同位相同；缺失或错位都不能局部合并。
+  for (let i = 0; i < prevIds.length; i++) {
+    if (prevIds[i] !== nextIds[i]) return null;
+  }
+  // 流式段与落盘条目逐位对齐：对上的行升级为持久条目，对不上的行保持原样追加。
+  const liveStart = prevIds.length;
+  const keepMessages = [...prevMessages];
+  const appendIds: string[] = [];
+  const appendMessages: AgentMessage[] = [];
+  let aligned = 0;
+  for (let offset = 0; liveStart + offset < prevMessages.length; offset++) {
+    const id = nextIds[liveStart + offset];
+    const persisted = nextMessages[liveStart + offset];
+    const live = prevMessages[liveStart + offset];
+    if (id === undefined || persisted === undefined || live === undefined || !sameMessage(live, persisted)) break;
+    aligned += 1;
+    appendIds.push(id);
+    appendMessages.push(persisted);
+  }
+  // 服务端窗口内剩余的未对齐条目也接上（例如中段窗口期间落盘的其它条目）。
+  for (let i = liveStart + aligned; i < nextIds.length; i++) {
+    const message = nextMessages[i];
+    if (message === undefined) break;
+    appendIds.push(nextIds[i]);
+    appendMessages.push(message);
+  }
+  if (appendIds.length === 0 && aligned === 0) return null;
+  return { entryIds: [...prevIds, ...appendIds], messages: [...keepMessages, ...appendMessages] };
+}
+
 export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, newSessionDraftKey, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen, background = false, dormant = false,
-    onOpenSettings, onDebugSnapshotReaderChange, reattachToTail,
+    onOpenSettings, onDebugSnapshotReaderChange,
   } = opts;
 
   const isNew = session === null && newSessionCwd !== null;
@@ -621,6 +667,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const applyRecordedQueueSnapshot = useCallback((snapshot: QueuedMessages, token: number, entries?: readonly QueuedSnapshotEntry[]) => {
     const gate = queueSnapshotGateRef.current;
     if (!gate.isFresh(token)) return;
+    // 本地还有没被服务器回显的排队条目时，这一轮快照整体跳过：点对点读到的
+    // 快照里没有它，应用下去会把刚发出的条目删掉，等回显再加回来（消息一闪一没）。
+    // SSE 的 queue_update 不受此限，仍是即时通道。
+    if (hasUnconfirmedQueuedRecord(queuedSubmissionsRef.current, snapshot)) return;
     gate.observe();
     applyQueuedRecords(snapshot, entries);
   }, [applyQueuedRecords]);
@@ -688,7 +738,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const bashRecoveryIdRef = useRef(0);
   const handleAgentEventRef = useRef<((event: AgentEvent) => void) | null>(null);
   const initialScrollDoneRef = useRef(Boolean(opts.deferInitialScroll));
-  const pendingTailScrollRef = useRef(false);
   const previousScrollTopRef = useRef(0);
   const executeBashRef = useRef<(command: string, excludeFromContext: boolean) => Promise<void> | undefined>(undefined);
   const handleNavigateRef = useRef<((entryId: string) => Promise<boolean>) | undefined>(undefined);
@@ -979,7 +1028,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // 整载会用叶子尾窗替换 messages：窗口不得小于已载入条数，否则每次刷新都把
       // 翻页载入的历史裁回 50 条——读者往上翻，内容已经不在内存里了。
       const loadedCount = sessionIdRef.current === sid ? entryIdsRef.current.length : 0;
-      params.set("tail", String(Math.min(1000, Math.max(VISIBLE_PAGE_SIZE, loadedCount))));
+      params.set("tail", String(Math.min(1000, Math.max(MIN_LOAD_TAIL, loadedCount))));
       if (options?.force) params.set("force", "1");
       const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?${params}`);
       if (res.status === 404) {
@@ -1016,7 +1065,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         && cached?.revision === d.snapshotRevision
         && cached.entryIds.length >= (d.context.entryIds ?? []).length,
       );
+      // 两者必须取自同一份窗口：revision 未变时保留的是“更宽的已加载窗口”，
+      // 只放宽 messages 而 entryIds 仍取服务端窄窗口，会让两个数组长度不等、
+      // 索引错位——key 与 data-entry-id 串位，表现就是消息错乱、部分“消失”。
       const persistedMessages = revisionUnchanged ? messagesRef.current : d.context.messages;
+      const persistedEntryIds = revisionUnchanged ? entryIdsRef.current : (d.context.entryIds ?? []);
       setData(revisionUnchanged
         ? {
             ...d,
@@ -1052,7 +1105,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         });
       } else {
         const previous = { messages: messagesRef.current, entryIds: entryIdsRef.current };
-        const next = { messages: persistedMessages, entryIds: d.context.entryIds ?? [] };
+        // 同会话且已加载前缀与窗口一致时走尾部合并：保留已加载行（含翻页历史
+        // 与流式行），只接新尾部，key 经别名迁移保持不变，React 不重挂载——
+        // 回合结束的整载不再引发全列表重绘。前缀不一致（分叉/截断/跨叶）才
+        // 回退整载替换。
+        const merged = sessionIdRef.current === sid && !browsingHistoryRef.current
+          ? mergeLoadedTail(previous.entryIds, previous.messages, persistedEntryIds, persistedMessages)
+          : null;
+        const next = merged
+          ? { messages: merged.messages, entryIds: merged.entryIds }
+          : { messages: persistedMessages, entryIds: persistedEntryIds };
         setMessageKeyAliases((aliases) => carryMessageKeys({ ...previous, aliases }, next));
         setMessages(next.messages);
         setEntryIds(next.entryIds);
@@ -2556,7 +2618,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     setAgentRunning(true);
     setAgentPhase(isSlashCommandPrompt ? { kind: "running_command" } : { kind: "waiting_model" });
     dispatch({ type: "start" });
-    pendingTailScrollRef.current = true;
 
     // A queued prompt (parked behind compaction, or queued into a run) is not a
     // sent message yet: the queue rows show it, and the transcript shows it when
@@ -3777,19 +3838,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   useLayoutEffect(() => {
     if (messages.length === 0) return;
-    if (pendingTailScrollRef.current) {
-      // 发送后贴底（WhatsApp 式）：乐观气泡落位即滚到底部。滚前先解除手势
-      // 压制重挂跟随：带内脱离状态下发送，若只滚不重挂，压制仍在，后续流式
-      // 输出无人跟随，直到内容把距离推出带外按钮才出现。
-      pendingTailScrollRef.current = false;
-      initialScrollDoneRef.current = true;
-      reattachToTail?.();
-      scrollToBottom("instant");
-    } else if (!initialScrollDoneRef.current) {
-      initialScrollDoneRef.current = true;
-      scrollToBottom("instant");
-    }
-  }, [messages.length, scrollToBottom, reattachToTail]);
+    if (initialScrollDoneRef.current) return;
+    // 首次落地：默认位置由 provider 定为末端，这里只在它没生效（隐藏槽位挂载）时兜底。
+    initialScrollDoneRef.current = true;
+    scrollToBottom("instant");
+  }, [messages.length, scrollToBottom]);
 
   // Load the model list with bounded retries; loadModels exposes each failure.
   useEffect(() => {
@@ -3893,7 +3946,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     editEntryId,
     // Refs
     sessionIdRef, scrollContainerRef,
-    pendingTailScrollRef, initialScrollDoneRef,
+    initialScrollDoneRef,
     // Actions
     handleSend, handleAbort, startSideChat, handleFork, handleNavigate, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,

@@ -69,9 +69,11 @@ function MessageScrollerItem({
     <MessageScrollerPrimitive.Item
       data-slot="message-scroller-item"
       scrollAnchor={scrollAnchor}
-      // 官方配方把离屏行交给 `content-visibility:auto`，但它靠 `contain-intrinsic-size`
-      // 估算未渲染行的高度：长会话里这些估值让内容末端算不准，贴底会漂一点。
-      // 行窗口（visibleCount）已经限制了挂载数量，这里不再叠一层估算高度。
+      // 离屏行不交给 `content-visibility:auto`：它的 `contain-intrinsic-size` 只能
+      // 按估算高度占位，而思考块与工具卡的真实高度是 120px 的几十倍，新行首次进
+      // 视口时先渲染成矮的一行再撑开——这正是「思考/工具冒出来时闪一下」，流式期
+      // 间不断产生新行，于是看起来一直在闪（见 fef57b23）。已加载的行数由分页控制，
+      // 不叠这层估算。
       className={cn("min-w-0 shrink-0", className)}
       {...props}
     />

@@ -23,7 +23,7 @@ import {
   type AtQueryMatch, type FileIndexEntry,
 } from "@/lib/file-fuzzy";
 import { getMarkdownListContinuation } from "@/lib/markdown-list-continuation";
-import { CHAT_COLUMN_CLASS } from "@/lib/chat-layout";
+import { CHAT_COLUMN_CLASS, CHAT_COMPOSER_INSET_CLASS } from "@/lib/chat-layout";
 import { StreamStatusPill } from "./StreamStatusPill";
 import type { StreamingStore } from "@/lib/streaming-message";
 import { quoteSeparator } from "@/lib/quoted-selection";
@@ -2323,12 +2323,16 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         )}
         </Reveal>
         {/* 运行状态行就在输入卡片正上方、队列之下：队列长高只往聊天区方向长，
-            状态行与输入框的距离恒定。行高写死 22px（不跟字号偏移长大），两端
-            都用 items-center 真居中；文案换字不重放进场动画，不重挂载。 */}
+            状态行与输入框的距离恒定。行高写死 16px（不跟字号偏移长大），并用
+            `-mb-1` 把父容器的 gap-2 吃掉一半，与输入卡片之间只剩 4px 净间距：
+            常驻高度 16+4，不再是 22+8。两端
+            都用 items-center 真居中；文案换字不重放进场动画，不重挂载。
+            水平内衬与扩展状态行（含 YOLO 徽标）同一份 `CHAT_COMPOSER_INSET_CLASS`：
+            左端对齐输入框文字起点，右端对齐发送键右缘，两端都不顶到卡片外框。 */}
         {!compact && (
-          <div className="flex min-h-[22px] items-center justify-between gap-3">
-            <span className="min-w-0 truncate pl-2 text-xs leading-none text-muted-foreground">{activityNotice}</span>
-            {streamStatusStore && <StreamStatusPill store={streamStatusStore} />}
+          <div className={`-mb-1 flex min-h-4 items-center gap-3 ${CHAT_COMPOSER_INSET_CLASS}`}>
+            {streamStatusStore ? <StreamStatusPill store={streamStatusStore} /> : null}
+            <span className="min-w-0 flex-1 truncate text-xs leading-none text-muted-foreground">{activityNotice}</span>
           </div>
         )}
         {/* Main input */}

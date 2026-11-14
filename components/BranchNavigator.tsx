@@ -353,7 +353,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
         <HeaderFlyout
           side="bottom"
           align="end"
-          sideOffset={6}
+          sideOffset={14}
           collisionPadding={8}
           onOpenAutoFocus={(event) => event.preventDefault()}
           width={flyoutWidth} className={flyoutClassName}
@@ -379,7 +379,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
       <HeaderFlyout
         side="bottom"
         align="end"
-        sideOffset={6}
+        sideOffset={14}
         collisionPadding={8}
         onOpenAutoFocus={(event) => event.preventDefault()}
         width={flyoutWidth} className={flyoutClassName}
