@@ -2,6 +2,9 @@
 
 import { useEffect } from "react";
 
+/** 水位学习的稳定性门槛：布局高读数静止达到此时长才允许学为水位。 */
+export const VIEWPORT_LEARN_STABLE_MS = 500;
+
 /**
  * 水位跟随规则（只服务 data-keyboard-open 标志位）：未聚焦且 1s 内无焦点变化时
  * 跟随当前布局高。否则冻结——聚焦期布局可能被键盘缩小；失焦后 1s 内是边界回涨
@@ -13,14 +16,23 @@ export function nextFullHeight({
   layoutHeight,
   focused,
   recentlyFocused,
+  layoutStableMs,
 }: {
   fullHeight: number;
   layoutHeight: number;
   focused: boolean;
   recentlyFocused: boolean;
+  /** 当前布局高读数保持不变的时长。动画/拖拽期间逐帧变化，永不达标。 */
+  layoutStableMs: number;
 }): number {
   // 0 = 未知（首次/转屏后重学）：无条件采用当前布局高。
   if (fullHeight === 0) return layoutHeight;
+  // 稳定性门槛（何时才能学）：收起动画/交互拖拽期间读数逐帧在变，任何中间值
+  // 都不许学。此前只有 recentlyFocused 1s 冻结——拖拽收键盘超过 1s 后冻结过期，
+  // 中间值（如 700）恰好落在 ±8% 带内被学成水位，钉高塌陷、落底后再修一次，
+  // 正是「下落时尺寸变化」。布局静止 ≥500ms 才可能是真实变化（挤占一步到位、
+  // 转屏回稳），落定后的静止读数必然是真实终值。
+  if (layoutStableMs < VIEWPORT_LEARN_STABLE_MS) return fullHeight;
   // 键盘缩小的布局永远不配当水位：键盘收缩幅度 ~55%，虚高噪声 ~7%。若把缩小的
   // 383 学成水位，钉高塌到 383，滚动量归零——顶栏推不出去且闪（焦点被 IME/附件
   // 栏瞬时吃掉时真的会发生）。只跟随“未聚焦 + 1s 内无焦点事件 + 幅度 <30%”的静止变化。
@@ -84,12 +96,20 @@ export function useViewportHeight(): void {
     let fullHeight = 0;
     let lastFocusAt = -Infinity;
     let frame = 0;
+    // 稳定性跟踪：读数每变一次就重置计时，sync 用「静止了多久」决定能否学。
+    let lastLayoutHeight = 0;
+    let lastLayoutChangeAt = 0;
 
     const sync = () => {
       frame = 0;
       const layoutHeight = root.clientHeight;
+      const now = Date.now();
+      if (layoutHeight !== lastLayoutHeight) {
+        lastLayoutHeight = layoutHeight;
+        lastLayoutChangeAt = now;
+      }
       const focused = isEditableElement(document.activeElement);
-      const recentlyFocused = Date.now() - lastFocusAt < 1000;
+      const recentlyFocused = now - lastFocusAt < 1000;
       const keyboardPeriod = isKeyboardPeriod({
         layoutHeight,
         fullHeight,
@@ -100,6 +120,7 @@ export function useViewportHeight(): void {
         layoutHeight,
         focused,
         recentlyFocused,
+        layoutStableMs: now - lastLayoutChangeAt,
       });
       root.style.setProperty("--keyboard-full-height", `${fullHeight}px`);
       if (keyboardPeriod || focused) root.dataset.keyboardOpen = "true";

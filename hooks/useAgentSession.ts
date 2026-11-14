@@ -2094,6 +2094,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const probe = async () => {
       if (document.visibilityState !== "visible") return;
+      // 键盘期（聚焦打字、收起动画全程）不整载刷列表：重渲染撞上 iOS 键盘避让
+      // 就是「自动加载完成后键盘跳」的撞车源。暂停期落盘的消息由恢复后第一轮
+      // 补齐（latest !== current 的判定不变），无丢失。
+      if (document.documentElement.dataset.keyboardOpen === "true") return;
       if (followProbeInFlightRef.current || browsingHistoryRef.current) return;
       if (sessionIdRef.current !== sid) return;
       followProbeInFlightRef.current = true;

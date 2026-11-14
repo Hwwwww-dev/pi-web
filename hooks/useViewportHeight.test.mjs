@@ -11,6 +11,7 @@ test("learns the layout from an unknown watermark", () => {
     layoutHeight: 812,
     focused: true,
     recentlyFocused: true,
+    layoutStableMs: 600,
   }), 812);
 });
 
@@ -20,6 +21,7 @@ test("keeps the watermark frozen while the keyboard is up", () => {
     layoutHeight: 383,
     focused: true,
     recentlyFocused: true,
+    layoutStableMs: 600,
   }), 812);
 });
 
@@ -29,6 +31,7 @@ test("keeps the watermark frozen during the dismissal window", () => {
     layoutHeight: 700,
     focused: false,
     recentlyFocused: true,
+    layoutStableMs: 600,
   }), 812);
 });
 
@@ -40,6 +43,7 @@ test("never learns a keyboard-shrunk layout as the watermark", () => {
     layoutHeight: 383,
     focused: false,
     recentlyFocused: false,
+    layoutStableMs: 600,
   }), 812);
 });
 
@@ -50,6 +54,7 @@ test("heals an inflated mount-time watermark at rest", () => {
     layoutHeight: 812,
     focused: false,
     recentlyFocused: false,
+    layoutStableMs: 600,
   }), 812);
 });
 
@@ -72,4 +77,53 @@ test("stays in the keyboard period until the layout regrows", () => {
     fullHeight: 812,
     focused: false,
   }), false);
+});
+
+test("never learns a mid-animation reading, however long the drag lasts", () => {
+  // 交互拖拽收键盘可以超过 recentlyFocused 的 1s 冻结（focused 早已 false）。
+  // 拖拽期间读数逐帧在变（stableMs 很小），任何中间值都不许学——
+  // 学进去就是「下落时尺寸变化」：钉高塌陷 + 落底后再修一次。
+  assert.equal(nextFullHeight({
+    fullHeight: 812,
+    layoutHeight: 700,
+    focused: false,
+    recentlyFocused: false,
+    layoutStableMs: 50,
+  }), 812);
+});
+
+test("learns a layout change only once the reading has settled", () => {
+  // 读数静止满 500ms 才可能是真实变化（状态栏挤占一步到位、转屏回稳）。
+  assert.equal(nextFullHeight({
+    fullHeight: 812,
+    layoutHeight: 790,
+    focused: false,
+    recentlyFocused: false,
+    layoutStableMs: 499,
+  }), 812);
+  assert.equal(nextFullHeight({
+    fullHeight: 812,
+    layoutHeight: 790,
+    focused: false,
+    recentlyFocused: false,
+    layoutStableMs: 500,
+  }), 790);
+});
+
+test("stability never bypasses the keyboard-shrink and inflation guards", () => {
+  // 静止读数仍受既有守卫约束：键盘缩小的布局和上行虚高都不许学。
+  assert.equal(nextFullHeight({
+    fullHeight: 812,
+    layoutHeight: 383,
+    focused: false,
+    recentlyFocused: false,
+    layoutStableMs: 600,
+  }), 812);
+  assert.equal(nextFullHeight({
+    fullHeight: 812,
+    layoutHeight: 900,
+    focused: false,
+    recentlyFocused: false,
+    layoutStableMs: 600,
+  }), 812);
 });

@@ -223,6 +223,13 @@ test("session mount, idle follow, and late appends are the only forced disk read
   assert.match(mountSource, /loadSession\(session\.id, !cached, true, \{ force: true \}\)/);
   assert.match(idleFollowSource, /force=1&tree=summary/);
   assert.match(idleFollowSource, /await loadSession\(sid, false, false, \{ force: true \}\)/);
+  // 键盘期（聚焦打字、收起动画全程）暂停空闲探测：整载重渲染撞上 iOS 键盘避让
+  // 就是「自动加载完成后键盘跳」的撞车源。守卫在 probe 入口，每轮定时重新判定，
+  // 键盘期结束自动恢复；暂停期落盘的消息由恢复后第一轮补齐。
+  assert.match(
+    idleFollowSource,
+    /document\.visibilityState !== "visible"[\s\S]*?dataset\.keyboardOpen === "true"[\s\S]*?followProbeInFlightRef\.current/,
+  );
   assert.match(lateAppendSource, /void loadSession\(sid, false, false, \{ force: true \}\)/);
   assert.match(source, /await loadSession\(sid\)/);
   assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 3);
