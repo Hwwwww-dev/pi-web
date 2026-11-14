@@ -42,6 +42,8 @@ export function useChatFollow(
     let suppressed = false;
     let wasInBand = true;
     let following = true;
+    // 触摸进行中：收缩补偿不写 scrollTop（写入手势动量 = 周期性抖动）。
+    let touching = false;
     // 上一次事件时的距底距离：收缩事件据此判断钳制是否拖近了尾端。
     let lastDistance = Math.max(0, container.scrollHeight - container.scrollTop - container.clientHeight);
     const update = () => {
@@ -49,7 +51,7 @@ export function useChatFollow(
       const shrank = height < lastScrollHeightRef.current;
       lastScrollHeightRef.current = height;
       const distance = Math.max(0, height - container.scrollTop - container.clientHeight);
-      if (shrank && !following) {
+      if (shrank && !following && !touching) {
         // 钳制把 scrollTop 拉小了：退回原距离，读者原地不动；本事件不改状态。
         if (distance < lastDistance - 0.5) {
           container.scrollTop = Math.max(0, height - container.clientHeight - lastDistance);
@@ -94,11 +96,31 @@ export function useChatFollow(
     let touchStartY: number | null = null;
     const onTouchStart = (event: TouchEvent) => {
       touchStartY = event.touches[0]?.clientY ?? null;
+      touching = true;
     };
     const onTouchMove = (event: TouchEvent) => {
       const y = event.touches[0]?.clientY;
-      // 手指下移（clientY 变大）= 内容上滚看历史 = 离开跟随。
-      if (touchStartY !== null && y !== undefined && y > touchStartY) release();
+      if (touchStartY === null || y === undefined) return;
+      const dy = y - touchStartY;
+      // 手指下移（clientY 变大）= 内容上滚看历史 = 离开跟随；小于 6px 的位移是
+      // 点按抖动，不是手势，不脱离（否则一次误杀就永久压制，停在底部也不再跟随）。
+      if (dy > 6) {
+        release();
+        return;
+      }
+      // 反向手势（手指上移 = 内容向下）立即重挂：压制期间停在带内的读者想回尾，
+      // 不必先滚出带再滚回来。
+      if (dy < -6 && suppressed
+        && isAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)) {
+        suppressed = false;
+        following = true;
+        wasInBand = true;
+        setAtTail(true);
+      }
+    };
+    const onTouchEnd = () => {
+      touchStartY = null;
+      touching = false;
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Home") release();
@@ -108,12 +130,16 @@ export function useChatFollow(
     container.addEventListener("wheel", onWheel, { passive: true });
     container.addEventListener("touchstart", onTouchStart, { passive: true });
     container.addEventListener("touchmove", onTouchMove, { passive: true });
+    container.addEventListener("touchend", onTouchEnd, { passive: true });
+    container.addEventListener("touchcancel", onTouchEnd, { passive: true });
     container.addEventListener("keydown", onKeyDown);
     return () => {
       container.removeEventListener("scroll", update);
       container.removeEventListener("wheel", onWheel);
       container.removeEventListener("touchstart", onTouchStart);
       container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("touchend", onTouchEnd);
+      container.removeEventListener("touchcancel", onTouchEnd);
       container.removeEventListener("keydown", onKeyDown);
     };
     // lastScrollHeightRef 只做跨事件记忆，不参与 effect 依赖。

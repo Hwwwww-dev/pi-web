@@ -726,6 +726,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const earlierTurnCountRef = useRef(0);
   const newestCursorRef = useRef<string | null>(null);
   const hasNewerMessagesRef = useRef(false);
+  // 中段窗口期间送达的实时消息缓冲：message_end 守卫不再丢消息，缓冲到落位时机
+  // （就地重置窗口标记的发送路径按到达顺序补齐；整页/续页重载自会带上，缓冲清空）。
+  const pendingWindowMessagesRef = useRef<AgentMessage[]>([]);
   /** 正在请求中的后一页游标。 */
   const loadingAfterRef = useRef<string | null>(null);
 
@@ -970,6 +973,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           setHistoryCursor(null);
           setHasEarlierMessages(false);
           setEarlierTurnCount(0);
+          setNewestCursor(null);
+          setHasNewerMessages(false);
+          pendingWindowMessagesRef.current = [];
           setError(null);
         }
         deleteSessionViewSnapshot(sid);
@@ -1034,6 +1040,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setHistoryCursor(d.context.oldestEntryId);
         setHasEarlierMessages(d.context.hasMore);
         setEarlierTurnCount(d.context.turnsBefore ?? 0);
+        // 整载落在叶子：不存在更新的一页。上一会话残留的中段窗口标记与实时
+        // 缓冲必须一并清掉，否则新会话的实时消息会被误缓冲（跨会话污染），
+        // 下次发送时把上个会话的消息顶进当前列表。
+        setNewestCursor(null);
+        setHasNewerMessages(false);
+        pendingWindowMessagesRef.current = [];
       }
       // Tool-preset state is independent of the view cache: it must be applied
       // on every read, cached window or not (#700).
@@ -1171,6 +1183,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         // A tail page reaches the leaf, so nothing newer can be paged in.
         setNewestCursor(d.context.newestEntryId ?? null);
         setHasNewerMessages(Boolean(d.context.hasNewer));
+        if (!d.context.hasNewer) pendingWindowMessagesRef.current = [];
       }
       return d.context;
     } catch (e) {
@@ -1215,6 +1228,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setEarlierTurnCount(context.turnsBefore ?? 0);
       setNewestCursor(context.newestEntryId ?? null);
       setHasNewerMessages(Boolean(context.hasNewer));
+      if (!context.hasNewer) pendingWindowMessagesRef.current = [];
       setData((prev) => (prev && prev.sessionId === sid ? { ...prev, context } : prev));
       return context;
     } catch (e) {
@@ -1235,6 +1249,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setEntryIds((prev) => [...prev, ...page.entryIds]);
       setNewestCursor(context.newestEntryId ?? null);
       setHasNewerMessages(Boolean(context.hasNewer));
+      if (!context.hasNewer) pendingWindowMessagesRef.current = [];
       return context;
     } catch (e) {
       console.error("Failed to load newer history:", e);
@@ -2094,6 +2109,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!dormant || agentRunningRef.current || session === null || messages.length === 0) return;
     setMessages([]);
     setEntryIds([]);
+    // 唤醒后从叶子整载，窗口标记与实时缓冲不留残留（同整载路径）。
+    setNewestCursor(null);
+    setHasNewerMessages(false);
+    pendingWindowMessagesRef.current = [];
     dormantUnloadRef.current = true;
   }, [dormant, session, messages.length]);
   useEffect(() => {
@@ -2260,10 +2279,21 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         // appending it again would duplicate it.
         if (!agentRunningRef.current) break;
         if (isSystemMessageEvent(event)) break;
-        // 视图处于中段窗口时，本轮实时消息不在该窗口内，追加到窗口末尾会错位；
-        // 返回尾页时由历史接口一次性补齐。
-        if (hasNewerMessagesRef.current) break;
+        // 视图处于中段窗口时，本轮实时消息不在该窗口内，追加到窗口末尾会错位。
+        // 不丢：缓冲后落位——从历史窗口就地发送（handleSend 重置窗口标记）时按
+        // 到达顺序补齐；整页/续页历史重载自会从会话文件带上它们，缓冲随即清空。
         const completed = event.message as AgentMessage | undefined;
+        if (hasNewerMessagesRef.current) {
+          if (completed) {
+            const bufferedNotices = Array.isArray(event.transcriptNotices) ? event.transcriptNotices as TranscriptNotice[] : undefined;
+            pendingWindowMessagesRef.current.push(
+              completed.role === "user"
+                ? normalizeToolCalls(completed)
+                : withTranscriptNotices(normalizeToolCalls(completed), bufferedNotices),
+            );
+          }
+          break;
+        }
         if (completed && completed.role === "user") {
           // Delivered steering/follow-up messages surface here as user
           // messages. The run's initial prompt also emits one, but handleSend
@@ -2458,14 +2488,31 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const savedViewIds = entryIdsRef.current;
     const lastEntryIdAtSend = savedViewIds.at(-1) ?? null;
     const sameTextAfterSend = countUserMessages(messagesRef.current.slice(savedViewIds.length), userKey);
-    setMessages((prev) => [...prev, userMsg]);
-    // 从历史窗口发出提问时先回到叶子，使新消息有正确落点。
+    // 从历史窗口发出提问时先回到叶子，使新消息有正确落点；缓冲的中段窗口
+    // 消息按到达顺序先于新提问补齐，乐观气泡随后追加（顺序不能颠倒）。
     if (hasNewerMessagesRef.current) {
       hasNewerMessagesRef.current = false;
       setHasNewerMessages(false);
       newestCursorRef.current = null;
       setNewestCursor(null);
+      // 就地重置窗口标记没有整页重载来带上中段窗口期间送达的消息，此处按到达
+      // 顺序补齐；相邻同文（可能已由续页加载）去重。
+      const pendingWindowMessages = pendingWindowMessagesRef.current;
+      pendingWindowMessagesRef.current = [];
+      if (pendingWindowMessages.length > 0) {
+        setMessages((prev) => {
+          const next = [...prev];
+          for (const pending of pendingWindowMessages) {
+            const last = next[next.length - 1];
+            if (pending.role === "user" && last?.role === "user"
+              && userMessageKey(last) === userMessageKey(pending)) continue;
+            next.push(pending);
+          }
+          return next;
+        });
+      }
     }
+    setMessages((prev) => [...prev, userMsg]);
     optimisticUserMessageKeyRef.current = userKey;
     promptRunIdRef.current = promptRunId;
     agentRunningRef.current = true;

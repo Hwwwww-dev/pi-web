@@ -1349,9 +1349,22 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       // Anchor for live-tail detection. A compaction summary or subagent
       // completion can sit after the last user message and own the
       // still-streaming segment.
+      // 流式中的助手消息是分段所有者：它之后入列的消息（排队用户、后台子代理
+      // 完成通知）不得切开流式段，否则流式回合被按已结束回合拆分渲染，随每个
+      // 分块重排。仅运行期降级；回合结束后恢复完整锚点语义。
+      let streamingAssistantIdx = -1;
+      if (sessionBusy || isStreaming) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === "assistant") { streamingAssistantIdx = i; break; }
+        }
+      }
+      const isTurnAnchor = (i: number) => {
+        if (!isMessageGroupAnchor(messages[i])) return false;
+        return streamingAssistantIdx === -1 || i < streamingAssistantIdx;
+      };
       let lastAnchorIdx = -1;
       for (let i = messages.length - 1; i >= 0; i--) {
-        if (isMessageGroupAnchor(messages[i])) { lastAnchorIdx = i; break; }
+        if (isTurnAnchor(i)) { lastAnchorIdx = i; break; }
       }
 
       const visibleRefIndexByMessage = new Map<number, number>();
@@ -1466,8 +1479,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         idx = headEnd;
       }
       for (; idx < messages.length;) {
-        const msg = messages[idx];
-        if (!isMessageGroupAnchor(msg)) {
+        if (!isTurnAnchor(idx)) {
           rendered.push(renderMessage(idx, { showModelLabel: true }));
           idx += 1;
           continue;
@@ -1475,7 +1487,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
         const userIdx = idx;
         let endIdx = userIdx + 1;
-        while (endIdx < messages.length && !isMessageGroupAnchor(messages[endIdx])) endIdx += 1;
+        while (endIdx < messages.length && !isTurnAnchor(endIdx)) endIdx += 1;
 
         const finalAssistantIdx = findFinalAssistantIndex(messages, userIdx, endIdx);
 
@@ -1514,6 +1526,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 live
               />,
             );
+          }
+          // 活动行不渲染用户消息：流式段内助手之后入列的排队/引导用户消息在
+          // 实时段末尾原样渲染，保持「已排队」可见。
+          for (let queuedIdx = userIdx + 1; queuedIdx < endIdx; queuedIdx++) {
+            if (messages[queuedIdx].role === "user") {
+              rendered.push(renderMessage(queuedIdx, { showModelLabel: true }));
+            }
           }
           idx = endIdx;
           continue;
