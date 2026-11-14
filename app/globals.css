@@ -581,14 +581,12 @@ html[data-keyboard-open] .terminal-extra-keys {
 * {
 --sb-alpha: 0;
 }
-/* 点亮档按主题分档：55% 的中灰在两种背景上都太淡——暗色近黑上几乎不可见，
-   亮色白底上 55% × oklch(0.556) ≈ #9e9e9e，手机 6px 细条下同样看不见
-   （白主题反馈）。亮色提至 75%，暗色 80%。 */
-/* thumb 基色同样按主题分档：浅色下中灰点亮后白底上仍看不见，浅色改用
-   近黑的 --foreground，深色维持中灰。 */
+/* 点亮档按主题分档：暗色 80%，亮色 75%。thumb 基色两档都用 --muted-foreground
+   （oklch 0.556 中灰）：亮色用户定稿浅灰——近黑提档曾过，视觉太重；
+   中灰 × 75% 在白底上是清晰但不抢眼的浅灰条。 */
 :root {
 --sb-lit: 75%;
---sb-thumb: var(--foreground);
+--sb-thumb: var(--muted-foreground);
 }
 .dark {
 --sb-lit: 80%;
@@ -679,7 +677,19 @@ html[data-keyboard-open] .terminal-extra-keys {
     scrollbar-color: transparent transparent;
   }
   .scrollbar-visible {
-    scrollbar-color: color-mix(in srgb, var(--sb-thumb, var(--muted-foreground)) var(--sb-lit, 55%), transparent) transparent;
+    scrollbar-color: color-mix(in srgb, var(--sb-thumb, var(--muted-foreground)) var(--sb-lit, 75%), transparent) transparent;
+  }
+}
+/* iOS（iPhone/iPad PWA）声明 ::-webkit-scrollbar 但不渲染自定义 thumb：
+   画的是系统 overlay 指示条（低对比浅灰白，不可控）。iOS 18.2+ 支持
+   scrollbar-color 标准属性，与 -webkit-touch-callout（iOS 专有）组合
+   出 iOS-only 块：滚动时 .scrollbar-visible 出现即着色，停下移除即隐。 */
+@supports (scrollbar-color: red blue) and (-webkit-touch-callout: none) {
+  * {
+    scrollbar-color: transparent transparent;
+  }
+  .scrollbar-visible {
+    scrollbar-color: color-mix(in srgb, var(--sb-thumb, var(--muted-foreground)) var(--sb-lit, 75%), transparent) transparent;
   }
 }
 
