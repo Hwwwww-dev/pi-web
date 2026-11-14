@@ -287,7 +287,10 @@ html[data-keyboard-open] body {
    高度，不走这条。 */
 @media (max-width: 640px), (pointer: coarse) and (max-height: 500px) {
   .app-shell {
-    height: 100dvh;
+    /* 恒用 px 水位（钩子 1Hz + resize 事件保持新鲜），不再在键盘收起终点从
+       px 切回 100dvh：两个系统只要有一次不相等（水位过时/虚高自愈前后），
+       收起动画的最后一帧就是一次整壳高度跳变。属性缺失时（首帧）回退 dvh。 */
+    height: var(--keyboard-full-height, 100dvh);
     min-height: 0;
   }
 }

@@ -24,7 +24,13 @@ export function nextFullHeight({
   // 键盘缩小的布局永远不配当水位：键盘收缩幅度 ~55%，虚高噪声 ~7%。若把缩小的
   // 383 学成水位，钉高塌到 383，滚动量归零——顶栏推不出去且闪（焦点被 IME/附件
   // 栏瞬时吃掉时真的会发生）。只跟随“未聚焦 + 1s 内无焦点事件 + 幅度 <30%”的静止变化。
-  if (!focused && !recentlyFocused && layoutHeight >= Math.round(fullHeight * 0.7)) {
+  // 上行同样受限：恢复/还原瞬间 iOS 可能短暂上报挤占前的虚高（如 874 vs 790，
+  // +10.6%），学进去会让钉高恒比真实视口高出一截——键盘收下后高度跳一次、且
+  // 要等 1Hz 自愈才回落。静止跟随只接受 ±8%（噪声带）内的变化，更大的上行视为
+  // 瞬时虚高拒绝；真实的长高（转屏/分屏）走 orientationchange 的强制重学。
+  if (!focused && !recentlyFocused
+    && layoutHeight >= Math.round(fullHeight * 0.7)
+    && layoutHeight <= Math.round(fullHeight * 1.08)) {
     return layoutHeight;
   }
   return fullHeight;
