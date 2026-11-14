@@ -47,7 +47,7 @@ import {
   type QueuedSnapshotEntry,
   type QueuedSubmission,
 } from "@/lib/queued-submissions";
-import { carryMessageKeys, messageRenderKeys, sameMessage } from "@/lib/message-keys";
+import { carryMessageKeys, mergeLoadedTail, messageRenderKeys } from "@/lib/message-keys";
 import {
   AgentEventConnection,
   canReleaseHiddenEventStream,
@@ -487,53 +487,6 @@ function dedupePage(ids: readonly string[], messages: readonly AgentMessage[], e
     kept.push(message);
   });
   return { entryIds, messages: kept };
-}
-
-/**
- * 尾部合并：回合结束时（agent_settled / prompt_done / 晚到 message_end / 重连
- * onopen）的整载不再整体替换列表——那会把流式行的 `live:` 键全部换成 entryId，
- * carryMessageKeys 对不上的行从第一个 mismatch 起整体重挂载，一轮回复超过首屏
- * 窗口时就是一次全列表重绘。改为保留已加载的行（含翻页历史），只把文件里新出现
- * 的尾部条目接上去；流式行与落盘条目按 `sameMessage` 逐位对齐，对上的行原地
- * 换成持久身份（entryId），key 通过别名迁移保持不变，React 不重挂载。
- *
- * 已加载条目必须是服务端窗口的前缀，合并才成立；否则（分叉、被 TUI 截断、
- * 跨叶切换）返回 null，调用方回退整载替换。
- */
-function mergeLoadedTail(
-  prevIds: readonly string[],
-  prevMessages: readonly AgentMessage[],
-  nextIds: readonly string[],
-  nextMessages: readonly AgentMessage[],
-): { entryIds: string[]; messages: AgentMessage[] } | null {
-  // 前缀校验：已加载的每个 id 必须与窗口同位相同；缺失或错位都不能局部合并。
-  for (let i = 0; i < prevIds.length; i++) {
-    if (prevIds[i] !== nextIds[i]) return null;
-  }
-  // 流式段与落盘条目逐位对齐：对上的行升级为持久条目，对不上的行保持原样追加。
-  const liveStart = prevIds.length;
-  const keepMessages = [...prevMessages];
-  const appendIds: string[] = [];
-  const appendMessages: AgentMessage[] = [];
-  let aligned = 0;
-  for (let offset = 0; liveStart + offset < prevMessages.length; offset++) {
-    const id = nextIds[liveStart + offset];
-    const persisted = nextMessages[liveStart + offset];
-    const live = prevMessages[liveStart + offset];
-    if (id === undefined || persisted === undefined || live === undefined || !sameMessage(live, persisted)) break;
-    aligned += 1;
-    appendIds.push(id);
-    appendMessages.push(persisted);
-  }
-  // 服务端窗口内剩余的未对齐条目也接上（例如中段窗口期间落盘的其它条目）。
-  for (let i = liveStart + aligned; i < nextIds.length; i++) {
-    const message = nextMessages[i];
-    if (message === undefined) break;
-    appendIds.push(nextIds[i]);
-    appendMessages.push(message);
-  }
-  if (appendIds.length === 0 && aligned === 0) return null;
-  return { entryIds: [...prevIds, ...appendIds], messages: [...keepMessages, ...appendMessages] };
 }
 
 export function useAgentSession(opts: UseAgentSessionOptions) {
