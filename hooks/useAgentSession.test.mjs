@@ -230,6 +230,14 @@ test("session mount, idle follow, and late appends are the only forced disk read
     idleFollowSource,
     /document\.visibilityState !== "visible"[\s\S]*?dataset\.keyboardOpen === "true"[\s\S]*?followProbeInFlightRef\.current/,
   );
+  // 事件流健在时定时探测整体让位（SSE 逐条增量就是活同步）；只有 catch-up
+  // （前台切回，SSE 重连不回放错过历史）与流不健康的 tick 才走到整载兕底。
+  assert.match(
+    idleFollowSource,
+    /mode === "tick" && eventConnectionRef\.current\?\.snapshot\(\)\.state === "connected"\) return;/,
+  );
+  assert.match(idleFollowSource, /void probe\("catch-up"\)/);
+  assert.match(idleFollowSource, /void probe\("tick"\)\.finally\(schedule\)/);
   assert.match(lateAppendSource, /void loadSession\(sid, false, false, \{ force: true \}\)/);
   assert.match(source, /await loadSession\(sid\)/);
   assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 3);

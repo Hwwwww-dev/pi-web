@@ -2092,12 +2092,18 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     prevBackgroundRef.current = background;
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const probe = async () => {
+    const probe = async (mode: "tick" | "catch-up" = "tick") => {
       if (document.visibilityState !== "visible") return;
       // 键盘期（聚焦打字、收起动画全程）不整载刷列表：重渲染撞上 iOS 键盘避让
       // 就是「自动加载完成后键盘跳」的撞车源。暂停期落盘的消息由恢复后第一轮
       // 补齐（latest !== current 的判定不变），无丢失。
       if (document.documentElement.dataset.keyboardOpen === "true") return;
+      // 事件流健在时 SSE 就是活同步通路（逐条增量，只动一行），定时探测整体让位：
+      // 正被写入的会话末尾 id 每秒都在变，探测照跑就是每 5s 一次整窗替换——
+      // 「没贴顶也莫名其妙自动加载、一次冒出十几轮积压」的根源。探测只保留两个
+      // 职责：前台切回的强制补读（catch-up，SSE 重连不回放错过历史），与流断开
+      // 时的窗口兕底（tick 且流不健康才会走到整载）。
+      if (mode === "tick" && eventConnectionRef.current?.snapshot().state === "connected") return;
       if (followProbeInFlightRef.current || browsingHistoryRef.current) return;
       if (sessionIdRef.current !== sid) return;
       followProbeInFlightRef.current = true;
@@ -2127,12 +2133,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           ? IDLE_FOLLOW_BACKGROUND_BACKOFF_MS
           : IDLE_FOLLOW_BACKGROUND_POLL_MS
         : IDLE_FOLLOW_POLL_MS;
-      timer = setTimeout(() => { void probe().finally(schedule); }, delay);
+      timer = setTimeout(() => { void probe("tick").finally(schedule); }, delay);
     };
-    if (becameActive) void probe();
+    if (becameActive) void probe("catch-up");
     schedule();
     const onVisible = () => {
-      if (document.visibilityState === "visible") void probe();
+      if (document.visibilityState === "visible") void probe("catch-up");
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
