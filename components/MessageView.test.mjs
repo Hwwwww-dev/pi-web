@@ -201,7 +201,7 @@ test("keeps streamed tool input out of collapsed markup while counting it", () =
   }, { isStreaming: true });
 
   assert.match(html, /write/);
-  assert.match(html, /Generating parameters/);
+  assert.match(html, /Preparing parameters/);
   assert.doesNotMatch(html, /secret-stream-fragment/);
   assert.equal(getToolCallInputText(block), block.rawInput);
   assert.equal(getTokenEstimateText(block), block.rawInput);
@@ -712,6 +712,7 @@ test("a row keeps its tool name for the selectors that count rows", () => {
 test("a running call with parsed input says what it is doing instead of showing rows", () => {
   assert.match(toolTraceSource, /streamingInput/);
   assert.match(toolTraceSource, /chat\.generatingToolInput/);
+assert.match(toolTraceSource, /kind === "compact" \? undefined : t\("chat\.generatingToolInput"\)/, "compact skips the parameters hint");
 });
 
 test("a TUI result keeps its ANSI colours instead of printing escape codes", () => {

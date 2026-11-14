@@ -296,8 +296,9 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, stepUs
   // object 同样不得与 chip 重复（例如“编辑 tool-view.ts [tool-view.ts]”）。
   const chipNamesObject = chips !== null && view.object !== undefined
     && view.filePaths.some((path) => baseName(path) === view.object || path === view.object);
+  // compact 无参数可流式，参数生成提示对它是噪音；其余工具保留。
   const description = view.streamingInput
-    ? t("chat.generatingToolInput")
+    ? view.kind === "compact" ? undefined : t("chat.generatingToolInput")
     : chips && repeatsChip ? undefined : view.description;
   // 读取/写入/编辑仅显示代码块：path、offset、limit 属于工具内部参数，不是阅读内容。
   const hideFields = view.kind === "file-read" || view.kind === "file-write" || view.kind === "file-edit";

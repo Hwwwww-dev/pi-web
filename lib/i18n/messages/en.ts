@@ -695,7 +695,7 @@ export const enLocale: LocalePlugin = {
     "files.videoLoadFailed": "Failed to load video",
     "files.dropToUpload": "Release to upload to {directory}",
     "chat.runningTool": "Running tool...",
-    "chat.generatingToolInput": "Generating parameters...",
+    "chat.generatingToolInput": "Preparing parameters...",
     "chat.truncatedByOutputLimit": "This response was cut off after reaching the model’s output limit. Send a follow-up to continue.",
     "chat.truncatedWithoutAnswer": "The output limit was reached before an answer was produced: thinking or a nearly full context used it up. Sending another message will likely be cut off again. Compact the context first, or lower the thinking level.",
     "chat.runningNamedTool": "Running {name}...",
