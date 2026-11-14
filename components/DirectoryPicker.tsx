@@ -342,7 +342,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
 
         {createOpen && (
           <div
-            className="absolute inset-0 z-[1] flex items-center justify-center bg-black/35 p-3"
+            className="absolute inset-0 z-[1] flex items-center justify-center bg-black/35 p-3 animate-in fade-in duration-150 motion-reduce:animate-none"
             onPointerDown={(event) => {
               createBackdropPressRef.current = event.target === event.currentTarget;
             }}

@@ -20,6 +20,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { COLLAPSIBLE_EXPANDED_EVENT, getFoldChoice, setToolCallExpanded } from "@/lib/tool-call-expansion";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import type { ThinkingContent } from "@/lib/types";
+import { useFoldAnchor } from "./TraceRow";
 
 /**
  * A thought (official `pattern_reasoning.md`): one line, the text inside the fold.
@@ -116,9 +117,13 @@ function ReasoningText({ text, error, loading, className, onScroll, scrollRef }:
       )}
       onScroll={onScroll}
     >
-      {loading ? <Skeleton className="h-3 w-1/2" /> : error ?? (pieceGroups ?? [text]).map((line, index) => (
-        <div key={index}>{line}</div>
-      ))}
+      {loading ? <Skeleton className="h-3 w-1/2" /> : (
+        <div className="animate-in fade-in duration-200 motion-reduce:animate-none">
+          {error ?? (pieceGroups ?? [text]).map((line, index) => (
+            <div key={index}>{line}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -214,21 +219,25 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
     stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= THINKING_STREAM_TAIL_TOLERANCE;
   }, []);
 
+  // 用户点击的展开/收起走 TraceRow 同款行顶锚定 + 贴底跟随抑制；流结束的自动
+  // 收起发生在回合重组里，无需锚定。
+  const changeExpanded = useCallback((next: boolean) => {
+    userToggledRef.current = true;
+    setToolCallExpanded(foldKey, next);
+    // Expanding mid-stream means "show me the live tail"; expanding a
+    // finished block opens from the top for reading.
+    stickRef.current = next && Boolean(active);
+    prevScrollTopRef.current = 0;
+    setExpanded(next);
+    if (next) window.dispatchEvent(new Event(COLLAPSIBLE_EXPANDED_EVENT));
+  }, [active, foldKey]);
+  const { rowRef, toggleFold } = useFoldAnchor(expanded, changeExpanded);
+
   return (
-    <Trace data-activity="thinking">
+    <Trace data-activity="thinking" ref={rowRef}>
       <TraceCollapsible
         open={expanded}
-        onOpenChange={() => {
-          const next = !expanded;
-          userToggledRef.current = true;
-          setToolCallExpanded(foldKey, next);
-          // Expanding mid-stream means "show me the live tail"; expanding a
-          // finished block opens from the top for reading.
-          stickRef.current = next && Boolean(active);
-          prevScrollTopRef.current = 0;
-          setExpanded(next);
-          if (next) window.dispatchEvent(new Event(COLLAPSIBLE_EXPANDED_EVENT));
-        }}
+        onOpenChange={() => toggleFold(!expanded)}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
         <TraceCollapsibleTrigger

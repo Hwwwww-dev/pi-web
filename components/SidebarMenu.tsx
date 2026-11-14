@@ -367,6 +367,7 @@ function menuBoxClassName(classic: boolean): string {
     "border border-(--border) rounded-(--radius-md) bg-background text-foreground text-xs shadow-(--shadow-md)",
     classic ? "p-0" : "p-1",
     "animate-in fade-in slide-in-from-top-[3px] duration-[120ms] ease-out motion-reduce:animate-none",
+    "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[100ms] data-[state=closed]:fill-mode-forwards motion-reduce:data-[state=closed]:animate-none",
     "focus:outline-none",
   ].filter(Boolean).join(" ");
 }

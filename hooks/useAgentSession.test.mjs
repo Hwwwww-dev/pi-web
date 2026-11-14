@@ -754,7 +754,7 @@ test("a newly sent message lands at the bottom, not pinned to the top", () => {
   );
 
   assert.match(source, /pendingTailScrollRef\.current = true;/);
-  assert.match(scrollEffectSource, /pendingTailScrollRef\.current = false;\s*initialScrollDoneRef\.current = true;\s*scrollToBottom\("instant"\);/);
+  assert.match(scrollEffectSource, /pendingTailScrollRef\.current = false;\s*initialScrollDoneRef\.current = true;(?:\s*reattachToTail\?\.\(\);)?\s*scrollToBottom\("instant"\);/);
   // prompt-anchor 机制已全部拆除。
   assert.doesNotMatch(source, /promptAnchor|scrollUserMsgToTop|lastUserMsgRef/);
   assert.doesNotMatch(chatWindowSource, /promptAnchor|scrollUserMsgToTop/);

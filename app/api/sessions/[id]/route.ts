@@ -66,6 +66,9 @@ export async function GET(
     const deferToolResultImages = searchParams.has("deferMedia");
     const rawTail = Number(searchParams.get("tail"));
     const tail = Number.isFinite(rawTail) && rawTail > 0 ? Math.min(rawTail, 1000) : 50;
+    // Whole-turn pages: the client asks for turns, the probe for `tail=1`.
+    const rawTurns = Number(searchParams.get("turns"));
+    const turns = Number.isFinite(rawTurns) && rawTurns > 0 ? Math.min(rawTurns, 200) : 0;
     // pi's showCacheMissNotices (#1265): cache, cost and provider notices on the messages they follow.
     const transcriptNotices = readSessionTranscriptNotices({
       entries: entries as unknown as SessionEntry[],
@@ -77,6 +80,7 @@ export async function GET(
       deferThinking,
       deferToolResultImages,
       tail,
+      ...(turns ? { turns } : {}),
       sessionId: id, // local: lazy URLs for historical tool-result images
     }), transcriptNotices);
     perf?.span("context");

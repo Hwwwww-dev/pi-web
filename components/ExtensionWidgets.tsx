@@ -269,7 +269,7 @@ export function ExtensionWidgetPanel({ widget, triggerId, panelId, closing = fal
       data-state={closing ? "closed" : "open"}
       // fill-mode-forwards：退场动画结束到 useDelayedUnmount 真正卸载之间存在一帧以上空档，
       // 默认 fill-mode none 会使面板弹回可见；forwards 将终态固定为透明与缩小。
-      className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:fill-mode-forwards"
+      className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-150 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:duration-150 data-[state=closed]:fill-mode-forwards"
     >
       <div className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{widget.key}</div>
       {/* Extension widgets render TUI output: tables, progress bars and box drawing

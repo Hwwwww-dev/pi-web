@@ -54,6 +54,7 @@ import { createExpandedPathsMemory } from "@/lib/file-tree-expansion";
 import { loadChangesViewMode, saveChangesViewMode, type ChangesViewMode } from "@/lib/sidebar-prefs";
 import { droppedItems } from "@/hooks/useDragDrop";
 import { useI18n } from "@/hooks/useI18n";
+import { Reveal } from "@/components/Reveal";
 type Translate = ReturnType<typeof useI18n>["t"];
 
 /** Why a listed entry is normally left out; only listings with `hidden=1` report it. */
@@ -1192,6 +1193,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
       onDrop={handleExplorerDrop}
     >
       <input ref={uploadInputRef} type="file" multiple hidden onChange={handleUploadInput} />
+      <Reveal open={showUploadFeedback}>
       {showUploadFeedback && (
         <div className="px-2 py-1.5">
         {uploadBusy && (
@@ -1293,7 +1295,9 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         )}
         </div>
       )}
+      </Reveal>
 
+      <Reveal open={fileSearchOpen}>
       {fileSearchOpen && (
       <div className="px-2 pb-1.5 pt-0.5">
         <InputGroup className="h-8 rounded-md bg-muted">
@@ -1365,7 +1369,9 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         )}
       </div>
       )}
+      </Reveal>
 
+      <Reveal open={!changesCollapsed && gitFiles.length > 0}>
       {!changesCollapsed && gitFiles.length > 0 && (
         <div className="px-1 pb-0.5">
           <div
@@ -1421,6 +1427,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
           )}
         </div>
       )}
+      </Reveal>
 
       {(changesCollapsed || gitFiles.length === 0) && (!fileSearchOpen || !hasSearchQuery) && (
         <div className="px-1 py-[2px]">
@@ -1472,7 +1479,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         <div
           role="status"
           aria-live="polite"
-          className="pointer-events-none sticky bottom-0 z-[1] flex select-none items-center gap-1.5 bg-card px-2 py-1.5 text-xs text-primary"
+          className="pointer-events-none sticky bottom-0 z-[1] flex select-none items-center gap-1.5 bg-card px-2 py-1.5 text-xs text-primary animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:animate-none"
         >
           <UploadIcon size={13} strokeWidth={1.8} className="shrink-0" />
           {t("files.dropToUpload", {

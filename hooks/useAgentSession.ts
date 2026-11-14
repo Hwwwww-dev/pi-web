@@ -8,6 +8,7 @@ import type {
   ExtensionStatusItem,
   ExtensionUiRequest,
   ExtensionWidgetItem,
+  HeadTurnSummary,
   SessionInfo,
   SessionTreeNode,
   ToolResultMessage,
@@ -72,7 +73,7 @@ import {
   upsertExtensionUiRequest,
 } from "@/lib/extension-ui-queue";
 import {
-  VISIBLE_PAGE_SIZE,
+  VISIBLE_PAGE_TURNS,
 } from "@/lib/chat-lazy-load";
 import {
   createStreamingStore,
@@ -98,6 +99,8 @@ export interface SessionData {
     turnsBefore: number;
     newestEntryId?: string | null;
     hasNewer?: boolean;
+    /** The turn the window's first entry sits inside (a page that begins mid-turn). */
+    headTurn?: HeadTurnSummary;
     thinkingLevel: string;
     model: { provider: string; modelId: string } | null;
   };
@@ -251,6 +254,9 @@ export interface UseAgentSessionOptions {
   /** Registers the debug panel's reader of this page's stream and lease: it reads refs only, never a request. */
   onDebugSnapshotReaderChange?: (reader: (() => DebugClientSession) | null) => void;
   onSessionStatsPanelOpen?: () => void;
+  /** 发送后贴底时解除手势压制重挂跟随（hooks/useChatFollow 的 reattach）。
+   *  只滚不重挂的话，带内脱离状态下发送后压制仍在，流式输出无人跟随。 */
+  reattachToTail?: () => void;
   /** Opens Settings on a section; a bare `/mcp` the built-in MCP extension owns opens Settings › MCP. */
   onOpenSettings?: (section: SettingsSection) => void;
   setToolPreset?: (preset: ToolPreset) => void;
@@ -484,7 +490,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, newSessionDraftKey, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen, background = false, dormant = false,
-    onOpenSettings, onDebugSnapshotReaderChange,
+    onOpenSettings, onDebugSnapshotReaderChange, reattachToTail,
   } = opts;
 
   const isNew = session === null && newSessionCwd !== null;
@@ -505,6 +511,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // Tail of the loaded page: null-or-equal to the leaf when the page reaches it.
   const [newestCursor, setNewestCursor] = useState<string | null>(null);
   const [hasNewerMessages, setHasNewerMessages] = useState(false);
+  // 窗口从回合中间开始时的整轮汇总；客户端只用于给被截断的回合头补一条用量行。
+  const [headTurn, setHeadTurn] = useState<HeadTurnSummary | null>(null);
   // Outside React state: a streamed chunk must not re-render the whole chat (see StreamingStore).
   const [streamingStore] = useState(createStreamingStore);
   const dispatch = streamingStore.dispatch;
@@ -975,6 +983,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           setEarlierTurnCount(0);
           setNewestCursor(null);
           setHasNewerMessages(false);
+          setHeadTurn(null);
           pendingWindowMessagesRef.current = [];
           setError(null);
         }
@@ -1045,6 +1054,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         // 下次发送时把上个会话的消息顶进当前列表。
         setNewestCursor(null);
         setHasNewerMessages(false);
+        setHeadTurn(d.context.headTurn ?? null);
         pendingWindowMessagesRef.current = [];
       }
       // Tool-preset state is independent of the view cache: it must be applied
@@ -1126,7 +1136,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return await flight;
   }, [applyLiveUsage, applyRecordedQueueSnapshot, setToolPresetState, syncLiveModel]);
 
-  const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { tail?: number; signal?: AbortSignal }) => {
+  const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { signal?: AbortSignal }) => {
     try {
       // 同一页正在请求中：滚动到顶部与预取可能并发触发，重复返回会导致该页被 prepend 两次。
       if (before) {
@@ -1135,10 +1145,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1" });
       if (leafId) params.set("leafId", leafId);
-      // Page upward: ask the server for the `tail` ancestors preceding `before`,
-      // then prepend them. Omitting `before` fetches the most-recent `tail`.
+      // Page upward: ask the server for the `turns` preceding `before`, then
+      // prepend them. Omitting `before` fetches the most-recent `turns`.
       if (before) params.set("before", before);
-      if (options?.tail) params.set("tail", String(options.tail));
+      params.set("turns", String(VISIBLE_PAGE_TURNS));
       const url = `/api/sessions/${encodeURIComponent(sid)}/context?${params}`;
       const res = await fetch(url, { signal: options?.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1153,6 +1163,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setHistoryCursor(d.context.oldestEntryId);
       setHasEarlierMessages(d.context.hasMore);
       setEarlierTurnCount(d.context.turnsBefore ?? 0);
+      setHeadTurn(d.context.headTurn ?? null);
       setData((prev) => {
         if (!prev || prev.sessionId !== sid) return prev;
         if (!before) return { ...prev, context: d.context };
@@ -1200,9 +1211,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const fetchWindow = useCallback(async (
     sid: string,
     leafId: string | null,
-    window: { anchor?: string; newerThan?: string; tail: number; after?: number },
+    window: { anchor?: string; newerThan?: string; turns: number; after?: number },
   ) => {
-    const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1", tail: String(window.tail) });
+    const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1", turns: String(window.turns) });
     if (leafId) params.set("leafId", leafId);
     if (window.anchor) params.set("anchor", window.anchor);
     if (window.newerThan) params.set("newerThan", window.newerThan);
@@ -1218,7 +1229,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   /** 小地图跳转：单次请求获取目标轮附近的窗口，不逐页向上拉取。 */
   const jumpToEntry = useCallback(async (sid: string, leafId: string | null, anchorId: string) => {
     try {
-      const context = await fetchWindow(sid, leafId, { anchor: anchorId, tail: VISIBLE_PAGE_SIZE, after: VISIBLE_PAGE_SIZE });
+      const context = await fetchWindow(sid, leafId, { anchor: anchorId, turns: VISIBLE_PAGE_TURNS });
       if (!context) return null;
       browsingHistoryRef.current = true;
       setMessages(context.messages);
@@ -1226,6 +1237,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setHistoryCursor(context.oldestEntryId);
       setHasEarlierMessages(context.hasMore);
       setEarlierTurnCount(context.turnsBefore ?? 0);
+      setHeadTurn(context.headTurn ?? null);
       setNewestCursor(context.newestEntryId ?? null);
       setHasNewerMessages(Boolean(context.hasNewer));
       if (!context.hasNewer) pendingWindowMessagesRef.current = [];
@@ -1242,7 +1254,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (loadingAfterRef.current === newerThan) return null;
     loadingAfterRef.current = newerThan;
     try {
-      const context = await fetchWindow(sid, leafId, { newerThan, tail: VISIBLE_PAGE_SIZE });
+      const context = await fetchWindow(sid, leafId, { newerThan, turns: VISIBLE_PAGE_TURNS });
       if (!context) return null;
       const page = dedupePage(context.entryIds, context.messages, entryIdsRef.current);
       setMessages((prev) => [...prev, ...page.messages]);
@@ -3742,15 +3754,18 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   useLayoutEffect(() => {
     if (messages.length === 0) return;
     if (pendingTailScrollRef.current) {
-      // 发送后贴底（WhatsApp 式）：乐观气泡落位即滚到底部。
+      // 发送后贴底（WhatsApp 式）：乐观气泡落位即滚到底部。滚前先解除手势
+      // 压制重挂跟随：带内脱离状态下发送，若只滚不重挂，压制仍在，后续流式
+      // 输出无人跟随，直到内容把距离推出带外按钮才出现。
       pendingTailScrollRef.current = false;
       initialScrollDoneRef.current = true;
+      reattachToTail?.();
       scrollToBottom("instant");
     } else if (!initialScrollDoneRef.current) {
       initialScrollDoneRef.current = true;
       scrollToBottom("instant");
     }
-  }, [messages.length, scrollToBottom]);
+  }, [messages.length, scrollToBottom, reattachToTail]);
 
   // Load the model list with bounded retries; loadModels exposes each failure.
   useEffect(() => {
@@ -3840,7 +3855,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   return {
     // State
-    data, loading, error, activeLeafId, messages, activeToolResults, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, newestCursor, hasNewerMessages, streamingStore,
+    data, loading, error, activeLeafId, messages, activeToolResults, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, newestCursor, hasNewerMessages, headTurn, streamingStore,
     agentRunning, modelNames, modelList, modelError, missingCwd, modelScopeWarnings, isModelScopeActive, allModelList, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage: displayContextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats, autoCompactionEnabled,

@@ -82,7 +82,7 @@ export function SvgBlock({ code, isStreaming }: { code: string; isStreaming?: bo
     <img
       src={url ?? undefined}
       alt={t("i18n.svgImage")}
-      className={cn(baseClass, unsizedUrl === url && unsizedClass)}
+      className={cn(baseClass, unsizedUrl === url && unsizedClass, "animate-in fade-in duration-200 motion-reduce:animate-none")}
       onLoad={(event) => {
         const { naturalWidth, naturalHeight } = event.currentTarget;
         if (!naturalWidth || !naturalHeight) setUnsizedUrl(url);
@@ -104,7 +104,7 @@ export function SvgBlock({ code, isStreaming }: { code: string; isStreaming?: bo
       {source === undefined ? (
         <div className="mermaid-block mermaid-block-loading p-3 overflow-x-auto bg-muted min-h-[120px]" />
       ) : !ready ? (
-        <div className="mermaid-block mermaid-block-error p-3 overflow-x-auto bg-muted text-muted-foreground font-mono text-xs">{t("i18n.invalidSvg")}</div>
+        <div className="mermaid-block mermaid-block-error p-3 overflow-x-auto bg-muted text-muted-foreground font-mono text-xs animate-in fade-in duration-200 motion-reduce:animate-none">{t("i18n.invalidSvg")}</div>
       ) : (
         <>
           {!zoomOpen && (

@@ -812,7 +812,8 @@ export function SettingsPanel({
       data-phone-level={isPhone ? phone.level : undefined}
       // A section's settings above its list (Models' enabledModels, Sub-agents'
       // switch) belong to the list level, not to each row's detail.
-      className="min-h-0 min-w-0 w-full flex-1 max-[640px]:data-[phone-level=detail]:[&_.enabled-models-banner]:hidden max-[640px]:data-[phone-level=detail]:[&_.agents-feature-setting]:hidden"
+      // display:none → block 会让 CSS 动画重放：桌面切换 section 时内容淡入。
+      className="min-h-0 min-w-0 w-full flex-1 animate-in fade-in duration-150 motion-reduce:animate-none max-[640px]:data-[phone-level=detail]:[&_.enabled-models-banner]:hidden max-[640px]:data-[phone-level=detail]:[&_.agents-feature-setting]:hidden"
     >
       {content}
     </div>

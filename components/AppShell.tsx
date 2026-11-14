@@ -605,11 +605,15 @@ export function AppShell() {
     setActiveFlyout((cur) => cur === panel ? null : panel);
   }, [isMobile]);
 
-  // The Debug button on screen (one of its three places at a time); Escape gives focus back to it.
-  const debugButtonRef = useRef<HTMLButtonElement | null>(null);
+  // 页头浮层的唯一鼠标入口（各宽下都在）：系统提示 / 工具定义 / 分支 / 调试
+  // 都在它的菜单里，所以它既是这些面板的锚点，也是 Escape 后焦点的落点。
+  const moreButtonRef = useRef<HTMLButtonElement | null>(null);
+  // 会话信息面板的入口：顶栏那粒 stats（token / 成本 / ctx）。
+  const statsButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // 页头下挂的四张非模态面板（系统 / 工具定义 / 会话信息 / 调试）均为受控 Popover，
-  // anchor 为头部容器 topBarRef 的 virtualRef；外点关闭、Esc 与进出动画由 Radix 处理。
+  // anchor 是各自真正的触发控件（⋯ 或 stats），面板从被点的地方长出来、右对齐
+  // 向左展开；外点关闭、Esc 与进出动画由 Radix 处理。
   // 触发按钮走 toggle 而非 PopoverTrigger，避免与指针点击重复处理。
   const closeFlyout = useCallback((panel: "branches" | "system" | "tools" | "session") => {
     setActiveFlyout((cur) => cur === panel ? null : cur);
@@ -629,7 +633,7 @@ export function AppShell() {
   // Debug button gets it back, unless the user moved it meanwhile (focusIfLost).
   const closeDebugPanel = useCallback((restoreFocus: boolean) => {
     setActiveFlyout((panel) => panel === "debug" ? null : panel);
-    if (restoreFocus) requestAnimationFrame(() => focusIfLost(document, debugButtonRef.current));
+    if (restoreFocus) requestAnimationFrame(() => focusIfLost(document, moreButtonRef.current));
   }, []);
 
   // A ⋯-menu item's select closes the menu synchronously in the same tick;
@@ -2116,7 +2120,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             覆盖刚打开或关闭的调试面板。可达名由 aria-label 提供。 */}
         <DropdownMenuTrigger asChild>
           <Button
-            ref={debugButtonRef}
+            ref={moreButtonRef}
             variant="ghost"
             size="icon-sm"
             aria-label={moreControlsLabel}
@@ -2329,8 +2333,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         <Button
           variant="ghost"
           size="sm"
-          onPointerDown={holdStatsPress}
+            onPointerDown={holdStatsPress}
           onClick={() => toggleFlyout("session")}
+          ref={statsButtonRef}
           disabled={!showChat}
           title={tooltip || translate("session.title")}
           aria-label={translate("session.title")}
@@ -2369,6 +2374,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         variant="ghost"
         size="sm"
         onPointerDown={holdStatsPress}
+        ref={statsButtonRef}
         onClick={() => toggleFlyout("session")}
         title={tooltip || translate("session.title")}
         aria-label={translate("session.title")}
@@ -2540,7 +2546,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               locked={branchSwitchLocked}
               inline
               compact
-              containerRef={topBarRef}
+              containerRef={moreButtonRef}
               open={activeFlyout === "branches"}
               onToggle={() => toggleFlyout("branches")}
               hasSession={showChat}
@@ -2549,17 +2555,17 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           )}
         </div>
         </header>
-          {/* Top panels — anchored to the header container (virtualRef), only
-              one open at a time. z-[240] stays below the quote toolbar's 260
+          {/* Top panels — anchored to the control that opened them, only one
+              open at a time. z-[240] stays below the quote toolbar's 260
               (ChatWindow). */}
           <Popover
             open={activeFlyout === "system"}
             onOpenChange={(next) => next ? setActiveFlyout("system") : closeFlyout("system")}
           >
-            <PopoverAnchor virtualRef={topBarRef} />
-            {/* 系统提示与工具定义共用同一浮层卡：顶栏下方 8px，左右各 8px（宽度减 16 加 mx-2 保持对称），
-                圆角 rounded-xl。 */}
-            <HeaderFlyout width="w-[560px] max-w-[calc(100vw-16px)]" align="start" sideOffset={8} avoidCollisions={false}>
+            <PopoverAnchor virtualRef={moreButtonRef} />
+            {/* 系统提示与工具定义共用同一浮层卡：⋯ 按钮下方 8px，右对齐向左展开
+                （面板比按钮宽得多）；圆角 rounded-xl。 */}
+            <HeaderFlyout width="w-[560px] max-w-[calc(100vw-16px)]" align="end" sideOffset={8} collisionPadding={8}>
               <SystemPromptPanel
                 loading={systemInfoLoading}
                 prompt={systemPrompt}
@@ -2571,8 +2577,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             open={activeFlyout === "tools"}
             onOpenChange={(next) => next ? setActiveFlyout("tools") : closeFlyout("tools")}
           >
-            <PopoverAnchor virtualRef={topBarRef} />
-            <HeaderFlyout width="w-[720px] max-w-[calc(100vw-16px)]" align="start" sideOffset={8} avoidCollisions={false}>
+            <PopoverAnchor virtualRef={moreButtonRef} />
+            <HeaderFlyout width="w-[720px] max-w-[calc(100vw-16px)]" align="end" sideOffset={8} collisionPadding={8}>
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
                 tools={systemTools}
@@ -2584,10 +2590,12 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             open={activeFlyout === "session"}
             onOpenChange={(next) => next ? setActiveFlyout("session") : closeFlyout("session")}
           >
-            <PopoverAnchor virtualRef={topBarRef} />
-            {/* 会话信息浮层：与系统提示、工具定义、调试共用同一浮层卡（同宽、同圆角、同描边阴影）；
-                session-info-popover 类名保留作为 e2e 定位锚，内容滚动发生在面板内部。 */}
-            <HeaderFlyout className="session-info-popover" width="w-[560px] max-w-[calc(100vw-16px)]" align="start" sideOffset={8} avoidCollisions={false}>
+            <PopoverAnchor virtualRef={statsButtonRef} />
+            {/* 会话信息浮层：从 stats 那粒（token / 成本 / ctx）长出来，右对齐向左
+                展开；与系统提示、工具定义、调试共用同一浮层卡（同宽、同圆角、同
+                描边阴影）；session-info-popover 类名保留作为 e2e 定位锚，内容滚动
+                发生在面板内部。 */}
+            <HeaderFlyout className="session-info-popover" width="w-[560px] max-w-[calc(100vw-16px)]" align="end" sideOffset={8} collisionPadding={8}>
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
                 const ws = selectedSession;
@@ -2707,8 +2715,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               ? setActiveFlyout("debug")
               : setActiveFlyout((cur) => cur === "debug" ? null : cur)}
           >
-            <PopoverAnchor virtualRef={topBarRef} />
-            <HeaderFlyout width="w-[560px] max-w-[calc(100vw-16px)]" align="start" sideOffset={8} avoidCollisions={false}>
+            <PopoverAnchor virtualRef={moreButtonRef} />
+            <HeaderFlyout width="w-[560px] max-w-[calc(100vw-16px)]" align="end" sideOffset={8} collisionPadding={8}>
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
                   readerRef={debugSnapshotReaderRef}

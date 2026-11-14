@@ -120,7 +120,7 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
   }
 
   const body = renderState?.key === currentKey && renderState.status === "error" ? (
-      <div className="mermaid-block mermaid-block-error p-3 overflow-x-auto bg-muted text-muted-foreground font-mono text-xs">{t("i18n.invalidMermaid")}</div>
+      <div className="mermaid-block mermaid-block-error p-3 overflow-x-auto bg-muted text-muted-foreground font-mono text-xs animate-in fade-in duration-200 motion-reduce:animate-none">{t("i18n.invalidMermaid")}</div>
     ) : renderState?.key !== currentKey || renderState.status !== "ready" ? (
       <div className="mermaid-block mermaid-block-loading p-3 overflow-x-auto bg-muted min-h-[120px]" aria-label={t("i18n.renderingMermaid")} />
     ) : (
@@ -130,7 +130,7 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
             ref={previewRef}
             type="button"
             variant="ghost"
-            className="block h-auto max-h-[min(600px,60dvh)] w-full cursor-zoom-in overflow-auto p-0 text-left font-normal text-inherit"
+            className="block h-auto max-h-[min(600px,60dvh)] w-full cursor-zoom-in overflow-auto p-0 text-left font-normal text-inherit animate-in fade-in duration-200 motion-reduce:animate-none"
             title={t("i18n.openMermaidViewer")}
             aria-label={t("i18n.openMermaidViewer")}
             onClick={() => setZoomOpen(true)}

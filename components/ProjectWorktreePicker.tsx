@@ -131,7 +131,7 @@ export function WorktreeRemoveForm({
       {heading && <div className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-2 pt-1.5 pb-1 text-xs [.sidebar-sheet_&]:px-4 [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs">{heading}</div>}
       {dirty && <div className="sidebar-worktree-message pt-0.5 px-1 text-foreground text-xs leading-[1.4]">{t("sidebar.forceRemoveCheckout")}</div>}
       {(dirty || showCancel) && (
-        <div className="sidebar-worktree-form-buttons flex gap-1.5 mt-1.5">
+        <div className="sidebar-worktree-form-buttons flex gap-1.5 mt-1.5 animate-in fade-in duration-150 motion-reduce:animate-none">
           {dirty && (
             <Button
               type="button"
@@ -158,7 +158,7 @@ export function WorktreeRemoveForm({
           )}
         </div>
       )}
-      {error && <div className="sidebar-worktree-error mt-1.5 text-destructive text-xs leading-[1.35] [overflow-wrap:anywhere]" role="alert">{error}</div>}
+      {error && <div className="sidebar-worktree-error mt-1.5 text-destructive text-xs leading-[1.35] [overflow-wrap:anywhere] animate-in fade-in duration-150 motion-reduce:animate-none" role="alert">{error}</div>}
     </div>
   );
 }

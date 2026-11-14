@@ -5,10 +5,11 @@ import {
 import { closeSync, type Dirent, fstatSync, openSync, readSync, statSync } from "fs";
 import { readdir } from "fs/promises";
 import { isAbsolute, join, normalize as normalizePath, relative, resolve as resolvePath, sep } from "path";
-import type { AgentMessage, ImageContent, MinimapTurnDescriptor, SessionEntry, SessionHeader, SessionInfo, SessionContext } from "./types";
+import type { AgentMessage, HeadTurnSummary, ImageContent, MinimapTurnDescriptor, SessionEntry, SessionHeader, SessionInfo, SessionContext } from "./types";
 import { normalizeToolCalls } from "./normalize";
 import { withoutMessageSignatures } from "./message-signatures";
 import { getThinkingPreview, isMessageGroupAnchor } from "./message-display";
+import { summarizeTurnUsage } from "./turn-view";
 import { projectIdentityKey } from "./project-identity";
 import { sessionPathKey } from "./session-path";
 import { skillExpansionToCommand } from "./slash-display";
@@ -720,7 +721,12 @@ function activeBranchChain(entries: SessionEntry[], leafId: string | null): Sess
 export interface BuildSessionContextOptions {
   deferThinking?: boolean;
   deferToolResultImages?: boolean;
+  /** Page by a number of visible messages (the cheap `tail=1` probe, older callers). */
   tail?: number;
+  /** Page by whole turns: the window is the last `turns` turns, or `turns` around
+   *  the `anchor`. A page that starts mid-turn renders as a truncated head
+   *  (flat rows, no fold row, no usage line), so history pages never cut a turn. */
+  turns?: number;
   excludeLeaf?: boolean;
   /** Session id used to build lazy URLs for historical tool-result images. */
   sessionId?: string;
@@ -735,9 +741,22 @@ export interface BuildSessionContextOptions {
 /**
  * The page of the active branch a request asks for. No window start means the
  * usual tail page; `anchor` centers a page on an entry (minimap jump), and
- * `newerThan` continues downward from the last loaded entry.
+ * `newerThan` continues downward from the last loaded entry. With `turns` the
+ * page is measured in whole turns, so it always begins on a turn anchor.
  */
 function resolveContextWindow(
+  entries: SessionEntry[],
+  leafId: string | null | undefined,
+  options: BuildSessionContextOptions,
+): { sliced: SessionEntry[]; hasMore: boolean; hasNewer: boolean } {
+  const { turns, excludeLeaf, anchor, after, newerThan } = options;
+  const turnPage = turns && turns > 0 ? Math.floor(turns) : 0;
+  if (turnPage) return turnWindow(entries, leafId, { turnPage, excludeLeaf, anchor, after, newerThan });
+  return messageWindow(entries, leafId, options);
+}
+
+/** By-message page: the `tail` probe and callers that predate turn pages. */
+function messageWindow(
   entries: SessionEntry[],
   leafId: string | null | undefined,
   options: BuildSessionContextOptions,
@@ -767,6 +786,70 @@ function resolveContextWindow(
   return { sliced: chain.slice(start, end), hasMore: start > 0, hasNewer: end < chain.length };
 }
 
+/** Index of the turn anchor containing `index`, or the branch root above it. */
+function turnStartIndex(chain: SessionEntry[], index: number): number {
+  for (let i = Math.min(index, chain.length - 1); i >= 0; i -= 1) if (isTurnAnchorEntry(chain[i])) return i;
+  return 0;
+}
+
+/** Index where the page starts: the `turns`-th anchor counted up from `endExclusive`, never mid-turn. */
+function turnPageStart(chain: SessionEntry[], endExclusive: number, turns: number): number {
+  const want = Math.max(1, turns);
+  let seen = 0;
+  for (let i = Math.min(endExclusive, chain.length) - 1; i >= 0; i -= 1) {
+    if (!isTurnAnchorEntry(chain[i])) continue;
+    seen += 1;
+    if (seen >= want) return i;
+  }
+  return 0;
+}
+
+/** Index just past the last of `afterTurns` turns following the one at `index`. */
+function turnSpanEnd(chain: SessionEntry[], index: number, afterTurns: number): number {
+  let remaining = Math.max(0, afterTurns);
+  for (let i = turnStartIndex(chain, index) + 1; i < chain.length; i += 1) {
+    if (!isTurnAnchorEntry(chain[i])) continue;
+    if (remaining === 0) return i;
+    remaining -= 1;
+  }
+  return chain.length;
+}
+
+/** A page of whole turns: the last `turnPage`, or that many around `anchor`. */
+function turnWindow(
+  entries: SessionEntry[],
+  leafId: string | null | undefined,
+  window: { turnPage: number; excludeLeaf?: boolean; anchor?: string; after?: number; newerThan?: string },
+): { sliced: SessionEntry[]; hasMore: boolean; hasNewer: boolean } {
+  const { turnPage, excludeLeaf, anchor, after, newerThan } = window;
+  if (leafId === null) return { sliced: [], hasMore: false, hasNewer: false };
+  const chain = activeBranchChain(entries, leafId ?? null);
+  const windowStart = anchor ?? newerThan;
+  const index = windowStart ? chain.findIndex((entry) => entry.id === windowStart) : -1;
+  if (!windowStart || index < 0) {
+    // Tail page. Paging upward rewinds one entry (the oldest already loaded).
+    const end = excludeLeaf ? Math.max(0, chain.length - 1) : chain.length;
+    const start = turnPageStart(chain, end, turnPage);
+    return {
+      sliced: chain.slice(start, end),
+      hasMore: start > 0,
+      hasNewer: Boolean(excludeLeaf) && end < chain.length,
+    };
+  }
+  if (newerThan) {
+    const start = index + 1;
+    if (start >= chain.length) return { sliced: [], hasMore: true, hasNewer: false };
+    const end = turnSpanEnd(chain, start, turnPage - 1);
+    return { sliced: chain.slice(start, end), hasMore: true, hasNewer: end < chain.length };
+  }
+  // A jump centres the page on the anchor's turn: `after` turns below it
+  // (half a page when the caller says nothing), the rest above.
+  const spanBelow = Math.min(Math.max(0, Math.floor(after ?? turnPage / 2)), turnPage - 1);
+  const end = turnSpanEnd(chain, index, spanBelow);
+  const start = turnPageStart(chain, index + 1, turnPage - spanBelow);
+  return { sliced: chain.slice(start, end), hasMore: start > 0, hasNewer: end < chain.length };
+}
+
 export function buildSessionContext(
   entries: SessionEntry[],
   leafId?: string | null,
@@ -791,7 +874,7 @@ export function buildSessionContext(
     }
   }
 
-  return {
+  const context: SessionContext = {
     messages,
     entryIds,
     oldestEntryId: sliced[0]?.id ?? null,
@@ -801,6 +884,15 @@ export function buildSessionContext(
     hasNewer,
     ...getSessionSettings(entries, leafId),
   };
+  // 窗口从回合中间开始时，被截断的回合头也要一条用量行：整轮求和需要窗口外的
+  // 助手消息，只能由服务端给（客户端只拿到窗口内的半截）。
+  if (hasMore && sliced[0] && !isTurnAnchorEntry(sliced[0])) {
+    const chain = activeBranchChain(entries, leafId ?? null);
+    const firstIdx = chain.findIndex((entry) => entry.id === sliced[0].id);
+    const headTurn = firstIdx >= 0 ? summarizeHeadTurn(chain, firstIdx, options) : undefined;
+    if (headTurn) context.headTurn = headTurn;
+  }
+  return context;
 }
 
 /**
@@ -822,6 +914,12 @@ function turnAnchorShape(entry: SessionEntry): Parameters<typeof isMessageGroupA
   }
 }
 
+/** Entry the chat groups a turn by: a user message, a compaction divider, a subagent follow-up. */
+function isTurnAnchorEntry(entry: SessionEntry): boolean {
+  const shape = turnAnchorShape(entry);
+  return shape !== null && isMessageGroupAnchor(shape);
+}
+
 /**
  * Turns on the branch above `oldest`, the first entry of a page: the anchors
  * the chat would group by (#791). The minimap numbers loaded turns from it, so
@@ -833,11 +931,56 @@ function countTurnsBefore(entries: SessionEntry[], oldest: SessionEntry): number
   let turns = 0;
   let current = oldest.parentId ? byId.get(oldest.parentId) : undefined;
   while (current) {
-    const shape = turnAnchorShape(current);
-    if (shape && isMessageGroupAnchor(shape)) turns++;
+    if (isTurnAnchorEntry(current)) turns++;
     current = current.parentId ? byId.get(current.parentId) : undefined;
   }
   return turns;
+}
+
+/**
+ * The turn a page's first entry sits inside, aggregated over its whole span.
+ *
+ * A tail page can begin mid-turn: `ChatWindow` then renders the remaining rows
+ * as a flat head, which ends at the turn's own end — and that turn's usage line
+ * sums the requests of the whole turn, half of which is outside the page. The
+ * branch is in memory, so sum it here and hand the numbers to the client.
+ */
+function summarizeHeadTurn(
+  chain: SessionEntry[],
+  firstIdx: number,
+  options: BuildSessionContextOptions,
+): HeadTurnSummary | undefined {
+  // The turn's own anchor precedes the window's first entry; the next anchor ends it.
+  let turnStart = firstIdx;
+  while (turnStart > 0 && !isTurnAnchorEntry(chain[turnStart])) turnStart -= 1;
+  const messages: AgentMessage[] = [];
+  // 思考等级前向携带（thinking_level_change 条目），与该回合的助手消息一起下发。
+  let thinkingLevel: string | undefined;
+  for (let index = 0; index < turnStart; index++) {
+    const entry = chain[index];
+    if (entry.type === "thinking_level_change") thinkingLevel = entry.thinkingLevel;
+  }
+  for (let index = turnStart; index < chain.length; index++) {
+    if (index > turnStart && isTurnAnchorEntry(chain[index])) break;
+    const entry = chain[index];
+    if (entry.type === "thinking_level_change") {
+      thinkingLevel = entry.thinkingLevel;
+      continue;
+    }
+    const message = entryToUiMessage(entry, options);
+    if (!message) continue;
+    if (thinkingLevel !== undefined && message.role === "assistant") message.thinkingLevel = thinkingLevel;
+    messages.push(message);
+  }
+  const { usage, lastAssistant } = summarizeTurnUsage({ messages, startIdx: 0, endIdx: messages.length });
+  if (!lastAssistant) return undefined;
+  return {
+    usage,
+    provider: lastAssistant.provider,
+    model: lastAssistant.model,
+    thinkingLevel: lastAssistant.thinkingLevel,
+    timestamp: lastAssistant.timestamp,
+  };
 }
 
 /** The user-visible text of a turn anchor, as the minimap's preview shows it.

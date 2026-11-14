@@ -23,6 +23,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { getAssistantErrorMessage, hasAssistantAnswer, isAssistantTruncated, isEmptyTextBlock, isEmptyThinkingBlock } from "@/lib/message-display";
 import { formatTurnDuration } from "@/lib/turn-duration";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
+import { Reveal } from "@/components/Reveal";
 import type { WrittenFile } from "@/lib/turn-written-files";
 import { skillExpansionContent, skillExpansionToCommand } from "@/lib/slash-display";
 import type {
@@ -273,10 +274,13 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               decoding="async"
               width={cachedSize?.width}
               height={cachedSize?.height}
+              ref={(el) => { if (el?.complete) el.dataset.loaded = "1"; }}
               onLoad={(event) => {
+                event.currentTarget.dataset.loaded = "1";
                 if (src) rememberImageSize(src, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
               }}
-              className="block min-h-16 min-w-16 max-h-60 max-w-60 object-contain"
+              onError={(event) => { event.currentTarget.dataset.loaded = "1"; }}
+              className="block min-h-16 min-w-16 max-h-60 max-w-60 object-contain opacity-0 transition-opacity duration-200 data-[loaded=1]:opacity-100"
             />
           </ImagePreview>
         );
@@ -335,9 +339,11 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   </span>
                 )}
               </div>
-              {expanded && (
-                <MarkdownBody className="markdown-user-message" keepLineBreaks cwd={cwd} onOpenFile={onOpenFile}>{skillExpansionContent(content) ?? content}</MarkdownBody>
-              )}
+              <Reveal open={expanded}>
+                {expanded && (
+                  <MarkdownBody className="markdown-user-message" keepLineBreaks cwd={cwd} onOpenFile={onOpenFile}>{skillExpansionContent(content) ?? content}</MarkdownBody>
+                )}
+              </Reveal>
             </div>
           ) : (
           <>
@@ -601,16 +607,19 @@ function AssistantMessageView({
         <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
       ))}
 
-      {providerError && (
-        <Alert variant="destructive" className={cn("font-mono text-xs leading-normal", blocks.length > 0 ? "mt-2" : "mt-0")}>
+      <Reveal open={Boolean(providerError)} className={blocks.length > 0 ? "mt-2" : "mt-0"}>
+        {providerError && (
+          <Alert variant="destructive" className="font-mono text-xs leading-normal">
           <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
             Error: {providerError}
           </AlertDescription>
         </Alert>
-      )}
+        )}
+      </Reveal>
 
-      {truncated && (
-        <Alert variant="warning" className={cn("font-mono text-xs leading-normal", blocks.length > 0 || providerError ? "mt-2" : "mt-0")}>
+      <Reveal open={Boolean(truncated)} className={blocks.length > 0 || providerError ? "mt-2" : "mt-0"}>
+        {truncated && (
+          <Alert variant="warning" className="font-mono text-xs leading-normal">
           <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
             {t(unansweredTruncation ? "chat.truncatedWithoutAnswer" : "chat.truncatedByOutputLimit")}
             {unansweredTruncation && onCompact && (
@@ -630,14 +639,17 @@ function AssistantMessageView({
             )}
           </AlertDescription>
         </Alert>
-      )}
+        )}
+      </Reveal>
 
       {writtenFiles && writtenFiles.length > 0 && (
-        <TurnWrittenFiles files={writtenFiles} onOpenFile={onOpenFile} />
+        <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+          <TurnWrittenFiles files={writtenFiles} onOpenFile={onOpenFile} />
+        </div>
       )}
 
       {((stats.length > 0 && !isStreaming) || (turnDurationMs !== undefined && !isStreaming) || (textContent && !isStreaming && !hideCopy) || (time && !isStreaming)) && (
-        <MessageFooter className="mt-1.5 gap-2 px-0">
+        <MessageFooter className="mt-1.5 gap-2 px-0 animate-in fade-in-0 duration-200">
           {(stats.length > 0 || turnDurationMs !== undefined) && !isStreaming && (
             // One item per count: a single space at 11px ran them together. The
             // spaces stay in the text for copying; the flex gap draws the room.
@@ -656,7 +668,7 @@ function AssistantMessageView({
             title={t("i18n.copyMessage")}
             aria-label={t("i18n.copyMessage")}
             className={cn(
-              "pointer-events-none shrink-0 text-muted-foreground opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
+              "pointer-events-none shrink-0 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
               copied && "text-primary",
             )}
           >

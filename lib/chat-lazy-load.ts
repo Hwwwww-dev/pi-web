@@ -1,5 +1,9 @@
 import { CHAT_TAIL_TOLERANCE, isAtTail } from "./chat-follow";
 
+/** 一页的窗口按整轮切：6 轮既接近原来 50 条的观感，也不会把某一轮切一半。 */
+export const VISIBLE_PAGE_TURNS = 6;
+
+/** 只作用在已加载消息上的渲染窗口（不是请求窗口）。 */
 export const VISIBLE_PAGE_SIZE = 50;
 
 export function getVisibleRenderWindow(totalCount: number, visibleCount: number): {
