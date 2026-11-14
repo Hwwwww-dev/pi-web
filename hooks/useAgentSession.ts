@@ -1076,9 +1076,15 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setMessageKeyAliases((aliases) => carryMessageKeys({ ...previous, aliases }, next));
         setMessages(next.messages);
         setEntryIds(next.entryIds);
-        setHistoryCursor(d.context.oldestEntryId);
-        setHasEarlierMessages(d.context.hasMore);
-        setEarlierTurnCount(d.context.turnsBefore ?? 0);
+        if (merged) {
+          // 合并成功：已载入的历史行（含窗口外翻页历史）还在列表里，翻页游标与
+          // 「还有更早」标记保留——重置到窗口头会让下次向上翻页重复载入已在
+          // 列表的行（旧消息重现）。只有整载替换才把游标重置到窗口头。
+        } else {
+          setHistoryCursor(d.context.oldestEntryId);
+          setHasEarlierMessages(d.context.hasMore);
+          setEarlierTurnCount(d.context.turnsBefore ?? 0);
+        }
         // 整载落在叶子：不存在更新的一页。上一会话残留的中段窗口标记与实时
         // 缓冲必须一并清掉，否则新会话的实时消息会被误缓冲（跨会话污染），
         // 下次发送时把上个会话的消息顶进当前列表。
