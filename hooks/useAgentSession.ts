@@ -758,6 +758,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const defaultThinkingLevelRef = useRef<ConcreteThinkingLevel | null>(null);
   const promptRunIdRef = useRef(0);
   const optimisticUserMessageKeyRef = useRef<string | null>(null);
+  // 本次 run 自己的 prompt 的 userMessageKey：独立于 optimistic 键存活到 run 结束。
+  // prompt_done / reconcile 会先清 optimistic 键并整载（持久副本入列），之后才冲到
+  // 的同一条 message_end（标签页冻结期间缓存的 SSE 事件重放）若只看 optimistic 键
+  // 会再 append 一份——同一条提问出现两只气泡。此键匹配时永不 append。
+  const promptOwnUserKeyRef = useRef<string | null>(null);
   // The run whose prompt the server is known to have got: one of its events
   // (agent_start, prompt_done, queue_update, its user message) arrived, maybe
   // before its request failed. Later ones clear the unconfirmed record itself.
@@ -2281,6 +2286,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       case "agent_settled": {
         const agentWasActive = sdkAgentActiveRef.current;
         sdkAgentActiveRef.current = false;
+        promptOwnUserKeyRef.current = null;
         if (!agentWasActive || rpcPromptPendingRef.current) break;
 
         const sid = sessionIdRef.current;
@@ -2366,6 +2372,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         // 事件比 run 结束晚到时不能直接丢：reconcile 那次读取可能赶在落盘之前，
         // 该条此时才写出。追加会和已读入的重复，故改为延后一次定向整载。
         if (!agentRunningRef.current) {
+          const early = event.message as AgentMessage | undefined;
+          if (early?.role === "user" && promptOwnUserKeyRef.current !== null && promptOwnUserKeyRef.current === userMessageKey(normalizeToolCalls(early))) {
+            promptOwnUserKeyRef.current = null;
+          }
           const sid = sessionIdRef.current;
           // 读者正在上翻历史时不动：整载会把窗口拉回叶子。
           if (sid && !browsingHistoryRef.current) {
@@ -2402,6 +2412,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           const deliveredKey = userMessageKey(delivered);
           const optimisticKey = optimisticUserMessageKeyRef.current;
           optimisticUserMessageKeyRef.current = null;
+          const own = promptOwnUserKeyRef.current !== null && promptOwnUserKeyRef.current === deliveredKey;
+          if (own) promptOwnUserKeyRef.current = null;
           // While the run's own bubble waits, a delivered user message is its prompt.
           if (optimisticKey) markPromptLanded();
           setMessages((prev) => {
@@ -2411,6 +2423,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
                 ? prev
                 : [...prev.slice(0, -1), delivered];
             }
+            // 自己 prompt 的迟到重放：持久副本已由整载带进列表，绝不再 append。
+            if (own) return prev;
             return [...prev, delivered];
           });
         } else if (completed) {
@@ -2613,6 +2627,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
     setMessages((prev) => [...prev, userMsg]);
     optimisticUserMessageKeyRef.current = userKey;
+    promptOwnUserKeyRef.current = userKey;
     promptRunIdRef.current = promptRunId;
     agentRunningRef.current = true;
     setAgentRunning(true);
@@ -2716,6 +2731,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       else addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) });
       restoreSubmission(message, images, composerDraftKey);
       optimisticUserMessageKeyRef.current = null;
+      promptOwnUserKeyRef.current = null;
       // Rejection only describes this submission. Another tab or an event we
       // missed may still have a real run active for the same session, so keep
       // its SSE connection until server state says the wrapper is idle.
