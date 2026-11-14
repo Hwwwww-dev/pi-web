@@ -196,7 +196,8 @@ function StatusPill({
 
 /**
  * ChatWindow 判断胶囊挂哪（同状态条自身的 widget 去重口径）：状态条会不会渲染。
- * 状态条在 → 胶囊作 leading 插行首（插件内容之前）；不在 → 胶囊绝对定位浮在同一条带左端。
+ * 状态条在 → 胶囊作 leading 插条带最左端（widgets 触发器与状态内容之前）；
+ * 不在 → 胶囊绝对定位浮在同一条带左端。
  */
 export function hasExtensionStatusBarContent(statuses: ExtensionStatusItem[], widgets: ExtensionWidgetItem[]): boolean {
   const widgetLabels = new Set(
@@ -218,7 +219,7 @@ export function ExtensionStatusBar({
 }: {
   statuses: ExtensionStatusItem[];
   widgets?: ExtensionWidgetItem[];
-  /** 流式状态胶囊（StreamStatusPill）：插在行首，插件状态内容之前。 */
+  /** 流式状态胶囊（StreamStatusPill）：插在条带最左端，widgets 触发器之前。 */
   leading?: ReactNode;
   /** Sends the command of a `command:` status; without it those buttons stay disabled. */
   onCommand?: (command: string) => void;
@@ -249,9 +250,8 @@ export function ExtensionStatusBar({
   const pinnedCells = cells.filter(isPermissiveCell);
   const scrollingCells = cells.filter((cell) => !isPermissiveCell(cell));
 
-  const statusLine = cells.length > 0 || leading ? (
+  const statusLine = cells.length > 0 ? (
     <div className="flex min-w-0 flex-1 items-center gap-1">
-      {leading}
       <div
         role="status"
         className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden pl-0.5 pr-1.5 scrollbar-none"
@@ -267,7 +267,7 @@ export function ExtensionStatusBar({
           />
         ))}
       </div>
-      {pinnedCells.length > 0 && (scrollingCells.length > 0 || leading != null) && (
+      {pinnedCells.length > 0 && scrollingCells.length > 0 && (
         <Separator orientation="vertical" className="mx-1 h-4" />
       )}
       {pinnedCells.map((cell, index) => (
@@ -291,6 +291,10 @@ export function ExtensionStatusBar({
     // the row.
     //
     <div className={`extension-status-bar relative ${CHAT_COMPOSER_INSET_CLASS} flex shrink-0 items-stretch pb-3`}>
+      {/* 胶囊在最外层、widgets 触发器之前：todo 等胶囊是 widgets，排在 ExtensionWidgets
+          内部 statusLine 前面，插行首抢不过它们——只有提出去才能保证 token 恒在最左。 */}
+      {leading}
+      {leading && <Separator orientation="vertical" className="mx-1 h-4 shrink-0" />}
       {widgets.length > 0 ? <ExtensionWidgets widgets={widgets}>{statusLine}</ExtensionWidgets> : statusLine}
     </div>
   );
