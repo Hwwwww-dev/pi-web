@@ -73,6 +73,7 @@ import {
   upsertExtensionUiRequest,
 } from "@/lib/extension-ui-queue";
 import {
+  OLDER_PAGE_TURNS,
   VISIBLE_PAGE_TURNS,
 } from "@/lib/chat-lazy-load";
 import {
@@ -1145,10 +1146,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1" });
       if (leafId) params.set("leafId", leafId);
-      // Page upward: ask the server for the `turns` preceding `before`, then
-      // prepend them. Omitting `before` fetches the most-recent `turns`.
+      // Page upward: ask the server for the turn preceding `before`, then
+      // prepend it. Omitting `before` fetches the first screen's turns.
       if (before) params.set("before", before);
-      params.set("turns", String(VISIBLE_PAGE_TURNS));
+      params.set("turns", String(before ? OLDER_PAGE_TURNS : VISIBLE_PAGE_TURNS));
       const url = `/api/sessions/${encodeURIComponent(sid)}/context?${params}`;
       const res = await fetch(url, { signal: options?.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1254,7 +1255,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (loadingAfterRef.current === newerThan) return null;
     loadingAfterRef.current = newerThan;
     try {
-      const context = await fetchWindow(sid, leafId, { newerThan, turns: VISIBLE_PAGE_TURNS });
+      const context = await fetchWindow(sid, leafId, { newerThan, turns: OLDER_PAGE_TURNS });
       if (!context) return null;
       const page = dedupePage(context.entryIds, context.messages, entryIdsRef.current);
       setMessages((prev) => [...prev, ...page.messages]);

@@ -1,11 +1,9 @@
 "use client";
 
 /**
- * 流式状态胶囊：`↓token 数 + t/s` 从消息列表头部（AssistantMessageHeader 的流式
- * 分支，已删）整体搬到 composer 下方——出现/消失不再推动消息列表，也不碰队列
- * pills。挂载点有两处，同一时刻只渲染一个（由 ChatWindow 决定）：
- * - 插件状态条存在时，作为该行的真 flex 子项插在行首（插件状态内容之前）；
- * - 状态条不存在时，绝对定位浮在同一条带的左端（pointer-events-none）。
+ * 流式状态胶囊：`↓token 数 + t/s`。挂在输入框上方那条运行状态行的右端（左侧是
+ * 运行阶段文案）：等待期不渲染，流式开始才出现，两者在同一格内更替，出现/消失
+ * 不动消息列表、不改变任何高度。
  *
  * 数据与口径和旧消息头一致：token 估算共用 lib/token-estimate（CJK≈1、其余
  * ≈4 chars/token，含增量缓存），速度用 lib/stream-token-rate（按消息键去重，
@@ -139,6 +137,8 @@ export function StreamStatusPill({ store }: { store: StreamingStore }) {
   // 静态口径：流式中实时读数；结束后停留最后一帧（RATE_HOLD_MS）；空闲/无数据 0.0。
   const shownTokens = held?.tokens ?? (active ? tokens : 0);
   const shownTps = held ? held.tps : active ? tps : null;
+  // 空闲（无流式、无停留读数）不渲染：那一格留给左侧的运行阶段文案。
+  if (!active && !held) return null;
   return (
     <div className="pointer-events-none flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-xs leading-[1.5] text-muted-foreground [font-variant-numeric:tabular-nums]">
       <StreamRateBadge tokens={shownTokens} tps={shownTps} streaming={active} />
