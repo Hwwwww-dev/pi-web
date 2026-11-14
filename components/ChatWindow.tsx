@@ -1864,8 +1864,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             })}
             {/* 非条目行（流式回复、阶段提示、待执行命令）不是 Item 的测量对象，
                 但仍需落在与行一致的列宽内。 */}
-            <ChatRow>
+            <ChatRow className={isStreaming && hasStreamingContent ? "-mt-2.5" : undefined}>
             {isStreaming && hasStreamingContent && (
+              /* 上收 10px：容器行距 16px 是普通消息行的节奏，而流式行紧跟的
+                 TurnTrace 活动行内部只有 gap-1.5（6px）；不减回差额，思考行
+                 会与上方活动行之间裂开一道两倍半的空隙。 */
               <StreamingReply store={streamingStore} toolResults={toolResultsMap} modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
             )}
 
