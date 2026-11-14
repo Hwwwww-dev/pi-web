@@ -15,10 +15,11 @@ const {
   CompactionSummaryDetails,
   MessageView,
   getModelDisplayName,
-  getTokenEstimateText,
   getToolCallInputText,
   replaceUserMessageText,
 } = await jiti.import("./MessageView.tsx");
+const { getTokenEstimateText } = await jiti.import("../lib/token-estimate.ts");
+const { StreamRateBadge } = await jiti.import("./StreamStatusPill.tsx");
 const { PatchDiffFiles } = await jiti.import("./PatchDiffFiles.tsx");
 const { ReasoningTrace } = await jiti.import("./transcript/ReasoningTrace.tsx");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
@@ -50,26 +51,28 @@ test("a message's actions are icon-only and keep their titles", () => {
   }
 });
 
-test("streaming headers preserve counts and speed without showing empty metrics", () => {
+test("the message header shows only the model name; the pill badge keeps counts and speed", () => {
   const renderHeader = (props) => renderToStaticMarkup(React.createElement(
     I18nProvider, null, React.createElement(AssistantMessageHeader, { modelName: "Test Model", ...props }),
   ));
-  for (const props of [{}, { estimatedTokens: 0, tps: 20 }]) {
-    const html = renderHeader(props);
-    assert.match(html, />Test Model<\/span>/);
-    assert.doesNotMatch(html, /t\/s|Estimated token count while streaming/);
-  }
-  const tokensOnly = renderHeader({ estimatedTokens: 100 });
+  const html = renderHeader({});
+  assert.match(html, />Test Model<\/span>/);
+  assert.doesNotMatch(html, /t\/s|Estimated token count while streaming/);
+
+  const renderBadge = (props) => renderToStaticMarkup(React.createElement(
+    I18nProvider, null, React.createElement(StreamRateBadge, props),
+  ));
+  const empty = renderBadge({ tokens: 0, tps: 20 });
+  assert.doesNotMatch(empty, /t\/s|Estimated token count while streaming/);
+  const tokensOnly = renderBadge({ tokens: 100, tps: null });
   assert.match(tokensOnly, />100<\/span>/);
   assert.doesNotMatch(tokensOnly, /t\/s/);
-  const streaming = renderHeader({ estimatedTokens: 1234567, tps: 12345.6 });
+  const streaming = renderBadge({ tokens: 1234567, tps: 12345.6 });
   assert.match(streaming, />1234567<\/span>/);
   assert.match(streaming, /12345\.6 t\/s/);
 
   const message = { role: "assistant", provider: "test", model: "model", content: [{ type: "text", text: "Response" }] };
-  const complete = renderMessage(message);
-  assert.doesNotMatch(complete, /Estimated token count while streaming/);
-  assert.match(renderMessage(message, { isStreaming: true }), /Estimated token count while streaming/);
+  assert.doesNotMatch(renderMessage(message), /Estimated token count while streaming/);
 });
 
 test("matches response model aliases and otherwise includes the provider", () => {

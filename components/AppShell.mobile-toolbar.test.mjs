@@ -40,10 +40,10 @@ test("only renders the Agents switcher when the active session family has subage
   assert.match(source, /const agentsBadge = activeSessionFamily \? getAgentsBadge\(activeSessionFamily\.subagents, runningSessionIds\) : null;/);
   // The Agents control opens/toggles its own top panel and leaves the ⋯ menu's
   // state alone: since the menu-driven panels defer their open past the menu's
-  // unmount (openTopPanelFromMenu), no keepMobileToolbarOpen flag is needed.
+  // unmount (openFlyoutFromMenu), no keepMobileToolbarOpen flag is needed.
   assert.match(
     source,
-    /onOpenChange=\{\(\) => toggleTopPanel\("agents"\)\}\s*>\s*<Tooltip>\s*<TooltipTrigger asChild>\s*<PopoverTrigger asChild>\s*<Button\s+variant="ghost"\s+size="sm"\s+disabled=\{!activeSessionFamily\}/,
+    /onOpenChange=\{\(\) => toggleFlyout\("agents"\)\}\s*>\s*<Tooltip>\s*<TooltipTrigger asChild>\s*<PopoverTrigger asChild>\s*<Button\s+variant="ghost"\s+size="sm"\s+disabled=\{!activeSessionFamily\}/,
   );
   const agentsButton = source.slice(
     source.indexOf("const renderAgentsButton = (mobile: boolean) => ("),
@@ -58,7 +58,7 @@ test("keeps the Agents panel open while switching sessions and bounds it to the 
   assert.match(source, /const AGENT_PANEL_WIDTH = 420/);
   // The Popover is driven by the single active-panel state; its transparent
   // content carries the panel at the AGENT_PANEL_WIDTH budget.
-  assert.match(source, /open=\{activeTopPanel === "agents" && Boolean\(activeSessionFamily\)\}/);
+  assert.match(source, /open=\{activeFlyout === "agents" && Boolean\(activeSessionFamily\)\}/);
   assert.match(source, /w-\[var\(--agent-panel-width\)\] max-w-\[calc\(100vw-1\.5rem\)\]/);
   assert.match(source, /"\-\-agent-panel-width": `\$\{AGENT_PANEL_WIDTH\}px`/);
   assert.match(source, /<AgentSessionPanel[\s\S]*?onSelectSession=\{handleSelectSession\}/);
@@ -75,12 +75,12 @@ test("the ⋯ menu is Radix-controlled: outside clicks and Escape close it", () 
   // The old document-level capture listeners are gone; Radix owns dismissal.
   assert.doesNotMatch(source, /document\.addEventListener\("pointerdown", handlePointerDown, true\)/);
   assert.doesNotMatch(source, /event\.key !== "Escape"[\s\S]*?setMobileToolbarMoreOpen\(false\)/);
-  // Opening folds the drawer on a phone; the top-panel toggles live in this
+  // Opening folds the drawer on a phone; the flyout toggles live in this
   // menu (Debug/系统/工具定义), so opening must not kill the open panel —
   // otherwise a panel opened from the menu could never be closed again.
   assert.match(source, /const handleMobileToolbarMoreOpenChange = useCallback\(\(open: boolean\) => \{\s*if \(isMobile && open\) setSidebarOpen\(false\);/);
   assert.match(source, /setMobileToolbarMoreOpen\(open\);\s*\}, \[isMobile\]\);/);
-  assert.doesNotMatch(source, /if \(open\) setActiveTopPanel\(null\);/);
+  assert.doesNotMatch(source, /if \(open\) setActiveFlyout\(null\);/);
   // Layout and session changes still close it.
   assert.match(source, /\}, \[isMobile, isNarrowMobile, selectedSession\?\.id, newSessionDraftId\]\);/);
 });
@@ -95,16 +95,16 @@ test("keeps the naming menu open while the title generates", () => {
   // The other menu items defer their panel open past the menu's unmount, so
   // the synchronous select-close does not read as focus-outside and close the
   // panel again; the deferral replaces the retired keepMobileToolbarOpen flag.
-  assert.match(source, /openTopPanelFromMenu\(\(\) => toggleTopPanel\("branches"\)\)/);
-  assert.match(source, /const openTopPanelFromMenu = useCallback\(\(open: \(\) => void\) => \{\s*window\.setTimeout\(open, 0\);\s*\}, \[\]\);/);
+  assert.match(source, /openFlyoutFromMenu\(\(\) => toggleFlyout\("branches"\)\)/);
+  assert.match(source, /const openFlyoutFromMenu = useCallback\(\(open: \(\) => void\) => \{\s*window\.setTimeout\(open, 0\);\s*\}, \[\]\);/);
   assert.match(source, /handleSystemInfoToggle\("system"\)/);
   assert.match(source, /handleSystemInfoToggle\("tools"\)/);
-  assert.match(source, /onClick=\{\(\) => toggleTopPanel\("session"\)\}/);
+  assert.match(source, /onClick=\{\(\) => toggleFlyout\("session"\)\}/);
 });
 
 test("keeps language out of the chat toolbar; the theme control writes the shared preference", () => {
   assert.doesNotMatch(source, /renderLanguageButton/);
-  assert.doesNotMatch(source, /toggleTopPanel\("language"/);
+  assert.doesNotMatch(source, /toggleFlyout\("language"/);
   assert.doesNotMatch(source, /data-mobile-toolbar-action=\{mobile \? "language"/);
   assert.match(source, /import \{ useTheme \} from "@\/hooks\/useTheme"/);
   assert.match(source, /setThemePreference\(theme === "dark" \? "light" : "dark"\)/);
@@ -133,10 +133,10 @@ test("places trust warnings below the mobile toolbar and the file toggle in tool
 test("closes top-bar dropdowns when the file panel expands to full width", () => {
   assert.match(
     source,
-    /const handleRightPanelExpandToggle = useCallback\(\(\) => \{\s*setActiveTopPanel\(null\);\s*setRightPanelExpanded\(\(expanded\) => !expanded\);/,
+    /const handleRightPanelExpandToggle = useCallback\(\(\) => \{\s*setActiveFlyout\(null\);\s*setRightPanelExpanded\(\(expanded\) => !expanded\);/,
   );
   assert.match(source, /onClick=\{handleRightPanelExpandToggle\}/);
-  assert.match(source, /if \(rightPanelFullWidth\) setActiveTopPanel\(null\);/);
+  assert.match(source, /if \(rightPanelFullWidth\) setActiveFlyout\(null\);/);
 });
 
 test("a sidebar pick closes the phone's drawer unless it asks to stay open (the sidebar's Fork)", () => {

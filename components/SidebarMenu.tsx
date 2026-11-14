@@ -118,8 +118,8 @@ export const SIDEBAR_MENU_FILTER_MIN_CHOICES = 8;
 export interface SidebarMenuProps {
   open: boolean;
   anchor: SidebarMenuAnchor | null;
-  /** True on a phone (≤640px): a bottom sheet with its own backdrop. */
-  sheet: boolean;
+  /** Render as a bottom sheet with its own backdrop instead of the anchored dropdown. */
+  sheet?: boolean;
   ariaLabel: string;
   /** The sheet's heading (one line, ellipsis). */
   title?: string;
@@ -724,7 +724,7 @@ function SheetInner({
 }
 
 export interface SidebarMenuSurfaceProps {
-  sheet: boolean;
+  sheet?: boolean;
   ariaLabel: string;
   title?: string;
   items?: SidebarMenuItem[];
@@ -750,7 +750,7 @@ export interface SidebarMenuSurfaceProps {
  * are the ones `SidebarMenu` puts on Radix's content.
  */
 export function SidebarMenuSurface({
-  sheet,
+  sheet = false,
   ariaLabel,
   title,
   items,
@@ -823,7 +823,7 @@ export function SidebarMenuSurface({
 export function SidebarMenu({
   open,
   anchor,
-  sheet,
+  sheet = false,
   ariaLabel,
   title,
   items,

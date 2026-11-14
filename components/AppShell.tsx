@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode } from "react";
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftIcon,
@@ -36,7 +36,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Popover, PopoverAnchor, PopoverTrigger } from "./ui/popover";
+import { HeaderFlyout } from "./HeaderFlyout";
 import { Spinner } from "./ui/spinner";
 import { cn } from "@/lib/utils";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -158,27 +159,6 @@ const TOOL_END_REFRESH_MS = 1000;
 function lastAgentTabId(tabs: readonly { sessionId: string }[]): string | null {
   const last = tabs.at(-1);
   return last ? `agent:${last.sessionId}` : null;
-}
-
-/**
- * 顶栏下挂四张浮层（系统 / 工具定义 / 会话信息 / 调试）的共用外壳：距顶栏 8px，左右各 8px
- * （宽度减 16 并配 mx-2 保持对称），圆角 rounded-xl。差异化只在内容层实现。
- */
-function TopPanelPopoverContent({ className, children }: { className?: string; children: ReactNode }) {
-  return (
-    <PopoverContent
-      side="bottom"
-      align="start"
-      sideOffset={8}
-      avoidCollisions={false}
-      className={cn(
-        "z-[240] mx-2 w-[calc(var(--radix-popover-trigger-width)-16px)] min-w-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg",
-        className,
-      )}
-    >
-      {children}
-    </PopoverContent>
-  );
 }
 
 export function AppShell() {
@@ -585,24 +565,24 @@ export function AppShell() {
   }, []);
 
   // Single active panel — only one dropdown open at a time
-  const [activeTopPanel, setActiveTopPanel] = useState<"agents" | "branches" | "system" | "tools" | "session" | "debug" | null>(null);
+  const [activeFlyout, setActiveFlyout] = useState<"agents" | "branches" | "system" | "tools" | "session" | "debug" | null>(null);
 
   useEffect(() => {
     if (!sessionHasBranches) {
-      setActiveTopPanel((panel) => panel === "branches" ? null : panel);
+      setActiveFlyout((panel) => panel === "branches" ? null : panel);
     }
   }, [sessionHasBranches]);
 
   useEffect(() => {
     if (!activeSessionFamily) {
-      setActiveTopPanel((panel) => panel === "agents" ? null : panel);
+      setActiveFlyout((panel) => panel === "agents" ? null : panel);
     }
   }, [activeSessionFamily]);
 
   // Agents 面板打开即进入装载态：强制刷一次会话目录，目录回到（或兑底超时）
   // 才渲染列表元素——面板里永远是"装好后"的数据，不再先弹旧列表再补。
   const [agentsPanelLoading, setAgentsPanelLoading] = useState(false);
-  const agentsPanelOpen = activeTopPanel === "agents";
+  const agentsPanelOpen = activeFlyout === "agents";
   useEffect(() => {
     if (!agentsPanelOpen) return;
     setAgentsPanelLoading(true);
@@ -615,14 +595,14 @@ export function AppShell() {
   }, [agentsPanelLoading, sessionCatalog]);
 
   useEffect(() => {
-    if (rightPanelFullWidth) setActiveTopPanel(null);
+    if (rightPanelFullWidth) setActiveFlyout(null);
   }, [rightPanelFullWidth]);
 
-  const toggleTopPanel = useCallback((
+  const toggleFlyout = useCallback((
     panel: "agents" | "branches" | "system" | "tools" | "session" | "debug",
   ) => {
     if (isMobile) setSidebarOpen(false);
-    setActiveTopPanel((cur) => cur === panel ? null : panel);
+    setActiveFlyout((cur) => cur === panel ? null : panel);
   }, [isMobile]);
 
   // The Debug button on screen (one of its three places at a time); Escape gives focus back to it.
@@ -631,8 +611,8 @@ export function AppShell() {
   // 页头下挂的四张非模态面板（系统 / 工具定义 / 会话信息 / 调试）均为受控 Popover，
   // anchor 为头部容器 topBarRef 的 virtualRef；外点关闭、Esc 与进出动画由 Radix 处理。
   // 触发按钮走 toggle 而非 PopoverTrigger，避免与指针点击重复处理。
-  const closeTopPanel = useCallback((panel: "branches" | "system" | "tools" | "session") => {
-    setActiveTopPanel((cur) => cur === panel ? null : cur);
+  const closeFlyout = useCallback((panel: "branches" | "system" | "tools" | "session") => {
+    setActiveFlyout((cur) => cur === panel ? null : cur);
   }, []);
   // The stats buttons keep their press from reaching DismissableLayer's
   // document pointerdown listener (stopPropagation) and from moving focus
@@ -648,7 +628,7 @@ export function AppShell() {
   // in the panel, that focus leaves the page with it: once the panel is gone (the next frame), the
   // Debug button gets it back, unless the user moved it meanwhile (focusIfLost).
   const closeDebugPanel = useCallback((restoreFocus: boolean) => {
-    setActiveTopPanel((panel) => panel === "debug" ? null : panel);
+    setActiveFlyout((panel) => panel === "debug" ? null : panel);
     if (restoreFocus) requestAnimationFrame(() => focusIfLost(document, debugButtonRef.current));
   }, []);
 
@@ -656,15 +636,15 @@ export function AppShell() {
   // deferring the panel open past that unmount keeps the two state changes
   // from interleaving (the menu content also no longer bounces focus back to
   // the trigger, see its onCloseAutoFocus).
-  const openTopPanelFromMenu = useCallback((open: () => void) => {
+  const openFlyoutFromMenu = useCallback((open: () => void) => {
     window.setTimeout(open, 0);
   }, []);
 
   const handleSystemInfoToggle = useCallback((
     panel: "system" | "tools",
   ) => {
-    const opening = activeTopPanel !== panel;
-    toggleTopPanel(panel);
+    const opening = activeFlyout !== panel;
+    toggleFlyout(panel);
     if (!opening || systemInfoLoading) return;
 
     const load = systemInfoLoaderRef.current;
@@ -678,12 +658,12 @@ export function AppShell() {
         setSystemInfoLoading(false);
       }
     });
-  }, [activeTopPanel, systemInfoLoading, toggleTopPanel]);
+  }, [activeFlyout, systemInfoLoading, toggleFlyout]);
 
   const openSessionStatsPanel = useCallback(() => {
     if (isMobile) setSidebarOpen(false);
     setMobileToolbarMoreOpen(false);
-    setActiveTopPanel("session");
+    setActiveFlyout("session");
   }, [isMobile]);
 
   // The composer opens Settings too: a bare /mcp opens Settings › MCP (useAgentSession).
@@ -694,7 +674,7 @@ export function AppShell() {
 
   const handleSidebarToggle = useCallback(() => {
     if (isMobile) {
-      setActiveTopPanel(null);
+      setActiveFlyout(null);
       setMobileToolbarMoreOpen(false);
     }
     setSidebarOpen((open) => {
@@ -710,21 +690,21 @@ export function AppShell() {
   const handleMobileToolbarMoreOpenChange = useCallback((open: boolean) => {
     if (isMobile && open) setSidebarOpen(false);
     // 此处不清 top panel：打开菜单的指针事件已将其关闭（面板无豁免），
-    // 选中后再 toggle 必从关闭态开启，互斥由 toggleTopPanel 保证。
+    // 选中后再 toggle 必从关闭态开启，互斥由 toggleFlyout 保证。
     setMobileToolbarMoreOpen(open);
   }, [isMobile]);
 
   const handleRightPanelToggle = useCallback(() => {
     if (isMobile) {
       setSidebarOpen(false);
-      setActiveTopPanel(null);
+      setActiveFlyout(null);
       setMobileToolbarMoreOpen(false);
     }
     setRightPanelOpen((open) => !open);
   }, [isMobile]);
 
   const handleRightPanelExpandToggle = useCallback(() => {
-    setActiveTopPanel(null);
+    setActiveFlyout(null);
     setRightPanelExpanded((expanded) => !expanded);
   }, []);
 
@@ -1109,7 +1089,7 @@ export function AppShell() {
     setSystemTools(null);
     setSystemInfoLoading(false);
     // The debug panel stays open across the switch: it follows whichever session is shown.
-    setActiveTopPanel((panel) => panel === "debug" ? panel : null);
+    setActiveFlyout((panel) => panel === "debug" ? panel : null);
     if (currentProject !== newProject) {
       // Keep #281's project isolation, but park each workspace's file tabs
       // instead of discarding them so they return when the user switches back.
@@ -1134,7 +1114,7 @@ export function AppShell() {
     const projectKey = workspaceKeyOf(session);
     if (activeProjectKeyRef.current !== projectKey) {
       changeFileWorkspace(activeProjectKeyRef.current, projectKey);
-      setActiveTopPanel((panel) => panel === "debug" ? panel : null);
+      setActiveFlyout((panel) => panel === "debug" ? panel : null);
     }
     activeProjectKeyRef.current = projectKey;
     // Re-clicking the already-open session must not remount the chat and
@@ -1224,7 +1204,7 @@ export function AppShell() {
     setSystemPrompt(null);
     setSystemTools(null);
     setSystemInfoLoading(false);
-    setActiveTopPanel((panel) => panel === "debug" ? panel : null);
+    setActiveFlyout((panel) => panel === "debug" ? panel : null);
     if (isMobile) setSidebarOpen(false);
     router.replace(`?cwd=${encodeURIComponent(cwd)}`, { scroll: false });
     // The fresh composer takes the caret once it renders (#1313), unless the
@@ -1379,7 +1359,7 @@ export function AppShell() {
     const sessionId = selectedSession?.id;
     if (!sessionId || autoNameStatus.kind === "naming") return;
     if (autoNameTimerRef.current) clearTimeout(autoNameTimerRef.current);
-    setActiveTopPanel(null);
+    setActiveFlyout(null);
     setAutoNameStatus({ kind: "naming" });
 
     try {
@@ -1474,7 +1454,7 @@ export function AppShell() {
     setSystemPrompt(null);
     setSystemTools(null);
     setSystemInfoLoading(false);
-    setActiveTopPanel(null);
+    setActiveFlyout(null);
     router.replace(cwd ? `?cwd=${encodeURIComponent(cwd)}` : (typeof window !== "undefined" ? window.location.pathname : "/"), { scroll: false });
   }, [router]);
 
@@ -1548,7 +1528,7 @@ export function AppShell() {
       setSystemPrompt(null);
       setSystemTools(null);
       setSystemInfoLoading(false);
-      setActiveTopPanel((panel) => panel === "debug" ? panel : null);
+      setActiveFlyout((panel) => panel === "debug" ? panel : null);
       router.replace(cwd ? `?cwd=${encodeURIComponent(cwd)}` : (typeof window !== "undefined" ? window.location.pathname : "/"), { scroll: false });
     }
   }, [invalidateWorkspaceRestore, router]);
@@ -1626,7 +1606,7 @@ export function AppShell() {
       handleCloseFileTab(`agent:${sessionId}`);
       return;
     }
-    if (isMobile) setActiveTopPanel(null);
+    if (isMobile) setActiveFlyout(null);
     handleOpenSubagentTab(sessionId, label, side);
   };
 
@@ -1654,7 +1634,7 @@ export function AppShell() {
   const handleNewSideChat = useCallback(async (rootSessionId: string) => {
     const result = await createSideChat(rootSessionId, translate);
     if ("error" in result) return result.error;
-    if (isMobile) setActiveTopPanel(null);
+    if (isMobile) setActiveFlyout(null);
     handleSideSession(result.session, null);
     return null;
   }, [handleSideSession, isMobile, translate]);
@@ -1787,7 +1767,6 @@ export function AppShell() {
   const newSessionContextBar = selectedSession === null && effectiveNewSessionCwd ? (
     <NewSessionContextBar
       context={contextForCwd(sidebarNewSessionContext, effectiveNewSessionCwd, newSessionMoveRef.current)}
-      mobile={isMobile}
       initialFocus={newSessionBarFocusRef.current}
       onInitialFocusDone={handleNewSessionBarFocusDone}
       onPick={handlePickNewSessionContext}
@@ -1828,7 +1807,7 @@ export function AppShell() {
 
   // The Debug button shows with a chat only: without one, its panel would have nothing to close it.
   useEffect(() => {
-    if (!showChat) setActiveTopPanel((panel) => panel === "debug" ? null : panel);
+    if (!showChat) setActiveFlyout((panel) => panel === "debug" ? null : panel);
   }, [showChat]);
 
   useEffect(() => {
@@ -2060,8 +2039,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
   // the badge stays in sight. A run lights the 5px breathing dot.
   const renderAgentsButton = (mobile: boolean) => (
     <Popover
-      open={activeTopPanel === "agents" && Boolean(activeSessionFamily)}
-      onOpenChange={() => toggleTopPanel("agents")}
+      open={activeFlyout === "agents" && Boolean(activeSessionFamily)}
+      onOpenChange={() => toggleFlyout("agents")}
     >
       <Tooltip>
         <TooltipTrigger asChild>
@@ -2071,10 +2050,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               size="sm"
               disabled={!activeSessionFamily}
               aria-label={agentsButtonLabel}
-              aria-pressed={activeTopPanel === "agents"}
+              aria-pressed={activeFlyout === "agents"}
               className={cn(
                 "gap-1.5 rounded-md font-medium text-muted-foreground",
-                activeTopPanel === "agents" && HEADER_CONTROL_OPEN,
+                activeFlyout === "agents" && HEADER_CONTROL_OPEN,
               )}
               data-mobile-toolbar-action={mobile ? "agents" : undefined}
             >
@@ -2085,12 +2064,14 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         </TooltipTrigger>
         <TooltipContent>{agentsButtonLabel}</TooltipContent>
       </Tooltip>
-      <PopoverContent
-        // 标准弹层本体（bg-popover + border + shadow-md）；清单由 AgentSessionPanel 渲染，
-        // 此处仅负责定位（贴触发钮右缘）、宽度（AGENT_PANEL_WIDTH）与 z-500（高于引用工具栏）。
+      <HeaderFlyout
+        // 统一浮层壳（HeaderFlyout）；清单由 AgentSessionPanel 渲染，此处仅负责
+        // 定位（贴触发钮右缘）、宽度（AGENT_PANEL_WIDTH）与 z-500（高于引用工具栏）。
         align="end"
         sideOffset={8}
-        className="z-[500] mt-0 min-h-[300px] w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg"
+        z="z-[500]"
+        width="w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)]"
+        className="mt-0 min-h-[300px]"
         style={{ "--agent-panel-width": `${AGENT_PANEL_WIDTH}px` } as React.CSSProperties}
       >
         {agentsPanelLoading ? (
@@ -2119,7 +2100,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <Spinner className="size-5 text-muted-foreground" />
           </div>
         )}
-      </PopoverContent>
+      </HeaderFlyout>
     </Popover>
   );
 
@@ -2207,7 +2188,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             );
           })()}
           <DropdownMenuItem
-            onSelect={() => openTopPanelFromMenu(() => handleSystemInfoToggle("system"))}
+            onSelect={() => openFlyoutFromMenu(() => handleSystemInfoToggle("system"))}
             disabled={mobile && !showChat}
             title={translate("system.prompt")}
             className="gap-2"
@@ -2220,7 +2201,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <span className="min-w-0 flex-1">{translate("system.label")}</span>
           </DropdownMenuItem>
           <DropdownMenuItem
-            onSelect={() => openTopPanelFromMenu(() => handleSystemInfoToggle("tools"))}
+            onSelect={() => openFlyoutFromMenu(() => handleSystemInfoToggle("tools"))}
             disabled={mobile && !showChat}
             title={translate("tools.title")}
             className="gap-2"
@@ -2263,7 +2244,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               </DropdownMenuItem>
               {sessionHasBranches && (
                 <DropdownMenuItem
-                  onSelect={() => openTopPanelFromMenu(() => toggleTopPanel("branches"))}
+                  onSelect={() => openFlyoutFromMenu(() => toggleFlyout("branches"))}
                   title={translate("i18n.branches")}
                   className="gap-2"
                   data-mobile-toolbar-action="branches"
@@ -2276,13 +2257,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
-                onSelect={() => openTopPanelFromMenu(() => toggleTopPanel("debug"))}
+                onSelect={() => openFlyoutFromMenu(() => toggleFlyout("debug"))}
                 disabled={!showChat}
                 title={translate("debug.title")}
                 className="gap-2"
                 data-mobile-toolbar-action={mobile ? "debug" : undefined}
               >
-                <BugIcon className={cn("size-3.5 shrink-0", activeTopPanel === "debug" ? "text-primary" : "text-muted-foreground")} strokeWidth={2} />
+                <BugIcon className={cn("size-3.5 shrink-0", activeFlyout === "debug" ? "text-primary" : "text-muted-foreground")} strokeWidth={2} />
                 <span className="min-w-0 flex-1">{translate("debug.title")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -2349,15 +2330,15 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           variant="ghost"
           size="sm"
           onPointerDown={holdStatsPress}
-          onClick={() => toggleTopPanel("session")}
+          onClick={() => toggleFlyout("session")}
           disabled={!showChat}
           title={tooltip || translate("session.title")}
           aria-label={translate("session.title")}
-          aria-pressed={activeTopPanel === "session"}
+          aria-pressed={activeFlyout === "session"}
           className={cn(
             "min-w-0 shrink-0 justify-end overflow-hidden whitespace-nowrap rounded-md px-2 text-xs font-normal text-muted-foreground",
             !showChat && "cursor-default",
-            activeTopPanel === "session" && HEADER_CONTROL_OPEN,
+            activeFlyout === "session" && HEADER_CONTROL_OPEN,
             "enabled:hover:bg-accent enabled:hover:text-foreground",
             "mobile-session-stats",
           )}
@@ -2388,13 +2369,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         variant="ghost"
         size="sm"
         onPointerDown={holdStatsPress}
-        onClick={() => toggleTopPanel("session")}
+        onClick={() => toggleFlyout("session")}
         title={tooltip || translate("session.title")}
         aria-label={translate("session.title")}
-        aria-pressed={activeTopPanel === "session"}
+        aria-pressed={activeFlyout === "session"}
         className={cn(
           "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 font-mono text-[11px] font-normal tabular-nums text-muted-foreground",
-          activeTopPanel === "session" && HEADER_CONTROL_OPEN,
+          activeFlyout === "session" && HEADER_CONTROL_OPEN,
         )}
       >
         {tokens && (
@@ -2560,8 +2541,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               inline
               compact
               containerRef={topBarRef}
-              open={activeTopPanel === "branches"}
-              onToggle={() => toggleTopPanel("branches")}
+              open={activeFlyout === "branches"}
+              onToggle={() => toggleFlyout("branches")}
               hasSession={showChat}
               hideInlineButton
             />
@@ -2572,41 +2553,41 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               one open at a time. z-[240] stays below the quote toolbar's 260
               (ChatWindow). */}
           <Popover
-            open={activeTopPanel === "system"}
-            onOpenChange={(next) => next ? setActiveTopPanel("system") : closeTopPanel("system")}
+            open={activeFlyout === "system"}
+            onOpenChange={(next) => next ? setActiveFlyout("system") : closeFlyout("system")}
           >
             <PopoverAnchor virtualRef={topBarRef} />
             {/* 系统提示与工具定义共用同一浮层卡：顶栏下方 8px，左右各 8px（宽度减 16 加 mx-2 保持对称），
                 圆角 rounded-xl。 */}
-            <TopPanelPopoverContent>
+            <HeaderFlyout width="w-[560px] max-w-[calc(100vw-16px)]" align="start" sideOffset={8} avoidCollisions={false}>
               <SystemPromptPanel
                 loading={systemInfoLoading}
                 prompt={systemPrompt}
                 translate={translate}
               />
-            </TopPanelPopoverContent>
+            </HeaderFlyout>
           </Popover>
           <Popover
-            open={activeTopPanel === "tools"}
-            onOpenChange={(next) => next ? setActiveTopPanel("tools") : closeTopPanel("tools")}
+            open={activeFlyout === "tools"}
+            onOpenChange={(next) => next ? setActiveFlyout("tools") : closeFlyout("tools")}
           >
             <PopoverAnchor virtualRef={topBarRef} />
-            <TopPanelPopoverContent>
+            <HeaderFlyout width="w-[720px] max-w-[calc(100vw-16px)]" align="start" sideOffset={8} avoidCollisions={false}>
               <ToolDefinitionsPanel
                 loading={systemInfoLoading}
                 tools={systemTools}
                 translate={translate}
               />
-            </TopPanelPopoverContent>
+            </HeaderFlyout>
           </Popover>
           <Popover
-            open={activeTopPanel === "session"}
-            onOpenChange={(next) => next ? setActiveTopPanel("session") : closeTopPanel("session")}
+            open={activeFlyout === "session"}
+            onOpenChange={(next) => next ? setActiveFlyout("session") : closeFlyout("session")}
           >
             <PopoverAnchor virtualRef={topBarRef} />
             {/* 会话信息浮层：与系统提示、工具定义、调试共用同一浮层卡（同宽、同圆角、同描边阴影）；
                 session-info-popover 类名保留作为 e2e 定位锚，内容滚动发生在面板内部。 */}
-            <TopPanelPopoverContent className="session-info-popover">
+            <HeaderFlyout className="session-info-popover" width="w-[560px] max-w-[calc(100vw-16px)]" align="start" sideOffset={8} avoidCollisions={false}>
               {sessionStats ? (() => {
                 const totalActiveMs = sessionStats.totalActiveMs ?? 0;
                 const ws = selectedSession;
@@ -2718,16 +2699,16 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                    {translate("session.load")}
                 </div>
               )}
-            </TopPanelPopoverContent>
+            </HeaderFlyout>
           </Popover>
           <Popover
-            open={activeTopPanel === "debug"}
+            open={activeFlyout === "debug"}
             onOpenChange={(next) => next
-              ? setActiveTopPanel("debug")
-              : setActiveTopPanel((cur) => cur === "debug" ? null : cur)}
+              ? setActiveFlyout("debug")
+              : setActiveFlyout((cur) => cur === "debug" ? null : cur)}
           >
             <PopoverAnchor virtualRef={topBarRef} />
-            <TopPanelPopoverContent>
+            <HeaderFlyout width="w-[560px] max-w-[calc(100vw-16px)]" align="start" sideOffset={8} avoidCollisions={false}>
               <DebugPanelBoundary fallback={translate("debug.failed")}>
                 <DebugPanel
                   readerRef={debugSnapshotReaderRef}
@@ -2736,7 +2717,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   onClose={closeDebugPanel}
                 />
               </DebugPanelBoundary>
-            </TopPanelPopoverContent>
+            </HeaderFlyout>
           </Popover>
 
         {isMobile && renderProjectTrustWarning(true)}
