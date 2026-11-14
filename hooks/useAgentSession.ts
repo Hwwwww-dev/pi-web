@@ -2220,7 +2220,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           setExtensionDialogs((queue) => retainExtensionUiRequests(queue, pending));
           setExtensionCustomUis((queue) => retainExtensionUiRequests(queue, pending));
         }
-        if (event.isStreaming === true) {
+        // isStreaming 只覆盖 token 流式；工具执行中 / compaction / bash 阶段它是
+        // false，只看它会把运行中的面板重置回空闲（composer 变输入态、活动行
+        // 消失、已完成回复画出用量条）。isRunActive 是服务端完整判定。
+        const runActive = event.isStreaming === true || event.isRunActive === true;
+        if (runActive) {
           cancelEventStreamGrace();
           sdkAgentActiveRef.current = true;
           agentRunningRef.current = true;
@@ -2232,7 +2236,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         }
         // 断线窗口内完成的消息不会重放：重连时本端仍在运行（流式中，或阻塞在
         // 工具调用上）就整载一次会话文件回填，否则这些消息要等回合结束才出现。
-        if ((event.isStreaming === true || agentRunningRef.current) && sessionIdRef.current) {
+        if ((runActive || agentRunningRef.current) && sessionIdRef.current) {
           void loadSession(sessionIdRef.current);
         }
         // Opening the stream is what resumes an idle-reaped session, so the

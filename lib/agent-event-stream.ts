@@ -9,6 +9,8 @@ import type { DebugEventStream } from "./debug-types";
 export interface AgentEventStreamSession {
   readonly isStreaming: boolean;
   readonly streamingMessage: unknown;
+  /** Full run-active predicate (pending prompts, compaction, bash), unlike the token-streaming flag. */
+  isRunning?(): boolean;
   isAlive?(): boolean;
   onEvent(listener: (event: AgentEventLike) => void): () => void;
 }
@@ -327,6 +329,9 @@ export function createAgentEventStream(
             type: "connected",
             sessionId,
             isStreaming: session.isStreaming,
+            // Token-streaming alone misses tool/compaction phases: a reconnecting
+            // client would flip to idle mid-run. isRunning() is the full predicate.
+            isRunActive: session.isRunning ? session.isRunning() : session.isStreaming,
             // onEvent() has just replayed every request the session still holds,
             // so a reconnecting client can drop the ones closed while it was away.
             pendingExtensionUiIds: bufferedEvents
