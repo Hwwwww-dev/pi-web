@@ -2795,6 +2795,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       onMcpServersChange={isActive ? handleMcpServersChange : undefined}
                       onSystemInfoLoaderChange={isActive ? handleSystemInfoLoaderChange : undefined}
                       onDebugSnapshotReaderChange={isActive ? handleDebugSnapshotReaderChange : undefined}
+                      onReloadSessionChange={isActive ? handleReloadSessionChange : undefined}
                       onSessionStatsChange={isActive ? handleSessionStatsChange : undefined}
                       onSessionStatsPanelOpen={isActive ? openSessionStatsPanel : undefined}
                       onContextUsageChange={isActive ? handleContextUsageChange : undefined}
