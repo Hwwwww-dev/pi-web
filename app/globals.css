@@ -1,6 +1,11 @@
 @import "@xterm/xterm/css/xterm.css";
 @import "tailwindcss";
 @import "tw-animate-css";
+/* MiSans 全局字体（npm 自托管子集，unicode-range 按需加载）：Regular/400、
+   Medium/500、Bold/700。代码/终端保持等宽栈（MiSans 无等宽版）。 */
+@import "misans/lib/Normal/MiSans-Regular.min.css";
+@import "misans/lib/Normal/MiSans-Medium.min.css";
+@import "misans/lib/Normal/MiSans-Bold.min.css";
 /* Agent worktrees: scanning them makes webpack snapshot their symlinked
    node_modules, which crashes `next build` with "reading 'length'". */
 @source not "../.claude";
@@ -735,7 +740,7 @@ html[data-keyboard-open] .terminal-extra-keys {
 }
 
 :root {
-  --font-ui-default: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-ui-default: "MiSans", var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono-default: var(--font-geist-mono), 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, 'PingFang SC', 'Microsoft YaHei', monospace;
   --font-ui: var(--font-ui-default);
   --font-mono: var(--font-mono-default);
