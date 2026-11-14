@@ -17,6 +17,17 @@ import { userMessageKey } from "./prompt-recovery";
  */
 const liveKey = (anchor: string | undefined, offset: number) => `live:${anchor ?? ""}:${offset}`;
 
+/**
+ * 当前流式气泡落进 `messages` 后将携带的键。它追加在已读条目之后，位置就是
+ * `entryIds.length + liveCount`，因此键与列表那一行（`liveKey(anchor, idx -
+ * entryIds.length)`）逐字相同；`carryMessageKeys()` 再把它交给同位置的条目 id。
+ * 于是这一个键跨「流式 → message_end → 读文件」三跳不变，思考行的折叠选择与
+ * 实测时长（`lib/thinking-durations.ts`）才能活过那几次重挂载。
+ */
+export function streamingMessageKey(entryIds: readonly string[], liveCount: number): string {
+  return liveKey(entryIds[entryIds.length - 1], liveCount);
+}
+
 export function messageRenderKeys(entryIds: readonly string[], count: number, aliases: ReadonlyMap<string, string>): string[] {
   const anchor = entryIds[entryIds.length - 1];
   const keys: string[] = [];

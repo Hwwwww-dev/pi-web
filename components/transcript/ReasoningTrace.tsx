@@ -81,10 +81,12 @@ export function loadThinkingContent(sessionId: string, entryId: string, blockInd
 /** |delta| ≤ 1 is our own content growth, not a user scroll. */
 const THINKING_STREAM_TAIL_TOLERANCE = 24;
 
-function ReasoningText({ text, error, loading, className, onScroll, scrollRef }: {
+function ReasoningText({ text, error, loading, fadeIn = false, className, onScroll, scrollRef }: {
   text: string;
   error: string | null;
   loading: boolean;
+  /** 仅历史内容延迟加载完的那一次淡入：流式块重挂载时不能重放，否则整段闪一下。 */
+  fadeIn?: boolean;
   className?: string;
   onScroll?: () => void;
   scrollRef?: React.RefObject<HTMLDivElement | null>;
@@ -118,7 +120,7 @@ function ReasoningText({ text, error, loading, className, onScroll, scrollRef }:
       onScroll={onScroll}
     >
       {loading ? <Skeleton className="h-3 w-1/2" /> : (
-        <div className="animate-in fade-in duration-200 motion-reduce:animate-none">
+        <div className={cn(fadeIn && "animate-in fade-in duration-200 motion-reduce:animate-none")}>
           {error ?? (pieceGroups ?? [text]).map((line, index) => (
             <div key={index}>{line}</div>
           ))}
@@ -128,22 +130,22 @@ function ReasoningText({ text, error, loading, className, onScroll, scrollRef }:
   );
 }
 
-export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex, active }: {
+export function ReasoningTrace({ block, duration, sessionId, entryId, durationKey, blockIndex, active }: {
   block: ThinkingContent;
   duration?: number;
   sessionId?: string;
   entryId?: string;
+  /** 稳定渲染键 + 块序号：折叠选择与实测时长都靠它跨「流式 → 列表 → 读文件」的重挂载。 */
+  durationKey?: string;
   blockIndex: number;
   /** The model is still writing this block. */
   active?: boolean;
 }) {
   const { t } = useI18n();
-  // 手动折叠选择持久化到模块级 store（与工具卡同一套，键同 thinking 内容缓存的
-  // 三元组）：回合完成的消息重读会重挂载本组件，仅靠本地 state 会把读者手动
-  // 点开的卡片拍回收起。从未手动操作过的卡片照旧在思考结束时自动折叠。
-  const foldKey = sessionId !== undefined && entryId !== undefined
-    ? `thinking:${sessionId}:${entryId}:${blockIndex}`
-    : undefined;
+  // 手动折叠选择持久化到模块级 store（与工具卡同一套）：回合完成的消息重读会
+  // 重挂载本组件（流式气泡 → 列表 → 读文件），仅靠本地 state 会把读者手动
+  // 点开的卡片拍回收起。稳定键让这个选择连成一条，而不是每次换一个键。
+  const foldKey = durationKey === undefined ? undefined : `thinking:${durationKey}`;
   const [expanded, setExpanded] = useState(() => getFoldChoice(foldKey) ?? isThinkingExpandedByDefault());
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -261,6 +263,7 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, blockIndex
             text={block.deferred ? (content ?? "") : block.thinking}
             error={error}
             loading={loading}
+            fadeIn={Boolean(block.deferred)}
             onScroll={handleDetailScroll}
           />
         </TraceCollapsibleContent>

@@ -10,6 +10,8 @@ const phaseLabelSource = await jitiSource(new URL("../lib/chat-phase-label.ts", 
 const chatInputSource = await jitiSource(new URL("../components/ChatInput.tsx", import.meta.url));
 const messageViewSource = await jitiSource(new URL("../components/MessageView.tsx", import.meta.url));
 const appShellSource = await jitiSource(new URL("../components/AppShell.tsx", import.meta.url));
+const chatFollowSource = await jitiSource(new URL("./useChatFollow.ts", import.meta.url));
+const chatFollowRulesSource = await jitiSource(new URL("../lib/chat-follow.ts", import.meta.url));
 
 test("keeps the session event stream open through the idle grace window", () => {
   const finishSource = source.slice(
@@ -724,11 +726,21 @@ test("one tail-follower signal, owned by ChatWindow", () => {
   assert.match(scrollToBottomSource, /const container = scrollContainerRef\.current;\s*if \(!container\) return;/);
   assert.match(scrollToBottomSource, /container\.scrollTo\(\{ top: container\.scrollHeight, behavior \}\);/);
   assert.doesNotMatch(scrollToBottomSource, /scrollIntoView/);
-  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll=\{false\} defaultScrollPosition="end">/);
-  assert.match(chatWindowSource, /<FollowTailWhenAtTail atTail=\{atTail && !foldInFlight\} contentRef=\{messageContentRef\} \/>/);
-  assert.match(chatWindowSource, /isAtTail\(container\.scrollTop, container\.clientHeight, container\.scrollHeight\)/);
-  assert.match(chatWindowSource, /addEventListener\("wheel", onWheel/);
+  // 官方 scroller 只负责测量与前插保位：跟随关闭，按钮可见阈值与贴底容差同一个数
+  // （距底 >0 即出现），不在两者之间留"既不跟、也没按钮"的死区。
+  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll=\{false\} defaultScrollPosition="end" scrollEdgeThreshold=\{0\}>/);
+  // ChatWindow 不再自己贴底：没有跟随组件、没有"滚到末端"的调用。
+  assert.doesNotMatch(chatWindowSource, /FollowTailWhenAtTail|scrollToEnd|CHAT_TAIL_TOLERANCE/);
   assert.doesNotMatch(chatWindowSource, /shouldFollow\(/);
+  // 判定与动作都归状态机：贴底/脱离/补位/收缩保位在 lib/chat-follow.ts，DOM 翻译在 hook。
+  assert.match(chatFollowRulesSource, /export function nextFollowState/);
+  assert.match(chatFollowRulesSource, /export const CHAT_TAIL_EPSILON = 1;/);
+  assert.match(chatFollowRulesSource, /action: "pin-bottom"/);
+  assert.doesNotMatch(chatFollowRulesSource, /CHAT_TAIL_TOLERANCE/);
+  assert.match(chatFollowSource, /addEventListener\("wheel", onWheel/);
+  assert.match(chatFollowSource, /kind: "reach-bottom"/);
+  // 读者滚动先看高度是否同时变化：布局钳制不是读者动作。
+  assert.match(chatFollowSource, /if \(container\.scrollHeight !== stateRef\.current\.lastHeight\) return;/);
   assert.doesNotMatch(source, /SCROLL_BOTTOM_THRESHOLD|completionScrollAllowedRef|ignoreProgrammaticScrollUntilRef/);
   assert.doesNotMatch(streamUpdateSource, /scrollToBottom/);
 });

@@ -1,43 +1,31 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
+import {
+  CHAT_TAIL_EPSILON,
+  createWheelGesture,
+  initialFollowState,
+  nextFollowState,
+  type FollowEvent,
+  type FollowState,
+} from "@/lib/chat-follow";
+
+/** 折叠行自行锚定顶边时派发的事件（components/transcript/TraceRow.tsx）。 */
+const FOLD_EVENT = "pi-web:trace-fold";
+/** 折叠动画期内不补位：260ms 覆盖行高变化的过渡帧。 */
+const FOLD_FREEZE_MS = 260;
+
 /**
- * 会话列表贴底跟随状态机（从 components/ChatWindow.tsx 原位抽出，契约见
- * lib/chat-follow.ts）：`atTail` 是唯一的跟随信号，官方 scroller 以
- * `autoScroll={false}` 运行，贴底跟随、完成时刻的保持都只消费这一个状态。
- *
- * - 贴底判定：距底 ≤ CHAT_TAIL_TOLERANCE 即贴底；滚轮向上累计 ≥
- *   WHEEL_LEAVE_THRESHOLD_PX、触摸上滑 > 6px、ArrowUp·PageUp·Home 到达即
- *   脱离（手势压制）。触控板单帧几个 px 的负 delta 属噪声，不再误杀跟随。
- * - 程序化滚动（跟随回写、折叠保位、浏览器钳制）不参与意图判定，状态按
- *   几何位置自愈。
- * - 带内回挂：压制期间滚轮向下 ≥ 6px、触摸下拉 > 6px 且几何仍在带内 →
- *   立即解除压制重挂跟随。否则带内脱离后滚回底部既无按钮也不跟随，
- *   读者须先滚出距离带再滚回来才有一条活路。
- * - **收缩保位**：非跟随态下内容缩短（完成重组、行折叠）时，浏览器钳制会把
- *   读者拉向尾端；这里按收缩量回退 scrollTop，读者距底距离不变，且本次事件
- *   不做贴底重算、不解除压制——钳制不会被误读成"用户滚回尾部"（完成时刻
- *   强行跳底的根因）。
- * - reattachToTail()：回底按钮与发送后贴底的入口——解除压制并置贴底；调用方
- *   随后自行滚动，飞行中与之后的内容增长由 FollowTailWhenAtTail 即时校正到真底。
- * - 压制/跟随状态存于组件级 ref：`loading` 翻转重建监听时不丢压制，只有会话
- *   切换（sessionKey 变化）才整体重置。
+ * 把 DOM 事件翻译成 `lib/chat-follow.ts` 的状态机事件，并按返回的动作写 scrollTop。
+ * 状态机之外这里不做任何判定：
+ * - 读者滚动：几何（距离 ≤ 1px）决定贴不贴底，绝不因为"进了某个距离带"就贴底；
+ * - 只有"收缩把非贴底的读者钳到尾部"这一种形状的事件不是读者动作，其余全部交给
+ *   状态机（锚点调整保持距底距离不变，交出去也不会误判）；
+ * - 自己写的 scrollTop 用标记排除，避免自我触发；
+ * - 保活槽隐藏（clientHeight 为 0）时几何是假的：照常收基准，但不写 scrollTop；
+ * - 贴底时内容/视口变化只补这一帧长出来的量，位移上界 = 增长量。
  */
-
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import { createWheelGesture, isAtTail } from "@/lib/chat-follow";
-
-interface FollowState {
-  suppressed: boolean;
-  following: boolean;
-  wasInBand: boolean;
-  touching: boolean;
-  lastDistance: number;
-}
-
-function initialFollowState(distance: number): FollowState {
-  return { suppressed: false, following: true, wasInBand: true, touching: false, lastDistance: distance };
-}
-
 export function useChatFollow(
   scrollContainerRef: RefObject<HTMLDivElement | null>,
   contentRef: RefObject<HTMLDivElement | null>,
@@ -45,162 +33,143 @@ export function useChatFollow(
   loading: boolean,
 ) {
   const [atTail, setAtTail] = useState(true);
+  const stateRef = useRef<FollowState>(initialFollowState(0, 0));
   const reattachRef = useRef<() => void>(() => {});
-  const followStateRef = useRef<FollowState>(initialFollowState(0));
-  // 跨事件记忆上次 scrollHeight（判定收缩）。
-  const lastScrollHeightRef = useRef(0);
-  const lastSessionKeyRef = useRef<string | undefined>(undefined);
+  const resyncRef = useRef<() => void>(() => {});
+  const sessionRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    const readDistance = () => Math.max(0, container.scrollHeight - container.scrollTop - container.clientHeight);
-    // 会话切换整体重置；loading 翻转只重建监听，压制不丢（否则加载完成瞬间
-    // 上一会话读史中的压制被静默清零）。
-    if (lastSessionKeyRef.current !== sessionKey) {
-      lastSessionKeyRef.current = sessionKey;
-      followStateRef.current = initialFollowState(readDistance());
+    const content = contentRef.current;
+    const readDistance = () =>
+      Math.max(0, container.scrollHeight - container.scrollTop - container.clientHeight);
+
+    // 会话切换整体重置；loading 翻转只重建监听，跟随状态不丢（否则读史完成瞬间
+    // 上一会话的贴底判定被静默清零）。
+    if (sessionRef.current !== sessionKey) {
+      sessionRef.current = sessionKey;
+      stateRef.current = initialFollowState(readDistance(), container.scrollHeight);
+      setAtTail(stateRef.current.pinned);
     }
-    lastScrollHeightRef.current = container.scrollHeight;
-    const state = followStateRef.current;
-    const gesture = createWheelGesture();
-    // 触摸手势进行中的起点 Y：effect 局部即可，监听重建时本就应重置。
-    let touchStartY: number | null = null;
-    const reattach = () => {
-      state.suppressed = false;
-      state.following = true;
-      state.wasInBand = true;
-      setAtTail(true);
+
+    // 自己写的 scrollTop 不算读者滚动。handler 里消费一次标记，rAF 再兜底清一次：
+    // 写入若是空操作（已经到底）不会有 scroll 事件，标记不能留到下一次真实滚动。
+    let programmatic = false;
+    const writeScrollTop = (value: number) => {
+      programmatic = true;
+      container.scrollTop = value;
+      requestAnimationFrame(() => {
+        programmatic = false;
+      });
     };
-    reattachRef.current = reattach;
-    const release = () => {
-      state.suppressed = true;
-      state.following = false;
-      setAtTail(false);
-    };
-    const update = () => {
-      const height = container.scrollHeight;
-      const shrank = height < lastScrollHeightRef.current;
-      lastScrollHeightRef.current = height;
-      const dist = readDistance();
-      if (shrank && !state.following && !state.touching) {
-        // 钳制把 scrollTop 拉小了：退回原距离，读者原地不动；本事件不改状态。
-        if (dist < state.lastDistance - 0.5) {
-          container.scrollTop = Math.max(0, height - container.clientHeight - state.lastDistance);
-          state.lastDistance = readDistance();
-          return;
-        }
-        // 缩的是尾端以远（读者距底距离反而变大）：照常走几何重算。
-        state.lastDistance = dist;
-      } else {
-        state.lastDistance = dist;
+
+    const dispatch = (event: FollowEvent) => {
+      const { state, action } = nextFollowState(stateRef.current, event);
+      stateRef.current = state;
+      if (action === "pin-bottom") {
+        // 隐藏槽位（display:none）的几何全为 0，此时补位只会把真实位置写成 0。
+        if (container.clientHeight > 0) writeScrollTop(container.scrollHeight);
+      } else if (action === "restore-distance") {
+        writeScrollTop(Math.max(0, container.scrollHeight - container.clientHeight - state.baseline));
       }
-      const inBand = isAtTail(container.scrollTop, container.clientHeight, container.scrollHeight);
-      if (state.suppressed) {
-        if (inBand && !state.wasInBand) {
-          // 带外→带内跃迁 = 用户自己回到尾部，解除压制并重挂。
-          reattach();
-        } else {
-          setAtTail(false);
-        }
-      } else {
-        state.following = inBand;
-        setAtTail(inBand);
-      }
-      state.wasInBand = inBand;
+      setAtTail(state.pinned);
     };
-    const onWheel = (event: WheelEvent) => {
-      // deltaMode 非 0 时把行/页单位换算成像素（行 ×16、页 ×视口高）。
-      let scale = 1;
-      if (event.deltaMode === 1) scale = 16;
-      else if (event.deltaMode === 2) scale = container.clientHeight;
-      const action = gesture.feed(event.deltaY, scale);
-      if (action === "leave") {
-        release();
-      } else if (action === "reattach" && state.suppressed
-        && isAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)) {
-        reattach();
-      }
-    };
-    const onTouchStart = (event: TouchEvent) => {
-      state.touching = true;
-      touchStartY = event.touches[0]?.clientY ?? null;
-    };
-    const onTouchMove = (event: TouchEvent) => {
-      const y = event.touches[0]?.clientY;
-      if (touchStartY === null || y === undefined) return;
-      const dy = y - touchStartY;
-      // 手指下移（clientY 变大）= 内容上滚看历史 = 离开跟随；小于 6px 的位移是
-      // 点按抖动，不是手势，不脱离（否则一次误杀就永久压制，停在底部也不再跟随）。
-      if (dy > 6) {
-        release();
+    reattachRef.current = () => dispatch({ kind: "reach-bottom" });
+    resyncRef.current = () =>
+      dispatch({ kind: "settle", distance: readDistance(), height: container.scrollHeight });
+
+    const onScroll = () => {
+      if (programmatic) {
+        programmatic = false;
         return;
       }
-      // 反向手势（手指上移 = 内容向下）立即重挂：压制期间停在带内的读者想回尾，
-      // 不必先滚出带再滚回来。
-      if (dy < -6 && state.suppressed
-        && isAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)) {
-        reattach();
+      // 唯一不算读者动作的形状：内容收缩后浏览器把 scrollTop 钳回尾部（距底归零），
+      // 而读者本来不在尾部。交给 resize 的"收缩原地保位"，别把它判成"回到底部"。
+      // 不能按"这一帧高度变了"一刀切——流式换行、图片落地都会让 lastHeight 落后一帧，
+      // 那一帧里读者的触摸/拖拽事件会被整批丢掉。
+      const height = container.scrollHeight;
+      const distance = readDistance();
+      const previous = stateRef.current;
+      if (
+        height < previous.lastHeight
+        && distance <= CHAT_TAIL_EPSILON
+        && previous.baseline > CHAT_TAIL_EPSILON
+      ) return;
+      dispatch({ kind: "user-scroll", distance });
+    };
+
+    const gesture = createWheelGesture();
+    const onWheel = (event: WheelEvent) => {
+      const scale =
+        event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? container.clientHeight : 1;
+      if (gesture.feed(event.deltaY, scale) === "leave") dispatch({ kind: "wheel-leave" });
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Home") {
+        dispatch({ kind: "wheel-leave" });
       }
     };
-    const onTouchEnd = () => {
-      state.touching = false;
-      touchStartY = null;
+
+    // 展开/收起行自己锚定顶边（components/transcript/TraceRow.tsx）：这几帧里内容
+    // 高度变化的来源不是"流式追加"，补位会把刚展开的行拉上去。冻结期只重算基准，
+    // 冻结结束时再按几何否决一次跟随。
+    let frozenUntil = 0;
+    let freezeTimer = 0;
+    const onFold = () => {
+      frozenUntil = performance.now() + FOLD_FREEZE_MS;
+      window.clearTimeout(freezeTimer);
+      freezeTimer = window.setTimeout(() => {
+        frozenUntil = 0;
+        dispatch({ kind: "settle", distance: readDistance(), height: container.scrollHeight });
+      }, FOLD_FREEZE_MS);
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Home") release();
+
+    let frame = 0;
+    const onResize = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const event =
+          performance.now() < frozenUntil
+            ? ({ kind: "settle", distance: readDistance(), height: container.scrollHeight } as const)
+            : ({ kind: "resize", distance: readDistance(), height: container.scrollHeight } as const);
+        dispatch(event);
+      });
     };
-    // 脱离态下内容增长不产生 scroll 事件（没人写 scrollTop），只靠 scroll 更新的
-    // lastDistance 会在流式期间停更：完成重组收缩触发浏览器钳制时，收缩保位用
-    // 陈旧基准回退，读者被拉向尾部（脱离后增长多少拉多少）。这里以 ResizeObserver
-    // 跟踪内容高度：非跟随、非触摸、且未贴底（钳制未发生）时刷新基准——读者
-    // 没动，他的真实距底距离就是内容变化后的值。已贴底时不刷新：那正是钳制征兆，
-    // 收缩保位须用旧基准把读者退回钳制前的位置。跟随态不介入（那是
-    // FollowTailWhenAtTail 的职责）。
-    let contentFrame = 0;
-    const contentEl = contentRef.current;
-    const contentObserver = contentEl && typeof ResizeObserver !== "undefined"
-      ? new ResizeObserver(() => {
-        if (contentFrame) return;
-        contentFrame = requestAnimationFrame(() => {
-          contentFrame = 0;
-          if (state.following || state.touching) return;
-          const height = container.scrollHeight;
-          if (height === lastScrollHeightRef.current) return;
-          if (container.scrollTop + container.clientHeight < container.scrollHeight) {
-            lastScrollHeightRef.current = height;
-            state.lastDistance = Math.max(0, height - container.scrollTop - container.clientHeight);
-          }
-        });
-      })
-      : null;
-    if (contentObserver && contentEl) contentObserver.observe(contentEl);
-    update();
-    container.addEventListener("scroll", update, { passive: true });
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
+    if (observer) {
+      // 内容（流式追加、行折叠、图片落地）与视口（键盘开合、队列条长高）都观察。
+      if (content) observer.observe(content);
+      observer.observe(container);
+    }
+
+    window.addEventListener(FOLD_EVENT, onFold);
+    container.addEventListener("scroll", onScroll, { passive: true });
     container.addEventListener("wheel", onWheel, { passive: true });
-    container.addEventListener("touchstart", onTouchStart, { passive: true });
-    container.addEventListener("touchmove", onTouchMove, { passive: true });
-    container.addEventListener("touchend", onTouchEnd, { passive: true });
-    container.addEventListener("touchcancel", onTouchEnd, { passive: true });
     container.addEventListener("keydown", onKeyDown);
     return () => {
-      if (contentFrame) cancelAnimationFrame(contentFrame);
-      contentObserver?.disconnect();
-      container.removeEventListener("scroll", update);
+      if (frame) cancelAnimationFrame(frame);
+      window.clearTimeout(freezeTimer);
+      window.removeEventListener(FOLD_EVENT, onFold);
+      observer?.disconnect();
+      container.removeEventListener("scroll", onScroll);
       container.removeEventListener("wheel", onWheel);
-      container.removeEventListener("touchstart", onTouchStart);
-      container.removeEventListener("touchmove", onTouchMove);
-      container.removeEventListener("touchend", onTouchEnd);
-      container.removeEventListener("touchcancel", onTouchEnd);
       container.removeEventListener("keydown", onKeyDown);
     };
-    // lastScrollHeightRef 只做跨事件记忆，不参与 effect 依赖；contentRef 引用稳定，
-    // 列入依赖仅为满足 exhaustive-deps（loading 翻转重建时重新 observe 新 content）。
+    // contentRef 引用稳定，列入依赖仅为满足 exhaustive-deps（loading 翻转重建时
+    // 重新 observe 新的内容节点）。
   }, [scrollContainerRef, contentRef, sessionKey, loading]);
 
   const reattachToTail = useCallback(() => {
     reattachRef.current();
   }, []);
 
-  return { atTail, reattachToTail };
+  /** 布局被外部改写后（切回保活会话、还原滚动位置）重读几何，不滚、只重算基准。 */
+  const resyncFollow = useCallback(() => {
+    resyncRef.current();
+  }, []);
+
+  return { atTail, reattachToTail, resyncFollow };
 }

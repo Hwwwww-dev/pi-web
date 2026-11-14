@@ -13,15 +13,16 @@ test("one scroll-to-latest control, and it is the official one", () => {
   assert.match(source, /<MessageScrollerButton[\s\S]*?chat\.scrollToLatest/);
 });
 
-test("the scroller runs without internal following; FollowTailWhenAtTail is the only follower", () => {
+test("the scroller runs without internal following; the follow state machine is the only follower", () => {
   // 官方内部跟随（following-bottom 会被状态提交强制回填、与翻页前插保位互拓）
-  // 已关闭；贴底跟随全部由 ChatWindow 的 atTail 信号经 FollowTailWhenAtTail 接管。
-  assert.match(source, /<MessageScrollerProvider autoScroll=\{false\} defaultScrollPosition="end">/);
-  assert.match(source, /<FollowTailWhenAtTail atTail=\{atTail && !foldInFlight\}/);
+  // 已关闭；贴底跟随全部由 hooks/useChatFollow 驱动的 lib/chat-follow.ts 状态机
+  // 接管，ChatWindow 不再有跟随组件，也没有"滚到末端"的调用。
+  assert.match(source, /<MessageScrollerProvider autoScroll=\{false\} defaultScrollPosition="end" scrollEdgeThreshold=\{0\}>/);
+  assert.doesNotMatch(source, /FollowTailWhenAtTail|scrollToEnd|CHAT_TAIL_TOLERANCE/);
   // Hand-rolled compensation must not sit next to the official one.
   assert.equal(source.includes("preserveScrollOnPrepend={false}"), false);
-  // A message row is the anchor the scroller opens at.
-  assert.match(source, /scrollAnchor=\{anchorRole === "user"\}/);
+  // 消息行不传 scrollAnchor：原语会趁追加把该行对齐到顶。
+  assert.equal(source.includes('scrollAnchor={anchorRole === "user"}'), false);
 });
 
 test("nothing else writes the reader's scroll position", () => {

@@ -74,6 +74,7 @@ import {
 } from "@/lib/extension-ui-queue";
 import {
   OLDER_PAGE_TURNS,
+  VISIBLE_PAGE_SIZE,
   VISIBLE_PAGE_TURNS,
 } from "@/lib/chat-lazy-load";
 import {
@@ -309,6 +310,8 @@ const IDLE_FOLLOW_BACKGROUND_POLL_MS = 20_000;
 const IDLE_FOLLOW_BACKGROUND_BACKOFF_MS = 60_000;
 const IDLE_FOLLOW_BACKGROUND_BACKOFF_AFTER_MS = 5 * 60_000;
 const BASH_STATE_RECONCILE_MS = 1_000;
+/** 晚到的 `message_end` 补读延迟：等这一次落盘完成，再按会话文件整载一次。 */
+const LATE_APPEND_REFETCH_MS = 400;
 /** Stop hands its queue back to be sent again; the stopped run has to unwind first, or a prompt rides it. */
 const STOP_RESEND_SETTLE_TIMEOUT_MS = 5_000;
 const STOP_RESEND_POLL_MS = 50;
@@ -671,6 +674,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // labelling it with whichever preset the resolved tools happen to match.
   const sessionToolsPinnedRef = useRef(false);
   const browsingHistoryRef = useRef(false);
+  // 晚到 message_end 的定向补读：一批晚到事件合并成一次整载。
+  const lateAppendTimerRef = useRef<number | null>(null);
   const followProbeInFlightRef = useRef(false);
   // Last tick's background flag, so the idle-follow effect can tell an
   // activation (slot becoming selected) from an ordinary re-run and probe at once.
@@ -971,6 +976,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       browsingHistoryRef.current = false;
       if (showLoading) setLoading(true);
       const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1", tree: "summary" });
+      // 整载会用叶子尾窗替换 messages：窗口不得小于已载入条数，否则每次刷新都把
+      // 翻页载入的历史裁回 50 条——读者往上翻，内容已经不在内存里了。
+      const loadedCount = sessionIdRef.current === sid ? entryIdsRef.current.length : 0;
+      params.set("tail", String(Math.min(1000, Math.max(VISIBLE_PAGE_SIZE, loadedCount))));
       if (options?.force) params.set("force", "1");
       const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?${params}`);
       if (res.status === 404) {
@@ -2292,10 +2301,20 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
       }
       case "message_end": {
-        // Same late-event guard: after reconcile finished this run,
-        // loadSession already loaded this message from the session file —
-        // appending it again would duplicate it.
-        if (!agentRunningRef.current) break;
+        // 事件比 run 结束晚到时不能直接丢：reconcile 那次读取可能赶在落盘之前，
+        // 该条此时才写出。追加会和已读入的重复，故改为延后一次定向整载。
+        if (!agentRunningRef.current) {
+          const sid = sessionIdRef.current;
+          // 读者正在上翻历史时不动：整载会把窗口拉回叶子。
+          if (sid && !browsingHistoryRef.current) {
+            if (lateAppendTimerRef.current !== null) window.clearTimeout(lateAppendTimerRef.current);
+            lateAppendTimerRef.current = window.setTimeout(() => {
+              lateAppendTimerRef.current = null;
+              if (sessionIdRef.current === sid) void loadSession(sid, false, false, { force: true });
+            }, LATE_APPEND_REFETCH_MS);
+          }
+          break;
+        }
         if (isSystemMessageEvent(event)) break;
         // 视图处于中段窗口时，本轮实时消息不在该窗口内，追加到窗口末尾会错位。
         // 不丢：缓冲后落位——从历史窗口就地发送（handleSend 重置窗口标记）时按
@@ -3634,6 +3653,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
     return () => {
       sessionHookMountedRef.current = false;
+      if (lateAppendTimerRef.current !== null) {
+        window.clearTimeout(lateAppendTimerRef.current);
+        lateAppendTimerRef.current = null;
+      }
       const abandonedDraftKey = isNew ? newSessionDraftKey : null;
       if (abandonedDraftKey) {
         queueMicrotask(() => {

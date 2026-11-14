@@ -1,34 +1,30 @@
 /**
- * 会话列表贴底判定的唯一定义处。
- * `ChatWindow` 的 `atTail` 是唯一的跟随信号：官方 scroller 以 `autoScroll={false}`
- * 运行，贴底跟随、完成时刻的保持都只消费这一个状态。
-
- * 业界标准契约（chat-scroll stick-to-bottom、ChatGPT-Next-Web 等的共同做法）：
- * - 贴底与重进跟随共用一个距离带（100px，业界默认 40–100 的通用上限值）。
- * - 跟随的脱离只认用户输入：滚轮上滚、触摸上滑、ArrowUp/PageUp/Home 到达即
- *   脱离。不从 scrollTop 差值反推意图——折叠保位、浏览器钳制、图片加载引起的
- *   程序化滚动都会被差值启发式误判成"用户离开"（思考行折叠后跟随脱死的根因）。
- *   滚轮另有累计阈值（createWheelGesture）：触控板单帧几个 px 的负 delta
- *   属噪声，累计到 WHEEL_LEAVE_THRESHOLD_PX 才算离开意图。
- * - 滚动条拖拽没有输入事件，由几何兜底：距底超出距离带即脱离。
- * - 带内回挂：压制期间读者向下滚（滚轮/触摸）且几何仍在带内 = 回底意图，
- *   立即解除压制——读者不必先滚出距离带再滚回来，否则带内脱离后回底
- *   按钮不亮、跟随不恢复，读者进退无门。
- * - 内容高度变化（行折叠、图片加载、流式追加）后按几何位置重算，状态自愈。
+ * 会话列表贴底跟随的唯一定义处：状态机 + 滚轮噪声过滤。
+ *
+ * 三条不变式（"完美"在这里是可验证的约定，不是调出来的手感）：
+ * 1. 程序化滚动只有两个来源：已贴底时内容/视口变化带来的补位，以及显式回底
+ *    （回底按钮、发送、切会话）。除此之外代码永不写 scrollTop。
+ * 2. 贴底只由意图进入：读者自己滚到底（距离 ≤ CHAT_TAIL_EPSILON）、点回底、发送、
+ *    切会话。几何只能否决跟随，不能发起跟随——"距底 160px 内自动贴底"正是吸附感
+ *    的来源，这里没有距离带。
+ * 3. 判定只看容器自身几何，与"可视底边在哪"无关：composer 是停靠还是浮层、键盘
+ *    钉多高、视口怎么变，都不影响 `scrollTop + clientHeight >= scrollHeight - 1`。
+ *
+ * 由此，任意事件造成的位移上界 = 这一帧内容长出来的量（补位），不可能是"跳到底"。
+ * 判定万一失准，后果只是"不自动跟"，而回底按钮（只要距底 >0 就出现）永远兜底：
+ * 按钮的可见阈值与这里的贴底容差同一个数，二者之间不留"既不跟、也没按钮"的缝。
  */
 
-/** 贴底/重进跟随共用距离带（px）：距内容末端不超过该值即视为贴底。
- *  160 > 手机端输入框浮层高度：浮层悬在容器底边之上，「看到最后一条结尾」
- *  时的距底距离可达约 110px，100px 的旧带在手机上根本进不去。 */
-export const CHAT_TAIL_TOLERANCE = 160;
+/** 贴底容差（px）：只吸收亚像素与页面缩放的取整，不是设计余量。 */
+export const CHAT_TAIL_EPSILON = 1;
 
 export function isAtTail(
   scrollTop: number,
   clientHeight: number,
   scrollHeight: number,
-  tolerance = CHAT_TAIL_TOLERANCE,
+  epsilon = CHAT_TAIL_EPSILON,
 ): boolean {
-  return scrollTop + clientHeight >= scrollHeight - tolerance;
+  return scrollTop + clientHeight >= scrollHeight - epsilon;
 }
 
 /** 用户输入是否为"向上离开"意图：滚轮/触摸事件的向上分量。 */
@@ -39,35 +35,28 @@ export function isUpwardGesture(deltaY: number): boolean {
 /** 滚轮脱离阈值（px）：窗口内向上累计超过即脱离。鼠标一格 ~100px 一次脱离；
  *  触控板单帧几个 px 的负 delta（轻碰、横向滑动噪声）到不了。 */
 export const WHEEL_LEAVE_THRESHOLD_PX = 32;
-/** 滚轮回挂阈值（px）：压制期间向下累计超过即回挂（几何仍在带内时）。低门槛：
- *  回底意图的误判代价低，几何贴底本来就该跟随。 */
-export const WHEEL_REATTACH_THRESHOLD_PX = 6;
+
 /** 累计时间窗（ms）：窗内断续滚轮持续累计，超窗清零。 */
 export const WHEEL_ACCUM_WINDOW_MS = 400;
 
-export type WheelAction = "none" | "leave" | "reattach";
+export type WheelAction = "none" | "leave";
 
 /**
- * 滚轮手势判定器：向上累计到阈值才报告"离开"，向下累计到阈值报告"回挂"；
- * 方向反转或超窗清零。脱离开关由 hooks/useChatFollow 消费（回挂还须几何
- * 在带内，几何不归这里管）。
+ * 滚轮手势判定器：向上累计到阈值才报告"离开"，向下只清零累计。
+ * 向下不产生任何动作——回底只有"滚到真底"（几何）或"点按钮"（命令）两条路，
+ * 所以不存在"轻推 6px 换来一次跳跃"。
  */
 export function createWheelGesture(now: () => number = () => Date.now()) {
   let up = 0;
-  let down = 0;
   let lastAt = -Infinity;
   return {
     /** scale：deltaMode 非 0 时把行/页单位换算成像素（行 ×16、页 ×视口高）。 */
     feed(deltaY: number, scale = 1): WheelAction {
       const t = now();
-      if (t - lastAt > WHEEL_ACCUM_WINDOW_MS) {
-        up = 0;
-        down = 0;
-      }
+      if (t - lastAt > WHEEL_ACCUM_WINDOW_MS) up = 0;
       lastAt = t;
       const dy = deltaY * scale;
       if (dy < 0) {
-        down = 0;
         up += -dy;
         if (up >= WHEEL_LEAVE_THRESHOLD_PX) {
           up = 0;
@@ -75,16 +64,76 @@ export function createWheelGesture(now: () => number = () => Date.now()) {
         }
         return "none";
       }
-      if (dy > 0) {
-        up = 0;
-        down += dy;
-        if (down >= WHEEL_REATTACH_THRESHOLD_PX) {
-          down = 0;
-          return "reattach";
-        }
-        return "none";
-      }
+      if (dy > 0) up = 0;
       return "none";
     },
   };
+}
+
+export type FollowState = {
+  /** 跟随中：内容/视口变化时补位，把尾端保持在视野内。 */
+  pinned: boolean;
+  /** 非跟随态的距底距离基准：收缩（折叠、完成重组）时据此原地保位。 */
+  baseline: number;
+  /** 上次观察到的内容高度（scrollHeight），用于区分增长与收缩。 */
+  lastHeight: number;
+};
+
+export function initialFollowState(distance: number, height: number): FollowState {
+  return { pinned: distance <= CHAT_TAIL_EPSILON, baseline: distance, lastHeight: height };
+}
+
+export type FollowEvent =
+  /** 读者滚动（含拖滚动条、触摸滑动）：几何在这里唯一一次决定贴不贴底。 */
+  | { kind: "user-scroll"; distance: number }
+  /** 向上滚轮累计到阈值：脱离，不滚动。 */
+  | { kind: "wheel-leave" }
+  /** 内容或视口尺寸变化：贴底时补位，否则只在收缩时原地保位。 */
+  | { kind: "resize"; distance: number; height: number }
+  /** 命令式回底：回底按钮、发送、切会话。 */
+  | { kind: "reach-bottom" }
+  /** 布局刚被别的组件改写（展开/收起行自行锚定顶边）：只重算基准，绝不补位。 */
+  | { kind: "settle"; distance: number; height: number };
+
+/** 只允许两种程序化滚动：贴到真底、回到收缩前的位置。 */
+export type FollowAction = "none" | "pin-bottom" | "restore-distance";
+
+export type FollowResult = { state: FollowState; action: FollowAction };
+
+const NO_ACTION: FollowResult = { state: { pinned: false, baseline: 0, lastHeight: 0 }, action: "none" };
+
+export function nextFollowState(state: FollowState, event: FollowEvent): FollowResult {
+  switch (event.kind) {
+    case "user-scroll": {
+      const pinned = event.distance <= CHAT_TAIL_EPSILON;
+      return {
+        state: { pinned, baseline: event.distance, lastHeight: state.lastHeight },
+        action: "none",
+      };
+    }
+    case "wheel-leave": {
+      if (!state.pinned) return { state, action: "none" };
+      return { state: { ...state, pinned: false, baseline: Math.max(state.baseline, CHAT_TAIL_EPSILON) }, action: "none" };
+    }
+    case "resize": {
+      const shrank = event.height < state.lastHeight;
+      if (state.pinned) {
+        return { state: { pinned: true, baseline: 0, lastHeight: event.height }, action: "pin-bottom" };
+      }
+      // 收缩把读者往下推（浏览器钳制）时退回原距底距离：读者原地不动。
+      if (shrank && event.distance < state.baseline) {
+        return { state: { pinned: false, baseline: state.baseline, lastHeight: event.height }, action: "restore-distance" };
+      }
+      return { state: { pinned: false, baseline: event.distance, lastHeight: event.height }, action: "none" };
+    }
+    case "reach-bottom":
+      return { state: { pinned: true, baseline: 0, lastHeight: state.lastHeight }, action: "pin-bottom" };
+    case "settle": {
+      // 几何只能否决跟随：折叠把尾端推出了视野就停止跟随，没推出去就继续跟。
+      const pinned = event.distance <= CHAT_TAIL_EPSILON;
+      return { state: { pinned, baseline: event.distance, lastHeight: event.height }, action: "none" };
+    }
+    default:
+      return NO_ACTION;
+  }
 }

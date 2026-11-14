@@ -747,8 +747,11 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
     <div className="flex min-w-0 flex-col gap-1.5 [&_[data-message-text]]:my-1">
       {nodes.map((node, index) =>
         isValidElement(node) ? (
-          <div key={node.key ?? index} className="min-w-0 animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:animate-none">
-            {node}
+          // 高度展开式进场：行的占位高度从 0fr 逐帧长到 1fr（复用 trace-fold-down），
+          // 贴底跟随逐帧同步，列表上移连续平滑；只动画绘制（fade/slide）时高度仍是
+          // 一帧跳变，读作硬挤。motion-reduce 退回瞬时出现。
+          <div key={node.key ?? index} className="grid min-w-0 grid-rows-[1fr] animate-[trace-fold-down_200ms_ease-out] motion-reduce:animate-none">
+            <div className="min-h-0 min-w-0 overflow-hidden">{node}</div>
           </div>
         ) : (
           node

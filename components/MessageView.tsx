@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, memo, useState, useRef, useEffect, useMemo } from "react";
+import { Fragment, memo, useCallback, useState, useRef, useEffect, useMemo } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, ClockIcon, CopyIcon, CornerDownRightIcon, GitBranchIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "./ui/alert";
@@ -22,6 +22,7 @@ import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
 import { getAssistantErrorMessage, hasAssistantAnswer, isAssistantTruncated, isEmptyTextBlock, isEmptyThinkingBlock } from "@/lib/message-display";
 import { formatTurnDuration } from "@/lib/turn-duration";
+import { measuredThinkingDuration, recordThinkingDuration, thinkingDurationKey } from "@/lib/thinking-durations";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import { Reveal } from "@/components/Reveal";
 import type { WrittenFile } from "@/lib/turn-written-files";
@@ -52,6 +53,8 @@ interface Props {
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
   entryId?: string;
+  /** 这条消息的稳定渲染键（`lib/message-keys.ts`）：思考行的折叠选择与实测时长靠它跨重挂载。 */
+  messageKey?: string;
   searchBlock?: AssistantContentBlock;
   /** `message` 按输入框的方式取回：pi 的 /fork 将被 fork 的消息放入编辑器。 */
   onFork?: (entryId: string, message: UserMessage) => void;
@@ -150,12 +153,12 @@ function haveSameRelevantToolResults(
   return true;
 }
 
-export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, modelNames, cwd, onOpenFile, onOpenSubagent, entryId, searchBlock, onFork, forking, onEditContent, onCancelEdit, isEditing, showTimestamp, prevTimestamp, sessionId, writtenFiles, turnDurationMs, showModelLabel, hideUsage, hideCopy, onCompact, isCompacting, compactError }: Props) {
+export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, modelNames, cwd, onOpenFile, onOpenSubagent, entryId, messageKey, searchBlock, onFork, forking, onEditContent, onCancelEdit, isEditing, showTimestamp, prevTimestamp, sessionId, writtenFiles, turnDurationMs, showModelLabel, hideUsage, hideCopy, onCompact, isCompacting, compactError }: Props) {
   if (message.role === "user") {
     return <UserMessageView message={message as UserMessage} cwd={cwd} onOpenFile={onOpenFile} entryId={entryId} onFork={onFork} forking={forking} onEditContent={onEditContent} onCancelEdit={onCancelEdit} isEditing={isEditing} />;
   }
   if (message.role === "assistant") {
-    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} turnDurationMs={turnDurationMs} showModelLabel={showModelLabel} hideUsage={hideUsage} hideCopy={hideCopy} onCompact={onCompact} isCompacting={isCompacting} compactError={compactError} />;
+    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} messageKey={messageKey} searchBlock={searchBlock} writtenFiles={writtenFiles} turnDurationMs={turnDurationMs} showModelLabel={showModelLabel} hideUsage={hideUsage} hideCopy={hideCopy} onCompact={onCompact} isCompacting={isCompacting} compactError={compactError} />;
   }
   if (message.role === "toolResult") {
     // Rendered inline under its toolCall — skip standalone rendering if paired
@@ -448,6 +451,7 @@ function AssistantMessageView({
   prevTimestamp,
   sessionId,
   entryId,
+  messageKey,
   searchBlock,
   writtenFiles,
   turnDurationMs,
@@ -469,6 +473,8 @@ function AssistantMessageView({
   prevTimestamp?: number;
   sessionId?: string;
   entryId?: string;
+  /** 这条消息的稳定渲染键（`lib/message-keys.ts`）：思考行的折叠选择与实测时长靠它跨重挂载。 */
+  messageKey?: string;
   searchBlock?: AssistantContentBlock;
   writtenFiles?: WrittenFile[];
   turnDurationMs?: number;
@@ -498,6 +504,12 @@ function AssistantMessageView({
   // Streaming-based timing for thinking blocks
   const blockStartTimesRef = useRef<Map<number, number>>(new Map());
   const [streamingDurations, setStreamingDurations] = useState<Map<number, number>>(new Map());
+
+  // 测出的时长写进模块级表：这条消息在回合结束时会被换成一棵新子树重挂载，state
+  // 随之归零，不接住就会退回整条回复的 durationMs（3s 闪一下变 5s）。
+  const recordDuration = useCallback((blockIndex: number, seconds: number) => {
+    recordThinkingDuration(thinkingDurationKey(messageKey, blockIndex), seconds);
+  }, [messageKey]);
 
   // Thinking duration of a completed message: the whole response's generation time, which pi
   // records since 1.1 (`durationMs`, from the request's start). Older messages only have
@@ -543,7 +555,9 @@ function AssistantMessageView({
           const next = new Map(prev);
           for (const [idx, start] of blockStartTimesRef.current) {
             if (!next.has(idx)) {
-              next.set(idx, Math.round((now - start) / 1000));
+              const seconds = Math.round((now - start) / 1000);
+              next.set(idx, seconds);
+              recordDuration(idx, seconds);
               changed = true;
             }
           }
@@ -572,7 +586,9 @@ function AssistantMessageView({
           if (!next.has(originalIndex) && blockStartTimesRef.current.has(originalIndex)) {
             const start = blockStartTimesRef.current.get(originalIndex)!;
             const nextStart = blockStartTimesRef.current.get(nextOriginalIndex) ?? now;
-            next.set(originalIndex, Math.round((nextStart - start) / 1000));
+            const seconds = Math.round((nextStart - start) / 1000);
+            next.set(originalIndex, seconds);
+            recordDuration(originalIndex, seconds);
             changed = true;
           }
         }
@@ -582,7 +598,7 @@ function AssistantMessageView({
     };
     const id = setInterval(tick, 300);
     return () => clearInterval(id);
-  }, [isStreaming]);
+  }, [isStreaming, recordDuration]);
 
   if (blocks.length === 0 && !isStreaming && !providerError && !truncated) return null;
 
@@ -604,7 +620,7 @@ function AssistantMessageView({
       {/* Not keyed by the entry id: a message of this run gets one when the file is
           read again, and its blocks keep their state across that read (#1184). */}
       {blockItems.map(({ block, originalIndex }) => (
-        <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
+        <BlockView key={originalIndex} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? measuredThinkingDuration(thinkingDurationKey(messageKey, originalIndex)) ?? thinkingDurationFromFile : undefined)} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} sessionId={sessionId} entryId={entryId} messageKey={messageKey} blockIndex={originalIndex} />
       ))}
 
       <Reveal open={Boolean(providerError)} className={blocks.length > 0 ? "mt-2" : "mt-0"}>
@@ -685,12 +701,12 @@ function AssistantMessageView({
   );
 }
 
-function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDuration, cwd, onOpenFile, onOpenSubagent, sessionId, entryId, blockIndex }: { block: AssistantContentBlock; searchTarget?: boolean; toolResults?: Map<string, ToolResultMessage>; isStreaming?: boolean; streamingDuration?: number; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void; onOpenSubagent?: (sessionId: string, label: string) => void; sessionId?: string; entryId?: string; blockIndex: number }) {
+function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDuration, cwd, onOpenFile, onOpenSubagent, sessionId, entryId, messageKey, blockIndex }: { block: AssistantContentBlock; searchTarget?: boolean; toolResults?: Map<string, ToolResultMessage>; isStreaming?: boolean; streamingDuration?: number; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void; onOpenSubagent?: (sessionId: string, label: string) => void; sessionId?: string; entryId?: string; messageKey?: string; blockIndex: number }) {
   if (block.type === "text") {
     return <div data-message-text data-search-target={searchTarget || undefined}><TextBlock block={block as TextContent} isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile} /></div>;
   }
   if (block.type === "thinking") {
-    return <ReasoningTrace block={block as ThinkingContent} duration={streamingDuration} sessionId={sessionId} entryId={entryId} blockIndex={blockIndex} active={isStreaming && streamingDuration === undefined} />;
+    return <ReasoningTrace block={block as ThinkingContent} duration={streamingDuration} sessionId={sessionId} entryId={entryId} durationKey={thinkingDurationKey(messageKey, blockIndex)} blockIndex={blockIndex} active={isStreaming && streamingDuration === undefined} />;
   }
   if (block.type === "toolCall") {
     const tc = block as ToolCallContent;

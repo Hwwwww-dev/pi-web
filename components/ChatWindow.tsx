@@ -20,7 +20,6 @@ import { TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, getUserMessageDraftImages, getUserMessageText, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
-import { StreamStatusPill } from "./StreamStatusPill";
 import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
 import { TurnTrace } from "./transcript/TurnTrace";
@@ -36,7 +35,6 @@ import {
   MessageScrollerContent,
   MessageScrollerProvider,
   MessageScrollerViewport,
-  useMessageScroller,
 } from "@/components/ui/message-scroller";
 import {
   Questionnaire,
@@ -46,7 +44,7 @@ import {
   QuestionnaireItem,
 } from "@/components/ui/questionnaire";
 import { ChatRow } from "@/components/chat/ChatRow";
-import { CHAT_COLUMN_CLASS, CHAT_COMPOSER_INSET_CLASS, CHAT_MESSAGE_TEXT_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
+import { CHAT_COLUMN_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
@@ -65,7 +63,7 @@ import type { DebugClientSession } from "@/lib/debug-types";
 import type { ToolEntry } from "@/lib/tool-presets";
 import type { SettingsSection } from "@/lib/settings-navigation";
 import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll-position";
-import { CHAT_TAIL_TOLERANCE } from "@/lib/chat-follow";
+import { streamingMessageKey } from "@/lib/message-keys";
 import {
   getNextVisibleCount,
   getVisibleRenderWindow,
@@ -171,56 +169,9 @@ interface Props {
 // `app/globals.css` 的 `--chat-*` 变量），组件内不写字面量。
 
 /**
- * 唯一的贴底跟随者：官方 scroller 以 `autoScroll={false}` 运行，内部跟随关闭。
- * `atTail` 为真期间内容或视口长高（流式追加、行展开、完成重组、键盘收起）即
- * 调用 `scrollToEnd`；读者上滑后 `atTail` 变假并停止干涉。跟随与否由几何贴底
- * （100px 距离带）与用户向上输入共同决定，见 `lib/chat-follow.ts`。
- */
-function FollowTailWhenAtTail({ atTail, contentRef, viewportRef }: {
-  atTail: boolean;
-  contentRef: React.RefObject<HTMLDivElement | null>;
-  viewportRef: React.RefObject<HTMLDivElement | null>;
-}) {
-  const { scrollToEnd } = useMessageScroller();
-  useEffect(() => {
-    if (!atTail) return;
-    const content = contentRef.current;
-    const viewport = viewportRef.current;
-    if (!content || !viewport) return;
-    let frame = 0;
-    const follow = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        // 几何复核后再跟：折叠抑制（foldInFlight）结束重挂时 atTail 可能是
-        // 陈旧值——折叠让内容长高但不产生 scroll 事件，贴底判定没机会重算。
-        // 此时无条件 scrollToEnd 会把整个列表瞬移到底（展开即整屏跳动）。
-        // 距底超过容差就不跟，等 useChatFollow 的下一次滚动事件纠正 atTail。
-        const el = viewportRef.current;
-        if (el && el.scrollHeight - el.scrollTop - el.clientHeight > CHAT_TAIL_TOLERANCE) return;
-        scrollToEnd({ behavior: "instant" });
-      });
-    };
-    const observer = new ResizeObserver(follow);
-    observer.observe(content);
-    // 视口也在观察内：键盘开合缩放 dvh 视口时列表容器跟着变矮/变高，
-    // 贴底时保持尾端可见（零位移模式下 composer 随视口底上下移动）。
-    observer.observe(viewport);
-    follow();
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      observer.disconnect();
-    };
-  }, [atTail, contentRef, viewportRef, scrollToEnd]);
-  return null;
-}
-
-/**
- * 回底按钮：点击 = 贴底重挂（解除压制 + 置贴底），滚动交给重挂后的跟随
- * （FollowTailWhenAtTail 重挂时立即 scrollToEnd，instant，落点永远是真底，
- * 此后增长也由跟随接管）。不再手动 smooth：飞行总在当帧被跟随的即时校正
- * 打断，从未真正起飞；原一次性 smooth scrollTo 停在调用时刻的最大值，
- * 飞行中的增长还会让它"按了不是底"、压制也不解除。
+ * 回底按钮：唯一允许"跳到底"的入口——它是读者的显式命令（state machine 的
+ * reach-bottom），落点直接写 scrollTop = scrollHeight，instant。不做 smooth：
+ * 跟随会逐帧校正落点，飞行会被打断，落地反而不准。
  */
 function ScrollToTailButton({ reattachToTail }: { reattachToTail: () => void }) {
   const { t } = useI18n();
@@ -244,8 +195,10 @@ function ScrollToTailButton({ reattachToTail }: { reattachToTail: () => void }) 
  * ChatWindow 只订阅 isStreaming/hasStreamingContent 两个布尔——chunk 不再
  * 触发整容器重渲染（文档一直声称的容器级隔离，此处落地）。
  */
-function StreamingReply({ store, toolResults, modelNames, cwd, onOpenFile, onOpenSubagent }: {
+function StreamingReply({ store, messageKey, toolResults, modelNames, cwd, onOpenFile, onOpenSubagent }: {
   store: StreamingStore;
+  /** 落进列表后将携带的键：思考行的折叠选择与实测时长靠它活过重挂载。 */
+  messageKey: string;
   toolResults: Map<string, ToolResultMessage>;
   modelNames: React.ComponentProps<typeof MessageView>["modelNames"];
   cwd: React.ComponentProps<typeof MessageView>["cwd"];
@@ -259,6 +212,7 @@ function StreamingReply({ store, toolResults, modelNames, cwd, onOpenFile, onOpe
       message={streamingMessage as AgentMessage}
       toolResults={toolResults}
       isStreaming
+      messageKey={messageKey}
       modelNames={modelNames}
       cwd={cwd}
       onOpenFile={onOpenFile}
@@ -681,19 +635,16 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // State, not a ref: the sentinel can appear with nothing else changing (a
   // finished turn regrouped into more rows), and must get an observer then.
   const [sentinel, setSentinel] = useState<HTMLElement | null>(null);
-  /** 展开/折叠行的若干帧内禁用贴底跟随，否则该行会被拉上去。 */
-  const [foldInFlight, setFoldInFlight] = useState(false);
   /**
    * 读者是否贴底（唯一的跟随信号，状态机在 hooks/useChatFollow.ts）。贴底跟随是官方
    * scroller 的内部状态：若传入恒为 true 的 `autoScroll`，前插整页时会被当作跟随而
    * 滑到底部，导致翻页时在底与顶之间跳动——因此官方以 `autoScroll={false}` 运行
-   * （内部跟随会与翻页的前插保位互相打架），贴底跟随全部由 `FollowTailWhenAtTail`
-   * 消费此状态。
+   * （内部跟随会与翻页的前插保位互相打架），贴底跟随全部由 `hooks/useChatFollow`
+   * 的状态机接管（贴底判定、补位、收缩保位都在那里）。
    */
   const messageContentRef = useRef<HTMLDivElement | null>(null);
-  const { atTail, reattachToTail } = useChatFollow(scrollContainerRef, messageContentRef, session?.id, loading);
+  const { atTail, reattachToTail, resyncFollow } = useChatFollow(scrollContainerRef, messageContentRef, session?.id, loading);
   tailReattachRef.current = reattachToTail;
-  const foldTimerRef = useRef<number | undefined>(undefined);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
   /** 上一页请求进行中。 */
   const loadingOlderRef = useRef(false);
@@ -815,28 +766,33 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       // 切回时既无默认位置也无记录，直接定位到最新一条。
       container.scrollTop = container.scrollHeight;
       liveScrollRef.current = { atBottom: true };
-      return;
-    }
-    liveScrollRef.current = saved;
-    // 还原期间禁止顶部加载器介入，也禁止贴底跟随改写位置。
-    scrollRestoringRef.current = true;
-    if (saved.atBottom || !content) {
-      container.scrollTop = container.scrollHeight;
     } else {
-      const anchorEntryId = saved.anchorEntryId;
-      const anchorOffset = saved.anchorOffset;
-      const anchor = Array.from(content.children).find((child): child is HTMLElement => (
-        child instanceof HTMLElement && child.dataset.entryId === anchorEntryId
-      ));
-      if (anchor) {
-        container.scrollTop += (anchor.getBoundingClientRect().top - container.getBoundingClientRect().top) - anchorOffset;
-      } else {
+      liveScrollRef.current = saved;
+      // 还原期间禁止顶部加载器介入，并让跟随状态机知道这次改写不是读者动作。
+      scrollRestoringRef.current = true;
+      if (saved.atBottom || !content) {
         container.scrollTop = container.scrollHeight;
+      } else {
+        const anchorEntryId = saved.anchorEntryId;
+        const anchorOffset = saved.anchorOffset;
+        const anchor = Array.from(content.children).find((child): child is HTMLElement => (
+          child instanceof HTMLElement && child.dataset.entryId === anchorEntryId
+        ));
+        if (anchor) {
+          container.scrollTop += (anchor.getBoundingClientRect().top - container.getBoundingClientRect().top) - anchorOffset;
+        } else {
+          container.scrollTop = container.scrollHeight;
+        }
       }
     }
-    const frame = requestAnimationFrame(() => { scrollRestoringRef.current = false; });
+    // 隐藏期间容器几何为 0，跟随状态机已被钉成"贴底"；不重算就会在下一帧补位，把刚
+    // 还原的位置覆盖成最底。还原写完再重读一次几何，只重算基准不滚动。
+    const frame = requestAnimationFrame(() => {
+      scrollRestoringRef.current = false;
+      resyncFollow();
+    });
     return () => cancelAnimationFrame(frame);
-  }, [active, scrollContainerRef]);
+  }, [active, scrollContainerRef, messageContentRef, resyncFollow]);
 
   useEffect(() => {
     if (searchTarget) setPendingScrollRestore(null);
@@ -877,21 +833,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // Expanding a collapsed row no longer kicks the list: `components/transcript/TraceRow.tsx`
   // keeps the toggled row's own top edge fixed across the change, so opening a card
   // grows it downward instead of scrolling the tail into view.
-
-  // 展开/折叠行期间关闭贴底跟随：行保持在原位、内容向下增长，避免先上拉后补内容
-  // 造成的闪动。
-  useEffect(() => {
-    const onFold = () => {
-      setFoldInFlight(true);
-      window.clearTimeout(foldTimerRef.current);
-      foldTimerRef.current = window.setTimeout(() => setFoldInFlight(false), 260);
-    };
-    window.addEventListener("pi-web:trace-fold", onFold);
-    return () => {
-      window.removeEventListener("pi-web:trace-fold", onFold);
-      window.clearTimeout(foldTimerRef.current);
-    };
-  }, []);
 
   // 键盘升起时 html/body 不缩高：由 iOS 自己 pan visual viewport，整个界面连带页头
   // 一起上移。这里不插手滚动，避免与浏览器自己的贴底争同一帧。
@@ -1300,7 +1241,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     ? (modelThinkingLevelMaps[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
     : null;
 
-  const chatInputElement = (
+  // 状态行现在住在输入框里（队列之下、卡片正上方），而它的文案在列表渲染之后才
+  // 算得出来；因此输入框延迟到停靠区那一刻才构造，避免把两百行 JSX 搬下来。
+  const renderChatInput = (notice: string | null | undefined) => (
     <ChatInput
       ref={chatInputRef}
       onSend={handleSend}
@@ -1341,6 +1284,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       onSetDefaultThinkingLevel={session || isNew ? handleSetDefaultThinkingLevel : undefined}
       retryInfo={retryInfo}
       queuedSubmissions={queuedSubmissions}
+      activityNotice={notice ?? undefined}
+      streamStatusStore={streamingStore}
       inputHistory={inputHistory}
       onQueuedAction={handleQueuedAction}
       slashCommands={slashCommands}
@@ -1456,6 +1401,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
             entryId={entryIds[idx]}
+            messageKey={messageKey}
             searchBlock={entryIds[idx] === pendingSearchScroll?.entryId ? searchBlock : undefined}
             onFork={bashRunning || isNew ? undefined : forkFromMessage}
             forking={forkingEntryId === entryIds[idx]}
@@ -1864,8 +1810,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </div>
           </div>
         ) : <>
-        <MessageScrollerProvider autoScroll={false} defaultScrollPosition="end" scrollEdgeThreshold={CHAT_TAIL_TOLERANCE}>
-        <FollowTailWhenAtTail atTail={atTail && !foldInFlight} contentRef={messageContentRef} viewportRef={scrollContainerRef} />
+        <MessageScrollerProvider autoScroll={false} defaultScrollPosition="end" scrollEdgeThreshold={0}>
         <MessageScroller className="min-h-0 min-w-0 flex-1 animate-in fade-in duration-150">
         <MessageScrollerViewport
           ref={scrollContainerRef}
@@ -1926,7 +1871,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 外边距，否则上下沿各跳一次。 */}
             <ChatRow className={agentRunning || isCompacting ? "-mt-2.5" : undefined}>
             {isStreaming && hasStreamingContent && (
-              <StreamingReply store={streamingStore} toolResults={toolResultsMap} modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
+              <StreamingReply store={streamingStore} messageKey={streamingMessageKey(entryIds, messages.length - entryIds.length)} toolResults={toolResultsMap} modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
             )}
 
             {pendingBash && (
@@ -2066,21 +2011,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </div>
           </div>
         )}
-        {/* 运行状态行：左边是运行阶段提示，右边是流式速率——两者在同一固定
-            槽位里更替（等待时显示文案、流式时显示速度），出现/消失/换文案都
-            不动高度。留白同输入框文字起点（InputGroup p-2 + 控件 px-3 =
-            --chat-composer-inset），与下方扩展状态行同一条竖线。 */}
-        <div className={cn("flex min-h-[1.65em] items-center justify-between gap-3", CHAT_COMPOSER_INSET_CLASS, CHAT_MESSAGE_TEXT_CLASS)}>
-          {activityNotice ? (
-            <span key={activityNotice} className="min-w-0 truncate text-muted-foreground animate-in fade-in duration-200 [animation-iteration-count:1]">
-              {activityNotice}
-            </span>
-          ) : (
-            <span className="min-w-0 truncate text-muted-foreground">{activityNotice}</span>
-          )}
-          <StreamStatusPill store={streamingStore} />
-        </div>
-        {chatInputElement}
+        {/* 运行状态行（阶段文案 + 流式速率）已移进输入框：位于队列之下、输入卡片
+            正上方。队列长高只往聊天区方向长，状态行不再被顶走。 */}
+        {renderChatInput(activityNotice)}
         <ExtensionStatusBar
           statuses={extensionStatuses}
           widgets={extensionWidgets}

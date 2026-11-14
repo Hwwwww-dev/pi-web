@@ -24,6 +24,8 @@ import {
 } from "@/lib/file-fuzzy";
 import { getMarkdownListContinuation } from "@/lib/markdown-list-continuation";
 import { CHAT_COLUMN_CLASS } from "@/lib/chat-layout";
+import { StreamStatusPill } from "./StreamStatusPill";
+import type { StreamingStore } from "@/lib/streaming-message";
 import { quoteSeparator } from "@/lib/quoted-selection";
 import { isBareMcpCommand, isBuiltinMcpCommand } from "@/lib/mcp-command";
 import { BorderBeam } from "border-beam";
@@ -142,6 +144,10 @@ interface Props {
   /** Saves a reasoning level as the default for new sessions and selects it here. */
   onSetDefaultThinkingLevel?: (level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") => void;
   retryInfo?: { attempt: number; maxAttempts: number; errorMessage?: string } | null;
+  /** 运行阶段文案（"等待模型…" / "正在运行 bash…"）。与右侧速率共用输入框正上方那一行。 */
+  activityNotice?: string;
+  /** 速率胶囊的数据源；传对象而非元素，输入框的 memo 才能照常跳过分块重渲染。 */
+  streamStatusStore?: StreamingStore;
   queuedSubmissions?: QueuedSubmission[];
   inputHistory?: string[];
   /** Steer a pending message into the running turn, or take it back for editing. */
@@ -842,6 +848,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   thinkingLevel, isAutoThinkingSelection = false, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   savedDefaultThinkingLevel, onSetDefaultThinkingLevel,
   retryInfo, queuedSubmissions, inputHistory = [], onQueuedAction,
+  activityNotice, streamStatusStore,
   slashCommands, slashCommandsLoading, onLoadSlashCommands,
   onBuiltinCommand,
   soundEnabled, onSoundToggle, onAudioUnlock,
@@ -2315,6 +2322,15 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           </Alert>
         )}
         </Reveal>
+        {/* 运行状态行就在输入卡片正上方、队列之下：队列长高只往聊天区方向长，
+            状态行与输入框的距离恒定。行高写死 22px（不跟字号偏移长大），两端
+            都用 items-center 真居中；文案换字不重放进场动画，不重挂载。 */}
+        {!compact && (
+          <div className="flex min-h-[22px] items-center justify-between gap-3">
+            <span className="min-w-0 truncate pl-2 text-xs leading-none text-muted-foreground">{activityNotice}</span>
+            {streamStatusStore && <StreamStatusPill store={streamStatusStore} />}
+          </div>
+        )}
         {/* Main input */}
         <div className="relative min-w-0">
           {historyMenuOpen && inputHistory.length > 0 && (

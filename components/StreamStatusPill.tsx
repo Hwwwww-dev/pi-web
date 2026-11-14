@@ -140,7 +140,7 @@ export function StreamStatusPill({ store }: { store: StreamingStore }) {
   // 空闲（无流式、无停留读数）不渲染：那一格留给左侧的运行阶段文案。
   if (!active && !held) return null;
   return (
-    <div className="pointer-events-none flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-xs leading-[1.5] text-muted-foreground [font-variant-numeric:tabular-nums]">
+    <div className="pointer-events-none flex items-center gap-1.5 font-mono text-xs leading-none text-muted-foreground [font-variant-numeric:tabular-nums]">
       <StreamRateBadge tokens={shownTokens} tps={shownTps} streaming={active} />
     </div>
   );

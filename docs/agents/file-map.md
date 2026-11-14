@@ -90,7 +90,8 @@ lib/
   session-links.ts          same-instance links: a session's (?session=<id>), a fresh composer's (?cwd=<dir>); the plain-click rule the sidebar keeps in the page
   new-session-context.ts    client-safe: what the project/worktree pickers show (project, worktrees, project list), lag-safe contextForCwd, the directory a group's + and Open in new tab use
   normalize.ts              normalizeToolCalls(): file-format vs our toolCall field names
-  message-keys.ts           client-safe React keys of chat messages: a run's messages keep theirs when the file is read again
+  message-keys.ts           client-safe React keys of chat messages: a run's messages keep theirs when the file is read again, plus the key the streaming bubble will carry
+  thinking-durations.ts     client-safe per-thinking-block seconds measured while streaming, kept across the remounts so the row shows one quantity
   types.ts                  shared TypeScript types
   pi-types.ts               local structural types for pi SDK objects
   pi-sdk-internals.ts       loader for SDK modules the package does not export (MCP connection, config, OAuth)
