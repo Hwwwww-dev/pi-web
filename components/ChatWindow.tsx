@@ -946,14 +946,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [pendingSearchScroll, searchTarget, searchMessage, scrollContainerRef, scrollToMessage, onSearchTargetHandled]);
 
   // 贴顶时自动加载下一页。IntersectionObserver 仅在交叉状态变化时回调，哨兵持续可见
-  // 时不再上报，故改为监听 scroll：贴顶即尝试一次，且每次自动取页只允许由一次滚动
-  // 或首屏进入触发。
+  // 时不再上报，故改为监听 scroll：只有真实手势（拖拽/滚轮/键盘滚动）先武装、随后
+  // 贴顶的那一次滚动才会取页；程序化滚动（还原写回、前插锚点写入、键盘推挤、
+  // 惯性收尾）永不取页。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!sentinel || !container) return;
     const attempt = () => {
       // 隐藏槽位、正在写回位置的帧、以及等待分页锚点落地的会话均不计为贴顶。
       if (scrollRestoringRef.current || pendingScrollRestoreRef.current || !activeRef.current) return;
+      // 闸门核心：消费制。程序化滚动不武装，只有 arm 过的那一次贴顶滚动才取一页。
+      // 此前漏检导致内容不满一屏（scrollTop 恒 0）时任何滚动事件都连环取页。
+      if (!autoLoadArmedRef.current) return;
       if (container.scrollTop > TOP_SLACK) return;
       // Skip while a page is loading or the last one is still rendering.
       if (loadingOlderRef.current || pageRenderingRef.current) return;
@@ -981,15 +985,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         attempt();
       });
     };
-    // 只在真实输入下重新武装：前插后的锚点写入、位置还原都会触发 scroll，若以 scroll
-    // 作为武装信号，一次手势即可连续取页。
+    // 只在真实滚动意图下重新武装：前插后的锚点写入、位置还原都会触发 scroll，若以
+    // scroll 作为武装信号，一次手势即可连续取页。用 touchmove 而非 touchstart/pointerdown：
+    // 点按折叠头、长按复制不产生拖拽，不该武装。
     const arm = () => {
       autoLoadArmedRef.current = true;
     };
     container.addEventListener("scroll", onScroll, { passive: true });
     container.addEventListener("wheel", arm, { passive: true });
-    container.addEventListener("touchstart", arm, { passive: true });
-    container.addEventListener("pointerdown", arm, { passive: true });
+    container.addEventListener("touchmove", arm, { passive: true });
     container.addEventListener("keydown", arm);
     // 首次也尝试一次（贴顶打开的会话不会触发滚动事件）；闸门放行导致的重建只有在
     // 武装时才会再试，否则会连跳多页。
@@ -998,13 +1002,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return () => {
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("wheel", arm);
-      container.removeEventListener("touchstart", arm);
-      container.removeEventListener("pointerdown", arm);
+      container.removeEventListener("touchmove", arm);
       container.removeEventListener("keydown", arm);
       if (frame) cancelAnimationFrame(frame);
     };
-    // `olderPageState` 为刻意依赖：上一页落地并绘制后 effect 重建，内容撑不满一屏
-    // 时闸门会重新武装并在此接续，无需再次滚动。
+    // `olderPageState` 为刻意依赖：上一页落地并绘制后 effect 重建，重挂监听并让
+    // 武装后的下一次手势立即可取页。
   }, [sentinel, historyCursor, hasEarlierMessages, session, loadOlderPage, sessionIdRef, scrollContainerRef, olderPageState]);
 
   // Clear the page gate once the prepended rows have painted a frame. Until then
