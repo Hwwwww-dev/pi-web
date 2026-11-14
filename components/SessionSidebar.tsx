@@ -3367,7 +3367,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               handleRef={filesPickerRef}
               layout={filesBelow ? "row" : "stacked"}
               context={newSessionContext ?? { project: null, worktrees: null, currentWorktreePath: null, projects: projectChoiceList }}
-              mobile={isMobile}
               label={t("sidebar.projectAndWorktree")}
               placeholder={initialSessionId && !restoredRef.current ? "" : t("sidebar.selectProject")}
               homeDir={homeDir}
@@ -3445,7 +3444,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       <SidebarMenu
         open={menu !== null}
         anchor={menu?.anchor ?? null}
-        sheet={isMobile}
         ariaLabel={menuLabel}
         title={menuTitle}
         items={menuItems}

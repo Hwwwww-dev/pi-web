@@ -11,8 +11,6 @@ export type NewSessionContextControl = ProjectWorktreeControl;
 
 interface Props {
   context: NewSessionContext;
-  /** A phone: the menus open as bottom sheets. */
-  mobile: boolean;
   /** The control the move that mounted this bar came from: it takes focus once, if focus fell to the page. */
   initialFocus: NewSessionContextControl | null;
   onInitialFocusDone: () => void;
@@ -57,7 +55,6 @@ function loadHomeDir(): Promise<string> {
  */
 export function NewSessionContextBar({
   context,
-  mobile,
   initialFocus,
   onInitialFocusDone,
   onPick,
@@ -103,7 +100,6 @@ export function NewSessionContextBar({
         handleRef={pickerRef}
         layout="inline"
         context={context}
-        mobile={mobile}
         label={t("workspace.newSessionContext")}
         homeDir={homeDir}
         newWorktreeTitle={t("sidebar.newWorktreeForSession")}

@@ -65,7 +65,6 @@ interface Props {
    */
   layout: "inline" | "stacked" | "row";
   context: ProjectWorktreeContext;
-  mobile: boolean;
   /** The group's accessible name. */
   label: string;
   /** The project button's text while there is no project. */
@@ -222,7 +221,6 @@ function WorktreeConfirmRow({ busy, onForce, onCancel }: { busy: boolean; onForc
 export function ProjectWorktreePicker({
   layout,
   context,
-  mobile,
   label,
   placeholder = "",
   homeDir,
@@ -253,10 +251,10 @@ export function ProjectWorktreePicker({
   // The files' picker, either way its boxes are laid out.
   const stacked = layout !== "inline";
   const inline = !stacked;
-  // The menus on a desktop look as main's dropdowns did: whole paths,
+  // The menus look as main's dropdowns did everywhere: whole paths,
   // "Custom path…", the "New worktree…" form under the list, a dirty
-  // checkout's question in its row. A phone keeps the sheet.
-  const classic = !mobile;
+  // checkout's question in its row — phones included (the sheet is gone).
+  const classic = true;
   const { project, worktrees } = context;
   const current = currentWorktreeOf(context);
   // Inline, the project's name as the menus name it: its display name, else
@@ -591,10 +589,10 @@ export function ProjectWorktreePicker({
     menuBody = (
       <div data-sidebar-menu-esc-to-body="" className="contents">
         <WorktreeCreateForm
-          heading={mobile ? null : menuTitle}
+          heading={menuTitle}
           busy={body.busy}
           error={body.error}
-          showCancel={!mobile}
+          showCancel
           onCreate={(branch) => { void createWorktree(branch); }}
           onCancel={closeMenu}
         />
@@ -604,11 +602,11 @@ export function ProjectWorktreePicker({
     menuTitle = t("sidebar.removeWorktreeHeading", { name: worktreeLabel(body.worktree) });
     menuBody = (
       <WorktreeRemoveForm
-        heading={mobile ? null : menuTitle}
+        heading={menuTitle}
         dirty={body.dirty}
         busy={body.busy}
         error={body.error}
-        showCancel={!mobile}
+        showCancel
         onForce={() => { void removeWorktree(body.worktree, true); }}
         onCancel={closeMenu}
       />
@@ -736,7 +734,6 @@ export function ProjectWorktreePicker({
       <SidebarMenu
         open={menu !== null}
         anchor={menu?.anchor ?? null}
-        sheet={mobile}
         ariaLabel={menuTitle}
         title={menuTitle}
         items={menuItems}

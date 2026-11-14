@@ -17,7 +17,6 @@ import {
 } from "./ActivityRows";
 import { ReasoningTrace } from "./transcript/ReasoningTrace";
 import { SafeMarkdownBody } from "./SafeMarkdownBody";
-import { beamDurationSeconds } from "@/lib/beam-speed";
 import { formatNoticeTokens } from "@/lib/transcript-notices";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
@@ -26,7 +25,6 @@ import { formatTurnDuration } from "@/lib/turn-duration";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
 import { skillExpansionContent, skillExpansionToCommand } from "@/lib/slash-display";
-import { streamRateKey, streamRateStart, streamTokensPerSecond, type StreamRateStart } from "@/lib/stream-token-rate";
 import type {
   AgentMessage,
   UserMessage,
@@ -40,60 +38,6 @@ import type {
   ThinkingContent,
   ToolCallContent,
 } from "@/lib/types";
-
-// CJK chars ~1 token each (GLM/DeepSeek/GPT-o200k); other chars ~4 chars/token.
-const CJK_PATTERN = /[\u3000-\u30ff\u3400-\u9fff\uf900-\ufaff\u{20000}-\u{2fa1f}\uac00-\ud7af]/u;
-
-// 流式结束后「token 数 + 速度」在消息上的停留时长。
-const RATE_HOLD_MS = 6000;
-function estimateTokens(text: string): number {
-  let cjk = 0;
-  let rest = 0;
-  for (const ch of text) {
-    if (CJK_PATTERN.test(ch)) cjk++;
-    else rest++;
-  }
-  return cjk + rest / 4;
-}
-
-interface TokenEstimateCacheEntry {
-  text: string;
-  tokens: number;
-}
-
-export function getTokenEstimateText(block: AssistantContentBlock): string | null {
-  if (block.type === "text") return block.text;
-  if (block.type === "thinking") return block.thinking;
-  if (block.type === "toolCall") return block.rawInput ?? JSON.stringify(block.input ?? {}) ?? "";
-  return null;
-}
-
-function isHighSurrogate(codeUnit: number): boolean {
-  return codeUnit >= 0xd800 && codeUnit <= 0xdbff;
-}
-
-function isLowSurrogate(codeUnit: number): boolean {
-  return codeUnit >= 0xdc00 && codeUnit <= 0xdfff;
-}
-
-function estimateUpdatedTokens(previous: TokenEstimateCacheEntry | undefined, text: string): number {
-  if (!previous || !text.startsWith(previous.text)) return estimateTokens(text);
-
-  let baseTokens = previous.tokens;
-  let suffixStart = previous.text.length;
-  // A streamed delta can complete a surrogate pair that was counted as two
-  // non-CJK code points in the previous update.
-  if (
-    suffixStart > 0
-    && suffixStart < text.length
-    && isHighSurrogate(previous.text.charCodeAt(suffixStart - 1))
-    && isLowSurrogate(text.charCodeAt(suffixStart))
-  ) {
-    baseTokens -= 1 / 4;
-    suffixStart--;
-  }
-  return baseTokens + estimateTokens(text.slice(suffixStart));
-}
 
 // Messages larger than this skip markdown rendering entirely (guard now lives
 // in ActivityRows.SafeMarkdownBody and is shared with activity prose).
@@ -470,59 +414,18 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   );
 }
 
-export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = null, className }: {
+export function AssistantMessageHeader({ modelName, className }: {
   modelName?: string;
-  estimatedTokens?: number;
-  tps?: number | null;
   className?: string;
 }) {
-  const { t } = useI18n();
   return (
-    // Fixed row height and tabular numerals keep the streaming token count
-    // readable while it counts up; widths are content-driven (no reserved
-    // minimums — those parked dead space between the number and the badge).
+    // 固定行高 + tabular numerals：模型名单行展示。流式期的 ↓tokens + 速度
+    // 已移至 composer 下方的 StreamStatusPill（components/StreamStatusPill.tsx）。
     <div className={cn(
       "flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-xs leading-[1.5] text-muted-foreground [font-variant-numeric:tabular-nums]",
       className,
     )}>
       {modelName && <span className="min-w-0 truncate">{modelName}</span>}
-      {estimatedTokens > 0 && (
-        <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground" title={t("i18n.estimatedTokens")}>
-          <span className="flex items-center gap-0.5 text-xs font-normal">
-            <ArrowDownIcon aria-hidden className="size-2.5" strokeWidth={1.5} />
-            {/* No minimum width on purpose: a reserved 6ch made a finished
-                count like 155 carry ~3ch of permanent dead space between the
-                number and the badge. tabular-nums keeps the digits readable
-                while the count grows; compact wins over never shifting. */}
-            <span>{estimatedTokens}</span>
-          </span>
-          {tps !== null && (
-            // 速率分五档，按阈值切换颜色：<15 红、15–30 黄、30–50 绿、
-            // 50–120 蓝、>120 彩虹。彩虹档同为胶囊样式，底层为密排流动彩虹（文字
-            // 恒白，≥166 t/s 后固定为 0.3s 一圈，不再加速）。
-            <span
-              className={cn(
-                "inline-flex shrink-0 items-center rounded-md px-1.5 text-xs leading-tight font-medium tabular-nums",
-                tps > 120 ? "relative isolate overflow-hidden text-white"
-                  : tps >= 50 ? "bg-info/15 text-info"
-                  : tps >= 30 ? "bg-success/15 text-success"
-                  : tps >= 15 ? "bg-warning/15 text-warning"
-                  : "bg-destructive/15 text-destructive",
-              )}
-              title={`${tps.toFixed(1)} t/s`}
-            >
-              {tps > 120 && (
-                <span
-                  aria-hidden="true"
-                  className="tps-rainbow pointer-events-none absolute inset-y-0 left-0 -z-10"
-                  style={{ animationDuration: `${beamDurationSeconds(tps).toFixed(2)}s` }}
-                />
-              )}
-              {tps.toFixed(1)} t/s
-            </span>
-          )}
-        </span>
-      )}
     </div>
   );
 }
@@ -580,42 +483,8 @@ function AssistantMessageView({
   const truncated = isAssistantTruncated(message, { isStreaming });
   const unansweredTruncation = truncated && !hasAssistantAnswer(message);
   const [copied, setCopied] = useState(false);
-  const streamStartRef = useRef<StreamRateStart | null>(null);
-  const rateKey = streamRateKey(message);
-  const streamRateKeyRef = useRef(rateKey);
-  streamRateKeyRef.current = rateKey;
-  const [tps, setTps] = useState<number | null>(null);
-  // 流式结束后最后一帧「token 数 + 速度」在消息上停留 RATE_HOLD_MS，
-  // 而非随 isStreaming=false 立即消失；速率库 0.25s 即输出首帧。
-  const lastRateRef = useRef<{ tokens: number; tps: number } | null>(null);
-  const [holdRate, setHoldRate] = useState(false);
   const blockItemsRef = useRef(blockItems);
   blockItemsRef.current = blockItems;
-  const tokenEstimateCacheRef = useRef<Map<number, TokenEstimateCacheEntry>>(new Map());
-  const estimatedTokens = useMemo(() => {
-    if (!isStreaming) {
-      tokenEstimateCacheRef.current = new Map();
-      return 0;
-    }
-    const nextCache = new Map<number, TokenEstimateCacheEntry>();
-    let total = 0;
-    for (const { block, originalIndex } of blockItems) {
-      const text = getTokenEstimateText(block);
-      if (text === null) continue;
-      const tokens = estimateUpdatedTokens(tokenEstimateCacheRef.current.get(originalIndex), text);
-      nextCache.set(originalIndex, { text, tokens });
-      total += tokens;
-    }
-    tokenEstimateCacheRef.current = nextCache;
-    return total;
-  }, [blockItems, isStreaming]);
-  const estimatedTokensRef = useRef(estimatedTokens);
-  estimatedTokensRef.current = estimatedTokens;
-  if (isStreaming && tps !== null) {
-    lastRateRef.current = { tokens: Math.round(estimatedTokens), tps };
-  }
-  // 停留期（holdRate）展示最后一帧读数。
-  const heldRate = !isStreaming && holdRate ? lastRateRef.current : null;
 
   // Streaming-based timing for thinking blocks
   const blockStartTimesRef = useRef<Map<number, number>>(new Map());
@@ -673,17 +542,8 @@ function AssistantMessageView({
         });
         blockStartTimesRef.current = new Map();
       }
-      streamStartRef.current = null;
-      setTps(null);
-      // 结束后停留最后一帧读数，超时撤销（撤销时该行随 estimatedTokens=0 收起）。
-      if (lastRateRef.current) {
-        setHoldRate(true);
-        const holdTimer = setTimeout(() => setHoldRate(false), RATE_HOLD_MS);
-        return () => clearTimeout(holdTimer);
-      }
       return;
     }
-    setHoldRate(false);
     const tick = () => {
       const items = blockItemsRef.current;
       const now = Date.now();
@@ -710,11 +570,6 @@ function AssistantMessageView({
         return changed ? next : prev;
       });
 
-      const tokens = estimatedTokensRef.current;
-      if (tokens === 0) return;
-      streamStartRef.current ??= streamRateStart(streamRateKeyRef.current, tokens, now);
-      const rate = streamTokensPerSecond(streamStartRef.current, tokens, now);
-      if (rate !== null) setTps(rate);
     };
     const id = setInterval(tick, 300);
     return () => clearInterval(id);
@@ -729,17 +584,11 @@ function AssistantMessageView({
       className="group"
     >
       <MessageContent>
-      {/* Streaming status (estimated tokens + throughput); the model name lives
-          in the turn meta line / the per-message label for standalone messages. */}
-      {(showModelLabel || isStreaming || holdRate) && (
+      {/* 完成消息的模型名标签（showModelLabel）；流式期的 ↓tokens + t/s 已移至
+          composer 下方的 StreamStatusPill——列表不再因其出现/消失而跳动。 */}
+      {showModelLabel && message.provider && (
         <AssistantMessageHeader
-          modelName={showModelLabel && message.provider ? getModelDisplayName(message.provider, message.model, modelNames) : undefined}
-          estimatedTokens={isStreaming ? Math.round(estimatedTokens) : heldRate ? heldRate.tokens : 0}
-          tps={isStreaming ? tps : heldRate ? heldRate.tps : null}
-          // The live-tail streaming message renders next to the activity rows:
-          // line its tokens/rate up with the rows' icon column, and keep it
-          // clear of the tool row above.
-          className={cn(isStreaming && !showModelLabel && "mt-1.5 pl-1")}
+          modelName={getModelDisplayName(message.provider, message.model, modelNames)}
         />
       )}
 

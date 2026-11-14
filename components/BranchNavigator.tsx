@@ -6,7 +6,8 @@ import type { BranchPreview, SessionEntry, SessionTreeNode } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverTrigger } from "@/components/ui/popover";
+import { HeaderFlyout } from "./HeaderFlyout";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -321,12 +322,10 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
     />
   );
 
-  const contentClassName = cn(
-    "flex max-h-(--radix-popover-content-available-height) flex-col overflow-hidden p-0",
-    inline
-      ? "w-max min-w-56 max-w-(--radix-popover-content-available-width)"
-      : "w-(--radix-popover-trigger-width)",
-  );
+  const flyoutWidth = inline
+    ? "w-max min-w-56 max-w-(--radix-popover-content-available-width)"
+    : "w-(--radix-popover-trigger-width)";
+  const flyoutClassName = "flex max-h-(--radix-popover-content-available-height) flex-col overflow-hidden p-0";
 
   if (inline) {
     return (
@@ -351,16 +350,16 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
             </Button>
           </PopoverTrigger>
         )}
-        <PopoverContent
+        <HeaderFlyout
           side="bottom"
           align="end"
           sideOffset={6}
           collisionPadding={8}
           onOpenAutoFocus={(event) => event.preventDefault()}
-          className={contentClassName}
+          width={flyoutWidth} className={flyoutClassName}
         >
           {panel}
-        </PopoverContent>
+        </HeaderFlyout>
       </Popover>
     );
   }
@@ -377,16 +376,16 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
           {chevron}
         </Button>
       </PopoverTrigger>
-      <PopoverContent
+      <HeaderFlyout
         side="bottom"
         align="end"
         sideOffset={6}
         collisionPadding={8}
         onOpenAutoFocus={(event) => event.preventDefault()}
-        className={contentClassName}
+        width={flyoutWidth} className={flyoutClassName}
       >
         {panel}
-      </PopoverContent>
+      </HeaderFlyout>
     </Popover>
   );
 }

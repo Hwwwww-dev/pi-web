@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { stripAnsi } from "@/lib/ansi";
 import { isPermissiveStatusText } from "@/lib/extension-status";
 import { displayLabel } from "@/lib/label-case";
@@ -194,14 +194,32 @@ function StatusPill({
   );
 }
 
+/**
+ * ChatWindow 判断胶囊挂哪（同状态条自身的 widget 去重口径）：状态条会不会渲染。
+ * 状态条在 → 胶囊作 trailing 插行内；不在 → 胶囊绝对定位浮在同一条带右端。
+ */
+export function hasExtensionStatusBarContent(statuses: ExtensionStatusItem[], widgets: ExtensionWidgetItem[]): boolean {
+  const widgetLabels = new Set(
+    widgets.map((widget) => displayLabel(extensionWidgetLabel(widget.key)).toLowerCase()),
+  );
+  const cells = buildExtensionStatusCells(statuses).filter((cell) => {
+    const label = cell.kind === "text" ? displayLabel(stripAnsi(cell.text)) : displayLabel(cell.label);
+    return !widgetLabels.has(label.toLowerCase());
+  });
+  return cells.length > 0 || widgets.length > 0;
+}
+
 export function ExtensionStatusBar({
   statuses,
   widgets = [],
+  trailing,
   onCommand,
   commandsDisabled = false,
 }: {
   statuses: ExtensionStatusItem[];
   widgets?: ExtensionWidgetItem[];
+  /** 流式状态胶囊（StreamStatusPill）：插在右端 pinned 标记（YOLO）左边。 */
+  trailing?: ReactNode;
   /** Sends the command of a `command:` status; without it those buttons stay disabled. */
   onCommand?: (command: string) => void;
   commandsDisabled?: boolean;
@@ -231,7 +249,7 @@ export function ExtensionStatusBar({
   const pinnedCells = cells.filter(isPermissiveCell);
   const scrollingCells = cells.filter((cell) => !isPermissiveCell(cell));
 
-  const statusLine = cells.length > 0 ? (
+  const statusLine = cells.length > 0 || trailing ? (
     <div className="flex min-w-0 flex-1 items-center gap-1">
       <div
         role="status"
@@ -248,7 +266,8 @@ export function ExtensionStatusBar({
           />
         ))}
       </div>
-      {pinnedCells.length > 0 && scrollingCells.length > 0 && (
+      {trailing}
+      {pinnedCells.length > 0 && (scrollingCells.length > 0 || trailing != null) && (
         <Separator orientation="vertical" className="mx-1 h-4" />
       )}
       {pinnedCells.map((cell, index) => (
