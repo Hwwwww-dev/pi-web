@@ -12,8 +12,10 @@
  * - 内容高度变化（行折叠、图片加载、流式追加）后按几何位置重算，状态自愈。
  */
 
-/** 贴底/重进跟随共用距离带（px）：距内容末端不超过该值即视为贴底。 */
-export const CHAT_TAIL_TOLERANCE = 100;
+/** 贴底/重进跟随共用距离带（px）：距内容末端不超过该值即视为贴底。
+ *  160 > 手机端输入框浮层高度：浮层悬在容器底边之上，「看到最后一条结尾」
+ *  时的距底距离可达约 110px，100px 的旧带在手机上根本进不去。 */
+export const CHAT_TAIL_TOLERANCE = 160;
 
 export function isAtTail(
   scrollTop: number,

@@ -10,7 +10,6 @@ import type { SessionInfo } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PathLabel } from "./PathLabel";
 import { RunningSessionIndicator, UnreadSessionIndicator } from "./SessionIndicators";
 
@@ -126,42 +125,37 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
           setPanelOpen(next);
         }}
       >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button
-                ref={buttonRef}
-                type="button"
-                variant="outline"
-                size="xs"
-                className={cn(
-                  // 浮动工具胶囊（shadcn badge 语义）：圆角描边 + 轻投影，图标与
-                  // 计数都收在 muted 层次里，运行/未读指示器带颜色；面板开着时
-                  // 同 AppShell 的按钮惯例压上 accent。
-                  "h-7 gap-1.5 rounded-full bg-background/95 px-2.5 text-xs font-normal text-muted-foreground shadow-sm select-none [touch-action:none] backdrop-blur-sm",
-                  "hover:text-foreground",
-                  panelOpen && "bg-accent text-foreground",
-                )}
-                aria-label={`${t("keepalive.title")} (${slots.length})`}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-              >
-                {/* 单一状态符号 + 计数：运行=旋转弧、有未读=脉冲点、空闲=层叠
-                    图标——互斥出现，不再层叠两个图标挤在胶囊里。 */}
-                {hasRunning ? (
-                  <span className="inline-flex [&_svg]:size-3"><RunningSessionIndicator /></span>
-                ) : hasUnread ? (
-                  <span className="inline-flex [&_svg]:size-3"><UnreadSessionIndicator /></span>
-                ) : (
-                  <LayersIcon className="size-3" aria-hidden="true" />
-                )}
-                <span className="text-[11px] font-semibold tabular-nums">{slots.length}</span>
-              </Button>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="right">{t("keepalive.title")}</TooltipContent>
-        </Tooltip>
+        <PopoverTrigger asChild>
+          <Button
+            ref={buttonRef}
+            type="button"
+            variant="outline"
+            size="xs"
+            className={cn(
+              // 浮动工具胶囊（shadcn badge 语义）：圆角描边 + 轻投影，图标与
+              // 计数都收在 muted 层次里，运行/未读指示器带颜色；面板开着时
+              // 同 AppShell 的按钮惯例压上 accent。
+              "h-7 gap-1.5 rounded-full bg-background/95 px-2.5 text-xs font-normal text-muted-foreground shadow-sm select-none [touch-action:none] backdrop-blur-sm",
+              "hover:text-foreground",
+              panelOpen && "bg-accent text-foreground",
+            )}
+            aria-label={`${t("keepalive.title")} (${slots.length})`}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+          >
+            {/* 单一状态符号 + 计数：运行=旋转弧、有未读=脉冲点、空闲=层叠
+                图标——互斥出现，不再层叠两个图标挤在胶囊里。 */}
+            {hasRunning ? (
+              <span className="inline-flex [&_svg]:size-3"><RunningSessionIndicator /></span>
+            ) : hasUnread ? (
+              <span className="inline-flex [&_svg]:size-3"><UnreadSessionIndicator /></span>
+            ) : (
+              <LayersIcon className="size-3" aria-hidden="true" />
+            )}
+            <span className="text-[11px] font-semibold tabular-nums">{slots.length}</span>
+          </Button>
+        </PopoverTrigger>
 
         <PopoverContent
           side="right"

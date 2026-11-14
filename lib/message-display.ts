@@ -1,4 +1,4 @@
-import type { AgentMessage, AssistantContentBlock, AssistantMessage, ThinkingContent, ToolCallContent } from "./types";
+import type { AgentMessage, AssistantContentBlock, AssistantMessage, TextContent, ThinkingContent, ToolCallContent } from "./types";
 
 interface DisplayOptions {
   isStreaming?: boolean;
@@ -82,6 +82,14 @@ export function isMessageGroupAnchor(message: { role?: AgentMessage["role"]; cus
 
 export function isEmptyThinkingBlock(block: AssistantContentBlock, options: DisplayOptions = {}): block is ThinkingContent {
   return block.type === "thinking" && !block.deferred && !options.isStreaming && block.thinking.trim() === "";
+}
+
+export function isEmptyTextBlock(block: AssistantContentBlock, options: DisplayOptions = {}): block is TextContent {
+  // 流式期空洞：`text_start` 在首个 delta 前先物化 `{ text: "" }`，0 高的裸 div 夹在
+  // 已完成行之间把那些缝垫成双倍（10+0+10），而活跃行上方没有它、仍是 10px——
+  // 活跃行因此显得比其他行更近。空文本块无任何 UI 角色，流式期间直接滤掉；
+  // 与空 thinking 块不同（那是活跃「思考 >」行，必须保留），落盘消息本无空块。
+  return block.type === "text" && options.isStreaming === true && block.text.trim() === "";
 }
 
 export function getDisplayableAssistantBlocks(

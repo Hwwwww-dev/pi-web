@@ -196,7 +196,7 @@ function StatusPill({
 
 /**
  * ChatWindow 判断胶囊挂哪（同状态条自身的 widget 去重口径）：状态条会不会渲染。
- * 状态条在 → 胶囊作 trailing 插行内；不在 → 胶囊绝对定位浮在同一条带右端。
+ * 状态条在 → 胶囊作 leading 插行首（插件内容之前）；不在 → 胶囊绝对定位浮在同一条带左端。
  */
 export function hasExtensionStatusBarContent(statuses: ExtensionStatusItem[], widgets: ExtensionWidgetItem[]): boolean {
   const widgetLabels = new Set(
@@ -212,14 +212,14 @@ export function hasExtensionStatusBarContent(statuses: ExtensionStatusItem[], wi
 export function ExtensionStatusBar({
   statuses,
   widgets = [],
-  trailing,
+  leading,
   onCommand,
   commandsDisabled = false,
 }: {
   statuses: ExtensionStatusItem[];
   widgets?: ExtensionWidgetItem[];
-  /** 流式状态胶囊（StreamStatusPill）：插在右端 pinned 标记（YOLO）左边。 */
-  trailing?: ReactNode;
+  /** 流式状态胶囊（StreamStatusPill）：插在行首，插件状态内容之前。 */
+  leading?: ReactNode;
   /** Sends the command of a `command:` status; without it those buttons stay disabled. */
   onCommand?: (command: string) => void;
   commandsDisabled?: boolean;
@@ -249,8 +249,9 @@ export function ExtensionStatusBar({
   const pinnedCells = cells.filter(isPermissiveCell);
   const scrollingCells = cells.filter((cell) => !isPermissiveCell(cell));
 
-  const statusLine = cells.length > 0 || trailing ? (
+  const statusLine = cells.length > 0 || leading ? (
     <div className="flex min-w-0 flex-1 items-center gap-1">
+      {leading}
       <div
         role="status"
         className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden pl-0.5 pr-1.5 scrollbar-none"
@@ -266,8 +267,7 @@ export function ExtensionStatusBar({
           />
         ))}
       </div>
-      {trailing}
-      {pinnedCells.length > 0 && (scrollingCells.length > 0 || trailing != null) && (
+      {pinnedCells.length > 0 && (scrollingCells.length > 0 || leading != null) && (
         <Separator orientation="vertical" className="mx-1 h-4" />
       )}
       {pinnedCells.map((cell, index) => (

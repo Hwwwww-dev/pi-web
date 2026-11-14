@@ -20,7 +20,7 @@ import { SafeMarkdownBody } from "./SafeMarkdownBody";
 import { formatNoticeTokens } from "@/lib/transcript-notices";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
-import { getAssistantErrorMessage, hasAssistantAnswer, isAssistantTruncated, isEmptyThinkingBlock } from "@/lib/message-display";
+import { getAssistantErrorMessage, hasAssistantAnswer, isAssistantTruncated, isEmptyTextBlock, isEmptyThinkingBlock } from "@/lib/message-display";
 import { formatTurnDuration } from "@/lib/turn-duration";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
@@ -477,7 +477,10 @@ function AssistantMessageView({
   const time = showTimestamp ? formatTime(message.timestamp) : null;
   const blockItems = useMemo(() => (message.content ?? [])
     .map((block, originalIndex) => ({ block, originalIndex }))
-    .filter(({ block }) => !isEmptyThinkingBlock(block, { isStreaming })), [message.content, isStreaming]);
+    // 流式期空 thinking 块是活跃「思考 >」行，保留；空 text 块（text_start 先于首个
+    // delta 物化）无 UI 角色，滤掉——否则 0 高裸 div 夹在已完成行间把那些缝垫成双倍，
+    // 活跃行上方反而成了窄的那条缝。
+    .filter(({ block }) => !isEmptyThinkingBlock(block, { isStreaming }) && !isEmptyTextBlock(block, { isStreaming })), [message.content, isStreaming]);
   const blocks = useMemo(() => blockItems.map(({ block }) => block), [blockItems]);
   const providerError = getAssistantErrorMessage(message, { isStreaming });
   const truncated = isAssistantTruncated(message, { isStreaming });
