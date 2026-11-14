@@ -50,8 +50,12 @@ test("only renders the Agents switcher when the active session family has subage
     source.indexOf("const renderToolbarBGroup = (mobile: boolean) => ("),
   );
   assert.doesNotMatch(agentsButton, /setMobileToolbarMoreOpen/);
-  // The panel itself renders only while the family and the selected session exist.
-  assert.match(source, /\{activeSessionFamily && selectedSession && \(\n          <AgentSessionPanel/);
+  // The panel itself renders only while the family and the selected session exist:
+  // the loaded ternary arm wraps the real list in the fade-in container.
+  assert.match(
+    source,
+    /activeSessionFamily && selectedSession \? \(\n\s*(?:\/\*[^\n]*\*\/\s*\n\s*)?<div className="animate-in fade-in-0 duration-200" key=\{selectedSession\.id\}>\s*<AgentSessionPanel/,
+  );
 });
 
 test("keeps the Agents panel open while switching sessions and bounds it to the bar's width budget", () => {

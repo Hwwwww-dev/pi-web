@@ -725,11 +725,11 @@ test("a tooltip holds the view still: the mouse on a titled element freezes what
 });
 
 test("the Debug menu item only toggles its panel, beside the theme item and the stats", () => {
-  const item = between(shellSource, 'onSelect={() => openTopPanelFromMenu(() => toggleTopPanel("debug"))}', "</DropdownMenuItem>");
+  const item = between(shellSource, 'onSelect={() => openFlyoutFromMenu(() => toggleFlyout("debug"))}', "</DropdownMenuItem>");
   assert.doesNotMatch(item, /handleSystemInfoToggle|sendAgentCommand|fetch\(|setSessionKey|loadSession|systemInfoLoaderRef/);
   assert.match(item, /disabled=\{!showChat\}/);
   assert.match(item, /title=\{translate\("debug\.title"\)\}/);
-  assert.match(item, /activeTopPanel === "debug" \? "text-primary" : "text-muted-foreground"/);
+  assert.match(item, /activeFlyout === "debug" \? "text-primary" : "text-muted-foreground"/);
   assert.notEqual(enLocale.messages["debug.title"], enLocale.messages["session.title"], "e2e finds the stats button by its own name");
 
   // Desktop: the quiet stats lead, then the Agents pill and the toolbar
@@ -748,9 +748,9 @@ test("Escape with focus in the panel gives it back to the ⋯ control, after the
   assert.match(panelSource, /createDebugPanelEscapeListener\(\s*document,\s*\(\) => sectionRef\.current,\s*\(restoreFocus\) => onCloseRef\.current\(restoreFocus\),\s*\)/);
   // The Debug toggle lives in the ⋯ menu; its trigger button is the persistent
   // restore target (a menu item unmounts with the menu).
-  assert.match(shellSource, /<Button\s+ref=\{debugButtonRef\}/);
+  assert.match(shellSource, /<Button\s+ref=\{moreButtonRef\}/);
   const close = between(shellSource, "const closeDebugPanel = useCallback(", "}, []);");
-  assert.match(close, /\(restoreFocus: boolean\) => \{\s*setActiveTopPanel\(\(panel\) => panel === "debug" \? null : panel\);\s*if \(restoreFocus\) requestAnimationFrame\(\(\) => focusIfLost\(document, debugButtonRef\.current\)\);/);
+  assert.match(close, /\(restoreFocus: boolean\) => \{\s*setActiveFlyout\(\(panel\) => panel === "debug" \? null : panel\);\s*if \(restoreFocus\) requestAnimationFrame\(\(\) => focusIfLost\(document, moreButtonRef\.current\)\);/);
   assert.match(shellSource, /import \{ focusIfLost \} from "@\/lib\/stacked-dialog";/);
   assert.match(shellSource, /onClose=\{closeDebugPanel\}/);
 
@@ -789,7 +789,7 @@ test("AppShell keeps the chat's reader in a ref and the panel open across sessio
   assert.match(shellSource, /useEffect\(\(\) => \{\s*startPageVisibilityTracking\(\);\s*\}, \[\]\);/, "the page's visibility is tracked once");
   for (const [name, next] of [["handleCwdChange", "handleSelectSession"], ["handleSelectSession", "handleNewSession"], ["handleNewSession", "hydrateSelectedSession"], ["handleSessionDeleted", "handleOpenFile"]]) {
     const body = between(shellSource, `const ${name} = useCallback`, `const ${next} = useCallback`);
-    assert.match(body, /setActiveTopPanel\(\(panel\) => panel === "debug" \? panel : null\);/, name);
-    assert.doesNotMatch(body, /setActiveTopPanel\(null\)/, name);
+    assert.match(body, /setActiveFlyout\(\(panel\) => panel === "debug" \? panel : null\);/, name);
+    assert.doesNotMatch(body, /setActiveFlyout\(null\)/, name);
   }
 });

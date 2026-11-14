@@ -136,9 +136,9 @@ test("a page hidden past the grace closes the idle stream and its return reopens
     setVisibility("visible");
     assert.equal(state.open().length, 1, "the page's return opens the stream again");
     await settle();
-    // One read reopens the session; the idle follow's onVisible probe (tail=1)
-    // fires alongside it.
-    assert.equal(state.reads(), reads + 2, "and reads the session it may have missed");
+    // One read reopens the session and shows what it missed (the reattach's
+    // own loadSession); the idle-follow probe is gone, so nothing else reads.
+    assert.equal(state.reads(), reads + 1, "and reads the session it may have missed");
     assert.equal(state.sources.length, 2);
   } finally {
     await teardown(state);
@@ -181,9 +181,9 @@ test("a quick tab switch keeps the stream and reads nothing", async () => {
     await state.tick(HIDDEN_PAGE_GRACE_MS * 2);
     assert.equal(state.sources.length, 1);
     assert.equal(state.open().length, 1);
-    // The stream survived; the idle follow's onVisible probe ran once (the
-    // in-flight guard collapses the poll ticks behind it).
-    assert.equal(state.reads(), reads + 1);
+    // The stream survived; with the idle-follow probe gone, a quick round
+    // trip reads nothing at all.
+    assert.equal(state.reads(), reads);
   } finally {
     await teardown(state);
   }
