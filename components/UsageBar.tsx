@@ -3,21 +3,17 @@
 import type { CSSProperties, ReactNode } from "react";
 import { ArrowDown, ArrowUp, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCompactTokens, type UsageContextPart } from "@/lib/turn-view";
-import { ContextBadge } from "@/components/transcript/ContextBadge";
+import { formatCompactTokens } from "@/lib/turn-view";
 
 // One shared usage rendering for the toolbar stats and the chat usage lines:
 // same icons, sizes, gaps and number formats everywhere.
 
 const ICON_PROPS = { size: 11, strokeWidth: 2 } as const;
 
-export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8, style, className, title }: {
+export function UsageBar({ usage, emphasizeCost = false, gap = 8, style, className, title }: {
   usage?: { input?: number; output?: number; cacheRead?: number; cost?: number } | null;
-  ctx?: UsageContextPart | null;
   /** Toolbar look: cost emphasized against the dimmer token segments. */
   emphasizeCost?: boolean;
-  /** Optional highlight (warn/danger) for the ctx segment. */
-  ctxColor?: string;
   gap?: number;
   style?: CSSProperties;
   className?: string;
@@ -42,28 +38,6 @@ export function UsageBar({ usage, ctx, emphasizeCost = false, ctxColor, gap = 8,
         </span>
       ),
     });
-  }
-  if (ctx) {
-    const percent = ctx.tokens !== undefined && ctx.contextWindow
-      ? (ctx.tokens / ctx.contextWindow) * 100
-      : ctx.percent ?? null;
-    // No computable reading (provider without a declared context window) —
-    // omit the segment instead of rendering a meaningless "?".
-    if (percent !== null) {
-      segments.push({
-        id: "ctx",
-        // The segment stays the same text; the hover card carries the exact
-        // used / limit numbers (§14.3).
-        node: (
-          <ContextBadge
-            tokens={ctx.tokens}
-            contextWindow={ctx.contextWindow}
-            percent={percent}
-            color={ctxColor}
-          />
-        ),
-      });
-    }
   }
   if (segments.length === 0) return null;
 

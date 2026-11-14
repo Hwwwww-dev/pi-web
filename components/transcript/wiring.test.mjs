@@ -123,16 +123,13 @@ test("a call that names files offers one chip per file, and the chip opens it", 
   clearExpandedToolCalls();
 });
 
-test("a tool's context reading keeps its text and gains the hover card", () => {
+test("the usage line carries no ctx segment — the top bar owns the context reading", () => {
   const html = render(React.createElement(UsageBar, {
     usage: { input: 1200, output: 340, cacheRead: 0, cost: 0.0123 },
-    ctx: { tokens: 24500, contextWindow: 200000 },
   }));
 
-  assert.match(html, /data-usage-seg="ctx"/);
-  assert.match(html, /ctx<\/span><span[^>]*>24\.5k \/ 200\.0k/);
-  // The hover card's trigger is what carries the numbers; the card itself opens on hover.
-  assert.match(html, /data-slot="hover-card-trigger"|href=""/, "");
+  assert.doesNotMatch(html, /data-usage-seg="ctx"/);
+  assert.match(html, /data-usage-seg="in"/);
 });
 
 test("a turn with a failed call is an error turn", () => {

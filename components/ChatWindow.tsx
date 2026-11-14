@@ -1663,10 +1663,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               .map((b) => b.text)
               .join("\n")
           : "";
-        const isConversationTail = endIdx >= messages.length;
-        const liveCtx = turnView.nextPromptTokens === undefined && isConversationTail
-          ? ctxInfoRef.current ?? null
-          : null;
         const metaNode = (
           <div className="mb-2">
             <TurnMetaLine
@@ -1676,9 +1672,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               time={formatTime(turnLastAssistant?.timestamp)}
               timestamp={turnLastAssistant?.timestamp}
               copySource={finalAnswerCopyText || undefined}
-              ctxTokens={turnView.nextPromptTokens}
-              liveCtx={liveCtx}
-              ctxWindow={ctxInfoRef.current?.contextWindow}
             />
           </div>
         );
@@ -2028,10 +2021,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           onCommand={handleSend}
           commandsDisabled={sessionBusy}
         />
-        {/* 状态条不在时，胶囊浮在同一条带左端（包裹层 relative）：绝对定位不占布局，
-            消息列表与队列 pills 都不会因它出现/消失而移动。 */}
+        {/* 状态条不在时渲染同构实条带：胶囊常驻后浮层就是永久错位，与状态条同高同 inset 才对齐。 */}
         {!hasExtensionStatusBarContent(extensionStatuses, extensionWidgets) && (
-          <div className={`pointer-events-none absolute inset-x-0 bottom-1 flex justify-start ${CHAT_COMPOSER_INSET_CLASS}`}>
+          <div className={`flex min-h-[calc(1.5em+2px)] items-center pb-3 ${CHAT_COMPOSER_INSET_CLASS}`}>
             <StreamStatusPill store={streamingStore} />
           </div>
         )}

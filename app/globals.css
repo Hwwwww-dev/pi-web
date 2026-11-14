@@ -571,7 +571,11 @@ html[data-keyboard-open] .terminal-extra-keys {
    ancestor's value from lighting every nested scroller below it. The lit
    container itself keeps its inline value: inline styles win over this rule. */
 * {
-  --sb-alpha: 0;
+--sb-alpha: 0;
+}
+/* 点亮档按主题分档：55% 的中灰在暗色近黑背景上几乎不可见，暗色提到 80%。 */
+.dark {
+--sb-lit: 80%;
 }
 ::-webkit-scrollbar {
   width: 8px;
@@ -588,7 +592,7 @@ html[data-keyboard-open] .terminal-extra-keys {
 }
 @supports (color: color-mix(in srgb, red 10%, transparent)) {
   ::-webkit-scrollbar-thumb {
-    background-color: color-mix(in srgb, var(--muted-foreground) calc(var(--sb-alpha, 0) * 55%), transparent);
+    background-color: color-mix(in srgb, var(--muted-foreground) calc(var(--sb-alpha, 0) * var(--sb-lit, 55%)), transparent);
   }
 }
 ::-webkit-scrollbar-thumb:active {
@@ -658,7 +662,7 @@ html[data-keyboard-open] .terminal-extra-keys {
     scrollbar-color: transparent transparent;
   }
   .scrollbar-visible {
-    scrollbar-color: color-mix(in srgb, var(--muted-foreground) 55%, transparent) transparent;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) var(--sb-lit, 55%), transparent) transparent;
   }
 }
 
