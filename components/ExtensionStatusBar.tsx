@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { stripAnsi } from "@/lib/ansi";
 import { isPermissiveStatusText } from "@/lib/extension-status";
 import { displayLabel } from "@/lib/label-case";
@@ -194,33 +194,14 @@ function StatusPill({
   );
 }
 
-/**
- * ChatWindow 判断胶囊挂哪（同状态条自身的 widget 去重口径）：状态条会不会渲染。
- * 状态条在 → 胶囊作 leading 插条带最左端（widgets 触发器与状态内容之前）；
- * 不在 → 胶囊绝对定位浮在同一条带左端。
- */
-export function hasExtensionStatusBarContent(statuses: ExtensionStatusItem[], widgets: ExtensionWidgetItem[]): boolean {
-  const widgetLabels = new Set(
-    widgets.map((widget) => displayLabel(extensionWidgetLabel(widget.key)).toLowerCase()),
-  );
-  const cells = buildExtensionStatusCells(statuses).filter((cell) => {
-    const label = cell.kind === "text" ? displayLabel(stripAnsi(cell.text)) : displayLabel(cell.label);
-    return !widgetLabels.has(label.toLowerCase());
-  });
-  return cells.length > 0 || widgets.length > 0;
-}
-
 export function ExtensionStatusBar({
   statuses,
   widgets = [],
-  leading,
   onCommand,
   commandsDisabled = false,
 }: {
   statuses: ExtensionStatusItem[];
   widgets?: ExtensionWidgetItem[];
-  /** 流式状态胶囊（StreamStatusPill）：插在条带最左端，widgets 触发器之前。 */
-  leading?: ReactNode;
   /** Sends the command of a `command:` status; without it those buttons stay disabled. */
   onCommand?: (command: string) => void;
   commandsDisabled?: boolean;
@@ -234,16 +215,9 @@ export function ExtensionStatusBar({
     const label = cell.kind === "text" ? displayLabel(stripAnsi(cell.text)) : displayLabel(cell.label);
     return !widgetLabels.has(label.toLowerCase());
   });
-  if (cells.length === 0 && widgets.length === 0) {
-    // 无内容但有 leading（流式胶囊）：仍渲染同构空条带——胶囊固定在这一个挂载点，
-    // 状态条内容出现/消失时不再瞬移（此前胶囊在 leading 槽与独立条带间跳）。
-    if (!leading) return null;
-    return (
-      <div className={`extension-status-bar relative flex min-h-[calc(1.5em+2px)] items-center pb-3 ${CHAT_COMPOSER_INSET_CLASS}`}>
-        {leading}
-      </div>
-    );
-  }
+  // 没东西可显就不渲染：输入框与页面底边之间的空隙由停靠区自己负责，不再为空
+  // 条带留一块高度。
+  if (cells.length === 0 && widgets.length === 0) return null;
 
   const plainStatusLine = cells
     .map((cell) => {
@@ -299,11 +273,7 @@ export function ExtensionStatusBar({
     // row's pills. `relative` anchors an expanded widget's floating panel above
     // the row.
     //
-    <div className={`extension-status-bar relative ${CHAT_COMPOSER_INSET_CLASS} flex shrink-0 items-stretch pb-3`}>
-      {/* 胶囊在最外层、widgets 触发器之前：todo 等胶囊是 widgets，排在 ExtensionWidgets
-          内部 statusLine 前面，插行首抢不过它们——只有提出去才能保证 token 恒在最左。 */}
-      {leading}
-      {leading && <Separator orientation="vertical" className="mx-1 h-4 shrink-0" />}
+    <div className={`extension-status-bar relative ${CHAT_COMPOSER_INSET_CLASS} flex shrink-0 items-stretch`}>
       {widgets.length > 0 ? <ExtensionWidgets widgets={widgets}>{statusLine}</ExtensionWidgets> : statusLine}
     </div>
   );

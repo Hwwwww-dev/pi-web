@@ -46,7 +46,7 @@ import {
   QuestionnaireItem,
 } from "@/components/ui/questionnaire";
 import { ChatRow } from "@/components/chat/ChatRow";
-import { CHAT_COLUMN_CLASS, CHAT_MESSAGE_TEXT_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
+import { CHAT_COLUMN_CLASS, CHAT_COMPOSER_INSET_CLASS, CHAT_MESSAGE_TEXT_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
@@ -79,7 +79,7 @@ const TOP_SLACK = 24;
 /** 前插一页后等待其落位的最长帧数；超时即放行，避免闸门卡死。 */
 const PREPEND_SETTLE_FRAMES = 12;
 /** 两次自动取页之间的最小间隔：连续滚动事件不应把多页挤进同一次操作。 */
-const AUTO_LOAD_MIN_INTERVAL_MS = 400;
+const AUTO_LOAD_MIN_INTERVAL_MS = 300;
 
 /**
  * 读取当前滚动位置：贴尾记为 atBottom，否则记录视口顶部条目及其偏移。
@@ -192,6 +192,12 @@ function FollowTailWhenAtTail({ atTail, contentRef, viewportRef }: {
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
+        // 几何复核后再跟：折叠抑制（foldInFlight）结束重挂时 atTail 可能是
+        // 陈旧值——折叠让内容长高但不产生 scroll 事件，贴底判定没机会重算。
+        // 此时无条件 scrollToEnd 会把整个列表瞬移到底（展开即整屏跳动）。
+        // 距底超过容差就不跟，等 useChatFollow 的下一次滚动事件纠正 atTail。
+        const el = viewportRef.current;
+        if (el && el.scrollHeight - el.scrollTop - el.clientHeight > CHAT_TAIL_TOLERANCE) return;
         scrollToEnd({ behavior: "instant" });
       });
     };
@@ -2036,8 +2042,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         document.body,
       )}
 
-      {/* 底部停靠区：扩展状态行、排队条与输入框。 */}
-      <div className={cn("relative flex min-h-0 flex-col shrink-0", CHAT_PAGE_GUTTER_CLASS)}>
+      {/* 底部停靠区：运行状态行、排队条与输入框。底边留白由停靠区统一承担
+          （pb-3），扩展状态行可有可无，出现/消失不会改变输入框与屏幕底边的距离。 */}
+      <div className={cn("relative flex min-h-0 flex-col pb-3 shrink-0", CHAT_PAGE_GUTTER_CLASS)}>
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the
             composer's left edge. */}
@@ -2059,9 +2066,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </div>
           </div>
         )}
-        {/* 运行状态提示的常驻槽位：脱离列表、恒占一行（空闲时留空），提示
-            出现、消失、换文案都不改变任何高度；truncate 防止长文案换行撑高。 */}
-        <div className={cn("flex min-h-[1.65em] items-center", CHAT_COLUMN_CLASS, CHAT_MESSAGE_TEXT_CLASS)}>
+        {/* 运行状态行：左边是运行阶段提示，右边是流式速率——两者在同一固定
+            槽位里更替（等待时显示文案、流式时显示速度），出现/消失/换文案都
+            不动高度。留白同输入框文字起点（InputGroup p-2 + 控件 px-3 =
+            --chat-composer-inset），与下方扩展状态行同一条竖线。 */}
+        <div className={cn("flex min-h-[1.65em] items-center justify-between gap-3", CHAT_COMPOSER_INSET_CLASS, CHAT_MESSAGE_TEXT_CLASS)}>
           {activityNotice ? (
             <span key={activityNotice} className="min-w-0 truncate text-muted-foreground animate-in fade-in duration-200 [animation-iteration-count:1]">
               {activityNotice}
@@ -2069,12 +2078,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           ) : (
             <span className="min-w-0 truncate text-muted-foreground">{activityNotice}</span>
           )}
+          <StreamStatusPill store={streamingStore} />
         </div>
         {chatInputElement}
         <ExtensionStatusBar
           statuses={extensionStatuses}
           widgets={extensionWidgets}
-          leading={<StreamStatusPill store={streamingStore} />}
           onCommand={handleSend}
           commandsDisabled={sessionBusy}
         />
