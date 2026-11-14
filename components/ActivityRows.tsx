@@ -35,7 +35,9 @@ import { getToolCategory, getToolFilePaths, type ToolCategory } from "@/lib/tool
 import type { SubagentToolDetails } from "@/lib/subagent-extension";
 import { formatFullTimestamp, formatUsage, type ActivityItem, type StepUsage, type TurnUsage } from "@/lib/turn-view";
 import { UsageBar } from "./UsageBar";
+import { Reveal } from "@/components/Reveal";
 import { ReasoningTrace } from "./transcript/ReasoningTrace";
+import { useFoldAnchor } from "./transcript/TraceRow";
 import { SourcesTrace } from "./transcript/SourcesTrace";
 import { PlanTrace } from "./transcript/PlanTrace";
 import { QuestionTrace } from "./transcript/QuestionTrace";
@@ -335,6 +337,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
   const isHiddenDisplay = message.display === false;
   // 自定义事件默认收起（第 4.1 节）：打开会话时不占用版面。
   const [expanded, setExpanded] = useState(false);
+  const { rowRef, toggleFold } = useFoldAnchor(expanded, setExpanded);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const text = getMessageText(message.content);
@@ -356,11 +359,11 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
   };
 
   return (
-    <Trace data-activity-custom={message.customType} className={isHiddenDisplay ? "opacity-75" : undefined}>
+    <Trace data-activity-custom={message.customType} ref={rowRef} className={isHiddenDisplay ? "opacity-75" : undefined}>
       <div className="flex max-w-full min-w-0 items-center gap-1 bg-background">
         <TraceCollapsible
           open={expanded}
-          onOpenChange={() => setExpanded((v) => !v)}
+          onOpenChange={toggleFold}
           className="w-auto min-w-0 flex-[0_1_auto]"
         >
           <TraceCollapsibleTrigger>
@@ -412,12 +415,14 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
                       {detailsExpanded ? t("i18n.hideDetails") : t("i18n.showDetails")}
                     </Button>
                   </div>
-                  {detailsExpanded && (
-                    // 详情占满一行；不重排，超长 id 通过横向滚动查看，不折成两行。
-                    <CodeBlock size="sm">
-                      <CodeBlockContent wrap={false} className="max-h-[var(--card-max-height)]">{detailsText}</CodeBlockContent>
-                    </CodeBlock>
-                  )}
+                  <Reveal open={detailsExpanded}>
+                    {detailsExpanded && (
+                      // 详情占满一行；不重排，超长 id 通过横向滚动查看，不折成两行。
+                      <CodeBlock size="sm">
+                        <CodeBlockContent wrap={false} className="max-h-[var(--card-max-height)]">{detailsText}</CodeBlockContent>
+                      </CodeBlock>
+                    )}
+                  </Reveal>
                 </div>
               )}
               {(detailsRepeatBody || !hasDetails) && text && (
@@ -456,6 +461,7 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
+  const { rowRef, toggleFold } = useFoldAnchor(expanded, setExpanded);
   const summary = getMessageText(message.content);
   const parsedSummary = useMemo(() => parseCompactionSummary(summary), [summary]);
   const tokensBefore = (message.details as { tokensBefore?: unknown } | undefined)?.tokensBefore;
@@ -468,8 +474,8 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
     : previewText(parsedSummary.body, 120);
 
   return (
-    <Trace data-activity-custom="compaction">
-      <TraceCollapsible open={expanded} onOpenChange={() => setExpanded((v) => !v)}>
+    <Trace data-activity-custom="compaction" ref={rowRef}>
+      <TraceCollapsible open={expanded} onOpenChange={toggleFold}>
         <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
           <TraceLine>
             <TraceIcon><ToolCategoryIcon category="compact" /></TraceIcon>

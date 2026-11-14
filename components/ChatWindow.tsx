@@ -11,7 +11,7 @@ import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/exte
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { isHiddenCustomMessage, isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
 import { getToolCategory, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
-import { buildTurnActivityItems, getFinishedTurnView } from "@/lib/turn-view";
+import { buildTurnActivityItems, getFinishedTurnView, headSegmentEndsTurn } from "@/lib/turn-view";
 import { type WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
 import { dropMentionText, splitDroppedItems, uploadFiles, type DroppedItem } from "@/lib/file-upload-client";
@@ -19,7 +19,7 @@ import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
 import { TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, getUserMessageDraftImages, getUserMessageText, type ChatInputHandle } from "./ChatInput";
-import { ExtensionStatusBar, hasExtensionStatusBarContent } from "./ExtensionStatusBar";
+import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { StreamStatusPill } from "./StreamStatusPill";
 import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
@@ -46,7 +46,7 @@ import {
   QuestionnaireItem,
 } from "@/components/ui/questionnaire";
 import { ChatRow } from "@/components/chat/ChatRow";
-import { CHAT_COLUMN_CLASS, CHAT_COMPOSER_INSET_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
+import { CHAT_COLUMN_CLASS, CHAT_MESSAGE_TEXT_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
@@ -210,22 +210,21 @@ function FollowTailWhenAtTail({ atTail, contentRef, viewportRef }: {
 }
 
 /**
- * 回底按钮：点击 = 贴底重挂（解除压制 + 置贴底）+ 平滑滚动。平滑飞行中内容若增长，
- * FollowTailWhenAtTail 即时校正到真底——落点永远是真底；原一次性 smooth scrollTo
- * 停在调用时刻的最大值，飞行中的增长让它"按了不是底"、压制也不解除。
+ * 回底按钮：点击 = 贴底重挂（解除压制 + 置贴底），滚动交给重挂后的跟随
+ * （FollowTailWhenAtTail 重挂时立即 scrollToEnd，instant，落点永远是真底，
+ * 此后增长也由跟随接管）。不再手动 smooth：飞行总在当帧被跟随的即时校正
+ * 打断，从未真正起飞；原一次性 smooth scrollTo 停在调用时刻的最大值，
+ * 飞行中的增长还会让它"按了不是底"、压制也不解除。
  */
 function ScrollToTailButton({ reattachToTail }: { reattachToTail: () => void }) {
   const { t } = useI18n();
-  const { scrollToEnd } = useMessageScroller();
   return (
     <MessageScrollerButton
       className="text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100"
       onClick={(event) => {
-        // 接管原语默认行为（一次性 smooth scrollTo）：先重挂跟随再滚，
-        // 增长由跟随即时校正。
+        // 接管原语默认行为（一次性 smooth scrollTo）：跟随全权负责落点。
         event.preventDefault();
         reattachToTail();
-        scrollToEnd({ behavior: "smooth" });
       }}
     >
       <ArrowDownIcon className="size-4" aria-hidden="true" />
@@ -346,8 +345,16 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   });
   const [restoreAnchorReady, setRestoreAnchorReady] = useState(false);
 
+  // 发送后贴底（useAgentSession 内）需要解除手势压制重挂跟随；useChatFollow 在
+  // 本 hook 之后才创建 reattachToTail，用 ref 桥接（同 pendingScrollRestoreRef
+  // 的 render 期写 ref 模式）。
+  const tailReattachRef = useRef<() => void>(() => {});
+  const reattachToTailForSend = useCallback(() => {
+    tailReattachRef.current();
+  }, []);
+
   const {
-    loading, error, messages, activeToolResults, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, hasNewerMessages, newestCursor, streamingStore,
+    loading, error, messages, activeToolResults, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, hasNewerMessages, newestCursor, headTurn, streamingStore,
     agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, missingCwd, modelScopeWarnings, isModelScopeActive, allModelList, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
@@ -373,6 +380,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     dormant,
     onOpenSettings, onDebugSnapshotReaderChange, t,
     deferInitialScroll: Boolean(pendingScrollRestore),
+    reattachToTail: reattachToTailForSend,
   });
   // Only whether a reply is streaming and has content yet: the chunks themselves
   // re-render StreamingReply alone.
@@ -676,9 +684,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
    * （内部跟随会与翻页的前插保位互相打架），贴底跟随全部由 `FollowTailWhenAtTail`
    * 消费此状态。
    */
-  const { atTail, reattachToTail } = useChatFollow(scrollContainerRef, session?.id, loading);
-  const foldTimerRef = useRef<number | undefined>(undefined);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
+  const { atTail, reattachToTail } = useChatFollow(scrollContainerRef, messageContentRef, session?.id, loading);
+  tailReattachRef.current = reattachToTail;
+  const foldTimerRef = useRef<number | undefined>(undefined);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
   /** 上一页请求进行中。 */
   const loadingOlderRef = useRef(false);
@@ -712,7 +721,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // renders: the page lands, and loadingOlderRef clears, a moment before that
   // render, and an observer report in between still holds this cursor.
   const requestedCursorRef = useRef<string | null>(null);
-  const loadOlderPage = useCallback(async (sid: string, before: string, options?: { tail?: number; signal?: AbortSignal }) => {
+  const loadOlderPage = useCallback(async (sid: string, before: string, options?: { signal?: AbortSignal }) => {
     // 上一页未绘制完成时先等待：哨兵、点击、小地图翻页、搜索定位共用此入口，
     // 避免两页并发加载。
     if (pageRenderingRef.current) {
@@ -1339,6 +1348,24 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     />
   );
 
+  // 回合刚完成的 settle 过渡：busy 翻假的这帧渲染期同步记录刚完成的回合 id，
+  // 让折叠行首挂即展开（衔接流式活动行），随后由 TurnTrace 自动收起。渲染期
+  // 推导（而非 effect）保证 swap 帧就已带上 justSettled，不出现先塌再展开的一帧。
+  const busyNow = isStreaming || sessionBusy;
+  const settlingTurnIdRef = useRef<string | undefined>(undefined);
+  const wasBusyRef = useRef(false);
+  if (busyNow) {
+    settlingTurnIdRef.current = undefined;
+  } else if (wasBusyRef.current) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        settlingTurnIdRef.current = entryIds[i];
+        break;
+      }
+    }
+  }
+  wasBusyRef.current = busyNow;
+
   // The message list is built in one memoized pass. Streaming chunks only change
   // `streamState`, so the memo holds across them: per-chunk renders reuse the
   // previous element identities and the memoized message/activity views skip
@@ -1482,6 +1509,23 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             rendered.push(renderMessage(headIdx, { showModelLabel: true }));
           }
         }
+        // 被截断的回合头走到这一轮的终点：整轮求和要用窗口外的助手消息，客户端
+        // 只拿得到半截，所以数字由服务端随窗口下发（headTurn）。窗口止于叶子时
+        // 回合可能还在跑，那时不算结束，等整轮结束再补。
+        const headEndsTurn = headSegmentEndsTurn({ headEnd, messageCount: messages.length, running: sessionBusy || isStreaming });
+        if (headItems.length > 0 && headTurn && headEndsTurn) {
+          rendered.push(
+            <div key="head-activity-meta" className="mb-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+              <TurnMetaLine
+                usage={headTurn.usage}
+                model={headTurn.provider ? getModelDisplayName(headTurn.provider, headTurn.model, modelNames) : undefined}
+                thinkingLevel={headTurn.thinkingLevel ?? thinkingLevel}
+                time={formatTime(headTurn.timestamp)}
+                timestamp={headTurn.timestamp}
+              />
+            </div>,
+          );
+        }
         idx = headEnd;
       }
       for (; idx < messages.length;) {
@@ -1624,6 +1668,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               foldKey={processKey === undefined ? undefined : `process:${processKey}`}
               defaultOpen={!finalAnswerMessage}
               reveal={revealProcess}
+              justSettled={processKey !== undefined && processKey === settlingTurnIdRef.current && Boolean(finalAnswerMessage)}
             >
                 <TurnActivityBody
                   items={activityItems}
@@ -1664,7 +1709,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               .join("\n")
           : "";
         const metaNode = (
-          <div className="mb-2">
+          <div className="mb-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
             <TurnMetaLine
               usage={turnUsage}
               model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
@@ -1708,8 +1753,19 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [messages, entryIds, messageKeys, toolResultsMap, hasEarlierMessages, isStreaming, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
      sessionIdRef, forkFromMessage, handleEditContent, onOpenFile, onOpenSubagent,
-     isNew, messageRefs, bashRunning, editEntryId, cancelEdit, thinkingLevel]);
+     isNew, messageRefs, bashRunning, editEntryId, cancelEdit, thinkingLevel, headTurn]);
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
+  // 运行状态提示（等待模型、执行工具、运行命令、压缩上下文）不进消息列表：
+  // 它在列表尾出现或消失都会改动滚动内容的高度，尾部跟随下整列随之上下跳。
+  // 它固定在输入框上方的一行里，那一行由 min-h 恒占一行文字，有无与换文案
+  // 都不改任何高度。两个提示争一个槽时命令优先：bash 在跑是更当下的事实。
+  const activityNotice = liveActivityRendered
+    ? null
+    : bashRunning && !pendingBash
+      ? t("chat.runningCommand")
+      : (agentRunning || isCompacting) && !hasStreamingContent && (agentPhase || isCompacting)
+        ? phaseLabel(agentPhase, t, isCompacting, queuedSubmissions.length)
+        : null;
   const { startIndex } = getVisibleRenderWindow(turnRendered.length, visibleCount);
   const hasMoreRendered = startIndex > 0 || hasEarlierMessages;
 
@@ -1790,7 +1846,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         {!isEmptyNew && (loading ? (
           // 加载骨架占据消息列表区：顶栏与输入框照常渲染（此前整个布局被三根
           // 小条替换，用户反馈“小气而且不对”）。宽度参仿一段对话。
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col px-[var(--chat-column-padding,40px)] pt-[22px] max-sm:px-6 max-sm:pt-4">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col px-[var(--chat-column-padding,40px)] pt-[22px] max-sm:px-6 max-sm:pt-4 animate-in fade-in duration-200">
             {/* 与消息列同一条居中列（CHAT_COLUMN_CLASS）：骨架不再通铺全宽。 */}
             <div className={cn(CHAT_COLUMN_CLASS, "flex flex-col gap-3")}>
               <Skeleton className="h-4 w-[38%]" />
@@ -1804,7 +1860,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         ) : <>
         <MessageScrollerProvider autoScroll={false} defaultScrollPosition="end" scrollEdgeThreshold={CHAT_TAIL_TOLERANCE}>
         <FollowTailWhenAtTail atTail={atTail && !foldInFlight} contentRef={messageContentRef} viewportRef={scrollContainerRef} />
-        <MessageScroller className="min-h-0 min-w-0 flex-1">
+        <MessageScroller className="min-h-0 min-w-0 flex-1 animate-in fade-in duration-150">
         <MessageScrollerViewport
           ref={scrollContainerRef}
           className={cn(pendingScrollRestore && "invisible")}
@@ -1842,39 +1898,29 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               // 跳过渲染，长会话仅付出可见部分开销。非元素行（空渲染）原样返回。
               if (!isValidElement<{ "data-entry-id"?: string }>(node)) return node;
               const messageId = node.props["data-entry-id"] ?? `turn-${startIndex + index}`;
-              // 官方锚点：`defaultScrollPosition="last-anchor"` 在回复超过一屏时把最后一条
-              // 用户消息顶到顶部，否则直接贴尾。
-              const anchorRole = (node.props as { message?: { role?: string } }).message?.role;
+              // 不传 scrollAnchor：官方 scroller 会在追加含 scrollAnchor 行时把该行
+              // align-start 置顶并在列表尾垫隐形 spacer（anchored-to-message 模式
+              // 持续钉住），与贴底跟随打架：发送后“底”分裂成真底与 spacer 假底，
+              // 跟随判定（scrollHeight 含 spacer）与回底按钮（不含）各自为政；
+              // 搜索定位、向下翻页也会被它的抢滚。发送后的定位由贴底跟随全权负责。
               return (
                 <ChatRow
                   key={node.key ?? messageId}
                   messageId={messageId}
-                  scrollAnchor={anchorRole === "user"}
                 >
                   {node}
                 </ChatRow>
               );
             })}
-            {/* 非条目行（流式回复、阶段提示、待执行命令）不是 Item 的测量对象，
-                但仍需落在与行一致的列宽内。 */}
-            <ChatRow className={isStreaming && hasStreamingContent ? "-mt-2.5" : undefined}>
+            {/* 非条目行（流式回复、待执行命令）不是 Item 的测量对象，但仍需落在
+                与行一致的列宽内。上收 10px：容器行距 16px 是普通消息行的节奏，
+                而流式行紧跟的 TurnTrace 活动行内部只有 gap-1.5（6px），不减回
+                差额，思考行会与上方活动行之间裂开一道两倍半的空隙。条件取
+                “运行中”而不是“已有流式内容”：回复到达的首帧不能连带改变行的
+                外边距，否则上下沿各跳一次。 */}
+            <ChatRow className={agentRunning || isCompacting ? "-mt-2.5" : undefined}>
             {isStreaming && hasStreamingContent && (
-              /* 上收 10px：容器行距 16px 是普通消息行的节奏，而流式行紧跟的
-                 TurnTrace 活动行内部只有 gap-1.5（6px）；不减回差额，思考行
-                 会与上方活动行之间裂开一道两倍半的空隙。 */
               <StreamingReply store={streamingStore} toolResults={toolResultsMap} modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
-            )}
-
-            {(agentRunning || isCompacting) && !hasStreamingContent && (agentPhase || isCompacting) && !liveActivityRendered && (
-              <div className="break-words py-2 text-sm text-muted-foreground">
-                <span className="animate-[pulse_1.5s_infinite] motion-reduce:animate-none">{phaseLabel(agentPhase, t, isCompacting, queuedSubmissions.length)}</span>
-              </div>
-            )}
-
-            {bashRunning && !pendingBash && (
-              <div className="py-2 text-sm text-muted-foreground">
-                 <span className="animate-[pulse_1.5s_infinite] motion-reduce:animate-none">{t("chat.runningCommand")}</span>
-              </div>
             )}
 
             {pendingBash && (
@@ -2013,6 +2059,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </div>
           </div>
         )}
+        {/* 运行状态提示的常驻槽位：脱离列表、恒占一行（空闲时留空），提示
+            出现、消失、换文案都不改变任何高度；truncate 防止长文案换行撑高。 */}
+        <div className={cn("flex min-h-[1.65em] items-center", CHAT_COLUMN_CLASS, CHAT_MESSAGE_TEXT_CLASS)}>
+          {activityNotice ? (
+            <span key={activityNotice} className="min-w-0 truncate text-muted-foreground animate-in fade-in duration-200 [animation-iteration-count:1]">
+              {activityNotice}
+            </span>
+          ) : (
+            <span className="min-w-0 truncate text-muted-foreground">{activityNotice}</span>
+          )}
+        </div>
         {chatInputElement}
         <ExtensionStatusBar
           statuses={extensionStatuses}
@@ -2021,12 +2078,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           onCommand={handleSend}
           commandsDisabled={sessionBusy}
         />
-        {/* 状态条不在时渲染同构实条带：胶囊常驻后浮层就是永久错位，与状态条同高同 inset 才对齐。 */}
-        {!hasExtensionStatusBarContent(extensionStatuses, extensionWidgets) && (
-          <div className={`flex min-h-[calc(1.5em+2px)] items-center pb-3 ${CHAT_COMPOSER_INSET_CLASS}`}>
-            <StreamStatusPill store={streamingStore} />
-          </div>
-        )}
       </div>
       {/* 手机端底部留白占偏置的两份（顶部聊天列仍为一份），使空态的 hero+composer
           簇高于正中：保持簇完整，品牌块不与浮层重叠。 */}

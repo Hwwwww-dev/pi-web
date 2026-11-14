@@ -82,6 +82,7 @@ import {
   type EnabledModelsController,
 } from "./EnabledModelsSection";
 import { providerBadgeLabel } from "./enabled-models-helpers";
+import { Reveal } from "@/components/Reveal";
 import { OAuthPastePanel } from "./OAuthPastePanel";
 import { ProviderIcon } from "./ProviderIcon";
 import { ProviderUsageSummary } from "./ProviderUsageSummary";
@@ -1252,6 +1253,7 @@ function ModelDetail({
             />
           </Button>
 
+          <Reveal open={advancedOpen}>
           {advancedOpen && (
             <div id="model-advanced-settings" className="flex flex-col gap-3.5 pb-4 pt-1">
               <Field label={t("models.baseUrlOverride")}>
@@ -1340,6 +1342,7 @@ function ModelDetail({
               )}
             </div>
           )}
+          </Reveal>
         </div>
       </ConfigCard>
     </div>

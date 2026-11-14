@@ -582,7 +582,7 @@ export const ChatMinimap = memo(function ChatMinimap({
         width: MINIMAP_WIDTH,
         zIndex: 25,
       }}
-      className="cursor-pointer select-none overflow-visible"
+      className="cursor-pointer select-none overflow-visible animate-in fade-in slide-in-from-right-2 duration-200 motion-reduce:animate-none"
     >
       {positionedSlots.map((slot) => {
         const isNearest = minimapHovered && nearestSlot === slot;

@@ -195,7 +195,7 @@ export function EnabledModelsBanner({ controller }: { controller: EnabledModelsC
   if (!scoped && stale === 0) return null;
 
   return (
-    <div className="enabled-models-banner flex items-center gap-2.5 bg-sidebar px-3 py-1.5">
+    <div className="enabled-models-banner flex items-center gap-2.5 bg-sidebar px-3 py-1.5 animate-in fade-in duration-200 motion-reduce:animate-none">
       <span
         className="flex min-w-0 flex-1 items-baseline gap-1 text-xs leading-snug text-muted-foreground"
         {...(stale > 0 ? { title: t("models.enabledStaleHint") } : {})}

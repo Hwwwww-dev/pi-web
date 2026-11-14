@@ -554,7 +554,9 @@ export function AgentsConfig({
           <ConfigSidebarList>
               {loading ? (
                 <div className="p-2.5 text-xs text-muted-foreground">{t("agents.loading")}</div>
-              ) : (["project", "global", "workspace", "builtin"] as const).map((scope) => {
+              ) : (
+              <div className="animate-in fade-in duration-200">
+              {(["project", "global", "workspace", "builtin"] as const).map((scope) => {
                 const scopedProfiles = profiles.filter((profile) => profile.scope === scope);
                 if (scopedProfiles.length === 0) return null;
                 return (
@@ -581,6 +583,8 @@ export function AgentsConfig({
                   </div>
                 );
               })}
+              </div>
+              )}
           </ConfigSidebarList>
           <ConfigListAction
                 active={creating}
@@ -593,9 +597,9 @@ export function AgentsConfig({
         <ConfigDetail>
           <ConfigDetailStack className="min-h-full">
               {!selected && !creating ? (
-                <ConfigEmptyState>{t("agents.empty")}</ConfigEmptyState>
+                <div className="animate-in fade-in duration-200"><ConfigEmptyState>{t("agents.empty")}</ConfigEmptyState></div>
               ) : (
-                <ConfigDetailStack>
+                <ConfigDetailStack className="animate-in fade-in duration-150">
                   <ConfigDetailHeader>
                     <ConfigDetailHeaderInfo>
                       {/* A new profile chooses its scope where a saved one shows it. */}

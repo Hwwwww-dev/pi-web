@@ -121,7 +121,7 @@ export function PiWebTitle({ onWidthChange }: {
       type="button"
       variant="ghost"
       size="default"
-      className={`sidebar-brand ml-[7px] h-auto justify-start rounded-md px-1 py-0.5 text-left font-mono text-base font-bold tracking-[-0.01em] whitespace-nowrap cursor-default text-foreground${versionShown ? " min-w-[6ch]" : " min-w-0"}`}
+      className={`sidebar-brand ml-[7px] h-auto justify-start rounded-md px-1 py-0.5 text-left font-mono text-base font-bold tracking-[-0.01em] whitespace-nowrap cursor-default text-foreground transition-[min-width] duration-200${versionShown ? " min-w-[6ch]" : " min-w-0"}`}
       aria-label={t("sidebar.brandLabel", { app: appVersion ?? "0.0.0", pi: piVersion ?? "0.0.0" })}
       onClick={handleClick}
     >

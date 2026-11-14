@@ -1370,7 +1370,7 @@ function TextFileViewer({
 
   if (loading || (requestedInitialDisplayMode === "diff" && gitDiffLoading && !data)) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground animate-in fade-in duration-200">
         {t("i18n.loading")}
       </div>
     );
@@ -1461,7 +1461,7 @@ function TextFileViewer({
               title={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
               aria-label={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
               aria-pressed={wrapLines}
-              className={cn("hidden text-muted-foreground sm:inline-flex", wrapLines && "bg-accent text-foreground")}
+              className={cn("hidden text-muted-foreground sm:inline-flex animate-in fade-in duration-150", wrapLines && "bg-accent text-foreground")}
             >
               <WrapText className="size-3.5" strokeWidth={1.8} />
             </Button>

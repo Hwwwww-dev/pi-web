@@ -67,10 +67,14 @@ function MarkdownImage({
       width={cachedSize?.width}
       height={cachedSize?.height}
       onLoad={(event) => {
+        event.currentTarget.dataset.loaded = "1";
         if (!mediaSrc) return;
         const el = event.currentTarget;
         rememberImageSize(mediaSrc, el.naturalWidth, el.naturalHeight);
       }}
+      onError={(event) => { event.currentTarget.dataset.loaded = "1"; }}
+      ref={(el) => { if (el?.complete) el.dataset.loaded = "1"; }}
+      className="opacity-0 transition-opacity duration-200 data-[loaded=1]:opacity-100"
       {...props}
     />
   );

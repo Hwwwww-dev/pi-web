@@ -211,6 +211,19 @@ export function summarizeTurnUsage({ messages, startIdx, endIdx }: {
   return { usage, lastAssistant };
 }
 
+/**
+ * 被截断的回合头（窗口从回合中间开始）是否已经走到这一轮的终点：下一个锚点出现，
+ * 或窗口止于叶子且没有在跑。只有到这时候整轮求和才有意义：运行中那一轮的用量行等
+ * 整轮结束后才出现。
+ */
+export function headSegmentEndsTurn({ headEnd, messageCount, running }: {
+  headEnd: number;
+  messageCount: number;
+  running: boolean;
+}): boolean {
+  return headEnd < messageCount || !running;
+}
+
 export interface FinishedTurnView {
   finalAssistantIdx: number;
   finalAnswerMessage: AssistantMessage | null;

@@ -40,6 +40,7 @@ import { BEAM_BASE_SECONDS } from "@/lib/beam-speed";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import type { ToolPreset } from "@/lib/tool-presets";
 import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
+import { Reveal } from "@/components/Reveal";
 import {
   ArrowUpIcon,
   BrainIcon,
@@ -2239,6 +2240,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             time and a toggle, never a nested scroller: a scroll box here read
             as a row cut in half and, on a phone, swallowed the composer's own
             taps. The list stays short, so it cannot push the input off screen. */}
+        <Reveal open={Boolean(queuedSubmissions && queuedSubmissions.length > 0)}>
         {queuedSubmissions && queuedSubmissions.length > 0 && (
           <div className="flex w-full min-w-0 max-w-full flex-col gap-1.5 px-[13px] max-sm:px-[9px]">
             <div className="flex min-w-0 max-w-full flex-col items-stretch gap-1.5 px-[3px] py-0.5">
@@ -2274,7 +2276,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             </div>
           </div>
         )}
+        </Reveal>
         {/* Retry banner */}
+        <Reveal open={Boolean(retryInfo)}>
         {retryInfo && (
           <Alert variant="warning" className="items-center gap-x-1.5 rounded-md px-2.5 py-1 text-xs leading-normal">
             <RotateCcwIcon className="size-3.5 translate-y-0 shrink-0" />
@@ -2284,12 +2288,16 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             </span>
           </Alert>
         )}
+        </Reveal>
+        <Reveal open={Boolean(compactResultText)}>
         {compactResultText && (
           <Alert className="items-center gap-x-1.5 rounded-md border-success/25 bg-success/10 px-2.5 py-1 text-xs leading-normal text-success">
             <CheckIcon className="size-3.5 translate-y-0 shrink-0" />
             <span className="col-start-2">{compactResultText}</span>
           </Alert>
         )}
+        </Reveal>
+        <Reveal open={Boolean(compactError)}>
         {compactError && (
           <Alert variant="destructive" className="items-start rounded-md border-destructive/30 bg-destructive/[0.07] px-2.5 py-1 font-mono text-xs leading-normal">
             <AlertDescription className="col-start-2 row-start-1 min-w-0 whitespace-pre-wrap wrap-anywhere text-destructive/90">
@@ -2298,18 +2306,21 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             {onDismissCompactError && <DismissButton onClick={onDismissCompactError} title={t("chat.dismissCompactError")} />}
           </Alert>
         )}
+        </Reveal>
+        <Reveal open={Boolean(attachError)}>
         {attachError && (
           <Alert variant="destructive" className="items-center rounded-md border-destructive/40 bg-destructive/[0.06] px-2 py-1 text-xs leading-normal">
             <span className="col-start-2 row-start-1 min-w-0 wrap-anywhere">{attachError}</span>
             <DismissButton onClick={() => setAttachError(null)} title={t("chat.dismiss")} />
           </Alert>
         )}
+        </Reveal>
         {/* Main input */}
         <div className="relative min-w-0">
           {historyMenuOpen && inputHistory.length > 0 && (
             <div
               ref={historyMenuRef}
-              className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 max-h-[min(44vh,360px)] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
+              className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 max-h-[min(44vh,360px)] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 slide-in-from-bottom-1 duration-150"
             >
               <div
                 title={t("chat.inputHistory")}
@@ -2353,7 +2364,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           {slashMenuOpen && slashQuery !== null && (
             <div
               ref={slashMenuRef}
-              className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 flex max-h-[min(72.8vh,598px)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
+              className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 flex max-h-[min(72.8vh,598px)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 slide-in-from-bottom-1 duration-150"
               // Clamped by the measured free space above the composer.
               style={{
                 maxHeight: slashMenuMaxHeight === null
@@ -2435,7 +2446,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             return (
               <div
                 ref={atMenuRef}
-                className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 flex max-h-[min(48vh,400px)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
+                className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 flex max-h-[min(48vh,400px)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 slide-in-from-bottom-1 duration-150"
                 // Clamped by the measured free space above the composer.
                 style={{
                   maxHeight: atMenuMaxHeight === null
@@ -2525,6 +2536,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   : "flex-col items-stretch gap-0 p-2",
               )}
             >
+            <Reveal open={attachedImages.length > 0}>
             {attachedImages.length > 0 && (
               <InputGroupAddon align="block-start" className="flex-wrap px-0 pt-0">
                 {attachedImages.map((img, i) => (
@@ -2565,6 +2577,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 )}
               </InputGroupAddon>
             )}
+            </Reveal>
             <InputGroupTextarea
               ref={textareaRef}
               className={cn(
@@ -2831,7 +2844,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         {/* Bash mode status label */}
         {bashMode && (
           // pl-6：与卡片圆角切点（rounded-[24px]）对齐，不再紧贴卡片外沿。
-          <div className={cn("mt-1 pl-6 pr-1 text-xs", bashExcluded ? "text-muted-foreground" : "text-primary")}>
+          <div className={cn("mt-1 pl-6 pr-1 text-xs animate-in fade-in-0 slide-in-from-top-1 duration-150 motion-reduce:animate-none", bashExcluded ? "text-muted-foreground" : "text-primary")}>
              {t("chat.shell")} · {bashExcluded ? t("chat.outputLocal") : t("chat.outputModel")}
           </div>
         )}

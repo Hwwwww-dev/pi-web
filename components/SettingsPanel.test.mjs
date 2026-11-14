@@ -151,7 +151,7 @@ test("hosts the sections in one full-size layer, listed on a phone's home level"
   // The host fills the dialog body; a phone's detail level hides a section's
   // own list-level settings (Models' banner, Sub-agents' switch card), the
   // old `.settings-section-host` phone rules carried by utilities now.
-  assert.match(panelSource, /className="min-h-0 min-w-0 w-full flex-1 max-\[640px\]:data-\[phone-level=detail\]:\[\&_\.enabled-models-banner\]:hidden max-\[640px\]:data-\[phone-level=detail\]:\[\&_\.agents-feature-setting\]:hidden"/);
+  assert.match(panelSource, /className="min-h-0 min-w-0 w-full flex-1 animate-in fade-in duration-150 motion-reduce:animate-none max-\[640px\]:data-\[phone-level=detail\]:\[\&_\.enabled-models-banner\]:hidden max-\[640px\]:data-\[phone-level=detail\]:\[\&_\.agents-feature-setting\]:hidden"/);
   assert.doesNotMatch(cssSource, /\.settings-section-host/);
   // The v2 rail and the chip row are gone; the pre-Tabs self-drawn classes are
   // gone from panel and stylesheet (the aria-describedby id prefix

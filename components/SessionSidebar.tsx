@@ -4,6 +4,7 @@ import { memo, useEffect, useImperativeHandle, useLayoutEffect, useState, useCal
 import type { SessionInfo } from "@/lib/types";
 import { listSessionFamilies, type SessionFamily, isHiddenRelation } from "@/lib/session-family";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
+import { Reveal } from "@/components/Reveal";
 import { newSessionDeepLink, sessionDeepLink } from "@/lib/session-links";
 import { getProjectActivity, getRecentProjects } from "@/lib/project-groups";
 import { workspaceKeyOf } from "@/lib/workspace-memory";
@@ -3164,6 +3165,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         className={`sidebar-panel sidebar-sessions-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${filesBelow ? " min-h-[120px] basis-0" : ""}`}
         onScrollCapture={rememberScroll}
       >
+        <Reveal open={sessionSearchOpen}>
         {sessionSearchOpen && (
           <div className="sidebar-search flex-none px-2 pt-2 pb-1">
             {/* The files' search field (FileExplorer), mirrored. */}
@@ -3190,6 +3192,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
             </InputGroup>
           </div>
         )}
+        </Reveal>
         <SessionSearch
           open={sessionSearchOpen}
           query={sessionSearchQuery}
@@ -3411,12 +3414,14 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
             )}
           </div>
 
+          <Reveal open={Boolean(explorerCwd && fileManagerErrorMessage)}>
           {explorerCwd && fileManagerErrorMessage && (
             <div role="alert" className={`sidebar-files-error flex flex-none items-start gap-1.5 text-xs leading-[1.35] text-destructive${filesBelow ? " pb-1 pt-0.5 pl-[15px] pr-(--sidebar-files-inset-right)" : " px-2.5 pt-1.5"}`}>
               <span className="sidebar-files-error-text min-w-0 flex-1 [overflow-wrap:anywhere]">{fileManagerErrorMessage}</span>
               <DismissButton onClick={() => setFileManagerError(null)} title={t("files.dismissError")} />
             </div>
           )}
+          </Reveal>
           {/* Mounted whenever there is a cwd, also while the tab or the folded
               section hides it, so the expanded tree, a search and an upload in
               progress survive a switch. */}

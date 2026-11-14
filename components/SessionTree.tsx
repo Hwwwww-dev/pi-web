@@ -508,7 +508,7 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
             {/* Drop indicator between rows: the measured Y of the insertion point. */}
             {dropLineY !== null && (
               <div
-                className="session-tree-drop-line absolute -mt-px h-[2px] rounded-[1px] bg-accent left-(--session-tree-inset-left) right-(--session-tree-inset-right) before:absolute before:-top-0.5 before:left-0 before:size-1.5 before:rounded-full before:bg-accent before:content-['']"
+                className="session-tree-drop-line absolute -mt-px h-[2px] rounded-[1px] bg-accent left-(--session-tree-inset-left) right-(--session-tree-inset-right) transition-[top] duration-100 ease-out before:absolute before:-top-0.5 before:left-0 before:size-1.5 before:rounded-full before:bg-accent before:content-['']"
                 aria-hidden="true"
                 style={{ top: dropLineY }}
               />

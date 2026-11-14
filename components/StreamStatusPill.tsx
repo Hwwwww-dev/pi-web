@@ -35,7 +35,7 @@ export function StreamRateBadge({ tokens, tps, streaming }: { tokens: number; tp
     <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground" title={t("i18n.estimatedTokens")}>
       {rate !== null ? (
         <span
-          className={`inline-flex w-[4.25rem] shrink-0 items-center justify-center rounded-md px-1.5 text-xs leading-tight font-medium tabular-nums ${
+          className={`inline-flex w-[4.25rem] shrink-0 items-center justify-center rounded-md px-1.5 text-xs leading-tight font-medium tabular-nums transition-colors duration-300 ${
             rate > 120 ? "relative isolate overflow-hidden text-white"
               : rate >= 50 ? "bg-info/15 text-info"
               : rate >= 30 ? "bg-success/15 text-success"
@@ -54,7 +54,7 @@ export function StreamRateBadge({ tokens, tps, streaming }: { tokens: number; tp
           {rate.toFixed(1)} t/s
         </span>
       ) : (
-        <span className="inline-flex w-[4.25rem] shrink-0 items-center justify-center rounded-md px-1.5 text-xs leading-tight font-medium tabular-nums text-muted-foreground">
+        <span className="inline-flex w-[4.25rem] shrink-0 items-center justify-center rounded-md px-1.5 text-xs leading-tight font-medium tabular-nums text-muted-foreground transition-colors duration-300">
           {(tps ?? 0).toFixed(1)} t/s
         </span>
       )}

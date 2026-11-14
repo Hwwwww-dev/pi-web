@@ -123,7 +123,7 @@ function StatusListChip({ title, items, label, full }: { title: string; items: s
           size="xs"
           title={full}
           aria-label={full}
-          className="shrink-0 font-mono text-xs font-medium text-muted-foreground"
+          className="shrink-0 font-mono text-xs font-medium text-muted-foreground animate-in fade-in duration-150 motion-reduce:animate-none"
         >
           {label}
         </Button>
@@ -171,7 +171,7 @@ function StatusPill({
         disabled
         title={stripAnsi(cell.text)}
         aria-label={stripAnsi(cell.text)}
-        className="max-w-full shrink-0 font-mono text-xs font-normal text-muted-foreground"
+        className="max-w-full shrink-0 font-mono text-xs font-normal text-muted-foreground animate-in fade-in duration-150 motion-reduce:animate-none"
       >
         {/* Plain status text is a label like any other; ANSI text is the extension's own. */}
         {/\u001b/.test(cell.text) ? <AnsiText text={cell.text} /> : displayLabel(cell.text)}
@@ -187,7 +187,7 @@ function StatusPill({
       title={`${cell.label} · ${cell.command}`}
       aria-label={`${cell.label} (${cell.command})`}
       onClick={() => onCommand?.(cell.command)}
-      className="shrink-0 font-mono text-xs text-muted-foreground"
+      className="shrink-0 font-mono text-xs text-muted-foreground animate-in fade-in duration-150 motion-reduce:animate-none"
     >
       {displayLabel(cell.label)}
     </Button>
@@ -234,7 +234,16 @@ export function ExtensionStatusBar({
     const label = cell.kind === "text" ? displayLabel(stripAnsi(cell.text)) : displayLabel(cell.label);
     return !widgetLabels.has(label.toLowerCase());
   });
-  if (cells.length === 0 && widgets.length === 0) return null;
+  if (cells.length === 0 && widgets.length === 0) {
+    // 无内容但有 leading（流式胶囊）：仍渲染同构空条带——胶囊固定在这一个挂载点，
+    // 状态条内容出现/消失时不再瞬移（此前胶囊在 leading 槽与独立条带间跳）。
+    if (!leading) return null;
+    return (
+      <div className={`extension-status-bar relative flex min-h-[calc(1.5em+2px)] items-center pb-3 ${CHAT_COMPOSER_INSET_CLASS}`}>
+        {leading}
+      </div>
+    );
+  }
 
   const plainStatusLine = cells
     .map((cell) => {

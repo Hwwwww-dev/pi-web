@@ -406,11 +406,31 @@ export interface SessionInfo {
   transient?: boolean;
 }
 
+/**
+ * 分页窗口从回合中间开始时，那一轮的整轮汇总：客户端把它渲染成被截断回合的用量行。
+ * 数字来自窗口外的助手消息，客户端只能看到半截，所以由服务端给。
+ */
+export interface HeadTurnSummary {
+  usage: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    cost: { total: number };
+  } | null;
+  provider: string;
+  model: string;
+  thinkingLevel?: string;
+  timestamp?: number;
+}
+
 export interface SessionContext {
   messages: AgentMessage[];
   entryIds: string[]; // parallel to messages — the session entry id for each message
   oldestEntryId: string | null;
   hasMore: boolean;
+  /** The turn `oldestEntryId` sits inside, when the window begins mid-turn. */
+  headTurn?: HeadTurnSummary;
   /** Last loaded entry; set when the window is a page inside the branch. */
   newestEntryId?: string | null;
   /** Entries after `newestEntryId` are not loaded (the window stopped short of the leaf). */

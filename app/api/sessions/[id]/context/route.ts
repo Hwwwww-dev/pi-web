@@ -35,6 +35,9 @@ export async function GET(
   // re-fetching the whole active branch.
   const rawTail = Number(url.searchParams.get("tail"));
   const tail = Number.isFinite(rawTail) && rawTail > 0 ? Math.min(rawTail, 1000) : 50;
+  // `turns` pages by whole turns; a page never starts mid-turn.
+  const rawTurns = Number(url.searchParams.get("turns"));
+  const turns = Number.isFinite(rawTurns) && rawTurns > 0 ? Math.min(rawTurns, 200) : 0;
   const { before, anchor, newerThan, after } = parseWindowParams(url);
 
   try {
@@ -62,6 +65,7 @@ export async function GET(
       deferThinking,
       deferToolResultImages,
       tail,
+      ...(turns ? { turns } : {}),
       excludeLeaf: Boolean(before) && !anchor && !newerThan,
       anchor,
       after,
@@ -69,7 +73,7 @@ export async function GET(
       sessionId: id,
     }), transcriptNotices);
 
-    return NextResponse.json({ context, tail, before: before ?? null });
+    return NextResponse.json({ context, tail, turns: turns || null, before: before ?? null });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
