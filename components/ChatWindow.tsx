@@ -19,7 +19,8 @@ import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
 import { TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, getUserMessageDraftImages, getUserMessageText, type ChatInputHandle } from "./ChatInput";
-import { ExtensionStatusBar } from "./ExtensionStatusBar";
+import { ExtensionStatusBar, hasExtensionStatusBarContent } from "./ExtensionStatusBar";
+import { StreamStatusPill } from "./StreamStatusPill";
 import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
 import { TurnTrace } from "./transcript/TurnTrace";
@@ -45,11 +46,12 @@ import {
   QuestionnaireItem,
 } from "@/components/ui/questionnaire";
 import { ChatRow } from "@/components/chat/ChatRow";
-import { CHAT_COLUMN_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
+import { CHAT_COLUMN_CLASS, CHAT_COMPOSER_INSET_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
+import { useChatFollow } from "@/hooks/useChatFollow";
 import { formatTurnDuration, getTurnDurationMs } from "@/lib/turn-duration";
 import { phaseLabel } from "@/lib/chat-phase-label";
 import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
@@ -63,7 +65,7 @@ import type { DebugClientSession } from "@/lib/debug-types";
 import type { ToolEntry } from "@/lib/tool-presets";
 import type { SettingsSection } from "@/lib/settings-navigation";
 import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll-position";
-import { isAtTail, isUpwardGesture } from "@/lib/chat-follow";
+import { CHAT_TAIL_TOLERANCE } from "@/lib/chat-follow";
 import {
   getNextVisibleCount,
   getVisibleRenderWindow,
@@ -205,6 +207,31 @@ function FollowTailWhenAtTail({ atTail, contentRef, viewportRef }: {
     };
   }, [atTail, contentRef, viewportRef, scrollToEnd]);
   return null;
+}
+
+/**
+ * 回底按钮：点击 = 贴底重挂（解除压制 + 置贴底）+ 平滑滚动。平滑飞行中内容若增长，
+ * FollowTailWhenAtTail 即时校正到真底——落点永远是真底；原一次性 smooth scrollTo
+ * 停在调用时刻的最大值，飞行中的增长让它"按了不是底"、压制也不解除。
+ */
+function ScrollToTailButton({ reattachToTail }: { reattachToTail: () => void }) {
+  const { t } = useI18n();
+  const { scrollToEnd } = useMessageScroller();
+  return (
+    <MessageScrollerButton
+      className="text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100"
+      onClick={(event) => {
+        // 接管原语默认行为（一次性 smooth scrollTo）：先重挂跟随再滚，
+        // 增长由跟随即时校正。
+        event.preventDefault();
+        reattachToTail();
+        scrollToEnd({ behavior: "smooth" });
+      }}
+    >
+      <ArrowDownIcon className="size-4" aria-hidden="true" />
+      <span className="sr-only">{t("chat.scrollToLatest")}</span>
+    </MessageScrollerButton>
+  );
 }
 
 /**
@@ -643,12 +670,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   /** 展开/折叠行的若干帧内禁用贴底跟随，否则该行会被拉上去。 */
   const [foldInFlight, setFoldInFlight] = useState(false);
   /**
-   * 读者是否贴底。贴底跟随是官方 scroller 的内部状态：若传入恒为 true 的 `autoScroll`，
-   * 前插整页时会被当作跟随而滑到底部，导致翻页时在底与顶之间跳动。
+   * 读者是否贴底（唯一的跟随信号，状态机在 hooks/useChatFollow.ts）。贴底跟随是官方
+   * scroller 的内部状态：若传入恒为 true 的 `autoScroll`，前插整页时会被当作跟随而
+   * 滑到底部，导致翻页时在底与顶之间跳动——因此官方以 `autoScroll={false}` 运行
+   * （内部跟随会与翻页的前插保位互相打架），贴底跟随全部由 `FollowTailWhenAtTail`
+   * 消费此状态。
    */
-  const [atTail, setAtTail] = useState(true);
-  // ↑ 唯一的跟随信号：官方 scroller 以 `autoScroll={false}` 运行（内部跟随会与
-  // 翻页的前插保位互相打架），贴底跟随全部由 `FollowTailWhenAtTail` 消费此状态。
+  const { atTail, reattachToTail } = useChatFollow(scrollContainerRef, session?.id, loading);
   const foldTimerRef = useRef<number | undefined>(undefined);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
@@ -805,68 +833,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 监听器需读取当前可见状态，故用 ref 而非闭包中的旧 prop。
   const activeRef = useRef(active);
   activeRef.current = active;
-  // 跟随状态由几何位置与用户输入共同决定（业界标准契约，见 lib/chat-follow.ts）：
-  // 距底 100px 内即贴底；滚轮上滚/触摸上滑/向上翻页键立即脱离；程序化滚动
-  // （跟随回写、折叠保位、浏览器钳制）不参与意图判定，行折叠/图片加载后按
-  // 几何位置自愈，不会像差值启发式那样把保位误判成用户上拉。
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    // 手势压制：向上输入脱离后，带内几何事件不得重挂跟随——否则滚轮/触摸上滑的
-    // 前几帧被 update() 改回 true，effect 随 false→true 重挂立即 scrollToEnd 弹回
-    // 底部，与手势反复拉锯（贴底上滑抖几下、越近底越抖的根因）。只有从带外重新
-    // 进入带内（滚回底部、滚动条拖回）才解除压制恢复跟随；折叠保位、钳制等
-    // 程序化滚动仍按几何自愈，不受影响。
-    let suppressed = false;
-    let wasInBand = true;
-    const update = () => {
-      const inBand = isAtTail(container.scrollTop, container.clientHeight, container.scrollHeight);
-      if (suppressed) {
-        if (inBand && !wasInBand) {
-          // 带外→带内跃迁 = 用户自己回到尾部，解除压制并重挂。
-          suppressed = false;
-          setAtTail(true);
-        } else {
-          setAtTail(false);
-        }
-      } else {
-        setAtTail(inBand);
-      }
-      wasInBand = inBand;
-    };
-    const release = () => {
-      suppressed = true;
-      setAtTail(false);
-    };
-    const onWheel = (event: WheelEvent) => {
-      if (isUpwardGesture(event.deltaY)) release();
-    };
-    let touchStartY: number | null = null;
-    const onTouchStart = (event: TouchEvent) => {
-      touchStartY = event.touches[0]?.clientY ?? null;
-    };
-    const onTouchMove = (event: TouchEvent) => {
-      const y = event.touches[0]?.clientY;
-      // 手指下移（clientY 变大）= 内容上滚看历史 = 离开跟随。
-      if (touchStartY !== null && y !== undefined && y > touchStartY) release();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Home") release();
-    };
-    update();
-    container.addEventListener("scroll", update, { passive: true });
-    container.addEventListener("wheel", onWheel, { passive: true });
-    container.addEventListener("touchstart", onTouchStart, { passive: true });
-    container.addEventListener("touchmove", onTouchMove, { passive: true });
-    container.addEventListener("keydown", onKeyDown);
-    return () => {
-      container.removeEventListener("scroll", update);
-      container.removeEventListener("wheel", onWheel);
-      container.removeEventListener("touchstart", onTouchStart);
-      container.removeEventListener("touchmove", onTouchMove);
-      container.removeEventListener("keydown", onKeyDown);
-    };
-  }, [scrollContainerRef, session?.id, loading]);
 
   // 在同一批滚动事件中记录读者位置：保活槽被 `display:none` 隐藏后 scrollTop 与
   // scrollHeight 归零，届时无法测量。
@@ -1818,7 +1784,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </div>
           </div>
         ) : <>
-        <MessageScrollerProvider autoScroll={false} defaultScrollPosition="end">
+        <MessageScrollerProvider autoScroll={false} defaultScrollPosition="end" scrollEdgeThreshold={CHAT_TAIL_TOLERANCE}>
         <FollowTailWhenAtTail atTail={atTail && !foldInFlight} contentRef={messageContentRef} viewportRef={scrollContainerRef} />
         <MessageScroller className="min-h-0 min-w-0 flex-1">
         <MessageScrollerViewport
@@ -1905,10 +1871,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </ChatRow>
           </MessageScrollerContent>
         </MessageScrollerViewport>
-        <MessageScrollerButton className="text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100">
-          <ArrowDownIcon className="size-4" aria-hidden="true" />
-          <span className="sr-only">{t("chat.scrollToLatest")}</span>
-        </MessageScrollerButton>
+        <ScrollToTailButton reattachToTail={reattachToTail} />
         </MessageScroller>
         </MessageScrollerProvider>
         {isMobile || pendingScrollRestore || !minimapPaneWide ? null : (
@@ -2033,9 +1996,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         <ExtensionStatusBar
           statuses={extensionStatuses}
           widgets={extensionWidgets}
+          trailing={<StreamStatusPill store={streamingStore} />}
           onCommand={handleSend}
           commandsDisabled={sessionBusy}
         />
+        {/* 状态条不在时，胶囊浮在同一条带右端（包裹层 relative）：绝对定位不占布局，
+            消息列表与队列 pills 都不会因它出现/消失而移动。 */}
+        {!hasExtensionStatusBarContent(extensionStatuses, extensionWidgets) && (
+          <div className={`pointer-events-none absolute inset-x-0 bottom-1 flex justify-end ${CHAT_COMPOSER_INSET_CLASS}`}>
+            <StreamStatusPill store={streamingStore} />
+          </div>
+        )}
       </div>
       {/* 手机端底部留白占偏置的两份（顶部聊天列仍为一份），使空态的 hero+composer
           簇高于正中：保持簇完整，品牌块不与浮层重叠。 */}
