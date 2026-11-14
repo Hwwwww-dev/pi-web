@@ -212,6 +212,8 @@ export const zhCNLocale: LocalePlugin = {
     "history.full": "完整历史",
     "history.unsaved": "会话保存后才能查看完整历史",
     "history.label": "完整历史",
+    "session.reload.label": "重新加载",
+    "session.reload.title": "重新挂载当前会话，加载最新 3 轮",
     "title.generating": "正在生成...",
     "title.updated": "标题已更新",
     "title.failed": "生成失败",

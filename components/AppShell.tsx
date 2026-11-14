@@ -18,6 +18,7 @@ import {
   MoonIcon,
   PanelRightIcon,
   PenLineIcon,
+  RefreshCwIcon,
   SettingsIcon,
   ShieldAlertIcon,
   SlidersHorizontalIcon,
@@ -523,8 +524,13 @@ export function AppShell() {
   // The debug panel's reader of the chat's own state: kept in a ref, so registering renders
   // nothing, and read only by the open panel (DebugPanel), never on AppShell's renders.
   const debugSnapshotReaderRef = useRef<(() => DebugClientSession) | null>(null);
+  // 顶栏 ⋯ 菜单的「重新加载」：ChatWindow 内的 useAgentSession 上报，菜单动作调用。
+  const [reloadSessionFn, setReloadSessionFn] = useState<(() => void) | null>(null);
   const handleDebugSnapshotReaderChange = useCallback((reader: (() => DebugClientSession) | null) => {
     debugSnapshotReaderRef.current = reader;
+  }, []);
+  const handleReloadSessionChange = useCallback((fn: (() => void) | null) => {
+    setReloadSessionFn(() => fn);
   }, []);
   // The panel reports the page's visibility history from the first mount on, opened or not.
   useEffect(() => {
@@ -2246,6 +2252,16 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 <HistoryIcon className="size-3.5 shrink-0" strokeWidth={2} />
                 <span className="min-w-0 flex-1">{translate("history.label")}</span>
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => { if (reloadSessionFn) void reloadSessionFn(); }}
+                disabled={!selectedSession || !reloadSessionFn}
+                title={translate("session.reload.title")}
+                className="gap-2"
+                data-mobile-toolbar-action="reload"
+              >
+                <RefreshCwIcon className="size-3.5 shrink-0" strokeWidth={2} />
+                <span className="min-w-0 flex-1">{translate("session.reload.label")}</span>
+              </DropdownMenuItem>
               {sessionHasBranches && (
                 <DropdownMenuItem
                   onSelect={() => openFlyoutFromMenu(() => toggleFlyout("branches"))}
@@ -2828,6 +2844,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     onMcpServersChange={handleMcpServersChange}
                     onSystemInfoLoaderChange={handleSystemInfoLoaderChange}
                     onDebugSnapshotReaderChange={handleDebugSnapshotReaderChange}
+                    onReloadSessionChange={handleReloadSessionChange}
                     onSessionStatsChange={handleSessionStatsChange}
                     onSessionStatsPanelOpen={openSessionStatsPanel}
                     onOpenSettings={openSettingsSection}

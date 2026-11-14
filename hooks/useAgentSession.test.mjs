@@ -200,7 +200,7 @@ test("sessions the user never overrode follow pi's configured defaultTools (#700
   );
 });
 
-test("session mount, idle follow, and late appends are the only forced disk reads", () => {
+test("mounts on whole turns, auto disk reads are gone, and the menu reload re-mounts", () => {
   const loadSessionSource = source.slice(
     source.indexOf("  const loadSession = useCallback"),
     source.indexOf("  const loadContext = useCallback"),
@@ -209,38 +209,30 @@ test("session mount, idle follow, and late appends are the only forced disk read
     source.indexOf("// Load session on mount"),
     source.indexOf("sessionHookMountedRef.current = false"),
   );
-  const idleFollowSource = source.slice(
-    source.indexOf("  // Idle follow: a read-only open session must track appends"),
-    source.indexOf("  useEffect(() => {\n    agentRunningRef.current = agentRunning;"),
-  );
-  const lateAppendSource = source.slice(
-    source.indexOf('case "message_end":'),
-    source.indexOf('case "tool_execution_start"'),
-  );
   assert.match(loadSessionSource, /options\?: \{ force\?: boolean \}/);
   assert.match(loadSessionSource, /if \(options\?\.force\) params\.set\("force", "1"\)/);
   assert.match(loadSessionSource, /d\.wrapperRebuilt[\s\S]*?eventConnectionRef\.current\?\.close\("rebuilt"\)[\s\S]*?maintain\(sid\)/);
   assert.match(mountSource, /loadSession\(session\.id, !cached, true, \{ force: true \}\)/);
-  assert.match(idleFollowSource, /force=1&tree=summary/);
-  assert.match(idleFollowSource, /await loadSession\(sid, false, false, \{ force: true \}\)/);
-  // 键盘期（聚焦打字、收起动画全程）暂停空闲探测：整载重渲染撞上 iOS 键盘避让
-  // 就是「自动加载完成后键盘跳」的撞车源。守卫在 probe 入口，每轮定时重新判定，
-  // 键盘期结束自动恢复；暂停期落盘的消息由恢复后第一轮补齐。
-  assert.match(
-    idleFollowSource,
-    /document\.visibilityState !== "visible"[\s\S]*?dataset\.keyboardOpen === "true"[\s\S]*?followProbeInFlightRef\.current/,
+  // 挂载（本会话尚无已载入条目）按整轮取首屏，与翻页同一量纲；已有基线后的
+  // 刷新按条且不得小于已载入条数（翻页历史不裁）。
+  assert.match(loadSessionSource, /if \(loadedCount === 0\) \{[\s\S]*?params\.set\("turns", String\(VISIBLE_PAGE_TURNS\)\)[\s\S]*?params\.set\("tail", String\(Math\.min\(1000, Math\.max\(MIN_LOAD_TAIL, loadedCount\)\)\)\)/);
+  // 活跃会话的自动读盘已移除（探测/重连回填/回合结束/晚到 message_end）：
+  // 断流期落盘条目的唯一补读入口是顶栏菜单的手动重载（重新挂载，3 轮）。
+  assert.doesNotMatch(source, /Idle follow: a read-only open session/);
+  assert.doesNotMatch(source, /followProbeInFlightRef|lateAppendTimerRef/);
+  // 手动重载：基线清零走挂载路径、丢弃视图快照防 revision 保留分支复用空列表、
+  // 事件流不动，并上报给顶栏菜单。
+  const reloadSource = source.slice(
+    source.indexOf("const reloadSession = useCallback"),
+    source.indexOf("const branchSwitchLocked"),
   );
-  // 事件流健在时定时探测整体让位（SSE 逐条增量就是活同步）；只有 catch-up
-  // （前台切回，SSE 重连不回放错过历史）与流不健康的 tick 才走到整载兕底。
-  assert.match(
-    idleFollowSource,
-    /mode === "tick" && eventConnectionRef\.current\?\.snapshot\(\)\.state === "connected"\) return;/,
-  );
-  assert.match(idleFollowSource, /void probe\("catch-up"\)/);
-  assert.match(idleFollowSource, /void probe\("tick"\)\.finally\(schedule\)/);
-  assert.match(lateAppendSource, /void loadSession\(sid, false, false, \{ force: true \}\)/);
+  assert.match(reloadSource, /entryIdsRef\.current = \[\]/);
+  assert.match(reloadSource, /deleteSessionViewSnapshot\(sid\)/);
+  assert.match(reloadSource, /await loadSession\(sid, true, true, \{ force: true \}\)/);
+  assert.match(reloadSource, /onReloadSessionChange\?\.\(reloadSession\)/);
   assert.match(source, /await loadSession\(sid\)/);
-  assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 3);
+  // force 读只剩挂载与手动重载两处。
+  assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 2);
 });
 
 test("forking stays available during a run while in-session branch switches wait for it", () => {

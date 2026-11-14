@@ -212,6 +212,8 @@ export const enLocale: LocalePlugin = {
     "history.full": "Full history",
     "history.unsaved": "Full history is available after the session is saved",
     "history.label": "Full history",
+    "session.reload.label": "Reload",
+    "session.reload.title": "Re-mount this session and load the latest 3 turns",
     "title.generating": "Generating...",
     "title.updated": "Title updated",
     "title.failed": "Generation failed",

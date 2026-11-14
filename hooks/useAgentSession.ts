@@ -255,6 +255,8 @@ export interface UseAgentSessionOptions {
   dormant?: boolean;
   /** Registers the debug panel's reader of this page's stream and lease: it reads refs only, never a request. */
   onDebugSnapshotReaderChange?: (reader: (() => DebugClientSession) | null) => void;
+  /** Registers the manual reload action (topbar menu): re-mounts the current session's 3-turn window. */
+  onReloadSessionChange?: (fn: (() => void) | null) => void;
   onSessionStatsPanelOpen?: () => void;
   /** Opens Settings on a section; a bare `/mcp` the built-in MCP extension owns opens Settings › MCP. */
   onOpenSettings?: (section: SettingsSection) => void;
@@ -298,18 +300,8 @@ const EVENT_STREAM_IDLE_GRACE_MS = 30_000;
 const AGENT_STATE_RECONCILE_MS = 15_000;
 /** While queue rows are visible the state poll tightens to this: a paused or closed SSE stream leaves rows stale until the next read. */
 const QUEUE_FAST_RECONCILE_MS = 3_000;
-const IDLE_FOLLOW_POLL_MS = 5_000;
-// Keep-alive slots hidden behind the dock probe less often: 20s while fresh,
-// backing off to 60s once the slot has been background for 5 minutes. Becoming
-// active again probes immediately (activation compensation), so the selected
-// session keeps its instant catch-up while idle slots cost ~3-12× less.
-const IDLE_FOLLOW_BACKGROUND_POLL_MS = 20_000;
-const IDLE_FOLLOW_BACKGROUND_BACKOFF_MS = 60_000;
-const IDLE_FOLLOW_BACKGROUND_BACKOFF_AFTER_MS = 5 * 60_000;
 const BASH_STATE_RECONCILE_MS = 1_000;
-/** 晚到的 `message_end` 补读延迟：等这一次落盘完成，再按会话文件整载一次。 */
-const LATE_APPEND_REFETCH_MS = 400;
-/** 整载窗口的下限（条）：首屏与小地图跳转的轮数大致对应这个量级。 */
+/** 整载窗口的下限（条）：已有基线后的兕底/刷新至少拉这么多，锚定合并保证只追加新尾部。 */
 const MIN_LOAD_TAIL = 50;
 /** Stop hands its queue back to be sent again; the stopped run has to unwind first, or a prompt rides it. */
 const STOP_RESEND_SETTLE_TIMEOUT_MS = 5_000;
@@ -493,7 +485,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, newSessionDraftKey, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, onSideSession,
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen, background = false, dormant = false,
-    onOpenSettings, onDebugSnapshotReaderChange,
+    onOpenSettings, onDebugSnapshotReaderChange, onReloadSessionChange,
   } = opts;
 
   const isNew = session === null && newSessionCwd !== null;
@@ -677,12 +669,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // labelling it with whichever preset the resolved tools happen to match.
   const sessionToolsPinnedRef = useRef(false);
   const browsingHistoryRef = useRef(false);
-  // 晚到 message_end 的定向补读：一批晚到事件合并成一次整载。
-  const lateAppendTimerRef = useRef<number | null>(null);
-  const followProbeInFlightRef = useRef(false);
-  // Last tick's background flag, so the idle-follow effect can tell an
-  // activation (slot becoming selected) from an ordinary re-run and probe at once.
-  const prevBackgroundRef = useRef<boolean | null>(null);
   const agentRunningRef = useRef(false);
   const sdkAgentActiveRef = useRef(false);
   const rpcPromptPendingRef = useRef(false);
@@ -983,10 +969,15 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       browsingHistoryRef.current = false;
       if (showLoading) setLoading(true);
       const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1", tree: "summary" });
-      // 整载会用叶子尾窗替换 messages：窗口不得小于已载入条数，否则每次刷新都把
-      // 翻页载入的历史裁回 50 条——读者往上翻，内容已经不在内存里了。
+      // 挂载（本会话尚无已载入条目）按整轮取首屏：3 轮一屏，与翻页同一量纲。
+      // 已有基线后的兜底/刷新按条：窗口不得小于已载入条数，否则每次刷新都把
+      // 翻页载入的历史裁掉——读者往上翻，内容已经不在内存里了。
       const loadedCount = sessionIdRef.current === sid ? entryIdsRef.current.length : 0;
-      params.set("tail", String(Math.min(1000, Math.max(MIN_LOAD_TAIL, loadedCount))));
+      if (loadedCount === 0) {
+        params.set("turns", String(VISIBLE_PAGE_TURNS));
+      } else {
+        params.set("tail", String(Math.min(1000, Math.max(MIN_LOAD_TAIL, loadedCount))));
+      }
       if (options?.force) params.set("force", "1");
       const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?${params}`);
       if (res.status === 404) {
@@ -2080,79 +2071,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     };
   }, [agentRunning, reconcileAgentState]);
 
-  // Idle follow: a read-only open session must track appends made by another
-  // pi process (the TUI) writing the same file. Probe cheaply with tail=1 and
-  // tree=summary (entryIds live in context; the summary tree drops bodies) and
-  // only reload on a changed latest entry id; ?force=1 reuses the server's
-  // evictIfDiskAhead() so a live wrapper lagging behind disk is rebuilt.
-  // 运行中的会话同样需要探测：SSE 无重放，iOS 挂起页面会断开连接，期间产生的
-  // message_end 永久丢失（reconcile 仅在空闲时补状态，不重读消息）。仅在 latest entry id
-  // 与本地末条不一致时重读，正常流式下两者相等，不会额外请求。
-  // 仅在页面可见且未回翻历史时执行，否则重载会把视口拉回叶径。
-  useEffect(() => {
-    // Dormant slots have no message list to keep warm; reactivation reloads everything.
-    if (!session || dormant) return;
-    const sid = session.id;
-    const startedAt = Date.now();
-    const becameActive = prevBackgroundRef.current === true && background;
-    prevBackgroundRef.current = background;
-    let disposed = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const probe = async (mode: "tick" | "catch-up" = "tick") => {
-      if (document.visibilityState !== "visible") return;
-      // 键盘期（聚焦打字、收起动画全程）不整载刷列表：重渲染撞上 iOS 键盘避让
-      // 就是「自动加载完成后键盘跳」的撞车源。暂停期落盘的消息由恢复后第一轮
-      // 补齐（latest !== current 的判定不变），无丢失。
-      if (document.documentElement.dataset.keyboardOpen === "true") return;
-      // 事件流健在时 SSE 就是活同步通路（逐条增量，只动一行），定时探测整体让位：
-      // 正被写入的会话末尾 id 每秒都在变，探测照跑就是每 5s 一次整窗替换——
-      // 「没贴顶也莫名其妙自动加载、一次冒出十几轮积压」的根源。探测只保留两个
-      // 职责：前台切回的强制补读（catch-up，SSE 重连不回放错过历史），与流断开
-      // 时的窗口兕底（tick 且流不健康才会走到整载）。
-      if (mode === "tick" && eventConnectionRef.current?.snapshot().state === "connected") return;
-      if (followProbeInFlightRef.current || browsingHistoryRef.current) return;
-      if (sessionIdRef.current !== sid) return;
-      followProbeInFlightRef.current = true;
-      try {
-        const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?tail=1&deferThinking=1&deferMedia=1&force=1&tree=summary`);
-        if (!res.ok) return;
-        const d = await res.json() as SessionData;
-        if (sessionIdRef.current !== sid) return;
-        const ids = d.context.entryIds ?? [];
-        const latest = ids[ids.length - 1];
-        const current = entryIdsRef.current;
-        if (!latest || latest === current[current.length - 1]) return;
-        // 重读 tail 以补回后台期间丢失的条目。
-        await loadSession(sid, false, false, { force: true });
-      } catch {
-        // Transient fetch failure; the next tick retries.
-      } finally {
-        followProbeInFlightRef.current = false;
-      }
-    };
-    // Recurring delay instead of a fixed interval: the tier depends on the
-    // slot's background age, and the chain recomputes after every tick.
-    const schedule = () => {
-      if (disposed) return;
-      const delay = background
-        ? Date.now() - startedAt > IDLE_FOLLOW_BACKGROUND_BACKOFF_AFTER_MS
-          ? IDLE_FOLLOW_BACKGROUND_BACKOFF_MS
-          : IDLE_FOLLOW_BACKGROUND_POLL_MS
-        : IDLE_FOLLOW_POLL_MS;
-      timer = setTimeout(() => { void probe("tick").finally(schedule); }, delay);
-    };
-    if (becameActive) void probe("catch-up");
-    schedule();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void probe("catch-up");
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      disposed = true;
-      if (timer) clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [session, agentRunning, loadSession, background, dormant]);
 
   useEffect(() => {
     agentRunningRef.current = agentRunning;
@@ -2203,11 +2121,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           // down must not stay listed.
           setAgentPhase({ kind: "waiting_model" });
         }
-        // 断线窗口内完成的消息不会重放：重连时本端仍在运行（流式中，或阻塞在
-        // 工具调用上）就整载一次会话文件回填，否则这些消息要等回合结束才出现。
-        if ((runActive || agentRunningRef.current) && sessionIdRef.current) {
-          void loadSession(sessionIdRef.current);
-        }
         // Opening the stream is what resumes an idle-reaped session, so the
         // mount's state read may have found no runtime and no usage to show.
         if (sessionIdRef.current) void refreshContextUsage(sessionIdRef.current);
@@ -2238,7 +2151,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           const sid = sessionIdRef.current;
           const runId = promptRunIdRef.current;
           const usageRequestId = ++contextUsageRequestIdRef.current;
-          loadSession(sid);
           const queueToken = queueSnapshotGateRef.current.capture();
           fetch(`/api/agent/${encodeURIComponent(sid)}`)
             .then((r) => r.ok ? r.json() : null)
@@ -2266,9 +2178,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         const wasRunning = settleUiStage();
         setIsCompacting(false);
         if (sid) {
-          void loadSession(sid);
-          // The disk read behind loadSession is the slow path; take the live
-          // reading now so the toolbar is right before the next turn starts.
+          // 不读盘：回合结束的消息已由 SSE 送达，落盘内容的同步由顶栏「重新加载」
+          // 手动触发。工具栏的活跃读数走下面的快速通路。
           refreshStatsRef.current?.();
           scheduleEventStreamClose(sid);
         }
@@ -2288,7 +2199,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           if (!promptWasPending && !firstNotification) break;
 
           const sid = sessionIdRef.current;
-          if (sid) void loadSession(sid);
           refreshStatsRef.current?.();
           // An extension-injected agent may already have started before the
           // command's prompt_done. Keep that active stage visible and let its
@@ -2342,21 +2252,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
       }
       case "message_end": {
-        // 事件比 run 结束晚到时不能直接丢：reconcile 那次读取可能赶在落盘之前，
-        // 该条此时才写出。追加会和已读入的重复，故改为延后一次定向整载。
+        // 晚到的 message_end 不再读盘兕底（断流期落盘的条目由顶栏「重新加载」
+        // 手动补），但本端 prompt 的归属键仍要在这里消费：这轮的 user 行已由
+        // 乐观气泡占位，不能留着等到下一轮误吞。
         if (!agentRunningRef.current) {
           const early = event.message as AgentMessage | undefined;
           if (early?.role === "user" && promptOwnUserKeyRef.current !== null && promptOwnUserKeyRef.current === userMessageKey(normalizeToolCalls(early))) {
             promptOwnUserKeyRef.current = null;
-          }
-          const sid = sessionIdRef.current;
-          // 读者正在上翻历史时不动：整载会把窗口拉回叶子。
-          if (sid && !browsingHistoryRef.current) {
-            if (lateAppendTimerRef.current !== null) window.clearTimeout(lateAppendTimerRef.current);
-            lateAppendTimerRef.current = window.setTimeout(() => {
-              lateAppendTimerRef.current = null;
-              if (sessionIdRef.current === sid) void loadSession(sid, false, false, { force: true });
-            }, LATE_APPEND_REFETCH_MS);
           }
           break;
         }
@@ -3703,10 +3605,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
     return () => {
       sessionHookMountedRef.current = false;
-      if (lateAppendTimerRef.current !== null) {
-        window.clearTimeout(lateAppendTimerRef.current);
-        lateAppendTimerRef.current = null;
-      }
       const abandonedDraftKey = isNew ? newSessionDraftKey : null;
       if (abandonedDraftKey) {
         queueMicrotask(() => {
@@ -3812,6 +3710,30 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     onDebugSnapshotReaderChange?.(readDebugSnapshot);
     return () => onDebugSnapshotReaderChange?.(null);
   }, [readDebugSnapshot, onDebugSnapshotReaderChange]);
+
+  // 手动重载（顶栏菜单）：重新挂载当前会话——基线清零后走挂载路径（首屏 3 轮），
+  // 事件流不断开。文件静止时 revision 保留分支会把刚清空的 messages 当「已载入」
+  // 保留，故先丢弃视图快照，强制走服务端窗口替换。活跃会话的自动读盘已移除，
+  // 这是断流期落盘条目的唯一补读入口。
+  const reloadSession = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    entryIdsRef.current = [];
+    setEntryIds([]);
+    setMessages([]);
+    browsingHistoryRef.current = false;
+    pendingWindowMessagesRef.current = [];
+    setNewestCursor(null);
+    setHasNewerMessages(false);
+    setHeadTurn(null);
+    deleteSessionViewSnapshot(sid);
+    await loadSession(sid, true, true, { force: true });
+  }, [loadSession]);
+
+  useEffect(() => {
+    onReloadSessionChange?.(reloadSession);
+    return () => onReloadSessionChange?.(null);
+  }, [reloadSession, onReloadSessionChange]);
 
   const branchSwitchLocked = agentRunning || bashRunning || isCompacting;
   useEffect(() => {
@@ -3940,6 +3862,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     handleSend, handleAbort, startSideChat, handleFork, handleNavigate, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
     handleQueuedAction, refreshSessionStats,
+    reloadSession,
     dismissCompactError,
     handleBuiltinSlashCommand,
     handleEditContent,

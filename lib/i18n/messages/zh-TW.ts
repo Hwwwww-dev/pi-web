@@ -212,6 +212,8 @@ export const zhTWLocale: LocalePlugin = {
     "history.full": "完整紀錄",
     "history.unsaved": "工作階段儲存後才能查看完整紀錄",
     "history.label": "完整紀錄",
+    "session.reload.label": "重新載入",
+    "session.reload.title": "重新掛載目前會話，載入最新 3 輪",
     "title.generating": "正在產生...",
     "title.updated": "標題已更新",
     "title.failed": "產生失敗",
