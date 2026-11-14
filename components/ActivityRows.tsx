@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState, type ReactNode } from "react";
+import { isValidElement, memo, useMemo, useState, type ReactNode } from "react";
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -738,7 +738,24 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
     );
     index += 1;
   }
-  return <div className="flex min-w-0 flex-col gap-1.5 [&>[data-message-text]]:my-1">{nodes}</div>;
+  // live 尾部每行进场：仅 live 挂载的新行播一次（随流式出现）；完成态与历史
+  // 一次性渲染整棵树时不播（会整段波动）。行挂载后的就地更新不重放。
+  if (!live) {
+    return <div className="flex min-w-0 flex-col gap-1.5 [&>[data-message-text]]:my-1">{nodes}</div>;
+  }
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 [&_[data-message-text]]:my-1">
+      {nodes.map((node, index) =>
+        isValidElement(node) ? (
+          <div key={node.key ?? index} className="min-w-0 animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:animate-none">
+            {node}
+          </div>
+        ) : (
+          node
+        ),
+      )}
+    </div>
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
