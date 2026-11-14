@@ -14,7 +14,8 @@ import { createJiti } from "jiti";
 const shimPath = fileURLToPath(new URL("./__fixtures__/react-hook-shim.mjs", import.meta.url));
 const jiti = createJiti(import.meta.url, { tsconfigPaths: true, alias: { react: shimPath } });
 const { renderHook } = await import(pathToFileURL(shimPath).href);
-const { peekPageId, useAgentSession } = await jiti.import("./useAgentSession.ts");
+const { useAgentSession } = await jiti.import("./useAgentSession.ts");
+const { peekPageId } = await jiti.import("../lib/page-debug.ts");
 const { HIDDEN_PAGE_GRACE_MS } = await jiti.import("./usePageHidden.ts");
 // useAgentSession's SESSION_LEASE_RENEW_INTERVAL_MS.
 const SESSION_LEASE_RENEW_MS = 30_000;
@@ -423,9 +424,10 @@ test("the debug reader asks nothing and opens nothing, however often it reads", 
     assert.ok(state.requests.includes("/api/agent/s1/lease"), "the lease request carries no page id");
     assert.ok(!state.requests.some((url) => url.startsWith("/api/agent/s1/lease?")));
     // A Fast Refresh evaluates the module again; the page, and its open stream, keep their id.
+    // The id lives in lib/page-debug's module state; useAgentSession only reads it.
     const reloaded = await createJiti(import.meta.url, { tsconfigPaths: true, alias: { react: shimPath }, moduleCache: false })
-      .import("./useAgentSession.ts");
-    assert.equal(reloaded.peekPageId(), pageId);
+      .import("../lib/page-debug.ts");
+    assert.equal(reloaded.pageId(), pageId);
     assert.equal(snapshot.lease.requests, 1);
     assert.equal(snapshot.lease.inFlightSince, null);
     assert.equal(snapshot.lease.renewIntervalMs, SESSION_LEASE_RENEW_MS);

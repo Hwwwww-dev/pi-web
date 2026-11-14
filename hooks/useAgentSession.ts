@@ -56,6 +56,7 @@ import {
   type SessionLeaseReply,
 } from "@/lib/agent-event-connection";
 import { HIDDEN_PAGE_GRACE_MS } from "@/hooks/usePageHidden";
+import type { AttachedImage } from "@/components/ChatInput";
 import type { DebugClientLease, DebugClientSession, DebugEventConnectionSnapshot, DebugStreamCloseReason } from "@/lib/debug-types";
 import { pageId, peekPageId, trackEventSource } from "@/lib/page-debug";
 import type { TranslationParams } from "@/lib/i18n/types";
@@ -301,7 +302,7 @@ const AGENT_STATE_RECONCILE_MS = 15_000;
 /** While queue rows are visible the state poll tightens to this: a paused or closed SSE stream leaves rows stale until the next read. */
 const QUEUE_FAST_RECONCILE_MS = 3_000;
 const BASH_STATE_RECONCILE_MS = 1_000;
-/** 整载窗口的下限（条）：已有基线后的兕底/刷新至少拉这么多，锚定合并保证只追加新尾部。 */
+/** 整载窗口的下限（条）：已有基线后的兜底/刷新至少拉这么多，锚定合并保证只追加新尾部。 */
 const MIN_LOAD_TAIL = 50;
 /** Stop hands its queue back to be sent again; the stopped run has to unwind first, or a prompt rides it. */
 const STOP_RESEND_SETTLE_TIMEOUT_MS = 5_000;
@@ -312,8 +313,6 @@ const SESSION_LEASE_RENEW_INTERVAL_MS = 30_000;
 // A ready stream silent for two and a half heartbeats is dead (AgentEventConnection reconnects).
 const EVENT_STREAM_STALE_MS = AGENT_EVENT_HEARTBEAT_MS * 2.5;
 type SessionLeaseOutcome = SessionLeaseReply | "unanswered" | null;
-// This page's id, the `?holder=` of its event streams: lib/page-debug.ts.
-export { peekPageId };
 function sessionLeaseUrl(sid: string): string {
   return `/api/agent/${encodeURIComponent(sid)}/lease`;
 }
@@ -395,12 +394,6 @@ export interface ChatInputHandle {
   addImages: (files: File[]) => void;
   rekeyDraft: (previousKey: string, nextKey: string) => void;
   restoreSubmission: (text: string, images?: Array<{ data: string; mimeType: string }>, targetDraftKey?: string) => void;
-}
-
-export interface AttachedImage {
-  data: string;
-  mimeType: string;
-  previewUrl: string;
 }
 
 type SelectedModel = { provider: string; modelId: string };
@@ -2252,7 +2245,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
       }
       case "message_end": {
-        // 晚到的 message_end 不再读盘兕底（断流期落盘的条目由顶栏「重新加载」
+        // 晚到的 message_end 不再读盘兜底（断流期落盘的条目由顶栏「重新加载」
         // 手动补），但本端 prompt 的归属键仍要在这里消费：这轮的 user 行已由
         // 乐观气泡占位，不能留着等到下一轮误吞。
         if (!agentRunningRef.current) {
