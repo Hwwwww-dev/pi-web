@@ -2049,17 +2049,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             正上方。队列长高只往聊天区方向长，状态行不再被顶走。 */}
         {renderChatInput(activityNotice)}
         {(extensionStatuses.length > 0 || extensionWidgets.length > 0) && (
-          // 浮动时状态条直接压在消息上：一枚底色胶囊保住可读性。必须 w-full：
-          // 状态行内部是 flex-1（普通状态滚动、permissive 标记钉最右），收缩成
-          // 内容宽会把 YOLO 从右端拉到状态串旁边。
-          <div className={cn("w-full min-w-0", composerFloating && "rounded-lg border border-border/50 bg-background/85 px-2 py-0.5 backdrop-blur-sm")}>
-            <ExtensionStatusBar
-              statuses={extensionStatuses}
-              widgets={extensionWidgets}
-              onCommand={handleSend}
-              commandsDisabled={sessionBusy}
-            />
-          </div>
+          // 状态条直接渲染（无包装层）：停靠区为 flex-col，状态条默认 stretch
+          // 铺满整行，内部 flex-1 让 permissive 标记（YOLO）钉在右端；背后的
+          // 文字由渐隐层压暗，不需要再包一枚底色胶囊。
+          <ExtensionStatusBar
+            statuses={extensionStatuses}
+            widgets={extensionWidgets}
+            onCommand={handleSend}
+            commandsDisabled={sessionBusy}
+          />
         )}
       </div>
       {/* 手机端底部留白占偏置的两份（顶部聊天列仍为一份），使空态的 hero+composer
