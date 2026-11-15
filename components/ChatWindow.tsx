@@ -2019,7 +2019,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         )}
       >
         {composerFloating && (
-          <div aria-hidden className="chat-composer-fade pointer-events-none absolute inset-x-0 bottom-full h-12" />
+          // 渐隐层覆盖整个停靠区（状态行、卡片、胶囊区的空隙）并向上延伸 48px：
+          // 渐变自屏幕底边向上连续淡出。锚在卡片顶边会与停靠区其它行之间留出
+          // 亮字断层，悬空的渐暗带看起来像一道阴影。
+          <div aria-hidden className="chat-composer-fade pointer-events-none absolute inset-x-0 bottom-0 -top-12" />
         )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the

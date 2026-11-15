@@ -1589,8 +1589,10 @@ span.token.table {
   container-type: inline-size;
 }
 
-/* 浮动 composer：卡片上方的内容渐隐带。颜色取消息区背景（--background），
-   穿过卡片上方的内容在此淡出；纯渐变无模糊，不引入逐帧 filter 开销。 */
+/* 浮动 composer：停靠区背后的内容渐隐层。元素铺满整个停靠区并向上延伸
+   48px，颜色取消息区背景（--background），自屏幕底边向上连续淡出——状态行、
+   卡片、胶囊区之间的空隙不再透出亮字断层；纯渐变无模糊，不引入逐帧 filter
+   开销。 */
 .chat-composer-fade {
   background: linear-gradient(to top, var(--background), transparent);
 }
