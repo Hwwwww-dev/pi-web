@@ -2576,7 +2576,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           >
             <InputGroup
               className={cn(
-                "chat-composer-row min-w-0 rounded-[24px] border-border bg-card shadow-sm",
+                // bg-card! 压过基类的 dark:bg-input/30（≈4.5% 透明），否则暗色下卡片
+                // 透明、消息文字直接穿透输入区。卡片不加阴影：按暗色主题设计，
+                // 浮层与卡片靠边框分层。
+                "chat-composer-row min-w-0 rounded-[24px] border-border bg-card!",
                 compact
                   ? "flex-row items-center gap-1 rounded-[18px] p-1.5"
                   : "flex-col items-stretch gap-0 p-2",
