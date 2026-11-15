@@ -190,10 +190,11 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                     isSelected ? "bg-accent" : "hover:bg-accent/60",
                   )}
                 >
-                  <button
+                  <Button
                     type="button"
                     role="menuitem"
-                    className="flex min-w-0 flex-1 cursor-pointer flex-col items-stretch gap-1 rounded-lg px-2 py-2 text-left outline-none"
+                    variant="ghost"
+                    className="h-auto min-w-0 flex-1 flex-col items-stretch gap-1 rounded-lg px-2 py-2 text-left hover:bg-transparent"
                     onClick={() => {
                       if (!isSelected) onSelect(info);
                       setPanelOpen(false);
@@ -211,7 +212,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                       text={info.cwd}
                       className="text-[11px] font-mono text-muted-foreground/60"
                     />
-                  </button>
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -230,14 +231,15 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
           {slots.some((slot) => slot.session.id !== selectedSessionId) && (
             <>
               <Separator className="mt-1" />
-              <button
+              <Button
                 type="button"
                 role="menuitem"
-                className="mt-1 flex w-full cursor-pointer items-center rounded-lg px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors outline-none hover:bg-accent/60 hover:text-destructive"
+                variant="ghost"
+                className="mt-1 h-auto w-full items-center rounded-lg px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent/60 hover:text-destructive"
                 onClick={() => { onDismissAll(); setPanelOpen(false); }}
               >
                 {t("keepalive.dismissAll")}
-              </button>
+              </Button>
             </>
           )}
         </PopoverContent>

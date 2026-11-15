@@ -11,7 +11,6 @@ import {
   ExternalLinkIcon,
   FolderTreeIcon,
   ListIcon,
-  LoaderCircleIcon,
   LoaderIcon,
   SearchIcon,
   TriangleAlertIcon,
@@ -36,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import {
   encodeFilePathForApi,
@@ -1200,7 +1200,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
           <div role="status" aria-live="polite" aria-label={uploadPhase === "checking" ? t("files.checking") : t("files.uploading", { progress: uploadProgress })}>
             <div className="flex min-h-[14px] items-center justify-between gap-2 text-muted-foreground">
               {uploadPhase === "checking" ? (
-                <LoaderCircleIcon size={13} strokeWidth={1.8} className="animate-spin" />
+                <Spinner className="size-[13px]" strokeWidth={1.8} aria-hidden="true" />
               ) : (
                 <UploadIcon size={13} strokeWidth={1.8} />
               )}

@@ -356,8 +356,8 @@ test("Radix owns the shell: the controlled hidden trigger and the dismissal wiri
   // not the opener and not a row; Escape goes through Radix's capture-phase
   // handler (which marks the event handled, keeping the global Esc out);
   // placement, outside dismissal and the focus scope are its.
-  assert.match(component, /<DropdownMenuPrimitive\.Trigger asChild aria-hidden tabIndex=\{-1\}>/);
-  assert.match(component, /<DropdownMenuPrimitive\.Root key=\{anchorKey\} open onOpenChange=\{handleOpenChange\} modal=\{false\}>/);
+  assert.match(component, /<DropdownMenuTrigger asChild aria-hidden tabIndex=\{-1\}>/);
+  assert.match(component, /<DropdownMenu key=\{anchorKey\} open onOpenChange=\{handleOpenChange\} modal=\{false\}>/);
   assert.match(component, /onEscapeKeyDown=\{handleEscapeKeyDown\}/);
   assert.match(component, /onPointerDownOutside=\{handlePointerDownOutside\}/);
   assert.match(component, /onFocusOutside=\{handleFocusOutside\}/);

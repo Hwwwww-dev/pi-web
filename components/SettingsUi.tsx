@@ -8,6 +8,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader } from "./ui/empty";
 import { Field, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
@@ -50,64 +51,62 @@ export function ConfigPanelShell({
   width = 900,
   height = "78vh",
 }: ConfigPanelShellProps) {
-  const panelStyle = embedded
-    ? undefined
-    : ({
-        "--config-panel-width": `${width}px`,
-        "--config-panel-height": height,
-      } as CSSProperties);
+  // A settings panel opened inside Settings renders in place: no Dialog, the
+  // host owns the shell (the phone shows the panes one at a time there).
+  if (embedded) {
+    return (
+      <div className="flex h-full w-full min-h-0 min-w-0">
+        <div className="flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden bg-background">{children}</div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      role={embedded ? undefined : "dialog"}
-      aria-modal={embedded ? undefined : "true"}
-      aria-label={title}
-      // A phone shows it full screen under the safe areas: the page's own
-      // colour, no frame (the standalone fallback pads via env() insets).
-      className={cn(
-        "min-h-0 min-w-0",
-        embedded
-          ? "flex h-full w-full"
-          : "fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 max-[640px]:bg-background max-[640px]:p-[env(safe-area-inset-top)_env(safe-area-inset-right)_env(safe-area-inset-bottom)_env(safe-area-inset-left)]",
-      )}
-      onClick={(event) => {
-        if (!embedded && event.target === event.currentTarget) onClose();
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
     >
-      <div
+      <DialogContent
+        showCloseButton={false}
+        aria-label={title}
+        overlayClassName="z-[1000]"
+        // A phone shows it full screen under the safe areas: the page's own
+        // colour, no frame (the standalone fallback pads via env() insets).
         className={cn(
-          "flex min-h-0 min-w-0 flex-col overflow-hidden bg-background",
-          embedded ? "h-full w-full" : cn(
-            "h-[min(var(--config-panel-height),calc(100dvh-16px))] w-[min(var(--config-panel-width),calc(100vw-16px))] rounded-xl border border-border shadow-lg",
-            "max-[640px]:h-full max-[640px]:max-h-full max-[640px]:w-full max-[640px]:max-w-full max-[640px]:rounded-none max-[640px]:border-0 max-[640px]:shadow-none",
-          ),
+          "z-[1000] flex flex-col gap-0 overflow-hidden rounded-xl p-0",
+          "h-[min(var(--config-panel-height),calc(100dvh-16px))] w-[min(var(--config-panel-width),calc(100vw-16px))] max-w-none sm:max-w-none",
+          "max-[640px]:bg-background max-[640px]:p-[env(safe-area-inset-top)_env(safe-area-inset-right)_env(safe-area-inset-bottom)_env(safe-area-inset-left)]",
+          "max-[640px]:h-full max-[640px]:max-h-full max-[640px]:w-full max-[640px]:max-w-full max-[640px]:rounded-none max-[640px]:border-0 max-[640px]:shadow-none",
         )}
-        style={panelStyle}
+        style={{
+          "--config-panel-width": `${width}px`,
+          "--config-panel-height": height,
+        } as CSSProperties}
       >
-        {!embedded && (
-          <div className="flex h-12 shrink-0 items-center gap-2.5 pr-3 pl-4">
-            <strong className="min-w-0 text-base">{title}</strong>
-            {subtitle && (
-              <code className="min-w-0 overflow-hidden font-mono text-xs text-muted-foreground truncate" title={subtitle}>
-                {subtitle}
-              </code>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="ml-auto max-[640px]:size-11"
-              onClick={onClose}
-              title={closeLabel}
-              aria-label={closeLabel}
-            >
-              <XIcon />
-            </Button>
-          </div>
-        )}
+        <div className="flex h-12 shrink-0 items-center gap-2.5 pr-3 pl-4">
+          <DialogTitle className="min-w-0 text-base font-bold">{title}</DialogTitle>
+          {subtitle && (
+            <code className="min-w-0 overflow-hidden font-mono text-xs text-muted-foreground truncate" title={subtitle}>
+              {subtitle}
+            </code>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="ml-auto max-[640px]:size-11"
+            onClick={onClose}
+            title={closeLabel}
+            aria-label={closeLabel}
+          >
+            <XIcon />
+          </Button>
+        </div>
         {children}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

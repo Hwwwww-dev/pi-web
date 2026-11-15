@@ -9,7 +9,6 @@ import {
   CircleStopIcon,
   CircleXIcon,
   ClockIcon,
-  LoaderCircleIcon,
   MessageSquarePlusIcon,
   MessagesSquareIcon,
   PanelRightIcon,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react";
 import type { SessionUsageSummary } from "@/lib/session-stats";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { formatActiveDuration, formatCompactCount, formatCostShort } from "@/lib/session-stats-format";
 import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -186,7 +186,7 @@ function statusTextClass(status: SubagentSessionStatus): string {
 
 export function StatusIcon({ status }: { status: SubagentSessionStatus }) {
   if (status === "running" || status === "starting") {
-    return <LoaderCircleIcon className="size-[13px] animate-spin motion-reduce:animate-none" strokeWidth={1.8} />;
+    return <Spinner className="size-[13px]" strokeWidth={1.8} aria-hidden="true" />;
   }
   if (status === "failed") {
     return <CircleXIcon size={13} strokeWidth={1.8} />;

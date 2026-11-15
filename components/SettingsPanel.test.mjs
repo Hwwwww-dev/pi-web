@@ -68,8 +68,11 @@ test("offers system, light and dark selection with the RadioGroup (shadcn theme 
 
 test("keeps language selection in General settings", () => {
   assert.match(panelSource, /t\("common\.language"\)/);
-  assert.match(panelSource, /<div role="radiogroup" aria-label=\{t\("common\.language"\)\} className="flex w-full flex-col gap-0\.5">/);
-  assert.match(panelSource, /setLocale\(plugin\.id/);
+  // The group rides the official RadioGroup (as the theme group does); each
+  // row is the label of its visually-hidden Radix radio.
+  assert.match(panelSource, /<RadioGroup\s*\n\s*value=\{locale\}/);
+  assert.match(panelSource, /onValueChange=\{\(value\) => setLocale\(value as typeof locale\)\}/);
+  assert.match(panelSource, /<RadioGroupItem value=\{plugin\.id\} className="sr-only" \/>/);
 });
 
 test("groups fonts, chat font size and width with the chat switches, without row backgrounds", () => {

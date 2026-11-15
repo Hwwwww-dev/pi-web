@@ -562,33 +562,34 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     </>
   );
   const languageGroup = (
-    <div role="radiogroup" aria-label={t("common.language")} className="flex w-full flex-col gap-0.5">
-      {supportedLocales.map((plugin) => {
-        const selected = locale === plugin.id;
-        return (
-          <button
-            key={plugin.id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            onClick={() => setLocale(plugin.id as typeof locale)}
-            className="group flex h-9 min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-left text-sm text-foreground outline-none hover:bg-accent/50 focus-visible:bg-accent/50 aria-checked:bg-accent/50 aria-checked:font-medium"
+    <RadioGroup
+      value={locale}
+      onValueChange={(value) => setLocale(value as typeof locale)}
+      aria-label={t("common.language")}
+      className="flex w-full flex-col gap-0.5"
+    >
+      {supportedLocales.map((plugin) => (
+        <label
+          key={plugin.id}
+          className="group flex h-9 min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-left text-sm text-foreground hover:bg-accent/50 has-[[data-state=checked]]:bg-accent/50 has-[[data-state=checked]]:font-medium has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-accent/50"
+        >
+          {/* The Radix radio carries the group's semantics (roving focus,
+              arrow keys); the row stays the visual, as in the theme group. */}
+          <RadioGroupItem value={plugin.id} className="sr-only" />
+          <span
+            aria-hidden="true"
+            className={cn(
+              "grid size-4 shrink-0 place-items-center rounded-full border",
+              locale === plugin.id ? "border-primary" : "border-border",
+            )}
           >
-            <span
-              aria-hidden="true"
-              className={cn(
-                "grid size-4 shrink-0 place-items-center rounded-full border",
-                selected ? "border-primary" : "border-border",
-              )}
-            >
-              {selected && <span className="size-2 rounded-full bg-primary" />}
-            </span>
-            <span className="min-w-0 flex-1">{plugin.label}</span>
-            <span className="shrink-0 font-mono text-xs text-muted-foreground">{plugin.id}</span>
-          </button>
-        );
-      })}
-    </div>
+            {locale === plugin.id && <span className="size-2 rounded-full bg-primary" />}
+          </span>
+          <span className="min-w-0 flex-1">{plugin.label}</span>
+          <span className="shrink-0 font-mono text-xs text-muted-foreground">{plugin.id}</span>
+        </label>
+      ))}
+    </RadioGroup>
   );
   // One shape on every size: a list beside the detail. A phone shows one pane
   // at a time (ConfigSplitView's data-pane) behind the header's Back button.

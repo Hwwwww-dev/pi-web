@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLineIcon,
-  CheckIcon,
-  ChevronDownIcon,
   ChevronLeftIcon,
   FolderIcon,
   GitBranchIcon,
@@ -17,6 +15,7 @@ import { formatRelativeTime } from "@/lib/i18n/format";
 import { getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DiffView } from "./DiffView";
 import { PathLabel } from "./PathLabel";
 import { FileMentionButton, FileToolbar, FILE_MODE_LABELS } from "./FileToolbar";
@@ -104,7 +103,9 @@ interface DropdownOption {
   secondary?: string;
 }
 
-/** Custom dropdown (no native select), modeled after the sidebar branch switcher. */
+/** Repository / branch picker on the official Select: the trigger shows the
+ *  option's primary label (plus its secondary path right-aligned) and the
+ *  list opens under the trigger at the trigger's width. */
 function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, disabled = false, className }: {
   value: string | null;
   options: DropdownOption[];
@@ -115,95 +116,54 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
   disabled?: boolean;
   className?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
-    };
-    const keyHandler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("keydown", keyHandler);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("keydown", keyHandler);
-    };
-  }, [open]);
-
   const selected = options.find((option) => option.value === value) ?? null;
   return (
-    <div ref={rootRef} className={cn("relative min-w-0 flex-1", className)}>
-      <Button
-        type="button"
-        variant="outline"
-        size="default"
-        onClick={() => setOpen((current) => !current)}
-        disabled={disabled}
+    <Select
+      value={value ?? undefined}
+      disabled={disabled || options.length === 0}
+      onValueChange={onSelect}
+    >
+      <SelectTrigger
         aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open}
         className={cn(
-          "h-auto py-0 justify-start has-[>svg]:px-2.5",
-          "flex min-h-9 w-full cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-left text-xs text-foreground shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:hover:bg-accent disabled:pointer-events-none disabled:opacity-50",
+          "min-h-9 w-full min-w-0 flex-1 justify-start gap-1.5 px-2.5 text-left text-xs shadow-sm enabled:hover:bg-accent data-[placeholder]:text-foreground",
+          "[&>svg:last-child]:size-[13px] [&>svg:last-child]:stroke-[1.8] [&>svg:last-child]:opacity-100 [&>svg:last-child]:transition-transform data-[state=open]:[&>svg:last-child]:rotate-180",
+          className,
         )}
       >
         <span className="flex shrink-0 items-center text-muted-foreground" aria-hidden="true">{icon}</span>
-        <span className="min-w-0 flex-1 truncate">
-          {selected ? selected.primary : placeholder}
-        </span>
-        {selected?.secondary && (
-          <span className="max-w-[45%] shrink-0 truncate font-mono text-xs text-muted-foreground">{selected.secondary}</span>
+        {selected ? (
+          <>
+            <span className="min-w-0 flex-1 truncate">{selected.primary}</span>
+            {selected.secondary && (
+              <span className="max-w-[45%] shrink-0 truncate font-mono text-xs text-muted-foreground">{selected.secondary}</span>
+            )}
+          </>
+        ) : (
+          <SelectValue placeholder={placeholder} />
         )}
-        <ChevronDownIcon
-          className={cn("size-[13px] shrink-0 transition-transform", open && "rotate-180")}
-          strokeWidth={1.8}
-        />
-      </Button>
-      {open && (
-        <div
-          role="listbox"
-          // 定位方式：自定义下拉（见 GitPanel.test：不使用 native select / Radix），
-          // 面板锚定于触发器正下方，宽度随触发器拉伸。
-          className="absolute inset-x-0 top-[calc(100%+4px)] z-[100] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
-        >
-          <div className="max-h-[min(40vh,300px)] touch-pan-y overflow-y-auto">
-            {options.map((option) => {
-              const isSelected = option.value === value;
-              return (
-                <Button
-                  key={option.value}
-                  type="button"
-                  role="option"
-                  variant="ghost"
-                  size="default"
-                  aria-selected={isSelected}
-                  onClick={() => { setOpen(false); onSelect(option.value); }}
-                  className={cn(
-                    "h-auto justify-start focus-visible:ring-0 focus-visible:border-transparent has-[>svg]:px-2",
-                    "flex min-h-9 w-full cursor-pointer items-center gap-[7px] rounded-sm px-2 py-1.5 text-left text-xs outline-none focus-visible:bg-accent hover:bg-accent",
-                    isSelected ? "text-foreground" : "text-muted-foreground",
-                  )}
-                >
-                  {isSelected ? (
-                    <CheckIcon className="size-[13px] shrink-0 text-primary" strokeWidth={1.8} />
-                  ) : (
-                    <span className="w-[13px] shrink-0" />
-                  )}
-                  <span className="shrink-0 truncate">{option.primary}</span>
-                  {option.secondary && (
-                    <span className="min-w-0 flex-1 truncate text-right font-mono text-xs text-muted-foreground">{option.secondary}</span>
-                  )}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
+      </SelectTrigger>
+      <SelectContent
+        position="popper"
+        sideOffset={4}
+        // 定位：面板锚定于触发器正下方，宽度随触发器拉伸；面板上的竖向平移
+        // 手势类保证 iOS 独立模式侧滑返回中滚动可用（OPT-git-6）。
+        className="w-[var(--radix-select-trigger-width)] touch-pan-y"
+      >
+        {options.map((option) => (
+          <SelectItem
+            key={option.value}
+            value={option.value}
+            className="min-h-9 h-auto gap-[7px] py-1.5 text-xs text-muted-foreground data-[state=checked]:text-foreground"
+          >
+            <span className="shrink-0 truncate">{option.primary}</span>
+            {option.secondary && (
+              <span className="min-w-0 flex-1 truncate text-right font-mono text-xs text-muted-foreground">{option.secondary}</span>
+            )}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 

@@ -2,8 +2,9 @@
 
 import { Children, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, type SyntheticEvent } from "react";
 import { CheckIcon } from "lucide-react";
-import { Dialog as DialogPrimitive, DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -362,11 +363,14 @@ function menuBoxClassName(classic: boolean): string {
   return [
     "sidebar-menu",
     classic ? "is-classic" : "",
-    "z-[400] box-border max-w-[calc(100vw-16px)]",
+    "z-[400] box-border min-w-0 max-w-[calc(100vw-16px)]",
     "max-h-[min(calc(var(--app-viewport-height,100dvh)-16px),480px,var(--radix-popper-available-height,480px))] overflow-y-auto [overscroll-behavior:contain]",
     "border border-(--border) rounded-(--radius-md) bg-background text-foreground text-xs shadow-(--shadow-md)",
     classic ? "p-0" : "p-1",
-    "animate-in fade-in slide-in-from-top-[3px] duration-[120ms] ease-out motion-reduce:animate-none",
+    // 开合动画沿用官方 content 的 fade+滑入，缩放两档归零（旧手写动画无缩放），
+    // 时长保留侧栏自己的 120ms 进 / 100ms 出。
+    "duration-[120ms] ease-out motion-reduce:animate-none",
+    "data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100",
     "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[100ms] data-[state=closed]:fill-mode-forwards motion-reduce:data-[state=closed]:animate-none",
     "focus:outline-none",
   ].filter(Boolean).join(" ");
@@ -1127,53 +1131,51 @@ export function SidebarMenu({
   // props, but the runtime wires it (FocusScope's mount focus): taking it
   // stops the box itself from taking the focus Radix's internal mount
   // handler would give it after this component's own focus effect.
-  const mountFocusProps = { onOpenAutoFocus: handleOpenAutoFocus } as ComponentProps<typeof DropdownMenuPrimitive.Content>;
+  const mountFocusProps = { onOpenAutoFocus: handleOpenAutoFocus } as ComponentProps<typeof DropdownMenuContent>;
 
   return (
     // Keyed by the anchor: a menu re-anchored while it stays open remeasures
     // instead of sitting at the old coordinates.
-    <DropdownMenuPrimitive.Root key={anchorKey} open onOpenChange={handleOpenChange} modal={false}>
+    <DropdownMenu key={anchorKey} open onOpenChange={handleOpenChange} modal={false}>
       {/* The hidden trigger: parked at the anchor, outside the virtualized
           rows and outside the opener button, pointer-events off. Radix
           anchors its placement here. */}
-      <DropdownMenuPrimitive.Trigger asChild aria-hidden tabIndex={-1}>
+      <DropdownMenuTrigger asChild aria-hidden tabIndex={-1}>
         <span className="pointer-events-none" style={triggerStyle} />
-      </DropdownMenuPrimitive.Trigger>
-      <DropdownMenuPrimitive.Portal>
-        <DropdownMenuPrimitive.Content
-          ref={surfaceRef}
-          className={menuBoxClassName(classic)}
-          role={menuRole}
-          aria-label={ariaLabel}
-          style={{ width: width ?? DEFAULT_MENU_WIDTH }}
-          side="bottom"
-          align={anchor!.kind === "point" ? "start" : anchor!.align}
-          sideOffset={anchor!.kind === "point" ? 0 : 4}
-          collisionPadding={8}
-          avoidCollisions
-          {...mountFocusProps}
-          onCloseAutoFocus={handleCloseAutoFocus}
-          onEscapeKeyDown={handleEscapeKeyDown}
-          onPointerDownOutside={handlePointerDownOutside}
-          onFocusOutside={handleFocusOutside}
-          {...isolateEvents}
-          onKeyDown={onKeyDown}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        ref={surfaceRef}
+        className={menuBoxClassName(classic)}
+        role={menuRole}
+        aria-label={ariaLabel}
+        style={{ width: width ?? DEFAULT_MENU_WIDTH }}
+        side="bottom"
+        align={anchor!.kind === "point" ? "start" : anchor!.align}
+        sideOffset={anchor!.kind === "point" ? 0 : 4}
+        collisionPadding={8}
+        avoidCollisions
+        {...mountFocusProps}
+        onCloseAutoFocus={handleCloseAutoFocus}
+        onEscapeKeyDown={handleEscapeKeyDown}
+        onPointerDownOutside={handlePointerDownOutside}
+        onFocusOutside={handleFocusOutside}
+        {...isolateEvents}
+        onKeyDown={onKeyDown}
+      >
+        <MenuSurfaceBody
+          mode={mode}
+          ariaLabel={ariaLabel}
+          items={items}
+          filter={filter}
+          filterQuery={filterQuery}
+          onFilterQueryChange={setFilterQuery}
+          onFilterNavigate={onFilterNavigate}
+          footer={footer}
+          onActivate={(action, shiftKey) => activateRef.current(action, shiftKey)}
         >
-          <MenuSurfaceBody
-            mode={mode}
-            ariaLabel={ariaLabel}
-            items={items}
-            filter={filter}
-            filterQuery={filterQuery}
-            onFilterQueryChange={setFilterQuery}
-            onFilterNavigate={onFilterNavigate}
-            footer={footer}
-            onActivate={(action, shiftKey) => activateRef.current(action, shiftKey)}
-          >
-            {children}
-          </MenuSurfaceBody>
-        </DropdownMenuPrimitive.Content>
-      </DropdownMenuPrimitive.Portal>
-    </DropdownMenuPrimitive.Root>
+          {children}
+        </MenuSurfaceBody>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

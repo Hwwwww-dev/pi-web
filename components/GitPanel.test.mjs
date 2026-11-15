@@ -99,12 +99,18 @@ test("back navigation stays in-panel: no gesture routing, no new breakpoints", a
   assert.equal((source.match(/touch-pan-y/g) ?? []).length, 3);
 });
 
-test("repository and branch pickers are custom dropdowns, not native selects", () => {
+test("repository and branch pickers ride the official Select, not native selects", () => {
   assert.doesNotMatch(source, /<select/);
   assert.match(source, /function GitDropdown/);
-  assert.match(source, /role="listbox"/);
-  assert.match(source, /document\.addEventListener\("mousedown", handler\)/);
-  assert.match(source, /event\.key === "Escape"/);
+  // Radix Select owns trigger, listbox semantics, outside-click and Escape
+  // dismissal; the source keeps no hand-rolled listeners or listbox markup.
+  assert.match(source, /import \{ Select, SelectContent, SelectItem, SelectTrigger, SelectValue \} from "@\/components\/ui\/select";/);
+  assert.match(source, /<SelectTrigger/);
+  assert.match(source, /<SelectItem/);
+  assert.match(source, /<SelectValue placeholder=\{placeholder\} \/>/);
+  assert.doesNotMatch(source, /role="listbox"/);
+  assert.doesNotMatch(source, /document\.addEventListener\("mousedown", handler\)/);
+  assert.doesNotMatch(source, /event\.key === "Escape"/);
   assert.match(source, /options=\{repositories\.map\(\(repo\) => \(\{\s*value: repo\.repositoryRoot,\s*primary: repo\.name,\s*secondary: repo\.relativePath === "\." \|\| repo\.relativePath === "" \? undefined : repo\.relativePath,\s*\}\)\)\}/);
   assert.match(source, /options=\{branches\.map\(\(branch\) => \(\{ value: branch, primary: branch \}\)\)\}/);
 });

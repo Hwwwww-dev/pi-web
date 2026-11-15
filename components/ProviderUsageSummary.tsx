@@ -5,6 +5,7 @@ import { CheckIcon, RotateCcwIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { formatUpdatedTime } from "@/lib/i18n/format";
 import { isProviderUsageId } from "@/lib/provider-usage-ids";
 
@@ -138,8 +139,10 @@ function ProviderUsageContent({ providerId, enabled }: { providerId: string; ena
         >
           {refreshDone ? (
             <CheckIcon size={14} strokeWidth={2.5} className="size-3.5" aria-hidden="true" />
+          ) : querying ? (
+            <Spinner className="size-3.5" aria-hidden="true" />
           ) : (
-            <RotateCcwIcon size={14} strokeWidth={2} className={cn("size-3.5 motion-reduce:animate-none", querying && "animate-spin")} aria-hidden="true" />
+            <RotateCcwIcon size={14} strokeWidth={2} className="size-3.5" aria-hidden="true" />
           )}
         </Button>
         {report && (

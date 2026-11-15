@@ -15,6 +15,7 @@ import {
   TraceTitle,
 } from "@/components/ui/trace";
 import { ChevronRightIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   COLLAPSIBLE_EXPANDED_EVENT,
   getFoldChoice,
@@ -228,17 +229,19 @@ export function TraceRow({
           {/* 行尾计数（编辑的 +N/−N）位于胶囊之后，一次读完目标文件与改动量。 */}
           {trailing && <span className="shrink-0 pl-2">{trailing}</span>}
           {chips != null && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               onClick={() => toggleFold(!open)}
               aria-expanded={open}
               aria-label={ariaLabel}
-              className="flex shrink-0 cursor-pointer items-center text-muted-foreground transition-colors hover:text-foreground"
+              className="size-4 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground [&_svg]:size-3.5!"
             >
               <TraceIcon className={cn("transition-transform", open && "rotate-90")}>
                 <ChevronRightIcon />
               </TraceIcon>
-            </button>
+            </Button>
           )}
           {/* 行尾留白，将折叠箭头与 ··· 推至右边缘（胶囊为链接，不可嵌入按钮）。 */}
           <span className="min-w-0 flex-1" aria-hidden="true" />

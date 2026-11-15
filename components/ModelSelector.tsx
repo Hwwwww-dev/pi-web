@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDownIcon, CircleIcon, CpuIcon, LoaderCircleIcon, StarIcon } from "lucide-react";
+import { ChevronDownIcon, CircleIcon, CpuIcon, StarIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { isProviderUsageId } from "@/lib/provider-usage-ids";
@@ -222,7 +223,7 @@ export function ModelSelector({
       className="max-w-[260px] gap-1.5 overflow-hidden px-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground max-md:max-w-full disabled:pointer-events-auto disabled:cursor-not-allowed"
     >
       {busy
-        ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
+        ? <Spinner className="shrink-0" strokeWidth={2.4} aria-hidden="true" />
         : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
       <span className="min-w-0 flex-1 truncate">{currentName}</span>
       <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden="true" />
@@ -242,7 +243,7 @@ export function ModelSelector({
       )}
     >
       {busy
-        ? <LoaderCircleIcon className="size-4 shrink-0 animate-spin" strokeWidth={2.4} aria-hidden="true" />
+        ? <Spinner className="shrink-0" strokeWidth={2.4} aria-hidden="true" />
         : <CpuIcon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={1.8} aria-hidden="true" />}
       <span className="min-w-0 flex-1 truncate">{currentName}</span>
       <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden="true" />

@@ -1,7 +1,7 @@
 "use client";
 
-import { LoaderCircleIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { Spinner } from "@/components/ui/spinner";
 
 /**
  * Per-session status indicators shared by the sidebar tree and the
@@ -16,7 +16,7 @@ export function RunningSessionIndicator() {
       className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-primary"
     >
       {/* sidebar-spin (the retired app/sidebar-menu.css, folded here). */}
-      <LoaderCircleIcon size={14} strokeWidth={2.8} className="sidebar-spin shrink-0 animate-spin [animation-duration:0.9s] motion-reduce:animate-none" />
+      <Spinner className="sidebar-spin size-3.5 shrink-0 [animation-duration:0.9s]" strokeWidth={2.8} aria-hidden="true" />
     </span>
   );
 }

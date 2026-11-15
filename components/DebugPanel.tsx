@@ -15,6 +15,7 @@ import { Empty, EmptyHeader, EmptyTitle } from "./ui/empty";
 import { Field, FieldDescription, FieldGroup, FieldTitle } from "./ui/field";
 import { Item, ItemActions, ItemContent, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "./ui/item";
 import { Progress } from "./ui/progress";
+import { Spinner } from "./ui/spinner";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { cn } from "@/lib/utils";
 import {
@@ -637,7 +638,7 @@ function StatusSlot({ state, label }: { state: DebugStatusState; label: string }
     return (
       <span className={cn(slot, "text-primary")} title={label}>
         {/* sidebar-spin (the retired app/sidebar-menu.css, folded here). */}
-        <LoaderCircleIcon size={12} strokeWidth={2.8} className="sidebar-spin shrink-0 animate-spin [animation-duration:0.9s] motion-reduce:animate-none" role="img" aria-label={label} aria-hidden={false} />
+        <Spinner className="sidebar-spin size-3 shrink-0 [animation-duration:0.9s]" strokeWidth={2.8} role="img" aria-label={label} aria-hidden={false} />
       </span>
     );
   }
@@ -1421,7 +1422,7 @@ const RUN_TONES: Partial<Record<string, DebugTone>> = {
 /** A subagent run's mark: the sidebar's spinner while it runs, the agent switcher's shapes once settled. */
 function RunIcon({ status }: { status: string }) {
   if (status === "running" || status === "starting") {
-    return <LoaderCircleIcon className="size-3 shrink-0 animate-spin text-primary motion-reduce:animate-none" aria-hidden="true" />;
+    return <Spinner className="size-3 shrink-0 text-primary" aria-hidden="true" />;
   }
   const tone = RUN_TONES[status];
   if (tone) return <span className={cn("inline-flex size-3 shrink-0 items-center justify-center", TONE_TEXT[tone])}><StatusIcon status={status as SubagentSessionStatus} /></span>;

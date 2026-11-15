@@ -2,10 +2,10 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
-import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
 import { AnsiText } from "@/components/AnsiText";
 import { stripAnsi } from "@/lib/ansi";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { displayLabel } from "@/lib/label-case";
 import type { ExtensionWidgetItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -118,60 +118,55 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
     updateClearTimersRef.current.clear();
   }, []);
 
-  // The expanded panel plays tw-animate-css's animate-out on close: it stays
-  // mounted for the animation (useDelayedUnmount) and keeps the last expanded
-  // widget's content while it plays.
   const panelOpen = expandedWidgetKey !== null;
-  const panelMounted = useDelayedUnmount(panelOpen);
-
-  // 面板仅由点击开关，失焦、点击外部与 Escape 均不自动收起。
-  useEffect(() => {
-    if (!panelOpen) return;
-    const close = () => setExpandedWidgetKey(null);
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      if (target.closest(`[id^="${idPrefix}-trigger-"]`) || target.closest(`[id^="${idPrefix}-panel-"]`)) return;
-      close();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [panelOpen, idPrefix]);
-  const lastExpandedKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (expandedWidgetKey) lastExpandedKeyRef.current = expandedWidgetKey;
-  }, [expandedWidgetKey]);
-
-  if (widgets.length === 0) return null;
-
   const expandedWidget = widgets.find((widget) => (
     widget.key === expandedWidgetKey
     && widget.lines.length > 0
   ));
-  const panelWidget: ExtensionWidgetItem | null = expandedWidget
-    ?? (panelMounted ? widgets.find((widget) => widget.key === lastExpandedKeyRef.current) ?? null : null);
 
   const toggleWidget = (widget: ExtensionWidgetItem) => {
     setExpandedWidgetKey((current) => getNextExpandedWidgetKey(current, widget.key));
   };
 
   return (
-    <>
-      {(panelOpen || panelMounted) && panelWidget && (
-        <ExtensionWidgetPanel
-          widget={panelWidget}
-          triggerId={`${idPrefix}-trigger-${widgets.indexOf(panelWidget)}`}
-          panelId={`${idPrefix}-panel-${widgets.indexOf(panelWidget)}`}
-          closing={!panelOpen}
-        />
+    // Radix 驱动面板的开合与出入场动画（Presence 在退场动画期间保持已挂载）：
+    // 点击外部与 Escape 由 Popover 关闭，芯片点击仍走自身的开合切换。
+    <Popover
+      open={panelOpen}
+      onOpenChange={(open) => {
+        if (!open) setExpandedWidgetKey(null);
+      }}
+    >
+      {expandedWidget && (
+        <PopoverContent
+          id={`${idPrefix}-panel-${widgets.indexOf(expandedWidget)}`}
+          aria-labelledby={`${idPrefix}-trigger-${widgets.indexOf(expandedWidget)}`}
+          side="top"
+          align="start"
+          sideOffset={8}
+          // 面板不抢焦点：底部输入框与页面选区保持原状。
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onPointerDownOutside={(event) => {
+            // 芯片点击在行内自管开合，交给 Popover 反而会把「切到另一个 widget」
+            // 变成先关再开。
+            if ((event.target as Element | null)?.closest(`[id^="${idPrefix}-trigger-"]`)) {
+              event.preventDefault();
+            }
+          }}
+          className="z-50 w-[min(460px,calc(100vw-16px))] overflow-hidden rounded-xl border bg-popover p-0 text-popover-foreground shadow-md data-[state=closed]:pointer-events-none data-[state=open]:duration-150 data-[state=closed]:duration-150"
+        >
+          <div className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{expandedWidget.key}</div>
+          {/* Extension widgets render TUI output: tables, progress bars and box drawing
+              only line up while the monospace grid survives, so the panel scrolls
+              sideways rather than wrapping a line into a broken row. */}
+          <pre className="max-h-40 overflow-auto px-3 py-2 font-mono text-xs/relaxed [font-size:calc(12px+var(--chat-font-size-offset,0px))] [overflow-wrap:normal] whitespace-pre">
+            <AnsiText text={formatExtensionWidgetContent(expandedWidget.lines)} />
+          </pre>
+        </PopoverContent>
       )}
+      {/* 定位锚点：底栏左缘、其顶边上的零尺寸点——面板底边在栏顶上方 8px，与旧
+          `bottom-full left-0 mb-2` 一致（浮层从 Popover 门户渲染，锚点只是坐标）。 */}
+      <PopoverAnchor className="absolute bottom-full left-0 h-0 w-0" />
       <div className="flex min-w-0 flex-1 items-center gap-1 pl-0.5 pr-1.5">
         <div className="flex shrink-0 items-center gap-0.5" aria-label={t("chat.extensionWidgets")}>
           {widgets.map((widget, index) => {
@@ -245,39 +240,6 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
         </div>
         {children}
       </div>
-    </>
-  );
-}
-
-/**
- * Expanded widget content: a small popover-style card above the trigger row.
- */
-export function ExtensionWidgetPanel({ widget, triggerId, panelId, closing = false }: {
-  widget: ExtensionWidgetItem;
-  triggerId: string;
-  panelId: string;
-  /** True while the exit animation plays; the panel is already logically closed. */
-  closing?: boolean;
-}) {
-  return (
-    // Floats above the shelf bar (the bar root is its positioned ancestor): the
-    // official popover look — bg-popover, its own border, shadow — detached from
-    // the pill row, never nested inside it.
-    <section
-      id={panelId}
-      aria-labelledby={triggerId}
-      data-state={closing ? "closed" : "open"}
-      // fill-mode-forwards：退场动画结束到 useDelayedUnmount 真正卸载之间存在一帧以上空档，
-      // 默认 fill-mode none 会使面板弹回可见；forwards 将终态固定为透明与缩小。
-      className="absolute bottom-full left-0 z-50 mb-2 w-[min(460px,100%)] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md pointer-events-none data-[state=open]:pointer-events-auto data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-150 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:duration-150 data-[state=closed]:fill-mode-forwards"
-    >
-      <div className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{widget.key}</div>
-      {/* Extension widgets render TUI output: tables, progress bars and box drawing
-          only line up while the monospace grid survives, so the panel scrolls
-          sideways rather than wrapping a line into a broken row. */}
-      <pre className="max-h-40 overflow-auto px-3 py-2 font-mono text-xs/relaxed [font-size:calc(12px+var(--chat-font-size-offset,0px))] [overflow-wrap:normal] whitespace-pre">
-        <AnsiText text={formatExtensionWidgetContent(widget.lines)} />
-      </pre>
-    </section>
+    </Popover>
   );
 }
