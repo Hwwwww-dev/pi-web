@@ -1713,6 +1713,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (!dock || !host || panel) return;
     const apply = () => {
       host.style.setProperty("--composer-dock-h", `${dock.offsetHeight}px`);
+      // 渐变实心段终点＝输入壳层顶边（速率行正上方）：从屏幕底边到速率行
+      // 全部不透明，速率行往上再渐隐。实心值从渐隐层的底边起算（层底越过
+      // 安全区贴到屏幕底边），env 内嵌进值里——渐变停靠点不接受 calc+env。
+      // 壳层缺失时退化为整段停靠区实心。
+      const shell = dock.querySelector<HTMLElement>(".chat-input-shell");
+      const envInset = parseFloat(getComputedStyle(host).paddingBottom) || 0;
+      const solid = envInset + (shell
+        ? dock.getBoundingClientRect().bottom - shell.getBoundingClientRect().top
+        : dock.offsetHeight);
+      const clamped = Math.max(0, Math.ceil(solid));
+      host.style.setProperty("--composer-fade-solid", `${clamped}px`);
+      host.style.setProperty("--composer-fade-end", `${clamped + 96}px`);
     };
     apply();
     const ro = new ResizeObserver(apply);
@@ -1720,6 +1732,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return () => {
       ro.disconnect();
       host.style.removeProperty("--composer-dock-h");
+      host.style.removeProperty("--composer-fade-solid");
+      host.style.removeProperty("--composer-fade-end");
     };
   }, [panel]);
 
@@ -2019,10 +2033,19 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         )}
       >
         {composerFloating && (
-          // 渐隐层覆盖整个停靠区（状态行、卡片、胶囊区的空隙）并向上延伸 48px：
-          // 渐变自屏幕底边向上连续淡出。锚在卡片顶边会与停靠区其它行之间留出
-          // 亮字断层，悬空的渐暗带看起来像一道阴影。
-          <div aria-hidden className="chat-composer-fade pointer-events-none absolute inset-x-0 bottom-0 -top-12" />
+          // 渐隐层覆盖整个停靠区、向下越过安全区贴到屏幕底边，向上延伸 96px
+          // （正好容纳实心终点之上的整段渐隐，不产生截断缝）。底部（含
+          // TODO/YOLO 行与安全区）始终实心，不存在透出背后文字的细缝；实心段
+          // 终点由 --composer-fade-solid 钉在速率行。
+          //
+          // -z-10 把它压到停靠区（z-30 堆叠上下文）内所有常规内容之后：渐隐层
+          // 是 z-auto 的绝对定位元素，不压的话在 phase 8 绘制，会盖住未定位的
+          // 速率行与错误提示的文字；卡片与扩展状态条自身 relative 才没被盖。
+          // 负 z 只在停靠区上下文内部生效，仍压在消息列表之上。
+          <div
+            aria-hidden
+            className="chat-composer-fade pointer-events-none absolute inset-x-0 -top-24 -z-10 bottom-[calc(-1*env(safe-area-inset-bottom,0px))]"
+          />
         )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the
