@@ -70,6 +70,10 @@ async function listWithGit(cwd: string): Promise<FileListing | null> {
 
 function listWithWalk(cwd: string): FileListing {
   const files: string[] = [];
+  // The cap counts every dirent the synchronous walk considers, directories
+  // included: a tree of many near-empty folders would otherwise readdirSync
+  // unboundedly while collecting few files.
+  let visited = 0;
   // BFS so shallow files win when the cap truncates the listing.
   const queue: Array<{ abs: string; rel: string; depth: number }> = [{ abs: cwd, rel: "", depth: 0 }];
   while (queue.length > 0) {
@@ -84,15 +88,16 @@ function listWithWalk(cwd: string): FileListing {
       // The file tree's name list, only for this non-git fallback. Git repos
       // rely on .gitignore instead (matches the TUI's fd behavior).
       if (isHiddenOutsideGit(d.name)) continue;
+      visited += 1;
+      if (visited > WALK_HARD_CAP) {
+        return { files, hardTruncated: true };
+      }
       const childRel = rel ? `${rel}/${d.name}` : d.name;
       if (d.isDirectory()) {
         if (depth + 1 <= MAX_WALK_DEPTH) {
           queue.push({ abs: path.join(abs, d.name), rel: childRel, depth: depth + 1 });
         }
       } else if (d.isFile()) {
-        if (files.length >= WALK_HARD_CAP) {
-          return { files, hardTruncated: true };
-        }
         files.push(childRel);
       }
     }

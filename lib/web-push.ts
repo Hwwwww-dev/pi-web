@@ -70,6 +70,9 @@ function getDefaultEnvironment(): WebPushEnvironment {
           },
           TTL: PUSH_OPTIONS.TTL,
           urgency: PUSH_OPTIONS.urgency,
+          // Same bound as the server's other external requests; web-push hands
+          // this to https.request, which fails the delivery instead of hanging.
+          timeout: 15_000,
         },
       );
     },

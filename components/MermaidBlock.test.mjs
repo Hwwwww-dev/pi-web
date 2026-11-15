@@ -85,20 +85,22 @@ function shownCode(html) {
 
 const wrapSample = "const x = 1;\n    indented(\"https://example.invalid/a/b/c\");\n\nlast();";
 
-test("CodeBlock renders the same numbered lines without tokens until the Prism languages load", () => {
-  const html = renderCode({ code: "const x = 1;\nlet y = 2;", lang: "javascript" });
+test("CodeBlock renders the same numbered lines without tokens until the block's language loads", () => {
+  // tsx is mapped for on-demand loading (lib/prism-languages.ts) but nothing
+  // has loaded it yet, so the block falls back to the plain-text rendering.
+  const html = renderCode({ code: "const x = 1;\nlet y = 2;", lang: "tsx" });
 
   assert.doesNotMatch(html, /class="token/);
   assert.equal(html.match(/react-syntax-highlighter-line-number/g)?.length, 2);
   assert.match(html, /const x = 1;/);
-  const fallback = renderCode({ code: wrapSample, lang: "javascript" });
+  const fallback = renderCode({ code: wrapSample, lang: "tsx" });
   assert.deepEqual(lineRows(fallback), ["1", "2", "3", "4"]);
   assert.equal(shownCode(fallback), wrapSample);
 });
 
 test("CodeBlock highlights code when not streaming", async () => {
-  await loadPrismLanguages();
-  const html = renderCode({ code: "const x = 1;", lang: "javascript" });
+  await loadPrismLanguages("tsx");
+  const html = renderCode({ code: "const x = 1;", lang: "tsx" });
 
   assert.match(html, /class="token/);
   assert.match(html, /const/);

@@ -61,7 +61,8 @@ import type { DebugClientLease, DebugClientSession, DebugEventConnectionSnapshot
 import { pageId, peekPageId, trackEventSource } from "@/lib/page-debug";
 import type { TranslationParams } from "@/lib/i18n/types";
 import { AGENT_EVENT_HEARTBEAT_MS, isNestedToolExecutionEvent, isSystemMessageEvent } from "@/lib/agent-event-wire";
-import { runStatePhase } from "@/lib/chat-phase-label";
+import { createAgentPhaseStore, runStatePhase } from "@/lib/chat-phase-label";
+import { createActiveToolsStore } from "@/lib/active-tools";
 import { getToolExecutionProgress } from "@/lib/tool-execution-progress";
 import { CODEMODE_TOOL_NAME, getCodemodeProgress } from "@/lib/codemode-view";
 import { updateExtensionWidgets } from "@/lib/extension-widgets";
@@ -184,12 +185,6 @@ type NoticeAction =
   | { type: "add"; notice: NoticeItem }
   | { type: "mark_oldest_exiting" }
   | { type: "remove"; id: string };
-
-export type AgentPhase =
-  | { kind: "waiting_model" }
-  | { kind: "running_command" }
-  | { kind: "running_tools"; tools: { id: string; name: string; progress?: string }[] }
-  | null;
 
 export interface CompactResultInfo {
   reason: "manual" | "threshold" | "overflow" | "auto" | string;
@@ -489,7 +484,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [error, setError] = useState<string | null>(null);
   const [activeLeafId, setActiveLeafId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
-  const [activeToolResults, setActiveToolResults] = useState<Map<string, ToolResultMessage>>(new Map());
+  // In-flight tool results and the run phase live outside React: a
+  // tool_execution_update lands several times a second, and only the running
+  // card (per toolCallId) and the status line subscribe to them. React state
+  // here would re-render the whole chat per event.
+  const [activeToolsStore] = useState(createActiveToolsStore);
+  const [agentPhaseStore] = useState(createAgentPhaseStore);
   const [entryIds, setEntryIds] = useState<string[]>([]);
   // Entry ids that took over a run's message keys when the file was read again (lib/message-keys.ts).
   const [messageKeyAliases, setMessageKeyAliases] = useState<ReadonlyMap<string, string>>(() => new Map());
@@ -556,7 +556,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [autoCompactionEnabled, setAutoCompactionEnabled] = useState(true);
   const [compactError, setCompactError] = useState<string | null>(null);
   const [compactResult, setCompactResult] = useState<CompactResultInfo | null>(null);
-  const [agentPhase, setAgentPhase] = useState<AgentPhase>(null);
   const [slashCommands, setSlashCommands] = useState<SlashCommandInfo[]>([]);
   const [slashCommandsLoading, setSlashCommandsLoading] = useState(false);
   const [noticeState, dispatchNotice] = useReducer(noticeReducer, { visible: [], pending: [] });
@@ -1814,12 +1813,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const wasRunning = agentRunningRef.current;
     agentRunningRef.current = false;
     setAgentRunning(false);
-    setAgentPhase(null);
+    agentPhaseStore.set(null);
     setRetryInfo(null);
-    setActiveToolResults(new Map());
+    activeToolsStore.clear();
     dispatch({ type: "end" });
     return wasRunning;
-  }, [dispatch]);
+  }, [activeToolsStore, agentPhaseStore, dispatch]);
 
   const notifyPromptStage = useCallback((runId: number, aborted = false, subagentsActive = false) => {
     if (notifiedPromptRunIdRef.current === runId) return false;
@@ -1865,7 +1864,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           rpcPromptPendingRef.current = Boolean(state?.isPromptRunning);
           agentRunningRef.current = true;
           setAgentRunning(true);
-          setAgentPhase((prev) => runStatePhase(prev, Boolean(state?.isStreaming)));
+          agentPhaseStore.set((prev) => runStatePhase(prev, Boolean(state?.isStreaming)));
           return;
         }
 
@@ -1894,7 +1893,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
     eventStreamGraceTimerRef.current = setTimeout(() => void checkServerIdle(), EVENT_STREAM_IDLE_GRACE_MS);
     eventStreamGraceDueAtRef.current = Date.now() + EVENT_STREAM_IDLE_GRACE_MS;
-  }, [cancelEventStreamGrace, closeEvents, syncLiveModel]);
+  }, [agentPhaseStore, cancelEventStreamGrace, closeEvents, syncLiveModel]);
 
   const finishPromptWithoutStream = useCallback(async (sid: string | null = sessionIdRef.current, runId = promptRunIdRef.current) => {
     // Bail out before loadSession too: a stale finish for a previous run
@@ -2112,7 +2111,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           // The server replays every tool call still running right after this
           // event, so start from none: a call that ended while the stream was
           // down must not stay listed.
-          setAgentPhase({ kind: "waiting_model" });
+          agentPhaseStore.set({ kind: "waiting_model" });
         }
         // Opening the stream is what resumes an idle-reaped session, so the
         // mount's state read may have found no runtime and no usage to show.
@@ -2125,7 +2124,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         sdkAgentActiveRef.current = true;
         agentRunningRef.current = true;
         setAgentRunning(true);
-        setAgentPhase({ kind: "waiting_model" });
+        agentPhaseStore.set({ kind: "waiting_model" });
         // A retry's wait is over once its run starts, as pi's TUI shows it: the
         // successful auto_retry_end comes only with the retry's first complete
         // reply, which can stream for minutes.
@@ -2137,7 +2136,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         // compacting, or continuing messages queued by extension handlers.
         // Keep the stream open until prompt_done/agent_settled and the idle grace.
         if (!agentRunningRef.current) break;
-        setAgentPhase(null);
+        agentPhaseStore.set(null);
         setRetryInfo(null);
         dispatch({ type: "end" });
         if (sessionIdRef.current) {
@@ -2225,16 +2224,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           if (msg?.role === "user") break;
           if (msg?.role === "assistant") {
             dispatch({ type: "snapshot", message: msg });
-            if (msg.content.length > 0) setAgentPhase(null);
+            if (msg.content.length > 0) agentPhaseStore.set(null);
           } else if (msg) {
-            setAgentPhase(null);
+            agentPhaseStore.set(null);
           }
         } else {
           const delta = event.assistantMessageEvent as ClientAssistantMessageEvent | undefined;
           if (delta) {
             dispatch({ type: "delta", event: delta });
             if (delta.type !== "toolcall_start" && delta.type !== "toolcall_delta") {
-              setAgentPhase(null);
+              agentPhaseStore.set(null);
             }
           }
         }
@@ -2305,7 +2304,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           }
         }
         dispatch({ type: "end" });
-        setAgentPhase({ kind: "waiting_model" });
+        agentPhaseStore.set({ kind: "waiting_model" });
         break;
       }
       case "tool_execution_start": {
@@ -2315,7 +2314,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         if (isNestedToolExecutionEvent(event)) break;
         const id = event.toolCallId as string;
         const name = event.toolName as string;
-        setAgentPhase((prev) => {
+        agentPhaseStore.set((prev) => {
           const tools = prev?.kind === "running_tools" ? [...prev.tools] : [];
           if (!tools.some((t) => t.id === id)) tools.push({ id, name });
           return { kind: "running_tools", tools };
@@ -2330,23 +2329,19 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         const content = partialResult?.content;
         // Live output for shells; for codemode, the calls its script has made so far.
         if ((name === "bash" || name === "powershell" || name === CODEMODE_TOOL_NAME) && Array.isArray(content)) {
-          setActiveToolResults((prev) => {
-            const next = new Map(prev);
-            next.set(id, {
-              role: "toolResult",
-              toolCallId: id,
-              toolName: name,
-              content,
-              isError: partialResult?.isError,
-              details: partialResult?.details,
-            });
-            return next;
+          activeToolsStore.set(id, {
+            role: "toolResult",
+            toolCallId: id,
+            toolName: name,
+            content,
+            isError: partialResult?.isError,
+            details: partialResult?.details,
           });
         }
         const progress = name === CODEMODE_TOOL_NAME
           ? getCodemodeProgress(event.partialResult)
           : getToolExecutionProgress(event.partialResult);
-        setAgentPhase((prev) => {
+        agentPhaseStore.set((prev) => {
           const tools = prev?.kind === "running_tools" ? [...prev.tools] : [];
           const existing = tools.find((tool) => tool.id === id);
           const updated = {
@@ -2365,13 +2360,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         if (isNestedToolExecutionEvent(event)) break;
         const id = event.toolCallId as string;
         onToolEnd?.(event.toolName as string);
-        setActiveToolResults((prev) => {
-          if (!prev.has(id)) return prev;
-          const next = new Map(prev);
-          next.delete(id);
-          return next;
-        });
-        setAgentPhase((prev) => {
+        activeToolsStore.remove(id);
+        agentPhaseStore.set((prev) => {
           if (prev?.kind !== "running_tools") return prev;
           const tools = prev.tools.filter((t) => t.id !== id);
           if (tools.length === 0) return { kind: "waiting_model" };
@@ -2416,7 +2406,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setExtensionDialogs((queue) => removeExtensionUiRequest(queue, event.id as string));
         break;
     }
-  }, [addNotice, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, notifyPromptStage, onAgentEnd, onToolEnd, refreshContextUsage, scheduleEventStreamClose, settleUiStage, syncLiveModel]);
+  }, [activeToolsStore, addNotice, agentPhaseStore, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, notifyPromptStage, onAgentEnd, onToolEnd, refreshContextUsage, scheduleEventStreamClose, settleUiStage, syncLiveModel]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {
@@ -2499,7 +2489,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     promptRunIdRef.current = promptRunId;
     agentRunningRef.current = true;
     setAgentRunning(true);
-    setAgentPhase(isSlashCommandPrompt ? { kind: "running_command" } : { kind: "waiting_model" });
+    agentPhaseStore.set(isSlashCommandPrompt ? { kind: "running_command" } : { kind: "waiting_model" });
     dispatch({ type: "start" });
 
     // A queued prompt (parked behind compaction, or queued into a run) is not a
@@ -2610,10 +2600,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       agentRunningRef.current = false;
       closeEvents("send_failed");
       setAgentRunning(false);
-      setAgentPhase(null);
+      agentPhaseStore.set(null);
       dispatch({ type: "end" });
     }
-  }, [isNew, newSessionCwd, newSessionModel, session, ensureNewSession, ensureEventsConnected, promoteNewSession, waitForPromptSettlement, addNotice, releaseUnconfirmedSend, cancelEventStreamGrace, closeEvents, composerDraftKey, dispatch, reconcileAgentState, restoreSubmission, editEntryId, setEdit]);
+  }, [isNew, newSessionCwd, newSessionModel, session, ensureNewSession, ensureEventsConnected, promoteNewSession, waitForPromptSettlement, addNotice, agentPhaseStore, releaseUnconfirmedSend, cancelEventStreamGrace, closeEvents, composerDraftKey, dispatch, reconcileAgentState, restoreSubmission, editEntryId, setEdit]);
 
   const executeBash = useCallback(async (command: string, excludeFromContext: boolean) => {
     if (agentRunningRef.current || bashRunningRef.current) return;
@@ -3476,7 +3466,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         rpcPromptPendingRef.current = Boolean(agentState.state.isPromptRunning);
         agentRunningRef.current = true;
         setAgentRunning(true);
-        setAgentPhase((prev) => runStatePhase(prev, agentState.state?.isStreaming === true));
+        agentPhaseStore.set((prev) => runStatePhase(prev, agentState.state?.isStreaming === true));
         dispatch({ type: "resume" });
         if (!agentState.state.isStreaming && agentState.state.isPromptRunning) {
           void waitForPromptSettlement(sid);
@@ -3497,7 +3487,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // guarded by the snapshot gate; applying it here without a token could
       // overwrite a fresher SSE event.
     }
-  }, [dispatch, loadTools, waitForBashSettlement, waitForPromptSettlement]);
+  }, [agentPhaseStore, dispatch, loadTools, waitForBashSettlement, waitForPromptSettlement]);
 
   // Open a released stream again and read what it missed (a run another tab, a
   // device or an extension started or finished, statuses), shown as the mount
@@ -3836,7 +3826,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   return {
     // State
-    data, loading, error, activeLeafId, messages, activeToolResults, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, newestCursor, hasNewerMessages, headTurn, streamingStore,
+    data, loading, error, activeLeafId, messages, activeToolsStore, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, newestCursor, hasNewerMessages, headTurn, streamingStore,
     agentRunning, modelNames, modelList, modelError, missingCwd, modelScopeWarnings, isModelScopeActive, allModelList, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage: displayContextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats, autoCompactionEnabled,
@@ -3845,7 +3835,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     isAutoModelSelection: isNew && newSessionModel === null,
     isAutoThinkingSelection: isNew && newSessionThinkingLevel === null,    defaultModel: newSessionDefaultModel,
     savedDefaultThinkingLevel,
-    agentPhase,
+    agentPhaseStore,
     isNew,
     editEntryId,
     // Refs

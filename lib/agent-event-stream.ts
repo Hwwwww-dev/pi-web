@@ -164,6 +164,34 @@ function errorMessage(error: unknown): string {
 }
 
 /**
+ * One serialized copy per raw agent event. Every stream on a session used to
+ * run `toClientAgentEvent` + `JSON.stringify` for every event; the projection
+ * is a pure function of the event, so N streams shared one `emit` and the
+ * string is built once and broadcast. The snapshot filter stays per stream:
+ * streams connected while a message was streaming hold different snapshots
+ * and drop different events, but that decision reads the raw event only.
+ */
+interface EventSerialization {
+  clientEvent: ReturnType<typeof toClientAgentEvent>;
+  /** The `data: …\n\n` frame for the client event; empty when the projection dropped it. */
+  sse: string;
+}
+const eventSerializations = new WeakMap<AgentEventLike, EventSerialization>();
+
+function clientEventSerialization(event: AgentEventLike): EventSerialization {
+  let memo = eventSerializations.get(event);
+  if (!memo) {
+    const clientEvent = toClientAgentEvent(event);
+    memo = {
+      clientEvent,
+      sse: clientEvent ? `data: ${JSON.stringify(clientEvent)}\n\n` : "",
+    };
+    eventSerializations.set(event, memo);
+  }
+  return memo;
+}
+
+/**
  * Open the SSE transport immediately, then publish the session snapshot only
  * after the agent is ready and its event listener has been installed.
  * `meta` (the page's id, the request's reported address and browser label) only labels the
@@ -184,8 +212,9 @@ export function createAgentEventStream(
       let heartbeat: ReturnType<typeof setInterval> | null = null;
       let unsubscribe: (() => void) | null = null;
       let abortHandler: (() => void) | null = null;
-      // Latest `tool_execution_update` per tool call id, waiting for the flush.
-      const pendingToolUpdates = new Map<unknown, AgentEventLike>();
+      // Latest `tool_execution_update` per tool call id, waiting for the flush:
+      // the already-serialized frame, so the flush never re-stringifies.
+      const pendingToolUpdates = new Map<unknown, string>();
       let toolUpdateTimer: ReturnType<typeof setTimeout> | null = null;
 
       // "error": hard-terminate the response (SSE client sees a broken
@@ -265,11 +294,11 @@ export function createAgentEventStream(
         toolUpdateTimer = null;
         const updates = [...pendingToolUpdates.values()];
         pendingToolUpdates.clear();
-        for (const update of updates) encode(update, { droppable: true });
+        for (const sse of updates) enqueueText(sse, { droppable: true });
       };
-      const sendClientEvent = (clientEvent: AgentEventLike) => {
+      const sendClientEvent = (clientEvent: AgentEventLike, sse: string) => {
         if (clientEvent.type === "tool_execution_update") {
-          pendingToolUpdates.set(clientEvent.toolCallId, clientEvent);
+          pendingToolUpdates.set(clientEvent.toolCallId, sse);
           toolUpdateTimer ??= setTimeout(flushToolUpdates, TOOL_UPDATE_COALESCE_MS);
           return;
         }
@@ -281,12 +310,12 @@ export function createAgentEventStream(
         } else if (clientEvent.type === "agent_end") {
           pendingToolUpdates.clear();
         }
-        encode(clientEvent, { droppable: isDroppableEvent(clientEvent) });
+        enqueueText(sse, { droppable: isDroppableEvent(clientEvent) });
       };
       const forwardEvent = (event: AgentEventLike, snapshot: unknown) => {
         if (isEventIncludedInSnapshot(event, snapshot)) return;
-        const clientEvent = toClientAgentEvent(event);
-        if (clientEvent) sendClientEvent(clientEvent);
+        const { clientEvent, sse } = clientEventSerialization(event);
+        if (clientEvent && sse) sendClientEvent(clientEvent, sse);
       };
 
       const publishSession = async () => {

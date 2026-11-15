@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { splitThinkingPieces } from "@/lib/message-display";
@@ -130,7 +130,9 @@ function ReasoningText({ text, error, loading, fadeIn = false, className, onScro
   );
 }
 
-export function ReasoningTrace({ block, duration, sessionId, entryId, durationKey, blockIndex, active }: {
+// memo：props 均为原始值或稳定引用（lib/streaming-message.ts 保证未更新的 thinking
+// block 引用不变），长思考回复的每个 chunk 只重渲染仍在增长的那一块。
+export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, sessionId, entryId, durationKey, blockIndex, active }: {
   block: ThinkingContent;
   duration?: number;
   sessionId?: string;
@@ -270,4 +272,4 @@ export function ReasoningTrace({ block, duration, sessionId, entryId, durationKe
       </TraceCollapsible>
     </Trace>
   );
-}
+});

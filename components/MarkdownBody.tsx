@@ -4,6 +4,7 @@ import { createContext, memo, useContext, useMemo, useState, type ComponentProps
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
+import { useRehypeKatexVersion } from "@/hooks/useRehypeKatexVersion";
 import { copyText } from "@/lib/clipboard";
 import { parseFileOpenOptions, resolveLocalFileHref, resolveLocalFilePath, shouldOpenLocalFileInApp } from "@/lib/file-links";
 import { encodeFilePathForApi } from "@/lib/file-paths";
@@ -128,6 +129,9 @@ interface MarkdownBlockProps {
 
 /** One parse; skipped while its text and renderers stay the same. */
 const MarkdownBlock = memo(function MarkdownBlock({ markdown, remarkPlugins, urlTransform, rehypePlugins, components }: MarkdownBlockProps) {
+  // KaTeX 就绪前公式按普通文本画出；这里订阅就绪事件重画一次换回 KaTeX。
+  // 预检只圈可能含公式的块，纯文本块不被这次重画惊动。
+  useRehypeKatexVersion(markdown.includes("$") || markdown.includes("\\(") || markdown.includes("```math"));
   return (
     <ReactMarkdown
       remarkPlugins={remarkPlugins}

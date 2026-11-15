@@ -286,9 +286,9 @@ export function getFinishedTurnView({ messages, userIdx, endIdx, finalAssistantI
   const processBlockLimitByIdx = finalProcessEnd < 0 ? undefined : new Map([[finalAssistantIdx, finalProcessEnd]]);
 
   // The turn's own toolResult messages pair its tool calls; results still in
-  // flight (activeToolResults) only matter for the live tail, which is never
-  // cached. A page boundary can split a call from its result — then the row
-  // renders without it, exactly like the uncached path did.
+  // flight (the active tools store) only matter for the live tail, which is
+  // never cached. A page boundary can split a call from its result — then the
+  // row renders without it, exactly like the uncached path did.
   const toolResults = new Map<string, ToolResultMessage>();
   for (let idx = userIdx; idx < endIdx; idx++) {
     const message = messages[idx];

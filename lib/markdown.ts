@@ -1,7 +1,6 @@
 import type { Content, Link, Parent, Root } from "mdast";
 import type { Element as HastElement, Root as HastRoot, RootContent as HastContent } from "hast";
 import { defaultUrlTransform, type Options as ReactMarkdownOptions } from "react-markdown";
-import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkFrontmatter from "remark-frontmatter";
@@ -849,12 +848,69 @@ function rehypeDisplayMathSource() {
   };
 }
 
+type RehypeKatexFactory = typeof import("rehype-katex")["default"];
+type RehypeKatexOptions = Parameters<RehypeKatexFactory>[0];
+
+// rehype-katex（~80KB gz）不进首屏 bundle：导出的管线数组保持模块常量（它们被
+// 用作 MarkdownBlock 的 memo props），公式入口是一个稳定替身插件——首次在解析
+// 出的树里真正见到 math 节点才动态加载（模块级 promise 缓存，无公式的会话零加载）。
+// 加载完成前公式按普通文本/代码块画出；完成后版本号 +1，跑管线的渲染块订阅
+// hooks/useRehypeKatexVersion 各重画一次，换成 KaTeX。
+let rehypeKatexFactory: RehypeKatexFactory | null = null;
+let rehypeKatexVersion = 0;
+const rehypeKatexListeners = new Set<() => void>();
+
+function ensureRehypeKatex(): void {
+  if (rehypeKatexFactory) return;
+  void import("rehype-katex").then((mod) => {
+    rehypeKatexFactory = mod.default;
+    rehypeKatexVersion += 1;
+    for (const listener of rehypeKatexListeners) listener();
+  });
+}
+
+/** KaTeX 是否已就绪：就绪时版本号递增一次，订阅的渲染块据此重画。 */
+export function getRehypeKatexVersion(): number {
+  return rehypeKatexVersion;
+}
+
+export function subscribeRehypeKatexVersion(listener: () => void): () => void {
+  rehypeKatexListeners.add(listener);
+  return () => {
+    rehypeKatexListeners.delete(listener);
+  };
+}
+
+function hastTreeHasMath(tree: HastRoot): boolean {
+  const visit = (node: HastContent): boolean => {
+    if (node.type !== "element") return false;
+    if (node.tagName === "code") {
+      const classes = node.properties.className;
+      if (Array.isArray(classes) && classes.some((name) => name === "math-inline" || name === "math-display" || name === "language-math")) {
+        return true;
+      }
+    }
+    return node.children.some(visit);
+  };
+  return tree.children.some(visit);
+}
+
+/** rehype-katex 的稳定替身：见上方加载说明。 */
+function rehypeDeferredKatex(options?: RehypeKatexOptions) {
+  if (rehypeKatexFactory) return rehypeKatexFactory(options);
+  return (tree: HastRoot) => {
+    if (hastTreeHasMath(tree)) ensureRehypeKatex();
+  };
+}
+
+const rehypeKatexSettings = { throwOnError: false, strict: false } as const;
+
 export const markdownRehypePlugins: ReactMarkdownOptions["rehypePlugins"] = [
   rehypeRaw,
   [rehypeSanitize, markdownSanitizeSchema],
   rehypeMatchClobberedIds,
   rehypeDisplayMathSource,
-  [rehypeKatex, { throwOnError: false, strict: false }],
+  [rehypeDeferredKatex, rehypeKatexSettings],
 ];
 
 /** GitHub's heading slugs for `#fragment` links, as a data attribute: two rendered documents never share an id. */
@@ -887,12 +943,12 @@ export const markdownDocumentRehypePlugins: ReactMarkdownOptions["rehypePlugins"
   [rehypeSanitize, markdownSanitizeSchema],
   markdownHeadingAnchors,
   rehypeDisplayMathSource,
-  [rehypeKatex, { throwOnError: false, strict: false }],
+  [rehypeDeferredKatex, rehypeKatexSettings],
 ];
 
 export const markdownPreviewRehypePlugins: ReactMarkdownOptions["rehypePlugins"] = [
   rehypeRaw,
   [rehypeSanitize, markdownSanitizeSchema],
   rehypeMatchClobberedIds,
-  [rehypeKatex, { throwOnError: false, strict: false }],
+  [rehypeDeferredKatex, rehypeKatexSettings],
 ];

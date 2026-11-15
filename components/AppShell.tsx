@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftIcon,
@@ -13,7 +14,6 @@ import {
   FileTextIcon,
   GitBranchIcon,
   HistoryIcon,
-  LoaderCircleIcon,
   MenuIcon,
   MoonIcon,
   PanelRightIcon,
@@ -62,7 +62,9 @@ import { ToolDefinitionsPanel } from "./ToolDefinitionsPanel";
 import { AgentSessionPanel } from "./AgentSessionPanel";
 import { DebugPanel, DebugPanelBoundary } from "./DebugPanel";
 import { SessionChatPanel } from "./SessionChatPanel";
-import { TerminalPanel } from "./TerminalPanel";
+import { RegionErrorBoundary } from "./ErrorBoundary";
+// xterm（~70KB gz）只属于打开的终端标签：拆出首屏 bundle，首次挂载时才拉取。
+const TerminalPanel = dynamic(() => import("./TerminalPanel").then((mod) => mod.TerminalPanel), { ssr: false });
 import { newTerminalTab, restoreTerminalTabs, TERMINAL_TABS_KEY, type TerminalTab } from "./terminal-tab-state";
 import { appendSideTab, restoreSideTabs, sideTabsKey } from "./side-tab-state";
 import { useTheme } from "@/hooks/useTheme";
@@ -2186,7 +2188,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 data-mobile-toolbar-action={mobile ? "name" : undefined}
               >
                 {autoNameStatus.kind === "naming" ? (
-                  <LoaderCircleIcon className="size-3.5 shrink-0 animate-spin" strokeWidth={2} />
+                  <Spinner className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
                 ) : isSuccess ? (
                   <CheckIcon className="size-3.5 shrink-0" strokeWidth={2} />
                 ) : (
@@ -2477,7 +2479,13 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         聊天页，必须留原语的 bg-sidebar 底色。className 会落到侧栏容器上，加 w-full
         会把 w-(--sidebar-width) 盖掉（侧栏铺满整屏），故只传透明与隐藏。 */}
     <Sidebar side="left" variant="inset" collapsible="offcanvas" id="session-sidebar" inert={rightPanelFullWidth} className={cn(!isMobile && "bg-transparent", rightPanelFullWidth && "invisible")}>
-      {sidebarContent}
+      <RegionErrorBoundary
+        label={translate("region.sidebar")}
+        message={translate("region.crashed", { region: translate("region.sidebar") })}
+        retryLabel={translate("common.retry")}
+      >
+        {sidebarContent}
+      </RegionErrorBoundary>
       {/* 桌面拖拽手柄横跨侧栏右缘：panel-resize-handle 的基础规则为无层 CSS（position: relative），
           故外层包工具类定位；手机端由 Sheet 接管，不渲染。 */}
       <div className="absolute inset-y-0 -right-1.5 z-20 hidden w-3 min-[641px]:block">
@@ -2754,6 +2762,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         {/* 全宽文件面板时聊天列同样以 visibility 隐藏：minimap 浮层 z-260 高于面板 z-250，
             会从面板上方透出刻度。 */}
         <div inert={rightPanelFullWidth} className={cn("relative flex-1 overflow-hidden", rightPanelFullWidth && "invisible")}>
+          <RegionErrorBoundary
+            label={translate("region.chat")}
+            message={translate("region.crashed", { region: translate("region.chat") })}
+            retryLabel={translate("common.retry")}
+          >
           {showChat ? (
             <>
               {/* All keep-alive slots (including the selected one) live in the
@@ -2918,6 +2931,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               </div>
             )
           ) : null}
+          </RegionErrorBoundary>
         </div>
 
     </div>
@@ -3007,6 +3021,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
 
         {/* Only the active viewer is mounted. Lightweight per-tab state is restored on activation. */}
         <div className="min-h-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
+          <RegionErrorBoundary
+            label={translate("region.filePanel")}
+            message={translate("region.crashed", { region: translate("region.filePanel") })}
+            retryLabel={translate("common.retry")}
+          >
           {activeFileTabId === GIT_TAB_ID ? (
             <GitPanel
               cwd={selectedSession?.cwd ?? newSessionCwd ?? null}
@@ -3096,6 +3115,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               holdAudio={holdAudio}
             />
           )}
+          </RegionErrorBoundary>
         </div>
       </div>
     </SidebarProvider>

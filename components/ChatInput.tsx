@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, memo, KeyboardEvent } from "react";
+import React, { useRef, useState, useCallback, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, memo, useSyncExternalStore, KeyboardEvent, type ReactNode } from "react";
 import type { BuiltinSlashCommandResult, CompactResultInfo, QueuedSubmission, SlashCommandInfo } from "@/hooks/useAgentSession";
+import { phaseLabel, type AgentPhaseStore } from "@/lib/chat-phase-label";
 import type { SkillsResponse } from "@/lib/api-types";
 import type { TextContent, UserMessage } from "@/lib/types";
 import {
@@ -93,6 +94,31 @@ export interface AttachedImage {
 /** 粘贴文本超过该字符数时不再插入输入框，转成 TXT 文件上传（DeepSeek 同款行为）。 */
 export const PASTE_TEXT_TO_FILE_THRESHOLD = 10_000;
 
+/**
+ * 运行阶段文案的叶子：订阅 agentPhaseStore。工具输出事件每秒改写阶段数次，
+ * 只有这一行文字随事件重渲染，ChatWindow 与输入框本体不动。条件与旧
+ * ChatWindow 内联版一致：活动行在场时不显示；命令优先于阶段。
+ */
+export function ActivityNoticeLine({ store, live, bashRunning, pendingBash, agentRunning, isCompacting, hasStreamingContent, queuedCount }: {
+  store: AgentPhaseStore;
+  live: boolean;
+  bashRunning: boolean;
+  pendingBash: boolean;
+  agentRunning: boolean;
+  isCompacting: boolean;
+  hasStreamingContent: boolean;
+  queuedCount: number;
+}) {
+  const { t } = useI18n();
+  const phase = useSyncExternalStore(store.subscribe, store.get, store.get);
+  if (live) return null;
+  if (bashRunning && !pendingBash) return <>{t("chat.runningCommand")}</>;
+  if ((agentRunning || isCompacting) && !hasStreamingContent && (phase || isCompacting)) {
+    return <>{phaseLabel(phase, t, isCompacting, queuedCount)}</>;
+  }
+  return null;
+}
+
 interface Props {
   onSend: (message: string, images?: AttachedImage[]) => void;
   /** 超过 PASTE_TEXT_TO_FILE_THRESHOLD 的粘贴文本转交上层：包成 TXT 上传并以 @mention 引用。 */
@@ -145,7 +171,7 @@ interface Props {
   onSetDefaultThinkingLevel?: (level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") => void;
   retryInfo?: { attempt: number; maxAttempts: number; errorMessage?: string } | null;
   /** 运行阶段文案（"等待模型…" / "正在运行 bash…"）。与右侧速率共用输入框正上方那一行。 */
-  activityNotice?: string;
+  activityNotice?: ReactNode;
   /** 速率胶囊的数据源；传对象而非元素，输入框的 memo 才能照常跳过分块重渲染。 */
   streamStatusStore?: StreamingStore;
   queuedSubmissions?: QueuedSubmission[];

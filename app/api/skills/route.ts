@@ -96,6 +96,9 @@ export async function PATCH(req: Request) {
     }
 
     if (!filePath) return NextResponse.json({ error: "filePath required" }, { status: 400 });
+    if (typeof disableModelInvocation !== "boolean") {
+      return NextResponse.json({ error: "disableModelInvocation must be a boolean" }, { status: 400 });
+    }
     const refused = toggleSkillFile(filePath, disableModelInvocation, await getSkillEditRoots());
     if (refused) return NextResponse.json({ error: refused.error }, { status: refused.status });
     return NextResponse.json({ success: true });

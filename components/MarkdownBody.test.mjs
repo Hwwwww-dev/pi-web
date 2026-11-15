@@ -45,9 +45,13 @@ test("a document reader keeps HTML anchor destinations and link labels", () => {
   assert.match(html, /<a title="Read the setup guide" role="link" tabindex="0">Jump<\/a>/);
 });
 
-test("heading anchors are opt-in, scoped, formatted-text aware and generated before KaTeX", () => {
+test("heading anchors are opt-in, scoped, formatted-text aware and generated before KaTeX", async () => {
   const markdown = "# Setup **guide**!\n\n## Configuration\n\n## Configuration\n\n## Configuration-1\n\n## Configuration\n\n## 中文 标题\n\n## `code` & punctuation.\n\n## Compute $x$";
   assert.doesNotMatch(renderMarkdown(markdown), /data-heading-anchor/);
+  // KaTeX 按需加载（lib/markdown.ts 替身插件）：首渲染触发 import，等它落地后
+  // 的渲染才画 katex；锚点在 katex 之前生成，slug 取自公式原文。
+  renderMarkdown(markdown, { onNavigateLink() {} });
+  for (let i = 0; i < 10; i++) await new Promise((resolve) => setImmediate(resolve));
   const html = renderMarkdown(markdown, { onNavigateLink() {} });
   const anchors = [...html.matchAll(/data-heading-anchor="([^"]*)"/g)].map((match) => match[1]);
   assert.deepEqual(anchors, ["setup-guide", "configuration", "configuration-1", "configuration-1-1", "configuration-2", "中文-标题", "code--punctuation", "compute-x"]);
@@ -488,6 +492,8 @@ test("shows a user message's HTML as the text typed, like pi's TUI", () => {
   // Markdown around it still renders; code keeps its own text; assistant text keeps rendering HTML.
   const mixed = renderMarkdown("**bold** <u>x</u> [link](https://example.com) `<b>`\n\n```html\n<p>code</p>\n```", { keepLineBreaks: true });
   assert.match(mixed, /<strong>bold<\/strong> &lt;u&gt;x&lt;\/u&gt; <a href="https:\/\/example\.com"[^>]*>link<\/a> <code[^>]*>&lt;b&gt;<\/code>/);
-  assert.match(mixed, /&lt;p&gt;code&lt;\/p&gt;/);
+  // 常用语言（html 在按需加载的基线内）现在同步高亮，token 切分 spans 会拆开连续
+  // 字符：剥掉标签后断言原文仍以转义文本呈现，而非被解析。
+  assert.match(mixed.replaceAll(/<[^>]+>/g, ""), /&lt;p&gt;code&lt;\/p&gt;/);
   assert.match(renderMarkdown("normal <kbd>Ctrl</kbd>"), /<kbd>Ctrl<\/kbd>/);
 });

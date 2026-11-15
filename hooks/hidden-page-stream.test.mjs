@@ -308,7 +308,7 @@ test("the return shows a command, a ! command and a compaction the server has un
     await settle();
     state.hook.flush();
     assert.equal(state.hook.result.agentRunning, true);
-    assert.equal(state.hook.result.agentPhase?.kind, "running_command");
+    assert.equal(state.hook.result.agentPhaseStore.get()?.kind, "running_command");
     assert.equal(state.hook.result.bashRunning, true);
     assert.equal(state.hook.result.isCompacting, true);
   } finally {

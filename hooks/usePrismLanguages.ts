@@ -4,20 +4,23 @@ import { useEffect, useState } from "react";
 import { loadPrismLanguages, prismLanguagesLoaded } from "@/lib/prism-languages";
 
 /**
- * True once every Prism language is registered (lib/prism-languages.ts). While
- * `enabled`, a highlighter mounting before that starts the load and renders
- * again when it is done; until then it should render its code as plain text.
+ * True once the code's language is registered into the shared refractor core
+ * (lib/prism-languages.ts). While `enabled` and a language is named, a
+ * highlighter mounting before that starts the load and renders again when it
+ * is done; until then it should render its code as plain text. Baseline
+ * languages (refractor's common build) are registered from the start.
  */
-export function usePrismLanguages(enabled = true): boolean {
-  const [ready, setReady] = useState(prismLanguagesLoaded);
+export function usePrismLanguages(language: string | undefined, enabled = true): boolean {
+  const loaded = prismLanguagesLoaded(language);
+  const [ready, setReady] = useState(false);
   useEffect(() => {
-    if (ready || !enabled) return;
+    if (loaded || !enabled || !language) return;
     let active = true;
-    loadPrismLanguages().then(
-      () => { if (active) setReady(true); },
+    loadPrismLanguages(language).then(
+      () => { if (active && prismLanguagesLoaded(language)) setReady(true); },
       () => { /* Stays plain text; the next highlighter to mount retries. */ },
     );
     return () => { active = false; };
-  }, [enabled, ready]);
-  return ready;
+  }, [enabled, language, loaded]);
+  return ready || loaded;
 }

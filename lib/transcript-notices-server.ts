@@ -288,34 +288,114 @@ export function collectTranscriptNotices(
 }
 
 /**
+ * The `prev` state `scanCacheMisses()` would hold just before `message`,
+ * rebuilt from the tail backward. Only four entry kinds change that state —
+ * compaction and branch_summary reset it, a `cache_warm` usage and an
+ * assistant reply with prompt tokens set it — so the nearest one below
+ * `message` decides it, and a zero-cache reply only chains the
+ * `reportedCache` flag from the state before it. Exact, and it stops at that
+ * entry instead of walking the whole log like the forward scan does.
+ */
+function previousRequestFromTail(entries: readonly SessionEntry[], skipMessage: unknown): PreviousRequest | undefined {
+  // A zero-cache reply already found: its `prev` waits only for whether the
+  // state before it reported cache activity.
+  let pending: UsageMessage | undefined;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
+    // pi announces message_end before writing the entry, so the finished
+    // reply is usually not here; where it is, the tail walk skips it.
+    if (entry.type === "message" && (entry.message as unknown) === skipMessage) continue;
+    if (entry.type === "compaction" || entry.type === "branch_summary") {
+      // The context changed on purpose: the state before it is gone, and a
+      // waiting zero-cache reply inherits no cache report.
+      return pending ? asPreviousRequest(pending, false) : undefined;
+    }
+    if (entry.type === "usage" && entry.kind === "cache_warm") {
+      if (!isUsage(entry.usage)) continue;
+      const promptTokens = entry.usage.input + entry.usage.cacheRead + entry.usage.cacheWrite;
+      if (promptTokens <= 0) continue;
+      return pending
+        ? asPreviousRequest(pending, true)
+        : {
+          promptTokens,
+          modelKey: `${entry.provider}/${entry.model}`,
+          timestamp: Date.parse(entry.timestamp),
+          reportedCache: true,
+        };
+    }
+    const message = assistantMessageOf(entry);
+    if (!message) continue;
+    const promptTokens = message.usage.input + message.usage.cacheRead + message.usage.cacheWrite;
+    if (promptTokens <= 0) continue;
+    if (message.usage.cacheRead + message.usage.cacheWrite > 0) {
+      return pending ? asPreviousRequest(pending, true) : asPreviousRequest(message, true);
+    }
+    if (!pending) pending = message;
+    // Another zero-cache reply is transparent for the flag; keep walking.
+  }
+  return pending ? asPreviousRequest(pending, false) : undefined;
+}
+
+/**
+ * The cache-read price a session's own replies paid for one model, the figure
+ * `sessionCacheReadPrices()` maps it to: the latest entry of that model that
+ * read from the cache. Read from the tail, so it stops at that entry instead
+ * of building the whole map.
+ */
+function sessionCacheReadPriceFromTail(entries: readonly SessionEntry[], provider: string, modelId: string): number | undefined {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const message = assistantMessageOf(entries[i]);
+    if (!message || message.provider !== provider || message.model !== modelId) continue;
+    if (message.usage.cacheRead <= 0 || typeof message.usage.cost.cacheRead !== "number") continue;
+    return message.usage.cost.cacheRead / message.usage.cacheRead * 1_000_000;
+  }
+  return undefined;
+}
+
+/**
  * The notices of an assistant message that just completed, for its
  * `message_end`. pi announces it before writing it, so it is skipped if the
- * entries already hold it.
+ * entries already hold it. The cache-miss state and the session's own prices
+ * are rebuilt from the tail (see `previousRequestFromTail()`), and `getBranch`
+ * runs only when the reply dropped thinking blocks, so a long transcript pays
+ * for the entries near the reply rather than the whole log.
  */
 export function collectLiveAssistantNotices(
   entries: readonly SessionEntry[],
-  branch: readonly SessionEntry[],
+  getBranch: () => readonly SessionEntry[],
   message: unknown,
   models: NoticeModelLookup,
 ): TranscriptNotice[] {
   if (!isRecord(message) || message.role !== "assistant" || !isUsage(message.usage)) return [];
   if (message.stopReason === "aborted" || message.stopReason === "error") return [];
-  const isThis = (entry: SessionEntry) => entry.type === "message" && (entry.message as unknown) === message;
   const assistant = message as unknown as UsageMessage;
   const notices: TranscriptNotice[] = [];
 
-  const { prev } = scanCacheMisses(entries.filter((entry) => !isThis(entry)), models);
-  const miss = detectMiss(prev, assistant, models);
+  const prev = previousRequestFromTail(entries, message);
+  // A miss on a reply that read nothing from the cache is priced from the
+  // session's own cache reads, as `withSessionPrices()` does for the history
+  // routes; the tail lookup runs only on that path.
+  const miss = detectMiss(prev, assistant, {
+    getModel: (provider, modelId) => {
+      const fromSession = sessionCacheReadPriceFromTail(entries, provider, modelId);
+      return fromSession !== undefined
+        ? { cost: { cacheRead: fromSession } }
+        : models.getModel(provider, modelId);
+    },
+  });
   const missNotice = miss ? cacheMissNotice(miss) : undefined;
   if (missNotice) notices.push(missNotice);
 
   const dropped = countDroppedThinkingBlocks(message);
   if (dropped > 0) {
+    const branch = getBranch();
     let previousDropped = 0;
     for (let i = branch.length - 1; i >= 0; i--) {
       const entry = branch[i];
-      if (isThis(entry) || !assistantMessageOf(entry) || entry.type !== "message") continue;
-      previousDropped = countDroppedThinkingBlocks(entry.message);
+      if (entry.type === "message" && (entry.message as unknown) === message) continue;
+      const assistant = assistantMessageOf(entry);
+      if (!assistant) continue;
+      previousDropped = countDroppedThinkingBlocks(assistant);
       break;
     }
     const droppedNotice = thinkingDroppedNotice(dropped, previousDropped);

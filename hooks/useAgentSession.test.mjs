@@ -426,10 +426,13 @@ test("delegates event stream readiness and hides an empty agent phase", () => {
   assert.match(chatWindowSource, /const hasStreamingContent = useStreamingSelector\(streamingStore, selectHasStreamingContent\)/);
   assert.match(chatWindowSource, /isStreaming && hasStreamingContent && \(\s*<StreamingReply store=\{streamingStore\}/);
   assert.match(chatWindowSource, /if \(!streamingMessage\) return null;/);
-  assert.match(chatWindowSource, /\(agentRunning \|\| isCompacting\) && !hasStreamingContent && \(agentPhase \|\| isCompacting\)/);
+  // 阶段文案是叶子（ActivityNoticeLine，住在 ChatInput）：订阅 agentPhaseStore，
+  // 条件与旧内联版一致——活动行在场时不显示，命令优先于阶段。
+  assert.match(chatWindowSource, /<ActivityNoticeLine\s+store=\{agentPhaseStore\}/);
+  assert.match(chatInputSource, /\(agentRunning \|\| isCompacting\) && !hasStreamingContent && \(phase \|\| isCompacting\)/);
   // Compaction is what the user needs to know while a turn is being compacted, so it is
   // forwarded to the label instead of letting the stream phase read as a hang.
-  assert.match(chatWindowSource, /phaseLabel\(agentPhase, t, isCompacting, queuedSubmissions\.length\)/);
+  assert.match(chatInputSource, /phaseLabel\(phase, t, isCompacting, queuedCount\)/);
   assert.match(phaseLabelSource, /return null;/);
 });
 
@@ -571,10 +574,10 @@ test("reconnects active shell output to its streaming tool call", () => {
   );
 
   assert.match(updateSource, /name === "bash" \|\| name === "powershell" \|\| name === CODEMODE_TOOL_NAME/);
-  assert.match(updateSource, /setActiveToolResults/);
+  assert.match(updateSource, /activeToolsStore\.set\(id,/);
   assert.match(updateSource, /content,/);
-  assert.match(endSource, /setActiveToolResults[\s\S]*next\.delete\(id\)/);
-  assert.match(chatWindowSource, /const map = new Map\(activeToolResults\)/);
+  assert.match(endSource, /activeToolsStore\.remove\(id\)/);
+  assert.match(chatWindowSource, /const map = new Map<string, ToolResultMessage>\(\)/);
   assert.match(chatWindowSource, /<StreamingReply store=\{streamingStore\}[^>]*toolResults=\{toolResultsMap\}/);
   assert.match(chatWindowSource, /message=\{streamingMessage as AgentMessage\}\s+toolResults=\{toolResults\}/);
 });
@@ -758,7 +761,8 @@ test("restores an in-page session viewport without the default tail jump", () =>
   assert.match(source, /container\.scrollTop\s+- viewportOffset/);
   assert.match(chatWindowSource, /deferInitialScroll: Boolean\(pendingScrollRestore\)/);
   assert.match(chatWindowSource, /isScrollAtTail\(container\.scrollTop, container\.clientHeight, container\.scrollHeight\)/);
-  assert.match(chatWindowSource, /findChatScrollAnchor\(/);
+  // 锚点按行序二分收缩到视口顶之上的最后一行，不再整列测量。
+  assert.match(chatWindowSource, /getBoundingClientRect\(\)\.top <= viewportTop/);
   assert.match(chatWindowSource, /while \(hasMore && before && !controller\.signal\.aborted\)/);
   assert.match(chatWindowSource, /context\.oldestEntryId === position\.oldestEntryId/);
   assert.match(chatWindowSource, /if \(!context\) \{\s*(?:\/\/[^\n]*\n\s*)?scrollerApiRef\.current\?\.scrollToEnd\(\{ behavior: "instant" \}\);\s*setPendingScrollRestore\(null\);/);

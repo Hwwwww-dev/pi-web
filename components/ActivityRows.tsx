@@ -1,7 +1,8 @@
 "use client";
 
-import { isValidElement, memo, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useSyncExternalStore, isValidElement, memo, useMemo, useState, type ReactNode } from "react";
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
+import type { ActiveToolsStore } from "@/lib/active-tools";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { CodeBlock, CodeBlockContent } from "./ui/code-block";
@@ -75,6 +76,26 @@ function ToolCategoryIcon({ category, active = false }: { category: ToolCategory
 // Tool call rows
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * 本会话仍在执行的工具结果（lib/active-tools.ts）。ChatWindow 在根部下发自己的
+ * store；结果已在消息里的行不订阅，运行中的行按 toolCallId 单值订阅，工具输出
+ * 事件只重渲染这一张卡片。
+ */
+export const ActiveToolsContext = createContext<ActiveToolsStore | null>(null);
+
+function useActiveToolResult(toolCallId: string, enabled: boolean): ToolResultMessage | undefined {
+  const store = useContext(ActiveToolsContext);
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => (enabled && store ? store.subscribe(toolCallId, onStoreChange) : () => {}),
+    [store, toolCallId, enabled],
+  );
+  const getSnapshot = useCallback(
+    () => (enabled && store ? store.get(toolCallId) : undefined),
+    [store, toolCallId, enabled],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
 export function getToolCallInputText(block: ToolCallContent): string {
   return block.rawInput ?? JSON.stringify(block.input, null, 2);
 }
@@ -85,9 +106,6 @@ export interface ToolCallEntry {
   duration?: number;
   stepUsage?: StepUsage;
 }
-
-
-
 
 
 export function ToolRow({ block, result, stepUsage, cwd, onOpenFile, onOpenSubagent }: {
@@ -103,8 +121,12 @@ export function ToolRow({ block, result, stepUsage, cwd, onOpenFile, onOpenSubag
 }) {
   const { t } = useI18n();
 
-  const view = toToolView({ block, result, t });
-  const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
+  // 结果尚未写进消息的行才可能是运行中的工具：订阅活跃结果，输出事件只更新它自己。
+  const activeResult = useActiveToolResult(block.toolCallId, result === undefined);
+  const liveResult = result ?? activeResult;
+
+  const view = toToolView({ block, result: liveResult, t });
+  const subagent = isSubagentToolDetails(liveResult?.details) ? liveResult.details : null;
 
   // Images, video and audio the call produced: the viewers below the line, never
   // the bytes inside a code block.
@@ -179,7 +201,7 @@ export function ToolRow({ block, result, stepUsage, cwd, onOpenFile, onOpenSubag
   }
 
   const changeCounts = (view.kind === "file-edit" || view.kind === "file-write")
-    ? patchChangeCounts(block, result)
+    ? patchChangeCounts(block, liveResult)
     : null;
   const changeTrailing = changeCounts
     ? (

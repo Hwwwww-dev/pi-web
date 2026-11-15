@@ -15,21 +15,21 @@ import { prismLanguagesLoaded } from "@/lib/prism-languages";
  * (a tool card's `CodeBlockContent`), so a card keeps its frame, wrapping and
  * typography and only gains colors.
  *
- * Same rules as CodeBlock's fences: the languages load once in a chunk of their
- * own (`lib/prism-languages.ts`), a block past this task's highlight budget
- * stays plain monospace until an idle slice lets it take its language, and a
- * body over `MAX_HIGHLIGHT_CHARS` stays plain for good.
+ * Same rules as CodeBlock's fences: the language loads once on demand
+ * (`lib/prism-languages.ts`), a block past this task's highlight budget stays
+ * plain monospace until an idle slice lets it take its language, and a body
+ * over `MAX_HIGHLIGHT_CHARS` stays plain for good.
  */
 export const HighlightedCode = memo(function HighlightedCode({ code, language }: {
   code: string;
   language?: string;
 }) {
   const { isDark } = useTheme();
-  const languagesReady = usePrismLanguages();
   const plain = !language || language === "text" || language === "plaintext";
+  const languagesReady = usePrismLanguages(plain ? undefined : language);
   const highlightable = code.length <= MAX_HIGHLIGHT_CHARS;
   const [highlighted, setHighlighted] = useState(
-    () => highlightable && !plain && prismLanguagesLoaded() && takeHighlightBudget(code.length),
+    () => highlightable && !plain && prismLanguagesLoaded(language) && takeHighlightBudget(code.length),
   );
   useEffect(() => {
     if (plain || !highlightable || highlighted || !languagesReady) return;
@@ -40,8 +40,9 @@ export const HighlightedCode = memo(function HighlightedCode({ code, language }:
     if (!highlighted || !language) return null;
     const stylesheet = isDark ? vscDarkPlus : vs;
     try {
-      // refractor's core holds the grammars `refractor/all` registered, and
-      // throws for one this build lacks: that body renders as plain text.
+      // refractor's core holds the registered grammars (baseline + on-demand,
+      // lib/prism-languages.ts) and throws for one it lacks: that body renders
+      // as plain text.
       // The body's tokens sit straight on the returned root; a `<code>` wrapper
       // is for the shape an older refractor returned.
       const root = refractor.highlight(code, language);

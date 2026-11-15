@@ -56,7 +56,8 @@ function parseSearchOutput(raw: string): SkillSearchResult[] {
 
 async function searchSkillsApi(query: string, limit: number): Promise<SkillSearchResult[]> {
   const url = `${SEARCH_API_BASE}/api/search?q=${encodeURIComponent(query)}&limit=${limit}`;
-  const res = await fetch(url, { cache: "no-store" });
+  // Same bound as the server's other external requests (lib/terminal-client.ts).
+  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`skills.sh search failed: HTTP ${res.status}`);
 
   const data = (await res.json()) as SkillsApiResponse;

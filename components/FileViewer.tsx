@@ -36,6 +36,7 @@ import { FrontmatterCard } from "./FrontmatterCard";
 import { diffGapLabel, parseUnifiedPatch, unifiedDiffLines, type SplitDiffGap, type UnifiedDiffLine } from "@/lib/patch";
 import type { GitFileDiffResponse } from "@/lib/git-types";
 import { useI18n } from "@/hooks/useI18n";
+import { useRehypeKatexVersion } from "@/hooks/useRehypeKatexVersion";
 import {
   resolveInitialFileDisplayMode,
   resolveInitialWrapLines,
@@ -1226,6 +1227,8 @@ function TextFileViewer({
     () => (data?.language === "markdown" ? normalizeDisplayMath(data.content) : ""),
     [data],
   );
+  // KaTeX 就绪前公式按普通文本画出；订阅就绪事件重画一次换回 KaTeX（lib/markdown.ts）。
+  useRehypeKatexVersion(markdownPreview.includes("$") || markdownPreview.includes("\\(") || markdownPreview.includes("```math"));
 
   const frontmatter = useMemo(
     () => (data?.language === "markdown" ? parseFrontmatter(data.content) : null),

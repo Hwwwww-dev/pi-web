@@ -131,7 +131,12 @@ export async function GET(
           "Content-Type": "text/html; charset=utf-8",
           "Content-Disposition": getContentDisposition(fileName, inline),
           "Cache-Control": "no-cache",
-          "Content-Security-Policy": "frame-ancestors 'none'",
+          // An inline response renders session HTML on this origin: sandbox
+          // keeps its content from executing anything. An attachment is saved,
+          // not rendered, and keeps the headers it had.
+          "Content-Security-Policy": inline
+            ? "sandbox; frame-ancestors 'none'"
+            : "frame-ancestors 'none'",
           "X-Content-Type-Options": "nosniff",
           "X-Frame-Options": "DENY",
         },

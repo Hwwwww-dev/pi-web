@@ -65,7 +65,7 @@ test("one page at a time: the next request waits for the last one to render", ()
 });
 
 test("the earlier-messages row is a real button", () => {
-  assert.match(source, /ref=\{setSentinel\}\s*type="button"\s*onClick=/);
+  assert.match(source, /ref=\{setSentinel\}\s*type="button"\s*variant="ghost"\s*onClick=/);
   assert.match(source, /disabled=\{olderPageState !== "idle"\}/);
   assert.match(source, /t\("chat\.loadingEarlier"\)/);
   // A div with the label was the old shape: not clickable, and it started a

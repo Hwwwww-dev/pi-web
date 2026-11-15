@@ -95,7 +95,7 @@ async function setup() {
     hook.flush();
     assert.notEqual(stream(), broken, "a new stream opened");
   };
-  const phase = () => hook.result.agentPhase;
+  const phase = () => hook.result.agentPhaseStore.get();
   const toolNames = () => phase()?.tools?.map((tool) => tool.name);
   return { hook, emit, landStateRead, reconnect, phase, toolNames };
 }

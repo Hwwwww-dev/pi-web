@@ -77,11 +77,28 @@ export function buildEntriesFromFiles(files: string[]): FileIndexEntry[] {
 
 function isSubsequence(needle: string, haystack: string): boolean {
   if (!needle) return true;
+  // 子序列需要 needle.length 个不同位置，haystack 更短时必不成立。
+  if (needle.length > haystack.length) return false;
   let i = 0;
   for (let j = 0; j < haystack.length && i < needle.length; j++) {
     if (haystack[j] === needle[i]) i++;
   }
   return i === needle.length;
+}
+
+// 小写结果按 entry 对象缓存一次：entries 随索引一次性构建、跨击键稳定
+// （ChatInput 的 fileIndex state），每击键不再为每条 entry 分配小写副本。
+const lowerPathCache = new WeakMap<FileIndexEntry, { lowerPath: string; lowerName: string }>();
+
+function lowerOf(entry: FileIndexEntry): { lowerPath: string; lowerName: string } {
+  let cached = lowerPathCache.get(entry);
+  if (!cached) {
+    const lowerPath = entry.path.toLowerCase();
+    const slash = lowerPath.lastIndexOf("/");
+    cached = { lowerPath, lowerName: slash === -1 ? lowerPath : lowerPath.slice(slash + 1) };
+    lowerPathCache.set(entry, cached);
+  }
+  return cached;
 }
 
 /**
@@ -95,21 +112,19 @@ function isSubsequence(needle: string, haystack: string): boolean {
  * src directory itself, since "src" does not start with "src/").
  */
 function scoreEntry(entry: FileIndexEntry, lowerQuery: string): number {
-  const lowerPath = entry.path.toLowerCase();
+  const { lowerPath, lowerName } = lowerOf(entry);
   let score = 0;
   if (lowerQuery.includes("/")) {
     if (lowerPath === lowerQuery) score = 100;
     else if (lowerPath.startsWith(lowerQuery)) score = 80;
     else if (lowerPath.includes(lowerQuery)) score = 50;
-    else if (isSubsequence(lowerQuery, lowerPath)) score = 10;
+    else if (lowerPath.includes(lowerQuery.charAt(0)) && isSubsequence(lowerQuery, lowerPath)) score = 10;
   } else {
-    const slash = lowerPath.lastIndexOf("/");
-    const lowerName = slash === -1 ? lowerPath : lowerPath.slice(slash + 1);
     if (lowerName === lowerQuery) score = 100;
     else if (lowerName.startsWith(lowerQuery)) score = 80;
     else if (lowerName.includes(lowerQuery)) score = 50;
     else if (lowerPath.includes(lowerQuery)) score = 30;
-    else if (isSubsequence(lowerQuery, lowerPath)) score = 10;
+    else if (lowerPath.includes(lowerQuery.charAt(0)) && isSubsequence(lowerQuery, lowerPath)) score = 10;
   }
   if (entry.isDir && score > 0) score += 10;
   return score;

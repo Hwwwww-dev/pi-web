@@ -400,12 +400,12 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
   const { isDark } = useTheme();
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
-  // Loading starts with the first block, streaming or not, so a streamed
-  // reply usually finds the languages ready when it ends.
-  const languagesReady = usePrismLanguages();
+  // A fence's language starts loading with its first block, streaming or not,
+  // so a streamed reply usually finds it ready when the block finishes.
+  const languagesReady = usePrismLanguages(lang);
   const highlightable = code.length <= MAX_HIGHLIGHT_CHARS;
   const [highlighted, setHighlighted] = useState(
-    () => highlightable && !isStreaming && prismLanguagesLoaded() && takeHighlightBudget(code.length),
+    () => highlightable && !isStreaming && prismLanguagesLoaded(lang) && takeHighlightBudget(code.length),
   );
 
   useEffect(() => {

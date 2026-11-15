@@ -16,9 +16,9 @@ import { type WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
 import { dropMentionText, splitDroppedItems, uploadFiles, type DroppedItem } from "@/lib/file-upload-client";
 import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
-import { TurnActivityBody, TurnMetaLine } from "./ActivityRows";
+import { ActiveToolsContext, TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { MarkdownBody } from "./MarkdownBody";
-import { ChatInput, getUserMessageDraftImages, getUserMessageText, type ChatInputHandle } from "./ChatInput";
+import { ActivityNoticeLine, ChatInput, getUserMessageDraftImages, getUserMessageText, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
@@ -52,7 +52,6 @@ import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
 import { formatTurnDuration, getTurnDurationMs } from "@/lib/turn-duration";
-import { phaseLabel } from "@/lib/chat-phase-label";
 import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
 import { selectHasStreamingContent, selectIsStreaming, selectStreamingMessage, useStreamingSelector } from "@/hooks/useStreamingSelector";
 import { publishStreamCharacters } from "@/lib/stream-beam";
@@ -63,7 +62,7 @@ import type { SessionStatsInfo } from "@/lib/pi-types";
 import type { DebugClientSession } from "@/lib/debug-types";
 import type { ToolEntry } from "@/lib/tool-presets";
 import type { SettingsSection } from "@/lib/settings-navigation";
-import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll-position";
+import { type ChatScrollPosition } from "@/lib/chat-scroll-position";
 import { streamingMessageKey } from "@/lib/message-keys";
 import {
   isScrollAtTail,
@@ -79,6 +78,10 @@ const AUTO_LOAD_MIN_INTERVAL_MS = 300;
 /**
  * 读取当前滚动位置：贴尾记为 atBottom，否则记录视口顶部条目及其偏移。
  * 保存会话位置与保活槽隐藏前的快照共用此实现。
+ *
+ * 锚点只需「视口顶之上的最后一行」：行的 top 随 DOM 序单调递增，对行序二分收缩，
+ * 只读 O(log n) 个矩形——滚动帧里不再整列强制布局。无任何行在视口顶之上时退回
+ * 首行（读历史读到顶部的形态，偏移为正），与全量扫描的旧语义一致。
  */
 function readScrollPosition(
   container: HTMLElement,
@@ -88,14 +91,33 @@ function readScrollPosition(
   if (isScrollAtTail(container.scrollTop, container.clientHeight, container.scrollHeight)) return { atBottom: true };
   if (!content) return null;
   const viewportTop = container.getBoundingClientRect().top;
-  const candidates = Array.from(content.children).flatMap((element) => {
-    if (!(element instanceof HTMLElement) || !element.dataset.entryId) return [];
-    const rect = element.getBoundingClientRect();
-    return [{ entryId: element.dataset.entryId, top: rect.top, bottom: rect.bottom }];
-  });
-  const anchor = findChatScrollAnchor(candidates, viewportTop);
-  if (!anchor) return null;
-  return { atBottom: false, ...anchor, oldestEntryId };
+  const rows: Array<{ el: HTMLElement; entryId: string }> = [];
+  for (const element of content.children) {
+    if (element instanceof HTMLElement && element.dataset.entryId) {
+      rows.push({ el: element, entryId: element.dataset.entryId });
+    }
+  }
+  if (rows.length === 0) return null;
+  let low = 0;
+  let high = rows.length - 1;
+  let anchor = -1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (rows[mid].el.getBoundingClientRect().top <= viewportTop) {
+      anchor = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  if (anchor === -1) anchor = 0;
+  const rect = rows[anchor].el.getBoundingClientRect();
+  return {
+    atBottom: false,
+    anchorEntryId: rows[anchor].entryId,
+    anchorOffset: rect.top - viewportTop,
+    oldestEntryId,
+  };
 }
 
 interface Props {
@@ -313,7 +335,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 发送后回底：官方的跟随在几何贴底时自动接管，这里只需把位置写到底。
 
   const {
-    loading, error, messages, activeToolResults, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, hasNewerMessages, newestCursor, headTurn, streamingStore,
+    loading, error, messages, activeToolsStore, entryIds, messageKeys, historyCursor, hasEarlierMessages, earlierTurnCount, hasNewerMessages, newestCursor, headTurn, streamingStore,
     agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, missingCwd, modelScopeWarnings, isModelScopeActive, allModelList, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
@@ -323,7 +345,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     isAutoThinkingSelection,
     defaultModel,
     savedDefaultThinkingLevel,
-    agentPhase,
+    agentPhaseStore,
     isNew,
     sessionIdRef, scrollContainerRef,
     handleSend, handleAbort, startSideChat, handleFork, handleModelChange,
@@ -1160,15 +1182,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // (the streaming message lives in streamingStore), so memoized MessageViews
   // skip re-rendering on every message_update event. An inline `new Map()`
   // here used to defeat MessageView's memo() on each streamed chunk.
+  // In-flight tool results are not in this map: the running card subscribes to
+  // activeToolsStore by toolCallId (ActiveToolsContext), so a
+  // tool_execution_update neither rebuilds this map nor recomputes the list.
   const toolResultsMap = useMemo(() => {
-    const map = new Map(activeToolResults);
+    const map = new Map<string, ToolResultMessage>();
     for (const msg of messages) {
       if (msg.role === "toolResult") {
         map.set((msg as ToolResultMessage).toolCallId, msg as ToolResultMessage);
       }
     }
     return map;
-  }, [activeToolResults, messages]);
+  }, [messages]);
   const inputHistory = useMemo(() => {
     const seen = new Set<string>();
     const history: string[] = [];
@@ -1194,7 +1219,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
   // 状态行现在住在输入框里（队列之下、卡片正上方），而它的文案在列表渲染之后才
   // 算得出来；因此输入框延迟到停靠区那一刻才构造，避免把两百行 JSX 搬下来。
-  const renderChatInput = (notice: string | null | undefined) => (
+  const renderChatInput = (notice: ReactNode) => (
     <ChatInput
       ref={chatInputRef}
       onSend={handleSend}
@@ -1662,15 +1687,41 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 它在列表尾出现或消失都会改动滚动内容的高度，尾部跟随下整列随之上下跳。
   // 它固定在输入框上方的一行里，那一行由 min-h 恒占一行文字，有无与换文案
   // 都不改任何高度。两个提示争一个槽时命令优先：bash 在跑是更当下的事实。
-  const activityNotice = liveActivityRendered
-    ? null
-    : bashRunning && !pendingBash
-      ? t("chat.runningCommand")
-      : (agentRunning || isCompacting) && !hasStreamingContent && (agentPhase || isCompacting)
-        ? phaseLabel(agentPhase, t, isCompacting, queuedSubmissions.length)
-        : null;
+  // 阶段文案是叶子组件（订阅 agentPhaseStore）：工具输出事件只换这一行文字，
+  // 不再重渲染 ChatWindow。元素按输入 memo 化，身份稳定才不破 ChatInput 的 memo。
+  const activityNotice = useMemo(() => (
+    <ActivityNoticeLine
+      store={agentPhaseStore}
+      live={liveActivityRendered}
+      bashRunning={bashRunning}
+      pendingBash={Boolean(pendingBash)}
+      agentRunning={agentRunning}
+      isCompacting={isCompacting}
+      hasStreamingContent={hasStreamingContent}
+      queuedCount={queuedSubmissions.length}
+    />
+  ), [agentPhaseStore, liveActivityRendered, bashRunning, pendingBash, agentRunning, isCompacting, hasStreamingContent, queuedSubmissions]);
   // 每一行都已加载的消息都在 DOM 里，只由服务端是否还有更早的页决定顶部入口。
   const hasMoreRendered = hasEarlierMessages;
+  // 主聊天浮动停靠区：消息列延伸到卡片背后，内容末端按停靠区高度垫底。
+  // 空态（hero+composer 簇的垂直居中依赖文档流）与侧面板保持原有布局。
+  const composerDockRef = useRef<HTMLDivElement | null>(null);
+  const composerFloating = !panel && !isEmptyNew;
+  useEffect(() => {
+    const dock = composerDockRef.current;
+    const host = dock?.parentElement;
+    if (!dock || !host || panel) return;
+    const apply = () => {
+      host.style.setProperty("--composer-dock-h", `${dock.offsetHeight}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(dock);
+    return () => {
+      ro.disconnect();
+      host.style.removeProperty("--composer-dock-h");
+    };
+  }, [panel]);
 
   if (error) {
     return (
@@ -1686,6 +1737,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
 
   return (
+    <ActiveToolsContext value={activeToolsStore}>
     <div
       className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden [padding-bottom:env(safe-area-inset-bottom,0px)]"
       onDragEnter={handleDragEnter}
@@ -1776,14 +1828,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <MessageScrollerContent
             ref={messageContentRef}
             onPointerUp={captureQuotedSelection}
-            className="gap-[var(--chat-row-gap)] pt-[22px] pb-2 max-sm:pt-4"
+            className="gap-[var(--chat-row-gap)] pt-[22px] pb-[calc(var(--composer-dock-h,0px)+8px)] max-sm:pt-4"
           >
             {hasMoreRendered && (
               // 手动入口：自动加载需等上一页渲染完成，此按钮允许随时请求一页。
-              <button
+              <Button
                 // 该行固定在内容顶部，翻页时不移动。
                 ref={setSentinel}
                 type="button"
+                variant="ghost"
                 onClick={() => {
                   if (loadingOlderRef.current || pageRenderingRef.current) return;
                   const sid = session?.id ?? sessionIdRef.current;
@@ -1792,10 +1845,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 }}
                 disabled={olderPageState !== "idle"}
                 data-state={olderPageState}
-                className="mx-auto block rounded-lg px-3 py-3 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+                className="mx-auto block h-auto rounded-lg px-3 py-3 text-xs font-normal text-muted-foreground hover:bg-transparent hover:text-foreground disabled:opacity-60"
               >
                 {olderPageState === "idle" ? t("chat.loadEarlier") : t("chat.loadingEarlier")}
-              </button>
+              </Button>
             )}
             {turnRendered.map((node, index) => {
               // 每条消息一个 Item：官方据此测量、锚定并记录可视性。
@@ -1849,7 +1902,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         </MessageScrollerViewport>
         <MessageScrollerButton
           behavior="instant"
-          className="text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100"
+          className="bottom-[calc(var(--composer-dock-h,0px)+16px)] text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100"
         >
           <ArrowDownIcon className="size-4" aria-hidden="true" />
           <span className="sr-only">{t("chat.scrollToLatest")}</span>
@@ -1952,8 +2005,22 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       )}
 
       {/* 底部停靠区：运行状态行、排队条与输入框。底边留白由停靠区统一承担
-          （pb-3），扩展状态行可有可无，出现/消失不会改变输入框与屏幕底边的距离。 */}
-      <div className={cn("relative flex min-h-0 flex-col pb-3 shrink-0", CHAT_PAGE_GUTTER_CLASS)}>
+          （pb-3），扩展状态行可有可无，出现/消失不会改变输入框与屏幕底边的距离。
+          主聊天浮动在消息之上（chat-content 相对定位）：消息列延伸到卡片背后，
+          穿过卡片上方的内容由渐隐带淡出；空态与侧面板（panel）保持文档流。 */}
+      <div
+        ref={composerDockRef}
+        className={cn(
+          "chat-composer-dock relative flex min-h-0 flex-col pb-3",
+          CHAT_PAGE_GUTTER_CLASS,
+          composerFloating
+            ? "absolute inset-x-0 z-30 bottom-[env(safe-area-inset-bottom,0px)]"
+            : "shrink-0",
+        )}
+      >
+        {composerFloating && (
+          <div aria-hidden className="chat-composer-fade pointer-events-none absolute inset-x-0 bottom-full h-12" />
+        )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the
             composer's left edge. */}
@@ -1978,17 +2045,23 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         {/* 运行状态行（阶段文案 + 流式速率）已移进输入框：位于队列之下、输入卡片
             正上方。队列长高只往聊天区方向长，状态行不再被顶走。 */}
         {renderChatInput(activityNotice)}
-        <ExtensionStatusBar
-          statuses={extensionStatuses}
-          widgets={extensionWidgets}
-          onCommand={handleSend}
-          commandsDisabled={sessionBusy}
-        />
+        {(extensionStatuses.length > 0 || extensionWidgets.length > 0) && (
+          // 浮动时状态条直接压在消息上：一枚底色小胶囊保住可读性。
+          <div className={cn("w-fit max-w-full min-w-0", composerFloating && "rounded-lg border border-border/50 bg-background/85 px-2 py-0.5 backdrop-blur-sm")}>
+            <ExtensionStatusBar
+              statuses={extensionStatuses}
+              widgets={extensionWidgets}
+              onCommand={handleSend}
+              commandsDisabled={sessionBusy}
+            />
+          </div>
+        )}
       </div>
       {/* 手机端底部留白占偏置的两份（顶部聊天列仍为一份），使空态的 hero+composer
           簇高于正中：保持簇完整，品牌块不与浮层重叠。 */}
       {isEmptyNew && <div className="min-h-0 flex-1 max-sm:flex-[2]" />}
     </div>
+    </ActiveToolsContext>
   );
 });
 

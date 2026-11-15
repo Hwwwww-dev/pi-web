@@ -4,17 +4,19 @@
  * named session goes with every subagent session below it, persisted or
  * live. A session left behind whose header names a deleted one as its parent
  * is re-pointed at the nearest ancestor still there (`parentSession` is
- * display metadata only, so the rewrite is safe). Open wrappers are shut down,
- * subagents before their parents, before the files go; then the pins and
- * archive times of every deleted id are forgotten.
+ * display metadata only, so the rewrite is safe; a file a live wrapper still
+ * appends to is left alone). Open wrappers are shut down, subagents before
+ * their parents, before the files go; then the pins and archive times of every
+ * deleted id are forgotten.
  *
  * One call lists the catalogue and reads each folder once, however many
  * sessions it deletes: a project's hundreds of sessions deleted one request
  * each would read every file of the folder once per session.
  */
 
-import { readdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
-import { dirname, join } from "path";
+import { randomUUID } from "crypto";
+import { readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
+import { basename, dirname, join } from "path";
 import { abortSubagent, getRpcSession, getRpcSessionInfos, getRunningRpcSessionIds } from "./rpc-manager";
 import {
   invalidateSessionListCache,
@@ -47,6 +49,27 @@ function addChild(childrenByParent: Map<string, string[]>, parentId: string, chi
   const children = childrenByParent.get(parentId) ?? [];
   children.push(childId);
   childrenByParent.set(parentId, children);
+}
+
+/**
+ * Replace a session file atomically: a temporary file in its folder, then a
+ * rename over it, so a crash or a concurrent reader never sees half a file.
+ * The original mode is kept — pi owns these files, unlike the credentials the
+ * 0600 writer in lib/atomic-file.ts covers.
+ */
+function rewriteSessionFileSync(path: string, contents: string, mode: number): void {
+  const tempPath = join(dirname(path), `.${basename(path)}-${randomUUID()}.tmp`);
+  try {
+    writeFileSync(tempPath, contents, { encoding: "utf8", flag: "wx", mode, flush: true });
+    renameSync(tempPath, path);
+  } catch (error) {
+    try {
+      unlinkSync(tempPath);
+    } catch {
+      // Never created, or already renamed.
+    }
+    throw error;
+  }
 }
 
 /**
@@ -186,8 +209,22 @@ export async function deleteSessions(
           const childPath = join(dir, file);
           try {
             // The bounded header says whether it needs a rewrite at all.
-            const childParent = readSessionHeader(childPath)?.parentSession;
+            const head = readSessionHeader(childPath);
+            const childParent = head?.parentSession;
             if (!childParent || !deletedPathKeys.has(sessionPathKey(childParent))) continue;
+
+            // A live wrapper appends to this very file while the rewrite runs;
+            // entries landing between its read and the rename would be lost
+            // under the replaced file. The header is display metadata, so the
+            // re-parent is skipped until the run that writes is done.
+            const wrapper = getRpcSession(head?.id ?? "");
+            if (
+              wrapper
+              && typeof wrapper.isAlive === "function"
+              && wrapper.isAlive()
+              && sessionPathKey(wrapper.sessionFile) === sessionPathKey(childPath)
+            ) continue;
+
             const parentSessionPath = survivingParent(childParent);
             let parentSessionId: string | undefined;
             if (parentSessionPath) {
@@ -198,37 +235,54 @@ export async function deleteSessions(
                 parentSessionId = undefined;
               }
             }
-            const lines = readFileSync(childPath, "utf8").split("\n");
-            const header = JSON.parse(lines[0]) as { type?: string; parentSession?: string };
-            if (header.type !== "session") continue;
-            // Rewrite header with new parentSession
-            header.parentSession = parentSessionPath;
-            lines[0] = JSON.stringify(header);
-            if (parentSessionPath && parentSessionId) {
-              for (let index = 1; index < lines.length; index += 1) {
-                let entry: { type?: string; customType?: string; data?: unknown };
-                try {
-                  entry = JSON.parse(lines[index]);
-                } catch {
-                  continue;
+
+            // Another pi process can append between the read and the write:
+            // stat the file around the read and start over when it moved, so a
+            // rewrite never lands on a file seen growing.
+            let rewritten = false;
+            for (let attempt = 0; attempt < 3 && !rewritten; attempt += 1) {
+              const before = statSync(childPath);
+              const lines = readFileSync(childPath, "utf8").split("\n");
+              const header = JSON.parse(lines[0]) as { type?: string; parentSession?: string };
+              if (header.type !== "session") break;
+              // Rewrite header with new parentSession
+              header.parentSession = parentSessionPath;
+              lines[0] = JSON.stringify(header);
+              if (parentSessionPath && parentSessionId) {
+                for (let index = 1; index < lines.length; index += 1) {
+                  let entry: { type?: string; customType?: string; data?: unknown };
+                  try {
+                    entry = JSON.parse(lines[index]);
+                  } catch {
+                    continue;
+                  }
+                  if (
+                    entry.type !== "custom"
+                    || entry.customType !== SUBAGENT_META_TYPE
+                    || typeof entry.data !== "object"
+                    || entry.data === null
+                    || Array.isArray(entry.data)
+                  ) continue;
+                  entry.data = {
+                    ...entry.data,
+                    parentSessionId,
+                    parentSessionPath,
+                  };
+                  lines[index] = JSON.stringify(entry);
+                  break;
                 }
-                if (
-                  entry.type !== "custom"
-                  || entry.customType !== SUBAGENT_META_TYPE
-                  || typeof entry.data !== "object"
-                  || entry.data === null
-                  || Array.isArray(entry.data)
-                ) continue;
-                entry.data = {
-                  ...entry.data,
-                  parentSessionId,
-                  parentSessionPath,
-                };
-                lines[index] = JSON.stringify(entry);
-                break;
               }
+              const after = statSync(childPath);
+              if (after.size !== before.size || after.mtimeMs !== before.mtimeMs) {
+                if (attempt === 2) {
+                  console.warn(`[pi-web] left ${basename(childPath)} on its old parent: the file kept changing while re-pointing it`);
+                  break;
+                }
+                continue;
+              }
+              rewriteSessionFileSync(childPath, lines.join("\n"), before.mode & 0o777);
+              rewritten = true;
             }
-            writeFileSync(childPath, lines.join("\n"));
           } catch { /* skip malformed */ }
         }
       } catch { /* skip if dir unreadable */ }

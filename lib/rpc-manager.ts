@@ -71,7 +71,7 @@ import { mcpPromptPreparation, type McpCommandCandidate } from "./mcp-command";
 import { createReadOnlyMcpPolicyExtension, createSubagentMcpPolicyExtension } from "./mcp-read-only-policy";
 import { createSubagentSkillsBinding } from "./subagent-skills";
 import { isNestedToolExecutionEvent } from "./agent-event-wire";
-import { collectLiveAssistantNotices, readShowCacheMissNotices, withSessionPrices } from "./transcript-notices-server";
+import { collectLiveAssistantNotices, readShowCacheMissNotices } from "./transcript-notices-server";
 import {
   appendClearedSessionToolSelection,
   appendSessionToolSelection,
@@ -625,9 +625,12 @@ export class AgentSessionWrapper {
       const notices = collectLiveAssistantNotices(
         entries,
         // SAFETY: same jsonl entry stream as above, taken from the current branch.
-        manager.getBranch() as unknown as SessionEntry[],
+        // Built only when the reply dropped thinking blocks.
+        () => manager.getBranch() as unknown as SessionEntry[],
         message,
-        withSessionPrices(entries, this.inner.modelRuntime),
+        // The session's own prices are layered inside, from the tail, on the
+        // only path that consults them.
+        this.inner.modelRuntime,
       );
       return notices.length > 0 ? { ...event, transcriptNotices: notices } : event;
     } catch (error) {
@@ -1895,13 +1898,28 @@ export class AgentSessionWrapper {
 
     this.shutdownPromise = (async () => {
       try {
+        // session_start can park on an extension's unanswered dialog forever,
+        // which would hang every shutdown awaiter past this point. The wait
+        // gets the same deadline the dispose path gives session_shutdown, and
+        // shutdown proceeds over a binding still in flight.
+        let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+        const deadline = new Promise<"timeout">((resolve) => {
+          deadlineTimer = setTimeout(() => resolve("timeout"), SESSION_SHUTDOWN_DEADLINE_MS);
+          deadlineTimer.unref?.();
+        });
         try {
-          await this.waitForExtensionsBound();
+          if (await Promise.race([this.waitForExtensionsBound(), deadline]) === "timeout") {
+            console.warn(
+              `[pi-web] extensions did not finish binding for session ${this.sessionId} within ${SESSION_SHUTDOWN_DEADLINE_MS} ms; shutting it down anyway`,
+            );
+          }
         } catch (error) {
           console.error(
             "[pi-web] extension binding failed before session shutdown:",
             error instanceof Error ? error.message : error,
           );
+        } finally {
+          clearTimeout(deadlineTimer);
         }
         // After binding, so the host's session_start has run and finds nothing to record later.
         this.disposeMcpHost();
@@ -2979,6 +2997,69 @@ export function withSubagentDisplayStatus(sessions: SessionInfo[]): SessionInfo[
 }
 
 /**
+ * The entries-derived part of a live session's list row: everything the
+ * message filter, the subagent and side scans and the activity loop produce.
+ * Deriving it walks the whole entry list several times (getEntries' copy
+ * included), and the list poll runs it for every alive wrapper, so it is kept
+ * per manager and rebuilt when the entry tail moves — an append or a tree
+ * navigation. Header-backed fields never change; per-call ones (the name,
+ * persistence, run state) are read fresh every time.
+ */
+interface RpcSessionEntrySummary {
+  id: string;
+  cwd: string | undefined;
+  /** `header.timestamp ?? entries[0].timestamp`; undefined when neither exists yet. */
+  createdBase: string | undefined;
+  modified: string;
+  messageCount: number;
+  firstMessage: string;
+  hasUserMessage: boolean;
+  subagent: ReturnType<typeof readSubagentRun>;
+  side: ReturnType<typeof readSideRelation>;
+}
+
+const rpcSessionEntrySummaries = new WeakMap<object, { entryCount: number; leafId: string | null; summary: RpcSessionEntrySummary }>();
+
+function rpcSessionEntrySummary(session: AgentSessionWrapper, manager: AgentSessionWrapper["inner"]["sessionManager"]): RpcSessionEntrySummary {
+  const cached = rpcSessionEntrySummaries.get(manager);
+  const entryCount = manager.getEntryCount();
+  const leafId = manager.getLeafId();
+  if (cached && cached.entryCount === entryCount && cached.leafId === leafId) return cached.summary;
+
+  const header = manager.getHeader();
+  const entries = toSessionEntries(manager.getEntries());
+  const messages = entries.filter((entry): entry is SessionMessageEntry => entry.type === "message");
+  const firstUserMessage = messages.find((entry) => entry.message.role === "user");
+  const sessionFile = manager.getSessionFile() ?? session.sessionFile;
+  // SAFETY: SDK raw entries mirror the app's SessionEntry shape (lib/pi-types.ts).
+  const sessionEntries = entries as unknown as SessionEntry[];
+  // SAFETY: readSubagentRun reads only headers/parent chain, readSideRelation only the pi-web:side metadata.
+  const subagent = readSubagentRun(sessionEntries, header?.id ?? session.sessionId, sessionFile ?? "");
+  const side = subagent ? null : readSideRelation(sessionEntries);
+
+  const headerTimestamp = new Date(header?.timestamp ?? entries[0]?.timestamp ?? NaN).getTime();
+  let lastActivityMs = Number.isNaN(headerTimestamp) ? Date.now() : headerTimestamp;
+  for (const message of messages) {
+    const activityMs = runtimeMessageActivityMs(message);
+    if (activityMs !== undefined) lastActivityMs = Math.max(lastActivityMs, activityMs);
+  }
+
+  const summary: RpcSessionEntrySummary = {
+    id: header?.id ?? session.sessionId,
+    cwd: header?.cwd,
+    createdBase: header?.timestamp ?? entries[0]?.timestamp,
+    modified: new Date(lastActivityMs).toISOString(),
+    messageCount: messages.length,
+    firstMessage: catalogFirstMessage(firstUserMessage ? runtimeMessageText(firstUserMessage) || "(no messages)" : "(no messages)"),
+    hasUserMessage: Boolean(firstUserMessage),
+    subagent,
+    side,
+  };
+  rpcSessionEntrySummaries.set(manager, { entryCount, leafId, summary });
+  return summary;
+}
+
+/**
  * Return live sessions that should be visible in the session list. Pi delays
  * the first JSONL flush until an assistant message exists, so an accepted new
  * prompt must temporarily be described from its in-memory SessionManager.
@@ -2990,53 +3071,35 @@ export function getRpcSessionInfos(options: { includeTransient?: boolean } = {})
 
     const manager = session.inner?.sessionManager;
     if (!manager) continue;
-    const header = manager.getHeader();
-    const entries = toSessionEntries(manager.getEntries());
-    const messages = entries.filter((entry): entry is SessionMessageEntry => entry.type === "message");
-    const firstUserMessage = messages.find((entry) => entry.message.role === "user");
     const sessionFile = manager.getSessionFile() ?? session.sessionFile;
     const persisted = Boolean(sessionFile && existsSync(sessionFile));
-    // SAFETY: SDK raw entries mirror the app's SessionEntry shape (lib/pi-types.ts).
-    const sessionEntries = entries as unknown as SessionEntry[];
-    // SAFETY: readSubagentRun reads only headers/parent chain, readSideRelation only the pi-web:side metadata.
-    const subagent = readSubagentRun(sessionEntries, header?.id ?? session.sessionId, sessionFile ?? "");
-    const side = subagent ? null : readSideRelation(sessionEntries);
+    const summary = rpcSessionEntrySummary(session, manager);
 
     // An ensure_session call creates an idle, empty runtime while the composer
     // loads commands. Do not leak it into history before a prompt is accepted.
-    if (!persisted && !options.includeTransient && (!session.isRunning() || !firstUserMessage)) continue;
-
-    const created = header?.timestamp
-      ?? entries[0]?.timestamp
-      ?? new Date().toISOString();
-    const headerTimestamp = new Date(created).getTime();
-    let lastActivityMs = Number.isNaN(headerTimestamp) ? Date.now() : headerTimestamp;
-    for (const message of messages) {
-      const activityMs = runtimeMessageActivityMs(message);
-      if (activityMs !== undefined) lastActivityMs = Math.max(lastActivityMs, activityMs);
-    }
+    if (!persisted && !options.includeTransient && (!session.isRunning() || !summary.hasUserMessage)) continue;
 
     sessions.push({
       path: sessionFile ?? "",
-      id: header?.id ?? session.sessionId,
-      cwd: header?.cwd ?? session.cwd,
+      id: summary.id,
+      cwd: summary.cwd ?? session.cwd,
       name: manager.getSessionName(),
-      created,
-      modified: new Date(lastActivityMs).toISOString(),
-      messageCount: messages.length,
-      firstMessage: catalogFirstMessage(firstUserMessage ? runtimeMessageText(firstUserMessage) || "(no messages)" : "(no messages)"),
-      ...(subagent ? {
-        parentSessionId: subagent.parentSessionId,
+      created: summary.createdBase ?? new Date().toISOString(),
+      modified: summary.modified,
+      messageCount: summary.messageCount,
+      firstMessage: summary.firstMessage,
+      ...(summary.subagent ? {
+        parentSessionId: summary.subagent.parentSessionId,
         relation: {
           kind: "subagent" as const,
-          parentSessionId: subagent.parentSessionId,
-          profile: subagent.profile,
-          description: subagent.description,
-          status: session.isRunning() ? "running" as const : subagent.status,
+          parentSessionId: summary.subagent.parentSessionId,
+          profile: summary.subagent.profile,
+          description: summary.subagent.description,
+          status: session.isRunning() ? "running" as const : summary.subagent.status,
         },
-      } : side ? {
-        parentSessionId: side.parentSessionId,
-        relation: { kind: "side" as const, ...side },
+      } : summary.side ? {
+        parentSessionId: summary.side.parentSessionId,
+        relation: { kind: "side" as const, ...summary.side },
       } : {}),
       transient: !persisted,
     });

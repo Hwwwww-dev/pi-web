@@ -9,6 +9,7 @@ import { Button } from "./ui/button";
 import { ButtonGroup } from "./ui/button-group";
 import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
@@ -1388,37 +1389,54 @@ function OAuthDetail({ provider, onRefresh, enabledModels, contextSettings }: {
     eventSourceRef.current = es;
 
     es.onmessage = (e) => {
-      const data = JSON.parse(e.data) as {
+      // The stream is not trusted: an unparsable payload or a phase missing its
+      // fields surfaces as the panel's error state, never as a `!` assertion.
+      const failInvalid = () => {
+        es.close();
+        setLoginState({ phase: "error", message: t("models.oauthInvalidEvent") });
+      };
+      let data: {
         type: string; url?: string; instructions?: string | null;
         token?: string; message?: string; placeholder?: string | null;
         userCode?: string; verificationUri?: string; intervalSeconds?: number | null; expiresInSeconds?: number | null;
         options?: { id: string; label: string }[];
       };
+      try {
+        data = JSON.parse(e.data);
+      } catch {
+        failInvalid();
+        return;
+      }
       if (data.type === "auth") {
-        setLoginState({ phase: "auth", url: data.url!, instructions: data.instructions ?? null, token: data.token! });
+        if (!data.url || !data.token) return failInvalid();
+        setLoginState({ phase: "auth", url: data.url, instructions: data.instructions ?? null, token: data.token });
         openExternalUrl(data.url);
       } else if (data.type === "device_code") {
+        if (!data.userCode || !data.verificationUri) return failInvalid();
         setLoginState({
           phase: "device_code",
-          userCode: data.userCode!,
-          verificationUri: data.verificationUri!,
+          userCode: data.userCode,
+          verificationUri: data.verificationUri,
           intervalSeconds: data.intervalSeconds ?? null,
           expiresInSeconds: data.expiresInSeconds ?? null,
         });
         openExternalUrl(data.verificationUri);
       } else if (data.type === "prompt_request") {
-        setLoginState({ phase: "prompt", message: data.message!, placeholder: data.placeholder ?? null, token: data.token! });
+        if (!data.message || !data.token) return failInvalid();
+        setLoginState({ phase: "prompt", message: data.message, placeholder: data.placeholder ?? null, token: data.token });
       } else if (data.type === "select_request") {
-        setLoginState({ phase: "select", message: data.message!, options: data.options ?? [], token: data.token! });
+        if (!data.message || !data.token) return failInvalid();
+        setLoginState({ phase: "select", message: data.message, options: data.options ?? [], token: data.token });
       } else if (data.type === "progress") {
-        setLoginState({ phase: "progress", message: data.message! });
+        if (!data.message) return failInvalid();
+        setLoginState({ phase: "progress", message: data.message });
       } else if (data.type === "success") {
         es.close();
         setLoginState({ phase: "success" });
         onRefresh();
       } else if (data.type === "error") {
         es.close();
-        setLoginState({ phase: "error", message: data.message! });
+        setLoginState({ phase: "error", message: data.message ?? t("models.oauthInvalidEvent") });
       } else if (data.type === "cancelled") {
         es.close();
         setLoginState({ phase: "idle" });
@@ -1737,7 +1755,7 @@ function ApiKeyDetail({ provider, onRefresh, enabledModels, contextSettings }: {
             variant={canSave || savedOk ? "default" : "outline"}
             className={cn(
               "shrink-0 text-xs font-semibold",
-              savedOk && "bg-success text-white hover:bg-success/90",
+              savedOk && "bg-success text-success-foreground hover:bg-success/90",
             )}
           >
             {savedOk && (
@@ -1795,17 +1813,27 @@ function AddProviderPicker({
     "h-auto w-full min-w-0 justify-start gap-2 rounded-lg px-3 py-2.5 text-left font-normal text-foreground shadow-none border-border bg-card hover:border-primary hover:bg-accent/50";
 
   return (
-    <div
-      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      onKeyDown={(e) => {
-        if (e.key !== "Escape" || e.nativeEvent.isComposing || e.keyCode === 229) return;
-        e.preventDefault();
-        e.stopPropagation();
-        onClose();
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
     >
-      <div className="flex max-h-[min(72vh,calc(100vh-32px))] w-[820px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-lg">
+      <DialogContent
+        showCloseButton={false}
+        aria-label={t("i18n.addProvider")}
+        aria-describedby={undefined}
+        overlayClassName="z-[1100] bg-black/40"
+        onEscapeKeyDown={(e) => {
+          // An IME's composing Escape cancels the composition, not the picker.
+          if (e.isComposing || e.keyCode === 229) e.preventDefault();
+        }}
+        className={cn(
+          "z-[1100] flex flex-col gap-0 overflow-hidden rounded-xl p-0 shadow-lg",
+          "max-h-[min(72vh,calc(100vh-32px))] w-[820px] max-w-[calc(100vw-32px)] sm:max-w-[calc(100vw-32px)]",
+        )}
+      >
+        <DialogTitle className="sr-only">{t("i18n.addProvider")}</DialogTitle>
         {/* Search */}
         <div className="flex shrink-0 items-center gap-2 px-3.5 py-2.5">
           <Search size={13} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
@@ -1881,8 +1909,8 @@ function AddProviderPicker({
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -2437,16 +2465,18 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
                       >
                         <ConfigSidebarText>+ {t("i18n.model")}</ConfigSidebarText>
                       </ConfigSidebarItem>
-                      <button
+                      <Button
                         type="button"
-                        className="h-8 w-9 shrink-0 cursor-pointer rounded-md p-0 font-mono text-xs tabular-nums text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:cursor-default disabled:opacity-35"
+                        variant="ghost"
+                        size="sm"
+                        className="w-9 shrink-0 px-0 font-mono text-xs tabular-nums text-muted-foreground disabled:opacity-35"
                         aria-label={t("models.sortByName")}
                         title={t("models.sortByName")}
                         disabled={saving || loadError !== null || models.length < 2}
                         onClick={() => sortModels(pName)}
                       >
                         A–Z
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 );

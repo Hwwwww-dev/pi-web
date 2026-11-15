@@ -1,4 +1,8 @@
-import type { AgentPhase } from "@/hooks/useAgentSession";
+export type AgentPhase =
+  | { kind: "waiting_model" }
+  | { kind: "running_command" }
+  | { kind: "running_tools"; tools: { id: string; name: string; progress?: string }[] }
+  | null;
 
 /**
  * The phase a state read (`GET /api/sessions/[id]/state`, `GET /api/agent/[id]`)
@@ -11,6 +15,39 @@ import type { AgentPhase } from "@/hooks/useAgentSession";
 export function runStatePhase(prev: AgentPhase, isStreaming: boolean): AgentPhase {
   if (prev?.kind === "running_tools" && prev.tools.length > 0) return prev;
   return isStreaming ? { kind: "waiting_model" } : { kind: "running_command" };
+}
+
+/**
+ * The run phase outside React: tool events rewrite it several times a second
+ * and only the status line subscribes, so a streaming tool's output re-renders
+ * neither the chat container nor the message list. `set` accepts an updater
+ * like the React setter it replaces and skips identical values, so a chunk-era
+ * `setAgentPhase(null)` keeps its bail-out behaviour.
+ */
+export interface AgentPhaseStore {
+  get(): AgentPhase;
+  subscribe(listener: () => void): () => void;
+  set(next: AgentPhase | ((prev: AgentPhase) => AgentPhase)): void;
+}
+
+export function createAgentPhaseStore(): AgentPhaseStore {
+  let phase: AgentPhase = null;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => phase,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    set(next) {
+      const resolved = typeof next === "function" ? next(phase) : next;
+      if (resolved === phase) return;
+      phase = resolved;
+      for (const listener of listeners) listener();
+    },
+  };
 }
 
 /** The i18n translate function shape this module needs. */
