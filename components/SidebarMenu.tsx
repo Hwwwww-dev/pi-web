@@ -1,46 +1,16 @@
 "use client";
 
-import { Children, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, type SyntheticEvent } from "react";
+import { Children, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type SyntheticEvent } from "react";
 import { CheckIcon } from "lucide-react";
-import { Dialog as DialogPrimitive } from "radix-ui";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 
-/**
- * The session sidebar's popup menu: a row's ⋯ or right-click menu, a project
- * group's menu; also the project and worktree menus of the files tab and of
- * the bar above a fresh composer (components/ProjectWorktreePicker.tsx). On a
- * desktop it is a small menu placed at a point or beside a button; on a phone
- * (`sheet`) a bottom sheet over its own backdrop. Either way it is portaled to `document.body`: the mobile sidebar
- * drawer moves with `transform`, which would make a `position: fixed` menu
- * inside it fixed to the 280px drawer instead of the screen.
- *
- * What it shows and whether it is open come from the parent, which keeps
- * them above the virtualized rows so a row scrolled out of view does not
- * take its open menu with it; the menu keeps only its filter field's text.
- *
- * The shell is Radix: a DropdownMenu on a desktop, a Dialog on a phone.
- * Their trigger is a hidden zero-size element parked at the anchor
- * coordinates — never the real opener button (whose next click must close
- * the menu, not open it again) and never inside the virtualized rows. Radix
- * owns the placement with its collision handling, the Escape and
- * pointer-down-outside dismissal (its Escape listener runs in the document's
- * capture phase and marks the event handled, so the window-level Escape that
- * stops a running agent leaves the menu alone), and the focus scope into and
- * out of the menu. The items stay plain buttons with the sidebar's own
- * keyboard model: Radix's menu collection cannot be used here, because its
- * items must be its own `Item` components while these keep the old markup
- * (and with it the one-letter shortcuts and the arrow roving Radix has no
- * hook for). That keydown lives on the content; Radix's own Tab swallow
- * turns a desktop menu into a focus trap, with a way out along the form
- * fields of a swapped-in body. The old hand-written CSS (app/sidebar-menu.css,
- * retired) is folded into these class names; the old classes stay on as
- * stable markup markers next to the utilities.
- */
-
-/** What an item's `onSelect` is told about the activation. */
 export interface SidebarMenuSelectEvent {
   /** Shift was held (click, Enter or the item's shortcut letter): Delete skips its confirmation. */
   shiftKey: boolean;
@@ -90,15 +60,14 @@ export type SidebarMenuItem =
       onSelect: (event: SidebarMenuSelectEvent) => void;
     }
   | { type: "separator"; id: string }
-  | { type: "header"; id: string; label: string }
-  /** Shown as given in the item's place (a classic menu's confirmation row); its buttons mark themselves as items. */
+  /** Shown as given in the item's place (a worktree menu's confirmation row); its buttons mark themselves as items. */
   | { type: "custom"; id: string; content: ReactNode };
 
 export type SidebarMenuAnchor =
   | { kind: "point"; x: number; y: number }
   | { kind: "rect"; rect: { left: number; top: number; right: number; bottom: number }; align: "start" | "end" };
 
-export type SidebarMenuCloseReason = "escape" | "outside" | "select" | "cancel";
+export type SidebarMenuCloseReason = "escape" | "outside" | "select";
 
 /**
  * A field above the items that narrows the menu's choices (the items with
@@ -110,7 +79,7 @@ export interface SidebarMenuFilter {
   placeholder: string;
   /** Shown when no choice matches. */
   emptyLabel: string;
-  /** Choices needed for the field, if not `SIDEBAR_MENU_FILTER_MIN_CHOICES` (a classic project menu's 9, as on main). */
+  /** Choices needed for the field, if not `SIDEBAR_MENU_FILTER_MIN_CHOICES`. */
   minChoices?: number;
 }
 
@@ -119,24 +88,11 @@ export const SIDEBAR_MENU_FILTER_MIN_CHOICES = 8;
 export interface SidebarMenuProps {
   open: boolean;
   anchor: SidebarMenuAnchor | null;
-  /** Render as a bottom sheet with its own backdrop instead of the anchored dropdown. */
-  sheet?: boolean;
   ariaLabel: string;
-  /** The sheet's heading (one line, ellipsis). */
-  title?: string;
   items?: SidebarMenuItem[];
   filter?: SidebarMenuFilter;
   /** A custom body (a small form) instead of `items`. */
   children?: ReactNode;
-  /** The sheet's Cancel button. */
-  cancelLabel: string;
-  /**
-   * The sheet's Cancel takes focus when the menu opens or its body changes:
-   * for a question whose other answer discards something (force-removing a
-   * checkout), so Enter must not give it. On a desktop the body marks its own
-   * Cancel instead.
-   */
-  focusCancel?: boolean;
   /** Tab out of the menu reports "outside". */
   onClose: (reason: SidebarMenuCloseReason) => void;
   /**
@@ -147,12 +103,7 @@ export interface SidebarMenuProps {
   returnFocusTo?: HTMLElement | null;
   /** Desktop width in px. */
   width?: number;
-  /**
-   * The files tab's project and worktree menus on a desktop: the look of the
-   * dropdowns they were on main, rows divided by lines, 11px.
-   */
-  classic?: boolean;
-  /** Shown after the items, outside the list (a classic worktree menu's "New worktree…" form). */
+  /** Shown after the items, outside the list (a worktree menu's "New worktree…" form). */
   footer?: ReactNode;
   /** Focus goes into the menu again whenever this changes (a body swapped in or out). */
   focusKey?: string;
@@ -168,14 +119,12 @@ export interface SidebarMenuProps {
 type ActionItem = Extract<SidebarMenuItem, { type: "item" }>;
 /** What activating an item or its secondary action needs. */
 type MenuAction = Pick<ActionItem, "disabled" | "onSelect">;
-/** Where the surface sits: the classic dropdowns of the files tab, or a phone's sheet. */
-type SurfaceMode = { classic: boolean; sheet: boolean };
 
 const DEFAULT_MENU_WIDTH = 208;
 
 const ITEM_SELECTOR = "[data-sidebar-menu-item]";
 const FILTER_SELECTOR = "[data-sidebar-menu-filter]";
-/** The control that takes focus when the menu or its body shows (the filter, a confirmation's Cancel, the sheet's for `focusCancel`). */
+/** The control that takes focus when the menu or its body shows (a filter field, a question's Cancel). */
 const AUTOFOCUS_SELECTOR = "[data-sidebar-menu-autofocus]";
 /** A body whose Escape stays in the menu (the "New worktree…" form). */
 const BODY_ESC_SELECTOR = "[data-sidebar-menu-esc-to-body]";
@@ -267,10 +216,10 @@ function initialFocusTarget(surface: HTMLElement): HTMLElement | null {
 
 /**
  * What focus goes to when the menu's body is swapped while it stays open (the
- * worktree menu's "New worktree…" form under, or in place of, its list): the
- * new body's marked control, not the list's filter field above it — first in
- * the page, it took the focus when the menu opened and would keep it. Back to
- * the list nothing else is marked, so the filter takes it again.
+ * worktree menu's "New worktree…" form under its list): the new body's marked
+ * control, not the list's filter field above it — first in the page, it took
+ * the focus when the menu opened and would keep it. Back to the list nothing
+ * else is marked, so the filter takes it again.
  */
 export function menuBodyFocusTarget(surface: HTMLElement): HTMLElement | null {
   const marked = Array.from(surface.querySelectorAll<HTMLElement>(AUTOFOCUS_SELECTOR))
@@ -298,7 +247,7 @@ export function menuFocusReturnTarget(opener: HTMLElement | null): HTMLElement |
 }
 
 /**
- * The opener was pressed while its menu was open: that press closed the menu,
+ * The opener was pressed while its menu was open: that press closes the menu,
  * and its click must not open it again. Without this a second click on ⋯
  * would close and reopen the menu instead of closing it.
  */
@@ -357,153 +306,120 @@ const isolateEvents = {
 
 /** The Delete-confirmation ring: three pixels of half-transparent accent. The bodies' own buttons (a form's Create, a question's Confirm) take it too. */
 export const SIDEBAR_MENU_FOCUS_RING = "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
-const FOCUS_RING = SIDEBAR_MENU_FOCUS_RING;
 
-function menuBoxClassName(classic: boolean): string {
+/** The menu box's look, shared by the engine and the picker's own DropdownMenu content. */
+export function sidebarMenuBoxClassName(): string {
+  return menuBoxClassName();
+}
+
+function menuBoxClassName(): string {
   return [
     "sidebar-menu",
-    classic ? "is-classic" : "",
     "z-[400] box-border min-w-0 max-w-[calc(100vw-16px)]",
     "max-h-[min(calc(var(--app-viewport-height,100dvh)-16px),480px,var(--radix-popper-available-height,480px))] overflow-y-auto [overscroll-behavior:contain]",
     "border border-(--border) rounded-(--radius-md) bg-background text-foreground text-xs shadow-(--shadow-md)",
-    classic ? "p-0" : "p-1",
+    "p-0",
     // 开合动画沿用官方 content 的 fade+滑入，缩放两档归零（旧手写动画无缩放），
     // 时长保留侧栏自己的 120ms 进 / 100ms 出。
     "duration-[120ms] ease-out motion-reduce:animate-none",
     "data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100",
     "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[100ms] data-[state=closed]:fill-mode-forwards motion-reduce:data-[state=closed]:animate-none",
     "focus:outline-none",
-  ].filter(Boolean).join(" ");
+  ].join(" ");
 }
 
-function itemClassName(item: ActionItem, mode: SurfaceMode, inRow: boolean): string {
+function itemClassName(item: ActionItem): string {
   const choice = item.checked !== undefined;
   const color = item.danger ? "text-destructive"
-    : mode.classic ? (item.checked ? "text-foreground" : "text-muted-foreground")
+    : choice && !item.checked ? "text-muted-foreground"
     : "text-foreground";
   const highlight = item.danger
-    ? "not-aria-disabled:hover:bg-destructive/10 not-aria-disabled:focus-visible:bg-destructive/10"
-    : "not-aria-disabled:hover:bg-accent not-aria-disabled:focus-visible:bg-secondary";
+    ? "focus:bg-destructive/10 focus:text-destructive"
+    : "focus:bg-secondary focus:text-foreground";
   return [
     "sidebar-menu-item",
     choice ? "is-choice" : "",
     item.danger ? "is-danger" : "",
     item.checked ? "is-checked" : "",
-    mode.classic
-      ? "flex items-center gap-[7px] h-auto px-2.5 py-2 rounded-xs text-xs leading-[1.35] text-left"
-      : mode.sheet
-        ? "flex items-center gap-3 h-12 px-4 rounded-none text-base text-left"
-        : "flex items-center gap-2 w-full h-7 px-2 rounded-(--radius-sm) text-left",
-    mode.classic && choice && !inRow ? "" : "",
-    inRow ? "flex-1 min-w-0" : "",
+    "relative flex w-full items-center gap-2 rounded-xs px-2.5 py-2 text-left text-xs leading-[1.35] outline-hidden select-none",
     color,
     highlight,
     "cursor-pointer focus:outline-none",
-    "aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
-    !mode.sheet && !mode.classic ? "pointer-coarse:h-10" : "",
-    mode.classic ? "pointer-coarse:min-h-[36px]" : "",
+    "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+    "pointer-coarse:min-h-9",
   ].filter(Boolean).join(" ");
 }
 
-function iconClassName(item: ActionItem, mode: SurfaceMode): string {
+function iconClassName(item: ActionItem): string {
   const color = item.danger ? "text-destructive"
     : item.checked ? "text-(--accent)"
-    : mode.classic ? "text-inherit" : "text-muted-foreground";
+    : "text-muted-foreground";
   return [
     "sidebar-menu-icon",
-    "inline-flex items-center justify-center shrink-0 grow-0",
-    mode.classic ? "basis-[10px] size-[10px] [&_svg]:size-[10px]" : "basis-3.5 size-3.5",
+    "inline-flex size-3.5 shrink-0 grow-0 items-center justify-center",
+    // 强制统一 12px 与继承色：shadcn item 基类会给无 size-/text- 类的 svg 塞
+    // size-4 / text-muted-foreground，盖过外层 span 的颜色继承。
+    "[&_svg]:size-3! [&_svg]:text-inherit!",
     color,
-  ].filter(Boolean).join(" ");
+  ].join(" ");
 }
 
-function labelClassName(item: ActionItem, mode: SurfaceMode): string {
-  const monoSize = mode.sheet ? "text-sm" : mode.classic ? "text-xs" : "text-xs";
+function labelClassName(item: ActionItem): string {
   return [
     "sidebar-menu-label",
     item.mono ? "is-mono" : "",
     item.path ? "is-path" : "",
-    "flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-    item.mono ? `font-mono ${monoSize}` : "",
-    item.path ? "[direction:rtl] text-left [&>span]:[unicode-bidi:plaintext]" : "",
+    "flex-1 min-w-0 whitespace-nowrap",
+    // 长路径标签：不省略而是横向滚动（rtl 起始即显示尾部，滚去头部），
+    // 悬停另有整条 title 提示兜底——两样都对"显示不下"负责。
+    item.path
+      ? "overflow-x-auto overflow-y-hidden text-left [direction:rtl] [text-overflow:clip] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>span]:[unicode-bidi:plaintext]"
+      : "overflow-hidden text-ellipsis",
+    item.mono ? "font-mono text-xs" : "",
   ].filter(Boolean).join(" ");
 }
 
-function noteClassName(mode: SurfaceMode): string {
-  return [
-    "sidebar-menu-note",
-    "shrink-0 max-w-[45%] overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap",
-    mode.sheet ? "text-sm" : mode.classic ? "text-xs" : "text-xs",
-  ].filter(Boolean).join(" ");
+function noteClassName(): string {
+  return "sidebar-menu-note shrink-0 max-w-[45%] overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap text-xs";
 }
 
-function shortcutClassName(sheet: boolean): string {
-  return ["sidebar-menu-shortcut", "shrink-0 text-muted-foreground font-mono text-xs", sheet ? "hidden" : ""].filter(Boolean).join(" ");
+function shortcutClassName(): string {
+  return "sidebar-menu-shortcut shrink-0 text-muted-foreground font-mono text-xs";
 }
 
-function separatorClassName(mode: SurfaceMode): string {
-  return ["sidebar-menu-separator", "h-px bg-(--border)", mode.classic ? "m-0" : mode.sheet ? "my-1" : "my-1 mx-0.5"].filter(Boolean).join(" ");
+function separatorClassName(): string {
+  return "sidebar-menu-separator h-px bg-(--border) my-1 mx-0";
 }
 
-function headerClassName(mode: SurfaceMode): string {
-  return [
-    "sidebar-menu-header",
-    "overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap",
-    mode.sheet ? "px-4 pt-2 pb-1 text-xs" : "px-2 pt-1.5 pb-1 text-xs",
-  ].filter(Boolean).join(" ");
+function filterClassName(): string {
+  return "sidebar-menu-filter sticky top-0 z-[1] m-0 bg-background px-2 py-1.5";
 }
 
-function filterClassName(mode: SurfaceMode): string {
-  return [
-    "sidebar-menu-filter",
-    "sticky z-[1] bg-background",
-    mode.classic
-      ? "top-0 m-0 px-2 py-1.5"
-      : mode.sheet
-        ? "top-[-4px] -mt-1 mb-1 px-4 py-2"
-        : "top-[-4px] -mx-1 -mt-1 mb-1 p-1",
-  ].filter(Boolean).join(" ");
-}
-
-function filterInputClassName(mode: SurfaceMode): string {
+function filterInputClassName(): string {
   return [
     "sidebar-menu-filter-input",
-    "block w-full px-2 box-border border border-(--border) rounded-(--radius-sm) outline-none bg-background text-foreground [user-select:text] [-webkit-user-select:text] focus:border-(--accent) focus-visible:border-(--accent) focus-visible:ring-0",
-    // 字号统一由输入框原语（--field-font-size）提供，此处仅保留各模式自身高度。
-    mode.classic ? "h-auto py-[5px] font-mono" : mode.sheet ? "h-10" : "h-7",
-  ].filter(Boolean).join(" ");
+    "block h-auto w-full box-border border border-(--border) rounded-(--radius-sm) bg-background px-2 py-[5px] font-mono text-foreground outline-none [user-select:text] [-webkit-user-select:text] focus:border-(--accent) focus-visible:border-(--accent) focus-visible:ring-0",
+  ].join(" ");
 }
 
-function emptyClassName(mode: SurfaceMode): string {
-  return [
-    "sidebar-menu-empty",
-    "text-muted-foreground",
-    mode.classic ? "px-2.5 py-2 text-xs" : mode.sheet ? "px-4 py-3 text-base" : "px-2 py-1.5 text-xs",
-  ].filter(Boolean).join(" ");
+function emptyClassName(): string {
+  return "sidebar-menu-empty px-2.5 py-2 text-muted-foreground text-xs";
 }
 
-function secondaryClassName(secondary: SidebarMenuSecondaryAction, mode: SurfaceMode): string {
+function secondaryClassName(secondary: SidebarMenuSecondaryAction): string {
   const highlight = secondary.danger
-    ? "not-aria-disabled:hover:bg-destructive/10 not-aria-disabled:hover:text-destructive not-aria-disabled:focus-visible:bg-destructive/10 not-aria-disabled:focus-visible:text-destructive"
-    : "not-aria-disabled:hover:bg-accent not-aria-disabled:hover:text-foreground not-aria-disabled:focus-visible:bg-secondary not-aria-disabled:focus-visible:text-foreground";
+    ? "focus:bg-destructive/10 focus:text-destructive"
+    : "focus:bg-accent focus:text-foreground";
   return [
     "sidebar-menu-secondary",
     secondary.danger ? "is-danger" : "",
-    "inline-flex items-center justify-center shrink-0 grow-0 p-0 border-0 bg-transparent cursor-pointer focus:outline-none",
+    "inline-flex size-7 shrink-0 grow-0 items-center justify-center rounded-(--radius-sm) border-0 bg-transparent p-0 cursor-pointer outline-none [&_svg]:text-inherit!",
     secondary.danger ? "text-destructive" : "text-muted-foreground",
-    mode.classic ? "w-[34px] h-7 mr-1 rounded-(--radius-sm)" : mode.sheet ? "size-12 rounded-none" : "size-7 rounded-(--radius-sm)",
     highlight,
-    "aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
-    !mode.sheet && !mode.classic ? "pointer-coarse:size-10" : "",
+    "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+    "pointer-coarse:size-10",
   ].filter(Boolean).join(" ");
 }
-
-const SHEET_LAYER_CLASS = "sidebar-sheet-layer fixed top-0 right-0 left-0 z-[410] flex flex-col justify-end pointer-events-none focus:outline-none";
-const SHEET_BACKDROP_CLASS = "sidebar-sheet-backdrop fixed inset-0 z-[410] bg-black/35 animate-in fade-in duration-[120ms] ease-out [touch-action:none] [-webkit-tap-highlight-color:transparent] motion-reduce:animate-none";
-const SHEET_CLASS = "sidebar-sheet relative z-[1] box-border max-h-[calc(var(--app-viewport-height,100dvh)-48px)] overflow-y-auto [overscroll-behavior:contain] pt-1 pb-[max(8px,env(safe-area-inset-bottom))] rounded-t-(--radius-lg) bg-background text-foreground text-base  animate-in fade-in slide-in-from-bottom-[16px] duration-[120ms] ease-out pointer-events-auto focus:outline-none motion-reduce:animate-none [html[data-keyboard-open]_&]:pb-2";
-const SHEET_TITLE_CLASS = "sidebar-sheet-title px-4 pt-[10px] pb-[9px] overflow-hidden text-muted-foreground text-xs text-ellipsis whitespace-nowrap";
-const SHEET_BODY_CLASS = "sidebar-sheet-body py-1";
-const SHEET_CANCEL_CLASS = ["sidebar-sheet-cancel", "flex items-center justify-center w-full h-12 px-4 bg-transparent text-muted-foreground text-base [font:inherit] cursor-pointer hover:bg-accent", "rounded-none font-normal focus-visible:ring-0 focus-visible:border-(--border)", FOCUS_RING].filter(Boolean).join(" ");
 
 /** Enter is taken on the button rather than left to its click, which would not say whether Shift was held. */
 function activateOnEnter(action: MenuAction, onActivate: (action: MenuAction, shiftKey: boolean) => void) {
@@ -514,60 +430,128 @@ function activateOnEnter(action: MenuAction, onActivate: (action: MenuAction, sh
   };
 }
 
-function MenuItemButton({ item, mode, inRow = false, onActivate }: { item: ActionItem; mode: SurfaceMode; inRow?: boolean; onActivate: (action: MenuAction, shiftKey: boolean) => void }) {
+/** Static-mode stand-in for a Radix item (tests render the surface without a menu root). */
+function StaticItem({ role, checked, className, title, disabled, onActivate, action, children }: {
+  role: "menuitem" | "menuitemcheckbox";
+  checked?: boolean;
+  className: string;
+  title?: string;
+  disabled?: boolean;
+  onActivate: (action: MenuAction, shiftKey: boolean) => void;
+  action: MenuAction;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      role={role}
+      aria-checked={checked}
+      aria-disabled={disabled ? true : undefined}
+      tabIndex={-1}
+      title={title}
+      data-sidebar-menu-item=""
+      className={className}
+      onClick={(event) => onActivate(action, event.shiftKey)}
+      onKeyDown={activateOnEnter(action, onActivate)}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** One item of the list: a shadcn menu item (Radix under it), its own tooltip and its trailing note. */
+function MenuRow({ item, onActivate, radix = true }: {
+  item: ActionItem;
+  onActivate: (action: MenuAction, shiftKey: boolean, event?: Event) => void;
+  radix?: boolean;
+}) {
   const choice = item.checked !== undefined;
   let trailing: ReactNode = null;
   if (item.disabled && item.disabledReason) {
-    trailing = <span className={noteClassName(mode)}>{item.disabledReason}</span>;
+    trailing = <span className={noteClassName()}>{item.disabledReason}</span>;
   } else if (item.note) {
-    trailing = <span className={noteClassName(mode)}>{item.note}</span>;
+    trailing = <span className={noteClassName()}>{item.note}</span>;
   } else if (item.shortcut) {
-    trailing = <kbd className={shortcutClassName(mode.sheet)}>{item.shortcut}</kbd>;
+    trailing = <kbd className={shortcutClassName()}>{item.shortcut}</kbd>;
   }
-  const button = (
-    <button
-      type="button"
-      role={choice ? "menuitemradio" : "menuitem"}
-      aria-checked={choice ? item.checked : undefined}
-      aria-disabled={item.disabled ? true : undefined}
-      aria-keyshortcuts={item.shortcut && !item.disabled ? item.shortcut.toUpperCase() : undefined}
-      tabIndex={-1}
-      title={item.title}
-      data-sidebar-menu-item=""
-      className={itemClassName(item, mode, inRow)}
-      onClick={(event) => onActivate(item, event.shiftKey)}
-      onKeyDown={activateOnEnter(item, onActivate)}
-    >
-      <span className={iconClassName(item, mode)}>
-        {choice ? (item.checked ? <CheckIcon size={13} /> : null) : item.icon}
+  // 悬停提示：没有显式 title 的条目兜底为完整标签——凡是"显示不下"的地方
+  // 都保证有提示可看（配合路径标签的横向滚动）。
+  const tooltipTitle = item.title ?? item.label;
+  const inner = (
+    <>
+      <span className={iconClassName(item)}>
+        {choice ? (item.checked ? <CheckIcon size={12} /> : null) : item.icon}
       </span>
-      <span className={labelClassName(item, mode)}>{item.path ? <span>{item.label}</span> : item.label}</span>
+      <span className={labelClassName(item)}>{item.path ? <span>{item.label}</span> : item.label}</span>
       {item.badge}
       {trailing}
-    </button>
+    </>
+  );
+  const className = itemClassName(item);
+  const rowItem = radix ? (
+    choice ? (
+      <DropdownMenuCheckboxItem
+        checked={item.checked}
+        disabled={item.disabled}
+        title={tooltipTitle}
+        data-sidebar-menu-item=""
+        className={`${className} pr-2 pl-2.5 [&>span]:hidden`}
+        onSelect={(event) => onActivate(item, false, event)}
+      >
+        {inner}
+      </DropdownMenuCheckboxItem>
+    ) : (
+      <DropdownMenuItem
+        disabled={item.disabled}
+        title={tooltipTitle}
+        data-sidebar-menu-item=""
+        className={className}
+        onSelect={(event) => onActivate(item, false, event)}
+      >
+        {inner}
+      </DropdownMenuItem>
+    )
+  ) : (
+    <StaticItem
+      role={choice ? "menuitemcheckbox" : "menuitem"}
+      checked={item.checked}
+      className={choice ? `${className} pr-2 pl-2.5` : className}
+      title={tooltipTitle}
+      disabled={item.disabled}
+      action={item}
+      onActivate={onActivate}
+    >
+      {inner}
+    </StaticItem>
   );
   const secondary = item.secondary;
-  if (!secondary) return button;
-  return (
-    <div
-      className={[choice ? "sidebar-menu-row is-choice" : "sidebar-menu-row", "flex items-center gap-0.5", mode.classic && choice ? "" : ""].filter(Boolean).join(" ")}
-      role="none"
+  if (!secondary) return rowItem;
+  const secondaryNode = radix ? (
+    <DropdownMenuItem
+      disabled={secondary.disabled}
+      title={secondary.label}
+      aria-label={secondary.label}
+      data-sidebar-menu-item=""
+      className={secondaryClassName(secondary)}
+      onSelect={(event) => onActivate(secondary, false, event)}
     >
-      {button}
-      <button
-        type="button"
-        role="menuitem"
-        aria-label={secondary.label}
-        aria-disabled={secondary.disabled ? true : undefined}
-        tabIndex={-1}
-        title={secondary.label}
-        data-sidebar-menu-item=""
-        className={secondaryClassName(secondary, mode)}
-        onClick={(event) => onActivate(secondary, event.shiftKey)}
-        onKeyDown={activateOnEnter(secondary, onActivate)}
-      >
-        {secondary.icon}
-      </button>
+      {secondary.icon}
+    </DropdownMenuItem>
+  ) : (
+    <StaticItem
+      role="menuitem"
+      className={secondaryClassName(secondary)}
+      title={secondary.label}
+      disabled={secondary.disabled}
+      action={secondary}
+      onActivate={onActivate}
+    >
+      {secondary.icon}
+    </StaticItem>
+  );
+  return (
+    <div className={["sidebar-menu-row", choice ? "is-choice" : "", "flex items-center gap-0.5"].filter(Boolean).join(" ")} role="none">
+      <div className="flex min-w-0 flex-1">{rowItem}</div>
+      {secondaryNode}
     </div>
   );
 }
@@ -580,7 +564,6 @@ function isCompositeBody(items: readonly SidebarMenuItem[] | undefined, filter: 
 }
 
 interface MenuSurfaceBodyProps {
-  mode: SurfaceMode;
   ariaLabel: string;
   items?: SidebarMenuItem[];
   filter?: SidebarMenuFilter;
@@ -591,7 +574,9 @@ interface MenuSurfaceBodyProps {
   /** Focus goes into the list from the field: Down/Up to its first/last item (Tab like Down). */
   onFilterNavigate?: (element: HTMLElement | undefined) => void;
   footer?: ReactNode;
-  onActivate: (action: MenuAction, shiftKey: boolean) => void;
+  /** Radix on (the live menu); plain stand-ins off (the static surface the tests render). */
+  radix?: boolean;
+  onActivate: (action: MenuAction, shiftKey: boolean, event?: Event) => void;
 }
 
 /** The items of the list the field belongs to, focusable ones only. */
@@ -602,37 +587,36 @@ function itemsAround(field: HTMLInputElement): HTMLElement[] {
 }
 
 /**
- * The body of a desktop box or a sheet: the filter, what it found, the items,
- * a footer — or a custom body as given.
+ * The body of the menu: the filter, what it found, the items, a footer — or a
+ * custom body as given.
  */
-function MenuSurfaceBody({ mode, ariaLabel, items, filter, filterQuery = "", onFilterQueryChange, onFilterNavigate, footer, onActivate, children }: MenuSurfaceBodyProps) {
+function MenuSurfaceBody({ ariaLabel, items, filter, filterQuery = "", onFilterQueryChange, onFilterNavigate, footer, onActivate, radix = true, children }: MenuSurfaceBodyProps) {
   const custom = hasCustomMenuBody(children);
   const hasFooter = !custom && hasCustomMenuBody(footer);
   const filtered = filter !== undefined && !custom && sidebarMenuHasFilter(items, filter.minChoices);
   const shown = filtered ? filterSidebarMenuItems(items ?? [], filterQuery) : items ?? [];
   const list = shown.map((item) => {
-    if (item.type === "separator") return <div key={item.id} className={separatorClassName(mode)} role="separator" />;
-    if (item.type === "header") return <div key={item.id} className={headerClassName(mode)} role="presentation">{item.label}</div>;
+    if (item.type === "separator") return <div key={item.id} className={separatorClassName()} role="separator" />;
     if (item.type === "custom") return <div key={item.id} className="sidebar-menu-custom" role="none">{item.content}</div>;
-    return <MenuItemButton key={item.id} item={item} mode={mode} onActivate={onActivate} />;
+    return <MenuRow key={item.id} item={item} onActivate={onActivate} radix={radix} />;
   });
   // A menu holds only its items: the field and what it found stand before
-  // the list, a footer after it, inside a dialog (the sheet is one already).
+  // the list, a footer after it, inside a dialog.
   if (custom) return <>{children}</>;
   if (!filtered && !hasFooter) return <>{list}</>;
   return (
     <>
       {filtered && (
-        <div className={filterClassName(mode)}>
+        <div className={filterClassName()}>
           <Input
-            className={filterInputClassName(mode)}
+            className={filterInputClassName()}
             value={filterQuery}
             placeholder={filter.placeholder}
             aria-label={filter.placeholder}
             autoComplete="off"
             spellCheck={false}
             data-sidebar-menu-filter=""
-            data-sidebar-menu-autofocus={mode.sheet ? undefined : ""}
+            data-sidebar-menu-autofocus=""
             onChange={(event) => onFilterQueryChange?.(event.target.value)}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing || event.keyCode === 229) {
@@ -658,7 +642,7 @@ function MenuSurfaceBody({ mode, ariaLabel, items, filter, filterQuery = "", onF
       )}
       {filtered && (
         <div role="status">
-          {filterQuery.trim() && !shown.some(isChoice) && <div className={emptyClassName(mode)}>{filter.emptyLabel}</div>}
+          {filterQuery.trim() && !shown.some(isChoice) && <div className={emptyClassName()}>{filter.emptyLabel}</div>}
         </div>
       )}
       <div role="menu" aria-label={ariaLabel}>{list}</div>
@@ -667,160 +651,57 @@ function MenuSurfaceBody({ mode, ariaLabel, items, filter, filterQuery = "", onF
   );
 }
 
-/** The sheet's box: its title, its body and its Cancel. */
-function SheetInner({
-  ariaLabel,
-  title,
-  radixTitle = false,
-  items,
-  filter,
-  filterQuery,
-  onFilterQueryChange,
-  onFilterNavigate,
-  children,
-  cancelLabel,
-  focusCancel = false,
-  footer,
-  surfaceRef,
-  onActivate,
-  onCancel,
-}: Omit<MenuSurfaceBodyProps, "mode"> & {
-  title?: string;
-  /** The production sheet renders the title as a Radix dialog title. */
-  radixTitle?: boolean;
-  cancelLabel: string;
-  focusCancel?: boolean;
-  surfaceRef?: Ref<HTMLDivElement>;
-  onCancel: () => void;
-}) {
-  const menuRole = isCompositeBody(items, filter, children, footer) ? undefined : "menu";
-  const titleElement = radixTitle
-    ? <DialogPrimitive.Title className={title ? SHEET_TITLE_CLASS : "sr-only"}>{title ?? ariaLabel}</DialogPrimitive.Title>
-    : title ? <div className={SHEET_TITLE_CLASS}>{title}</div> : null;
-  return (
-    <div ref={surfaceRef} className={SHEET_CLASS} role="dialog" aria-modal="true" aria-label={ariaLabel}>
-      {titleElement}
-      <div className={SHEET_BODY_CLASS} role={menuRole} aria-label={menuRole ? ariaLabel : undefined}>
-        <MenuSurfaceBody
-          mode={{ classic: false, sheet: true }}
-          ariaLabel={ariaLabel}
-          items={items}
-          filter={filter}
-          filterQuery={filterQuery}
-          onFilterQueryChange={onFilterQueryChange}
-          onFilterNavigate={onFilterNavigate}
-          footer={footer}
-          onActivate={onActivate}
-        >
-          {children}
-        </MenuSurfaceBody>
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        className={SHEET_CANCEL_CLASS}
-        data-sidebar-menu-autofocus={focusCancel ? "" : undefined}
-        onClick={onCancel}
-      >
-        {cancelLabel}
-      </Button>
-    </div>
-  );
-}
-
 export interface SidebarMenuSurfaceProps {
-  sheet?: boolean;
   ariaLabel: string;
-  title?: string;
   items?: SidebarMenuItem[];
   filter?: SidebarMenuFilter;
   /** The filter field's text. */
   filterQuery?: string;
   onFilterQueryChange?: (query: string) => void;
   children?: ReactNode;
-  cancelLabel: string;
-  focusCancel?: boolean;
   width?: number;
-  classic?: boolean;
   footer?: ReactNode;
-  surfaceRef?: Ref<HTMLDivElement>;
-  onActivate: (action: MenuAction, shiftKey: boolean) => void;
-  onClose: (reason: "outside" | "cancel") => void;
+  onActivate: (action: MenuAction, shiftKey: boolean, event?: Event) => void;
+  onClose: (reason: "outside") => void;
 }
 
 /**
- * The menu or sheet itself, without the portal, placement, focus or key
- * handling `SidebarMenu` adds around it. The production sheet mounts the
- * same box under a Radix dialog; the desktop box's classes, role and body
- * are the ones `SidebarMenu` puts on Radix's content.
+ * The menu itself, without the portal, placement, focus or key handling
+ * `SidebarMenu` adds around it: the same box and body the live menu renders
+ * inside Radix's content. Static and test-facing.
  */
 export function SidebarMenuSurface({
-  sheet = false,
   ariaLabel,
-  title,
   items,
   filter,
   filterQuery = "",
   onFilterQueryChange,
   children,
-  cancelLabel,
-  focusCancel = false,
   width = DEFAULT_MENU_WIDTH,
-  classic = false,
   footer,
-  surfaceRef,
   onActivate,
-  onClose,
 }: SidebarMenuSurfaceProps) {
-  const mode: SurfaceMode = { classic, sheet };
   const menuRole = isCompositeBody(items, filter, children, footer) ? "dialog" : "menu";
-  if (!sheet) {
-    return (
-      <div
-        ref={surfaceRef}
-        className={menuBoxClassName(classic)}
-        role={menuRole}
-        aria-label={ariaLabel}
-        style={{ width }}
-        {...isolateEvents}
-      >
-        <MenuSurfaceBody
-          mode={mode}
-          ariaLabel={ariaLabel}
-          items={items}
-          filter={filter}
-          filterQuery={filterQuery}
-          onFilterQueryChange={onFilterQueryChange}
-          footer={footer}
-          onActivate={onActivate}
-        >
-          {children}
-        </MenuSurfaceBody>
-      </div>
-    );
-  }
-
   return (
-    <div className={SHEET_LAYER_CLASS} {...isolateEvents}>
-      {/* The backdrop takes the tap that closes the sheet, so it reaches neither the
-          drawer's own backdrop (which would close the sidebar) nor a row. */}
-      <div className={SHEET_BACKDROP_CLASS} aria-hidden="true" onClick={() => onClose("outside")} />
-      <SheetInner
+    <div
+      className={menuBoxClassName()}
+      role={menuRole}
+      aria-label={ariaLabel}
+      style={{ width }}
+      {...isolateEvents}
+    >
+      <MenuSurfaceBody
         ariaLabel={ariaLabel}
-        title={title}
         items={items}
         filter={filter}
         filterQuery={filterQuery}
         onFilterQueryChange={onFilterQueryChange}
-        cancelLabel={cancelLabel}
-        focusCancel={focusCancel}
         footer={footer}
-        surfaceRef={surfaceRef}
         onActivate={onActivate}
-        onCancel={() => onClose("cancel")}
+        radix={false}
       >
         {children}
-      </SheetInner>
+      </MenuSurfaceBody>
     </div>
   );
 }
@@ -828,18 +709,13 @@ export function SidebarMenuSurface({
 export function SidebarMenu({
   open,
   anchor,
-  sheet = false,
   ariaLabel,
-  title,
   items,
   filter,
   children,
-  cancelLabel,
-  focusCancel,
   onClose,
   returnFocusTo,
   width,
-  classic = false,
   footer,
   focusKey = "",
   onBodyEscape,
@@ -866,20 +742,30 @@ export function SidebarMenu({
   const wasVisibleRef = useRef(false);
   /** Which dismissal Radix reports: tagged by the handlers that see the cause. */
   const closeReasonRef = useRef<SidebarMenuCloseReason | null>(null);
+  /** Shift at the pointer/key press that will select: Radix's select event does not carry it. */
+  const lastShiftRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const visible = open && mounted && (sheet || anchor !== null);
+  const visible = open && mounted && anchor !== null;
   const custom = hasCustomMenuBody(children);
   const anchorKey = anchor ? JSON.stringify(anchor) : "";
 
-  const activate = (action: MenuAction, shiftKey: boolean) => {
+  /** Selects an item: keepOpen keeps Radix's select event unhandled (menu stays), else the closing is Radix's. */
+  const activate = (action: MenuAction, shiftKey: boolean, event?: Event) => {
     if (action.disabled) return;
     let keepOpen = false;
     action.onSelect({ shiftKey, keepOpen: () => { keepOpen = true; } });
-    if (!keepOpen) onCloseRef.current("select");
+    if (keepOpen) {
+      event?.preventDefault();
+      return;
+    }
+    // No event (a shortcut letter activated the item): the engine closes
+    // itself, since Radix's select flow is not in play.
+    if (!event) onCloseRef.current("select");
+    closeReasonRef.current = "select";
   };
   const activateRef = useRef(activate);
   activateRef.current = activate;
@@ -909,11 +795,11 @@ export function SidebarMenu({
     const opening = !openedRef.current;
     openedRef.current = true;
     (opening ? initialFocusTarget(surface) : menuBodyFocusTarget(surface))?.focus({ preventScroll: true });
-  }, [visible, sheet, custom, focusKey]);
+  }, [visible, custom, focusKey]);
 
   // On close, focus returns to the opener unless the user put it elsewhere.
   // The cleanup runs while the menu tree is still in the DOM (the parent
-  // closes by dropping its state): the row still shows its actions, so the
+  // closes it by dropping its state): the row still shows its actions, so the
   // opener can take focus back before the commit hides it again. Radix's own
   // deferred close focus runs after that; handleCloseAutoFocus prevents it.
   useLayoutEffect(() => {
@@ -931,7 +817,7 @@ export function SidebarMenu({
       // takes focus, as if it had never been hidden.
       if (opener && target !== opener && isRendered(opener)) opener.focus({ preventScroll: true });
     };
-  }, [visible, sheet]);
+  }, [visible]);
 
   /** Radix reports the dismissal; the cause tagged `closeReasonRef` first. */
   const handleOpenChange = (next: boolean) => {
@@ -1005,9 +891,9 @@ export function SidebarMenu({
   };
 
   /**
-   * The menu's keys: the items' arrows, Home/End and one-letter shortcuts,
-   * over the plain buttons Radix's collection does not know. Runs on the
-   * content, so it sees only keys of the menu itself.
+   * The menu's own keys: Tab inside a composite body, and the items' one-letter
+   * shortcuts. Arrows, Home/End and typeahead are Radix's (its collection owns
+   * the items now); a shortcut letter activates directly, as it always has.
    */
   const handleMenuKeyDown = (event: ReactKeyboardEvent) => {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -1033,20 +919,6 @@ export function SidebarMenu({
     // The filter field keeps its letters and caret keys; Down, Up and Tab go
     // on to the items (the field handles them itself).
     if (target && isTextEntry(target)) return;
-    if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Home" || event.key === "End") {
-      const list = enabledItems(surface);
-      if (list.length === 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const index = target ? list.indexOf(target as HTMLElement) : -1;
-      let next: number;
-      if (event.key === "Home") next = 0;
-      else if (event.key === "End") next = list.length - 1;
-      else if (event.key === "ArrowDown") next = index < 0 ? 0 : (index + 1) % list.length;
-      else next = index < 0 ? list.length - 1 : (index - 1 + list.length) % list.length;
-      list[next].focus({ preventScroll: false });
-      return;
-    }
     if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return;
     const item = findSidebarMenuShortcut(itemsRef.current, event.key);
     if (!item || custom) return;
@@ -1061,61 +933,11 @@ export function SidebarMenu({
 
   if (!visible) return null;
 
-  const mode: SurfaceMode = { classic, sheet };
   const menuRole = isCompositeBody(items, filter, children, footer) ? "dialog" : "menu";
   const onKeyDown = (event: ReactKeyboardEvent) => {
     stopReactPropagation(event);
     handleMenuKeyDown(event);
   };
-
-  if (sheet) {
-    return (
-      // Non-modal: the drawer underneath keeps its own dismissal, and the
-      // layer locks no pointer events; the backdrop takes the taps that
-      // close the sheet.
-      <DialogPrimitive.Root open onOpenChange={handleOpenChange} modal={false}>
-        <DialogPrimitive.Portal>
-          <div className={SHEET_BACKDROP_CLASS} aria-hidden="true" {...isolateEvents} />
-          {/* The layer spans the visible area the way the drawer does, from
-              the top of the screen down to --app-viewport-height (100dvh, the
-              only value anything writes it to now that the keyboard no longer
-              takes the layout height over). The layer lets taps through
-              (`pointer-events-none`): they land on the backdrop, which Radix
-              reads as a press outside the layer. */}
-          <DialogPrimitive.Content
-            ref={surfaceRef}
-            role="presentation"
-            className={cn(SHEET_LAYER_CLASS, "h-[var(--app-viewport-height,100dvh)]")}
-            onOpenAutoFocus={handleOpenAutoFocus}
-            onCloseAutoFocus={handleCloseAutoFocus}
-            onEscapeKeyDown={handleEscapeKeyDown}
-            onPointerDownOutside={handlePointerDownOutside}
-            onFocusOutside={handleFocusOutside}
-            {...isolateEvents}
-            onKeyDown={onKeyDown}
-          >
-            <SheetInner
-              ariaLabel={ariaLabel}
-              title={title}
-              radixTitle
-              items={items}
-              filter={filter}
-              filterQuery={filterQuery}
-              onFilterQueryChange={setFilterQuery}
-              onFilterNavigate={onFilterNavigate}
-              cancelLabel={cancelLabel}
-              focusCancel={focusCancel}
-              footer={footer}
-              onActivate={(action, shiftKey) => activateRef.current(action, shiftKey)}
-              onCancel={() => onCloseRef.current("cancel")}
-            >
-              {children}
-            </SheetInner>
-          </DialogPrimitive.Content>
-        </DialogPrimitive.Portal>
-      </DialogPrimitive.Root>
-    );
-  }
 
   const triggerStyle: CSSProperties = anchor!.kind === "point"
     ? { position: "fixed", left: anchor!.x, top: anchor!.y, width: 0, height: 0 }
@@ -1145,9 +967,9 @@ export function SidebarMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         ref={surfaceRef}
-        className={menuBoxClassName(classic)}
         role={menuRole}
         aria-label={ariaLabel}
+        className={menuBoxClassName()}
         style={{ width: width ?? DEFAULT_MENU_WIDTH }}
         side="bottom"
         align={anchor!.kind === "point" ? "start" : anchor!.align}
@@ -1160,10 +982,11 @@ export function SidebarMenu({
         onPointerDownOutside={handlePointerDownOutside}
         onFocusOutside={handleFocusOutside}
         {...isolateEvents}
+        onKeyDownCapture={(event) => { lastShiftRef.current = event.shiftKey; }}
+        onPointerDownCapture={(event) => { lastShiftRef.current = event.shiftKey; }}
         onKeyDown={onKeyDown}
       >
         <MenuSurfaceBody
-          mode={mode}
           ariaLabel={ariaLabel}
           items={items}
           filter={filter}
@@ -1171,7 +994,9 @@ export function SidebarMenu({
           onFilterQueryChange={setFilterQuery}
           onFilterNavigate={onFilterNavigate}
           footer={footer}
-          onActivate={(action, shiftKey) => activateRef.current(action, shiftKey)}
+          // Radix 的 select 事件不带 shift 状态：capture 层记录，选中时读取。
+          // 没有 event 的激活（快捷键字母）用调用方自己的 shiftKey。
+          onActivate={(action, shiftKey, event) => activateRef.current(action, event ? lastShiftRef.current : shiftKey, event)}
         >
           {children}
         </MenuSurfaceBody>

@@ -40,7 +40,6 @@ function decode(html) {
 
 const noop = () => {};
 const items = [
-  { type: "header", id: "head", label: "New session in which worktree?" },
   { type: "item", id: "pin", label: "Pin", icon: h(PinIcon), shortcut: "P", onSelect: noop },
   { type: "item", id: "main", label: "main", mono: true, note: "main", checked: true, onSelect: noop },
   { type: "item", id: "feature", label: "feature/x", mono: true, checked: false, title: "/work/app-worktrees/feature-x", onSelect: noop },
@@ -51,10 +50,8 @@ const items = [
 
 function surface(props = {}) {
   return decode(renderToStaticMarkup(h(SidebarMenuSurface, {
-    sheet: false,
     ariaLabel: "Session actions",
     items,
-    cancelLabel: "Cancel",
     onActivate: noop,
     onClose: noop,
     ...props,
@@ -77,35 +74,30 @@ test("the menu waits for the client before portaling, so server markup is empty"
 test("desktop menu markup: menu roles, check marks, shortcuts, notes and disabled reasons", () => {
   const html = surface();
   assert.match(html, /^<div class="sidebar-menu[^"]*" role="menu" aria-label="Session actions" style="width:208px">/);
-  assert.match(html, /<div class="sidebar-menu-header[^"]*" role="presentation">New session in which worktree\?<\/div>/);
   assert.match(html, /<div class="sidebar-menu-separator[^"]*" role="separator"><\/div>/);
 
-  const pin = html.match(/<button[^>]*>(?:(?!<\/button>).)*Pin(?:(?!<\/button>).)*<\/button>/)?.[0] ?? "";
-  assert.match(pin, /role="menuitem"/);
-  assert.match(pin, /tabindex="-1"/);
-  assert.match(pin, /aria-keyshortcuts="P"/);
+  const pin = html.match(/<div role="menuitem" tabindex="-1" title="Pin"[^>]*>(?:(?!<\/div>).)*<\/div>/)?.[0] ?? "";
+  assert.match(pin, /data-sidebar-menu-item=""/);
   assert.match(pin, /<kbd class="sidebar-menu-shortcut[^"]*">P<\/kbd>/);
   assert.match(pin, /<span class="sidebar-menu-icon[^"]*"><svg[^>]*aria-hidden="true"/);
 
-  const main = html.match(/<button[^>]*aria-checked="true"[^>]*>.*?<\/button>/)?.[0] ?? "";
-  assert.match(main, /role="menuitemradio"/);
+  const main = html.match(/<div role="menuitemcheckbox" aria-checked="true"[^>]*>(?:(?!<\/div>).)*<\/div>/)?.[0] ?? "";
   assert.match(main, /class="sidebar-menu-item is-choice is-checked[^"]*"/);
   assert.match(main, /<span class="sidebar-menu-label is-mono[^"]*">main<\/span>/);
   assert.match(main, /<span class="sidebar-menu-note[^"]*">main<\/span>/);
   assert.match(main, /<path d="M20 6 9 17l-5-5"><\/path>/, "a checked choice shows the check mark");
 
-  const feature = html.match(/<button[^>]*aria-checked="false"[^>]*>.*?<\/button>/)?.[0] ?? "";
-  assert.match(feature, /role="menuitemradio"/);
+  const feature = html.match(/<div role="menuitemcheckbox" aria-checked="false"[^>]*>(?:(?!<\/div>).)*<\/div>/)?.[0] ?? "";
   assert.match(feature, /<span class="sidebar-menu-icon[^"]*"><\/span>/, "an unchecked choice keeps an empty slot");
   assert.match(feature, /title="\/work\/app-worktrees\/feature-x"/, "a tooltip shows what the label shortens");
-  assert.doesNotMatch(main, /title=/);
+  assert.match(main, /title=/, "every row carries a tooltip, the label's own when no path is given");
 
-  const archive = html.match(/<button[^>]*aria-disabled="true"[^>]*>.*?<\/button>/)?.[0] ?? "";
+  const archive = html.match(/<div role="menuitem"[^>]*aria-disabled="true"[^>]*>(?:(?!<\/div>).)*<\/div>/)?.[0] ?? "";
   assert.match(archive, /Archive/);
   assert.match(archive, /<span class="sidebar-menu-note[^"]*">Running<\/span>/);
-  assert.doesNotMatch(archive, /sidebar-menu-shortcut|aria-keyshortcuts/, "the reason replaces the shortcut");
+  assert.doesNotMatch(archive, /sidebar-menu-shortcut/, "the reason replaces the shortcut");
 
-  assert.match(html, /<button[^>]*class="sidebar-menu-item is-danger[^"]*"[^>]*>.*?Delete…/);
+  assert.match(html, /<div[^>]*class="sidebar-menu-item is-danger[^"]*"[^>]*>(?:(?!<\/div>).)*Delete…/);
   assert.equal((html.match(/data-sidebar-menu-item=""/g) ?? []).length, 5);
 });
 
@@ -126,23 +118,6 @@ test("desktop width is configurable and a custom body is a dialog, not a menu", 
   assert.doesNotMatch(html, /role="menuitem"/);
 });
 
-test("the mobile sheet has its own backdrop, a title, the items and a Cancel button", () => {
-  const html = surface({ sheet: true, title: "A very long session title" });
-  assert.match(html, /^<div class="sidebar-sheet-layer[^"]*"><div class="sidebar-sheet-backdrop[^"]*" aria-hidden="true"><\/div>/);
-  assert.match(html, /<div class="sidebar-sheet[^"]*" role="dialog" aria-modal="true" aria-label="Session actions">/);
-  assert.match(html, /<div class="sidebar-sheet-title[^"]*">A very long session title<\/div>/);
-  assert.match(html, /<div class="sidebar-sheet-body[^"]*" role="menu" aria-label="Session actions">/);
-  assert.match(html, /<button data-slot="button"[^>]*class="[^"]*sidebar-sheet-cancel[^"]*"[^>]*>Cancel<\/button><\/div><\/div>$/);
-  assert.doesNotMatch(html, /style="width/, "the sheet is full width");
-
-  const form = surface({ sheet: true, children: h("input", { "aria-label": "Branch" }) });
-  assert.match(form, /<div class="sidebar-sheet-body[^"]*"><input aria-label="Branch"\/><\/div>/);
-  assert.doesNotMatch(form, /data-sidebar-menu-autofocus/, "the body's first control takes focus");
-  // A question whose other answer discards something starts on the sheet's Cancel.
-  const question = surface({ sheet: true, focusCancel: true, children: h("button", { type: "button" }, "Force") });
-  assert.match(question, /<div class="sidebar-sheet-body[^"]*"><button type="button">Force<\/button><\/div><button [^>]*class="[^"]*sidebar-sheet-cancel[^"]*"[^>]*data-sidebar-menu-autofocus="">Cancel<\/button>/);
-});
-
 test("conditional bodies that are all off are no body: the items show", () => {
   // `{a && <Form/>}{b && <Question/>}` with neither showing arrives as [false, false].
   for (const children of [undefined, null, false, [false, false], [null, undefined]]) {
@@ -150,8 +125,6 @@ test("conditional bodies that are all off are no body: the items show", () => {
     const html = surface({ children });
     assert.match(html, /^<div class="sidebar-menu[^"]*" role="menu"/);
     assert.equal((html.match(/data-sidebar-menu-item=""/g) ?? []).length, 5);
-    const sheet = surface({ sheet: true, children });
-    assert.match(sheet, /<div class="sidebar-sheet-body[^"]*" role="menu" aria-label="Session actions">/);
   }
   assert.equal(hasCustomMenuBody([false, h("form")]), true);
   assert.match(surface({ children: [false, h("form", { key: "form" })] }), /^<div class="sidebar-menu[^"]*" role="dialog"[^>]*><form><\/form><\/div>$/);
@@ -271,55 +244,35 @@ test("a filter shows once a menu has enough choices, and narrows only the choice
   assert.deepEqual(ids("nothing"), ["separator", "open-folder"]);
 });
 
-test("a classic menu: main's dropdown look, paths cut at their left, a footer and a row of its own", () => {
-  const classicItems = [
-    { type: "item", id: "app", label: "~/work/app", mono: true, path: true, title: "/home/me/work/app", checked: true, onSelect: noop },
-    { type: "custom", id: "feature", content: h("div", { className: "question" }, h("button", { type: "button", "data-sidebar-menu-item": "" }, "Force")) },
-    { type: "item", id: "default", label: "Use default directory", onSelect: noop },
-  ];
-  const html = surface({ classic: true, items: classicItems, footer: h("form", { className: "footer" }, "New worktree") });
-  // A footer stands after the list, so the surface is a dialog holding a menu.
-  assert.match(html, /^<div class="sidebar-menu is-classic[^"]*" role="dialog" aria-label="Session actions"[^>]*><div role="menu" aria-label="Session actions">/);
-  assert.match(html, /<\/div><form class="footer">New worktree<\/form><\/div>$/);
-  // A path is cut at its left, the text kept left to right.
-  assert.match(html, /<span class="sidebar-menu-label is-mono is-path[^"]*"><span>~\/work\/app<\/span><\/span>/);
-  // A custom entry shows as given, in its place.
-  assert.match(html, /<div class="sidebar-menu-custom" role="none"><div class="question"><button type="button" data-sidebar-menu-item="">Force<\/button><\/div><\/div>/);
-  // Without a footer a classic menu is a plain menu; a sheet never takes the look.
-  assert.match(surface({ classic: true }), /^<div class="sidebar-menu is-classic[^"]*" role="menu"/);
-  assert.doesNotMatch(surface({ classic: true, sheet: true }), /is-classic/);
-  // A filter may ask for more choices.
-  assert.equal(sidebarMenuHasFilter(projectMenu, 9), false);
-  assert.equal(sidebarMenuHasFilter([...projectMenu, { ...projectChoices[0], id: "ninth" }], 9), true);
-});
-
-test("filter markup: a field above the list, the empty label, focus only on a desktop", () => {
+test("filter markup: a field above the list, the empty label, a footer and a custom row", () => {
   // A menu holds only items: the field and the empty label stand before it, in a dialog.
   const html = surface({ items: projectMenu, filter, filterQuery: "" });
   assert.match(html, /^<div class="sidebar-menu[^"]*" role="dialog" aria-label="Session actions" style="width:208px"><div class="sidebar-menu-filter[^"]*"><input data-slot="input" class="[^"]*sidebar-menu-filter-input[^"]*"/);
   assert.match(html, /placeholder="Filter projects…" aria-label="Filter projects…" autoComplete="off"/);
   assert.match(html, /data-sidebar-menu-filter=""[^>]*data-sidebar-menu-autofocus=""[^>]*value=""/);
-  assert.match(html, /<\/div><div role="status"><\/div><div role="menu" aria-label="Session actions"><button/);
+  assert.match(html, /<\/div><div role="status"><\/div><div role="menu" aria-label="Session actions"><div/);
   assert.equal((html.match(/role="menu"/g) ?? []).length, 1);
-  assert.equal((html.match(/role="menuitemradio"/g) ?? []).length, 8);
+  assert.equal((html.match(/role="menuitemcheckbox"/g) ?? []).length, 8);
   const narrowed = surface({ items: projectMenu, filter, filterQuery: "pi-web" });
-  assert.equal((narrowed.match(/role="menuitemradio"/g) ?? []).length, 1);
+  assert.equal((narrowed.match(/role="menuitemcheckbox"/g) ?? []).length, 1);
   assert.match(narrowed, /Open another project…/);
   assert.doesNotMatch(narrowed, /sidebar-menu-empty/);
   const none = surface({ items: projectMenu, filter, filterQuery: "nothing" });
   assert.match(none, /<\/div><div role="status"><div class="sidebar-menu-empty[^"]*">No matching projects<\/div><\/div><div role="menu" aria-label="Session actions"><div class="sidebar-menu-separator[^"]*" role="separator"><\/div>/);
-  // A phone's keyboard would cover the sheet: the field waits for a tap. The sheet is the dialog.
-  const sheet = surface({ sheet: true, items: projectMenu, filter, filterQuery: "" });
-  assert.match(sheet, /<div class="sidebar-sheet-body[^"]*"><div class="sidebar-menu-filter[^"]*"><input [^>]*data-sidebar-menu-filter="" value=""\/><\/div><div role="status"><\/div><div role="menu" aria-label="Session actions"><button/);
   // Too few choices, or a custom body: no field.
   assert.doesNotMatch(surface({ items: projectMenu.slice(1), filter }), /sidebar-menu-filter/);
   assert.doesNotMatch(surface({ items: projectMenu, filter, children: h("input") }), /sidebar-menu-filter/);
-  // A footer form under a filtered list is marked too, after the filter in
-  // the page: when it swaps in, its own field takes the focus
+  // A filter may ask for more choices.
+  assert.equal(sidebarMenuHasFilter(projectMenu, 9), false);
+  assert.equal(sidebarMenuHasFilter([...projectMenu, { ...projectChoices[0], id: "ninth" }], 9), true);
+  // A footer form under a filtered list stands after the menu, still inside
+  // the dialog; its marked field is the one a body swap focuses
   // (menuBodyFocusTarget), not the filter above the list.
-  const form = surface({ classic: true, items: projectMenu, filter, footer: h("input", { className: "sidebar-worktree-input", "data-sidebar-menu-autofocus": "" }) });
+  const form = surface({ items: projectMenu, filter, footer: h("input", { className: "sidebar-worktree-input", "data-sidebar-menu-autofocus": "" }) });
   assert.equal((form.match(/data-sidebar-menu-autofocus=""/g) ?? []).length, 2);
   assert.match(form, /data-sidebar-menu-filter="" data-sidebar-menu-autofocus=""[\s\S]*sidebar-worktree-input[^"]*" data-sidebar-menu-autofocus=""/);
+  // The footer stands after the list, still inside the dialog box.
+  assert.match(form, /<\/div><input class="sidebar-worktree-input[^"]*" data-sidebar-menu-autofocus=""\/><\/div>$/);
 });
 
 test("an item's secondary action is its own menu item at the row's end; a badge sits before the note", () => {
@@ -344,8 +297,8 @@ test("an item's secondary action is its own menu item at the row's end; a badge 
     { type: "item", id: "app", label: "app", checked: true, note: "Workspace", badge: h("span", { className: "badge" }, "2"), onSelect: noop },
   ];
   const html = surface({ items: removeItems });
-  assert.match(html, /<div class="sidebar-menu-row is-choice[^"]*" role="none"><button type="button" role="menuitemradio" aria-checked="false" tabindex="-1" title="\/work\/app-worktrees\/feature-x" data-sidebar-menu-item="" class="sidebar-menu-item is-choice[^"]*">[\s\S]*?<\/button><button type="button" role="menuitem" aria-label="Remove worktree checkout \/work\/app-worktrees\/feature-x" tabindex="-1" title="Remove worktree checkout \/work\/app-worktrees\/feature-x" data-sidebar-menu-item="" class="sidebar-menu-secondary is-danger[^"]*"><svg/);
-  assert.match(html, /aria-label="Remove busy" aria-disabled="true" tabindex="-1"[^>]*class="sidebar-menu-secondary[^"]*"/);
+  assert.match(html, /<div class="sidebar-menu-row is-choice[^"]*" role="none"><div class="flex min-w-0 flex-1"><div role="menuitemcheckbox" aria-checked="false" tabindex="-1" title="\/work\/app-worktrees\/feature-x" data-sidebar-menu-item="" class="sidebar-menu-item is-choice[^"]*">[\s\S]*?<\/div><\/div><div role="menuitem" tabindex="-1" title="Remove worktree checkout \/work\/app-worktrees\/feature-x" data-sidebar-menu-item="" class="sidebar-menu-secondary is-danger[^"]*"><svg/);
+  assert.match(html, /<div role="menuitem" aria-disabled="true" tabindex="-1" title="Remove busy" data-sidebar-menu-item="" class="sidebar-menu-secondary[^"]*"/);
   // Arrow keys reach both: each is a data-sidebar-menu-item.
   assert.equal((html.match(/data-sidebar-menu-item=""/g) ?? []).length, 5);
   assert.match(html, /<span class="sidebar-menu-label[^"]*">app<\/span><span class="badge">2<\/span><span class="sidebar-menu-note[^"]*">Workspace<\/span>/);
@@ -355,17 +308,16 @@ test("Radix owns the shell: the controlled hidden trigger and the dismissal wiri
   // The engine's contract with Radix, anchored in the source: the trigger is
   // not the opener and not a row; Escape goes through Radix's capture-phase
   // handler (which marks the event handled, keeping the global Esc out);
-  // placement, outside dismissal and the focus scope are its.
+  // placement, outside dismissal and the focus scope are its. Radix's select
+  // event carries no shift state, so the content records it on the way in.
   assert.match(component, /<DropdownMenuTrigger asChild aria-hidden tabIndex=\{-1\}>/);
   assert.match(component, /<DropdownMenu key=\{anchorKey\} open onOpenChange=\{handleOpenChange\} modal=\{false\}>/);
   assert.match(component, /onEscapeKeyDown=\{handleEscapeKeyDown\}/);
   assert.match(component, /onPointerDownOutside=\{handlePointerDownOutside\}/);
   assert.match(component, /onFocusOutside=\{handleFocusOutside\}/);
   assert.match(component, /onCloseAutoFocus=\{handleCloseAutoFocus\}/);
-  // The sheet is a Radix dialog: the layer parks the sheet at the visible
-  // area's bottom and lets the backdrop take the taps.
-  assert.match(component, /<DialogPrimitive\.Root open onOpenChange=\{handleOpenChange\} modal=\{false\}>/);
-  assert.match(component, /<DialogPrimitive\.Content/);
+  assert.match(component, /onKeyDownCapture=\{\(event\) => \{ lastShiftRef\.current = event\.shiftKey; \}\}/);
+  assert.match(component, /onPointerDownCapture=\{\(event\) => \{ lastShiftRef\.current = event\.shiftKey; \}\}/);
   // The bodies' Escape stays in the menu (the "New worktree…" form).
   assert.match(component, /BODY_ESC_SELECTOR = "\[data-sidebar-menu-esc-to-body\]"/);
 });

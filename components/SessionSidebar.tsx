@@ -2674,22 +2674,21 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     onConfirm: () => void;
     onCancel: () => void;
   }): ReactNode => (
-    // The look arrives as variants (the retired app/sidebar-menu.css, folded
-    // here); the sheet's narrower header inset wins over its own header rule.
-    <div className="sidebar-menu-question px-1 pt-0.5 pb-1 [.sidebar-sheet_&]:py-1 [.sidebar-sheet_&]:px-4">
+    // The look arrives as variants (the retired app/sidebar-menu.css, folded here).
+    <div className="sidebar-menu-question px-1 pt-0.5 pb-1">
       <div
-        className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-1 pt-1.5 pb-1 text-xs [.sidebar-sheet_&]:pt-2 [.sidebar-sheet_&]:pb-1 [.sidebar-sheet_&]:text-xs"
+        className="sidebar-menu-header overflow-hidden text-muted-foreground text-ellipsis whitespace-nowrap px-1 pt-1.5 pb-1 text-xs"
         title={headingTitle}
       >
         {heading}
       </div>
-      {notes.map((note) => <p key={note} className="sidebar-menu-question-text m-0 pt-0.5 px-1 text-foreground text-xs leading-[1.4] [.sidebar-sheet_&]:text-sm">{note}</p>)}
+      {notes.map((note) => <p key={note} className="sidebar-menu-question-text m-0 pt-0.5 px-1 text-foreground text-xs leading-[1.4]">{note}</p>)}
       <div className="sidebar-menu-question-buttons flex gap-1.5 mt-2">
         <Button
           type="button"
           variant="destructive"
           size="default"
-          className={["px-0 py-0 disabled:pointer-events-auto focus-visible:ring-0 focus-visible:border-transparent dark:bg-destructive", "sidebar-menu-question-confirm", "flex-1 min-w-0 h-[26px] border border-destructive rounded-(--radius-sm) bg-destructive text-white text-xs font-semibold cursor-pointer", "disabled:cursor-not-allowed disabled:opacity-50", FOCUS_RING, "[.sidebar-sheet_&]:h-10 [.sidebar-sheet_&]:text-sm"].join(" ")}
+          className={["px-0 py-0 disabled:pointer-events-auto focus-visible:ring-0 focus-visible:border-transparent dark:bg-destructive", "sidebar-menu-question-confirm", "flex-1 min-w-0 h-[26px] border border-destructive rounded-(--radius-sm) bg-destructive text-white text-xs font-semibold cursor-pointer", "disabled:cursor-not-allowed disabled:opacity-50", FOCUS_RING].join(" ")}
           disabled={count === 0}
           onClick={onConfirm}
         >
@@ -2821,33 +2820,28 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     onCancel: () => askArchiveDelete(undefined),
   });
 
-  let menuTitle: string | undefined;
   let menuLabel = "";
   // Room for "Archive sessions older than 7 days · N".
   let menuWidth: number | undefined;
   let menuItems: SidebarMenuItem[] | undefined;
   let menuBody: ReactNode = null;
   if (menu?.kind === "row" && menuRow) {
-    menuTitle = sessionRowTitle(menuRow.family.root);
     menuLabel = t("sidebar.sessionActions");
     menuItems = sessionMenuItems(menuRow);
   } else if (menu?.kind === "group") {
     // The project as the tree has it now: pinned, unpinned, renamed or moved in another window while the menu is open.
     const project = projectByKey.get(menu.project.key) ?? menu.project;
-    menuTitle = project.name;
     menuLabel = t("sidebar.projectActions", { name: project.name });
     menuItems = groupMenuItems(project, menu.olderCount);
     if (menu.askDelete) menuBody = projectDeleteBody(project);
     menuWidth = 264;
   } else if (menu?.kind === "archive-group") {
     const project = archiveGroups.find((row) => row.project.key === menu.project.key)?.project ?? menu.project;
-    menuTitle = project.name;
     menuLabel = t("sidebar.archivedProjectActions", { name: project.name });
     menuItems = archiveGroupMenuItems(project);
     if (menu.askDelete) menuBody = archiveDeleteBody({ projectKey: project.key }, project);
     menuWidth = 248;
   } else if (menu?.kind === "archive") {
-    menuTitle = t("sidebar.archived");
     menuLabel = t("sidebar.archiveActions");
     menuItems = archiveMenuItems();
     if (menu.askDelete) menuBody = archiveDeleteBody(menu.askDelete, null);
@@ -3375,7 +3369,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               homeDir={homeDir}
               projectActivity={projectActivity}
               worktreeHint={inactiveWorktreeSelector}
-              newWorktreeTitle={t("sidebar.createWorktreeTitle")}
               onPick={handleFilesPick}
               onUseDefaultDirectory={() => { void handleDefaultCwd(); }}
               onOpenFolder={handleCustomPathClick}
@@ -3450,10 +3443,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         open={menu !== null}
         anchor={menu?.anchor ?? null}
         ariaLabel={menuLabel}
-        title={menuTitle}
         items={menuItems}
-        cancelLabel={t("sidebar.cancel")}
-        focusCancel={menuBody !== null}
         onClose={closeMenu}
         returnFocusTo={menu?.opener ?? null}
         width={menuWidth}

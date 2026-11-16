@@ -100,7 +100,6 @@ export function NewSessionContextBar({
         context={context}
         label={t("workspace.newSessionContext")}
         homeDir={homeDir}
-        newWorktreeTitle={t("sidebar.newWorktreeForSession")}
         onPick={onPick}
         onUseDefaultDirectory={onUseDefaultDirectory}
         onOpenFolder={onOpenFolder}

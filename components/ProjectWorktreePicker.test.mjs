@@ -7,8 +7,7 @@ const jiti = createJiti(import.meta.url, { jsx: { runtime: "automatic" }, tsconf
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
-const { ProjectWorktreePicker, WorktreeRemoveForm } = await jiti.import("./ProjectWorktreePicker.tsx");
-const { SidebarMenuSurface } = await jiti.import("./SidebarMenu.tsx");
+const { ProjectWorktreePicker } = await jiti.import("./ProjectWorktreePicker.tsx");
 const source = await readFile(new URL("./ProjectWorktreePicker.tsx", import.meta.url), "utf8");
 
 const h = React.createElement;
@@ -31,7 +30,6 @@ function render(props = {}) {
     context,
     mobile: false,
     label: "Project and worktree",
-    newWorktreeTitle: "Create a worktree checkout for a branch",
     onPick: noop,
     onUseDefaultDirectory: noop,
     onOpenFolder: noop,
@@ -46,7 +44,7 @@ test("inline: the project's name and the branch as text, no path and no notes", 
   assert.match(html, /^<div class="project-picker is-inline [^"]*" role="group" aria-label="Project and worktree">/);
   // A folder icon, the name, a chevron; the whole path only as the tooltip
   // (the menu's rows show it on a desktop).
-  assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><svg[^>]*width="12" height="12"[^>]*class="lucide[^"]*project-picker-icon[^"]*"[\s\S]*?<\/svg><span class="[^"]*project-picker-name[^"]*"><span class="[^"]*project-picker-leaf[^"]*">app<\/span><\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron[^"]*rotate-90[^"]*"[\s\S]*?<\/svg><\/button>/);
+  assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app"[^>]*aria-haspopup="menu"[^>]*aria-expanded="false"[^>]*><svg[^>]*width="12" height="12"[^>]*class="lucide[^"]*project-picker-icon[^"]*"[\s\S]*?<\/svg><span class="[^"]*project-picker-name[^"]*"><span class="[^"]*project-picker-leaf[^"]*">app<\/span><\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron[^"]*rotate-90[^"]*"[\s\S]*?<\/svg><\/button>/);
   assert.doesNotMatch(html, /~\/work\/app<|project-picker-label/);
   // The branch, cut at its left, and the chevron: neither "main" nor the count.
   assert.match(html, /class="lucide[^"]*project-picker-icon is-linked[^"]*"[\s\S]*?<\/svg><span class="[^"]*project-picker-path[^"]*"><span[^>]*>feature\/x<\/span><\/span><svg[^>]*width="9" height="9"/);
@@ -98,7 +96,7 @@ test("stacked: main's two boxes, the project's whole path and the worktree's bra
   const html = render({ homeDir: "/home/me" });
   assert.match(html, /^<div class="project-picker is-stacked [^"]*" role="group" aria-label="Project and worktree">/);
   // The project box is its path, cut at its left: no folder icon, no name, no chevron.
-  assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><span class="[^"]*project-picker-path[^"]*"><span[^>]*>~\/work\/app<\/span><\/span><\/button>/);
+  assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app"[^>]*aria-haspopup="menu"[^>]*aria-expanded="false"[^>]*><span class="[^"]*project-picker-path[^"]*"><span[^>]*>~\/work\/app<\/span><\/span><\/button>/);
   assert.doesNotMatch(html, /project-picker-divider|is-name/);
   // A linked checkout: its branch icon in the accent, the branch, how many checkouts there are.
   assert.match(html, /<svg[^>]*width="11" height="11"[^>]*class="lucide[^"]*project-picker-icon is-linked[^"]*"[\s\S]*?<\/svg><span class="[^"]*project-picker-path[^"]*"><span[^>]*>feature\/x<\/span><\/span><span class="[^"]*project-picker-note[^"]*">2<\/span><svg[^>]*width="9" height="9"[^>]*class="lucide[^"]*project-picker-chevron[^"]*rotate-90[^"]*"/);
@@ -118,7 +116,7 @@ test("a project the user named shows that name in its box, the path as the toolt
   const named = { ...context, project: { ...context.project, alias: "Thermal <b>Models</b>" } };
   for (const layout of ["stacked", "row"]) {
     const html = render({ layout, homeDir: "/home/me", context: named });
-    assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app" aria-haspopup="menu" aria-expanded="false"><span class="[^"]*project-picker-label is-alias[^"]*">Thermal &lt;b&gt;Models&lt;\/b&gt;<\/span><\/button>/);
+    assert.match(html, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*" type="button" title="\/home\/me\/work\/app"[^>]*aria-haspopup="menu"[^>]*aria-expanded="false"[^>]*><span class="[^"]*project-picker-label is-alias[^"]*">Thermal &lt;b&gt;Models&lt;\/b&gt;<\/span><\/button>/);
     assert.doesNotMatch(html, /~\/work\/app<\/span>/);
   }
   // Inline every project shows a name: this one its own.
@@ -138,7 +136,7 @@ test("stacked: activity elsewhere shows a dot; the project in use does not count
 
 test("stacked: no project yet, and no worktree list", () => {
   const empty = render({ context: { project: null, worktrees: null, currentWorktreePath: null, projects: [] }, placeholder: "Select project…" });
-  assert.match(empty, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*is-empty[^"]*" type="button" title="" aria-haspopup="menu" aria-expanded="false">/);
+  assert.match(empty, /<button [^>]*class="[^"]*project-picker-button is-project[^"]*is-empty[^"]*" type="button" title=""[^>]*aria-haspopup="menu"[^>]*aria-expanded="false"[^>]*>/);
   assert.match(empty, /<span class="[^"]*project-picker-label[^"]*">Select project…<\/span>/);
   assert.equal((empty.match(/<button /g) ?? []).length, 1);
 
@@ -171,41 +169,11 @@ test("client code stays parseable by Safari 16.2", () => {
   assert.match(source, /worktreeBoxFlex = inline \? "min-w-18 shrink-\[1000000\]"/);
 });
 
-/** The removal body inside the menu surface, as the picker hands it over. */
-function removalSurface({ sheet, dirty = true, error = null }) {
-  return renderToStaticMarkup(h(I18nProvider, null, h(SidebarMenuSurface, {
-    sheet,
-    ariaLabel: "Remove feature/x?",
-    title: "Remove feature/x?",
-    cancelLabel: "Cancel",
-    focusCancel: true,
-    onActivate: noop,
-    onClose: noop,
-  }, h(WorktreeRemoveForm, {
-    heading: sheet ? null : "Remove feature/x?",
-    dirty,
-    busy: false,
-    error,
-    showCancel: !sheet,
-    onForce: noop,
-    onCancel: noop,
-  }))));
-}
-
-test("the force question starts on a Cancel on a desktop and in a sheet, never on Force", () => {
-  const desktop = removalSurface({ sheet: false });
-  assert.equal((desktop.match(/data-sidebar-menu-autofocus=""/g) ?? []).length, 1);
-  assert.match(desktop, /<button [^>]*class="[^"]*sidebar-worktree-cancel[^"]*" type="button" data-sidebar-menu-autofocus="">Cancel<\/button>/);
-  // The sheet brings its own Cancel, which takes the focus Force would get as the first control.
-  const sheet = removalSurface({ sheet: true });
-  assert.equal((sheet.match(/data-sidebar-menu-autofocus=""/g) ?? []).length, 1);
-  assert.match(sheet, /<button [^>]*class="[^"]*sidebar-worktree-force[^"]*" type="button">Force<\/button>/);
-  assert.match(sheet, /<button [^>]*class="[^"]*sidebar-sheet-cancel[^"]*"[^>]*data-sidebar-menu-autofocus="">Cancel<\/button><\/div><\/div>$/);
-  assert.doesNotMatch(sheet, /sidebar-worktree-cancel/, "one Cancel in the sheet");
-  // A failure without the question: the error, and still Cancel first.
-  const failed = removalSurface({ sheet: true, dirty: false, error: "locked" });
-  assert.doesNotMatch(failed, /sidebar-worktree-force/);
-  assert.match(failed, /<div class="sidebar-worktree-error[^"]*" role="alert">locked<\/div>/);
+test("the force question lives in the worktree menu, not a form of its own", () => {
+  // The dirty-checkout question is a menu item pair (keep-open), not the
+  // retired standalone form: Force and Cancel are rows inside the menu.
+  assert.match(source, /keepOpen/);
+  assert.doesNotMatch(source, /WorktreeRemoveForm/);
 });
 
 test("the worktree menu lists branches with no checkout and moves on pick", () => {
