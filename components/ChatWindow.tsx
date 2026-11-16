@@ -1713,23 +1713,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (!dock || !host || panel) return;
     const apply = () => {
       host.style.setProperty("--composer-dock-h", `${dock.offsetHeight}px`);
-      // 实心平台＝输入卡片本身：卡片下沿以下（TODO/YOLO 行、安全区）与上
-      // 沿以上（速率行）都属于渐变，只有输入框是实心。距离从渐隐层的底边
-      // 起算（层底越过安全区贴到屏幕底边），env 内嵌进值里——渐变停靠点不
-      // 接受 calc+env。卡片缺失时退化为整段停靠区实心。
-      const card = dock.querySelector<HTMLElement>(".chat-composer-row");
-      const envInset = parseFloat(getComputedStyle(host).paddingBottom) || 0;
-      const dockBottom = dock.getBoundingClientRect().bottom;
-      const start = Math.max(0, Math.ceil(card
-        ? envInset + (dockBottom - card.getBoundingClientRect().bottom)
-        : 0));
-      const end = Math.ceil(card
-        ? envInset + (dockBottom - card.getBoundingClientRect().top)
-        : envInset + dock.offsetHeight);
-      const solidEnd = Math.max(start, end);
-      host.style.setProperty("--composer-solid-start", `${start}px`);
-      host.style.setProperty("--composer-solid-end", `${solidEnd}px`);
-      host.style.setProperty("--composer-fade-end", `${solidEnd + 16}px`);
     };
     apply();
     const ro = new ResizeObserver(apply);
@@ -1737,9 +1720,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return () => {
       ro.disconnect();
       host.style.removeProperty("--composer-dock-h");
-      host.style.removeProperty("--composer-solid-start");
-      host.style.removeProperty("--composer-solid-end");
-      host.style.removeProperty("--composer-fade-end");
     };
   }, [panel]);
 
@@ -2027,7 +2007,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       {/* 底部停靠区：运行状态行、排队条与输入框。底边留白由停靠区统一承担
           （pb-3），扩展状态行可有可无，出现/消失不会改变输入框与屏幕底边的距离。
           主聊天浮动在消息之上（chat-content 相对定位）：消息列延伸到卡片背后，
-          穿过卡片上方的内容由渐隐带淡出；空态与侧面板（panel）保持文档流。 */}
+          只有贴近卡片的部分被卡片的羽化光晕遮住；空态与侧面板（panel）保持文档流。 */}
       <div
         ref={composerDockRef}
         className={cn(
@@ -2038,21 +2018,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             : "shrink-0",
         )}
       >
-        {composerFloating && (
-          // 渐隐层覆盖整个停靠区、向下越过安全区贴到屏幕底边，向上延伸
-          // 16px（容纳卡片上沿之上的窄渐隐）。只有输入卡片是实心平台：卡片
-          // 外的空隙——下方的 TODO/YOLO 行与安全区、上方的速率行——都是渐
-          // 变的过渡带；卡片上沿只软化 16px，不压暗上方滚动的消息。
-          //
-          // -z-10 把它压到停靠区（z-30 堆叠上下文）内所有常规内容之后：渐隐层
-          // 是 z-auto 的绝对定位元素，不压的话在 phase 8 绘制，会盖住未定位的
-          // 速率行与错误提示的文字；卡片与扩展状态条自身 relative 才没被盖。
-          // 负 z 只在停靠区上下文内部生效，仍压在消息列表之上。
-          <div
-            aria-hidden
-            className="chat-composer-fade pointer-events-none absolute inset-x-0 -top-4 -z-10 bottom-[calc(-1*env(safe-area-inset-bottom,0px))]"
-          />
-        )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the
             project/worktree row right above the composer, all on the
             composer's left edge. */}

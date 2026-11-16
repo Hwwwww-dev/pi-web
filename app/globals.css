@@ -1589,20 +1589,12 @@ span.token.table {
   container-type: inline-size;
 }
 
-/* 浮动 composer：停靠区背后的内容渐隐层。元素铺满整个停靠区、向下越过
-   安全区贴到屏幕底边。只有输入卡片本身是实心平台：卡片下沿以下（TODO/
-   YOLO 行、安全区）与上沿以上（速率行）都属于渐变——下沿从屏幕底边向
-   上升到实心，上沿 16px 内渐隐到透明，速率行上方滚动的消息不再被成片压
-   暗。距离由 ChatWindow 从层底边实测写入（层底越过安全区贴到屏幕底边），
-   停靠点只用 var 引用：calc(var()+env()) 在渐变停靠点上会被静默丢弃。 */
-.chat-composer-fade {
-  background: linear-gradient(
-    to top,
-    transparent 0px,
-    var(--background) var(--composer-solid-start, 44px),
-    var(--background) var(--composer-solid-end, 190px),
-    transparent var(--composer-fade-end, 206px)
-  );
+/* 浮动 composer：输入卡片的羽化光晕。实心只到卡片边缘外一档（spread），
+   再向外按 blur 羽化到透明——速率行、TODO/YOLO 行与安全区落在羽化带里，
+   滚到停靠区背后的消息只有贴近卡片才被遮住。光晕沿卡片自己的圆角轮廓向
+   四外羽化，随卡片尺寸变化自动跟随，无 JS 测距。 */
+.chat-composer-halo {
+  box-shadow: 0 0 24px 12px var(--background);
 }
 
 /* While the software keyboard is up (set by useViewportHeight), only a few
