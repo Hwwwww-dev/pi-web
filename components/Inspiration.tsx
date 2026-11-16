@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeftIcon, FileIcon, ImagePlusIcon, LightbulbIcon, PencilIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftIcon, FileIcon, ImagePlusIcon, LightbulbIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import { MAX_ATTACHED_IMAGES } from "@/lib/image-attachments";
+import { encodeFilePathForApi } from "@/lib/file-paths";
+import { uploadFiles, uploadRepoDirectory } from "@/lib/file-upload-client";
 import { MAX_INSPIRATION_FILE_BYTES, type Inspiration, type InspirationFileRef } from "@/lib/inspiration-shared";
 import type { Locale } from "@/lib/i18n/types";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /**
@@ -35,8 +38,9 @@ const AUTOSAVE_DEBOUNCE_MS = 800;
 /** 列表缩略图最多展示几张，其余并入计数。 */
 const MAX_ROW_THUMBNAILS = 4;
 
-function fileUrl(fileId: string): string {
-  return `/api/inspirations/files/${fileId}`;
+/** 附件本体住在统一上传仓库;经文件 API 按扩展名出 MIME 直读。 */
+function fileUrl(filePath: string): string {
+  return `/api/files/${encodeFilePathForApi(filePath)}?type=read`;
 }
 
 function isInlineImage(mime: string): boolean {
@@ -46,8 +50,8 @@ function isInlineImage(mime: string): boolean {
 export function Inspiration({ sessionId, onImplement, onClose, className }: {
   /** 会话隔离：无会话时不挂入口，此值恒有。 */
   sessionId: string;
-  /** 文本与附件回到输入框（不自动发送）；由持有 composer 接口的一方接线。 */
-  onImplement: (text: string, images: File[], files: File[]) => void;
+  /** 文本与附件回到输入框（不自动发送）；图片是字节，其余文件是仓库引用，由持有 composer 接口的一方编排。 */
+  onImplement: (text: string, images: File[], files: InspirationFileRef[]) => void;
   /** 实现成功后容器如何退场（如关闭弹窗）；不传则只做核心内部的导航。 */
   onClose?: () => void;
   className?: string;
@@ -128,18 +132,25 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       }
       savedTextRef.current = text;
-      // 附件逐个上传（先文件落盘，后挂到条目上）；失败的那个留在待传列。
+      // 附件逐个走统一上传接口落进灵感仓库（同名 skip：引用现有那份），成功后
+      // PATCH 挂接引用；失败的那个留在待传列。
+      const directory = uploadRepoDirectory("inspiration");
       while (pendingFilesRef.current.length > 0) {
         const pendingFile = pendingFilesRef.current[0];
-        const form = new FormData();
-        form.set("sessionId", sessionId);
-        form.set("itemId", itemId);
-        form.set("file", pendingFile.file);
-        const res = await fetch(`/api/inspirations/${sessionId}/files`, { method: "POST", body: form });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const uploaded = await res.json() as InspirationFileRef;
+        const { status, data } = await uploadFiles(directory, [pendingFile.file], "skip");
+        if (status !== 200 && status !== 207) throw new Error(data.error ?? `HTTP ${status}`);
+        if ((data.errors ?? []).length > 0) throw new Error(`${pendingFile.file.name}: ${data.errors?.[0].error}`);
+        const attachRes = await fetch(`/api/inspirations/${sessionId}/${itemId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "attach",
+            files: [{ name: pendingFile.file.name, mime: pendingFile.file.type || "application/octet-stream", path: `${directory}/${pendingFile.file.name}` }],
+          }),
+        });
+        if (!attachRes.ok) throw new Error(`HTTP ${attachRes.status}`);
+        setEditorFiles(((await attachRes.json()) as { item: Inspiration }).item.files);
         setPendingFiles((prev) => prev.slice(1));
-        setEditorFiles((prev) => [...prev, uploaded]);
         if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
       }
       setSaveState("saved");
@@ -221,13 +232,17 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
     }
   }, [editorFiles.length, scheduleSave, t]);
 
-  const removeSavedFile = useCallback(async (fileId: string) => {
+  const removeSavedFile = useCallback(async (filePath: string) => {
     const itemId = editorItemIdRef.current;
     if (!itemId) return;
     try {
-      const res = await fetch(`/api/inspirations/files/${fileId}?sessionId=${sessionId}&itemId=${itemId}`, { method: "DELETE" });
+      const res = await fetch(`/api/inspirations/${sessionId}/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "detach", path: filePath }),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setEditorFiles((prev) => prev.filter((entry) => entry.id !== fileId));
+      setEditorFiles(((await res.json()) as { item: Inspiration }).item.files);
       void refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -275,23 +290,16 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
     }
   }, [sessionId, refresh]);
 
-  /** 实现：图片回 addImages，其余文件回上传+@mention 路径；都不自动发送。 */
+  /** 实现：图片取回字节回 addImages，其余附件以仓库引用交由 composer 编排；都不自动发送。 */
   const implement = useCallback(async (item: Inspiration) => {
     setBusyId(item.id);
     try {
-      const [images, files] = await Promise.all([
-        Promise.all(item.files.filter((ref) => isInlineImage(ref.mime)).map(async (ref) => {
-          const res = await fetch(fileUrl(ref.id));
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return new File([await res.blob()], ref.name, { type: ref.mime });
-        })),
-        Promise.all(item.files.filter((ref) => !isInlineImage(ref.mime)).map(async (ref) => {
-          const res = await fetch(fileUrl(ref.id));
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return new File([await res.blob()], ref.name, { type: ref.mime });
-        })),
-      ]);
-      onImplement(item.text, images, files);
+      const images = await Promise.all(item.files.filter((ref) => isInlineImage(ref.mime)).map(async (ref) => {
+        const res = await fetch(fileUrl(ref.path));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return new File([await res.blob()], ref.name, { type: ref.mime });
+      }));
+      onImplement(item.text, images, item.files.filter((ref) => !isInlineImage(ref.mime)));
       onClose?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -432,7 +440,7 @@ function FileTile({ ref: fileRef, pending = false, onRemove, removeLabel, previe
   removeLabel?: string;
   previewUrl?: string | null;
 }) {
-  const src = previewUrl ?? (isInlineImage(fileRef.mime) ? fileUrl(fileRef.id) : null);
+  const src = previewUrl ?? (isInlineImage(fileRef.mime) && fileRef.path ? fileUrl(fileRef.path) : null);
   return (
     <div className="relative">
       {src ? (
@@ -467,7 +475,7 @@ type InspirationT = (
     | "inspiration.actionPurge" | "inspiration.confirmPurge"
     | "inspiration.actionBack" | "inspiration.editorCreate" | "inspiration.editorEdit"
     | "inspiration.editorPlaceholder" | "inspiration.actionAddFile" | "inspiration.actionRemoveFile"
-    | "inspiration.saveStateIdle" | "inspiration.saveStateSaving" | "inspiration.saveStateSaved" | "inspiration.saveStateError"
+    | "inspiration.saveStateSaving" | "inspiration.saveStateSaved" | "inspiration.saveStateError"
 ) => string;
 
 function InspirationRow({ item, busyId, locale, t, confirmPurgeId, setConfirmPurgeId, onImplement, onEdit, onAction, onPurge, actions }: {
@@ -499,7 +507,7 @@ function InspirationRow({ item, busyId, locale, t, confirmPurgeId, setConfirmPur
           <div className="flex items-center gap-1">
             {thumbnails.map((ref) => (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={ref.id} src={fileUrl(ref.id)} alt={ref.name} loading="lazy" className="size-10 rounded-md border border-border object-cover" />
+              <img key={ref.path} src={fileUrl(ref.path)} alt={ref.name} loading="lazy" className="size-10 rounded-md border border-border object-cover" />
             ))}
             {extraImages > 0 && <span className="text-[11px] tabular-nums text-muted-foreground">+{extraImages}</span>}
             {otherCount > 0 && (
@@ -522,7 +530,6 @@ function InspirationRow({ item, busyId, locale, t, confirmPurgeId, setConfirmPur
         )}
         {actions.includes("edit") && (
           <Button type="button" variant="ghost" size="xs" className={actionClass} disabled={busy} onClick={onEdit}>
-            <PencilIcon data-icon="inline-start" aria-hidden="true" />
             {t("inspiration.actionEdit")}
           </Button>
         )}
@@ -538,13 +545,11 @@ function InspirationRow({ item, busyId, locale, t, confirmPurgeId, setConfirmPur
         )}
         {actions.includes("restore") && (
           <Button type="button" variant="ghost" size="xs" className={actionClass} disabled={busy} onClick={() => onAction(item, "restore")}>
-            <RotateCcwIcon data-icon="inline-start" aria-hidden="true" />
             {t("inspiration.actionRestore")}
           </Button>
         )}
         {actions.includes("delete") && (
           <Button type="button" variant="ghost" size="xs" className={cn(actionClass, "hover:bg-destructive/10 hover:text-destructive")} disabled={busy} onClick={() => onAction(item, "delete")}>
-            <Trash2Icon data-icon="inline-start" aria-hidden="true" />
             {t("inspiration.actionDelete")}
           </Button>
         )}
@@ -595,7 +600,7 @@ function EditorPage({ creating, text, onTextChange, savedFiles, pendingFiles, sa
         <h2 className="text-base">{creating ? t("inspiration.editorCreate") : t("inspiration.editorEdit")}</h2>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
-        <textarea
+        <Textarea
           autoFocus
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
@@ -607,30 +612,30 @@ function EditorPage({ creating, text, onTextChange, savedFiles, pendingFiles, sa
             }
           }}
           placeholder={t("inspiration.editorPlaceholder")}
-          // 触屏 16px：小于它 iOS 聚焦时会把整页放大。
-          className="min-h-40 w-full resize-none rounded-lg border border-border bg-transparent p-3 text-sm leading-[1.55] text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none pointer-coarse:text-base"
+          className="min-h-40 resize-none rounded-lg border-border leading-[1.55]"
         />
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="xs" className="pointer-coarse:min-h-9" onClick={onAddFiles}>
             <ImagePlusIcon data-icon="inline-start" aria-hidden="true" />
             {t("inspiration.actionAddFile")}
           </Button>
-          <span className="text-[11px] text-muted-foreground/70">
-            {saveState === "saving" ? t("inspiration.saveStateSaving")
-              : saveState === "error" ? t("inspiration.saveStateError")
-                : saveState === "saved" ? t("inspiration.saveStateSaved")
-                  : t("inspiration.saveStateIdle")}
-          </span>
+          {saveState !== "idle" && (
+            <span className="text-[11px] text-muted-foreground/70">
+              {saveState === "saving" ? t("inspiration.saveStateSaving")
+                : saveState === "error" ? t("inspiration.saveStateError")
+                  : t("inspiration.saveStateSaved")}
+            </span>
+          )}
         </div>
         {(savedFiles.length > 0 || pendingFiles.length > 0) && (
           <div className="flex flex-wrap gap-2">
             {savedFiles.map((ref) => (
-              <FileTile key={ref.id} ref={ref} onRemove={() => onRemoveSaved(ref.id)} removeLabel={t("inspiration.actionRemoveFile")} />
+              <FileTile key={ref.path} ref={ref} onRemove={() => onRemoveSaved(ref.path)} removeLabel={t("inspiration.actionRemoveFile")} />
             ))}
             {pendingFiles.map((pending, index) => (
               <FileTile
                 key={pending.file.name + index}
-                ref={{ id: "", name: pending.file.name, mime: pending.file.type || "application/octet-stream" }}
+                ref={{ name: pending.file.name, mime: pending.file.type || "application/octet-stream", path: "" }}
                 pending
                 previewUrl={pending.previewUrl}
                 onRemove={() => onRemovePending(index)}
