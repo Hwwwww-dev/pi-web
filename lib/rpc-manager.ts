@@ -1765,13 +1765,11 @@ export class AgentSessionWrapper {
       }
 
       case "extension_ui_response": {
-        this.resolveExtensionUiResponse(command as ExtensionUiResponse);
-        return null;
+        return { applied: this.resolveExtensionUiResponse(command as ExtensionUiResponse) };
       }
 
       case "extension_ui_input": {
-        this.handleExtensionUiInput(command.id as string, command.data as string);
-        return null;
+        return { applied: this.handleExtensionUiInput(command.id as string, command.data as string) };
       }
 
       case "set_auto_retry": {
@@ -1968,10 +1966,12 @@ export class AgentSessionWrapper {
     }
   }
 
-  private resolveExtensionUiResponse(response: ExtensionUiResponse): void {
+  /** 未命中（问题已关闭、已超时，或根本不属于本会话）返回 false：调用方把结果回执给客户端。 */
+  private resolveExtensionUiResponse(response: ExtensionUiResponse): boolean {
     const pending = this.pendingUiResponses.get(response.id);
-    if (!pending) return;
+    if (!pending) return false;
     pending.resolve(response);
+    return true;
   }
 
   private getExtensionStatuses(): Array<{ key: string; text: string }> {
@@ -2288,12 +2288,14 @@ export class AgentSessionWrapper {
     custom.resolve(value);
   }
 
-  private handleExtensionUiInput(id: string, data: string): void {
+  /** 同上：面板已关闭或 id 不属于本会话时返回 false，不静默吞掉。 */
+  private handleExtensionUiInput(id: string, data: string): boolean {
     const custom = this.activeCustomUis.get(id);
-    if (!custom || typeof data !== "string") return;
+    if (!custom || typeof data !== "string") return false;
     try {
       custom.component.handleInput?.(data);
       if (this.activeCustomUis.has(id)) this.emitCustomUiRender(id, custom);
+      return true;
     } catch (error) {
       this.closeCustomUi(id, undefined);
       this.emit({
@@ -2302,6 +2304,7 @@ export class AgentSessionWrapper {
         event: "custom_ui_input",
         error: error instanceof Error ? error.message : String(error),
       });
+      return true;
     }
   }
 

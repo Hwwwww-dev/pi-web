@@ -16,17 +16,23 @@ test("one scroll-to-latest control, and it is the official one", () => {
 test("the official scroller owns following, prepend anchoring and the bottom edge", () => {
   // autoScroll 打开：贴底时跟随、向上滚动即脱开、程序滚动期间由它自己标记
   // （data-autoscrolling）。行窗口与手工前插保位都已删除，因此这里不能再有
-  // 自己的跟随状态机。折叠动画期间必须能关掉跟随（`pi-web:trace-fold`）：
-  // 展开的块向下长高，跟着底会把读者的视口拉到新底。
-  assert.match(source, /<MessageScrollerProvider autoScroll=\{!foldInFlight\} defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  // 自己的跟随状态机。折叠动画期间用 scrollTop 钉位拦住跳底（`pi-web:trace-fold`），
+  // 不关 autoScroll——关掉它模式就回不到 following-bottom，反而把读者抖出跟随。
+  assert.match(source, /<MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
   assert.match(source, /addEventListener\("pi-web:trace-fold"/);
-  assert.doesNotMatch(source, /autoScroll=\{false\}/);
+  // 折叠期不能改 autoScroll，也不能没有钉位。
+  assert.doesNotMatch(source, /autoScroll=\{!foldInFlight\}|autoScroll=\{false\}/);
+  assert.match(source, /foldPinRef/);
   assert.doesNotMatch(source, /useChatFollow|chat-follow|lib\/scroll-anchor/);
   // Hand-rolled compensation must not sit next to the official one.
   assert.equal(source.includes("preserveScrollOnPrepend={false}"), false);
   // 不传 scrollAnchor：官方给锚点行 align-start 置顶并在尾部垫 spacer，
   // 与贴底跟随互抢（"底"分裂成真底与假底）。
   assert.doesNotMatch(source, /scrollAnchor=/);
+  // 内容盒高度必须紧贴内容：`min-h-full` 让官方对「内容末端」的测量在短会话里
+  // 多出一屏空白，end 恒 true，跟随模式再也回不到 following-bottom（任何 1px
+  // 上滑就脱开）。shadcn 的 ui/ 不手改，在调用点用 tailwind-merge 盖掉。
+  assert.match(source, /<MessageScrollerContent[\s\S]{0,400}?className="min-h-0 /);
 });
 
 test("no render window: every loaded row stays mounted", () => {

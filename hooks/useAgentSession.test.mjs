@@ -648,13 +648,17 @@ test("queues extension dialogs and custom panels by request id instead of sharin
   assert.doesNotMatch(source, /setExtensionDialog\(|setExtensionCustomUi\(/);
   assert.match(
     extensionRequestSource,
-    /case "editor":\s+setExtensionDialogs\(\(queue\) => enqueueExtensionUiRequest\(queue, request\)\)/,
+    /case "editor": \{\s+const owner = requestOwnerSessionId\(\);\s+if \(owner\) extensionRequestOwnerRef\.current\.set\(request\.id, owner\);\s+setExtensionDialogs\(\(queue\) => enqueueExtensionUiRequest\(queue, request\)\)/,
   );
   // A custom panel re-renders under its id: replace it where it stands, drop it on close.
   assert.match(
     extensionRequestSource,
-    /case "custom":\s+setExtensionCustomUis\(\(queue\) => request\.closed\s+\? removeExtensionUiRequest\(queue, request\.id\)\s+: upsertExtensionUiRequest\(queue, request\)\)/,
+    /case "custom":\s+if \(request\.closed\) extensionRequestOwnerRef\.current\.delete\(request\.id\);\s+else \{\s+const owner = requestOwnerSessionId\(\);\s+if \(owner\) extensionRequestOwnerRef\.current\.set\(request\.id, owner\);\s+\}\s+setExtensionCustomUis\(\(queue\) => request\.closed\s+\? removeExtensionUiRequest\(queue, request\.id\)\s+: upsertExtensionUiRequest\(queue, request\)\)/,
   );
+  // 回答前核对归属，未命中时服务端的 `applied:false` 也要报错，而不是静默丢包。
+  assert.match(respondSource, /const owner = extensionRequestOwnerRef\.current\.get\(request\.id\);/);
+  assert.match(respondSource, /if \(owner && owner !== sid\)/);
+  assert.match(respondSource, /result\?\.applied === false/);
   assert.match(respondSource, /setExtensionDialogs\(\(queue\) => removeExtensionUiRequest\(queue, request\.id\)\)/);
   assert.match(closedSource, /setExtensionDialogs\(\(queue\) => removeExtensionUiRequest\(queue, event\.id as string\)\)/);
   // The hook keeps exposing what is on screen under the old names, plus how many wait behind it.
@@ -748,7 +752,7 @@ test("one tail-follower signal, owned by ChatWindow", () => {
   assert.doesNotMatch(scrollToBottomSource, /scrollIntoView/);
   // 跟随、前插保位与底部边界全部交回官方 scroller（autoScroll 默认关闭，必须显式打开）；
   // ChatWindow 不再有自己的跟随状态机，也不再自己写读者的滚动位置。
-  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll=\{!foldInFlight\} defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
   assert.doesNotMatch(chatWindowSource, /autoScroll=\{false\}|useChatFollow|FollowTailWhenAtTail/);
   // 程序化滚动只经官方命令（它会把模式置为 settling-jump 并抑制跟随）。
   assert.match(chatWindowSource, /scrollerApiRef\.current\?\.scrollTo(?:End|Message)\(/);
@@ -775,7 +779,7 @@ test("a new turn does not anchor its user row to the top of the viewport", () =>
   // 跟随互抢，"底"分裂成真底与假底，读者没有操作也会被推到别的消息上。
   assert.doesNotMatch(source, /pendingTailScrollRef|reattachToTail/);
   assert.doesNotMatch(chatWindowSource, /scrollAnchor=/);
-  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll=\{!foldInFlight\} defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
   // prompt-anchor 机制已全部拆除。
   assert.doesNotMatch(source, /promptAnchor|scrollUserMsgToTop|lastUserMsgRef/);
   assert.doesNotMatch(chatWindowSource, /promptAnchor|scrollUserMsgToTop/);

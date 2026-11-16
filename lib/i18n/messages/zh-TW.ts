@@ -807,6 +807,7 @@ export const zhTWLocale: LocalePlugin = {
     "chat.submit": "送出",
     "chat.extensionCustomAnswer": "自訂答案（不勾選選項時提交此項）",
     "chat.extensionInput": "擴充功能終端輸入",
+    "chat.extensionAnswerUndelivered": "這次回答沒有送達：問題已失效，或屬於另一個工作階段",
     "chat.extensionPanel": "擴充功能面板",
     "chat.extensionWidgets": "擴充功能小工具",
     "chat.extensionWidgetAbove": "編輯器上方小工具",

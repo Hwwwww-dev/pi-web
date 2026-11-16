@@ -662,38 +662,50 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const [atTail, setAtTail] = useState(true);
   const [pendingRevealEntryId, setPendingRevealEntryId] = useState<string | null>(null);
   const scrollerApiRef = useRef<ScrollerApi | null>(null);
-  // 折叠期间关掉贴底跟随：展开的块在下方长高，跟随会把读者的视口拉到新底，
-  // 看起来就是「一打开就把内容推上去」。`pi-web:trace-fold` 由 TraceRow 的
-  // useFoldAnchor（折叠前钉住本行顶边）与 Reveal（通用展开块）发出，窗口
-  // 覆盖一次折叠动画（180ms）加余量。
-  const [foldInFlight, setFoldInFlight] = useState(false);
+  // 折叠期间钉住滚动位置：展开/收起的块在锚点行下方改变高度，官方跟随会在尺寸
+  // 变化时把视口拉到新底，看起来就是「一打开就把内容推上去」。折叠是「在锚点行
+  // 下方长高」，scrollTop 不变即视口不动，所以钉住是安全的。`pi-web:trace-fold`
+  // 由 TraceRow 的 useFoldAnchor（折叠前钉住本行顶边）与 Reveal（通用展开块）
+  // 发出，窗口覆盖一次折叠动画（180ms）加余量；期间读者自己的手势立刻解钉。
+  const foldPinRef = useRef<number | null>(null);
   const foldTimerRef = useRef<number | undefined>(undefined);
-  // 跟随重新打开的那一帧，官方 scroller 会自己 scrollToEnd（autoScroll 变 true
-  // 且模式仍停在底）。记下折叠刚结束时的位置，在同一个 commit 的 layout 阶段
-  // 还回去——子组件的 layout effect 先跑，这里后跑，所以能抹掉那一下。
-  const foldRestoreRef = useRef<number | null>(null);
   useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const release = () => {
+      foldPinRef.current = null;
+      window.clearTimeout(foldTimerRef.current);
+    };
     const onFold = () => {
-      setFoldInFlight(true);
+      const pin = foldPinRef.current ?? container.scrollTop;
+      foldPinRef.current = pin;
+      if (Math.abs(container.scrollTop - pin) > 0.5) container.scrollTop = pin;
       window.clearTimeout(foldTimerRef.current);
       foldTimerRef.current = window.setTimeout(() => {
-        foldRestoreRef.current = scrollContainerRef.current?.scrollTop ?? null;
-        setFoldInFlight(false);
+        foldPinRef.current = null;
       }, 260);
     };
+    const onScroll = () => {
+      const pin = foldPinRef.current;
+      if (pin !== null && Math.abs(container.scrollTop - pin) > 0.5) container.scrollTop = pin;
+    };
     window.addEventListener("pi-web:trace-fold", onFold);
+    container.addEventListener("scroll", onScroll, { passive: true });
+    // 读者手势优先：滚轮、指针按下（含拖滚动条）、键盘翻页、触控滑动都立即解钉。
+    window.addEventListener("wheel", release, { passive: true });
+    window.addEventListener("pointerdown", release, { passive: true });
+    window.addEventListener("keydown", release);
+    window.addEventListener("touchmove", release, { passive: true });
     return () => {
       window.removeEventListener("pi-web:trace-fold", onFold);
+      container.removeEventListener("scroll", onScroll);
+      window.removeEventListener("wheel", release);
+      window.removeEventListener("pointerdown", release);
+      window.removeEventListener("keydown", release);
+      window.removeEventListener("touchmove", release);
       window.clearTimeout(foldTimerRef.current);
     };
   }, [scrollContainerRef]);
-  useLayoutEffect(() => {
-    const top = foldRestoreRef.current;
-    if (foldInFlight || top === null) return;
-    foldRestoreRef.current = null;
-    const container = scrollContainerRef.current;
-    if (container && Math.abs(container.scrollTop - top) > 1) container.scrollTop = top;
-  }, [foldInFlight, scrollContainerRef]);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   /** 上一页请求进行中。 */
   const loadingOlderRef = useRef(false);
@@ -1846,9 +1858,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           </div>
         ) : <>
         {/* `autoScroll` 官方默认为 false：不显式打开，内容增长时视图不会自己贴底。
-            `scrollEdgeThreshold` 默认 8px 太窄，手指一动就脱离跟随；放宽到 120px（约一行半）。
-            折叠动画那几帧关掉跟随：展开的块向下长，跟随会把视口拉到新底。 */}
-        <MessageScrollerProvider autoScroll={!foldInFlight} defaultScrollPosition="end" scrollEdgeThreshold={120}>
+            跟随只在两处松手：读者自己往上滚超过 `scrollEdgeThreshold`（120px，约一行半），
+            或者会话被切换。折叠动画那几帧由下面的 scrollTop 钉位拦住，不动这个开关——
+            一关它模式就无法回到 following-bottom，折叠期的尺寸变化反而会把读者抖出去。 */}
+        <MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold={120}>
         <ScrollerBridge apiRef={scrollerApiRef} onAtTailChange={setAtTail} />
         <MessageScroller className="min-h-0 min-w-0 flex-1 animate-in fade-in duration-150">
         <MessageScrollerViewport
@@ -1861,7 +1874,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <MessageScrollerContent
             ref={messageContentRef}
             onPointerUp={captureQuotedSelection}
-            className="gap-[var(--chat-row-gap)] pt-[22px] pb-[calc(var(--composer-dock-h,0px)+8px)] max-sm:pt-4"
+            className="min-h-0 gap-[var(--chat-row-gap)] pt-[22px] pb-[calc(var(--composer-dock-h,0px)+8px)] max-sm:pt-4"
           >
             {hasMoreRendered && (
               // 手动入口：自动加载需等上一页渲染完成，此按钮允许随时请求一页。

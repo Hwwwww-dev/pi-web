@@ -1645,38 +1645,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     };
   }, [closeEvents, eventStreamIdle, eventStreamReattachCount, requestLease, session?.id]);
 
-  const respondToExtensionUi = useCallback(async (
-    request: ExtensionUiDialogRequest,
-    response: { value: string } | { confirmed: boolean } | { cancelled: true },
-  ) => {
-    const sid = sessionIdRef.current;
-    setExtensionDialogs((queue) => removeExtensionUiRequest(queue, request.id));
-    if (!sid) return;
-    try {
-      await sendAgentCommand(sid, {
-        type: "extension_ui_response",
-        id: request.id,
-        ...response,
-      });
-    } catch (e) {
-      console.error("Failed to send extension UI response:", e);
-    }
-  }, []);
-
-  const sendExtensionCustomInput = useCallback(async (request: ExtensionUiCustomRequest, data: string) => {
-    const sid = sessionIdRef.current;
-    if (!sid) return;
-    try {
-      await sendAgentCommand(sid, {
-        type: "extension_ui_input",
-        id: request.id,
-        data,
-      });
-    } catch (e) {
-      console.error("Failed to send extension custom UI input:", e);
-    }
-  }, []);
-
   const addNotice = useCallback((notice: { id?: string; message: string; type?: NoticeType }) => {
     const message = notice.message.trim();
     if (!message) return;
@@ -1692,6 +1660,67 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const translateRef = useRef(opts.t);
   translateRef.current = opts.t;
   const translate = useCallback((key: string, params?: TranslationParams) => translateRef.current(key, params), []);
+  // 每个待答请求属于哪个会话：回答前核对，避免同一页面里两个会话的弹框互相投递
+  // （A 的答案落进 B 的 pendingUiResponses）。事件流按会话订阅，正常路径恒等；
+  // 这条只是把“万一错位”从静默丢包变成可见的错误。服务端未命中 pending 也会
+  // 回执 `applied:false`，客户端同样报错，而不是看起来“提交了但没反应”。
+  const extensionRequestOwnerRef = useRef(new Map<string, string>());
+  const extensionAnswerUndelivered = useCallback(() => {
+    addNotice({ message: translate("chat.extensionAnswerUndelivered"), type: "error" });
+  }, [addNotice, translate]);
+
+  const respondToExtensionUi = useCallback(async (
+    request: ExtensionUiDialogRequest,
+    response: { value: string } | { confirmed: boolean } | { cancelled: true },
+  ) => {
+    const sid = sessionIdRef.current;
+    const owner = extensionRequestOwnerRef.current.get(request.id);
+    extensionRequestOwnerRef.current.delete(request.id);
+    setExtensionDialogs((queue) => removeExtensionUiRequest(queue, request.id));
+    if (!sid) return;
+    if (owner && owner !== sid) {
+      console.error("[pi-web] extension UI response belongs to another session:", { id: request.id, owner, sid });
+      extensionAnswerUndelivered();
+      return;
+    }
+    try {
+      const result = await sendAgentCommand<{ applied?: boolean }>(sid, {
+        type: "extension_ui_response",
+        id: request.id,
+        ...response,
+      });
+      if (result?.applied === false) {
+        console.error("[pi-web] extension UI response matched no pending request:", { id: request.id, sid });
+        extensionAnswerUndelivered();
+      }
+    } catch (e) {
+      console.error("Failed to send extension UI response:", e);
+    }
+  }, [extensionAnswerUndelivered]);
+
+  const sendExtensionCustomInput = useCallback(async (request: ExtensionUiCustomRequest, data: string) => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    const owner = extensionRequestOwnerRef.current.get(request.id);
+    if (owner && owner !== sid) {
+      console.error("[pi-web] extension custom UI input belongs to another session:", { id: request.id, owner, sid });
+      extensionAnswerUndelivered();
+      return;
+    }
+    try {
+      const result = await sendAgentCommand<{ applied?: boolean }>(sid, {
+        type: "extension_ui_input",
+        id: request.id,
+        data,
+      });
+      if (result?.applied === false) {
+        console.error("[pi-web] extension custom UI input matched no active panel:", { id: request.id, sid });
+        extensionAnswerUndelivered();
+      }
+    } catch (e) {
+      console.error("Failed to send extension custom UI input:", e);
+    }
+  }, [extensionAnswerUndelivered]);
   // A steer or follow-up whose request failed without the server's refusal (the
   // network dropped, a proxy answered) may still have been accepted. Its text
   // goes back to the composer all the same (restoreSubmission merges it in front
@@ -1769,6 +1798,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     dispatchNotice({ type: "remove", id });
   }, []);
 
+  // 归属按「这个事件流属于哪个会话」记，而不是选中的会话：新会话草稿期
+  // sessionIdRef 还没换成真实 id，事件却已经属于刚建好的那个会话。
+  const requestOwnerSessionId = useCallback(
+    () => eventConnectionRef.current?.snapshot().sessionId ?? sessionIdRef.current,
+    [],
+  );
   const handleExtensionUiRequest = useCallback((request: ExtensionUiRequest) => {
     if (isBlockingExtensionUiRequest(request)) onAttentionNeeded?.(request);
 
@@ -1776,9 +1811,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       case "select":
       case "confirm":
       case "input":
-      case "editor":
+      case "editor": {
+        const owner = requestOwnerSessionId();
+        if (owner) extensionRequestOwnerRef.current.set(request.id, owner);
         setExtensionDialogs((queue) => enqueueExtensionUiRequest(queue, request));
         break;
+      }
       case "notify": {
         addNotice({
           id: request.id,
@@ -1810,12 +1848,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         opts.chatInputRef?.current?.insertText(stripAnsi(request.text));
         break;
       case "custom":
+        if (request.closed) extensionRequestOwnerRef.current.delete(request.id);
+        else {
+          const owner = requestOwnerSessionId();
+          if (owner) extensionRequestOwnerRef.current.set(request.id, owner);
+        }
         setExtensionCustomUis((queue) => request.closed
           ? removeExtensionUiRequest(queue, request.id)
           : upsertExtensionUiRequest(queue, request));
         break;
     }
-  }, [addNotice, onAttentionNeeded, opts.chatInputRef]);
+  }, [addNotice, onAttentionNeeded, opts.chatInputRef, requestOwnerSessionId]);
 
   const settleUiStage = useCallback(() => {
     const wasRunning = agentRunningRef.current;
@@ -2414,9 +2457,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       case "extension_ui_request":
         handleExtensionUiRequest(event as ExtensionUiRequest);
         break;
-      case "extension_ui_closed":
+      case "extension_ui_closed": {
+        extensionRequestOwnerRef.current.delete(event.id as string);
         setExtensionDialogs((queue) => removeExtensionUiRequest(queue, event.id as string));
         break;
+      }
     }
   }, [activeToolsStore, addNotice, agentPhaseStore, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, notifyPromptStage, onAgentEnd, onToolEnd, refreshContextUsage, scheduleEventStreamClose, settleUiStage, syncEntryIdsAfterRun, syncLiveModel]);
   handleAgentEventRef.current = handleAgentEvent;

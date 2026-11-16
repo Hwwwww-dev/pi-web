@@ -807,6 +807,7 @@ export const zhCNLocale: LocalePlugin = {
     "chat.submit": "提交",
     "chat.extensionCustomAnswer": "自定义答案（不勾选选项时提交此项）",
     "chat.extensionInput": "扩展终端输入",
+    "chat.extensionAnswerUndelivered": "这次回答没有送达：问题已失效，或属于另一个会话",
     "chat.extensionPanel": "扩展面板",
     "chat.extensionWidgets": "扩展组件",
     "chat.extensionWidgetAbove": "输入框上方组件",

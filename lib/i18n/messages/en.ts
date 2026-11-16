@@ -807,6 +807,7 @@ export const enLocale: LocalePlugin = {
     "chat.submit": "Submit",
     "chat.extensionCustomAnswer": "Custom answer (submitted when nothing is checked)",
     "chat.extensionInput": "Extension terminal input",
+    "chat.extensionAnswerUndelivered": "That answer did not reach the agent: the request expired, or it belongs to another session",
     "chat.extensionPanel": "Extension panel",
     "chat.extensionWidgets": "Extension widgets",
     "chat.extensionWidgetAbove": "Above editor widget",
