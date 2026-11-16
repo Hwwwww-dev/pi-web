@@ -411,7 +411,9 @@ export function ProjectWorktreePicker({
   });
   const projectIconSlot = (checked: boolean) => [
     "inline-flex size-3.5 shrink-0 grow-0 items-center justify-center [&_svg]:size-3! [&_svg]:text-inherit!",
-    checked ? "text-(--accent)" : "text-muted-foreground",
+    // 当前项目的勾选标记要强：--accent 是背景色 token，当文字色画在
+    // 菜单底色上两边主题都近乎隐形（亮色近白、暗色近黑）。
+    checked ? "text-foreground" : "text-muted-foreground",
   ].join(" ");
   const projectRowClass = (checked: boolean) => [
     "relative flex w-full cursor-pointer items-center gap-2 rounded-xs py-2 pl-2.5 pr-2 text-left text-xs leading-[1.35] outline-hidden select-none",

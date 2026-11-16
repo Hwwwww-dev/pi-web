@@ -50,7 +50,6 @@ export const enLocale: LocalePlugin = {
     "keepalive.title": "Active chats",
     "keepalive.close": "Remove from active",
     "keepalive.dismissAll": "Remove all from active chats",
-    "keepalive.hide": "Hide panel",
     "keepalive.statusIdle": "Idle",
     "keepalive.statusRunning": "Running",
     "keepalive.statusDone": "Finished",

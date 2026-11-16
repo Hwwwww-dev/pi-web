@@ -222,37 +222,24 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
             : open ? "translate-y-0" : "-translate-y-1",
         )}
       >
-        {/* 头部一行收纳计数、「全部移出」与收起；行内信息层级：标题 →
-            状态词 · 消息数 · 时间 → 路径。 */}
+        {/* 头部一行收纳计数与「全部移出」；关闭靠失焦、Esc 或再点胶囊，
+            不设收起钮。行内信息层级：标题 → 状态词 · 消息数 · 时间 → 路径。 */}
         <div className="flex shrink-0 items-center justify-between gap-2 px-2 pb-1 pt-1.5">
           <span className="flex items-baseline gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {t("keepalive.title")}
             <span className="text-[11px] font-normal tabular-nums text-muted-foreground/70">{slots.length}</span>
           </span>
-          <span className="flex shrink-0 items-center gap-1">
-            {slots.some((slot) => slot.session.id !== selectedSessionId) && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                className="h-6 rounded-full px-2 text-[11px] font-normal text-muted-foreground hover:bg-accent/60 hover:text-destructive"
-                onClick={() => { onDismissAll(); closePanel(); }}
-              >
-                {t("keepalive.dismissAll")}
-              </Button>
-            )}
+          {slots.some((slot) => slot.session.id !== selectedSessionId) && (
             <Button
               type="button"
               variant="ghost"
-              size="icon-xs"
-              className="size-6 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-              title={t("keepalive.hide")}
-              aria-label={t("keepalive.hide")}
-              onClick={closePanel}
+              size="xs"
+              className="h-6 rounded-full px-2 text-[11px] font-normal text-muted-foreground hover:bg-accent/60 hover:text-destructive"
+              onClick={() => { onDismissAll(); closePanel(); }}
             >
-              <XIcon className="size-3.5" aria-hidden="true" />
+              {t("keepalive.dismissAll")}
             </Button>
-          </span>
+          )}
         </div>
         {/* 滚动条放在内层：面板由 maxHeight 封顶、行列表 flex-1 min-h-0
             消化剩余空间，超高即内层滚动；外层圆角 + 裁切，滚动条不会在

@@ -160,7 +160,7 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
           <SelectItem
             key={option.value}
             value={option.value}
-            className="min-h-9 h-auto gap-[7px] py-1.5 text-xs text-muted-foreground data-[state=checked]:text-foreground"
+            className="min-h-9 h-auto gap-[7px] py-1.5 text-xs text-muted-foreground data-[state=checked]:text-foreground [&>span:last-child]:min-w-0"
           >
             <span className={SCROLLING_LABEL_CLASS} title={option.primary}><span>{option.primary}</span></span>
             {option.secondary && (
