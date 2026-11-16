@@ -24,7 +24,7 @@ const RATE_HOLD_MS = 6000;
 /** `[速度徽标 + ↓token 数]`——原 AssistantMessageHeader 的计量段。胶囊定宽
  *  （w-[5rem] 容纳 "999.9 t/s" 并留出左右各 10px 内边距），数字位数变化不推挤同行内容；流式中按
  *  五档变色（<15 红、15–30 黄、30–50 绿、50–120 蓝、>120 彩虹），静态一律
- *  中性灰无底色，无读数显示 0.0。 */
+ *  浅灰底中性色，无读数也占同一颗胶囊（读 0.0），槽位宽度不随流式开始/结束变化。 */
 export function StreamRateBadge({ tokens, tps, streaming }: { tokens: number; tps: number | null; streaming: boolean }) {
   const { t } = useI18n();
   // 只有流式中才吃配色档：静态/结束后停留期永远中性，绝不出现红色档。
@@ -52,7 +52,7 @@ export function StreamRateBadge({ tokens, tps, streaming }: { tokens: number; tp
           {rate.toFixed(1)} t/s
         </span>
       ) : (
-        <span className="inline-flex w-[5rem] shrink-0 items-center justify-center rounded-md px-2.5 text-xs leading-tight font-medium tabular-nums text-muted-foreground transition-colors duration-300">
+        <span className="inline-flex w-[5rem] shrink-0 items-center justify-center rounded-md bg-muted px-2.5 text-xs leading-tight font-medium tabular-nums text-muted-foreground transition-colors duration-300">
           {(tps ?? 0).toFixed(1)} t/s
         </span>
       )}
@@ -137,14 +137,7 @@ export function StreamStatusPill({ store }: { store: StreamingStore }) {
   // 静态口径：流式中实时读数；结束后停留最后一帧（RATE_HOLD_MS）；空闲/无数据 0.0。
   const shownTokens = held?.tokens ?? (active ? tokens : 0);
   const shownTps = held ? held.tps : active ? tps : null;
-  // 空闲时也占位：显示一个无色的 0，槽位不随流式开始/结束改变宽度。
-  if (!active && !held) {
-    return (
-      <div className="pointer-events-none flex shrink-0 items-center font-mono text-xs leading-none text-muted-foreground [font-variant-numeric:tabular-nums]">
-        0.0 t/s
-      </div>
-    );
-  }
+  // 空闲也走同一颗胶囊（浅灰底读 0.0）：槽位不随流式开始/结束改变形状与宽度。
   return (
     <div className="pointer-events-none flex items-center gap-1.5 font-mono text-xs leading-none text-muted-foreground [font-variant-numeric:tabular-nums]">
       <StreamRateBadge tokens={shownTokens} tps={shownTps} streaming={active} />

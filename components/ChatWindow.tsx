@@ -3,7 +3,7 @@ import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { isHiddenRelation } from "@/lib/session-family";
 import { ArrowDownIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from "lucide-react";
 import Image from "next/image";
-import { isValidElement, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { isValidElement, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";import type { StreamingStore } from "@/lib/streaming-message";import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
 import { splitNoticeText } from "@/lib/notice-text";
@@ -15,6 +15,7 @@ import { buildTurnActivityItems, getFinishedTurnView, headSegmentEndsTurn } from
 import { type WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
 import { dropMentionText, splitDroppedItems, uploadFiles, type DroppedItem } from "@/lib/file-upload-client";
+import { buildAtMentionText } from "@/lib/file-fuzzy";
 import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
 import { ActiveToolsContext, TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { MarkdownBody } from "./MarkdownBody";
@@ -662,50 +663,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const [atTail, setAtTail] = useState(true);
   const [pendingRevealEntryId, setPendingRevealEntryId] = useState<string | null>(null);
   const scrollerApiRef = useRef<ScrollerApi | null>(null);
-  // 折叠期间钉住滚动位置：展开/收起的块在锚点行下方改变高度，官方跟随会在尺寸
-  // 变化时把视口拉到新底，看起来就是「一打开就把内容推上去」。折叠是「在锚点行
-  // 下方长高」，scrollTop 不变即视口不动，所以钉住是安全的。`pi-web:trace-fold`
-  // 由 TraceRow 的 useFoldAnchor（折叠前钉住本行顶边）与 Reveal（通用展开块）
-  // 发出，窗口覆盖一次折叠动画（180ms）加余量；期间读者自己的手势立刻解钉。
-  const foldPinRef = useRef<number | null>(null);
-  const foldTimerRef = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const release = () => {
-      foldPinRef.current = null;
-      window.clearTimeout(foldTimerRef.current);
-    };
-    const onFold = () => {
-      const pin = foldPinRef.current ?? container.scrollTop;
-      foldPinRef.current = pin;
-      if (Math.abs(container.scrollTop - pin) > 0.5) container.scrollTop = pin;
-      window.clearTimeout(foldTimerRef.current);
-      foldTimerRef.current = window.setTimeout(() => {
-        foldPinRef.current = null;
-      }, 260);
-    };
-    const onScroll = () => {
-      const pin = foldPinRef.current;
-      if (pin !== null && Math.abs(container.scrollTop - pin) > 0.5) container.scrollTop = pin;
-    };
-    window.addEventListener("pi-web:trace-fold", onFold);
-    container.addEventListener("scroll", onScroll, { passive: true });
-    // 读者手势优先：滚轮、指针按下（含拖滚动条）、键盘翻页、触控滑动都立即解钉。
-    window.addEventListener("wheel", release, { passive: true });
-    window.addEventListener("pointerdown", release, { passive: true });
-    window.addEventListener("keydown", release);
-    window.addEventListener("touchmove", release, { passive: true });
-    return () => {
-      window.removeEventListener("pi-web:trace-fold", onFold);
-      container.removeEventListener("scroll", onScroll);
-      window.removeEventListener("wheel", release);
-      window.removeEventListener("pointerdown", release);
-      window.removeEventListener("keydown", release);
-      window.removeEventListener("touchmove", release);
-      window.clearTimeout(foldTimerRef.current);
-    };
-  }, [scrollContainerRef]);
   const messageContentRef = useRef<HTMLDivElement | null>(null);
   /** 上一页请求进行中。 */
   const loadingOlderRef = useRef(false);
@@ -1197,16 +1154,25 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     }
         }, [addNotice, chatInputRef, newSessionCwd, onFilesUploaded, session?.cwd, t]);
 
-  // 大文案粘贴（DeepSeek 同款）：超过阈值的粘贴文本不进输入框，包成 TXT 走
-  // 同一条 drop 上传链（上传到工作目录 + @mention 引用）。上传失败把原文插回
-  // 输入框，文案不丢。
+  // 大文案粘贴（DeepSeek 同款）：超过阈值的粘贴文本不进输入框，落到系统临时目录的
+  // `pi/pasted`（macOS 即 `/tmp/pi/pasted`）后再以 `@绝对路径` 引用。落盘不碰会话工作
+  // 目录，也不触发文件树刷新；写入失败把原文插回输入框，文案不丢。
   const onPasteLargeText = useCallback(async (text: string) => {
-    const now = new Date();
-    const pad = (value: number) => String(value).padStart(2, "0");
-    const name = `pasted-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.txt`;
-    const ok = await uploadDroppedFiles([new File([text], name, { type: "text/plain" })]);
-    if (!ok) chatInputRef?.current?.insertText(text);
-  }, [chatInputRef, uploadDroppedFiles]);
+    try {
+      const response = await fetch("/api/paste", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = (await response.json().catch(() => null)) as { path?: string } | null;
+      if (!response.ok || typeof data?.path !== "string") throw new Error(`HTTP ${response.status}`);
+      chatInputRef?.current?.insertText(buildAtMentionText(data.path, false));
+      addNotice({ type: "success", message: t("chat.pasteSaved", { path: data.path }) });
+    } catch (error) {
+      addNotice({ type: "warning", message: t("chat.pasteFailed", { message: error instanceof Error ? error.message : String(error) }) });
+      chatInputRef?.current?.insertText(text);
+    }
+  }, [addNotice, chatInputRef, t]);
 
   const onDrop = useCallback((items: DroppedItem[]) => {
     const { images, files, folders } = splitDroppedItems(items);
@@ -1834,7 +1800,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             key={extensionDialog.id}
             request={extensionDialog}
             waitingCount={waitingExtensionDialogCount}
-            queueTotal={extensionDialogQueue.length}
+            queueTotal={extensionDialogQueue.length + 1}
             answered={answeredDialogs}
             onRespond={handleDialogRespond}
           />
@@ -1857,11 +1823,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             </div>
           </div>
         ) : <>
-        {/* `autoScroll` 官方默认为 false：不显式打开，内容增长时视图不会自己贴底。
-            跟随只在两处松手：读者自己往上滚超过 `scrollEdgeThreshold`（120px，约一行半），
-            或者会话被切换。折叠动画那几帧由下面的 scrollTop 钉位拦住，不动这个开关——
-            一关它模式就无法回到 following-bottom，折叠期的尺寸变化反而会把读者抖出去。 */}
-        <MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold={120}>
+        {/* `autoScroll` 只在 agent 运行时打开：跟随的对象是流式输出。空闲时它恒为 false，
+            于是 `handleResize` 里的 `scrollToEnd()` 连条件都进不去——展开/收起折叠块的高度
+            变化交还给浏览器原生滚动锚定，锚点行纹丝不动。此前常开，折叠一展开就被当成
+            「又有新内容」顶上去（见 shadcn-ui/ui#11211 对同一现象的描述）。 */}
+        <MessageScrollerProvider autoScroll={agentRunning} defaultScrollPosition="end" scrollEdgeThreshold={120}>
         <ScrollerBridge apiRef={scrollerApiRef} onAtTailChange={setAtTail} />
         <MessageScroller className="min-h-0 min-w-0 flex-1 animate-in fade-in duration-150">
         <MessageScrollerViewport
@@ -2410,7 +2376,10 @@ function ExtensionDialog({
   const multiSelect = request.method === "input" ? parseMultiSelectPrompt(request.title) : null;
   // 选项型提问（select / multiSelect）用 shadcn base Questionnaire：radio/checkbox
   // 原生语义（方向键、空格内置），答案走 form 提交；底部确认按钮通过 form 属性
-  // 关联回来。
+  // 关联回来。表单 id 必须每个实例唯一：keep-alive 把切走的会话都留在 DOM 里，
+  // 字面量 id 会重名，而 `<Button form="…">` 只认文档里第一个——也就是另一个会话
+  // 那个隐藏表单，于是「确认」提交到别处、自己的 onSubmit 一次也不跑。
+  const formId = useId();
   const [collapsed, setCollapsed] = useState(false);
   // Multi-question asks page: ‹ › steps back through the answers already sent
   // (read-only review — those responses are with the agent) and forward to the
@@ -2543,7 +2512,7 @@ function ExtensionDialog({
           variant="ghost"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          className="pointer-events-auto flex h-auto w-full max-w-[min(560px,100%)] cursor-pointer items-center justify-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left font-normal text-foreground shadow-lg hover:bg-background hover:text-foreground"
+          className="pointer-events-auto flex h-auto w-full max-w-[min(560px,100%)] cursor-pointer items-center justify-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left font-normal text-foreground shadow-lg hover:bg-background hover:text-foreground dark:hover:bg-background"
         >
           <span className="shrink-0 text-xs font-[650] text-primary">
             {t("chat.extensionPending")}
@@ -2679,7 +2648,7 @@ function ExtensionDialog({
           )}
           {request.method === "select" && (
             <Questionnaire
-              id="extension-ask-form"
+              id={formId}
               className="gap-3"
               items={[{ name: "answer", required: true, choices: request.options.map((option) => ({ value: option })) }]}
               onSubmit={submitSelectForm}
@@ -2712,7 +2681,7 @@ function ExtensionDialog({
           )}
           {request.method === "input" && (multiSelect ? (
             <Questionnaire
-              id="extension-ask-form"
+              id={formId}
               className="gap-3"
               items={[{ name: "answer", choices: multiSelect.options.map((option) => ({ value: option.id })) }]}
               onSubmit={submitMultiForm}
@@ -2787,7 +2756,7 @@ function ExtensionDialog({
           ) : request.method === "select" || multiSelect ? (
             <Button
               type="submit"
-              form="extension-ask-form"
+              form={formId}
               autoFocus={request.method === "select" && request.options.length === 0}
             >
                {t("chat.confirm")}
@@ -2847,7 +2816,7 @@ function ExtensionCustomPanel({
           variant="ghost"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          className="pointer-events-auto flex h-auto w-full max-w-[min(920px,100%)] cursor-pointer items-center justify-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left font-normal text-foreground shadow-lg hover:bg-background hover:text-foreground"
+          className="pointer-events-auto flex h-auto w-full max-w-[min(920px,100%)] cursor-pointer items-center justify-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left font-normal text-foreground shadow-lg hover:bg-background hover:text-foreground dark:hover:bg-background"
         >
           <span className="shrink-0 text-xs font-[650] text-primary">
             {t("chat.extensionPending")}

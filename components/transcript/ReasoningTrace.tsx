@@ -20,7 +20,6 @@ import { useI18n } from "@/hooks/useI18n";
 import { COLLAPSIBLE_EXPANDED_EVENT, getFoldChoice, setToolCallExpanded } from "@/lib/tool-call-expansion";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import type { ThinkingContent } from "@/lib/types";
-import { useFoldAnchor } from "./TraceRow";
 
 /**
  * A thought (official `pattern_reasoning.md`): one line, the text inside the fold.
@@ -235,13 +234,13 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
     setExpanded(next);
     if (next) window.dispatchEvent(new Event(COLLAPSIBLE_EXPANDED_EVENT));
   }, [active, foldKey]);
-  const { rowRef, toggleFold } = useFoldAnchor(expanded, changeExpanded);
+  const rowRef = useRef<HTMLDivElement>(null);
 
   return (
     <Trace data-activity="thinking" ref={rowRef}>
       <TraceCollapsible
         open={expanded}
-        onOpenChange={() => toggleFold(!expanded)}
+        onOpenChange={() => changeExpanded(!expanded)}
         className="w-auto min-w-0 flex-[0_1_auto]"
       >
         <TraceCollapsibleTrigger

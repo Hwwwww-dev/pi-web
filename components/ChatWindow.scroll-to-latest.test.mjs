@@ -14,15 +14,13 @@ test("one scroll-to-latest control, and it is the official one", () => {
 });
 
 test("the official scroller owns following, prepend anchoring and the bottom edge", () => {
-  // autoScroll 打开：贴底时跟随、向上滚动即脱开、程序滚动期间由它自己标记
-  // （data-autoscrolling）。行窗口与手工前插保位都已删除，因此这里不能再有
-  // 自己的跟随状态机。折叠动画期间用 scrollTop 钉位拦住跳底（`pi-web:trace-fold`），
-  // 不关 autoScroll——关掉它模式就回不到 following-bottom，反而把读者抖出跟随。
-  assert.match(source, /<MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
-  assert.match(source, /addEventListener\("pi-web:trace-fold"/);
-  // 折叠期不能改 autoScroll，也不能没有钉位。
-  assert.doesNotMatch(source, /autoScroll=\{!foldInFlight\}|autoScroll=\{false\}/);
-  assert.match(source, /foldPinRef/);
+  // autoScroll 只在 agent 运行时打开：跟随的对象是流式输出。空闲时它恒为 false，
+  // 折叠展开的高度增长就进不了 `handleResize` 的 `scrollToEnd()`，也不会把展开块
+  // 顶出视口。行窗口与手工前插保位都已删除，因此这里不能再有自己的跟随状态机。
+  assert.match(source, /<MessageScrollerProvider autoScroll=\{agentRunning\} defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  // 折叠不再自带钉位：既不写 scrollTop，也不再有 pi-web:trace-fold 这条契约。
+  assert.doesNotMatch(source, /foldPinRef|pi-web:trace-fold/);
+  assert.doesNotMatch(source, /autoScroll=\{false\}|autoScroll=\{!foldInFlight\}/);
   assert.doesNotMatch(source, /useChatFollow|chat-follow|lib\/scroll-anchor/);
   // Hand-rolled compensation must not sit next to the official one.
   assert.equal(source.includes("preserveScrollOnPrepend={false}"), false);

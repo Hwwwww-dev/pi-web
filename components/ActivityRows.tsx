@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useSyncExternalStore, isValidElement, memo, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, useSyncExternalStore, isValidElement, memo, useMemo, useState, type ReactNode } from "react";
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import type { ActiveToolsStore } from "@/lib/active-tools";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,6 @@ import { formatFullTimestamp, formatUsage, type ActivityItem, type StepUsage, ty
 import { UsageBar } from "./UsageBar";
 import { Reveal } from "@/components/Reveal";
 import { ReasoningTrace } from "./transcript/ReasoningTrace";
-import { useFoldAnchor } from "./transcript/TraceRow";
 import { SourcesTrace } from "./transcript/SourcesTrace";
 import { PlanTrace } from "./transcript/PlanTrace";
 import { QuestionTrace } from "./transcript/QuestionTrace";
@@ -359,7 +358,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
   const isHiddenDisplay = message.display === false;
   // 自定义事件默认收起（第 4.1 节）：打开会话时不占用版面。
   const [expanded, setExpanded] = useState(false);
-  const { rowRef, toggleFold } = useFoldAnchor(expanded, setExpanded);
+  const rowRef = useRef<HTMLDivElement>(null);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const text = getMessageText(message.content);
@@ -385,7 +384,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
       <div className="flex max-w-full min-w-0 items-center gap-1 bg-background">
         <TraceCollapsible
           open={expanded}
-          onOpenChange={toggleFold}
+          onOpenChange={setExpanded}
           className="w-auto min-w-0 flex-[0_1_auto]"
         >
           <TraceCollapsibleTrigger>
@@ -483,7 +482,7 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const { rowRef, toggleFold } = useFoldAnchor(expanded, setExpanded);
+  const rowRef = useRef<HTMLDivElement>(null);
   const summary = getMessageText(message.content);
   const parsedSummary = useMemo(() => parseCompactionSummary(summary), [summary]);
   const tokensBefore = (message.details as { tokensBefore?: unknown } | undefined)?.tokensBefore;
@@ -497,7 +496,7 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
 
   return (
     <Trace data-activity-custom="compaction" ref={rowRef}>
-      <TraceCollapsible open={expanded} onOpenChange={toggleFold}>
+      <TraceCollapsible open={expanded} onOpenChange={setExpanded}>
         <TraceCollapsibleTrigger title={expanded ? t("i18n.collapse") : t("i18n.expand")}>
           <TraceLine>
             <TraceIcon><ToolCategoryIcon category="compact" /></TraceIcon>

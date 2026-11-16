@@ -78,13 +78,23 @@ test("queues concurrent requests and pages over pending ones", () => {
 
 test("select answers are two-step: click selects, confirm sends", () => {
   // shadcn base Questionnaire：点击仅选中（radio），表单提交才发送；双击选项直接发送。
-  assert.match(dialogSource, /<Questionnaire\s+id="extension-ask-form"[\s\S]*?items=\{\[\{ name: "answer", required: true,[\s\S]*?onSubmit=\{submitSelectForm\}/);
+  assert.match(dialogSource, /<Questionnaire\s+id=\{formId\}[\s\S]*?items=\{\[\{ name: "answer", required: true,[\s\S]*?onSubmit=\{submitSelectForm\}/);
   assert.match(dialogSource, /<QuestionnaireItem name="answer" required>/);
   assert.match(dialogSource, /<QuestionnaireChoice[\s\S]*?onDoubleClick=\{\(\) => onRespond\(request, \{ value: option \}\)\}/);
   assert.match(
     dialogSource,
     /const selected = Array\.from\(new FormData\(event\.currentTarget\)\.values\(\)\)\.map\(String\)\.find\(\(v\) => v\.length > 0\);\s*\n\s*if \(selected !== undefined\) onRespond\(request, \{ value: selected \}\);/,
   );
+});
+
+test("every extension form id is per instance, so 确认 submits its own form", () => {
+  // keep-alive 把切走的会话都留在 DOM 里，字面量 id 会在文档里重名，
+  // `form="…"` 只认第一个——「确认」于是提交到另一个会话的隐藏表单（required →
+  // 全红）而自己的 onSubmit 一次也不跑。
+  assert.match(dialogSource, /const formId = useId\(\);/);
+  assert.doesNotMatch(dialogSource, /extension-ask-form/);
+  assert.equal(dialogSource.match(/id=\{formId\}/g)?.length, 2);
+  assert.match(dialogSource, /<Button\s+type="submit"\s+form=\{formId\}/);
 });
 
 test("shows how many extension requests wait behind the one on screen", () => {

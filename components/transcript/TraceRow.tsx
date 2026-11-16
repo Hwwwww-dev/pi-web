@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { UsageBar } from "@/components/UsageBar";
 import type { StepUsage } from "@/lib/turn-view";
@@ -35,48 +35,6 @@ const STATUS_ATTR = {
   pending: "pending",
   done: undefined,
 } as const;
-
-/** The nearest ancestor that actually scrolls — the message list's viewport. */
-function scrollParentOf(element: HTMLElement): HTMLElement | null {
-  let node = element.parentElement;
-  while (node) {
-    const overflowY = getComputedStyle(node).overflowY;
-    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node;
-    node = node.parentElement;
-  }
-  return null;
-}
-
-/**
- * 展开/收起时行保持原位，内容在其下方增长：否则列表在收起时上跳、展开时滑到底部。
- * 锚定的是本行顶边，在布局阶段测量、绘制之前应用；同时派发 `pi-web:trace-fold`
- * 通知列表在这几帧禁用贴底跟随。TraceRow 与 TurnTrace、ReasoningTrace、
- * CustomRow、CompactionRow 共用。
- */
-export function useFoldAnchor(open: boolean, onOpenChange: (next: boolean) => void) {
-  const rowRef = useRef<HTMLDivElement>(null);
-  const pinRef = useRef<{ container: HTMLElement; top: number } | null>(null);
-  const toggleFold = useCallback(
-    (next: boolean) => {
-      const row = rowRef.current;
-      const container = row ? scrollParentOf(row) : null;
-      if (row && container) pinRef.current = { container, top: row.getBoundingClientRect().top };
-      // 通知列表本行正在折叠：这几帧禁用贴底跟随，否则展开的行会被拉上去。
-      window.dispatchEvent(new Event("pi-web:trace-fold"));
-      onOpenChange(next);
-    },
-    [onOpenChange],
-  );
-  useLayoutEffect(() => {
-    const pin = pinRef.current;
-    pinRef.current = null;
-    const row = rowRef.current;
-    if (!pin || !row || !pin.container.isConnected) return;
-    const delta = row.getBoundingClientRect().top - pin.top;
-    if (delta !== 0) pin.container.scrollTop += delta;
-  }, [open]);
-  return { rowRef, toggleFold };
-}
 
 /**
  * Fold state for one row. `foldKey` keeps the user's choice across remounts
@@ -170,7 +128,7 @@ export function TraceRow({
   activityTool?: string;
 }) {
   const { open, onOpenChange } = useTraceFold(foldKey, defaultOpen);
-  const { rowRef, toggleFold } = useFoldAnchor(open, onOpenChange);
+  const rowRef = useRef<HTMLDivElement>(null);
   // 文件胶囊与行本身均为按钮，HTML 不允许按钮嵌套（移动端内层还会截获点击）。
   // 因此有展开内容时，行按钮只承载文字，胶囊作为其兄弟节点置于行尾并对齐。
   const line = (withChips: boolean, withTrailing = true) => (
@@ -210,11 +168,11 @@ export function TraceRow({
 
   return (
     <Trace ref={rowRef} data-activity="trace-row" data-activity-tool={activityTool}>
-      <TraceCollapsible open={open} onOpenChange={toggleFold}>
+      <TraceCollapsible open={open} onOpenChange={onOpenChange}>
         {/* 行内间距与触发区一致（gap-1）：有无胶囊的行，箭头前留白必须相同。 */}
         <div className="flex w-full max-w-full items-center gap-1">
           {/* 触发区仅覆盖文字：胶囊紧跟动作名，不被 flex-1 推到行尾。胶囊为按钮，不可
-              嵌套于触发按钮内，故触发区不绘制箭头，箭头改为胶囊后的兄弟按钮（同样调 toggleFold）。 */}
+              嵌套于触发按钮内，故触发区不绘制箭头，箭头改为胶囊后的兄弟按钮（同样调 onOpenChange）。 */}
           <TraceCollapsibleTrigger
             aria-label={ariaLabel}
             className="min-w-0 max-w-full"
@@ -233,7 +191,7 @@ export function TraceRow({
               type="button"
               variant="ghost"
               size="icon-xs"
-              onClick={() => toggleFold(!open)}
+              onClick={() => onOpenChange(!open)}
               aria-expanded={open}
               aria-label={ariaLabel}
               className="size-4 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground [&_svg]:size-3.5!"
