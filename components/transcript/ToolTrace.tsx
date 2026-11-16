@@ -251,9 +251,9 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             variant="outline"
             size="xs"
             disabled={!resolved}
-            // 胶囊为文件名设定上限：手机端更窄（约半屏），超长文件名自身省略，
-            // 避免将前置动作名与后置 +N/-N 挤出可见区。
-            className="min-w-0 shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
+            // 胶囊是行内最先收缩的片段：工具名与 +N/-N 都不可挤压，空间不足时
+            // 文件名自身省略（右缘一小段渐变淡出，不再硬边）。
+            className="relative min-w-0 shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
             title={resolved ?? path}
             aria-label={label}
             onClick={(event) => {
@@ -263,7 +263,10 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             }}
           >
             <FileTextIcon className="size-3 shrink-0" />
-            <span className="min-w-0 truncate">{label}</span>
+            <span className="relative min-w-0">
+              <span className="block truncate">{label}</span>
+              <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-r from-transparent to-background" />
+            </span>
           </Button>
         );
       })}

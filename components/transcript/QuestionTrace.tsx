@@ -40,6 +40,7 @@ export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey
       defaultOpen
       status={steps.length > 0 && answered === steps.length ? "done" : undefined}
       ariaLabel={title}
+      wrap
       content={(
         <Trace>
           {steps.map((step, index) => {

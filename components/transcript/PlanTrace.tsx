@@ -44,6 +44,7 @@ export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool,
       stepUsage={stepUsage}
       defaultOpen
       ariaLabel={title}
+      wrap
       content={(
         <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
           <Trace>

@@ -7,7 +7,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Item } from "@/components/ui/item"
-import { ChevronRightIcon } from "lucide-react"
 
 function Trace({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -115,12 +114,8 @@ function TraceCollapsible({
 function TraceCollapsibleTrigger({
   className,
   children,
-  showChevron = true,
   ...props
-}: React.ComponentProps<typeof CollapsibleTrigger> & {
-  /** 行尾还有胶囊时，箭头得跟在胶囊后面：由调用方在外面自己画一个。 */
-  showChevron?: boolean;
-}) {
+}: React.ComponentProps<typeof CollapsibleTrigger>) {
   return (
     <CollapsibleTrigger
       data-slot="trace-collapsible-trigger"
@@ -131,11 +126,6 @@ function TraceCollapsibleTrigger({
       {...props}
     >
       {children}
-      {showChevron && (
-        <TraceIcon className="transition-transform group-aria-expanded/trace-collapsible-trigger:rotate-90">
-          <ChevronRightIcon />
-        </TraceIcon>
-      )}
     </CollapsibleTrigger>
   )
 }
