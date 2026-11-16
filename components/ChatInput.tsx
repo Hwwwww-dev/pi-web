@@ -2276,7 +2276,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         <Reveal open={Boolean(queuedSubmissions && queuedSubmissions.length > 0)}>
         {queuedSubmissions && queuedSubmissions.length > 0 && (
           <div className="flex w-full min-w-0 max-w-full flex-col gap-1.5 px-[13px] max-sm:px-[9px]">
-            <div className="flex min-w-0 max-w-full flex-col items-stretch gap-1.5 px-[3px] py-0.5">
+            {/* 行外层只留右侧内边距：左侧归零，白胶囊与下面“展开/收起”按钮、
+                消息文字的左边缘对齐（原来这里再缩 3px，引导胶囊看起来陷在右边）。 */}
+            <div className="flex min-w-0 max-w-full flex-col items-stretch gap-1.5 py-0.5 pr-[3px]">
               {(queueExpanded ? queuedSubmissions : queuedSubmissions.slice(0, QUEUE_PREVIEW_ROWS)).map((item, index) => (
                 // `w-full` on a block wrapper gives the pill a definite width to
                 // measure `max-w-full` against; as a bare `self-start` flex item
