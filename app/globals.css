@@ -1589,21 +1589,28 @@ span.token.table {
   container-type: inline-size;
 }
 
-/* 浮动 composer：停靠区背后的内容渐隐层。元素铺满整个停靠区并向上延伸
-   48px，颜色取消息区背景（--background），自屏幕底边向上连续淡出——状态行、
-   卡片、胶囊区之间的空隙不再透出亮字断层；纯渐变无模糊，不引入逐帧 filter
-   开销。 */
+/* 浮动 composer：停靠区背后的内容渐隐层。元素铺满整个停靠区、向下越过
+   安全区贴到屏幕底边、向上延伸 96px（容纳实心终点之上的整段渐隐）。梯度
+   两段：从屏幕底边到 --composer-fade-solid（层底到输入壳层顶边，含安全区，
+   由 ChatWindow 实测）完全不透明——速率行、卡片、TODO/YOLO 行、安全区都
+   不透出背后文字；到 --composer-fade-end（实心终点 +96px）渐隐到透明。
+   停靠点只用 var 引用：calc(var()+env()) 形式在渐变停靠点上会被丢弃，
+   实心段会失效。 */
 .chat-composer-fade {
-  background: linear-gradient(to top, var(--background), transparent);
+  background: linear-gradient(
+    to top,
+    var(--background) var(--composer-fade-solid, 160px),
+    transparent var(--composer-fade-end, 256px)
+  );
 }
 
 /* While the software keyboard is up (set by useViewportHeight), only a few
-   hundred pixels remain above it. Hand them to the conversation: hide a fresh
-   composer's project bar and drop the home indicator inset the keyboard
-   already covers. Nothing in the composer area itself is ever hidden — the
-   pill row's hide rule shoved the send button left, and hiding the status
-   shelf made the bottom row vanish and come back with every keyboard open —
-   both are gone. Phone landscape is wider than the mobile breakpoint but
+   hundred pixels remain above it. Hand them to the conversation: drop the
+   home indicator inset the keyboard already covers. Nothing is ever hidden —
+   the pill row's hide shoved the send button left, hiding the status shelf
+   made the bottom row vanish and come back with every keyboard open, and a
+   fresh composer's project bar hid its branch picker on every focus — all
+   three are gone. Phone landscape is wider than the mobile breakpoint but
    leaves the least room of all, so short touch screens opt in too; tablets
    keep their controls because the keyboard leaves them enough height. */
 @media (max-width: 640px), (pointer: coarse) and (max-height: 500px) {
@@ -1617,10 +1624,6 @@ span.token.table {
   }
   html[data-keyboard-open] .chat-input-shell {
     padding-bottom: 6px !important;
-  }
-  /* Tapping it would close the keyboard anyway. */
-  html[data-keyboard-open] .new-session-context {
-    display: none !important;
   }
 }
 

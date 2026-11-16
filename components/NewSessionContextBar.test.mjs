@@ -45,7 +45,7 @@ function render(props = {}) {
 test("the bar shows the project's name and the worktree's branch as two menu buttons", () => {
   const html = render();
   // No visible label: the folder icon says what the row is; the group keeps its name.
-  assert.match(html, /^<div class="new-session-context [^"]*"><div class="project-picker is-inline [^"]*" role="group" aria-label="New session location"><button /);
+  assert.match(html, /^<div class="flex [^"]*"><div class="project-picker is-inline [^"]*" role="group" aria-label="New session location"><button /);
   assert.equal((html.match(/New session location/g) ?? []).length, 1);
   // The project: a 12px folder icon, its name in code type, a chevron; the
   // full path is the tooltip (and the menu's rows), never the button's text.
@@ -59,7 +59,7 @@ test("the bar shows the project's name and the worktree's branch as two menu but
   assert.doesNotMatch(main, /project-picker-note|is-linked/);
   assert.doesNotMatch(html, /project-picker-note|project-picker-divider|style=/);
   // The side padding is the header's (ChatWindow), on phones too.
-  assert.match(render({ mobile: true }), /^<div class="new-session-context [^"]*"><div class="project-picker is-inline [^"]*"/);
+  assert.match(render({ mobile: true }), /^<div class="flex [^"]*"><div class="project-picker is-inline [^"]*"/);
 });
 
 test("the project's name is the menus': its display name, else its folder's, its parent only where names collide", () => {
@@ -95,7 +95,7 @@ test("client code stays parseable by Safari 16.2", () => {
   // The hero centres the row under the brand lockup now (ChatWindow wraps it
   // in a justify-center flex), so the old left-edge pull is gone: the row's
   // margin carries no horizontal component.
-  const row = source.match(/new-session-context ([^"]*)/);
+  const row = source.match(/"flex min-w-0 flex-nowrap ([^"]*)"/);
   assert.ok(row);
   assert.doesNotMatch(row[1], /-?mx-|-?ml-|-?mr-/, "no horizontal margin on the bar");
   // The inline boxes never take a share of the row (60% of a lone project

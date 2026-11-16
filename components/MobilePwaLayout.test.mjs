@@ -13,7 +13,6 @@ const codeBlockPrimitiveSource = await readFile(new URL("./ui/code-block.tsx", i
 const mcpConfigSource = await readFile(new URL("./McpConfig.tsx", import.meta.url), "utf8");
 const mcpSignInSource = await readFile(new URL("./McpSignIn.tsx", import.meta.url), "utf8");
 const mcpAddSource = await readFile(new URL("./McpAddServer.tsx", import.meta.url), "utf8");
-const newSessionBarSource = await readFile(new URL("./NewSessionContextBar.tsx", import.meta.url), "utf8");
 const layoutSource = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const appShellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 const settingsPanelSource = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
@@ -154,21 +153,19 @@ test("every class the keyboard-open rules target exists on its component", () =>
   assert.match(extensionStatusBarSource, /className="extension-status-bar /);
   assert.match(chatWindowSource, /className="chat-content /);
   // Phone landscape exceeds the 640px breakpoint but has the least height.
-  // Nothing in the composer area is hidden by the keyboard rules any more:
-  // the pill row's hide dropped the send button to the row's left edge, and
-  // the status shelf's hide made the bottom row vanish while typing.
+  // Nothing is hidden by the keyboard rules any more: the pill row's hide
+  // dropped the send button to the row's left edge, the status shelf's hide
+  // made the bottom row vanish while typing, and a fresh composer's project
+  // bar hid its branch picker on every focus.
   assert.doesNotMatch(cssSource, /html\[data-keyboard-open\] \.chat-input-controls/);
   assert.doesNotMatch(cssSource, /html\[data-keyboard-open\] \.extension-status-bar/);
+  assert.doesNotMatch(cssSource, /html\[data-keyboard-open\] \.new-session-context/);
   assert.match(cssSource, /html\[data-keyboard-open\] \.chat-content \{\s*padding-bottom: 0 !important;/);
   assert.match(cssSource, /html\[data-keyboard-open\] \.chat-input-shell \{\s*padding-bottom: 6px !important;/);
   // While streaming with an empty composer the main button stops the run.
   assert.match(chatInputSource, /aria-label=\{t\("chat\.stopAgent"\)\}/);
-  // A fresh composer's project bar goes too, in a rule of its own inside the same query.
-  assert.match(newSessionBarSource, /<div className="new-session-context[ "]/);
-  assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{[^@]*?html\[data-keyboard-open\] \.new-session-context \{\s*display: none !important;/);
   // Mobile send is icon-only but keeps an accessible name.
   assert.match(chatInputSource, /aria-label=\{t\("chat\.send"\)\}/);
-  assert.match(newSessionBarSource, /<div className="new-session-context[ "]/);
 });
 
 test("every .mcp-* rule in settings.css matches a class the MCP panel renders", () => {
