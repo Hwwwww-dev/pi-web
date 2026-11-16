@@ -201,7 +201,10 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
         onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}
         onInteractOutside={(event) => { if (busy) event.preventDefault(); }}
         className={cn(
-          "directory-picker-panel relative flex h-[min(620px,calc(100dvh-16px))] max-h-[calc(100dvh-16px)] w-[520px] max-w-[calc(100vw-16px)] sm:max-w-[calc(100vw-16px)] flex-col gap-0 overflow-hidden p-0",
+          // 不加 relative：与基类的 fixed 冲突（tailwind-merge 后者被吃），定位
+          // 从视口居中跌回流内位置——移动端落到 Sheet 内容末尾、PC 被侧栏
+          // overflow-hidden 裁没。内层 absolute 遮罩的定位由 fixed 提供。
+          "directory-picker-panel flex h-[min(620px,calc(100dvh-16px))] max-h-[calc(100dvh-16px)] w-[520px] max-w-[calc(100vw-16px)] sm:max-w-[calc(100vw-16px)] flex-col gap-0 overflow-hidden p-0",
           panelSurfaceClass,
         )}
       >
