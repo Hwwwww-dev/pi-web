@@ -672,6 +672,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
    */
   // 必须由真实手势重新武装：初值 false，打开会话不会自己取页。
   const autoLoadArmedRef = useRef(false);
+  /**
+   * 一页落地后挂起自动取页，直到读者真的离开顶部（`scrollTop > TOP_SLACK`）。
+   * 前插不改变 `scrollTop`：刚加载完仍在顶部时，任何一次向下滚也会武装、
+   * 紧接着判成贴顶再取一页，把读者眼前的内容整块顶下去。
+   */
+  const autoLoadSuspendedRef = useRef(false);
   /** 上一次自动取页的时刻，用于拦截同一串滚动事件里的连续取页。 */
   const lastAutoLoadAtRef = useRef(0);
   /**
@@ -973,13 +979,19 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 贴顶时自动加载下一页。IntersectionObserver 仅在交叉状态变化时回调，哨兵持续可见
   // 时不再上报，故改为监听 scroll：只有真实手势（拖拽/滚轮/键盘滚动）先武装、随后
   // 贴顶的那一次滚动才会取页；程序化滚动（还原写回、前插锚点写入、键盘推挤、
-  // 惯性收尾）永不取页。
+  // 惯性收尾）永不取页。手势还必须带方向：往上翻历史才取页，往下滑不武装。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!sentinel || !container) return;
     const attempt = () => {
       // 隐藏槽位、正在写回位置的帧、以及等待分页锚点落地的会话均不计为贴顶。
       if (scrollRestoringRef.current || pendingScrollRestoreRef.current || !activeRef.current) return;
+      // 一页落地后先挂起：前插不改 scrollTop，读者还在顶部时往下滑也算“贴顶”，
+      // 一武装就会再取一页，把眼前的内容整块顶下去。离开顶部即恢复。
+      if (autoLoadSuspendedRef.current) {
+        if (container.scrollTop <= TOP_SLACK) return;
+        autoLoadSuspendedRef.current = false;
+      }
       // 闸门核心：消费制。程序化滚动不武装，只有 arm 过的那一次贴顶滚动才取一页。
       // 此前漏检导致内容不满一屏（scrollTop 恒 0）时任何滚动事件都连环取页。
       if (!autoLoadArmedRef.current) return;
@@ -989,6 +1001,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       if (performance.now() - lastAutoLoadAtRef.current < AUTO_LOAD_MIN_INTERVAL_MS) return;
       autoLoadArmedRef.current = false;
       lastAutoLoadAtRef.current = performance.now();
+      autoLoadSuspendedRef.current = true;
       // Fetch the previous page from the server and prepend it. 前插保位由官方 scroller
       // 的 `preserveScrollOnPrepend` 负责：它按 `messageId` 记住视口边缘那一行，
       // 新页落地后把同一行放回原位，并跟随后续长高。
@@ -1010,25 +1023,46 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         attempt();
       });
     };
-    // 只在真实滚动意图下重新武装：前插后的锚点写入、位置还原都会触发 scroll，若以
-    // scroll 作为武装信号，一次手势即可连续取页。用 touchmove 而非 touchstart/pointerdown：
+    // 只在“向上翻历史”的意图下重新武装，而且必须分方向：往下滚轮、手指上推、
+    // 按 ArrowDown/PageDown/End 都是在往回读，不该把闸门打开（否则向下滑也会取一页）。
+    // 前插后的锚点写入、位置还原都会触发 scroll，若以 scroll 作为武装信号，
+    // 一次手势即可连续取页。用 touchmove 而非 touchstart/pointerdown：
     // 点按折叠头、长按复制不产生拖拽，不该武装。
     const arm = () => {
       autoLoadArmedRef.current = true;
     };
+    let touchY: number | null = null;
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) arm();
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY;
+      if (y === undefined) return;
+      // 手指下移 = 内容往回走 = 在读更早的历史。
+      if (touchY !== null && y > touchY) arm();
+      touchY = y;
+    };
+    const onTouchEnd = () => {
+      touchY = null;
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Home") arm();
+    };
     container.addEventListener("scroll", onScroll, { passive: true });
-    container.addEventListener("wheel", arm, { passive: true });
-    container.addEventListener("touchmove", arm, { passive: true });
-    container.addEventListener("keydown", arm);
+    container.addEventListener("wheel", onWheel, { passive: true });
+    container.addEventListener("touchmove", onTouchMove, { passive: true });
+    container.addEventListener("touchend", onTouchEnd, { passive: true });
+    container.addEventListener("keydown", onKeyDown);
     // 首次也尝试一次（贴顶打开的会话不会触发滚动事件）；闸门放行导致的重建只有在
     // 武装时才会再试，否则会连跳多页。
     // 挂载时不自动取页：贴顶打开的会话应当就停在首屏那几轮，往上滑才续。
     // （之前这里会 attempt 一次，effect 每次重建又重复，打开就被拉成十几轮。）
     return () => {
       container.removeEventListener("scroll", onScroll);
-      container.removeEventListener("wheel", arm);
-      container.removeEventListener("touchmove", arm);
-      container.removeEventListener("keydown", arm);
+      container.removeEventListener("wheel", onWheel);
+      container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("touchend", onTouchEnd);
+      container.removeEventListener("keydown", onKeyDown);
       if (frame) cancelAnimationFrame(frame);
     };
     // `olderPageState` 为刻意依赖：上一页落地并绘制后 effect 重建，重挂监听并让
@@ -1842,26 +1876,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             onPointerUp={captureQuotedSelection}
             className="min-h-0 gap-[var(--chat-row-gap)] pt-[22px] pb-[calc(var(--composer-dock-h,0px)+8px)] max-sm:pt-4"
           >
-            {hasMoreRendered && (
-              // 手动入口：自动加载需等上一页渲染完成，此按钮允许随时请求一页。
-              <Button
-                // 该行固定在内容顶部，翻页时不移动。
-                ref={setSentinel}
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  if (loadingOlderRef.current || pageRenderingRef.current) return;
-                  const sid = session?.id ?? sessionIdRef.current;
-                  if (!sid || !historyCursor) return;
-                  void loadOlderPage(sid, historyCursor);
-                }}
-                disabled={olderPageState !== "idle"}
-                data-state={olderPageState}
-                className="mx-auto block h-auto rounded-lg px-3 py-3 text-xs font-normal text-muted-foreground hover:bg-transparent hover:text-foreground disabled:opacity-60"
-              >
-                {olderPageState === "idle" ? t("chat.loadEarlier") : t("chat.loadingEarlier")}
-              </Button>
-            )}
+            {/* “加载更早”排在 Content 子元素的最后、用 CSS `order-first` 放到最上面：
+                官方的前插保位判定是「原先的首个子元素是否移到了 index > 0」，
+                它若占在 DOM 首位则永远不动，`preserveScrollOnPrepend` 永不生效，
+                前插就变成「内容往上塞、眼前整块往下掉」。视觉位置由 order 保持。 */}
             {turnRendered.map((node, index) => {
               // 每条消息一个 Item：官方据此测量、锚定并记录可视性。
               // 离屏行不做 `content-visibility` 跳过：估算高度会让新行先矮再撑开。非元素行（空渲染）原样返回。
@@ -1910,6 +1928,26 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             )}
 
             </ChatRow>
+            {hasMoreRendered && (
+              // 手动入口：自动加载需等上一页渲染完成，此按钮允许随时请求一页。
+              // 位置见上方注释：DOM 末位 + `order-first`。
+              <Button
+                ref={setSentinel}
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  if (loadingOlderRef.current || pageRenderingRef.current) return;
+                  const sid = session?.id ?? sessionIdRef.current;
+                  if (!sid || !historyCursor) return;
+                  void loadOlderPage(sid, historyCursor);
+                }}
+                disabled={olderPageState !== "idle"}
+                data-state={olderPageState}
+                className="order-first mx-auto block h-auto rounded-lg px-3 py-3 text-xs font-normal text-muted-foreground hover:bg-transparent hover:text-foreground disabled:opacity-60"
+              >
+                {olderPageState === "idle" ? t("chat.loadEarlier") : t("chat.loadingEarlier")}
+              </Button>
+            )}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <MessageScrollerButton
