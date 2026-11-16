@@ -1233,12 +1233,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     }
   }, [addNotice, chatInputRef, t]);
 
-  // 💡灵感「实现」：文本与图片装进输入框（不自动发送），焦点回到输入框。
-  const handleImplementInspiration = useCallback((text: string, images: File[]) => {
+  // 💡灵感「实现」：文本与附件装进输入框（不自动发送），焦点回到输入框。
+  // 图片走附件胶囊；其余文件走拖拽同一条上传链——工作目录已有同名文件时引用
+  // 原路径（skip），否则落盘复制后 @mention。远程客户端同样只是字节数据，链路一致。
+  const handleImplementInspiration = useCallback((text: string, images: File[], files: File[]) => {
     if (text) chatInputRef?.current?.insertText(text);
     if (images.length > 0) chatInputRef?.current?.addImages(images);
+    if (files.length > 0) void uploadDroppedFiles(files);
     chatInputRef?.current?.focus();
-  }, [chatInputRef]);
+  }, [chatInputRef, uploadDroppedFiles]);
 
   const onDrop = useCallback((items: DroppedItem[]) => {
     const { images, files, folders } = splitDroppedItems(items);

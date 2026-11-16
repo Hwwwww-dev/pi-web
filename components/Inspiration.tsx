@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeftIcon, ImagePlusIcon, LightbulbIcon, PencilIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftIcon, FileIcon, ImagePlusIcon, LightbulbIcon, PencilIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/i18n/format";
-import { MAX_ATTACHED_IMAGE_BYTES, MAX_ATTACHED_IMAGES } from "@/lib/image-attachments";
-import type { InspirationItem } from "@/lib/inspirations";
+import { MAX_ATTACHED_IMAGES } from "@/lib/image-attachments";
+import { MAX_INSPIRATION_FILE_BYTES, type Inspiration, type InspirationFileRef } from "@/lib/inspirations";
 import type { Locale } from "@/lib/i18n/types";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,37 +15,45 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
  * 💡灵感的核心界面（pi-web 独有），与容器无关——今天挂在 dialog 里，明天也
  * 可以挂进任何面板；这里没有 dialog 假设，壳（关闭钮、圆角、遮罩）由容器负责。
  * 三个视图：列表（灵感/历史/已删除 三个 Tab）、新建页、编辑页。新建与编辑都
- * 自动保存（输入停顿后落盘，返回或卸载前冲刷），没有保存按钮。列表行按 Tab
- * 给出 实现/编辑/完成/删除、重新挂入/删除、恢复/彻底删除。「实现」把文本与
- * 图片交给 onImplement（通常是输入框），绝不自动发送。
+ * 自动保存（输入停顿后落盘，返回或卸载前冲刷），没有保存按钮。附件收图片与
+ * 任意文件（≤10MB），点选、粘贴、拖拽三条路都进。列表行按 Tab 给出 实现/
+ * 编辑/完成/删除、重新挂入/删除、恢复/彻底删除。「实现」把文本与附件交给
+ * onImplement（通常是输入框），绝不自动发送。
  */
 
 type TabValue = "active" | "done" | "deleted";
 
-interface PendingImage {
+/** 与服务端 serve 路由同一张 inline 白名单：只有它渲染缩略图，其余都是文件 chip。 */
+const INLINE_IMAGE_PATTERN = /^image\/(png|jpeg|gif|webp)$/;
+
+interface PendingFile {
   file: File;
-  previewUrl: string;
+  previewUrl: string | null;
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
 /** 列表缩略图最多展示几张，其余并入计数。 */
 const MAX_ROW_THUMBNAILS = 4;
 
-function imageUrl(imageId: string): string {
-  return `/api/inspirations/images/${imageId}`;
+function fileUrl(fileId: string): string {
+  return `/api/inspirations/files/${fileId}`;
+}
+
+function isInlineImage(mime: string): boolean {
+  return INLINE_IMAGE_PATTERN.test(mime);
 }
 
 export function Inspiration({ sessionId, onImplement, onClose, className }: {
   /** 会话隔离：无会话时不挂入口，此值恒有。 */
   sessionId: string;
-  /** 文本与图片回到输入框（不自动发送）；由持有 composer 接口的一方接线。 */
-  onImplement: (text: string, images: File[]) => void;
+  /** 文本与附件回到输入框（不自动发送）；由持有 composer 接口的一方接线。 */
+  onImplement: (text: string, images: File[], files: File[]) => void;
   /** 实现成功后容器如何退场（如关闭弹窗）；不传则只做核心内部的导航。 */
   onClose?: () => void;
   className?: string;
 }) {
   const { t, locale } = useI18n();
-  const [items, setItems] = useState<InspirationItem[] | null>(null);
+  const [items, setItems] = useState<Inspiration[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabValue>("active");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -54,26 +62,26 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
 
   // 编辑器状态（新建与编辑共用一页）。已存文本 ref 用来判断 PATCH 是否需要发。
   const [editorText, setEditorText] = useState("");
-  const [editorImages, setEditorImages] = useState<string[]>([]);
-  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [editorFiles, setEditorFiles] = useState<InspirationFileRef[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const editorItemIdRef = useRef<string | null>(null);
   const savedTextRef = useRef("");
   const editorTextRef = useRef("");
-  const pendingImagesRef = useRef<PendingImage[]>([]);
+  const pendingFilesRef = useRef<PendingFile[]>([]);
   const saveTimerRef = useRef(0);
   const savingRef = useRef(false);
   const resaveRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   editorTextRef.current = editorText;
-  pendingImagesRef.current = pendingImages;
+  pendingFilesRef.current = pendingFiles;
 
   const refresh = useCallback(async () => {
     try {
       const res = await fetch(`/api/inspirations/${sessionId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { items: InspirationItem[] };
+      const data = await res.json() as { items: Inspiration[] };
       setItems(data.items);
       setError(null);
     } catch (err) {
@@ -95,7 +103,7 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
       return;
     }
     const text = editorTextRef.current;
-    const pending = pendingImagesRef.current;
+    const pending = pendingFilesRef.current;
     // 全空的编辑器不落任何东西：离开即丢弃。
     if (!text && pending.length === 0 && editorItemIdRef.current === null) return;
     savingRef.current = true;
@@ -109,7 +117,7 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
           body: JSON.stringify({ text }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        itemId = ((await res.json()) as { item: InspirationItem }).item.id;
+        itemId = ((await res.json()) as { item: Inspiration }).item.id;
         editorItemIdRef.current = itemId;
       } else if (text !== savedTextRef.current) {
         const res = await fetch(`/api/inspirations/${sessionId}/${itemId}`, {
@@ -120,19 +128,19 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       }
       savedTextRef.current = text;
-      // 图片逐张上传（先文件落盘，后挂到条目上）；失败的那张留在待传列。
-      while (pendingImagesRef.current.length > 0) {
-        const pendingImage = pendingImagesRef.current[0];
+      // 附件逐个上传（先文件落盘，后挂到条目上）；失败的那个留在待传列。
+      while (pendingFilesRef.current.length > 0) {
+        const pendingFile = pendingFilesRef.current[0];
         const form = new FormData();
         form.set("sessionId", sessionId);
         form.set("itemId", itemId);
-        form.set("file", pendingImage.file);
-        const res = await fetch(`/api/inspirations/${sessionId}/images`, { method: "POST", body: form });
+        form.set("file", pendingFile.file);
+        const res = await fetch(`/api/inspirations/${sessionId}/files`, { method: "POST", body: form });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const { imageId } = await res.json() as { imageId: string };
-        setPendingImages((prev) => prev.slice(1));
-        setEditorImages((prev) => [...prev, imageId]);
-        URL.revokeObjectURL(pendingImage.previewUrl);
+        const uploaded = await res.json() as InspirationFileRef;
+        setPendingFiles((prev) => prev.slice(1));
+        setEditorFiles((prev) => [...prev, uploaded]);
+        if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
       }
       setSaveState("saved");
       void refresh();
@@ -175,60 +183,67 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
     void saveNowRef.current();
   }, []);
 
-  const openEditor = useCallback((item: InspirationItem | null) => {
+  const openEditor = useCallback((item: Inspiration | null) => {
     editorItemIdRef.current = item?.id ?? null;
     savedTextRef.current = item?.text ?? "";
     setEditorText(item?.text ?? "");
-    setEditorImages(item?.imageIds ?? []);
-    setPendingImages([]);
+    setEditorFiles(item?.files ?? []);
+    setPendingFiles([]);
     setSaveState("idle");
     setError(null);
     setView({ kind: "editor", itemId: item?.id ?? null });
   }, []);
 
-  // ── 图片：添加（点选/粘贴/拖拽）、移除（已存/待传） ────────────────────
-  const addImageFiles = useCallback((files: File[]) => {
-    const accepted: PendingImage[] = [];
+  // ── 附件：添加（点选/粘贴/拖拽都走这里）、移除（已存/待传） ─────────────
+  const addFiles = useCallback((files: File[]) => {
+    const accepted: PendingFile[] = [];
+    const oversized: string[] = [];
     let overflow: number | null = null;
     for (const file of files) {
-      if (!file.type.startsWith("image/")) continue;
-      if (file.size > MAX_ATTACHED_IMAGE_BYTES) continue;
-      if (editorImages.length + pendingImagesRef.current.length + accepted.length >= MAX_ATTACHED_IMAGES) {
+      if (file.size > MAX_INSPIRATION_FILE_BYTES) {
+        oversized.push(file.name || "file");
+        continue;
+      }
+      if (editorFiles.length + pendingFilesRef.current.length + accepted.length >= MAX_ATTACHED_IMAGES) {
         overflow = MAX_ATTACHED_IMAGES;
         break;
       }
-      accepted.push({ file, previewUrl: URL.createObjectURL(file) });
+      accepted.push({ file, previewUrl: isInlineImage(file.type) ? URL.createObjectURL(file) : null });
     }
     if (accepted.length > 0) {
-      setPendingImages((prev) => [...prev, ...accepted]);
+      setPendingFiles((prev) => [...prev, ...accepted]);
       scheduleSave();
     }
-    setError(overflow === null ? null : t("inspiration.tooManyImages", { max: MAX_ATTACHED_IMAGES }));
-  }, [editorImages.length, scheduleSave, t]);
+    if (oversized.length > 0) {
+      setError(t("inspiration.fileTooLarge", { names: oversized.join(", ") }));
+    } else {
+      setError(overflow === null ? null : t("inspiration.tooManyFiles", { max: MAX_ATTACHED_IMAGES }));
+    }
+  }, [editorFiles.length, scheduleSave, t]);
 
-  const removeSavedImage = useCallback(async (imageId: string) => {
+  const removeSavedFile = useCallback(async (fileId: string) => {
     const itemId = editorItemIdRef.current;
     if (!itemId) return;
     try {
-      const res = await fetch(`/api/inspirations/images/${imageId}?sessionId=${sessionId}&itemId=${itemId}`, { method: "DELETE" });
+      const res = await fetch(`/api/inspirations/files/${fileId}?sessionId=${sessionId}&itemId=${itemId}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setEditorImages((prev) => prev.filter((entry) => entry !== imageId));
+      setEditorFiles((prev) => prev.filter((entry) => entry.id !== fileId));
       void refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
   }, [sessionId, refresh]);
 
-  const removePendingImage = useCallback((index: number) => {
-    setPendingImages((prev) => {
+  const removePendingFile = useCallback((index: number) => {
+    setPendingFiles((prev) => {
       const [removed] = prev.splice(index, 1);
-      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
       return [...prev];
     });
   }, []);
 
   // ── 列表行操作 ───────────────────────────────────────────────────────
-  const runAction = useCallback(async (item: InspirationItem, action: "done" | "remount" | "delete" | "restore") => {
+  const runAction = useCallback(async (item: Inspiration, action: "done" | "remount" | "delete" | "restore") => {
     setBusyId(item.id);
     try {
       const res = await fetch(`/api/inspirations/${sessionId}/${item.id}`, {
@@ -246,7 +261,7 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
     }
   }, [sessionId, refresh]);
 
-  const purge = useCallback(async (item: InspirationItem) => {
+  const purge = useCallback(async (item: Inspiration) => {
     setBusyId(item.id);
     try {
       const res = await fetch(`/api/inspirations/${sessionId}/${item.id}?purge=1`, { method: "DELETE" });
@@ -260,17 +275,23 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
     }
   }, [sessionId, refresh]);
 
-  /** 实现：图片取回为 File 连同文本交给输入框；不自动发送。 */
-  const implement = useCallback(async (item: InspirationItem) => {
+  /** 实现：图片回 addImages，其余文件回上传+@mention 路径；都不自动发送。 */
+  const implement = useCallback(async (item: Inspiration) => {
     setBusyId(item.id);
     try {
-      const files = await Promise.all(item.imageIds.map(async (imageId) => {
-        const res = await fetch(imageUrl(imageId));
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        return new File([blob], imageId, { type: blob.type || "image/png" });
-      }));
-      onImplement(item.text, files);
+      const [images, files] = await Promise.all([
+        Promise.all(item.files.filter((ref) => isInlineImage(ref.mime)).map(async (ref) => {
+          const res = await fetch(fileUrl(ref.id));
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return new File([await res.blob()], ref.name, { type: ref.mime });
+        })),
+        Promise.all(item.files.filter((ref) => !isInlineImage(ref.mime)).map(async (ref) => {
+          const res = await fetch(fileUrl(ref.id));
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return new File([await res.blob()], ref.name, { type: ref.mime });
+        })),
+      ]);
+      onImplement(item.text, images, files);
       onClose?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -289,13 +310,12 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
         multiple
         className="hidden"
         onChange={(event) => {
           const files = [...event.target.files ?? []];
           event.target.value = "";
-          addImageFiles(files);
+          addFiles(files);
         }}
       />
       {view.kind === "list" ? (
@@ -386,13 +406,13 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
         <EditorPage
           creating={view.itemId === null}
           text={editorText} onTextChange={(text) => { setEditorText(text); scheduleSave(); }}
-          savedImages={editorImages} pendingImages={pendingImages}
+          savedFiles={editorFiles} pendingFiles={pendingFiles}
           saveState={saveState} error={error}
           onBack={leaveEditor}
-          onAddImages={() => fileInputRef.current?.click()}
-          onRemoveSaved={removeSavedImage}
-          onRemovePending={removePendingImage}
-          onPasteImages={addImageFiles}
+          onAddFiles={() => fileInputRef.current?.click()}
+          onRemoveSaved={removeSavedFile}
+          onRemovePending={removePendingFile}
+          onPasteFiles={addFiles}
           t={t}
         />
       )}
@@ -404,6 +424,41 @@ function EmptyHint({ text }: { text: string }) {
   return <div className="flex h-32 items-center justify-center px-4 text-center text-xs text-muted-foreground">{text}</div>;
 }
 
+/** 图片缩略图 / 文件 chip；列表行与编辑页共用。 */
+function FileTile({ ref: fileRef, pending = false, onRemove, removeLabel, previewUrl }: {
+  ref: InspirationFileRef;
+  pending?: boolean;
+  onRemove?: () => void;
+  removeLabel?: string;
+  previewUrl?: string | null;
+}) {
+  const src = previewUrl ?? (isInlineImage(fileRef.mime) ? fileUrl(fileRef.id) : null);
+  return (
+    <div className="relative">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" className={cn("size-16 rounded-md border border-border object-cover", pending && "border-dashed opacity-80")} />
+      ) : (
+        <div className={cn("flex h-16 w-28 items-center gap-1.5 rounded-md border border-border px-2", pending && "border-dashed")}>
+          <FileIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={fileRef.name}>{fileRef.name}</span>
+        </div>
+      )}
+      {onRemove && (
+        <Button
+          type="button" variant="ghost" size="icon-xs"
+          onClick={onRemove}
+          title={removeLabel}
+          aria-label={removeLabel}
+          className="absolute -right-1 -top-1 size-4 rounded-full p-0 text-muted-foreground hover:text-destructive"
+        >
+          <Trash2Icon className="size-2" strokeWidth={2.5} aria-hidden="true" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
 type InspirationT = (
   key:
     | "inspiration.timeCreated" | "inspiration.timeDone" | "inspiration.timeDeleted"
@@ -411,40 +466,48 @@ type InspirationT = (
     | "inspiration.actionRemount" | "inspiration.actionDelete" | "inspiration.actionRestore"
     | "inspiration.actionPurge" | "inspiration.confirmPurge"
     | "inspiration.actionBack" | "inspiration.editorCreate" | "inspiration.editorEdit"
-    | "inspiration.editorPlaceholder" | "inspiration.actionAddImage" | "inspiration.actionRemoveImage"
+    | "inspiration.editorPlaceholder" | "inspiration.actionAddFile" | "inspiration.actionRemoveFile"
     | "inspiration.saveStateIdle" | "inspiration.saveStateSaving" | "inspiration.saveStateSaved" | "inspiration.saveStateError"
 ) => string;
 
 function InspirationRow({ item, busyId, locale, t, confirmPurgeId, setConfirmPurgeId, onImplement, onEdit, onAction, onPurge, actions }: {
-  item: InspirationItem;
+  item: Inspiration;
   busyId: string | null;
   locale: Locale;
   t: InspirationT;
   confirmPurgeId: string | null;
   setConfirmPurgeId: (id: string | null) => void;
-  onImplement: (item: InspirationItem) => void;
+  onImplement: (item: Inspiration) => void;
   onEdit: () => void;
-  onAction: (item: InspirationItem, action: "done" | "remount" | "delete" | "restore") => void;
-  onPurge: (item: InspirationItem) => void;
+  onAction: (item: Inspiration, action: "done" | "remount" | "delete" | "restore") => void;
+  onPurge: (item: Inspiration) => void;
   actions: readonly ("implement" | "edit" | "done" | "remount" | "delete" | "restore" | "purge")[];
 }) {
   const busy = busyId === item.id;
   const timeKey = item.deletedAt ? "inspiration.timeDeleted" : item.doneAt ? "inspiration.timeDone" : "inspiration.timeCreated";
   const time = item.deletedAt ?? item.doneAt ?? item.createdAt;
-  const thumbnails = item.imageIds.slice(0, MAX_ROW_THUMBNAILS);
-  const extraImages = item.imageIds.length - thumbnails.length;
+  const imageRefs = item.files.filter((ref) => isInlineImage(ref.mime));
+  const otherCount = item.files.length - imageRefs.length;
+  const thumbnails = imageRefs.slice(0, MAX_ROW_THUMBNAILS);
+  const extraImages = imageRefs.length - thumbnails.length;
   const actionClass = "pointer-coarse:min-h-9 h-7 px-2 text-xs font-normal text-muted-foreground hover:bg-accent/60 hover:text-foreground";
   return (
     <div className={cn("flex items-start gap-2 rounded-lg px-2 py-2 transition-colors pointer-coarse:min-h-9", busy ? "opacity-60" : "hover:bg-accent/40")}>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {item.text && <span className="line-clamp-2 text-[13px] whitespace-pre-wrap text-foreground" title={item.text}>{item.text}</span>}
-        {item.imageIds.length > 0 && (
+        {item.files.length > 0 && (
           <div className="flex items-center gap-1">
-            {thumbnails.map((imageId) => (
+            {thumbnails.map((ref) => (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={imageId} src={imageUrl(imageId)} alt="" loading="lazy" className="size-10 rounded-md border border-border object-cover" />
+              <img key={ref.id} src={fileUrl(ref.id)} alt={ref.name} loading="lazy" className="size-10 rounded-md border border-border object-cover" />
             ))}
             {extraImages > 0 && <span className="text-[11px] tabular-nums text-muted-foreground">+{extraImages}</span>}
+            {otherCount > 0 && (
+              <span className="flex h-6 items-center gap-1 rounded-md border border-border px-1.5 text-[11px] tabular-nums text-muted-foreground" title={item.files.filter((ref) => !isInlineImage(ref.mime)).map((ref) => ref.name).join("\n")}>
+                <FileIcon className="size-3" aria-hidden="true" />
+                {otherCount}
+              </span>
+            )}
           </div>
         )}
         <span className="text-[11px] text-muted-foreground/70" title={time}>
@@ -501,19 +564,19 @@ function InspirationRow({ item, busyId, locale, t, confirmPurgeId, setConfirmPur
   );
 }
 
-function EditorPage({ creating, text, onTextChange, savedImages, pendingImages, saveState, error, onBack, onAddImages, onRemoveSaved, onRemovePending, onPasteImages, t }: {
+function EditorPage({ creating, text, onTextChange, savedFiles, pendingFiles, saveState, error, onBack, onAddFiles, onRemoveSaved, onRemovePending, onPasteFiles, t }: {
   creating: boolean;
   text: string;
   onTextChange: (text: string) => void;
-  savedImages: string[];
-  pendingImages: PendingImage[];
+  savedFiles: InspirationFileRef[];
+  pendingFiles: PendingFile[];
   saveState: "idle" | "saving" | "saved" | "error";
   error: string | null;
   onBack: () => void;
-  onAddImages: () => void;
-  onRemoveSaved: (imageId: string) => void;
+  onAddFiles: () => void;
+  onRemoveSaved: (fileId: string) => void;
   onRemovePending: (index: number) => void;
-  onPasteImages: (files: File[]) => void;
+  onPasteFiles: (files: File[]) => void;
   t: InspirationT;
 }) {
   return (
@@ -522,7 +585,7 @@ function EditorPage({ creating, text, onTextChange, savedImages, pendingImages, 
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
-        onPasteImages([...event.dataTransfer.files]);
+        onPasteFiles([...event.dataTransfer.files]);
       }}
     >
       <div className="flex shrink-0 items-center gap-2 pl-2 pr-4 pt-3">
@@ -540,7 +603,7 @@ function EditorPage({ creating, text, onTextChange, savedImages, pendingImages, 
             const files = [...event.clipboardData.files];
             if (files.length > 0) {
               event.preventDefault();
-              onPasteImages(files);
+              onPasteFiles(files);
             }
           }}
           placeholder={t("inspiration.editorPlaceholder")}
@@ -548,9 +611,9 @@ function EditorPage({ creating, text, onTextChange, savedImages, pendingImages, 
           className="min-h-40 w-full resize-none rounded-lg border border-border bg-transparent p-3 text-sm leading-[1.55] text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none pointer-coarse:text-base"
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="xs" className="pointer-coarse:min-h-9" onClick={onAddImages}>
+          <Button type="button" variant="outline" size="xs" className="pointer-coarse:min-h-9" onClick={onAddFiles}>
             <ImagePlusIcon data-icon="inline-start" aria-hidden="true" />
-            {t("inspiration.actionAddImage")}
+            {t("inspiration.actionAddFile")}
           </Button>
           <span className="text-[11px] text-muted-foreground/70">
             {saveState === "saving" ? t("inspiration.saveStateSaving")
@@ -559,37 +622,20 @@ function EditorPage({ creating, text, onTextChange, savedImages, pendingImages, 
                   : t("inspiration.saveStateIdle")}
           </span>
         </div>
-        {(savedImages.length > 0 || pendingImages.length > 0) && (
+        {(savedFiles.length > 0 || pendingFiles.length > 0) && (
           <div className="flex flex-wrap gap-2">
-            {savedImages.map((imageId) => (
-              <div key={imageId} className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imageUrl(imageId)} alt="" className="size-16 rounded-md border border-border object-cover" />
-                <Button
-                  type="button" variant="ghost" size="icon-xs"
-                  onClick={() => onRemoveSaved(imageId)}
-                  title={t("inspiration.actionRemoveImage")}
-                  aria-label={t("inspiration.actionRemoveImage")}
-                  className="absolute -right-1 -top-1 size-4 rounded-full p-0 text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2Icon className="size-2" strokeWidth={2.5} aria-hidden="true" />
-                </Button>
-              </div>
+            {savedFiles.map((ref) => (
+              <FileTile key={ref.id} ref={ref} onRemove={() => onRemoveSaved(ref.id)} removeLabel={t("inspiration.actionRemoveFile")} />
             ))}
-            {pendingImages.map((image) => (
-              <div key={image.previewUrl} className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={image.previewUrl} alt="" className="size-16 rounded-md border border-border border-dashed object-cover opacity-80" />
-                <Button
-                  type="button" variant="ghost" size="icon-xs"
-                  onClick={() => onRemovePending(pendingImages.indexOf(image))}
-                  title={t("inspiration.actionRemoveImage")}
-                  aria-label={t("inspiration.actionRemoveImage")}
-                  className="absolute -right-1 -top-1 size-4 rounded-full p-0 text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2Icon className="size-2" strokeWidth={2.5} aria-hidden="true" />
-                </Button>
-              </div>
+            {pendingFiles.map((pending, index) => (
+              <FileTile
+                key={pending.file.name + index}
+                ref={{ id: "", name: pending.file.name, mime: pending.file.type || "application/octet-stream" }}
+                pending
+                previewUrl={pending.previewUrl}
+                onRemove={() => onRemovePending(index)}
+                removeLabel={t("inspiration.actionRemoveFile")}
+              />
             ))}
           </div>
         )}

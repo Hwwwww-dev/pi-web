@@ -15,8 +15,8 @@ export function InspirationDialog({ sessionId, open, onOpenChange, onImplement }
   sessionId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** 文本与图片回到输入框（不自动发送）；由持有 ChatInputHandle 的一方接线。 */
-  onImplement: (text: string, images: File[]) => void;
+  /** 文本与附件回到输入框（不自动发送）；由持有 ChatInputHandle 的一方接线。 */
+  onImplement: (text: string, images: File[], files: File[]) => void;
 }) {
   const { t } = useI18n();
   return (

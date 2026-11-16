@@ -1892,10 +1892,19 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(e.clipboardData?.items ?? []);
     const imageItems = items.filter((item) => item.type.startsWith("image/"));
-    if (!compact && imageItems.length) {
+    // 任意文件与图片同权：图片进附件胶囊，其余文件走上传+@mention（与拖拽、
+    // 附件按钮同一条链——工作目录里已有同名文件时引用原路径，否则才落盘）。
+    const otherFiles = items
+      .filter((item) => item.kind === "file" && !item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => f !== null);
+    if (!compact && (imageItems.length || otherFiles.length)) {
       e.preventDefault();
-      const files = imageItems.map((item) => item.getAsFile()).filter((f): f is File => f !== null);
-      processImageFiles(files);
+      if (imageItems.length) {
+        const files = imageItems.map((item) => item.getAsFile()).filter((f): f is File => f !== null);
+        processImageFiles(files);
+      }
+      if (otherFiles.length && onAttachFiles) onAttachFiles(otherFiles);
       return;
     }
 
@@ -1952,7 +1961,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       ta.focus();
       ta.setSelectionRange(start + markdown.length, start + markdown.length);
     });
-  }, [compact, onPasteLargeText, processImageFiles, updateAtQuery]);
+  }, [compact, onAttachFiles, onPasteLargeText, processImageFiles, updateAtQuery]);
 
   useEffect(() => {
     if (slashQuery === null) {
