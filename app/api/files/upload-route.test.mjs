@@ -134,3 +134,33 @@ test("overwrite refuses directories and directory links without touching their t
   assert.equal(fs.lstatSync(path.join(directory, "linked")).isSymbolicLink(), true);
   assert.equal(fs.readFileSync(path.join(outside, "secret.txt"), "utf8"), "private contents");
 });
+
+test("a dated directory under the upload repository is created on first upload", async (t) => {
+  const repo = path.join(os.homedir(), ".pi-web", "upload");
+  fs.mkdirSync(repo, { recursive: true });
+  const directory = path.join(repo, `test-${Date.now()}-${process.pid}`);
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  globalThis.__piAllowedRootsCache = { roots: new Set([repo]), expiresAt: Date.now() + 60_000 };
+
+  const encoded = encodeFilePathForApi(directory);
+  const form = new FormData();
+  form.append("files", new File(["created"], "fresh.txt"));
+  const response = await POST(new NextRequest(`http://localhost/api/files/${encoded}?type=upload&conflict=skip`, {
+    method: "POST", headers: { host: "localhost" }, body: form,
+  }), { params: Promise.resolve({ path: encoded.split("/").map(decodeURIComponent) }) });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { uploaded: ["fresh.txt"], skipped: [], errors: [] });
+  assert.equal(fs.readFileSync(path.join(directory, "fresh.txt"), "utf8"), "created");
+});
+
+test("a missing directory outside the upload repository still fails with 404", async () => {
+  const directory = path.join(base, "missing-outside-repo");
+  globalThis.__piAllowedRootsCache = { roots: new Set([base]), expiresAt: Date.now() + 60_000 };
+  const encoded = encodeFilePathForApi(directory);
+  const form = new FormData();
+  form.append("files", new File(["x"], "a.txt"));
+  const response = await POST(new NextRequest(`http://localhost/api/files/${encoded}?type=upload&conflict=skip`, {
+    method: "POST", headers: { host: "localhost" }, body: form,
+  }), { params: Promise.resolve({ path: encoded.split("/").map(decodeURIComponent) }) });
+  assert.equal(response.status, 404);
+});

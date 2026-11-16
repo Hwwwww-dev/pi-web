@@ -8,11 +8,18 @@ export const MAX_INSPIRATION_FILE_BYTES = 10 * 1024 * 1024;
 /** 灵感文本上限：超过它是把整份文档当灵感存（粘贴有 /api/paste 负责）。 */
 export const MAX_INSPIRATION_TEXT_CHARS = 64 * 1024;
 
-/** 附件引用：id 定位文件；name 是落盘名（保留原名，同名加序号），即引用与下载所用之名。 */
+/** 灵感附件在统一上传仓库里的固定子域；attach 时服务端按它校验 path。 */
+export const INSPIRATION_UPLOAD_PREFIX = "~/.pi-web/upload/inspiration/";
+
+/**
+ * 附件引用：文件本体在统一上传仓库（`~/.pi-web/upload/inspiration/<日期>/<原名>`，
+ * 上传接口写入），条目只记录引用。name 是原文件名（展示与「实现」引用所用），
+ * path 是 `~` 形态的仓库路径（缩略图/下载走 /api/files?type=read，「实现」直接 @ 它）。
+ */
 export interface InspirationFileRef {
-  id: string;
   name: string;
   mime: string;
+  path: string;
 }
 
 export interface Inspiration {

@@ -1,3 +1,6 @@
+import { mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { getAdditionalAllowedRoots, normalizeSlashes } from "./allowed-roots";
 import { isExistingPathWithinRoots, isPathWithinRoots } from "./path-security";
 import { listAllSessions } from "./session-reader";
@@ -14,6 +17,23 @@ declare global {
 
 const ALLOWED_ROOTS_TTL_MS = 5_000;
 
+// The unified upload repository: composer non-image uploads and inspiration
+// attachments land under `~/.pi-web/upload/<domain>/<date>/`, so it is a fixed
+// file-access root. Created on the spot — a missing root would break the
+// realpath checks that authorize writes into it.
+export const UPLOAD_REPO_ROOT = normalizeSlashes(join(homedir(), ".pi-web", "upload"));
+
+function ensureUploadRepoRoot(): string | null {
+  try {
+    mkdirSync(UPLOAD_REPO_ROOT, { recursive: true });
+    return UPLOAD_REPO_ROOT;
+  } catch {
+    // Cannot create it (permissions, disk): do not add a root that realpath
+    // checks cannot resolve; uploads into it fail explicitly instead.
+    return null;
+  }
+}
+
 export async function getAllowedFileRoots(): Promise<Set<string>> {
   const now = Date.now();
   const cached = globalThis.__piAllowedRootsCache;
@@ -29,6 +49,9 @@ export async function getAllowedFileRoots(): Promise<Set<string>> {
   }
 
   for (const root of getAdditionalAllowedRoots()) roots.add(root);
+
+  const uploadRepoRoot = ensureUploadRepoRoot();
+  if (uploadRepoRoot) roots.add(uploadRepoRoot);
 
   globalThis.__piAllowedRootsCache = { roots, expiresAt: now + ALLOWED_ROOTS_TTL_MS };
   return roots;

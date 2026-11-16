@@ -30,7 +30,8 @@ import {
 } from "@/lib/file-upload";
 import { parseFormDataWithinLimit, RequestBodyTooLargeError } from "@/lib/bounded-form-data";
 import { expandHomePath, filePathFromApiSegments, samePath } from "@/lib/paths";
-import { hasParentDirectorySegment } from "@/lib/path-security";
+import { hasParentDirectorySegment, isPathWithinRoots } from "@/lib/path-security";
+import { UPLOAD_REPO_ROOT } from "@/lib/file-access";
 import { readTextPreviewChunk } from "@/lib/text-preview";
 import { registerFileWatch } from "@/lib/file-watch-registry";
 import { pageStreamLabel, registerPageStream } from "@/lib/page-stream-registry";
@@ -96,7 +97,13 @@ async function getUploadDirectory(segments: string[]): Promise<
   try {
     stat = fs.statSync(directory);
   } catch {
-    return { response: NextResponse.json({ error: "Upload directory not found" }, { status: 404 }) };
+    // The upload repository's dated directories are created on first upload;
+    // every other missing directory stays a 404.
+    if (!isPathWithinRoots(directory, new Set([UPLOAD_REPO_ROOT]))) {
+      return { response: NextResponse.json({ error: "Upload directory not found" }, { status: 404 }) };
+    }
+    fs.mkdirSync(directory, { recursive: true });
+    stat = fs.statSync(directory);
   }
   if (!stat.isDirectory()) {
     return { response: NextResponse.json({ error: "Upload target is not a directory" }, { status: 400 }) };

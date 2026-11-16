@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Inspiration } from "@/components/Inspiration";
 import { useI18n } from "@/hooks/useI18n";
+import type { InspirationFileRef } from "@/lib/inspiration-shared";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,8 +16,8 @@ export function InspirationDialog({ sessionId, open, onOpenChange, onImplement }
   sessionId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** 文本与附件回到输入框（不自动发送）；由持有 ChatInputHandle 的一方接线。 */
-  onImplement: (text: string, images: File[], files: File[]) => void;
+  /** 文本与附件回到输入框（不自动发送）；图片是字节，其余文件是仓库引用。 */
+  onImplement: (text: string, images: File[], files: InspirationFileRef[]) => void;
 }) {
   const { t } = useI18n();
   return (

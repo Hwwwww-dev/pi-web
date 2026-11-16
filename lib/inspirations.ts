@@ -1,43 +1,40 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import lockfile from "proper-lockfile";
-import { MAX_INSPIRATION_FILE_BYTES, MAX_INSPIRATION_TEXT_CHARS, type Inspiration, type InspirationFileRef } from "./inspiration-shared";
+import {
+  INSPIRATION_UPLOAD_PREFIX,
+  MAX_INSPIRATION_FILE_BYTES,
+  MAX_INSPIRATION_TEXT_CHARS,
+  type Inspiration,
+  type InspirationFileRef,
+} from "./inspiration-shared";
 
 // 共享形态（常量与类型）的真实定义在 lib/inspiration-shared.ts；re-export 保持既有 import 路径不变。
 export { MAX_INSPIRATION_FILE_BYTES, MAX_INSPIRATION_TEXT_CHARS };
 export type { Inspiration, InspirationFileRef };
 
 /**
- * 灵感的单一存储来源：每个会话一个 JSON（`<sessionId>.json`），附件（图片与
- * 任意文件，≤10MB）按 uuid 落盘在 files/ 下、磁盘索引在 files.json。文件名一律
- * 由这里生成——调用方（路由）只传 id 与内容，从不传路径，因此不与 /api/files
- * 的边界发生关系。
+ * 灵感的单一存储来源：每个会话一个 JSON（`<sessionId>.json`）。附件本体不归这里
+ * 管——它们由统一上传接口（`POST /api/files?type=upload`）写进仓库
+ * `~/.pi-web/upload/inspiration/<日期>/<原名>`；条目只保存引用
+ * （name/mime/path，见 InspirationFileRef）。挂接（attach）时服务端校验 path
+ * 必须在灵感子域内，客户端给不出仓库外的引用。仓库是共享的 append-only 存储，
+ * 彻底删除只删条目，不删文件——引用别的文件不受牵连，也没有死链清理职责。
  *
  * 归属由时间戳推导：灵感 = 无 doneAt 无 deletedAt；历史 = 有 doneAt；已删除 =
  * 有 deletedAt。恢复只清 deletedAt，完成过的落回历史。
- *
- * 条目上的 `files`（id/name/mime）是展示与实现用的副本；磁盘索引（files.json）
- * 是服务真相（Content-Type、落盘位置）。两处只在下方加锁的 add/remove/purge
- * 流程里同步改动，任何一方都不会被单独改写。
  */
 
-/** 附件引用：id 定位文件；name/mime 供列表与「实现」直接使用（见上方同步说明）。 */
-
-interface InspirationFileRecord {
-  file: string;
-  mime: string;
-  name: string;
-  createdAt: string;
-}
-
-type InspirationFileManifest = Record<string, InspirationFileRecord>;
-
-/** 会话与附件都是 uuid 形态的 id：既是文件名，也是唯一的合法输入形态。 */
+/** 会话与条目都是 uuid 形态的 id：既是文件名，也是唯一的合法输入形态。 */
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-/** 服务端要按它发 Content-Type，必须是个像样的 mime，但不限制类型。 */
+/** 服务端展示/实现要按它分流图片，必须是个像样的 mime，但不限制类型。 */
 const MIME_PATTERN = /^[\w.+-]+\/[\w.+-]+$/;
+/** 附件引用的 path 是 `~` 形态的仓库路径，逐字符校验，绝不接受别的写法。 */
+const INSPIRATION_PATH_PATTERN = /^~\/\.pi-web\/upload\/inspiration\/\d{4}-\d{2}-\d{2}\/[^/]+$/;
+/** 展示名同附件落盘规则：无分隔符、无控制字符、有界。 */
+const NAME_MAX_CHARS = 120;
 
 export function isValidSessionId(sessionId: string): boolean {
   return UUID_PATTERN.test(sessionId);
@@ -69,14 +66,6 @@ function parseItems(path: string, text: string): Inspiration[] {
   return parsed.items as Inspiration[];
 }
 
-function readFileManifest(root: string): InspirationFileManifest {
-  const path = join(root, "files.json");
-  if (!existsSync(path)) return {};
-  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-  if (!isRecord(parsed)) throw new Error(`Invalid inspirations file manifest: ${path}`);
-  return parsed as InspirationFileManifest;
-}
-
 /** 读改写全程持锁；写走 tmp+rename 原子落盘，两标签页并发写不互相覆盖。 */
 async function mutateSession<T>(sessionId: string, root: string, mutate: (items: Inspiration[]) => T): Promise<T> {
   const path = sessionFilePath(sessionId, root);
@@ -100,27 +89,6 @@ async function mutateSession<T>(sessionId: string, root: string, mutate: (items:
   }
 }
 
-async function mutateFileManifest<T>(root: string, mutate: (manifest: InspirationFileManifest) => T): Promise<T> {
-  const path = join(root, "files.json");
-  mkdirSync(root, { recursive: true });
-  try {
-    writeFileSync(path, "{}", { flag: "wx", mode: 0o600 });
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-  }
-  const release = await lockfile.lock(path, { realpath: false, retries: 10 });
-  try {
-    const manifest = readFileManifest(root);
-    const result = mutate(manifest);
-    const tmp = `${path}.${randomUUID()}.tmp`;
-    writeFileSync(tmp, JSON.stringify(manifest, null, 2), { mode: 0o600 });
-    renameSync(tmp, path);
-    return result;
-  } finally {
-    await release();
-  }
-}
-
 function requireItem(items: Inspiration[], itemId: string): Inspiration {
   const item = items.find((entry) => entry.id === itemId);
   if (!item) throw new Error(`Inspiration not found: ${itemId}`);
@@ -134,16 +102,35 @@ function requireLive(item: Inspiration, itemId: string): void {
 
 const ACTIONS = new Set(["done", "remount", "delete", "restore"]);
 
-/** 附件名只做展示与实现下载，剥掉路径分隔符与控制字符，绝不还原成路径。 */
+/** 展示名保留原名做展示与实现引用，剥掉路径分隔符与控制字符，绝不还原成路径。 */
 function sanitizeFileName(raw: string): string {
   const cleaned = raw.replace(/[\\/\u0000-\u001f\u007f]/g, "").trim();
-  return (cleaned || "file").slice(0, 120);
+  const safe = cleaned || "file";
+  return safe.length <= NAME_MAX_CHARS ? safe : safe.slice(0, NAME_MAX_CHARS);
+}
+
+/** attach 的单条校验：path 必须在灵感子域内，mime 与展示名干净。校验不过整体失败。 */
+function normalizeFileRef(raw: unknown): InspirationFileRef {
+  if (!isRecord(raw)) throw new Error("Invalid inspiration file reference");
+  const { name, mime, path } = raw as { name?: unknown; mime?: unknown; path?: unknown };
+  const basename = typeof path === "string" ? path.slice(path.lastIndexOf("/") + 1) : "";
+  if (typeof path !== "string" || !INSPIRATION_PATH_PATTERN.test(path) || basename === "." || basename === "..") {
+    throw new Error(`Invalid inspiration file path: ${String(path)}`);
+  }
+  if (typeof mime !== "string") throw new Error("Invalid inspiration file mime");
+  const cleanMime = mime.trim().toLowerCase();
+  if (cleanMime.length > 100 || !MIME_PATTERN.test(cleanMime)) throw new Error(`Invalid inspiration file mime: ${mime}`);
+  if (typeof name !== "string") throw new Error("Invalid inspiration file name");
+  return { name: sanitizeFileName(name), mime: cleanMime, path };
 }
 
 export async function listInspirations(sessionId: string, root = inspirationsRoot()): Promise<Inspiration[]> {
   const path = sessionFilePath(sessionId, root);
   if (!existsSync(path)) return [];
-  return parseItems(path, readFileSync(path, "utf8"));
+  const items = parseItems(path, readFileSync(path, "utf8"));
+  // 引用的唯一合法形态是 {name,mime,path}：旧版（id 定位、自有仓库）引用的
+  // serve 路由已删除，读出来也无法展示或实现，读取时一并规整掉。
+  return items.map((item) => ({ ...item, files: Array.isArray(item.files) ? item.files.filter((ref) => isRecord(ref) && typeof ref.path === "string") : [] }));
 }
 
 export async function createInspiration(sessionId: string, text: string, root = inspirationsRoot()): Promise<Inspiration> {
@@ -196,96 +183,44 @@ export async function transitionInspiration(
   });
 }
 
-/** 软删除的记录与附件文件一起消失；索引条目一并清理。条目已不在时是幂等的 no-op。 */
-export async function purgeInspiration(sessionId: string, itemId: string, root = inspirationsRoot()): Promise<void> {
-  const removedIds = await mutateSession(sessionId, root, (items) => {
-    const index = items.findIndex((entry) => entry.id === itemId);
-    if (index === -1) return [];
-    const [item] = items.splice(index, 1);
-    return item.files.map((ref) => ref.id);
-  });
-  await mutateFileManifest(root, (manifest) => {
-    for (const fileId of removedIds) {
-      const record = manifest[fileId];
-      if (!record) continue;
-      try {
-        unlinkSync(join(root, record.file));
-      } catch {
-        // 幂等：文件已不在即视为清理完成。
-      }
-      delete manifest[fileId];
-    }
-  });
-}
-
-/** 保存一份附件（任意类型 ≤10MB）并挂到灵感上；同一份只属于一条灵感。 */
-export async function addInspirationFile(
+/** 批量挂接附件引用；同一 path 重复挂接是 no-op（同名 skip 上传后仍要挂上）。 */
+export async function attachInspirationFiles(
   sessionId: string,
   itemId: string,
-  bytes: Buffer,
-  mime: string,
-  name: string,
+  files: unknown,
   root = inspirationsRoot(),
-): Promise<InspirationFileRef> {
-  if (!Number.isInteger(bytes.length) || bytes.length <= 0 || bytes.length > MAX_INSPIRATION_FILE_BYTES) throw new Error("Invalid inspiration file size");
-  const cleanMime = mime.trim().toLowerCase();
-  if (cleanMime.length > 100 || !MIME_PATTERN.test(cleanMime)) throw new Error(`Invalid inspiration file mime: ${mime}`);
-  const cleanName = sanitizeFileName(name);
-  const fileId = randomUUID();
-  const filesDir = join(root, "files");
-  mkdirSync(filesDir, { recursive: true });
-  const file = join("files", fileId);
-  writeFileSync(join(root, file), bytes, { mode: 0o600 });
-  const ref: InspirationFileRef = { id: fileId, name: cleanName, mime: cleanMime };
-  try {
-    await mutateFileManifest(root, (manifest) => {
-      manifest[fileId] = { file, mime: cleanMime, name: cleanName, createdAt: new Date().toISOString() };
-    });
-    await mutateItem(sessionId, itemId, root, (item) => {
-      requireLive(item, itemId);
+): Promise<Inspiration> {
+  if (!Array.isArray(files) || files.length === 0) throw new Error("attach needs at least one file reference");
+  const refs = files.map((file) => normalizeFileRef(file));
+  return mutateItem(sessionId, itemId, root, (item) => {
+    requireLive(item, itemId);
+    const known = new Set(item.files.map((ref) => ref.path));
+    for (const ref of refs) {
+      if (known.has(ref.path)) continue;
       item.files.push(ref);
-    });
-  } catch (error) {
-    // 挂接失败就不留孤儿文件与索引条目。
-    try {
-      unlinkSync(join(root, file));
-    } catch { /* 尽力清理 */ }
-    try {
-      await mutateFileManifest(root, (manifest) => {
-        delete manifest[fileId];
-      });
-    } catch { /* 尽力清理 */ }
-    throw error;
-  }
-  return ref;
+      known.add(ref.path);
+    }
+  });
 }
 
-/** 从灵感上摘掉一份附件：引用、索引条目、文件三者同删（文件缺失幂等）。 */
-export async function removeInspirationFile(sessionId: string, itemId: string, fileId: string, root = inspirationsRoot()): Promise<void> {
-  if (!UUID_PATTERN.test(fileId)) throw new Error(`Invalid inspiration file id: ${fileId}`);
-  await mutateItem(sessionId, itemId, root, (item) => {
+/** 按仓库路径摘掉一份附件引用；引用不存在是显式错误，不静默成功。 */
+export async function detachInspirationFile(sessionId: string, itemId: string, filePath: string, root = inspirationsRoot()): Promise<Inspiration> {
+  if (typeof filePath !== "string" || !filePath.startsWith(INSPIRATION_UPLOAD_PREFIX)) {
+    throw new Error(`Invalid inspiration file path: ${String(filePath)}`);
+  }
+  return mutateItem(sessionId, itemId, root, (item) => {
     requireLive(item, itemId);
-    const index = item.files.findIndex((ref) => ref.id === fileId);
-    if (index === -1) throw new Error(`Inspiration file not attached: ${fileId}`);
+    const index = item.files.findIndex((ref) => ref.path === filePath);
+    if (index === -1) throw new Error(`Inspiration file not attached: ${filePath}`);
     item.files.splice(index, 1);
   });
-  await mutateFileManifest(root, (manifest) => {
-    const record = manifest[fileId];
-    if (!record) return;
-    try {
-      unlinkSync(join(root, record.file));
-    } catch {
-      // 幂等：文件已不在即视为清理完成。
-    }
-    delete manifest[fileId];
-  });
 }
 
-export async function readInspirationFile(fileId: string, root = inspirationsRoot()): Promise<{ bytes: Buffer; mime: string; name: string } | null> {
-  if (!UUID_PATTERN.test(fileId)) return null;
-  const record = readFileManifest(root)[fileId];
-  if (!record) return null;
-  const path = join(root, record.file);
-  if (!existsSync(path)) return null;
-  return { bytes: readFileSync(path), mime: record.mime, name: record.name };
+/** 彻底删除只删条目：附件本体在共享仓库里，别的引用可能还在用。条目已不在时是幂等的 no-op。 */
+export async function purgeInspiration(sessionId: string, itemId: string, root = inspirationsRoot()): Promise<void> {
+  await mutateSession(sessionId, root, (items) => {
+    const index = items.findIndex((entry) => entry.id === itemId);
+    if (index === -1) return;
+    items.splice(index, 1);
+  });
 }

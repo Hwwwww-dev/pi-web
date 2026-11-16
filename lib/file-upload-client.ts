@@ -84,15 +84,27 @@ export function splitDroppedItems(items: DroppedItem[]): { images: File[]; files
 }
 
 /**
- * The `@` mentions for files now in the working directory, in drop order.
+ * The unified upload repository's dated directory for one domain: composer
+ * non-image uploads and inspiration attachments each land in their own
+ * subdomain, grouped by the local date. The file API expands the leading `~`.
+ */
+export function uploadRepoDirectory(domain: "composer" | "inspiration"): string {
+  const now = new Date();
+  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return domain === "composer" ? `~/.pi-web/upload/${day}` : `~/.pi-web/upload/inspiration/${day}`;
+}
+
+/**
+ * The `@` mentions for files now in the upload repository, in drop order.
  * @param files The dropped files
+ * @param directory The repository directory they were uploaded to
  * @param present Names the upload reports as written or already there
  * @returns Mentions ready to insert, or an empty string
  */
-export function dropMentionText(files: File[], present: string[]): string {
+export function dropMentionText(files: File[], directory: string, present: string[]): string {
   const names = new Set(present);
   return files
     .filter((file) => names.has(file.name))
-    .map((file) => buildAtMentionText(file.name, false))
+    .map((file) => buildAtMentionText(`${directory}/${file.name}`, false))
     .join("");
 }

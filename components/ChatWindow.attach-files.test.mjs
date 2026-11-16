@@ -29,11 +29,11 @@ const report = new File(["x"], "report.pdf", { type: "application/pdf" });
 const log = new File(["x"], "server.log", { type: "" });
 
 /** Picks files with the composer's attach button, through ChatWindow's real drop path. */
-async function attach(files, { cwd = "/project", response } = {}) {
-  const calls = { images: [], uploads: [], mentions: [], notices: [], refreshed: 0 };
+async function attach(files, { response } = {}) {
+  const calls = { images: [], uploads: [], mentions: [], notices: [] };
   const scope = {
     session: null,
-    newSessionCwd: cwd,
+    newSessionCwd: "/project",
     chatInputRef: {
       current: {
         addImages: (images) => calls.images.push(...images),
@@ -42,9 +42,9 @@ async function attach(files, { cwd = "/project", response } = {}) {
     },
     addNotice: (notice) => calls.notices.push([notice.type, notice.message]),
     t: (key, vars) => (vars ? `${key} ${JSON.stringify(vars)}` : key),
-    onFilesUploaded: () => { calls.refreshed += 1; },
     splitDroppedItems,
     dropMentionText,
+    uploadRepoDirectory: (domain) => `~/.pi-web/upload/${domain === "inspiration" ? "inspiration/" : ""}2026-01-01`,
     uploadFiles: async (target, uploads, strategy) => {
       calls.uploads.push([target, uploads.map((file) => file.name), strategy]);
       return response;
@@ -57,19 +57,19 @@ async function attach(files, { cwd = "/project", response } = {}) {
   return calls;
 }
 
-test("the attach button sends picked files down the chat drop path (#1101)", async () => {
+test("the attach button sends picked files to the upload repository and mentions them there", async () => {
   const mixed = await attach([photo, report, log], {
     response: { status: 207, data: { uploaded: ["report.pdf"], skipped: ["server.log"] } },
   });
-  // Images attach to the prompt; the rest are uploaded like a drop: never replacing a file, then mentioned.
+  // Images attach to the prompt; the rest land in the dated repository directory
+  // (never replacing a file) and are mentioned by their repository path.
   assert.deepEqual(mixed.images, [photo]);
-  assert.deepEqual(mixed.uploads, [["/project", ["report.pdf", "server.log"], "skip"]]);
-  assert.deepEqual(mixed.mentions, ["@report.pdf @server.log "]);
+  assert.deepEqual(mixed.uploads, [["~/.pi-web/upload/2026-01-01", ["report.pdf", "server.log"], "skip"]]);
+  assert.deepEqual(mixed.mentions, ["@~/.pi-web/upload/2026-01-01/report.pdf @~/.pi-web/upload/2026-01-01/server.log "]);
   assert.deepEqual(mixed.notices, [
     ["success", 'chat.dropUploaded {"count":1}'],
     ["warning", 'chat.dropAlreadyExists {"names":"server.log"}'],
   ]);
-  assert.equal(mixed.refreshed, 1);
 
   const imagesOnly = await attach([photo]);
   assert.deepEqual(imagesOnly.images, [photo]);
@@ -77,9 +77,11 @@ test("the attach button sends picked files down the chat drop path (#1101)", asy
   assert.deepEqual(imagesOnly.notices, []);
 });
 
-test("without a working directory, picked files behave like a drop there (#1101)", async () => {
-  const calls = await attach([photo, report], { cwd: null });
-  assert.deepEqual(calls.images, [photo]);
-  assert.deepEqual(calls.uploads, []);
-  assert.deepEqual(calls.notices, [["warning", "chat.dropNeedsCwd"]]);
+test("without a working directory, picked files still reach the upload repository", async () => {
+  const calls = await attach([report], {
+    response: { status: 200, data: { uploaded: ["report.pdf"] } },
+  });
+  assert.deepEqual(calls.uploads, [["~/.pi-web/upload/2026-01-01", ["report.pdf"], "skip"]]);
+  assert.deepEqual(calls.mentions, ["@~/.pi-web/upload/2026-01-01/report.pdf "]);
+  assert.deepEqual(calls.notices, [["success", 'chat.dropUploaded {"count":1}']]);
 });

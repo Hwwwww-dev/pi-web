@@ -14,8 +14,10 @@ import { getToolCategory, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/
 import { buildTurnActivityItems, getFinishedTurnView, headSegmentEndsTurn } from "@/lib/turn-view";
 import { type WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
-import { dropMentionText, splitDroppedItems, uploadFiles, type DroppedItem } from "@/lib/file-upload-client";
+import { dropMentionText, splitDroppedItems, uploadFiles, uploadRepoDirectory, type DroppedItem } from "@/lib/file-upload-client";
 import { buildAtMentionText } from "@/lib/file-fuzzy";
+import { getFileName } from "@/lib/file-paths";
+import type { InspirationFileRef } from "@/lib/inspiration-shared";
 import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
 import { ActiveToolsContext, TurnActivityBody, TurnMetaLine } from "./ActivityRows";
 import { InspirationDialog } from "./InspirationDialog";
@@ -172,8 +174,6 @@ interface Props {
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
-  /** Files dropped onto the chat were written into the working directory. */
-  onFilesUploaded?: () => void;
   onAskInNewChat?: (prompt: string, sourceSessionId: string, sourceEntryId: string) => Promise<void>;
   quoteSelectionEnabled?: boolean;
   initialPrompt?: string;
@@ -305,7 +305,7 @@ function getUserInputText(message: AgentMessage): string | null {
 
 
 // memo：后台 dock 常驻渲染，非流式内容变更不应触发重渲染
-export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, active = true, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, panel = false, onSideSession, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onDebugSnapshotReaderChange, onReloadSessionChange, background = false, dormant = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
+export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, active = true, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, panel = false, onSideSession, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onMcpServersChange, onSystemInfoLoaderChange, onDebugSnapshotReaderChange, onReloadSessionChange, background = false, dormant = false, onSessionStatsChange, onSessionStatsPanelOpen, onOpenSettings, onContextUsageChange, onOpenFile, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const completionNotificationsEnabled = !isHiddenRelation(session?.relation);
@@ -1179,39 +1179,34 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [background, ctxKey, onContextUsageChange]);
   useEffect(() => () => { onContextUsageChange?.(null); }, [onContextUsageChange]);
 
-  // Images attach to the prompt. Other files go through the file explorer's
-  // upload into the working directory, never replacing a file already there,
-  // and come back as @mentions. The composer's attach button takes the same
-  // path, for phones that cannot drop files.
+  // Images attach to the prompt. Other files go through the unified upload
+  // repository (`~/.pi-web/upload/<date>/`, never replacing a file already
+  // there) and come back as @mentions of their repository paths. The working
+  // directory is never touched, so the file tree has nothing to refresh.
   const uploadDroppedFiles = useCallback(async (files: File[]): Promise<boolean> => {
-    const cwd = session?.cwd ?? newSessionCwd;
-    if (!cwd) {
-      addNotice({ type: "warning", message: t("chat.dropNeedsCwd") });
-      return false;
-    }
+    const directory = uploadRepoDirectory("composer");
     try {
-      const { status, data } = await uploadFiles(cwd, files, "skip");
+      const { status, data } = await uploadFiles(directory, files, "skip");
       if (status !== 200 && status !== 207) throw new Error(data.error ?? `HTTP ${status}`);
       const uploaded = data.uploaded ?? [];
       const skipped = data.skipped ?? [];
-      const mentions = dropMentionText(files, [...uploaded, ...skipped]);
+      const mentions = dropMentionText(files, directory, [...uploaded, ...skipped]);
       if (mentions) chatInputRef?.current?.insertText(mentions);
       if (uploaded.length > 0) {
         addNotice({ type: "success", message: t("chat.dropUploaded", { count: uploaded.length }) });
-        onFilesUploaded?.();
       }
       if (skipped.length > 0) {
         addNotice({ type: "warning", message: t("chat.dropAlreadyExists", { names: skipped.join(", ") }) });
       }
-                        for (const failure of data.errors ?? []) {
-                                addNotice({ type: "error", message: t("chat.dropFailed", { message: `${failure.name}: ${failure.error}` }) });
-                        }
-                        return true;
-                } catch (uploadError) {
-                        addNotice({ type: "error", message: t("chat.dropFailed", { message: uploadError instanceof Error ? uploadError.message : String(uploadError) }) });
-                        return false;
+      for (const failure of data.errors ?? []) {
+        addNotice({ type: "error", message: t("chat.dropFailed", { message: `${failure.name}: ${failure.error}` }) });
+      }
+      return true;
+    } catch (uploadError) {
+      addNotice({ type: "error", message: t("chat.dropFailed", { message: uploadError instanceof Error ? uploadError.message : String(uploadError) }) });
+      return false;
     }
-        }, [addNotice, chatInputRef, newSessionCwd, onFilesUploaded, session?.cwd, t]);
+  }, [addNotice, chatInputRef, t]);
 
   // 大文案粘贴（DeepSeek 同款）：超过阈值的粘贴文本不进输入框，落到系统临时目录的
   // `pi/pasted`（macOS 即 `/tmp/pi/pasted`）后再以 `@绝对路径` 引用。落盘不碰会话工作
@@ -1233,15 +1228,30 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     }
   }, [addNotice, chatInputRef, t]);
 
-  // 💡灵感「实现」：文本与附件装进输入框（不自动发送），焦点回到输入框。
-  // 图片走附件胶囊；其余文件走拖拽同一条上传链——工作目录已有同名文件时引用
-  // 原路径（skip），否则落盘复制后 @mention。远程客户端同样只是字节数据，链路一致。
-  const handleImplementInspiration = useCallback((text: string, images: File[], files: File[]) => {
+  // 💡灵感「实现」：文本与图片装进输入框（不自动发送），附件引用做编排——
+  // 工作目录已有同名文件就引用原路径（@相对路径），否则引用仓库里的
+  // `~/.pi-web/upload/inspiration/<日期>/<原名>`（大模型认识 `~`）。焦点回到输入框。
+  const handleImplementInspiration = useCallback(async (text: string, images: File[], fileRefs: InspirationFileRef[]) => {
     if (text) chatInputRef?.current?.insertText(text);
     if (images.length > 0) chatInputRef?.current?.addImages(images);
-    if (files.length > 0) void uploadDroppedFiles(files);
+    if (fileRefs.length > 0) {
+      const cwd = session?.cwd ?? newSessionCwd;
+      let cwdFiles: string[] | null = null;
+      if (cwd) {
+        try {
+          const res = await fetch(`/api/file-index?cwd=${encodeURIComponent(cwd)}`);
+          if (res.ok) cwdFiles = ((await res.json()) as { files?: string[] }).files ?? [];
+        } catch {
+          cwdFiles = null; // 索引不可用就全部引用仓库路径，附件不丢。
+        }
+      }
+      const mentions = fileRefs
+        .map((ref) => buildAtMentionText(cwdFiles?.find((entry) => getFileName(entry) === ref.name) ?? ref.path, false))
+        .join("");
+      if (mentions) chatInputRef?.current?.insertText(mentions);
+    }
     chatInputRef?.current?.focus();
-  }, [chatInputRef, uploadDroppedFiles]);
+  }, [chatInputRef, newSessionCwd, session?.cwd]);
 
   const onDrop = useCallback((items: DroppedItem[]) => {
     const { images, files, folders } = splitDroppedItems(items);
