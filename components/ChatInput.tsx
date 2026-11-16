@@ -2240,7 +2240,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         // min-w-0: as a column flex item its `min-width: auto` resolves to
         // min-content, so one long unbreakable queue row stretched the whole
         // composer past the viewport instead of truncating inside it.
-        : "chat-input-shell flex min-h-0 min-w-0 flex-col pb-3.5 pt-1.5 max-sm:pb-3",
+        : "chat-input-shell isolate flex min-h-0 min-w-0 flex-col pb-3.5 pt-1.5 max-sm:pb-3",
         builtinCommandPending && "opacity-50 transition-opacity duration-150",
       )}
     >
@@ -2579,7 +2579,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 // bg-card! 压过基类的 dark:bg-input/30（≈4.5% 透明），否则暗色下卡片
                 // 透明、消息文字直接穿透输入区。chat-composer-halo（globals.css）
                 // 是卡片向外四周的羽化光晕：浮动时遮住贴近卡片的消息，远离即透。
-                "chat-composer-row chat-composer-halo min-w-0 rounded-[24px] border-border bg-card!",
+                // -z-10 把光晕压到壳层（isolate 上下文）内速率行、队列与错误提示
+                // 之后——卡片是定位元素最后绘制，不压的话阴影会盖住它们的文字；
+                // 负 z 只在壳层上下文内部生效，卡片与光晕仍高于背后的消息列表。
+                "chat-composer-row chat-composer-halo relative -z-10 min-w-0 rounded-[24px] border-border bg-card!",
                 compact
                   ? "flex-row items-center gap-1 rounded-[18px] p-1.5"
                   : "flex-col items-stretch gap-0 p-2",
