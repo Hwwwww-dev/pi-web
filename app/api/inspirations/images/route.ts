@@ -7,18 +7,17 @@ export const runtime = "nodejs";
 /**
  * 上传灵感图片。文件名由服务端生成（uuid），客户端永远不提供路径——本路由
  * 与 /api/paste 同一纪律：固定目录 + 生成的文件名，不拓宽 /api/files 的边界。
+ * 路由本身没有动态段，归属（sessionId/itemId）都来自表单。
  */
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ sessionId: string }> }
-) {
-  const { sessionId } = await params;
+export async function POST(req: Request) {
   let form: FormData;
   try {
     form = await req.formData();
   } catch {
     return NextResponse.json({ error: "Expected multipart form data" }, { status: 400 });
   }
+  const sessionId = form.get("sessionId");
+  if (typeof sessionId !== "string") return NextResponse.json({ error: "Missing sessionId" }, { status: 400 });
   const itemId = form.get("itemId");
   if (typeof itemId !== "string") return NextResponse.json({ error: "Missing itemId" }, { status: 400 });
   const file = form.get("file");

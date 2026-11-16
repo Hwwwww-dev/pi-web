@@ -124,6 +124,7 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
       while (pendingImagesRef.current.length > 0) {
         const pendingImage = pendingImagesRef.current[0];
         const form = new FormData();
+        form.set("sessionId", sessionId);
         form.set("itemId", itemId);
         form.set("file", pendingImage.file);
         const res = await fetch(`/api/inspirations/${sessionId}/images`, { method: "POST", body: form });
