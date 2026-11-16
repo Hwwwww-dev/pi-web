@@ -1724,7 +1724,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         : dock.offsetHeight);
       const clamped = Math.max(0, Math.ceil(solid));
       host.style.setProperty("--composer-fade-solid", `${clamped}px`);
-      host.style.setProperty("--composer-fade-end", `${clamped + 96}px`);
+      host.style.setProperty("--composer-fade-end", `${clamped + 48}px`);
     };
     apply();
     const ro = new ResizeObserver(apply);
@@ -2033,10 +2033,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         )}
       >
         {composerFloating && (
-          // 渐隐层覆盖整个停靠区、向下越过安全区贴到屏幕底边，向上延伸 96px
-          // （正好容纳实心终点之上的整段渐隐，不产生截断缝）。底部（含
-          // TODO/YOLO 行与安全区）始终实心，不存在透出背后文字的细缝；实心段
-          // 终点由 --composer-fade-solid 钉在速率行。
+          // 渐隐层覆盖整个停靠区、向下越过安全区贴到屏幕底边，向上延伸 48px
+          // （正好容纳实心终点之上的整段渐隐，不产生截断缝；再高会明显压暗
+          // 上方滚动的消息）。底部（含 TODO/YOLO 行与安全区）始终实心，不
+          // 存在透出背后文字的细缝；实心段终点由 --composer-fade-solid 钉在
+          // 速率行。
           //
           // -z-10 把它压到停靠区（z-30 堆叠上下文）内所有常规内容之后：渐隐层
           // 是 z-auto 的绝对定位元素，不压的话在 phase 8 绘制，会盖住未定位的
@@ -2044,7 +2045,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           // 负 z 只在停靠区上下文内部生效，仍压在消息列表之上。
           <div
             aria-hidden
-            className="chat-composer-fade pointer-events-none absolute inset-x-0 -top-24 -z-10 bottom-[calc(-1*env(safe-area-inset-bottom,0px))]"
+            className="chat-composer-fade pointer-events-none absolute inset-x-0 -top-12 -z-10 bottom-[calc(-1*env(safe-area-inset-bottom,0px))]"
           />
         )}
         {/* The brand (the logo, "Pi Web" and its versions line), then the

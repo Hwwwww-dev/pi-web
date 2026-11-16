@@ -1590,17 +1590,17 @@ span.token.table {
 }
 
 /* 浮动 composer：停靠区背后的内容渐隐层。元素铺满整个停靠区、向下越过
-   安全区贴到屏幕底边、向上延伸 96px（容纳实心终点之上的整段渐隐）。梯度
-   两段：从屏幕底边到 --composer-fade-solid（层底到输入壳层顶边，含安全区，
-   由 ChatWindow 实测）完全不透明——速率行、卡片、TODO/YOLO 行、安全区都
-   不透出背后文字；到 --composer-fade-end（实心终点 +96px）渐隐到透明。
-   停靠点只用 var 引用：calc(var()+env()) 形式在渐变停靠点上会被丢弃，
-   实心段会失效。 */
+   安全区贴到屏幕底边、向上延伸 48px（容纳实心终点之上的整段渐隐；再高会
+   明显压暗上方滚动的消息）。梯度两段：从屏幕底边到 --composer-fade-solid
+   （层底到输入壳层顶边，含安全区，由 ChatWindow 实测）完全不透明——速率
+   行、卡片、TODO/YOLO 行、安全区都不透出背后文字；到 --composer-fade-end
+   （实心终点 +48px）渐隐到透明。停靠点只用 var 引用：calc(var()+env())
+   形式在渐变停靠点上会被丢弃，实心段会失效。 */
 .chat-composer-fade {
   background: linear-gradient(
     to top,
     var(--background) var(--composer-fade-solid, 160px),
-    transparent var(--composer-fade-end, 256px)
+    transparent var(--composer-fade-end, 208px)
   );
 }
 
