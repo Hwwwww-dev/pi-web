@@ -1612,8 +1612,12 @@ span.token.table {
    fresh composer's project bar hid its branch picker on every focus — all
    three are gone. Phone landscape is wider than the mobile breakpoint but
    leaves the least room of all, so short touch screens opt in too; tablets
-   keep their controls because the keyboard leaves them enough height. */
-@media (max-width: 640px), (pointer: coarse) and (max-height: 500px) {
+   keep their controls because the keyboard leaves them enough height.
+   Both arms require a coarse pointer: the flag sets on any editable focus,
+   and a fine pointer (desktop, any window width) has no software keyboard —
+   without the gate a narrow desktop window switched the composer's bottom
+   padding on every focus and the card jumped a few pixels down. */
+@media (max-width: 640px) and (pointer: coarse), (pointer: coarse) and (max-height: 500px) {
   html[data-keyboard-open] .chat-content {
     padding-bottom: 0 !important;
   }
