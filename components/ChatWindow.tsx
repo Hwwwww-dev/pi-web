@@ -728,6 +728,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [activeLeafId, loadContext]);
   // Jump to a minimap turn: one request fetches a window centred on that turn,
   // so the jump does not drag the whole branch in behind it page by page.
+  const minimapJumpInFlightRef = useRef(false);
+  const minimapJumpTargetRef = useRef<string | null>(null);
   const revealTurnForMinimap = useCallback(async (turnNumber: number) => {
     const sid = session?.id;
     const target = minimapTurnIndex[turnNumber];
@@ -735,8 +737,29 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     // 目标不在当前窗口时只取一窗（该轮居中），不拖整条分支；落地后由下面的
     // effect 按 entryId 定位，滚动交给官方 `scrollToMessage`。
     if (!searchHistoryRef.current.entryIds.includes(target.entryId)) {
-      const context = await jumpToEntry(sid, activeLeafId, target.entryId);
-      if (!context) return;
+      // 拖拽会连续掠过未加载轮：单飞 + latest-wins。在途时只记录最新目标，
+      // 本窗落地后补跳最新，不为每个 mousemove 各发一窗请求。
+      if (minimapJumpInFlightRef.current) {
+        minimapJumpTargetRef.current = target.entryId;
+        return;
+      }
+      minimapJumpInFlightRef.current = true;
+      try {
+        let wanted = target.entryId;
+        for (;;) {
+          const entryId = minimapJumpTargetRef.current ?? wanted;
+          minimapJumpTargetRef.current = null;
+          const context = await jumpToEntry(sid, activeLeafId, entryId);
+          if (!context) return;
+          wanted = entryId;
+          if (!minimapJumpTargetRef.current) {
+            setPendingRevealEntryId(entryId);
+            return;
+          }
+        }
+      } finally {
+        minimapJumpInFlightRef.current = false;
+      }
     }
     setPendingRevealEntryId(target.entryId);
   }, [session?.id, minimapTurnIndex, activeLeafId, jumpToEntry]);

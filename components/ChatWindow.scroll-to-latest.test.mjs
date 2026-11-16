@@ -88,10 +88,12 @@ test("clearing the gate re-arms the sentinel without a scroll round-trip", () =>
 test("a minimap jump reads one window, never the whole branch", () => {
   const jump = source.slice(
     source.indexOf("const revealTurnForMinimap"),
-    source.indexOf("const revealTurnForMinimap") + 1200,
+    source.indexOf("const revealTurnForMinimap") + 1700,
   );
-  // 目标不在窗口里就取一窗（该轮居中），落地后按 entryId 定位。
-  assert.match(jump, /await jumpToEntry\(sid, activeLeafId, target\.entryId\)/);
+  // 目标不在窗口里就取一窗（该轮居中），落地后按 entryId 定位；拖拽划过未加载
+  // 区由单飞闸收敛成一次请求，只补跳最新目标。
+  assert.match(jump, /await jumpToEntry\(sid, activeLeafId, entryId\)/);
   assert.match(jump, /setPendingRevealEntryId\(target\.entryId\)/);
+  assert.match(jump, /minimapJumpInFlightRef/);
   assert.doesNotMatch(jump, /tail: 100|tail: 200/);
 });

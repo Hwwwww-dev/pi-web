@@ -100,6 +100,39 @@ function createTurnNodes(turns: TurnInfo[], firstIndex = 0): NodeInfo[] {
   }));
 }
 
+/** A turn listed only by the index: preview and time, nothing measured yet. */
+function indexTurn(descriptor: MinimapTurnDescriptor): TurnInfo {
+  return {
+    userMessage: { role: "user", content: descriptor.preview } as UserMessage,
+    scrollTop: null,
+    toolCount: 0,
+    usageTokens: null,
+    usageCost: null,
+    timestamp: descriptor.timestamp,
+  };
+}
+
+/**
+ * The rail's full turn list, assembled from the independent whole-branch index:
+ * index head (turns before the loaded window) + the window's measured turns +
+ * index tail (turns after it). The three sit in index order, so `node.index`
+ * is the turn number minus one and `turnIndex[node.index]` identifies every
+ * node — loaded or not. Without the index (fetch failed), the rail degrades to
+ * the measured window only.
+ */
+export function assembleTurnNodes(
+  turnIndex: MinimapTurnDescriptor[],
+  turnsBefore: number,
+  measuredTurns: TurnInfo[],
+): NodeInfo[] {
+  const headCount = Math.min(turnIndex.length, Math.max(0, turnsBefore));
+  return [
+    ...createTurnNodes(turnIndex.slice(0, headCount).map(indexTurn)),
+    ...createTurnNodes(measuredTurns, headCount),
+    ...createTurnNodes(turnIndex.slice(headCount + measuredTurns.length).map(indexTurn), headCount + measuredTurns.length),
+  ];
+}
+
 const EMPTY_TURN_INDEX: MinimapTurnDescriptor[] = [];
 
 /** A short absolute time for an unloaded turn's preview card. */
@@ -216,9 +249,6 @@ export const ChatMinimap = memo(function ChatMinimap({
   const previewHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeNodeLockRef = useRef<{ index: number; until: number } | null>(null);
-  const pendingNavigationRef = useRef<{
-    nodeIndex: number;
-  } | null>(null);
 
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -295,27 +325,12 @@ export const ChatMinimap = memo(function ChatMinimap({
 
       // 流式期间内容每 chunk 都在长，RO 会持续触发到这里；全量测量（逐 anchor
       // getBoundingClientRect + 全消息遍历）纯属烧 CPU，跳过（活动节点由 scroll
-      // 事件按上次测量继续同步，流结束后自然会再测）。跳转导航除外：用户明确
-      // 动作，一次性成本换准确定位。
+      // 事件按上次测量继续同步，流结束后自然会再测）。
       const streamingMessage = getStreamingMessage();
-      if (streamingMessage && !pendingNavigationRef.current) return;
+      if (streamingMessage) return;
 
       const refs = messageRefs.current;
       const containerRect = scrollEl.getBoundingClientRect();
-      // Turns listed from the whole-branch index sit ahead of the loaded
-      // window; their messages are not rendered, so they have no scroll
-      // position until their page is fetched and their anchor measures.
-      const headCount = Math.min(turnIndex.length, Math.max(0, turnsBefore));
-      const headNodes = createTurnNodes(
-        turnIndex.slice(0, headCount).map((descriptor) => ({
-          userMessage: { role: "user", content: descriptor.preview } as UserMessage,
-          scrollTop: null,
-          toolCount: 0,
-          usageTokens: null,
-          usageCost: null,
-          timestamp: descriptor.timestamp,
-        })),
-      );
       const measuredTurns: TurnInfo[] = [];
       let refIndex = 0;
       let currentTurn: TurnInfo | null = null;
@@ -366,34 +381,18 @@ export const ChatMinimap = memo(function ChatMinimap({
         }
       }
 
-      // Numbering comes from the whole-branch index once it is known (the JSX
-      // renders node.index + 1 directly); without it (not fetched yet), the
-      // earlier-page count keeps numbers continuous.
-      const nextNodes = [
-        ...headNodes,
-        ...createTurnNodes(measuredTurns, headCount),
-      ];
+      // Node numbering comes from the whole-branch index: head + window + tail
+      // (see assembleTurnNodes). Without the index (not fetched yet), the rail
+      // degrades to the measured window.
+      const nextNodes = assembleTurnNodes(turnIndex, turnsBefore, measuredTurns);
       setMinimapHeight(minimapEl.clientHeight);
       allNodesRef.current = nextNodes;
       setAllNodes(nextNodes);
       const nextVisible = scrollEl.scrollHeight - scrollEl.clientHeight > 20;
       setVisible(nextVisible);
       syncActiveNode(scrollEl, nextNodes);
-
-      const pendingNavigation = pendingNavigationRef.current;
-      const pendingNode = pendingNavigation
-        ? nextNodes.find((node) => node.index === pendingNavigation.nodeIndex)
-        : null;
-      if (pendingNavigation && pendingNode) {
-        const targetTop = pendingNode.targetTurn.scrollTop;
-        if (targetTop === null) return;
-        pendingNavigationRef.current = null;
-        lockActiveNode(pendingNode.index);
-        const targetOffset = scrollEl.clientHeight * 0.3;
-        scrollEl.scrollTo({ top: Math.max(0, targetTop - targetOffset), behavior: "smooth" });
-      }
     }, 150);
-  }, [getStreamingMessage, lockActiveNode, messageRefs, scrollContainer, syncActiveNode, turnIndex, turnsBefore]);
+  }, [getStreamingMessage, messageRefs, scrollContainer, syncActiveNode, turnIndex, turnsBefore]);
 
   useEffect(() => {
     const el = scrollContainer.current;
@@ -435,9 +434,9 @@ export const ChatMinimap = memo(function ChatMinimap({
     if (!scrollEl) return;
     lockActiveNode(node.index);
     if (node.targetTurn.scrollTop === null) {
-      // The next measurement completes the navigation once the turn's anchor
-      // has rendered (revealTurn pages hidden or unloaded history in).
-      pendingNavigationRef.current = { nodeIndex: node.index };
+      // Unloaded turn: the reveal pages its window in (or centers the already
+      // loaded entry); the official scroller lands it, so no measured scroll
+      // of our own here — that used to double-navigate with a second offset.
       onRevealTurn(node.index);
       return;
     }
