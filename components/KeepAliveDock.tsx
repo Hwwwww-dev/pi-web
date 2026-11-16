@@ -27,7 +27,7 @@ const PANEL_GAP_PX = 4;
  * when closed) so opening and closing are the same smooth transition. Escape
  * is intercepted here first so the global shortcut doesn't stop the agent.
  */
-export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessionIds, unreadSessionIds, onSelect, onDismiss, onDismissAll }: {
+export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessionIds, unreadSessionIds, onSelect, onDismiss }: {
   slots: KeepAliveSlot[];
   /** Live catalogue (AppShell's copy of the sidebar scan) for fresh counts. */
   sessions: SessionInfo[];
@@ -36,7 +36,6 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
   unreadSessionIds: Set<string>;
   onSelect: (session: SessionInfo) => void;
   onDismiss: (sessionId: string) => void;
-  onDismissAll: () => void;
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
@@ -222,25 +221,8 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
             : open ? "translate-y-0" : "-translate-y-1",
         )}
       >
-        {/* 头部一行收纳计数与「全部移出」；关闭靠失焦、Esc 或再点胶囊，
-            不设收起钮。行内信息层级：标题 → 状态词 · 消息数 · 时间 → 路径。 */}
-        <div className="flex shrink-0 items-center justify-between gap-2 px-2 pb-1 pt-1.5">
-          <span className="flex items-baseline gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("keepalive.title")}
-            <span className="text-[11px] font-normal tabular-nums text-muted-foreground/70">{slots.length}</span>
-          </span>
-          {slots.some((slot) => slot.session.id !== selectedSessionId) && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              className="h-6 rounded-full px-2 text-[11px] font-normal text-muted-foreground hover:bg-accent/60 hover:text-destructive"
-              onClick={() => { onDismissAll(); closePanel(); }}
-            >
-              {t("keepalive.dismissAll")}
-            </Button>
-          )}
-        </div>
+        {/* 无头部：计数在胶囊上，关闭靠失焦、Esc 或再点胶囊，逐行移出
+            在行尾。行内信息层级：标题 → 状态词 · 消息数 · 时间 → 路径。 */}
         {/* 滚动条放在内层：面板由 maxHeight 封顶、行列表 flex-1 min-h-0
             消化剩余空间，超高即内层滚动；外层圆角 + 裁切，滚动条不会在
             圆角外侧露出方角。 */}

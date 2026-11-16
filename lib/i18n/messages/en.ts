@@ -49,7 +49,6 @@ export const enLocale: LocalePlugin = {
     "settings.keepAliveIdleTimeout": "Auto-close after idle (minutes)",
     "keepalive.title": "Active chats",
     "keepalive.close": "Remove from active",
-    "keepalive.dismissAll": "Remove all from active chats",
     "keepalive.statusIdle": "Idle",
     "keepalive.statusRunning": "Running",
     "keepalive.statusDone": "Finished",

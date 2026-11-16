@@ -1492,16 +1492,6 @@ export function AppShell() {
   }, [keepAliveSlots, selectedSession, handleSelectSession, openNewSessionDraftForCwd]);
 
   // Remove every keep-alive slot except the session currently on screen.
-  const handleKeepAliveDismissAll = useCallback(() => {
-    setKeepAliveSlots((slots) => {
-      const selectedId = selectedSession?.id;
-      for (const slot of slots) {
-        if (slot.session.id !== selectedId) sessionScrollPositionsRef.current.delete(slot.session.id);
-      }
-      return slots.filter((slot) => slot.session.id === selectedId);
-    });
-  }, [selectedSession?.id]);
-
   // The sidebar calls this when the initial session is not in its list.
   const handleInitialRestoreDone = useCallback(() => {
     setInitialSessionRestored(true);
@@ -2888,7 +2878,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 unreadSessionIds={unreadSessionIds}
                 onSelect={handleSelectSession}
                 onDismiss={handleKeepAliveDismiss}
-                onDismissAll={handleKeepAliveDismissAll}
               />
             </>
 
