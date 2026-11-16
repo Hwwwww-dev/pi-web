@@ -6,7 +6,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import { MAX_ATTACHED_IMAGES } from "@/lib/image-attachments";
-import { MAX_INSPIRATION_FILE_BYTES, type Inspiration, type InspirationFileRef } from "@/lib/inspirations";
+import { MAX_INSPIRATION_FILE_BYTES, type Inspiration, type InspirationFileRef } from "@/lib/inspiration-shared";
 import type { Locale } from "@/lib/i18n/types";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

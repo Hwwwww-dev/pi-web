@@ -3,6 +3,11 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import lockfile from "proper-lockfile";
+import { MAX_INSPIRATION_FILE_BYTES, MAX_INSPIRATION_TEXT_CHARS, type Inspiration, type InspirationFileRef } from "./inspiration-shared";
+
+// 共享形态（常量与类型）的真实定义在 lib/inspiration-shared.ts；re-export 保持既有 import 路径不变。
+export { MAX_INSPIRATION_FILE_BYTES, MAX_INSPIRATION_TEXT_CHARS };
+export type { Inspiration, InspirationFileRef };
 
 /**
  * 灵感的单一存储来源：每个会话一个 JSON（`<sessionId>.json`），附件（图片与
@@ -18,27 +23,7 @@ import lockfile from "proper-lockfile";
  * 流程里同步改动，任何一方都不会被单独改写。
  */
 
-/** 与 composer 附件同一上限：灵感就是要回到输入框的，超限的存了也发不出。 */
-export const MAX_INSPIRATION_FILE_BYTES = 10 * 1024 * 1024;
-/** 灵感文本上限：超过它是把整份文档当灵感存（粘贴有 /api/paste 负责）。 */
-export const MAX_INSPIRATION_TEXT_CHARS = 64 * 1024;
-
 /** 附件引用：id 定位文件；name/mime 供列表与「实现」直接使用（见上方同步说明）。 */
-export interface InspirationFileRef {
-  id: string;
-  name: string;
-  mime: string;
-}
-
-export interface Inspiration {
-  id: string;
-  text: string;
-  files: InspirationFileRef[];
-  createdAt: string;
-  updatedAt: string;
-  doneAt: string | null;
-  deletedAt: string | null;
-}
 
 interface InspirationFileRecord {
   file: string;
