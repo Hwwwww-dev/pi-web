@@ -22,7 +22,7 @@ import { useI18n } from "@/hooks/useI18n";
 const RATE_HOLD_MS = 6000;
 
 /** `[速度徽标 + ↓token 数]`——原 AssistantMessageHeader 的计量段。胶囊定宽
- *  （w-[4.25rem] 容纳 "999.9 t/s"），数字位数变化不推挤同行内容；流式中按
+ *  （w-[5rem] 容纳 "999.9 t/s" 并留出左右各 10px 内边距），数字位数变化不推挤同行内容；流式中按
  *  五档变色（<15 红、15–30 黄、30–50 绿、50–120 蓝、>120 彩虹），静态一律
  *  中性灰无底色，无读数显示 0.0。 */
 export function StreamRateBadge({ tokens, tps, streaming }: { tokens: number; tps: number | null; streaming: boolean }) {
@@ -33,7 +33,7 @@ export function StreamRateBadge({ tokens, tps, streaming }: { tokens: number; tp
     <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground" title={t("i18n.estimatedTokens")}>
       {rate !== null ? (
         <span
-          className={`inline-flex w-[4.25rem] shrink-0 items-center justify-center rounded-md px-1.5 text-xs leading-tight font-medium tabular-nums transition-colors duration-300 ${
+          className={`inline-flex w-[5rem] shrink-0 items-center justify-center rounded-md px-2.5 text-xs leading-tight font-medium tabular-nums transition-colors duration-300 ${
             rate > 120 ? "relative isolate overflow-hidden text-white"
               : rate >= 50 ? "bg-info/15 text-info"
               : rate >= 30 ? "bg-success/15 text-success"
@@ -52,7 +52,7 @@ export function StreamRateBadge({ tokens, tps, streaming }: { tokens: number; tp
           {rate.toFixed(1)} t/s
         </span>
       ) : (
-        <span className="inline-flex w-[4.25rem] shrink-0 items-center justify-center rounded-md px-1.5 text-xs leading-tight font-medium tabular-nums text-muted-foreground transition-colors duration-300">
+        <span className="inline-flex w-[5rem] shrink-0 items-center justify-center rounded-md px-2.5 text-xs leading-tight font-medium tabular-nums text-muted-foreground transition-colors duration-300">
           {(tps ?? 0).toFixed(1)} t/s
         </span>
       )}

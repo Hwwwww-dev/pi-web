@@ -1155,6 +1155,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return await flight;
   }, [applyLiveUsage, applyRecordedQueueSnapshot, setToolPresetState, syncLiveModel]);
 
+  const syncEntryIdsAfterRun = useCallback((sid: string) => {
+    // 条目 id 只有读盘才拿得到（SSE 只追加消息），而编辑 / 分叉两个按钮以
+    // entryId 为开关：回合结束后如果 id 数组比消息短，补一次锚定合并读把它
+    // 对齐。id 齐了就跳过；同一会话并发调用由 loadSession 的 single-flight 合并。
+    if (entryIdsRef.current.length >= messagesRef.current.length) return;
+    void loadSession(sid);
+  }, [loadSession]);
+
   const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { signal?: AbortSignal }) => {
     try {
       // 同一页正在请求中：滚动到顶部与预取可能并发触发，重复返回会导致该页被 prepend 两次。
@@ -2170,8 +2178,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         const wasRunning = settleUiStage();
         setIsCompacting(false);
         if (sid) {
-          // 不读盘：回合结束的消息已由 SSE 送达，落盘内容的同步由顶栏「重新加载」
-          // 手动触发。工具栏的活跃读数走下面的快速通路。
+          // 落盘条目的同步：本回合的行是 SSE 追加的，没有 entryId，编辑 / 分叉
+          // 按钮就不会出现（复制不依赖它）。id 缺失时补一次读，齐了之后不再读。
+          syncEntryIdsAfterRun(sid);
           refreshStatsRef.current?.();
           scheduleEventStreamClose(sid);
         }
@@ -2197,7 +2206,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           // agent_settled event perform the next completion transition.
           if (!sdkAgentActiveRef.current) {
             settleUiStage();
-            if (sid) scheduleEventStreamClose(sid);
+            if (sid) {
+              syncEntryIdsAfterRun(sid);
+              scheduleEventStreamClose(sid);
+            }
           }
         }
         break;
@@ -2406,7 +2418,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setExtensionDialogs((queue) => removeExtensionUiRequest(queue, event.id as string));
         break;
     }
-  }, [activeToolsStore, addNotice, agentPhaseStore, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, notifyPromptStage, onAgentEnd, onToolEnd, refreshContextUsage, scheduleEventStreamClose, settleUiStage, syncLiveModel]);
+  }, [activeToolsStore, addNotice, agentPhaseStore, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, notifyPromptStage, onAgentEnd, onToolEnd, refreshContextUsage, scheduleEventStreamClose, settleUiStage, syncEntryIdsAfterRun, syncLiveModel]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {

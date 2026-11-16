@@ -111,7 +111,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
   return (
     <div
       ref={rootRef}
-      className="absolute left-0 z-30 max-[640px]:hidden -translate-y-1/2"
+      className="absolute left-2 z-30 min-[641px]:left-0 -translate-y-1/2"
       style={{ top: `${topPct}%` }}
     >
       <Popover

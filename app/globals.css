@@ -1388,10 +1388,14 @@ span.token.table {
     width: var(--right-panel-width, clamp(360px, 42vw, 640px));
     min-width: 300px;
   }
+  /* 关闭后只把宽度归零：1px ring 与 14px 圆角仍会画在视口右缘，成了一道
+     发丝线 + 圆角弧。关掉这两样，面板才是真的不见。 */
   .right-panel-container.right-panel-closed {
     width: 0;
     min-width: 0;
     margin-right: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
   /* keep inner content at fixed width so opening/closing the container never squishes it */
   .right-panel-container > * {
@@ -1438,10 +1442,17 @@ span.token.table {
   }
   .right-panel-container.right-panel-open {
     transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.2s ease, visibility 0s;
   }
+  /* translateX(100%) 只把盒子推出 right:8px 之外，屏幕右缘仍留着这 8px
+     面板本体，加上 -12px 的投影就是那条「面板的一角」。关闭后整块不画：
+     visibility 延迟到滑出动画结束才切换，滑动本身不受影响。 */
   .right-panel-container.right-panel-closed {
     transform: translateX(100%);
     pointer-events: none;
+    visibility: hidden;
+    transition: transform 0.2s ease, visibility 0s linear 0.2s;
   }
   .right-panel-container > * {
     width: 100%;
@@ -1595,6 +1606,9 @@ span.token.table {
    四外羽化，随卡片尺寸变化自动跟随，无 JS 测距。 */
 .chat-composer-halo {
   box-shadow: 0 0 24px 12px var(--background);
+  /* 只留上下羽化：左右在卡片自身的边缘硬裁，光晕不再糊到旁边的消息上。
+     上下各留 40px（24 blur + 12 spread 之外还有余量），裁剪不会截到羽化带。 */
+  clip-path: inset(-40px 0 -40px 0);
 }
 
 /* While the software keyboard is up (set by useViewportHeight), only a few

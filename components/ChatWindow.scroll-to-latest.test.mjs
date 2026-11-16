@@ -16,8 +16,10 @@ test("one scroll-to-latest control, and it is the official one", () => {
 test("the official scroller owns following, prepend anchoring and the bottom edge", () => {
   // autoScroll 打开：贴底时跟随、向上滚动即脱开、程序滚动期间由它自己标记
   // （data-autoscrolling）。行窗口与手工前插保位都已删除，因此这里不能再有
-  // 自己的跟随状态机。
-  assert.match(source, /<MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  // 自己的跟随状态机。折叠动画期间必须能关掉跟随（`pi-web:trace-fold`）：
+  // 展开的块向下长高，跟着底会把读者的视口拉到新底。
+  assert.match(source, /<MessageScrollerProvider autoScroll=\{!foldInFlight\} defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  assert.match(source, /addEventListener\("pi-web:trace-fold"/);
   assert.doesNotMatch(source, /autoScroll=\{false\}/);
   assert.doesNotMatch(source, /useChatFollow|chat-follow|lib\/scroll-anchor/);
   // Hand-rolled compensation must not sit next to the official one.

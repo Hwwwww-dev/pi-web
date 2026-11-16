@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
@@ -33,6 +33,12 @@ export function Reveal({ open, children, className, contentClassName }: {
   // 从未打开过就不挂载：在 flex-col + gap 的父容器里，一个恒在的 0 高包裹层
   // 仍会占一个 gap 槽位（幽灵间隙）；退场动画播完（160ms）再卸载。
   const mounted = useDelayedUnmount(open, 170);
+  // 与 TraceRow 的 useFoldAnchor 同一契约：折叠那几帧告诉列表别贴底跟随，
+  // 否则展开的块被底部跟随拉上去，看起来就是「一打开视口就上跳」。
+  useEffect(() => {
+    if (!mounted) return;
+    window.dispatchEvent(new Event("pi-web:trace-fold"));
+  }, [open, mounted]);
   if (!mounted) return null;
   return (
     <Collapsible open={open} data-slot="reveal" className={cn("min-w-0", className)}>
