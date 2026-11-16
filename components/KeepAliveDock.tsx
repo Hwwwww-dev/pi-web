@@ -186,8 +186,11 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                 <div
                   key={info.id}
                   className={cn(
-                    "group relative flex items-start gap-1 rounded-lg pr-1",
-                    isSelected ? "bg-accent" : "hover:bg-accent/60",
+                    "group relative flex items-start gap-1 rounded-lg pr-1 transition-colors",
+                    // 当前会话必须一眼认得出：暗色下 popover(0.145) 与 accent(0.205) 只差一档，
+                    // `bg-accent` 几乎溶于弹框底色。改用 primary 淡底 + 内描边（暗色的 primary
+                    // 是近白，亮色的 primary 是近黑，两边都是同档对比）。
+                    isSelected ? "bg-primary/12 ring-1 ring-primary/30 ring-inset" : "hover:bg-accent/60",
                   )}
                 >
                   <Button
