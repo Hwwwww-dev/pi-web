@@ -23,15 +23,10 @@ export function InspirationDialog({ sessionId, open, onOpenChange, onImplement }
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          // 布局：一列，核心占满；滚动在核心内部，壳上没有第二处。
-          "flex flex-col gap-0 overflow-hidden p-0",
-          // 手机：全屏 sheet——直角贴边、以视口变量定高（键盘期随 dvh 缩）。
-          // 直角与底色分两行写（设计门：涂底色的行不得带半径覆写）。
-          "top-0 left-0 h-[var(--app-viewport-height,100dvh)] w-full max-w-full translate-x-0 translate-y-0 rounded-none border-0",
-          // 桌面：居中卡片。
-          "sm:top-[50%] sm:left-[50%] sm:h-auto sm:max-h-[min(85dvh,640px)] sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg sm:border",
-          // 表面。
-          "bg-background text-foreground shadow-lg",
+          // 与设置弹窗同一壳：手机由 settings-card-safe 定几何（居中浮卡，
+          // 独立安装态扣安全区），桌面是大卡片；滚动只在核心内部。
+          "settings-card-safe z-[1000] flex flex-col gap-0 overflow-hidden p-0",
+          "h-[84vh] max-h-[calc(100dvh-16px)] w-[min(1080px,calc(100vw-16px))] max-w-none sm:max-w-none rounded-xl",
         )}
       >
         {/* Radix 要求 Content 内有 Title；核心自己的 h2 是可见标题，这里补无障碍位。 */}

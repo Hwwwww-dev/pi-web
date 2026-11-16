@@ -1050,7 +1050,7 @@ export const zhCNLocale: LocalePlugin = {
     "inspiration.timeCreated": "创建于",
     "inspiration.timeDone": "完成于",
     "inspiration.timeDeleted": "删除于",
-    "inspiration.emptyActive": "还没有灵感，想到什么先记下来。",
+    "inspiration.emptyActive": "有灵感，想到什么先记下来。",
     "inspiration.emptyDone": "还没有完成的灵感。",
     "inspiration.emptyDeleted": "没有已删除的灵感。",
     "inspiration.tooManyImages": "图片最多 {max} 张。",

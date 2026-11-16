@@ -1050,7 +1050,7 @@ export const enLocale: LocalePlugin = {
     "inspiration.timeCreated": "Created",
     "inspiration.timeDone": "Done",
     "inspiration.timeDeleted": "Deleted",
-    "inspiration.emptyActive": "Nothing here yet — jot an idea down.",
+    "inspiration.emptyActive": "Got an idea? Jot it down.",
     "inspiration.emptyDone": "Nothing marked done yet.",
     "inspiration.emptyDeleted": "Nothing deleted.",
     "inspiration.tooManyImages": "Up to {max} images.",

@@ -1050,7 +1050,7 @@ export const zhTWLocale: LocalePlugin = {
     "inspiration.timeCreated": "建立於",
     "inspiration.timeDone": "完成於",
     "inspiration.timeDeleted": "刪除於",
-    "inspiration.emptyActive": "還沒有靈感，想到什麼先記下來。",
+    "inspiration.emptyActive": "有靈感，想到什麼先記下來。",
     "inspiration.emptyDone": "還沒有完成的靈感。",
     "inspiration.emptyDeleted": "沒有已刪除的靈感。",
     "inspiration.tooManyImages": "圖片最多 {max} 張。",

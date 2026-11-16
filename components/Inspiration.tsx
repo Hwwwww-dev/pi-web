@@ -306,13 +306,14 @@ export function Inspiration({ sessionId, onImplement, onClose, className }: {
             <h2 className="text-base">{t("inspiration.title")}</h2>
             <Button
               type="button"
-              variant="outline"
-              size="xs"
-              className="pointer-coarse:min-h-9"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("inspiration.actionCreate")}
+              title={t("inspiration.actionCreate")}
+              className="pointer-coarse:min-h-9 pointer-coarse:min-w-9 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => openEditor(null)}
             >
-              <PlusIcon data-icon="inline-start" aria-hidden="true" />
-              {t("inspiration.actionCreate")}
+              <PlusIcon aria-hidden="true" />
             </Button>
           </div>
           <Tabs value={tab} onValueChange={(value) => setTab(value as TabValue)} className="flex min-h-0 flex-1 flex-col gap-0">
@@ -543,7 +544,8 @@ function EditorPage({ creating, text, onTextChange, savedImages, pendingImages, 
             }
           }}
           placeholder={t("inspiration.editorPlaceholder")}
-          className="min-h-40 w-full resize-none rounded-lg border border-border bg-transparent p-3 text-sm leading-[1.55] text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none"
+          // 触屏 16px：小于它 iOS 聚焦时会把整页放大。
+          className="min-h-40 w-full resize-none rounded-lg border border-border bg-transparent p-3 text-sm leading-[1.55] text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none pointer-coarse:text-base"
         />
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="xs" className="pointer-coarse:min-h-9" onClick={onAddImages}>
