@@ -18,6 +18,7 @@ import { dropMentionText, splitDroppedItems, uploadFiles, type DroppedItem } fro
 import { buildAtMentionText } from "@/lib/file-fuzzy";
 import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
 import { ActiveToolsContext, TurnActivityBody, TurnMetaLine } from "./ActivityRows";
+import { InspirationDialog } from "./InspirationDialog";
 import { MarkdownBody } from "./MarkdownBody";
 import { ActivityNoticeLine, ChatInput, getUserMessageDraftImages, getUserMessageText, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
@@ -419,6 +420,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   } | null>(null);
   const [quoteInputOpen, setQuoteInputOpen] = useState(false);
   const [quoteAskTarget, setQuoteAskTarget] = useState<"side" | "new">("side");
+  const [inspirationOpen, setInspirationOpen] = useState(false);
   const [quoteSubmitting, setQuoteSubmitting] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const quotePopoverRef = useRef<HTMLDivElement | null>(null);
@@ -1231,6 +1233,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     }
   }, [addNotice, chatInputRef, t]);
 
+  // 💡灵感「实现」：文本与图片装进输入框（不自动发送），焦点回到输入框。
+  const handleImplementInspiration = useCallback((text: string, images: File[]) => {
+    if (text) chatInputRef?.current?.insertText(text);
+    if (images.length > 0) chatInputRef?.current?.addImages(images);
+    chatInputRef?.current?.focus();
+  }, [chatInputRef]);
+
   const onDrop = useCallback((items: DroppedItem[]) => {
     const { images, files, folders } = splitDroppedItems(items);
     if (images.length > 0) chatInputRef?.current?.addImages(images);
@@ -1339,6 +1348,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       draftKey={session?.id ?? newSessionDraftKey ?? undefined}
       cwd={session?.cwd ?? newSessionCwd}
       onAttachFiles={onAttachFiles}
+      onOpenInspirations={session ? () => setInspirationOpen(true) : undefined}
     />
   );
 
@@ -2131,6 +2141,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           簇高于正中：保持簇完整，品牌块不与浮层重叠。 */}
       {isEmptyNew && <div className="min-h-0 flex-1 max-sm:flex-[2]" />}
     </div>
+    {/* 💡灵感：会话隔离；灵感按 session.id 归档，新会话（无 session）不挂。 */}
+    {session && (
+      <InspirationDialog
+        sessionId={session.id}
+        open={inspirationOpen}
+        onOpenChange={setInspirationOpen}
+        onImplement={handleImplementInspiration}
+      />
+    )}
     </ActiveToolsContext>
   );
 });

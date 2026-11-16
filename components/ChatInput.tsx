@@ -54,6 +54,7 @@ import {
   FolderClosedIcon,
   HistoryIcon,
   ImageIcon,
+  LightbulbIcon,
   ListPlusIcon,
   MessagesSquareIcon,
   MergeIcon,
@@ -190,6 +191,8 @@ interface Props {
   cwd?: string | null;
   /** Files picked with the attach button, handled like files dropped onto the chat. Without it the button takes images only. */
   onAttachFiles?: (files: File[]) => void;
+  /** 灵感入口：无会话（无归属）时不传，按钮不渲染。 */
+  onOpenInspirations?: () => void;
 }
 
 export interface ChatInputHandle {
@@ -882,6 +885,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   draftKey,
   cwd,
   onAttachFiles,
+  onOpenInspirations,
   onPasteLargeText,
   compact = false,
 }: Props, ref) {
@@ -2700,6 +2704,23 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     </TooltipTrigger>
                     <TooltipContent>{t("chat.attachFiles")}</TooltipContent>
                   </Tooltip>
+                  {/* 💡灵感：会话隔离的捕获箱；无会话（无归属）时不挂。 */}
+                  {onOpenInspirations && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={onOpenInspirations}
+                          aria-label={t("inspiration.title")}
+                          className="rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        >
+                          <LightbulbIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("inspiration.title")}</TooltipContent>
+                    </Tooltip>
+                  )}
                   {/* Model selector - visible always, busy while a switch is pending; a switch
                       during a run applies from its next request.
                       flex-shrink 8: the model pill gives up width first; the other pills only truncate. */}
