@@ -1713,18 +1713,23 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (!dock || !host || panel) return;
     const apply = () => {
       host.style.setProperty("--composer-dock-h", `${dock.offsetHeight}px`);
-      // 渐变实心段终点＝输入壳层顶边（速率行正上方）：从屏幕底边到速率行
-      // 全部不透明，速率行往上再渐隐。实心值从渐隐层的底边起算（层底越过
-      // 安全区贴到屏幕底边），env 内嵌进值里——渐变停靠点不接受 calc+env。
-      // 壳层缺失时退化为整段停靠区实心。
-      const shell = dock.querySelector<HTMLElement>(".chat-input-shell");
+      // 实心平台＝输入卡片本身：卡片下沿以下（TODO/YOLO 行、安全区）与上
+      // 沿以上（速率行）都属于渐变，只有输入框是实心。距离从渐隐层的底边
+      // 起算（层底越过安全区贴到屏幕底边），env 内嵌进值里——渐变停靠点不
+      // 接受 calc+env。卡片缺失时退化为整段停靠区实心。
+      const card = dock.querySelector<HTMLElement>(".chat-composer-row");
       const envInset = parseFloat(getComputedStyle(host).paddingBottom) || 0;
-      const solid = envInset + (shell
-        ? dock.getBoundingClientRect().bottom - shell.getBoundingClientRect().top
-        : dock.offsetHeight);
-      const clamped = Math.max(0, Math.ceil(solid));
-      host.style.setProperty("--composer-fade-solid", `${clamped}px`);
-      host.style.setProperty("--composer-fade-end", `${clamped + 16}px`);
+      const dockBottom = dock.getBoundingClientRect().bottom;
+      const start = Math.max(0, Math.ceil(card
+        ? envInset + (dockBottom - card.getBoundingClientRect().bottom)
+        : 0));
+      const end = Math.ceil(card
+        ? envInset + (dockBottom - card.getBoundingClientRect().top)
+        : envInset + dock.offsetHeight);
+      const solidEnd = Math.max(start, end);
+      host.style.setProperty("--composer-solid-start", `${start}px`);
+      host.style.setProperty("--composer-solid-end", `${solidEnd}px`);
+      host.style.setProperty("--composer-fade-end", `${solidEnd + 16}px`);
     };
     apply();
     const ro = new ResizeObserver(apply);
@@ -1732,7 +1737,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return () => {
       ro.disconnect();
       host.style.removeProperty("--composer-dock-h");
-      host.style.removeProperty("--composer-fade-solid");
+      host.style.removeProperty("--composer-solid-start");
+      host.style.removeProperty("--composer-solid-end");
       host.style.removeProperty("--composer-fade-end");
     };
   }, [panel]);
@@ -2033,11 +2039,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         )}
       >
         {composerFloating && (
-          // 渐隐层覆盖整个停靠区、向下越过安全区贴到屏幕底边，向上延伸 16px
-          // （正好容纳实心终点之上的整段渐隐，只软化速率行上沿，不触碰上方
-          // 滚动的消息）。底部（含 TODO/YOLO 行与安全区）始终实心，不存在
-          // 透出背后文字的细缝；实心段终点由 --composer-fade-solid 钉在速率
-          // 行。
+          // 渐隐层覆盖整个停靠区、向下越过安全区贴到屏幕底边，向上延伸
+          // 16px（容纳卡片上沿之上的窄渐隐）。只有输入卡片是实心平台：卡片
+          // 外的空隙——下方的 TODO/YOLO 行与安全区、上方的速率行——都是渐
+          // 变的过渡带；卡片上沿只软化 16px，不压暗上方滚动的消息。
           //
           // -z-10 把它压到停靠区（z-30 堆叠上下文）内所有常规内容之后：渐隐层
           // 是 z-auto 的绝对定位元素，不压的话在 phase 8 绘制，会盖住未定位的

@@ -1590,17 +1590,18 @@ span.token.table {
 }
 
 /* 浮动 composer：停靠区背后的内容渐隐层。元素铺满整个停靠区、向下越过
-   安全区贴到屏幕底边、向上延伸 16px（只容纳实心终点之上的窄渐隐带，软
-   化速率行上沿，不触碰上方滚动的消息）。梯度两段：从屏幕底边到
-   --composer-fade-solid（层底到输入壳层顶边，含安全区，由 ChatWindow 实
-   测）完全不透明——速率行、卡片、TODO/YOLO 行、安全区都不透出背后文字；
-   到 --composer-fade-end（实心终点 +16px）渐隐到透明。停靠点只用 var 引
-   用：calc(var()+env()) 形式在渐变停靠点上会被丢弃，实心段会失效。 */
+   安全区贴到屏幕底边。只有输入卡片本身是实心平台：卡片下沿以下（TODO/
+   YOLO 行、安全区）与上沿以上（速率行）都属于渐变——下沿从屏幕底边向
+   上升到实心，上沿 16px 内渐隐到透明，速率行上方滚动的消息不再被成片压
+   暗。距离由 ChatWindow 从层底边实测写入（层底越过安全区贴到屏幕底边），
+   停靠点只用 var 引用：calc(var()+env()) 在渐变停靠点上会被静默丢弃。 */
 .chat-composer-fade {
   background: linear-gradient(
     to top,
-    var(--background) var(--composer-fade-solid, 160px),
-    transparent var(--composer-fade-end, 176px)
+    transparent 0px,
+    var(--background) var(--composer-solid-start, 44px),
+    var(--background) var(--composer-solid-end, 190px),
+    transparent var(--composer-fade-end, 206px)
   );
 }
 
