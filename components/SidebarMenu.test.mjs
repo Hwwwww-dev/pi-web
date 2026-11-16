@@ -321,3 +321,12 @@ test("Radix owns the shell: the controlled hidden trigger and the dismissal wiri
   // The bodies' Escape stays in the menu (the "New worktree…" form).
   assert.match(component, /BODY_ESC_SELECTOR = "\[data-sidebar-menu-esc-to-body\]"/);
 });
+
+test("checked rows hide only the stock indicator span, never their own icon and label", () => {
+  // The worktree rows are all checked items; a bare [&>span]:hidden once hid
+  // the row's own spans too, leaving an empty row (a black menu in the dark
+  // theme). The stock indicator is the CheckboxItem's first child span —
+  // target it and nothing else. The static branch never had the hack.
+  assert.match(component, /\[&>span:first-child\]:hidden/);
+  assert.doesNotMatch(component, /\[&>span\]:hidden/);
+});

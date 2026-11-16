@@ -494,7 +494,7 @@ function MenuRow({ item, onActivate, radix = true }: {
         disabled={item.disabled}
         title={tooltipTitle}
         data-sidebar-menu-item=""
-        className={`${className} pr-2 pl-2.5 [&>span]:hidden`}
+        className={`${className} pr-2 pl-2.5 [&>span:first-child]:hidden`}
         onSelect={(event) => onActivate(item, false, event)}
       >
         {inner}

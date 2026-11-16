@@ -103,6 +103,11 @@ interface DropdownOption {
   secondary?: string;
 }
 
+// 长标签不省略：与侧栏菜单的路径标签同一套策略——横向滚动（rtl 起始即
+// 显示尾部，滚去头部）、隐藏滚动条、内层 plaintext 隔离避免 rtl 重排，
+// 悬停另有完整 title 兜底。
+const SCROLLING_LABEL_CLASS = "min-w-0 whitespace-nowrap overflow-x-auto overflow-y-hidden [direction:rtl] [text-overflow:clip] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>span]:[unicode-bidi:plaintext]";
+
 /** Repository / branch picker on the official Select: the trigger shows the
  *  option's primary label (plus its secondary path right-aligned) and the
  *  list opens under the trigger at the trigger's width. */
@@ -134,9 +139,9 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
         <span className="flex shrink-0 items-center text-muted-foreground" aria-hidden="true">{icon}</span>
         {selected ? (
           <>
-            <span className="min-w-0 flex-1 truncate">{selected.primary}</span>
+            <span className="min-w-0 flex-1 truncate" title={selected.primary}>{selected.primary}</span>
             {selected.secondary && (
-              <span className="max-w-[45%] shrink-0 truncate font-mono text-xs text-muted-foreground">{selected.secondary}</span>
+              <span className="max-w-[45%] shrink-0 truncate font-mono text-xs text-muted-foreground" title={selected.secondary}>{selected.secondary}</span>
             )}
           </>
         ) : (
@@ -147,8 +152,9 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
         position="popper"
         sideOffset={4}
         // 定位：面板锚定于触发器正下方，宽度随触发器拉伸；面板上的竖向平移
-        // 手势类保证 iOS 独立模式侧滑返回中滚动可用（OPT-git-6）。
-        className="w-[var(--radix-select-trigger-width)] touch-pan-y"
+        // 手势类保证 iOS 独立模式侧滑返回中滚动可用（OPT-git-6）。高度钳在
+        // 480px 内（分支列表不再拉满视口），且永不超出可用视口余量。
+        className="w-[var(--radix-select-trigger-width)] touch-pan-y max-h-[min(480px,var(--radix-select-content-available-height))]"
       >
         {options.map((option) => (
           <SelectItem
@@ -156,9 +162,9 @@ function GitDropdown({ value, options, onSelect, ariaLabel, placeholder, icon, d
             value={option.value}
             className="min-h-9 h-auto gap-[7px] py-1.5 text-xs text-muted-foreground data-[state=checked]:text-foreground"
           >
-            <span className="shrink-0 truncate">{option.primary}</span>
+            <span className={SCROLLING_LABEL_CLASS} title={option.primary}><span>{option.primary}</span></span>
             {option.secondary && (
-              <span className="min-w-0 flex-1 truncate text-right font-mono text-xs text-muted-foreground">{option.secondary}</span>
+              <span className={`flex-1 text-right font-mono text-xs text-muted-foreground ${SCROLLING_LABEL_CLASS}`} title={option.secondary}><span>{option.secondary}</span></span>
             )}
           </SelectItem>
         ))}
