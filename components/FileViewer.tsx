@@ -1425,15 +1425,16 @@ function TextFileViewer({
         {/* Everything that describes the file truncates inside this group, so the
             actions on the right can never sit on top of the path or the counts. */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {/* 文件名为首要信息，不压缩、不省略；路径不再占卡头一行，点击文件名
-              弹出完整路径（有目录部分才可点）。 */}
-          <CodeBlockTitle className="flex shrink-0 items-center gap-1.5 text-sm font-medium">
+          {/* 路径不再占卡头一行，点击文件名弹出完整路径（有目录部分才可点）。
+              名字优先但必须可收缩（min-w-0 + truncate）：面板一窄，不可收缩的
+              名字会把元信息和动作整个顶出卡头——点击区也被裁掉，点了没反应。 */}
+          <CodeBlockTitle className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
             <FileIcon aria-hidden="true" strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
             {getRelativeFilePath(filePath, cwd) !== getFileName(filePath) ? (
               <Popover>
                 <PopoverTrigger asChild>
-                  <button type="button" title={filePath} className="cursor-pointer whitespace-nowrap">
-                    {getFileName(filePath)}
+                  <button type="button" title={filePath} className="min-w-0 cursor-pointer">
+                    <span className="block truncate">{getFileName(filePath)}</span>
                   </button>
                 </PopoverTrigger>
                 <PopoverContent align="start" className="w-auto max-w-[min(90vw,560px)] break-all font-mono text-xs">
@@ -1441,10 +1442,10 @@ function TextFileViewer({
                 </PopoverContent>
               </Popover>
             ) : (
-              <span className="whitespace-nowrap">{getFileName(filePath)}</span>
+              <span className="min-w-0 truncate">{getFileName(filePath)}</span>
             )}
           </CodeBlockTitle>
-          <span className="hidden min-w-0 shrink truncate text-xs text-muted-foreground sm:inline" title={metadata}>
+          <span className="hidden min-w-0 shrink-[3] truncate text-xs text-muted-foreground sm:inline" title={metadata}>
             {metadata}
           </span>
           {isDeletedDiff ? undefined : (

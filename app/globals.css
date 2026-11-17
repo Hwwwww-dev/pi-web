@@ -1431,6 +1431,9 @@ span.token.table {
     top: 8px;
     right: calc(8px + env(safe-area-inset-right));
     bottom: 8px;
+    /* AppShell 的 h-full 在这里赢了 top/bottom 拉伸：高度变成视口全高，
+       底部整体溢出 8px（平板竖屏段）。显式归 auto，让 top/bottom 定高。 */
+    height: auto;
     z-index: 250;
     width: min(560px, calc(100vw - 48px));
     min-width: 300px;
