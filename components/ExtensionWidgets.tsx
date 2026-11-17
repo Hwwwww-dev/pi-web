@@ -153,7 +153,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
               event.preventDefault();
             }
           }}
-          className="z-50 w-[min(460px,calc(100vw-16px))] overflow-hidden rounded-xl border bg-popover p-0 text-popover-foreground shadow-md data-[state=closed]:pointer-events-none data-[state=open]:duration-150 data-[state=closed]:duration-150"
+          className="z-(--z-popover) w-[min(460px,calc(100vw-16px))] overflow-hidden rounded-xl border bg-popover p-0 text-popover-foreground shadow-md data-[state=closed]:pointer-events-none data-[state=open]:duration-150 data-[state=closed]:duration-150"
         >
           <div className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{expandedWidget.key}</div>
           {/* Extension widgets render TUI output: tables, progress bars and box drawing

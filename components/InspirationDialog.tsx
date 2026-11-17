@@ -26,7 +26,7 @@ export function InspirationDialog({ sessionId, open, onOpenChange, onImplement }
         className={cn(
           // 与设置弹窗同一壳：手机由 settings-card-safe 定几何（居中浮卡，
           // 独立安装态扣安全区），桌面是大卡片；滚动只在核心内部。
-          "settings-card-safe z-[1000] flex flex-col gap-0 overflow-hidden p-0",
+          "settings-card-safe z-(--z-modal) flex flex-col gap-0 overflow-hidden p-0",
           "h-[84vh] max-h-[calc(100dvh-16px)] w-[min(1080px,calc(100vw-16px))] max-w-none sm:max-w-none rounded-xl",
         )}
       >

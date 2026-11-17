@@ -159,6 +159,27 @@
   }
 }
 
+/* ── 全局层级梯（z-index 唯一真值源）──────────────────────────────
+   只收全局层（fixed/sticky 顶栏、portal 浮层、模态、右面板）；卡片内部的
+   z-10/z-[1] 这类局部栈只在自身 stacking context 里比较，不进这张表。
+   约束链（每条都曾是散落在注释里的口头约定）：
+     页内容 < 顶栏 < 聊天浮层 < 面板遮罩 < 右面板 < portal 弹层 < tooltip
+     < 顶栏弹出卡 < 划词工具条 < 模态 < 模态之上的嵌套层。间隙 10 留插空。 */
+:root {
+  --z-app-header: 30;         /* 顶栏（盖过聊天列的 minimap 轨道 25） */
+  --z-chat-float: 40;         /* 聊天区全幅浮层：扩展对话框容器 */
+  --z-chat-float-raised: 41;  /* 同槽位靠上的一层：扩展自定义 UI 容器 */
+  --z-panel-backdrop: 60;     /* 平板段右面板遮罩（641–959px） */
+  --z-panel: 70;              /* 右面板浮层/全宽/手机全屏 + 拖拽把手 */
+  --z-popover: 80;            /* portal 浮层默认：popover/select/dropdown */
+  --z-tooltip: 85;            /* 悬停提示：高于弹层，低于划词工具条 */
+  --z-flyout: 90;             /* 顶栏弹出卡 HeaderFlyout */
+  --z-flyout-top: 92;         /* 顶栏弹出卡之上的清单：Agent 清单、侧栏菜单 */
+  --z-selection-toolbar: 95;  /* 划词工具条：页面最高的事务浮层 */
+  --z-modal: 100;             /* 模态：dialog / alert-dialog / sheet / 移动端抽屉 */
+  --z-modal-raised: 110;      /* 模态之上的嵌套层：模态内 Select、嵌套对话框 */
+}
+
 :root {
   color-scheme: light;
   /* shadcn 官方 neutral 基色（ui.shadcn.com/docs/theming 原值）。 */
@@ -1305,7 +1326,8 @@ span.token.table {
 /* Keep the panel border as the idle separator; this element only expands the hit target. */
 .panel-resize-handle {
   position: relative;
-  z-index: 220;
+  /* 只在 960px+ 的分栏布局出现（浮层段 display:none），与右面板同层即可。 */
+  z-index: var(--z-panel);
   width: 12px;
   margin: 0 -6px;
   flex: 0 0 12px;
@@ -1414,7 +1436,7 @@ span.token.table {
   .right-panel-overlay-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 240;
+    z-index: var(--z-panel-backdrop);
     display: block;
     /* neutral black backdrop, kept literal: no backdrop token */
     background: rgba(0, 0, 0, 0.24);
@@ -1434,7 +1456,7 @@ span.token.table {
     /* AppShell 的 h-full 在这里赢了 top/bottom 拉伸：高度变成视口全高，
        底部整体溢出 8px（平板竖屏段）。显式归 auto，让 top/bottom 定高。 */
     height: auto;
-    z-index: 250;
+    z-index: var(--z-panel);
     width: min(560px, calc(100vw - 48px));
     min-width: 300px;
     overflow: hidden;
@@ -1468,7 +1490,7 @@ span.token.table {
   .right-panel-container.right-panel-open.right-panel-full-width {
     position: fixed;
     inset: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
-    z-index: 250;
+    z-index: var(--z-panel);
     width: auto;
     min-width: 0;
     height: 100dvh;
@@ -1491,7 +1513,7 @@ span.token.table {
     position: fixed;
     inset: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
     height: var(--app-viewport-height, 100dvh);
-    z-index: 250;
+    z-index: var(--z-panel);
     overflow: hidden;
     transition: transform 0.2s ease;
   }

@@ -307,7 +307,7 @@ function Select({ value, onChange, options, required }: { value: string; onChang
       <SelectTrigger size="sm" className={cn(inputClass, "w-full shadow-none dark:bg-transparent dark:hover:bg-transparent", value === "" ? "text-muted-foreground" : "text-foreground")}>
         <SelectValue>{value === "" ? `— ${t("i18n.default")} / none —` : value}</SelectValue>
       </SelectTrigger>
-      <SelectContent position="popper" align="start" className="z-[1100]">
+      <SelectContent position="popper" align="start" className="z-(--z-modal-raised)">
         {!required && <SelectItem value={SELECT_NONE}>— {t("i18n.default")} / none —</SelectItem>}
         {options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
       </SelectContent>
@@ -1823,13 +1823,13 @@ function AddProviderPicker({
         showCloseButton={false}
         aria-label={t("i18n.addProvider")}
         aria-describedby={undefined}
-        overlayClassName="z-[1100] bg-black/40"
+        overlayClassName="z-(--z-modal-raised) bg-black/40"
         onEscapeKeyDown={(e) => {
           // An IME's composing Escape cancels the composition, not the picker.
           if (e.isComposing || e.keyCode === 229) e.preventDefault();
         }}
         className={cn(
-          "z-[1100] flex flex-col gap-0 overflow-hidden rounded-xl p-0 shadow-lg",
+          "z-(--z-modal-raised) flex flex-col gap-0 overflow-hidden rounded-xl p-0 shadow-lg",
           "max-h-[min(72vh,calc(100vh-32px))] w-[820px] max-w-[calc(100vw-32px)] sm:max-w-[calc(100vw-32px)]",
         )}
       >

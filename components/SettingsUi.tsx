@@ -71,11 +71,11 @@ export function ConfigPanelShell({
       <DialogContent
         showCloseButton={false}
         aria-label={title}
-        overlayClassName="z-[1000]"
+        overlayClassName="z-(--z-modal)"
         // A phone shows it full screen under the safe areas: the page's own
         // colour, no frame (the standalone fallback pads via env() insets).
         className={cn(
-          "z-[1000] flex flex-col gap-0 overflow-hidden rounded-xl p-0",
+          "z-(--z-modal) flex flex-col gap-0 overflow-hidden rounded-xl p-0",
           "h-[min(var(--config-panel-height),calc(100dvh-16px))] w-[min(var(--config-panel-width),calc(100vw-16px))] max-w-none sm:max-w-none",
           "max-[640px]:bg-background max-[640px]:p-[env(safe-area-inset-top)_env(safe-area-inset-right)_env(safe-area-inset-bottom)_env(safe-area-inset-left)]",
           "max-[640px]:h-full max-[640px]:max-h-full max-[640px]:w-full max-[640px]:max-w-full max-[640px]:rounded-none max-[640px]:border-0 max-[640px]:shadow-none",

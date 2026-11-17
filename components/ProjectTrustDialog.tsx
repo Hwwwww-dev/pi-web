@@ -244,7 +244,7 @@ function ProjectTrustDialogView({
       }}
     >
       <AlertDialogContent
-        className="settings-phone-safe z-[1100] flex max-h-[100dvh] w-[480px] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden rounded-xl p-0"
+        className="settings-phone-safe z-(--z-modal-raised) flex max-h-[100dvh] w-[480px] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden rounded-xl p-0"
         onEscapeKeyDown={(event) => {
           if (busy) event.preventDefault();
         }}

@@ -226,7 +226,7 @@ function Sidebar({
           <div
             data-sidebar="sidebar-overlay"
             className={cn(
-              "fixed inset-0 z-50 bg-black/50",
+              "fixed inset-0 z-(--z-modal) bg-black/50",
               openMobile
                 ? "animate-in fade-in-0"
                 // 关闭退场的 340ms 里遮罩仍在文档中（透明度已归零），不能拦
@@ -265,7 +265,7 @@ function Sidebar({
               // fill-mode-forwards：常挂载后退场动画播完不会卸载，缺省的
               // fill-mode none 会让抽屉弹回原位、遮罩回显，直到 display:none
               // 才消失——这就是关闭时的闪。
-              "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=closed]:fill-mode-forwards data-[state=open]:animate-in data-[state=open]:duration-500",
+              "fixed z-(--z-modal) flex flex-col gap-4 bg-background shadow-lg transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=closed]:fill-mode-forwards data-[state=open]:animate-in data-[state=open]:duration-500",
               side === "left" &&
                 "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
               side === "right" &&

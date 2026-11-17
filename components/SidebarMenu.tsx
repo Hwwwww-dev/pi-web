@@ -315,7 +315,7 @@ export function sidebarMenuBoxClassName(): string {
 function menuBoxClassName(): string {
   return [
     "sidebar-menu",
-    "z-[400] box-border min-w-0 max-w-[calc(100vw-16px)]",
+    "z-(--z-flyout-top) box-border min-w-0 max-w-[calc(100vw-16px)]",
     "max-h-[min(calc(var(--app-viewport-height,100dvh)-16px),480px,var(--radix-popper-available-height,480px))] overflow-y-auto [overscroll-behavior:contain]",
     "border border-(--border) rounded-(--radius-md) bg-background text-foreground text-xs shadow-(--shadow-md)",
     "p-0",

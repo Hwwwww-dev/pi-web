@@ -4,9 +4,9 @@
 
    - the phone's safe-area padding (env() / @supports fallback, JS-free CSS);
    - a portal layering fix: the Remove confirmation's AlertDialog portals to
-     the body, which would put it under the Settings dialog (z-index 1000) —
-     the overlay and the box are raised above it, in their own layer beside
-     the trust dialog's 1100;
+     the body, which would put it under the Settings dialog — the overlay and
+     the box are raised to --z-modal-raised (app/globals.css 的层级梯), the
+     same tier the trust dialog rides;
    - the saved state's two @keyframes (button pop, check draw). */
 
 /* A Radix dialog that fills a phone's screen under the safe areas
@@ -25,12 +25,6 @@
   gap: 12px;
   width: 100%;
   max-width: 420px;
-}
-
-.settings-chat-option {
-  width: 100%;
-  color: var(--text);
-  font-size: 12px;
 }
 
 .settings-chat-switch-option {
@@ -273,7 +267,7 @@
 
 [data-slot="alert-dialog-overlay"]:has(+ [data-slot="alert-dialog-content"].mcp-remove-confirm),
 [data-slot="alert-dialog-content"].mcp-remove-confirm {
-  z-index: 1101;
+  z-index: var(--z-modal-raised);
 }
 
 @keyframes saved-pop {

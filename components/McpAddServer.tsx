@@ -316,7 +316,7 @@ export function McpAddServer({
             <SelectTrigger className={ADD_SELECT_CLASS} aria-label={t("mcp.add.serverLabel")}>
               <SelectValue>{revealHiddenCharacters((server ?? parsed.servers[0]).name)}</SelectValue>
             </SelectTrigger>
-            <SelectContent position="popper" align="start" className="z-[1100]">
+            <SelectContent position="popper" align="start" className="z-(--z-modal-raised)">
               {parsed.servers.map((item, index) => (
                 <SelectItem key={`${index}\0${item.name}`} value={String(index)}>{revealHiddenCharacters(item.name)}</SelectItem>
               ))}
@@ -590,7 +590,7 @@ function McpAddFieldInput({
           <SelectTrigger className={ADD_SELECT_CLASS} aria-label={label} {...invalid}>
             <SelectValue>{value === "" ? t("mcp.add.field.choose") : revealHiddenCharacters(value)}</SelectValue>
           </SelectTrigger>
-          <SelectContent position="popper" align="start" className="z-[1100]">
+          <SelectContent position="popper" align="start" className="z-(--z-modal-raised)">
             {!field.options?.includes(value) && <SelectItem value={ADD_SELECT_NONE}>{t("mcp.add.field.choose")}</SelectItem>}
             {(field.options ?? []).map((option) => <SelectItem key={option} value={option}>{revealHiddenCharacters(option)}</SelectItem>)}
           </SelectContent>

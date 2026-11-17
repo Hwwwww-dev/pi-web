@@ -21,16 +21,15 @@ test("offers compact quoting controls and sends branch questions through the mai
 test("keeps the selection toolbar above the session sidebar", async () => {
   const chatSource = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
   const shellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
+  const ladderSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const ladderZ = (name) => Number(ladderSource.match(new RegExp(`--z-${name}: (\\d+);`))?.[1]);
 
-  const toolbar = chatSource.match(/role=\{quoteInputOpen \? "dialog" : "toolbar"\}[\s\S]*?z-\[(\d+)\]/);
+  const toolbar = chatSource.match(/role=\{quoteInputOpen \? "dialog" : "toolbar"\}[\s\S]*?z-\((--z-[a-z-]+)\)/);
   // The ui Sidebar primitive's fixed container z utility (z-10), read out of
   // the vendored component the shell mounts with id="session-sidebar".
   const sidebar = shellSource.match(/id="session-sidebar"[\s\S]{0,600}?z-(\d+)/);
 
-  assert.ok(toolbar, "expected quote toolbar z-index");
+  assert.ok(toolbar, "expected quote toolbar z variable");
   assert.ok(sidebar, "expected session sidebar z-index");
-  assert.ok(
-    Number(toolbar[1]) > Number(sidebar[1]),
-    `quote toolbar z-index ${toolbar[1]} should be above session sidebar z-index ${sidebar[1]}`,
-  );
+  assert.ok(ladderZ(toolbar[1].replace("--z-", "")) > Number(sidebar[1]), `quote toolbar ${toolbar[1]} should be above session sidebar z-${sidebar[1]}`);
 });

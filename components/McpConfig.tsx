@@ -1767,7 +1767,7 @@ function McpServerDetail({
                         >
                           <SelectValue>{exposureOptionLabel(server.exposure)}</SelectValue>
                         </SelectTrigger>
-                        <SelectContent position="popper" align="start" className="z-[1100]">
+                        <SelectContent position="popper" align="start" className="z-(--z-modal-raised)">
                           {MCP_EXPOSURE_OPTIONS.map((exposure) => (
                             <SelectItem key={exposure} value={exposure}>{exposureOptionLabel(exposure)}</SelectItem>
                           ))}

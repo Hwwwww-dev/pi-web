@@ -698,7 +698,7 @@ export function AgentsConfig({
 
                   <Field label={t("agents.codemode")}>
                     <div className="flex flex-col gap-1.5">
-                      {/* 弹层挂载到 body，层级需高于设置对话框的 z-[1000]。 */}
+                      {/* 弹层挂载到 body，层级需高于设置对话框的 --z-modal。 */}
                       <Select
                         value={draft.codemode ?? "off"}
                         onValueChange={(value) => update("codemode", value as EditableProfile["codemode"])}
@@ -710,7 +710,7 @@ export function AgentsConfig({
                         >
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent position="popper" align="start" className="z-[1100]">
+                        <SelectContent position="popper" align="start" className="z-(--z-modal-raised)">
                           <SelectItem value="inherit">{t("agents.codemode.inherit")}</SelectItem>
                           <SelectItem value="on">{t("agents.codemode.on")}</SelectItem>
                           <SelectItem value="off">{t("agents.codemode.off")}</SelectItem>
@@ -751,7 +751,7 @@ export function AgentsConfig({
                         <SelectTrigger aria-label={t("agents.thinking")} className={`${controlClassName} h-9 w-full data-[size=default]:h-9`}>
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent position="popper" align="start" className="z-[1100]">
+                        <SelectContent position="popper" align="start" className="z-(--z-modal-raised)">
                           {THINKING_OPTIONS.map((value) => (
                             <SelectItem key={value || "default"} value={value || THINKING_NONE}>
                               {value || t("agents.inherit")}

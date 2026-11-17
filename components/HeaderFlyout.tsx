@@ -12,14 +12,14 @@ import { cn } from "@/lib/utils";
  */
 export function HeaderFlyout({
   width,
-  z = "z-[240]",
+  z = "z-(--z-flyout)",
   className,
   children,
   ...props
 }: ComponentProps<typeof PopoverContent> & {
   /** 宽度类，必给：如 `w-[560px] max-w-[calc(100vw-16px)]`、`w-max min-w-56`。 */
   width: string;
-  /** 层级类；默认 z-[240]（低于引用工具栏的 260），Agent 清单给 z-[500]。 */
+  /** 层级类；默认 --z-flyout（低于划词工具条 --z-selection-toolbar），Agent 清单给 z-(--z-flyout-top)。 */
   z?: string;
 }) {
   return (

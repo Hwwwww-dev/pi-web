@@ -2082,7 +2082,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           role={quoteInputOpen ? "dialog" : "toolbar"}
           aria-label={t(quoteInputOpen ? "chat.newQuoteChat" : "chat.selectionActions")}
           className={cn(
-            "fixed z-[260] flex flex-wrap items-start gap-[3px] max-w-[calc(100vw-16px)] max-h-[calc(var(--app-viewport-height,100dvh)-16px)] overflow-y-auto rounded-md border border-border bg-popover shadow-md",
+            "fixed z-(--z-selection-toolbar) flex flex-wrap items-start gap-[3px] max-w-[calc(100vw-16px)] max-h-[calc(var(--app-viewport-height,100dvh)-16px)] overflow-y-auto rounded-md border border-border bg-popover shadow-md",
             quoteInputOpen ? "w-[min(420px,calc(100vw-16px))] p-3" : "p-[3px]",
           )}
           style={{
@@ -2649,7 +2649,7 @@ function ExtensionDialog({
         }
         onRespond(request, { cancelled: true });
       }}
-      className={cn("absolute inset-0 z-[90] flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-end")}
+      className={cn("absolute inset-0 z-(--z-chat-float) flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-end")}
     >
       {collapsed ? (
         <Button
@@ -2953,7 +2953,7 @@ function ExtensionCustomPanel({
         wrapperRef.current = node;
         setPortalHost(node);
       }}
-      className={cn("absolute inset-0 z-[95] flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-center")}
+      className={cn("absolute inset-0 z-(--z-chat-float-raised) flex justify-center p-5 pointer-events-none", collapsed ? "items-start" : "items-center")}
     >
       {collapsed ? (
         <Button

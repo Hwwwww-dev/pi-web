@@ -14,9 +14,9 @@ const themeSource = await readFile(new URL("../hooks/useTheme.ts", import.meta.u
 
 test("the trust dialog Settings › MCP opens stacks above Settings", () => {
   // Both surfaces sit above every in-page overlay; the trust dialog mounts
-  // after and stacks one level higher (z-[1100] vs the panel's z-[1000]).
-  assert.match(panelSource, /settings-card-safe z-\[1000\]/);
-  assert.match(trustSource, /"settings-phone-safe z-\[1100\] /);
+  // after and stacks one level higher (--z-modal-raised vs the panel's --z-modal).
+  assert.match(panelSource, /settings-card-safe z-\(--z-modal\)/);
+  assert.match(trustSource, /"settings-phone-safe z-\(--z-modal-raised\) /);
 });
 
 test("an Add in Settings › MCP hands the folder's new trust to the page, which every section reloads on", () => {
@@ -96,7 +96,8 @@ test("groups fonts, chat font size and width with the chat switches, without row
   assert.doesNotMatch(panelSource, /ThinkingIcon|settings-thinking-/);
   // The rows carry no background of their own: Field lays them out, the Card is the surface.
   assert.doesNotMatch(chatOptions, /settings-chat-option/);
-  assert.doesNotMatch(cssSource, /\.settings-chat-option/);
+  // 词边界：`.settings-chat-options`（容器）合法，禁的是行类 `.settings-chat-option`。
+  assert.doesNotMatch(cssSource, /\.settings-chat-option\b/);
 });
 
 test("the desktop dialog navigates sections and General's details from one left rail", () => {

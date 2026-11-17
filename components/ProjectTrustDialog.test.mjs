@@ -223,7 +223,7 @@ test("while the listing loads it says so, and Trust waits for it", () => {
   // The shell is Radix's AlertDialog — its portal renders nothing server-side,
   // so its safe-area class and labelled ids are asserted in source, and the
   // body renders inside an open root.
-  assert.match(source, /<AlertDialogContent\s*\n\s*className="settings-phone-safe z-\[1100\] /);
+  assert.match(source, /<AlertDialogContent\s*\n\s*className="settings-phone-safe z-\(--z-modal-raised\) /);
   assert.match(source, /<AlertDialogTitle id="project-trust-title"/);
   assert.match(source, /<AlertDialogDescription id="project-trust-description"/);
   const html = view({ listing: { state: "loading" } });

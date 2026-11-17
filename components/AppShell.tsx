@@ -2053,10 +2053,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
       </Tooltip>
       <HeaderFlyout
         // 统一浮层壳（HeaderFlyout）；清单由 AgentSessionPanel 渲染，此处仅负责
-        // 定位（贴触发钮右缘）、宽度（AGENT_PANEL_WIDTH）与 z-500（高于引用工具栏）。
+        // 定位（贴触发钮右缘）、宽度（AGENT_PANEL_WIDTH）与 --z-flyout-top（高于划词工具条以下的各层）。
         align="end"
         sideOffset={14}
-        z="z-[500]"
+        z="z-(--z-flyout-top)"
         width="w-[var(--agent-panel-width)] max-w-[calc(100vw-1.5rem)]"
         className="mt-0 min-h-[300px]"
         style={{ "--agent-panel-width": `${AGENT_PANEL_WIDTH}px` } as React.CSSProperties}
@@ -2486,10 +2486,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             first element. */}
         {/* 全屏文件面板时页头 inert：面板覆盖全屏，页头不应接收焦点。inert 只落在页头与聊天列——
             文件面板是 SidebarInset 的兄弟顶级列，落在 SidebarInset 上会一并禁用面板自身的还原/关闭按钮。 */}
-        {/* z-30 keeps the header above the chat column's minimap rail (zIndex 25),
-            which otherwise paints over the header row. The hanging panels are
-            portaled to the body (Radix Popover) and layer by their own z-[240]. */}
-        <div ref={topBarRef} inert={rightPanelFullWidth} className="app-top-bar sticky top-0 z-[30] shrink-0 bg-background">
+        {/* 顶栏（--z-app-header）压过聊天列的 minimap 轨道（inline zIndex 25，页内
+            浮层保留字面值），否则轨道会画到顶栏上。悬挂面板 portal 到 body
+            （Radix Popover），按 --z-flyout 分层。 */}
+        <div ref={topBarRef} inert={rightPanelFullWidth} className="app-top-bar sticky top-0 z-(--z-app-header) shrink-0 bg-background">
         {/* The draft's header: 52px, title + crumb left, the pills right. On a
             phone it folds into two rows — the title row, then the controls. */}
         <header className="flex min-h-(--header-height) shrink-0 items-center gap-2 border-b pt-[env(safe-area-inset-top)] transition-[width,height] ease-linear">
@@ -2589,7 +2589,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         </div>
         </header>
           {/* Top panels — anchored to the control that opened them, only one
-              open at a time. z-[240] stays below the quote toolbar's 260
+              open at a time. --z-flyout stays below the quote toolbar's --z-selection-toolbar
               (ChatWindow). */}
           <Popover
             open={activeFlyout === "system"}
@@ -3148,7 +3148,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         onProjectTrustChanged={handleProjectTrustChanged}
       />
     )}
-    {/* After Settings, so it opens above it (z-index 1100 over 1000) when Settings › MCP asks for it. */}
+    {/* After Settings, so it opens above it (--z-modal-raised over --z-modal) when Settings › MCP asks for it. */}
     {projectTrustDialogOpen && projectTrustCwd && (
       <ProjectTrustDialog
         cwd={projectTrustCwd}

@@ -876,7 +876,7 @@ export function SettingsPanel({
           // A phone floats the card inset from the edges (.settings-card-safe's
           // plain rules own the whole phone geometry) instead of filling the
           // screen flat, so the rounded frame and border stay everywhere.
-          "settings-card-safe z-[1000] flex flex-col gap-0 overflow-hidden p-0",
+          "settings-card-safe z-(--z-modal) flex flex-col gap-0 overflow-hidden p-0",
           "h-[84vh] max-h-[calc(100dvh-16px)] w-[min(1080px,calc(100vw-16px))] max-w-none sm:max-w-none rounded-xl",
         )}
       >
