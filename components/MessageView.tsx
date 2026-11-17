@@ -20,6 +20,7 @@ import { SafeMarkdownBody } from "./SafeMarkdownBody";
 import { formatNoticeTokens } from "@/lib/transcript-notices";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
+import { useSmoothStreamText } from "@/hooks/useSmoothStreamText";
 import { getAssistantErrorMessage, hasAssistantAnswer, isAssistantTruncated, isEmptyTextBlock, isEmptyThinkingBlock } from "@/lib/message-display";
 import { formatTurnDuration } from "@/lib/turn-duration";
 import { measuredThinkingDuration, recordThinkingDuration, thinkingDurationKey } from "@/lib/thinking-durations";
@@ -722,7 +723,9 @@ function BlockView({ block, searchTarget, toolResults, isStreaming, streamingDur
 }
 
 function TextBlock({ block, isStreaming, cwd, onOpenFile }: { block: TextContent; isStreaming?: boolean; cwd?: string; onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void }) {
-  return <SafeMarkdownBody isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile}>{block.text}</SafeMarkdownBody>;
+  // 流式期按帧追赶显示（吐字平滑），chunk 不再一段段蹦出；历史消息直接全文。
+  const text = useSmoothStreamText(block.text, Boolean(isStreaming));
+  return <SafeMarkdownBody isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile}>{text}</SafeMarkdownBody>;
 }
 
 

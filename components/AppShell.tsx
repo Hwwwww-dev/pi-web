@@ -3025,8 +3025,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
           </Tooltip>
         </div>
 
-        {/* Only the active viewer is mounted. Lightweight per-tab state is restored on activation. */}
-        <div className="min-h-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
+        {/* Only the active viewer is mounted. Lightweight per-tab state is restored on activation.
+            right-panel-swap：换挂的页（切换文件标签、Git/终端/子会话、viewer 重挂）淡入而非瞬切，
+            规则在 globals.css。 */}
+        <div className="right-panel-swap min-h-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
           <RegionErrorBoundary
             label={translate("region.filePanel")}
             message={translate("region.crashed", { region: translate("region.filePanel") })}

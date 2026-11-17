@@ -765,7 +765,7 @@ const SessionRowView = memo(function SessionRowView({
       onClick={() => handlers.current.onSelectFamily(family)}
       onContextMenu={(event) => handlers.current.onRowContextMenu(row, event)}
     >
-      {statusDot && (
+      {statusDot ? (
         // 行首的状态点：落在行的缩进末端、标题前，不占标题的宽度，子会话的点
         // 也不跟着缩进漂移。垂直方向比行中线高 1px，压住笔画的那点视觉重量。
         <span
@@ -773,6 +773,15 @@ const SessionRowView = memo(function SessionRowView({
           title={statusTitle}
         >
           {statusDot}
+        </span>
+      ) : (
+        // 同一槽位常驻：空闲行点缩到透明，激活状态出现/消失走 opacity+scale
+        // 过渡，不再瞬切。绝对定位不占布局，隐藏时也不推挤标题。
+        <span
+          className={`pointer-events-none absolute top-[calc(50%-1px)] ${dotLeft} z-10 -translate-y-1/2 scale-50 opacity-0 transition-[opacity,scale] duration-200 ease-out motion-reduce:transition-none`}
+          aria-hidden="true"
+        >
+          <span className="inline-block size-[7px] rounded-full" />
         </span>
       )}
       {status.transient ? (
@@ -1117,11 +1126,11 @@ const GroupRowView = memo(function GroupRowView({
             展开后行内自带状态点，组头回到纯总数。 */}
         {!expanded && row.running + row.awaiting + row.unread > 0 ? (
           <span
-            className="flex shrink-0 items-center gap-[3px] font-normal text-xs tabular-nums text-muted-foreground"
+            className="flex shrink-0 items-center gap-[3px] font-normal text-xs tabular-nums text-muted-foreground animate-in fade-in slide-in-from-right-1 duration-150 motion-reduce:animate-none"
             title={t("sidebar.groupActiveCount", { active: row.running + row.awaiting + row.unread, total: row.count })}
             aria-label={t("sidebar.groupActiveCount", { active: row.running + row.awaiting + row.unread, total: row.count })}
           >
-            <span className={`size-1.5 shrink-0 rounded-full ${row.awaiting > 0 ? "bg-status-awaiting" : "bg-status-unread"}`} />
+            <span className={`size-1.5 shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${row.awaiting > 0 ? "bg-status-awaiting" : "bg-status-unread"}`} />
             {row.running + row.awaiting + row.unread}/{row.count}
           </span>
         ) : (
@@ -1199,7 +1208,7 @@ const PlainRowView = memo(function PlainRowView({
             <span className="session-tree-pinned-count font-normal text-muted-foreground">· {row.count}</span>
             {row.collapsed && row.running > 0 && (
               <span
-                className="session-tree-pinned-dot is-running ml-0.5 size-1.5 shrink-0 rounded-full bg-status-unread"
+                className="session-tree-pinned-dot is-running ml-0.5 size-1.5 shrink-0 rounded-full bg-status-unread animate-in fade-in duration-150 motion-reduce:animate-none"
                 role="img"
                 title={t("sidebar.agentRunning")}
                 aria-label={`${t("sidebar.agentRunning")} (${row.running})`}
@@ -1207,7 +1216,7 @@ const PlainRowView = memo(function PlainRowView({
             )}
             {row.collapsed && row.awaiting > 0 && (
               <span
-                className="session-tree-pinned-dot is-awaiting ml-0.5 size-1.5 shrink-0 rounded-full bg-status-awaiting"
+                className="session-tree-pinned-dot is-awaiting ml-0.5 size-1.5 shrink-0 rounded-full bg-status-awaiting animate-in fade-in duration-150 motion-reduce:animate-none"
                 role="img"
                 title={t("sidebar.agentAwaitingInput")}
                 aria-label={`${t("sidebar.agentAwaitingInput")} (${row.awaiting})`}
@@ -1215,7 +1224,7 @@ const PlainRowView = memo(function PlainRowView({
             )}
             {row.collapsed && row.unread > 0 && (
               <span
-                className="session-tree-pinned-dot is-unread ml-0.5 size-1.5 shrink-0 rounded-full bg-status-unread"
+                className="session-tree-pinned-dot is-unread ml-0.5 size-1.5 shrink-0 rounded-full bg-status-unread animate-in fade-in duration-150 motion-reduce:animate-none"
                 role="img"
                 title={t("sidebar.newSessionActivity")}
                 aria-label={`${t("sidebar.newSessionActivity")} (${row.unread})`}

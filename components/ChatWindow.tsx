@@ -5,7 +5,7 @@ import { ArrowDownIcon, GitForkIcon, MessagesSquareIcon, QuoteIcon, XIcon } from
 import Image from "next/image";
 import { isValidElement, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";import type { StreamingStore } from "@/lib/streaming-message";import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
+import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionStatusItem, ExtensionUiRequest, ExtensionWidgetItem, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";import type { StreamingStore } from "@/lib/streaming-message";import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
 import { splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
@@ -58,6 +58,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { formatTurnDuration, getTurnDurationMs } from "@/lib/turn-duration";
 import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
 import { selectHasStreamingContent, selectIsStreaming, selectStreamingMessage, useStreamingSelector } from "@/hooks/useStreamingSelector";
+import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
 import { publishStreamCharacters } from "@/lib/stream-beam";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -237,16 +238,51 @@ function StreamingReply({ store, messageKey, toolResults, modelNames, cwd, onOpe
   const streamingMessage = useStreamingSelector(store, selectStreamingMessage);
   if (!streamingMessage) return null;
   return (
-    <MessageView
-      message={streamingMessage as AgentMessage}
-      toolResults={toolResults}
-      isStreaming
-      messageKey={messageKey}
-      modelNames={modelNames}
-      cwd={cwd}
-      onOpenFile={onOpenFile}
-      onOpenSubagent={onOpenSubagent}
-    />
+    // 回复气泡入场：淡入 + 轻微上移，每轮运行挂载时播一次。
+    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+      <MessageView
+        message={streamingMessage as AgentMessage}
+        toolResults={toolResults}
+        isStreaming
+        messageKey={messageKey}
+        modelNames={modelNames}
+        cwd={cwd}
+        onOpenFile={onOpenFile}
+        onOpenSubagent={onOpenSubagent}
+      />
+    </div>
+  );
+}
+
+/**
+ * 扩展状态条的进出场：出现上滑淡入，消失时停在最后一次非空内容上下滑淡出
+ * （useDelayedUnmount），不再是整条瞬现瞬失。出场要拿旧内容渲染——状态条本体
+ * 对空 statuses 返回 null，直接条件渲染拿不到出场帧。
+ */
+function AnimatedExtensionStatusBar({ statuses, widgets, onCommand, commandsDisabled }: {
+  statuses: ExtensionStatusItem[];
+  widgets?: ExtensionWidgetItem[];
+  onCommand?: (command: string) => void;
+  commandsDisabled?: boolean;
+}) {
+  const open = statuses.length > 0 || (widgets?.length ?? 0) > 0;
+  const mounted = useDelayedUnmount(open, 150);
+  const lastContentRef = useRef({ statuses, widgets, onCommand, commandsDisabled });
+  if (open) lastContentRef.current = { statuses, widgets, onCommand, commandsDisabled };
+  if (!mounted) return null;
+  const shown = open ? { statuses, widgets, onCommand, commandsDisabled } : lastContentRef.current;
+  return (
+    // 停靠区为 flex-col：这一层 w-full 复原状态条本体的 stretch 铺满。
+    <div
+      className={`flex w-full shrink-0 transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none ${open ? "translate-y-0 opacity-100" : "translate-y-1.5 opacity-0"}`}
+    >
+      <ExtensionStatusBar
+        statuses={shown.statuses}
+        widgets={shown.widgets}
+        onCommand={shown.onCommand}
+        commandsDisabled={shown.commandsDisabled}
+      />
+    </div>
   );
 }
 
@@ -1483,10 +1519,24 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             hideCopy={options.hideCopy}
           />
         );
-        if (!isVisible || currentRefIdx === undefined) return view;
+        if (!isVisible || currentRefIdx === undefined) {
+          // ref 窗口外的行：包一层只管入场动画的 div，键沿用 view 自己的键，
+          // 官方 scroller 解析 messageId 的结果与原来一致。
+          return (
+            <div key={`${keyPrefix}-view-${messageKey}`} className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+              {view}
+            </div>
+          );
+        }
         return (
           // 行高固定：content-visibility 的估算高度会导致行进出视口时滚动位置跳动。
-          <div key={`${keyPrefix}-${messageKey}`} data-entry-id={entryIds[idx]} ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}>
+          // 入场动画挂在这一层：新行挂载播一次，会话切换整列同步淡入。
+          <div
+            key={`${keyPrefix}-${messageKey}`}
+            data-entry-id={entryIds[idx]}
+            ref={options.attachRef === false ? undefined : attachVisibleRef(idx, currentRefIdx)}
+            className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
+          >
             {view}
           </div>
         );
@@ -1742,10 +1792,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         // 负边距则会重叠，仅同行内的 gap 可靠。
         const lastNode = rendered[rendered.length - 1];
         // 提问本身是本轮最后一块内容时（回复尚未写入），合并会使用量贴到气泡上，
-        // 故仍单独成行，间距由行距提供。
-        const lastRole = isValidElement(lastNode)
-          ? (lastNode.props as { message?: { role?: string } }).message?.role
-          : undefined;
+        // 故仍单独成行，间距由行距提供。入场动画包装层（ref 窗口外的行）不带
+        // message，向里看一层拿角色。
+        const lastRole = (() => {
+          const outerProps = isValidElement(lastNode) ? (lastNode.props as { message?: unknown; children?: ReactNode }) : null;
+          const node = outerProps && !("message" in outerProps) && isValidElement(outerProps.children)
+            ? outerProps.children
+            : lastNode;
+          return isValidElement(node)
+            ? (node.props as { message?: { role?: string } }).message?.role
+            : undefined;
+        })();
         if (isValidElement<{ "data-entry-id"?: string }>(lastNode) && lastRole !== "user") {
           rendered[rendered.length - 1] = (
             <div
@@ -2138,17 +2195,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         {/* 运行状态行（阶段文案 + 流式速率）已移进输入框：位于队列之下、输入卡片
             正上方。队列长高只往聊天区方向长，状态行不再被顶走。 */}
         {renderChatInput(activityNotice)}
-        {(extensionStatuses.length > 0 || extensionWidgets.length > 0) && (
-          // 状态条直接渲染（无包装层）：停靠区为 flex-col，状态条默认 stretch
-          // 铺满整行，内部 flex-1 让 permissive 标记（YOLO）钉在右端；背后的
-          // 文字由渐隐层压暗，不需要再包一枚底色胶囊。
-          <ExtensionStatusBar
-            statuses={extensionStatuses}
-            widgets={extensionWidgets}
-            onCommand={handleSend}
-            commandsDisabled={sessionBusy}
-          />
-        )}
+        <AnimatedExtensionStatusBar
+          statuses={extensionStatuses}
+          widgets={extensionWidgets}
+          onCommand={handleSend}
+          commandsDisabled={sessionBusy}
+        />
       </div>
       {/* 手机端底部留白占偏置的两份（顶部聊天列仍为一份），使空态的 hero+composer
           簇高于正中：保持簇完整，品牌块不与浮层重叠。 */}

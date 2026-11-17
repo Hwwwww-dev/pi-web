@@ -1526,6 +1526,25 @@ span.token.table {
   }
 }
 
+/* 右面板内容换挂（切文件标签、Git/终端/子会话页、viewer 重挂）：新页 150ms
+   淡入，替换瞬切。display:none 的终端页不跑动画，切到它时才播，同页内部
+   重渲染不重播（元素没换）。 */
+@keyframes right-panel-swap-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.right-panel-swap > * {
+  animation: right-panel-swap-in 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .right-panel-swap > * {
+    animation: none;
+  }
+}
+
 /* The composer's pill row scrolls (overflow-x-auto), which clips a focus ring
    drawn outside its buttons into four corner wedges. Insetting the ring keeps it
    whole. */

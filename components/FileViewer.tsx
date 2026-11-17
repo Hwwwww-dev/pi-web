@@ -425,7 +425,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
           className={`flex items-center gap-1 ${watching ? "text-success" : "text-muted-foreground"}`}
         >
           <span
-            className={`inline-block size-[7px] rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
+            className={`inline-block size-[7px] rounded-full transition-[background-color,box-shadow] duration-300 ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
           />
           {watching ? "live" : "static"}
         </span>
@@ -567,7 +567,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
           className={`flex items-center gap-1 ${watching ? "text-success" : "text-muted-foreground"}`}
         >
           <span
-            className={`inline-block size-[7px] rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
+            className={`inline-block size-[7px] rounded-full transition-[background-color,box-shadow] duration-300 ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
           />
           {watching ? "live" : "static"}
         </span>
@@ -698,7 +698,7 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
           className={`flex items-center gap-1 ${watching ? "text-success" : "text-muted-foreground"}`}
         >
           <span
-            className={`inline-block size-[7px] rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
+            className={`inline-block size-[7px] rounded-full transition-[background-color,box-shadow] duration-300 ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
           />
           {watching ? "live" : "static"}
         </span>
@@ -863,7 +863,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
           className={`flex shrink-0 items-center gap-1 ${watching ? "text-success" : "text-muted-foreground"}`}
         >
           <span
-            className={`inline-block size-[7px] rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
+            className={`inline-block size-[7px] rounded-full transition-[background-color,box-shadow] duration-300 ${watching ? "bg-success shadow-[0_0_4px_var(--ok)]" : "bg-border"}`}
           />
           {watching ? "live" : "static"}
         </span>
@@ -1452,7 +1452,7 @@ function TextFileViewer({
             <span
               title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
               aria-label={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-              className={`inline-block size-[7px] shrink-0 rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--color-success)]" : "bg-border"}`}
+              className={`inline-block size-[7px] shrink-0 rounded-full transition-[background-color,box-shadow] duration-300 ${watching ? "bg-success shadow-[0_0_4px_var(--color-success)]" : "bg-border"}`}
             />
           )}
         </div>
@@ -1562,6 +1562,9 @@ function TextFileViewer({
           viewerStateRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
       >
+        {/* 模式切换（source/preview/diff）整链按模式重挂：150ms 淡入替掉瞬切。
+            滚动位置在外层容器上，不受这次重挂影响。 */}
+        <div key={effectiveDisplayMode} className="h-full min-h-0 animate-in fade-in duration-150 motion-reduce:animate-none">
         {effectiveDisplayMode === "diff" && hasGitDiff ? (
           <DiffView patch={gitDiff.patch!} wrapLines={wrapLines} />
         ) : isHtml && effectiveDisplayMode === "preview" && data?.truncated && !htmlFull?.text ? (
@@ -1676,6 +1679,7 @@ function TextFileViewer({
         ) : (
           <SourceCodeView content={viewerContent} language={language} wrapLines={wrapLines} />
         )}
+        </div>
       </div>
     </CodeBlockShell>
   );

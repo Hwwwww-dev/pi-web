@@ -117,7 +117,7 @@ test("the pinned header toggles the section and shows activity dots only while c
     rows: [{ kind: "pinned-header", key: "pinned-header", count: 3, collapsed: true, running: 1, awaiting: 0, unread: 2 }],
   }), "pinned-header");
   // A group header's height: both are section headers.
-  assert.match(collapsed, /^<div class="session-tree-row session-tree-pinned-header[^"]*" style="top:0;height:28px" data-row-key="pinned-header">/);
+  assert.match(collapsed, /^<div class="session-tree-row session-tree-pinned-header[^"]*" style="top:1px;height:26px" data-row-key="pinned-header">/);
   assert.match(collapsed, /<button [^>]*class="[^"]*session-tree-pinned-toggle[^"]*"[^>]*aria-expanded="false">/);
   // Its chevron leads, in the chevron column, decoration only; no pin icon.
   assert.match(collapsed, /aria-expanded="false"><svg[^>]*width="13" height="13"[^>]*stroke-width="3"[^>]*aria-hidden="true">[\s\S]*?<\/svg><span class="[^"]*session-tree-pinned-label[^"]*">Pinned<\/span><span class="[^"]*session-tree-pinned-count[^"]*">· 3<\/span><span class="[^"]*session-tree-pinned-dot is-running[^"]*"/);
@@ -202,7 +202,7 @@ test("a group's ⋯ shows its open menu; its + starts a session at once", () => 
 test("an idle session row shows its short time, branch and both actions", () => {
   const root = session("idle", { isWorktree: true, branch: "feat/rows" });
   const html = rowMarkup(render({ rows: [sessionRow(root)] }), "session:group:idle");
-  assert.match(html, /^<div class="session-tree-row session-tree-session[^"]*is-child[^"]*" style="top:0;height:32px" data-row-key="session:group:idle">/);
+  assert.match(html, /^<div class="session-tree-row session-tree-session[^"]*is-child[^"]*" style="top:1px;height:30px" data-row-key="session:group:idle">/);
   // Nothing before the title: it gets the room; the time sits at the right.
   // A saved session's title is a real link to it (middle-click, Ctrl/Cmd-click).
   // The branch is icon-only: the name crowded the row, the tooltip carries it.
@@ -211,8 +211,10 @@ test("an idle session row shows its short time, branch and both actions", () => 
   assert.match(html, /class="[^"]*session-tree-action session-tree-quick-action[^"]*"[^>]*aria-label="Archive" title="Archive"/);
   assert.match(html, /class="[^"]*session-tree-action session-tree-more-action[^"]*"[^>]*aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded="false"/);
   assert.doesNotMatch(html, /aria-current/);
-  // 空闲行不带状态点：只有等待输入、运行中、未读三种激活状态才显示。
-  assert.doesNotMatch(html, /left-\[14px\]|border-muted-foreground/);
+  // 空闲行的状态点缩进同一槽位里隐形（opacity+scale 过渡槽），不出现任何激活点：
+  // 无 role="img"、无激活配色。只有等待输入、运行中、未读三种状态才点亮。
+  assert.match(html, /<span class="pointer-events-none absolute top-\[calc\(50%-1px\)\] left-\[14px\] z-10 -translate-y-1\/2 scale-50 opacity-0 transition-\[opacity,scale\] duration-200 ease-out motion-reduce:transition-none" aria-hidden="true">/);
+  assert.doesNotMatch(html, /bg-success|bg-status-awaiting|bg-status-unread|session-tree-awaiting/);
 });
 
 test("a branch chip needs a linked worktree", () => {
@@ -343,9 +345,9 @@ test("pinned rows name their project and archived rows offer restore with the fa
 test("the phone layout uses tall rows, keeps ⋯ and drops the archive quick button", () => {
   const html = render({ layout: "mobile", rows: [groupRow(), sessionRow(session("m"))] });
   assert.match(html, /^<div class="session-tree[^"]*is-mobile[^"]*">/);
-  assert.match(rowMarkup(html, "group:/work/app"), /style="top:0;height:40px"/);
+  assert.match(rowMarkup(html, "group:/work/app"), /style="top:1px;height:38px"/);
   const row = rowMarkup(html, "session:group:m");
-  assert.match(row, /style="top:40px;height:40px"/);
+  assert.match(row, /style="top:41px;height:38px"/);
   assert.match(row, /aria-label="More actions"/);
   assert.doesNotMatch(row, /aria-label="Archive"/);
 });
@@ -374,7 +376,7 @@ test("a named project shows its name as plain text in its header, the path as th
 
 test("a project's rename swaps its header for a name field seeded with the name shown", () => {
   const html = rowMarkup(render({ rows: [groupRow({}, { name: "Thermal Models", customName: "Thermal Models" })], renamingProjectKey: "/work/app" }), "group:/work/app");
-  assert.match(html, /^<div class="session-tree-row session-tree-group[^"]*is-current is-renaming[^"]*" style="top:0;height:26px" data-row-key="group:\/work\/app">/);
+  assert.match(html, /^<div class="session-tree-row session-tree-group[^"]*is-current is-renaming[^"]*" style="top:1px;height:28px" data-row-key="group:\/work\/app">/);
   assert.match(html, /<input data-slot="input" class="[^"]*session-tree-rename[^"]*" aria-label="Project name" maxLength="80" value="Thermal Models"\/>/);
   assert.doesNotMatch(html, /session-tree-group-toggle|session-tree-group-actions/);
   // Another group, or none being renamed: the header as usual.
@@ -417,7 +419,7 @@ test("show more, empty groups, footer links and archive groups", () => {
   // Without sessions only a pin keeps a project listed once another one is current (#1476).
   assert.match(
     rowMarkup(html, "empty:/work/app"),
-    /style="top:74px;height:24px" data-row-key="empty:\/work\/app"><span class="[^"]*session-tree-group-empty-label[^"]*">No sessions yet<\/span><button [^>]*class="[^"]*session-tree-more-toggle[^"]*"[^>]*>Pin to keep<\/button><\/div>/,
+    /style="top:75px;height:22px" data-row-key="empty:\/work\/app"><span class="[^"]*session-tree-group-empty-label[^"]*">No sessions yet<\/span><button [^>]*class="[^"]*session-tree-more-toggle[^"]*"[^>]*>Pin to keep<\/button><\/div>/,
   );
   const pinnedEmpty = render({ rows: [{ kind: "group-empty", key: "empty:/work/app", project: { ...project, pinned: true } }] });
   assert.match(rowMarkup(pinnedEmpty, "empty:/work/app"), /No sessions yet<\/span><\/div>/);
@@ -487,7 +489,7 @@ test("only rows near the viewport are mounted, plus the ones that must stay", ()
     confirmDeleteRootId: "s180",
   }));
   assert.deepEqual(kept.slice(-3), ["session:group:s120", "session:group:s150", "session:group:s180"]);
-  assert.match(render({ rows, renamingRootId: "s120" }), /style="top:3840px;height:32px" data-row-key="session:group:s120"/);
+  assert.match(render({ rows, renamingRootId: "s120" }), /style="top:3841px;height:30px" data-row-key="session:group:s120"/);
 });
 
 test("a reveal request keeps its row mounted", () => {
@@ -655,7 +657,7 @@ test("group headers draw nothing for a drag while idle", () => {
   assert.match(html, /^<div class="session-tree[^"]*">/);
   assert.doesNotMatch(html, /session-tree-drag-|session-tree-drop-line|is-group-dragging|is-drag-armed/);
   // Headers keep their markup: the drag adds listeners, no attributes (and never draggable="true").
-  assert.match(rowMarkup(html, "group:/work/b"), /^<div class="session-tree-row session-tree-group[^"]*is-current[^"]*" style="top:26px;height:26px" data-row-key="group:\/work\/b">/);
+  assert.match(rowMarkup(html, "group:/work/b"), /^<div class="session-tree-row session-tree-group[^"]*is-current[^"]*" style="top:31px;height:28px" data-row-key="group:\/work\/b">/);
   assert.doesNotMatch(html, /draggable/);
 });
 

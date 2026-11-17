@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/trace";
 import { formatToolDurationIfShown } from "@/lib/tool-duration";
 import { useI18n } from "@/hooks/useI18n";
+import { useSmoothStreamText } from "@/hooks/useSmoothStreamText";
 import { COLLAPSIBLE_EXPANDED_EVENT, getFoldChoice, setToolCallExpanded } from "@/lib/tool-call-expansion";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import type { ThinkingContent } from "@/lib/types";
@@ -148,6 +149,8 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
   // 点开的卡片拍回收起。稳定键让这个选择连成一条，而不是每次换一个键。
   const foldKey = durationKey === undefined ? undefined : `thinking:${durationKey}`;
   const [expanded, setExpanded] = useState(() => getFoldChoice(foldKey) ?? isThinkingExpandedByDefault());
+  // 流式期吐字平滑：思考文本按帧追赶显示；历史块（非 active）直接全文。
+  const liveThinking = useSmoothStreamText(block.thinking, Boolean(active));
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -211,7 +214,9 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
     if (!el || !expanded || !active || !stickRef.current) return;
     el.scrollTop = el.scrollHeight;
     prevScrollTopRef.current = el.scrollTop;
-  }, [expanded, active, block.thinking, content]);
+  // 贴底跟随跟随的是显示帧（平滑后的文本），不是 chunk：吐字动画让高度逐帧长，
+  // 只挂在 chunk 上会在两 chunk 之间掉队。
+  }, [expanded, active, liveThinking, content]);
 
   const handleDetailScroll = useCallback(() => {
     const el = detailRef.current;
@@ -261,7 +266,7 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
         <TraceCollapsibleContent>
           <ReasoningText
             scrollRef={detailRef}
-            text={block.deferred ? (content ?? "") : block.thinking}
+            text={block.deferred ? (content ?? "") : liveThinking}
             error={error}
             loading={loading}
             fadeIn={Boolean(block.deferred)}
