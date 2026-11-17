@@ -1117,7 +1117,7 @@ const GroupRowView = memo(function GroupRowView({
             展开后行内自带状态点，组头回到纯总数。 */}
         {!expanded && row.running + row.awaiting + row.unread > 0 ? (
           <span
-            className="flex shrink-0 items-center gap-[3px] text-xs tabular-nums text-muted-foreground"
+            className="flex shrink-0 items-center gap-[3px] font-normal text-xs tabular-nums text-muted-foreground"
             title={t("sidebar.groupActiveCount", { active: row.running + row.awaiting + row.unread, total: row.count })}
             aria-label={t("sidebar.groupActiveCount", { active: row.running + row.awaiting + row.unread, total: row.count })}
           >
