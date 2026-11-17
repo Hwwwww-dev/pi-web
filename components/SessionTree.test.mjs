@@ -202,6 +202,8 @@ test("an idle session row shows its short time, branch and both actions", () => 
   assert.match(html, /class="[^"]*session-tree-action session-tree-quick-action[^"]*"[^>]*aria-label="Archive" title="Archive"/);
   assert.match(html, /class="[^"]*session-tree-action session-tree-more-action[^"]*"[^>]*aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded="false"/);
   assert.doesNotMatch(html, /aria-current/);
+  // 空闲行不带状态点：只有等待输入、运行中、未读三种激活状态才显示。
+  assert.doesNotMatch(html, /left-\[14px\]|border-muted-foreground/);
 });
 
 test("a branch chip needs a linked worktree", () => {
@@ -232,7 +234,7 @@ test("a running row shows the labelled breathing dot and cannot be archived from
   // The dot leads the row's indent, before the title, and the row says it is
   // running.
   assert.match(html, /class="session-tree-row session-tree-session[^"]*is-running[^"]*"/);
-  assert.match(html, /<span class="absolute top-1\/2 left-\[22px\] z-10[^"]*" title="Agent running…"><span class="relative size-1\.5[^"]*bg-status-unread[^"]*" role="img" aria-label="Agent running…"><\/span><\/span>/);
+  assert.match(html, /<span class="absolute top-\[calc\(50%-1px\)\] left-\[14px\] z-10 -translate-y-1\/2" title="Agent running…"><span class="relative inline-block size-\[7px\][^"]*bg-success[^"]*" role="img" aria-label="Agent running…"><\/span><\/span>/);
   // The title keeps the room the dot used to take: the time still follows it.
   assert.match(html, /<span class="[^"]*session-tree-title[^"]*">first run<\/span><span class="[^"]*text-muted-foreground[^"]*">5m<\/span>/);
   assert.doesNotMatch(html, /session-tree-slot/);
@@ -243,9 +245,9 @@ test("a running row shows the labelled breathing dot and cannot be archived from
 
 test("an unread row shows the labelled unread dot", () => {
   const html = rowMarkup(render({ rows: [sessionRow(session("new"), { status: { unread: true } })] }), "session:group:new");
-  assert.match(html, /<span class="[^"]*" title="New activity"><span class="relative size-1\.5[^"]*bg-status-unread[^"]*" role="img" aria-label="New session activity"><\/span><\/span>/);
+  assert.match(html, /<span class="[^"]*" title="New activity"><span class="relative inline-block size-\[7px\][^"]*bg-status-unread[^"]*" role="img" aria-label="New session activity"><\/span><\/span>/);
   // 状态点在行首，不在标题后面。
-  assert.match(html, /class="session-tree-row[^"]*"[^>]*><span class="absolute top-1\/2 left-\[22px\]/);
+  assert.match(html, /class="session-tree-row[^"]*"[^>]*><span class="absolute top-\[calc\(50%-1px\)\] left-\[14px\]/);
 });
 
 test("an awaiting row shows the amber dot in the spinner's slot", () => {
@@ -255,7 +257,7 @@ test("an awaiting row shows the amber dot in the spinner's slot", () => {
   // Awaiting wins the slot (it is the one thing worth knowing), and the row is
   // still the running row it is: same class, same actions, no archive button.
   assert.match(html, /class="session-tree-row session-tree-session[^"]*is-running[^"]*"/);
-  assert.match(html, /<span class="absolute top-1\/2 left-\[22px\][^"]*" title="Agent waiting for your input"><span class="session-tree-awaiting" role="img" aria-label="Agent waiting for your input"><\/span><\/span>/);
+  assert.match(html, /<span class="absolute top-\[calc\(50%-1px\)\] left-\[14px\][^"]*" title="Agent waiting for your input"><span class="session-tree-awaiting" role="img" aria-label="Agent waiting for your input"><\/span><\/span>/);
   assert.doesNotMatch(html, /sidebar-spin/);
   assert.doesNotMatch(html, /session-tree-unread/);
   assert.doesNotMatch(html, /aria-label="Archive"/);

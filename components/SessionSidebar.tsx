@@ -584,8 +584,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   const [explorerKey, setExplorerKey] = useState(0);
   const [explorerUploadBusy, setExplorerUploadBusy] = useState(false);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
-  // 会话搜索框常驻（demo⑨）：⌘K 聚焦，🔍 键收起/展开。
-  const [sessionSearchOpen, setSessionSearchOpen] = useState(true);
   const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [changesCount, setChangesCount] = useState(0);
   const [changesCollapsed, setChangesCollapsed] = useState(true);
@@ -658,6 +656,9 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   // The archive view's folded projects, per browser (lib/sidebar-prefs.ts).
   const [archiveCollapsed, setArchiveCollapsed] = useState<readonly string[]>([]);
   const [archiveView, setArchiveViewState] = useState(false);
+  // demo⑨ 常驻搜索框跟着归档视图走：归档盖在树上时收起（搜索结果会盖住归档），
+  // 退出归档自动回来。它没有开关按钮（demo⑨ 的头部只有 logo 和 New）。
+  const sessionSearchOpen = !archiveView;
   // The fold and the archive view move (hooks/useSidebarMotion.ts): only
   // when the user folds or goes in or out, never on a restore, a drag, keys,
   // a resize or a layout switch, and not at all under reduced motion. The
@@ -823,9 +824,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   // so the scrollbar hook stays bound to the element that is on the page.
   const headerRef = useRef<HTMLDivElement>(null);
   const explorerScrollRef = useRef<HTMLDivElement>(null);
-  // The toolbar row's search button: always there and enabled, so focus has
-  // somewhere to go when there are no tabs (selectedTabButton).
-  const searchButtonRef = useRef<HTMLButtonElement>(null);
   // The persistent session search's input: ⌘K lands here.
   const sessionSearchInputRef = useRef<HTMLInputElement>(null);
 
@@ -1757,10 +1755,10 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   /**
    * The selected tab: focus has somewhere to go when the control it was on is
    * gone. With the files below the sessions there are no tabs (their refs are
-   * null): the toolbar row's search button, always there and enabled.
+   * null): focusIfHidden(null) is a no-op then.
    */
   const selectedTabButton = useCallback(
-    () => (sessionsPanelRef.current?.hidden ? filesTabRef : sessionsTabRef).current ?? searchButtonRef.current,
+    () => (sessionsPanelRef.current?.hidden ? filesTabRef : sessionsTabRef).current,
     [],
   );
 
@@ -1856,8 +1854,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   const openArchiveView = useCallback((projectKey?: string) => {
     setMenu(null);
     setArchiveView(true);
-    // Search results would cover it.
-    setSessionSearchOpen(false);
     switchTab("sessions");
     if (projectKey === undefined) return;
     if (archiveCollapsed.includes(projectKey)) {
@@ -2928,12 +2924,10 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     if (!changesKeyDisabled || !key || sidebarFocusRef.current !== key) return;
     handOffDisabledKeyFocus(document, key, selectedTabButton());
   }, [changesKeyDisabled, selectedTabButton]);
-  // The toolbar row's search button searches the files on the files pane:
-  // the head has no search of its own. The sessions pane's search is the
-  // sessions'; the files section's header row below the tree has the files'.
-  const sessionsShown = sidebarTab === "sessions";
+  // The files pane has no head search of its own: its section's header row
+  // below the tree owns the field, ⌘K opens and focuses it.
   const searchesFiles = sidebarTab === "files" && explorerCwd !== null;
-  // ⌘K（Ctrl+K）：搜索当前面板——文件面板搜文件，否则会话搜索；开着就只聚焦。
+  // ⌘K（Ctrl+K）：搜索当前面板——文件面板搜文件，否则聚焦常驻的会话搜索框。
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== "k" || event.altKey || event.shiftKey || !(event.metaKey || event.ctrlKey)) return;
@@ -2943,7 +2937,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         document.getElementById("file-search-input")?.focus();
         return;
       }
-      setSessionSearchOpen(true);
       requestAnimationFrame(() => sessionSearchInputRef.current?.focus());
     };
     document.addEventListener("keydown", onKeyDown);
@@ -3095,10 +3088,10 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         />
       )}
       {/* The draft's head: the brand row (the panel's anchor; a click shows
-          the versions), then New and the search of the pane in view. Under it
-          the Sessions | Files track, in every layout — the panes switch in
-          the files-below layout too, where the files pane takes the files
-          section's place. Only the two tabs are the tablist. */}
+          the versions), then New. Under it the Sessions | Files track, in
+          every layout — the panes switch in the files-below layout too, where
+          the files pane takes the files section's place. Only the two tabs
+          are the tablist. */}
       <div ref={headerRef} className="sidebar-header flex flex-none min-h-[calc(var(--top-bar-height)-4px)] items-center">
         <PiWebTitle onWidthChange={fitHeader} />
         <span className="sidebar-header-spacer min-w-0 flex-1" />
@@ -3113,37 +3106,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           className="sidebar-new-button rounded-md hover:bg-accent dark:hover:bg-accent disabled:pointer-events-auto"
         >
           <PlusIcon size={16} className="size-4" />
-        </Button>
-        <Button
-          ref={searchButtonRef}
-          type="button"
-          onClick={() => {
-            // The search of the pane in view: the files pane's searches its
-            // files; without a folder there, it opens the sessions pane's.
-            if (searchesFiles) {
-              setFileSearchOpen((open) => !open);
-              return;
-            }
-            if (!sessionsShown) {
-              switchTab("sessions");
-              setSessionSearchOpen(true);
-              requestAnimationFrame(() => sessionSearchInputRef.current?.focus());
-              return;
-            }
-            setSessionSearchOpen((open) => {
-              if (!open) requestAnimationFrame(() => sessionSearchInputRef.current?.focus());
-              return !open;
-            });
-          }}
-          title={searchesFiles ? t("sidebar.searchFiles") : t("sidebar.toggleSessionSearch")}
-          aria-label={searchesFiles ? t("sidebar.searchFiles") : t("sidebar.toggleSessionSearch")}
-          aria-expanded={searchesFiles ? fileSearchOpen : sessionSearchOpen}
-          aria-controls={searchesFiles ? "file-search-input" : "session-search-input"}
-          variant="ghost"
-          size="icon-sm"
-          className={`sidebar-search-toggle rounded-md hover:bg-accent dark:hover:bg-accent${(searchesFiles ? fileSearchOpen : sessionSearchOpen) ? " bg-accent text-accent-foreground" : ""}`}
-        >
-          <SearchIcon size={16} className="size-4" />
         </Button>
       </div>
       {/* The segmented control: Radix's roving focus owns the arrows and
@@ -3195,7 +3157,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         {sessionSearchOpen && (
           <div className="sidebar-search flex-none px-2 pt-2 pb-1">
             {/* The files' search field (FileExplorer), mirrored. 常驻不 autofocus：
-                首屏不该被侧栏抢走焦点；⌘K / 🔍 负责聚焦。 */}
+                首屏不该被侧栏抢走焦点；⌘K 负责聚焦。 */}
             <InputGroup className="h-8 rounded-md bg-muted">
               <InputGroupInput
                 ref={sessionSearchInputRef}

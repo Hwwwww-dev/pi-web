@@ -687,15 +687,13 @@ const SessionRowView = memo(function SessionRowView({
       />
     );
     statusTitle = t("sidebar.newActivity");
-  } else {
-    // 空闲行也有一颗点（demo⑨ 的空心圆）：状态列常在，扫一眼即可对齐。
-    statusDot = <span className="inline-block size-[7px] shrink-0 rounded-full border-[1.2px] border-muted-foreground/45" />;
   }
+  // 空闲行不带点：只有等待输入、运行中、未读三种激活状态才显示。
 
   // 行首的状态点：横向与分组标题的展开箭头中心线附近（箭头中心 10.5px；
-  // 点 7px，left 12px 即中心 15.5px——用户目视定值，右移让开行首），
+  // 点 7px，left 14px 即中心 17.5px——用户目视定值，右移让开行首），
   // 固定行与会话行共用一个值。
-  const dotLeft = "left-[12px]";
+  const dotLeft = "left-[14px]";
   const meta = context === "pinned"
     ? <span className="inline-block max-w-[70px] truncate align-bottom">{row.project.name}</span>
     : formatShortRelativeTime(family.latestModified, locale, nowDate);

@@ -548,7 +548,6 @@ export const zhCNLocale: LocalePlugin = {
     "sidebar.noMatchingFiles": "没有匹配的文件",
     "sidebar.clearSearch": "清除搜索",
     "sidebar.searchSessions": "搜索所有对话...",
-    "sidebar.toggleSessionSearch": "搜索对话",
     "sidebar.sessionSearching": "搜索中...",
     "sidebar.sessionSearchEmpty": "没有匹配的对话",
     "sidebar.sessionSearchCount": "{count} 个匹配的对话",
