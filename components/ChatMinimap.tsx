@@ -573,10 +573,13 @@ export const ChatMinimap = memo(function ChatMinimap({
       }}
       // Canvas anchoring: the rail hugs the chat pane's LEFT edge at the shared
       // MINIMAP_WIDTH layout constant — measured positioning, kept as a style.
+      // bottom 让出浮动输入条（--composer-dock-h，与回到底部按钮同源）：主聊天
+      // 的消息列延伸到输入卡背后，轨道不缩就会带着预览卡伸进输入条背后、贴到
+      // 面板底边被裁；panel/空态没有该变量，缺省 0px 即原行为。
       style={{
         position: "absolute",
         top: 0,
-        bottom: 0,
+        bottom: "var(--composer-dock-h, 0px)",
         left: 14,
         width: MINIMAP_WIDTH,
         zIndex: 25,
