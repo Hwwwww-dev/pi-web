@@ -1098,17 +1098,18 @@ const GroupRowView = memo(function GroupRowView({
       <Button
         type="button"
         variant="ghost"
-        className={`session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[5px] rounded-md bg-transparent py-0 pl-1 pr-0 text-left text-sm font-normal whitespace-nowrap hover:bg-transparent ${project.current ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        className="session-tree-group-toggle h-full min-w-0 flex-1 justify-start gap-[5px] rounded-md bg-transparent py-0 pl-1 pr-0 text-left text-sm font-semibold whitespace-nowrap text-foreground hover:bg-transparent"
         aria-expanded={expanded}
         title={project.root}
         onClick={(event) => handlers.current.onToggleGroup(project.key, event.altKey)}
       >
         {/* A section header, not one more row: the chevron leads in a
             column of its own, so the name starts where the session titles
-            below it do and every header's chevron lines up. */}
+            below it do and every header's chevron lines up. The name takes
+            the whole middle (flex-1), so the count lands on the row's right
+            edge as the demo's ⑨ group head does. */}
         <ChevronRightIcon size={13} strokeWidth={3} className={`size-[13px] shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${expanded ? " rotate-90" : ""}`} />
-        <span className="session-tree-group-name min-w-0 truncate">{project.name}</span>
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">{row.count}</span>
+        <span className="session-tree-group-name min-w-0 flex-1 truncate">{project.name}</span>
         {project.pinned && <PinIcon size={10} className="ml-0.5 size-2.5 shrink-0 text-muted-foreground" role="img" aria-label={t("sidebar.pinnedProject")} aria-hidden={false} />}
         {!expanded && (
           <ActivitySummary
@@ -1119,6 +1120,7 @@ const GroupRowView = memo(function GroupRowView({
             t={t}
           />
         )}
+        <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">{row.count}</span>
       </Button>
       <span className={`session-tree-group-actions flex flex-none items-center gap-0.5${isMobile ? "" : " hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex"}`}>
         <Button
