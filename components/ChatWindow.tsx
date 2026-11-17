@@ -1875,11 +1875,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     };
   }, [panel]);
   /**
-   * 贴底判定的距离阈值：固定的 120px 落在输入条垫底的那 167–169px 之内，
-   * 于是「最后一条刚好露在输入条上方」也会被判成已离底，跟随当场失效（四端都
-   * 一样，触摸滚动最容易停在那里）。扣掉停靠区高度再加一点余量才是读者眼里的底。
+   * 贴底判定的距离阈值。这个值同时是「吸附范围」：库在 `autoScroll` 打开时只要
+   * 判成贴底，就把滚动模式续回 following-bottom，读者在范围内往上翻会被拽回。
+   * 取 80px 只覆盖「真的滚到底」，内容末端那层 `--composer-dock-h` 垫底（实测
+   * 167–169px）不进吸附区——输入条盖住的那一段不是读者看到的底。
    */
-  const scrollEdgeThreshold = Math.max(120, composerDockHeight + 24);
+  const scrollEdgeThreshold = 80;
   /**
    * 空闲时的尾部追加要自己补一次滚到底：`autoScroll` 只在 agent 运行时打开，
    * 空闲期库的滚动模式恒为 `free-scrolling`，发送出去的新气泡因此落在视口外，
@@ -1902,11 +1903,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     }
     const previous = lastRowKeyRef.current;
     lastRowKeyRef.current = key;
-    if (previous === null || key === null || key === previous || !atTail) return;
+    if (previous === null || key === null || key === previous) return;
     if (scrollRestoringRef.current || pendingScrollRestore || loadingOlderRef.current) return;
+    const viewport = scrollContainerRef.current;
+    if (!viewport) return;
+    // “该不该跟”用读者眼里的底（扣掉停靠区垫底），与上方的吸附阈值分开：把最后一条
+    // 滑到输入条上方时不再算贴底（不会把往上翻的人拽回），但新消息到来时仍应该跟到底。
+    const distanceToBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    if (distanceToBottom > Math.max(120, composerDockHeight + 24)) return;
     // 走官方命令：它同步更新滚动模式，下一帧的 `be()` 便能把模式续回 following-bottom。
     scrollerApiRef.current?.scrollToEnd({ behavior: "instant" });
-  }, [turnRendered, atTail, session?.id, pendingScrollRestore]);
+  }, [turnRendered, session?.id, pendingScrollRestore, composerDockHeight, scrollContainerRef]);
 
   if (error) {
     return (
