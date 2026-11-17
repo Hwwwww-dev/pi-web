@@ -559,6 +559,8 @@ export const zhTWLocale: LocalePlugin = {
     "sidebar.agentRunning": "Agent 執行中…",
     "sidebar.agentAwaitingInput": "Agent 等待你的輸入",
     "sidebar.newActivity": "有新活動",
+    "sidebar.groupActiveCount": "{total} 個工作階段中 {active} 個有活動",
+    
     "sidebar.worktreeBranch": "worktree 分支：{branch}",
     "sidebar.newSessionActivity": "工作階段有新活動",
     "sidebar.deleteSession": "刪除 {title}？",

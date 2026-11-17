@@ -559,6 +559,8 @@ export const enLocale: LocalePlugin = {
     "sidebar.agentRunning": "Agent running…",
     "sidebar.agentAwaitingInput": "Agent waiting for your input",
     "sidebar.newActivity": "New activity",
+    "sidebar.groupActiveCount": "{active} of {total} sessions have activity",
+    
     "sidebar.worktreeBranch": "Worktree branch: {branch}",
     "sidebar.newSessionActivity": "New session activity",
     "sidebar.deleteSession": "Delete {title}?",

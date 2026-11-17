@@ -143,40 +143,49 @@ test("a collapsed pinned header shows an awaiting dot of its own, without the ru
   assert.doesNotMatch(collapsed, /session-tree-pinned-dot is-running/);
 });
 
-test("a collapsed group shows awaiting families apart from running ones", () => {
-  const mixed = rowMarkup(render({ rows: [groupRow({ expanded: false, running: 1, awaiting: 2, unread: 0 })] }), "group:/work/app");
-  assert.match(mixed, /aria-label="Agent running… \(1\)"/);
-  assert.match(mixed, /<span class="[^"]*session-tree-summary-awaiting[^"]*" role="img" title="Agent waiting for your input" aria-label="Agent waiting for your input \(2\)"><span class="[^"]*session-tree-summary-dot[^"]*"><\/span>2<\/span>/);
+test("a collapsed group folds its activity into one ● active/total count", () => {
+  // 合并记法（demo⑨ 右缘一个数字槽）：● 活跃/总数，awaiting 琥珀优先，
+  // 其次运行中/未读蓝；不再有分段摘要的两套数字并排。
+  const mixed = rowMarkup(render({ rows: [groupRow({ expanded: false, running: 1, awaiting: 2, unread: 0, count: 9 })] }), "group:/work/app");
+  assert.match(mixed, /aria-label="3 of 9 sessions have activity"/);
+  assert.match(mixed, /<span class="[^"]*bg-status-awaiting[^"]*"><\/span>3\/9<\/span>/);
+  assert.doesNotMatch(mixed, /session-tree-summary/);
 
-  // Only awaiting: the amber count, no spinner.
-  const awaiting = rowMarkup(render({ rows: [groupRow({ expanded: false, running: 0, awaiting: 1, unread: 0 })] }), "group:/work/app");
-  assert.match(awaiting, /session-tree-summary-awaiting/);
-  assert.doesNotMatch(awaiting, /session-tree-summary-running/);
+  // Only awaiting: the amber dot, no spinner.
+  const awaiting = rowMarkup(render({ rows: [groupRow({ expanded: false, running: 0, awaiting: 1, unread: 0, count: 4 })] }), "group:/work/app");
+  assert.match(awaiting, /aria-label="1 of 4 sessions have activity"/);
+  assert.match(awaiting, /bg-status-awaiting/);
   assert.doesNotMatch(awaiting, /sidebar-spin/);
+
+  // Running (or unread) shows the blue dot.
+  const running = rowMarkup(render({ rows: [groupRow({ expanded: false, running: 2, unread: 0, count: 6 })] }), "group:/work/app");
+  assert.match(running, /<span class="[^"]*bg-status-unread[^"]*"><\/span>2\/6<\/span>/);
 });
 
-test("a collapsed group shows its running and unread counts and labelled actions", () => {
+test("a collapsed group shows its merged activity count and labelled actions", () => {
   const html = rowMarkup(render({
-    rows: [groupRow({ expanded: false, running: 2, unread: 1 }, { pinned: true, current: false })],
+    rows: [groupRow({ expanded: false, running: 2, unread: 1, count: 5 }, { pinned: true, current: false })],
   }), "group:/work/app");
-  assert.match(html, /^<div class="session-tree-row session-tree-group[^"]*" style="top:0;height:26px"/);
+  assert.match(html, /^<div class="session-tree-row session-tree-group[^"]*" style="top:1px;height:28px"/);
   assert.match(html, /<button [^>]*class="[^"]*session-tree-group-toggle[^"]*"[^>]*aria-expanded="false" title="\/work\/app">/);
   // The chevron leads, inside the toggle (the whole header still toggles)
-  // and hidden from its accessible name; then the name, its pin, the summary.
+  // and hidden from its accessible name; then the name, its pin, the merged
+  // ● 3/5 count (demo⑨ 的右缘一个数字槽).
   assert.match(html, /title="\/work\/app"><svg[^>]*width="13" height="13"[^>]*stroke-width="3"[^>]*aria-hidden="true"><path[^>]*><\/path><\/svg><span class="[^"]*session-tree-group-name[^"]*">app<\/span>/, "the chevron precedes the name");
-  assert.match(html, /<span class="[^"]*session-tree-group-name[^"]*">app<\/span><svg[^>]*class="lucide[^"]*"[\s\S]*?<\/svg><span class="[^"]*session-tree-summary[^"]*">/);
+  assert.match(html, /<span class="[^"]*session-tree-group-name[^"]*">app<\/span><svg[^>]*class="lucide[^"]*"[\s\S]*?<\/svg><span class="[^"]*flex shrink-0 items-center gap-\[3px\][^"]*" title="3 of 5 sessions have activity" aria-label="3 of 5 sessions have activity"><span class="[^"]*bg-status-unread[^"]*"><\/span>3\/5<\/span>/);
   // No folder: a project group is no second file tree.
   assert.doesNotMatch(html, /session-tree-group-icon/);
   assert.match(html, /<svg[^>]*class="lucide[^"]*" role="img" aria-label="Pinned"/);
-  assert.match(html, /aria-label="Agent running… \(2\)"/);
-  assert.match(html, /aria-label="New session activity \(1\)"/);
   assert.match(html, /aria-label="New session in app" title="New session in app"/);
   assert.match(html, /aria-label="app actions" title="app actions" aria-haspopup="menu" aria-expanded="false"/);
 
-  const expanded = rowMarkup(render({ rows: [groupRow({ expanded: true, running: 2, unread: 1 })] }), "group:/work/app");
+  const expanded = rowMarkup(render({ rows: [groupRow({ expanded: true, running: 2, unread: 1, count: 5 })] }), "group:/work/app");
   assert.match(expanded, /session-tree-group[^"]*is-current/);
   assert.match(expanded, /aria-expanded="true" title="\/work\/app"/);
   assert.doesNotMatch(expanded, /session-tree-summary/);
+  // 展开后行内自带状态点，组头回到纯总数。
+  assert.doesNotMatch(expanded, /sessions have activity/);
+  assert.match(expanded, /<span class="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">5<\/span>/);
   assert.doesNotMatch(expanded, /lucide lucide-pin/);
 });
 

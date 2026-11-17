@@ -1111,16 +1111,22 @@ const GroupRowView = memo(function GroupRowView({
         <ChevronRightIcon size={13} strokeWidth={3} className={`size-[13px] shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${expanded ? " rotate-90" : ""}`} />
         <span className="session-tree-group-name min-w-0 flex-1 truncate">{project.name}</span>
         {project.pinned && <PinIcon size={10} className="ml-0.5 size-2.5 shrink-0 text-muted-foreground" role="img" aria-label={t("sidebar.pinnedProject")} aria-hidden={false} />}
-        {!expanded && (
-          <ActivitySummary
-            running={row.running}
-            awaiting={row.awaiting}
-            unread={row.unread}
-            className={isMobile ? "" : "group-hover/tree-row:hidden group-has-[:focus-visible]/tree-row:hidden"}
-            t={t}
-          />
+        {/* demo⑨ 的右缘计数并作一处：折叠且有活跃时是 ● 活跃/总数，两个数字
+            不再并排读成两个意思（手机无 hover，原摘要与总数是常驻并排的）。
+            点色取最高优先级：等待输入琥珀，其次运行中/未读蓝，与行内点一致；
+            展开后行内自带状态点，组头回到纯总数。 */}
+        {!expanded && row.running + row.awaiting + row.unread > 0 ? (
+          <span
+            className="flex shrink-0 items-center gap-[3px] text-xs tabular-nums text-muted-foreground"
+            title={t("sidebar.groupActiveCount", { active: row.running + row.awaiting + row.unread, total: row.count })}
+            aria-label={t("sidebar.groupActiveCount", { active: row.running + row.awaiting + row.unread, total: row.count })}
+          >
+            <span className={`size-1.5 shrink-0 rounded-full ${row.awaiting > 0 ? "bg-status-awaiting" : "bg-status-unread"}`} />
+            {row.running + row.awaiting + row.unread}/{row.count}
+          </span>
+        ) : (
+          <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">{row.count}</span>
         )}
-        <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">{row.count}</span>
       </Button>
       <span className={`session-tree-group-actions flex flex-none items-center gap-0.5${isMobile ? "" : " hidden group-hover/tree-row:flex group-has-[:focus-visible]/tree-row:flex"}`}>
         <Button
