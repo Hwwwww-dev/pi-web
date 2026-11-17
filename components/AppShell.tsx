@@ -2589,8 +2589,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         </div>
         </header>
           {/* Top panels — anchored to the control that opened them, only one
-              open at a time. --z-flyout stays below the quote toolbar's --z-selection-toolbar
-              (ChatWindow). */}
+              open at a time. --z-flyout 必须低于 ⋯ 菜单的 --z-popover（菜单条目
+              打开面板的交接帧两层同挂，菜单在上焦点才落到面板内，反了即开即自关），
+              也低于划词工具条的 --z-selection-toolbar（ChatWindow）。 */}
           <Popover
             open={activeFlyout === "system"}
             onOpenChange={(next) => next ? setActiveFlyout("system") : closeFlyout("system")}

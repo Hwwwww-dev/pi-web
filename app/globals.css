@@ -162,20 +162,24 @@
 /* ── 全局层级梯（z-index 唯一真值源）──────────────────────────────
    只收全局层（fixed/sticky 顶栏、portal 浮层、模态、右面板）；卡片内部的
    z-10/z-[1] 这类局部栈只在自身 stacking context 里比较，不进这张表。
-   约束链（每条都曾是散落在注释里的口头约定）：
-     页内容 < 顶栏 < 聊天浮层 < 面板遮罩 < 右面板 < portal 弹层 < tooltip
-     < 顶栏弹出卡 < 划词工具条 < 模态 < 模态之上的嵌套层。间隙 10 留插空。 */
+   约束链（每条都曾是散落在注释里的口头约定，其中两条是硬约束）：
+     页内容 < 顶栏 < 聊天浮层 < 面板遮罩 < 右面板 < 顶栏弹出卡 < portal 弹层
+     < tooltip < 划词工具条 < Agent/侧栏清单 < 模态 < 模态之上的嵌套层。
+   硬约束一：⋯ 菜单（popover 层）必须压过顶栏弹出卡（flyout 层）——菜单条目
+     打开面板时交接帧两层同挂，菜单在上焦点交接才成立，反了面板即开即自关。
+   硬约束二：tooltip 压过弹层——悬停提示属于保持可用的那条栏。
+   间隙留插空。 */
 :root {
   --z-app-header: 30;         /* 顶栏（盖过聊天列的 minimap 轨道 25） */
   --z-chat-float: 40;         /* 聊天区全幅浮层：扩展对话框容器 */
   --z-chat-float-raised: 41;  /* 同槽位靠上的一层：扩展自定义 UI 容器 */
   --z-panel-backdrop: 60;     /* 平板段右面板遮罩（641–959px） */
   --z-panel: 70;              /* 右面板浮层/全宽/手机全屏 + 拖拽把手 */
-  --z-popover: 80;            /* portal 浮层默认：popover/select/dropdown */
-  --z-tooltip: 85;            /* 悬停提示：高于弹层，低于划词工具条 */
-  --z-flyout: 90;             /* 顶栏弹出卡 HeaderFlyout */
-  --z-flyout-top: 92;         /* 顶栏弹出卡之上的清单：Agent 清单、侧栏菜单 */
-  --z-selection-toolbar: 95;  /* 划词工具条：页面最高的事务浮层 */
+  --z-flyout: 80;             /* 顶栏弹出卡 HeaderFlyout（⋯ 菜单打开的那批面板） */
+  --z-popover: 85;            /* portal 弹层默认：popover/select/dropdown */
+  --z-tooltip: 90;            /* 悬停提示：高于弹层，低于清单与划词工具条 */
+  --z-selection-toolbar: 95;  /* 划词工具条 */
+  --z-flyout-top: 96;         /* 清单：Agent 清单、侧栏菜单（压过划词工具条） */
   --z-modal: 100;             /* 模态：dialog / alert-dialog / sheet / 移动端抽屉 */
   --z-modal-raised: 110;      /* 模态之上的嵌套层：模态内 Select、嵌套对话框 */
 }
