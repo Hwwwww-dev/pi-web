@@ -78,7 +78,7 @@ test("a to-do snapshot renders as the Plan pattern", () => {
   assert.doesNotMatch(html, /&quot;todos&quot;/);
 });
 
-test("a failed call shows the error status and repeats the whole error", () => {
+test("a failed call shows the X icon and repeats the whole error", () => {
   clearExpandedToolCalls();
   const block = call("edit", { file_path: "a.ts" });
   setToolCallExpanded(block.toolCallId, true);
@@ -87,9 +87,8 @@ test("a failed call shows the error status and repeats the whole error", () => {
     isError: true,
   });
 
-  // The unified card head marks the failure with the status dot, not the old X icon.
+  assert.match(html, /lucide-circle-x/);
   assert.match(html, /data-status="error"/);
-  assert.match(html, /bg-destructive/);
   assert.match(html, /Error: 3 tests failed/);
   clearExpandedToolCalls();
 });

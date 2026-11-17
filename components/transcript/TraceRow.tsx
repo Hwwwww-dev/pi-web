@@ -25,10 +25,6 @@ import type { ToolViewStatus } from "@/lib/tool-view";
  * The base every pattern below builds on: one `TraceLine` that folds its
  * content. Kept private to `components/transcript` — a pattern names the thing
  * being shown (a tool call, a thought, a group) instead of exposing this shape.
- *
- * `variant="card"` is the tool-call presentation (设计④ 统一卡头): the row is a
- * bordered card whose head carries the status dot + title + duration and folds
- * the body inside the same box — thinking rows and group heads stay lines.
  */
 
 const STATUS_ATTR = {
@@ -37,24 +33,6 @@ const STATUS_ATTR = {
   pending: "pending",
   done: undefined,
 } as const;
-
-/** 统一卡头的状态点：运行呼吸（info 环脉动）、成功绿点、失败红点、待命灰。
- *  软环沿用侧边栏状态点的伪元素写法（session-tree-status-pulse 同款）。 */
-function StatusDot({ status, className }: { status: ToolViewStatus; className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "relative size-[7px] shrink-0 rounded-full",
-        status === "running" && "bg-info after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-info after:opacity-35 motion-reduce:after:animate-none",
-        status === "done" && "bg-success after:absolute after:-inset-[3px] after:rounded-full after:border-[1.4px] after:border-success after:opacity-35",
-        status === "error" && "bg-destructive after:absolute after:-inset-[3px] after:rounded-full after:border-[1.4px] after:border-destructive after:opacity-35",
-        status === "pending" && "bg-muted-foreground/40",
-        className,
-      )}
-    />
-  );
-}
 
 /**
  * 折叠状态。`foldKey` 保存用户的选择（流式 → message_end → 过程详情 → 会话
@@ -121,7 +99,6 @@ export function TraceRow({
   href,
   activityTool,
   wrap = false,
-  variant = "line",
   children,
 }: {
   icon?: ReactNode;
@@ -159,8 +136,6 @@ export function TraceRow({
   activityTool?: string;
   /** 标题换行显示（提问/计划这类长标题行）：不截断、不加淡出。 */
   wrap?: boolean;
-  /** `card` = 工具卡统一卡头（状态点 + 标题 + 耗时 + 动作，内容在卡内折叠）。 */
-  variant?: "line" | "card";
   children?: ReactNode;
 }) {
   const { open, onOpenChange } = useTraceFold(foldKey, defaultOpen);
@@ -199,67 +174,6 @@ export function TraceRow({
       {withTrailing && trailing && <span className="shrink-0 pl-2">{trailing}</span>}
     </TraceLine>
   );
-
-  // ── 统一卡头（工具卡）───────────────────────────────────────────────
-  // 头行 = 状态点 + 标题（+对象/胶囊/计数）+ 耗时 + 行尾动作；内容折叠进同一张
-  // 卡片，不再用左缘竖线缩进。类别图标让位给状态点：状态一眼可辨，动作由标题
-  // 与文件胶囊说明。
-  if (variant === "card") {
-    const head = (
-      <div
-        className={cn(
-          "flex w-full max-w-full min-w-0 items-center gap-1.5 rounded-[inherit] px-2 py-1.5 transition-colors",
-          open ? "bg-muted/50" : "hover:bg-accent/50",
-          wrap && "items-start",
-        )}
-      >
-        <TraceCollapsibleTrigger aria-label={ariaLabel} className="max-w-full min-w-0 shrink-0 rounded-md">
-          <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0" data-expanded={open || undefined}>
-            <StatusDot status={status} className={wrap ? "mt-[6.5px] self-start" : "self-center"} />
-            {titleEl}
-            {description && <TraceDescription className="shrink-0 whitespace-nowrap">{description}</TraceDescription>}
-            {duration != null && <span className="shrink-0 tabular-nums">{duration}</span>}
-          </TraceLine>
-        </TraceCollapsibleTrigger>
-        {/* 对象在触发区之外独享让步位：点击同样开合折叠（悬停有整条提示）。 */}
-        {objectEl}
-        {chips}
-        {suffix != null && <span className="shrink-0 whitespace-nowrap">{suffix}</span>}
-        {trailing && <span className="shrink-0 pl-1 tabular-nums">{trailing}</span>}
-        {/* 无对象文本时由占位把行尾动作推到右缘；有对象时 flex-1 已承担。 */}
-        {!object && <span className="min-w-0 flex-1" aria-hidden="true" />}
-        {actions}
-      </div>
-    );
-
-    // 无内容的卡不渲染折叠区：触发器仍需在 Collapsible 根内（Radix 上下文要求）。
-    return (
-      <Trace
-        ref={rowRef}
-        data-activity="trace-row"
-        data-activity-tool={activityTool}
-        data-status={STATUS_ATTR[status]}
-        className="overflow-hidden rounded-lg border bg-card shadow-xs"
-      >
-        <TraceCollapsible open={open} onOpenChange={onOpenChange} className="min-w-0">
-          {head}
-          {content && (
-            // 展开区不设高度上限：代码块、思考块各自限高即可，两层同时限高会出现两个滚动条。
-            <TraceCollapsibleContent className="mt-0 mb-0 ml-0 flex flex-col gap-2 border-l-0 pl-3 pr-3 pb-3 pt-2.5 [&>*]:min-w-0">
-              {stepUsage && (
-                <div className="text-xs">
-                  <UsageBar usage={stepUsage} gap={10} />
-                </div>
-              )}
-              {content}
-              {children}
-            </TraceCollapsibleContent>
-          )}
-        </TraceCollapsible>
-        {below}
-      </Trace>
-    );
-  }
 
   if (!content) {
     return (

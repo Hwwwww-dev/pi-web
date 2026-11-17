@@ -21,7 +21,7 @@ const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
  * `<Trace>`, the report below them. A run still in the background is the line
  * alone — there is nothing to show yet.
  */
-export const SubagentTrace = memo(function SubagentTrace({ label, status, steps, report, foldKey, action, stepUsage, below, duration }: {
+export const SubagentTrace = memo(function SubagentTrace({ label, status, steps, report, foldKey, action, stepUsage, below }: {
   /** The profile or agent name; omitted for the generic line. */
   label?: string;
   status: ToolViewStatus;
@@ -35,8 +35,6 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
   stepUsage?: StepUsage;
   /** Media the run produced, below the line. */
   below?: ReactNode;
-  /** The call's own run time, shown in the unified card head. */
-  duration?: ReactNode;
 }) {
   const { t } = useI18n();
   // 行标题仅显示「子代」；profile 与描述可能较长，置于可截断的描述位，不挤占标题。
@@ -45,13 +43,11 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
 
   return (
     <TraceRow
-      variant="card"
       icon={<BotIcon className="size-3.5" />}
       title={title}
       description={label}
       status={status}
       foldKey={foldKey}
-      duration={duration}
       trailing={undefined}
       actions={action}
       ariaLabel={title}

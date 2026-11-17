@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, type ReactNode } from "react";
+import { memo } from "react";
 import { CircleIcon, CircleCheckIcon, MessageCircleQuestionIcon } from "lucide-react";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import type { ToolViewStep } from "@/lib/tool-view";
@@ -19,7 +19,7 @@ const STEP_ICON = {
  * prompt, the choices below it, the pick replacing them once answered. No
  * progress count — a question is not a to-do list.
  */
-export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey, activityTool, stepUsage, duration }: {
+export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey, activityTool, stepUsage }: {
   title: string;
   steps: ToolViewStep[];
   foldKey: string;
@@ -27,20 +27,16 @@ export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey
   activityTool?: string;
   /** The issuing request's usage: the expanded card's first line (TraceRow draws it). */
   stepUsage?: StepUsage;
-  /** The call's own run time, shown in the unified card head. */
-  duration?: ReactNode;
 }) {
   const answered = steps.filter((step) => step.status === "done").length;
 
   return (
     <TraceRow
-      variant="card"
       icon={<MessageCircleQuestionIcon />}
       title={title}
       foldKey={foldKey}
       activityTool={activityTool}
       stepUsage={stepUsage}
-      duration={duration}
       defaultOpen
       status={steps.length > 0 && answered === steps.length ? "done" : undefined}
       ariaLabel={title}
