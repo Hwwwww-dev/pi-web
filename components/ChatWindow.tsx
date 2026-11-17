@@ -1854,12 +1854,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 空态（hero+composer 簇的垂直居中依赖文档流）与侧面板保持原有布局。
   const composerDockRef = useRef<HTMLDivElement | null>(null);
   const composerFloating = !panel && !isEmptyNew;
+  // 停靠区高度同时进 CSS 变量（内容末端垫底）和 state（贴底阈值）：内容底部那层
+  // padding 就是被输入条盖住、读者永远看不到的区域，判定「是否贴底」时必须扣掉它。
+  const [composerDockHeight, setComposerDockHeight] = useState(0);
   useEffect(() => {
     const dock = composerDockRef.current;
     const host = dock?.parentElement;
     if (!dock || !host || panel) return;
     const apply = () => {
-      host.style.setProperty("--composer-dock-h", `${dock.offsetHeight}px`);
+      const height = dock.offsetHeight;
+      host.style.setProperty("--composer-dock-h", `${height}px`);
+      setComposerDockHeight((previous) => (previous === height ? previous : height));
     };
     apply();
     const ro = new ResizeObserver(apply);
@@ -1869,6 +1874,39 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       host.style.removeProperty("--composer-dock-h");
     };
   }, [panel]);
+  /**
+   * 贴底判定的距离阈值：固定的 120px 落在输入条垫底的那 167–169px 之内，
+   * 于是「最后一条刚好露在输入条上方」也会被判成已离底，跟随当场失效（四端都
+   * 一样，触摸滚动最容易停在那里）。扣掉停靠区高度再加一点余量才是读者眼里的底。
+   */
+  const scrollEdgeThreshold = Math.max(120, composerDockHeight + 24);
+  /**
+   * 空闲时的尾部追加要自己补一次滚到底：`autoScroll` 只在 agent 运行时打开，
+   * 空闲期库的滚动模式恒为 `free-scrolling`，发送出去的新气泡因此落在视口外，
+   * 必须手动滑一下才回到底部。只认「尾部换了新行」——折叠块展开属于高度变化、
+   * 不新增行，不能算作新内容。
+   */
+  const lastRowKeyRef = useRef<string | null>(null);
+  const followSessionRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const last = turnRendered[turnRendered.length - 1];
+    const key = isValidElement<{ "data-entry-id"?: string }>(last)
+      ? (last.props["data-entry-id"] ?? (typeof last.key === "string" && last.key ? last.key : null))
+      : null;
+    const sessionKey = session?.id ?? null;
+    if (followSessionRef.current !== sessionKey) {
+      // 会话切换这一帧交给恢复逻辑（scrollToMessage / scrollToEnd），这里不插手。
+      followSessionRef.current = sessionKey;
+      lastRowKeyRef.current = key;
+      return;
+    }
+    const previous = lastRowKeyRef.current;
+    lastRowKeyRef.current = key;
+    if (previous === null || key === null || key === previous || !atTail) return;
+    if (scrollRestoringRef.current || pendingScrollRestore || loadingOlderRef.current) return;
+    // 走官方命令：它同步更新滚动模式，下一帧的 `be()` 便能把模式续回 following-bottom。
+    scrollerApiRef.current?.scrollToEnd({ behavior: "instant" });
+  }, [turnRendered, atTail, session?.id, pendingScrollRestore]);
 
   if (error) {
     return (
@@ -1964,7 +2002,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             于是 `handleResize` 里的 `scrollToEnd()` 连条件都进不去——展开/收起折叠块的高度
             变化交还给浏览器原生滚动锚定，锚点行纹丝不动。此前常开，折叠一展开就被当成
             「又有新内容」顶上去（见 shadcn-ui/ui#11211 对同一现象的描述）。 */}
-        <MessageScrollerProvider autoScroll={agentRunning} defaultScrollPosition="end" scrollEdgeThreshold={120}>
+        <MessageScrollerProvider autoScroll={agentRunning} defaultScrollPosition="end" scrollEdgeThreshold={scrollEdgeThreshold}>
         <ScrollerBridge apiRef={scrollerApiRef} onAtTailChange={setAtTail} />
         <MessageScroller className="min-h-0 min-w-0 flex-1 animate-in fade-in duration-150">
         <MessageScrollerViewport

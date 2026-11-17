@@ -17,7 +17,14 @@ test("the official scroller owns following, prepend anchoring and the bottom edg
   // autoScroll 只在 agent 运行时打开：跟随的对象是流式输出。空闲时它恒为 false，
   // 折叠展开的高度增长就进不了 `handleResize` 的 `scrollToEnd()`，也不会把展开块
   // 顶出视口。行窗口与手工前插保位都已删除，因此这里不能再有自己的跟随状态机。
-  assert.match(source, /<MessageScrollerProvider autoScroll=\{agentRunning\} defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  assert.match(source, /<MessageScrollerProvider autoScroll=\{agentRunning\} defaultScrollPosition="end" scrollEdgeThreshold=\{scrollEdgeThreshold\}>/);
+  // 阈值必须扣掉输入条垫底：内容末端那层 `--composer-dock-h` padding 就是被停靠区
+  // 盖住、读者看不到的区域（实测 167–169px）。固定 120px 落在它之内，于是「最后一
+  // 条刚露在输入条上方」也判成已离底，四端跟随当场失效。
+  assert.match(source, /const scrollEdgeThreshold = Math\.max\(120, composerDockHeight \+ 24\);/);
+  // 空闲时 autoScroll 恒 false，库自己的跟随不走，尾部新增行得自己补一次到底；
+  // 只认「尾部换了新行」，折叠块展开属于高度变化、不得算成新内容。
+  assert.match(source, /lastRowKeyRef[\s\S]{0,1200}?scrollerApiRef\.current\?\.scrollToEnd\(\{ behavior: "instant" \}\);/);
   // 折叠不再自带钉位：既不写 scrollTop，也不再有 pi-web:trace-fold 这条契约。
   assert.doesNotMatch(source, /foldPinRef|pi-web:trace-fold/);
   assert.doesNotMatch(source, /autoScroll=\{false\}|autoScroll=\{!foldInFlight\}/);
