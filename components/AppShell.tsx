@@ -36,7 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Popover, PopoverAnchor, PopoverTrigger } from "./ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { HeaderFlyout } from "./HeaderFlyout";
 import { Spinner } from "./ui/spinner";
 import { cn } from "@/lib/utils";
@@ -2508,9 +2508,25 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               >
                 <MenuIcon className="size-4.5" strokeWidth={2} />
               </Button>
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-                {activeSessionTitle ?? "Pi Web"}
-              </span>
+              {/* 点击标题弹完整标题：会话名以首条消息开头，截断后没有途径看到全文。 */}
+              {activeSessionTitle ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      title={activeSessionTitle}
+                      className="min-w-0 flex-1 cursor-pointer truncate text-left text-sm font-semibold text-foreground"
+                    >
+                      {activeSessionTitle}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto max-w-[min(90vw,640px)] break-words text-sm font-normal">
+                    {activeSessionTitle}
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">Pi Web</span>
+              )}
               {renderSessionStats(true)}
               {renderAgentsButton(true)}
               {renderToolbarBGroup(true)}
@@ -2522,7 +2538,25 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
               <div className="flex h-10 min-w-0 flex-1 items-center gap-2.5">
                 <h1 className="min-w-0 truncate text-base font-semibold text-foreground">
-                  {activeSessionTitle ?? "Pi Web"}
+                  {/* 点击标题弹完整标题：截断后没有途径看到全文。 */}
+                  {activeSessionTitle ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          title={activeSessionTitle}
+                          className="block max-w-full cursor-pointer truncate text-left text-base font-semibold text-foreground"
+                        >
+                          {activeSessionTitle}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-auto max-w-[min(90vw,640px)] break-words text-sm font-normal">
+                        {activeSessionTitle}
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    "Pi Web"
+                  )}
                 </h1>
               </div>
             </>
