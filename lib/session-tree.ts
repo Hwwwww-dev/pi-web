@@ -25,7 +25,7 @@ import { workspaceKeyOf } from "./workspace-memory";
 export type SidebarLayout = "desktop" | "mobile";
 export type SidebarRowKind =
   | "pinned-header" | "session" | "pinned-more" | "group" | "group-more" | "group-empty"
-  | "spacer" | "footer-open" | "footer-archived" | "archive-group";
+  | "spacer" | "footer-open" | "archive-group";
 
 /**
  * Per-kind row heights: one rhythm. Session rows and the section headers (a
@@ -39,8 +39,8 @@ export type SidebarRowKind =
  * the groups from the footer.
  */
 export const SIDEBAR_ROW_HEIGHTS: Record<SidebarLayout, Record<SidebarRowKind, number>> = {
-  desktop: { "pinned-header": 28, session: 34, "pinned-more": 26, group: 26, "group-more": 24, "group-empty": 24, spacer: 4, "footer-open": 28, "footer-archived": 28, "archive-group": 26 },
-  mobile: { "pinned-header": 40, session: 40, "pinned-more": 36, group: 40, "group-more": 36, "group-empty": 40, spacer: 8, "footer-open": 40, "footer-archived": 40, "archive-group": 40 },
+  desktop: { "pinned-header": 28, session: 34, "pinned-more": 26, group: 30, "group-more": 24, "group-empty": 24, spacer: 4, "footer-open": 28, "archive-group": 26 },
+  mobile: { "pinned-header": 40, session: 40, "pinned-more": 36, group: 40, "group-more": 36, "group-empty": 40, spacer: 8, "footer-open": 40, "archive-group": 40 },
 };
 
 /**
@@ -74,7 +74,6 @@ export type SidebarRow =
   | { kind: "group-empty"; key: string; project: SidebarProject }
   | { kind: "spacer"; key: "top-spacer" | "pinned-spacer" | "footer-spacer" | `group-spacer:${string}` }
   | { kind: "footer-open"; key: "footer-open" }
-  | { kind: "footer-archived"; key: "footer-archived"; count: number }
   | { kind: "archive-group"; key: string; project: SidebarProject; count: number; expanded: boolean };
 
 export interface SessionTreeInput {
@@ -552,10 +551,10 @@ export function buildSessionTree(input: SessionTreeInput): SessionTreeModel {
   }
 
   // One spacer parts the groups from the footer, as one parts the pinned
-  // section from them.
+  // section from them. The archived entry lives in the sidebar's fixed
+  // footer (demo⑨), not in the list.
   if (orderedProjects.length > 0) rows.push({ kind: "spacer", key: "footer-spacer" });
   rows.push({ kind: "footer-open", key: "footer-open" });
-  if (archivedCount > 0) rows.push({ kind: "footer-archived", key: "footer-archived", count: archivedCount });
 
   return { rows, projects: orderedProjects, archivedCount, unorderedKeysByBand, projectKeysToRecord };
 }

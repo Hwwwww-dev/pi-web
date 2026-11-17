@@ -19,7 +19,6 @@ import {
   PanelRightIcon,
   PenLineIcon,
   RefreshCwIcon,
-  SettingsIcon,
   ShieldAlertIcon,
   SlidersHorizontalIcon,
   SunIcon,
@@ -151,9 +150,6 @@ const HEADER_CONTROL_OPEN = "bg-accent text-foreground";
 const GIT_TAB_ID = "git";
 const GIT_PANEL_TAB: Tab = { id: GIT_TAB_ID, label: "", filePath: "", kind: "git" };
 const AGENT_PANEL_WIDTH = 420;
-// The footer's version readout (the draft's mono version at the row's end).
-const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0";
-const PI_VERSION = process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0";
 // pi's built-in tools that never change a file; any other tool may (#1144).
 const READ_ONLY_TOOL_NAMES = new Set(PRESET_READ_ONLY);
 const TOOL_END_REFRESH_MS = 1000;
@@ -1982,31 +1978,11 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         onRunningSessionIdsChange={handleRunningSessionIdsChange}
         onSessionsChange={handleSessionsChange}
         onUnreadSessionIdsChange={handleUnreadSessionIdsChange}
+        onOpenSettings={() => {
+          setSettingsOpenAtHome(true);
+          setSettingsSection(getLastSettingsSection(projectTrustCwd));
+        }}
       />
-      {/* The draft's footer: one settings row, the version at the row's end.
-          Models and skills live in Settings alone. */}
-      <div className="flex shrink-0 items-center gap-1 px-2.5 pb-2.5 pt-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setSettingsOpenAtHome(true);
-            setSettingsSection(getLastSettingsSection(projectTrustCwd));
-          }}
-          title={translate("common.settings")}
-          aria-label={translate("common.settings")}
-          className="min-w-0 shrink justify-start gap-1.5 rounded-md px-2.5 font-medium text-muted-foreground"
-        >
-          <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
-          <span className="truncate">{translate("common.settings")}</span>
-        </Button>
-        <span
-          className="ml-auto shrink-0 font-mono text-xs leading-none tabular-nums text-muted-foreground opacity-70"
-          title={`pi-web ${APP_VERSION} · pi ${PI_VERSION}`}
-        >
-          v{APP_VERSION}
-        </span>
-      </div>
     </>
   );
 

@@ -393,7 +393,6 @@ test("show more, empty groups, footer links and archive groups", () => {
       { kind: "archive-group", key: "archive:/work/app", project, count: 2, expanded: true },
       { kind: "archive-group", key: "archive:/work/old", project: { ...project, key: "/work/old", root: "/work/old", name: "old" }, count: 5, expanded: false },
       { kind: "footer-open", key: "footer-open" },
-      { kind: "footer-archived", key: "footer-archived", count: 4 },
     ],
   });
   assert.match(rowMarkup(html, "pinned-more"), /<button [^>]*class="[^"]*session-tree-more-toggle[^"]*"[^>]*data-more-action="less">Show less<\/button><\/div>/);
@@ -421,8 +420,8 @@ test("show more, empty groups, footer links and archive groups", () => {
   assert.doesNotMatch(archiveHeader, /New session/);
   assert.match(rowMarkup(html, "archive:/work/old"), /aria-expanded="false" title="\/work\/old"><svg[^>]*class="lucide[^"]*"/);
   assert.match(rowMarkup(html, "footer-open"), /<button [^>]*class="[^"]*session-tree-footer-button[^"]*"[^>]*><svg[^>]*>[\s\S]*?<\/svg><span class="[^"]*session-tree-footer-label[^"]*">Open another project…<\/span><\/button>/);
-  assert.match(rowMarkup(html, "footer-archived"), /<span class="[^"]*session-tree-footer-label[^"]*">Archived · 4<\/span><\/button>/);
-  assert.doesNotMatch(rowMarkup(html, "footer-archived"), /session-tree-footer-chevron/);
+  // The archived entry lives in the sidebar's fixed footer (demo⑨), not in the list.
+  assert.doesNotMatch(html, /footer-archived/);
 });
 
 test("loading replaces the rows; the empty label shows only without session, group or archive-group rows", () => {
@@ -601,7 +600,9 @@ test("headers lead with their chevron, and every row's text starts in one column
   // The footer's labels start there too (its 12px icons in the chevron column).
   const footerButton = classOf("session-tree-footer-button");
   assert.ok(has(footerButton, "pl-[7px]") && has(footerButton, "gap-[3px]"), "the footer's text column");
-  assert.deepEqual([...source.matchAll(/<(?:FolderPlus|Archive)Icon size=\{(\d+)\}(?: className="[^"]*")? \/>\s*<span className="session-tree-footer-label/g)].map((match) => Number(match[1])), [12, 12]);
+  // The archive entry moved to the sidebar's fixed footer (demo⑨): the
+  // list's only footer button is "Open another project…".
+  assert.deepEqual([...source.matchAll(/<(?:FolderPlus|Archive)Icon size=\{(\d+)\}(?: className="[^"]*")? \/>\s*<span className="session-tree-footer-label/g)].map((match) => Number(match[1])), [12]);
   // These rows span the whole width, so their padding is the text column's
   // 22px; the pinned header's toggle starts its chevron 4px in.
   const textColumn = source.match(/const TEXT_COLUMN = "([^"]+)"/)?.[1] ?? "";
@@ -611,19 +612,17 @@ test("headers lead with their chevron, and every row's text starts in one column
   assert.ok(has(pinnedToggle, "pl-1"), "the pinned section's chevron in the same column");
 
   // Session rows stay 34px (a family's child 32px); project headers carry the
-  // 13px names, so a group is 26px and its trailing rows 24px; the pinned
-  // label and the footer keep 28px.
-  assert.deepEqual(SIDEBAR_ROW_HEIGHTS.desktop, { "pinned-header": 28, session: 34, "pinned-more": 26, group: 26, "group-more": 24, "group-empty": 24, spacer: 4, "footer-open": 28, "footer-archived": 28, "archive-group": 26 });
+  // 13px names, so a group is 30px (demo⑨'s group head) and its trailing
+  // rows 24px; the pinned label and the footer keep 28px.
+  assert.deepEqual(SIDEBAR_ROW_HEIGHTS.desktop, { "pinned-header": 28, session: 34, "pinned-more": 26, group: 30, "group-more": 24, "group-empty": 24, spacer: 4, "footer-open": 28, "archive-group": 26 });
   assert.equal(SIDEBAR_ROW_HEIGHTS.desktop.session, 34);
-  // A group header holds a 13px name; the rows under it stay a step shorter.
-  for (const kind of ["group", "archive-group"]) {
-    assert.equal(SIDEBAR_ROW_HEIGHTS.desktop[kind], 26, `desktop ${kind}`);
-  }
+  // The archive's header keeps a step shorter than the demo⑨ group head.
+  assert.equal(SIDEBAR_ROW_HEIGHTS.desktop["archive-group"], 26, "desktop archive-group");
   for (const kind of ["group-empty", "group-more"]) {
     assert.equal(SIDEBAR_ROW_HEIGHTS.desktop[kind], 24, `desktop ${kind}`);
   }
   for (const [layout, height] of [["desktop", 28], ["mobile", 40]]) {
-    for (const kind of ["pinned-header", "footer-open", "footer-archived"]) {
+    for (const kind of ["pinned-header", "footer-open"]) {
       assert.equal(SIDEBAR_ROW_HEIGHTS[layout][kind], height, `${layout} ${kind}`);
     }
   }

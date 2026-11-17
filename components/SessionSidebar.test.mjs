@@ -156,7 +156,8 @@ test("with the files below the sessions, both are in view under the track", () =
   // New is an icon-only ghost button: no label, its name only in the a11y tree.
   assert.doesNotMatch(html, /sidebar-new-label/);
   assert.match(html, /class="[^"]*sidebar-new-button[^"]*"[^>]*aria-label="New"/);
-  assert.match(html, /<\/button><button [^>]*class="[^"]*sidebar-search-toggle[^"]*" type="button" title="Search conversations" aria-label="Search conversations" aria-expanded="false" aria-controls="session-search-input">/);
+  // The session search is persistent (demo⑨): the toggle reads open.
+  assert.match(html, /<\/button><button [^>]*class="[^"]*sidebar-search-toggle[^"]*" type="button" title="Search conversations" aria-label="Search conversations" aria-expanded="true" aria-controls="session-search-input">/);
   // Both tab panels shown: the sessions (its tab selected), the separator,
   // the files section under the tree.
   const sessions = openingTag(html, "session-sidebar-panel-sessions");
@@ -488,7 +489,7 @@ test("arrow keys move between the tabs and the search toggle opens the sessions 
   // reaching switchTab through onValueChange; the hand-written handler is gone.
   assert.doesNotMatch(source, /handleTabKeyDown/);
   assert.match(source, /<Tabs value=\{sidebarTab\} onValueChange=\{\(value\) => switchTab\(value as SidebarTab\)\}/);
-  assert.match(source, /if \(!sessionsShown\) \{\s*switchTab\("sessions"\);\s*setSessionSearchOpen\(true\);\s*return;\s*\}/);
+  assert.match(source, /if \(!sessionsShown\) \{\s*switchTab\("sessions"\);\s*setSessionSearchOpen\(true\);\s*requestAnimationFrame\(\(\) => sessionSearchInputRef\.current\?\.focus\(\)\);\s*return;\s*\}/);
 });
 
 test("does not register row-level session deletion shortcuts", () => {
@@ -756,7 +757,8 @@ test("the footer opens the project list in the files tab; the archive view repla
   // Once the tab shows, the picker's project menu opens below its button.
   assert.match(footer, /if \(target === "project-list"\) filesPickerRef\.current\?\.openMenu\("project"\);/);
   assert.match(source, /onOpenOtherProject: handleOpenOtherProject,/);
-  assert.match(source, /onOpenArchive: \(\) => openArchiveView\(\),/);
+  // The archive entry lives in the sidebar's fixed footer (demo⑨), left of 设置.
+  assert.match(source, /id="sidebar-footer-archive"[\s\S]*?onClick=\{\(\) => openArchiveView\(\)\}/);
   assert.match(callbackBody("openArchiveView"), /setArchiveView\(true\);[\s\S]*?setSessionSearchOpen\(false\);\s*switchTab\("sessions"\);/);
   assert.match(source, /<div className="sidebar-sessions-view[^"]*" hidden=\{archiveMotion\.mainHidden\} inert=\{archiveMotion\.mainInert\}>\s*<SessionTree\s+\{\.\.\.treeProps\}\s+rows=\{model\.rows\}\s+emptyLabel=\{t\("sidebar\.noSessions"\)\}\s+reveal=\{treeReveal\}\s+onRevealHandled=\{handleRevealHandled\}\s+\/>/);
   assert.match(source, /<SessionTree\s+\{\.\.\.treeProps\}\s+rows=\{archiveRows\}\s+emptyLabel=\{t\("sidebar\.noArchived"\)\}\s+reveal=\{archiveReveal\}\s+onRevealHandled=\{handleArchiveRevealHandled\}\s+\/>/);

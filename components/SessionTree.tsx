@@ -138,7 +138,6 @@ export interface SessionTreeProps {
   /** An archive header's ⋯: Restore all, Delete…. */
   onArchiveGroupMenu?(project: SidebarProject, opener: HTMLElement): void;
   onOpenOtherProject(opener: HTMLElement): void;
-  onOpenArchive(): void;
   /** Scroll a row into view (and maybe focus it); see SessionTreeReveal. */
   reveal?: SessionTreeReveal | null;
   /** The reveal request with this id was scrolled to or dropped: the parent lets go of it. */
@@ -688,6 +687,9 @@ const SessionRowView = memo(function SessionRowView({
       />
     );
     statusTitle = t("sidebar.newActivity");
+  } else {
+    // 空闲行也有一颗点（demo⑨ 的空心圆）：状态列常在，扫一眼即可对齐。
+    statusDot = <span className="inline-block size-[7px] shrink-0 rounded-full border-[1.2px] border-muted-foreground/45" />;
   }
 
   // 行首的状态点：横向与分组标题的展开箭头中心线附近（箭头中心 10.5px；
@@ -1287,20 +1289,6 @@ const PlainRowView = memo(function PlainRowView({
           >
             <FolderPlusIcon size={12} className="size-3 shrink-0" />
             <span className="session-tree-footer-label min-w-0 flex-1 truncate whitespace-nowrap">{t("sidebar.openOtherProject")}</span>
-          </Button>
-        </div>
-      );
-    case "footer-archived":
-      return (
-        <div className={`session-tree-row session-tree-footer flex min-w-0 items-stretch ${ROW_INSETS}`} style={style} data-row-key={row.key}>
-          <Button
-            type="button"
-            variant="ghost"
-            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[7px] pr-1 text-left text-[13px] text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-muted-foreground"
-            onClick={() => handlers.current.onOpenArchive()}
-          >
-            <ArchiveIcon size={12} className="size-3 shrink-0" />
-            <span className="session-tree-footer-label min-w-0 flex-1 truncate whitespace-nowrap">{t("sidebar.archivedCount", { count: row.count })}</span>
           </Button>
         </div>
       );

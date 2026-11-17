@@ -105,6 +105,7 @@ import { PiWebTitle } from "./PiWebTitle";
 import { ProjectWorktreePicker, type ProjectWorktreePickerHandle, type WorktreeRemoval } from "./ProjectWorktreePicker";
 import { SessionSearch } from "./SessionSearch";
 import { SessionTree, sessionRowTitle, type SessionTreeReveal } from "./SessionTree";
+import { APP_VERSION, PI_VERSION } from "@/lib/app-version";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -131,10 +132,14 @@ import {
   RotateCcwIcon,
   ArchiveRestoreIcon,
   SearchIcon,
+  SettingsIcon,
   TerminalIcon,
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
+
+/** ⌘K 提示的平台分叉：Apple 键盘 ⌘K，其余 Ctrl+K。 */
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform);
 
 interface FileManagerAvailability {
   supported: boolean;
@@ -261,6 +266,8 @@ interface Props {
   onSessionsChange?: (sessions: SessionInfo[]) => void;
   /** Reported upward so the keep-alive dock can show unread dots too. */
   onUnreadSessionIdsChange?: (ids: Set<string>) => void;
+  /** The footer's 设置（demo⑨ 页脚归档居左、设置居右）：打开设置弹窗的常规分区。 */
+  onOpenSettings(): void;
 }
 
 /**
@@ -542,7 +549,7 @@ function buttonAnchor(element: HTMLElement, align: "start" | "end"): SidebarMenu
 // Memoized: AppShell re-renders on every streamed stats/context poll, and the
 // sidebar's own state (tree, explorer) must not be re-rendered along with it.
 // All handler props are useCallback-stable in AppShell.
-export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, hiddenFinishedSessionIds, onRunningSessionIdsChange, onSessionsChange, onUnreadSessionIdsChange, onOpenGitPanel }: Props) {
+export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, hiddenFinishedSessionIds, onRunningSessionIdsChange, onSessionsChange, onUnreadSessionIdsChange, onOpenGitPanel, onOpenSettings }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
@@ -577,7 +584,8 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   const [explorerKey, setExplorerKey] = useState(0);
   const [explorerUploadBusy, setExplorerUploadBusy] = useState(false);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
-  const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
+  // 会话搜索框常驻（demo⑨）：⌘K 聚焦，🔍 键收起/展开。
+  const [sessionSearchOpen, setSessionSearchOpen] = useState(true);
   const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [changesCount, setChangesCount] = useState(0);
   const [changesCollapsed, setChangesCollapsed] = useState(true);
@@ -818,6 +826,8 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   // The toolbar row's search button: always there and enabled, so focus has
   // somewhere to go when there are no tabs (selectedTabButton).
   const searchButtonRef = useRef<HTMLButtonElement>(null);
+  // The persistent session search's input: ⌘K lands here.
+  const sessionSearchInputRef = useRef<HTMLInputElement>(null);
 
   // The files section's height below the sessions, on the sidebar's root
   // (--sidebar-files-height: the files panel's height, and what the toast
@@ -1877,7 +1887,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       focusIfHidden(archiveBackRef.current);
       return;
     }
-    const footer = sessionsPanelRef.current?.querySelector<HTMLElement>('[data-row-key="footer-archived"] button');
+    const footer = document.getElementById("sidebar-footer-archive");
     const target = footer && footer.getClientRects().length > 0 ? footer : selectedTabButton();
     focusIfHidden(target);
     if (target && document.activeElement === target) archiveCloseFocusRef.current = target;
@@ -2898,7 +2908,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     onToggleArchiveGroup: handleToggleArchiveGroup,
     onArchiveGroupMenu: handleArchiveGroupMenu,
     onOpenOtherProject: handleOpenOtherProject,
-    onOpenArchive: () => openArchiveView(),
     // The archive view has no group rows: only the main tree's can be dragged.
     onMoveGroup: moveProject,
   } as const;
@@ -2924,6 +2933,22 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   // sessions'; the files section's header row below the tree has the files'.
   const sessionsShown = sidebarTab === "sessions";
   const searchesFiles = sidebarTab === "files" && explorerCwd !== null;
+  // ⌘K（Ctrl+K）：搜索当前面板——文件面板搜文件，否则会话搜索；开着就只聚焦。
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "k" || event.altKey || event.shiftKey || !(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault();
+      if (searchesFiles) {
+        setFileSearchOpen(true);
+        document.getElementById("file-search-input")?.focus();
+        return;
+      }
+      setSessionSearchOpen(true);
+      requestAnimationFrame(() => sessionSearchInputRef.current?.focus());
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [searchesFiles]);
   // What the brand row's widths depend on: New's label (the track's tabs sit
   // on their own row, each with room). The brand's text reports its own
   // changes (fitHeader).
@@ -3102,9 +3127,13 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
             if (!sessionsShown) {
               switchTab("sessions");
               setSessionSearchOpen(true);
+              requestAnimationFrame(() => sessionSearchInputRef.current?.focus());
               return;
             }
-            setSessionSearchOpen((open) => !open);
+            setSessionSearchOpen((open) => {
+              if (!open) requestAnimationFrame(() => sessionSearchInputRef.current?.focus());
+              return !open;
+            });
           }}
           title={searchesFiles ? t("sidebar.searchFiles") : t("sidebar.toggleSessionSearch")}
           aria-label={searchesFiles ? t("sidebar.searchFiles") : t("sidebar.toggleSessionSearch")}
@@ -3165,12 +3194,13 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
         <Reveal open={sessionSearchOpen}>
         {sessionSearchOpen && (
           <div className="sidebar-search flex-none px-2 pt-2 pb-1">
-            {/* The files' search field (FileExplorer), mirrored. */}
+            {/* The files' search field (FileExplorer), mirrored. 常驻不 autofocus：
+                首屏不该被侧栏抢走焦点；⌘K / 🔍 负责聚焦。 */}
             <InputGroup className="h-8 rounded-md bg-muted">
               <InputGroupInput
+                ref={sessionSearchInputRef}
                 id="session-search-input"
                 type="search"
-                autoFocus
                 value={sessionSearchQuery}
                 maxLength={200}
                 aria-label={t("sidebar.searchSessions")}
@@ -3185,6 +3215,11 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               />
               <InputGroupAddon>
                 <SearchIcon size={13} strokeWidth={1.8} className="text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupAddon align="inline-end">
+                <kbd className="pointer-events-none shrink-0 rounded-sm border border-border bg-background font-mono text-xs text-muted-foreground px-1 leading-[16px] opacity-80">
+                  {IS_MAC ? "⌘K" : "Ctrl K"}
+                </kbd>
               </InputGroupAddon>
             </InputGroup>
           </div>
@@ -3440,6 +3475,42 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
             )}
           </div>
         </div>
+      </div>
+
+      {/* demo⑨ 页脚：归档入口居左，设置居右，版本保持随手可查。 */}
+      <div className="sidebar-foot flex flex-none items-center gap-1 px-2.5 pb-2.5 pt-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          id="sidebar-footer-archive"
+          onClick={() => openArchiveView()}
+          disabled={archivedCount === 0}
+          title={t("sidebar.viewArchive")}
+          aria-label={t("sidebar.archivedCount", { count: archivedCount })}
+          className="min-w-0 shrink justify-start gap-1.5 rounded-md px-2.5 font-medium text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:pointer-events-auto disabled:opacity-50"
+        >
+          <ArchiveIcon size={14} strokeWidth={2} aria-hidden="true" />
+          <span className="truncate">{t("sidebar.archivedCount", { count: archivedCount })}</span>
+        </Button>
+        <span
+          className="ml-auto shrink-0 font-mono text-xs leading-none tabular-nums text-muted-foreground opacity-70"
+          title={`pi-web ${APP_VERSION} · pi ${PI_VERSION}`}
+        >
+          v{APP_VERSION}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onOpenSettings}
+          title={t("common.settings")}
+          aria-label={t("common.settings")}
+          className="min-w-0 shrink justify-start gap-1.5 rounded-md px-2.5 font-medium text-muted-foreground hover:bg-accent dark:hover:bg-accent"
+        >
+          <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
+          <span className="truncate">{t("common.settings")}</span>
+        </Button>
       </div>
 
       <SidebarMenu
