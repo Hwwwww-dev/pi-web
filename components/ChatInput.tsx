@@ -705,7 +705,7 @@ function QueuedMessageRow({
     <div
       title={item.text}
       className={cn(
-        "flex min-w-0 max-w-full items-center gap-1.5 self-start overflow-hidden rounded-full py-0.5 pl-1 pr-1.5 text-[11px] leading-[1.35]",
+        "flex min-w-0 max-w-full items-center gap-1.5 self-start overflow-hidden rounded-full py-0.5 pl-0.5 pr-1.5 text-[11px] leading-[1.35]",
         isSteer
           ? "border border-primary/45 bg-background text-foreground"
           : "bg-secondary text-secondary-foreground",
@@ -728,14 +728,18 @@ function QueuedMessageRow({
       )}
       {onAction ? (
         <Badge variant={isSteer ? "default" : "ghost"} className={behaviorChipClass} asChild>
+          {/* steer 用 default 变体：它自带 hover:bg-primary/90，hover 只在同色系
+              里加深一档。ghost 在暗色下带 dark:hover:bg-accent/50，那是另一个
+              变体、tailwind-merge 不认冲突，暗色时它抢过 hover 底色，配上仍是
+              text-primary-foreground 的文字就成了黑底黑字。 */}
           <Button
             type="button"
-            variant="ghost"
+            variant={isSteer ? "default" : "ghost"}
             title={t("chat.queueBehaviorHint")}
             onClick={() => onAction(item.id, "toggle")}
             className={cn(
-              "h-auto cursor-pointer rounded-full transition-opacity hover:opacity-80",
-              isSteer ? "hover:bg-primary hover:text-primary-foreground" : "hover:bg-muted hover:text-muted-foreground",
+              "h-auto cursor-pointer rounded-full",
+              !isSteer && "transition-opacity hover:bg-muted hover:text-muted-foreground hover:opacity-80",
             )}
           >
             {behaviorLabel}
