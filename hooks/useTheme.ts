@@ -160,10 +160,18 @@ export function useTheme() {
       });
   }, []);
 
+  const toggleThemePreference = useCallback((origin?: ToggleOrigin) => {
+    // Read the live state at click time: a toggle built from a stale render
+    // must not compute its target from that render's resolved theme.
+    const current = ensureState();
+    setThemePreference(current.theme === "dark" ? "light" : "dark", origin);
+  }, [setThemePreference]);
+
   return {
     theme: snapshot.theme,
     preference: snapshot.preference,
     setThemePreference,
+    toggleThemePreference,
     isDark: isDarkTheme(snapshot.theme),
   };
 }

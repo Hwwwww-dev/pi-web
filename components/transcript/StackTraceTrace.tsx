@@ -10,7 +10,7 @@ import { TraceRow } from "./TraceRow";
  * rest are frames. `node_modules` frames stay muted so the reader's own code
  * stands out.
  */
-export const StackTraceTrace = memo(function StackTraceTrace({ title, text, foldKey, trailing, below, activityTool, children }: {
+export const StackTraceTrace = memo(function StackTraceTrace({ title, text, foldKey, trailing, below, duration, activityTool, children }: {
   /** "运行失败：npm test" — built by the caller from the tool's own title. */
   title: string;
   /** The whole error output: first line = error, the rest = frames. */
@@ -20,6 +20,8 @@ export const StackTraceTrace = memo(function StackTraceTrace({ title, text, fold
   activityTool?: string;
   trailing?: ReactNode;
   below?: ReactNode;
+  /** The call's own run time, shown in the unified card head. */
+  duration?: ReactNode;
   /** What the row holds besides the error (its arguments, its own result). */
   children?: ReactNode;
 }) {
@@ -27,10 +29,12 @@ export const StackTraceTrace = memo(function StackTraceTrace({ title, text, fold
 
   return (
     <TraceRow
+      variant="card"
       icon={<CircleXIcon />}
       title={title}
       status="error"
       foldKey={foldKey}
+      duration={duration}
       trailing={trailing}
       below={below}
       activityTool={activityTool}

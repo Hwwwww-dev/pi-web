@@ -1082,7 +1082,11 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
     onUploadBusyChange?.(uploadBusy);
   }, [onUploadBusyChange, uploadBusy]);
 
-  useEffect(() => () => onUploadBusyChange?.(false), [onUploadBusyChange]);
+  // Unmount cleanup only: the cleanup must not fire on a fresh callback
+  // identity, or a re-created parent callback clears the busy flag mid-upload.
+  const onUploadBusyChangeRef = useRef(onUploadBusyChange);
+  onUploadBusyChangeRef.current = onUploadBusyChange;
+  useEffect(() => () => onUploadBusyChangeRef.current?.(false), []);
 
   // Declared before the cwd effect, so that one saves the set the user last saw.
   useEffect(() => {

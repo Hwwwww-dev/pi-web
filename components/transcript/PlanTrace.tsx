@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { CircleCheckIcon, CircleDotIcon, CircleIcon, RouteIcon } from "lucide-react";
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { useI18n } from "@/hooks/useI18n";
@@ -19,13 +19,15 @@ const STEP_ICON = {
  * A todo snapshot (official `pattern_plan.md`): one collapsible line naming the
  * task in progress, its progress in the description, the steps below it.
  */
-export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool, stepUsage }: {
+export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool, stepUsage, duration }: {
   steps: ToolViewStep[];
   foldKey: string;
   /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
   activityTool?: string;
   /** The issuing request's usage: the expanded card's first line (TraceRow draws it). */
   stepUsage?: StepUsage;
+  /** The call's own run time, shown in the unified card head. */
+  duration?: ReactNode;
 }) {
   const { t } = useI18n();
   const current = steps.find((step) => step.status === "running") ?? steps.find((step) => step.status !== "done");
@@ -36,12 +38,14 @@ export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool,
 
   return (
     <TraceRow
+      variant="card"
       icon={<RouteIcon />}
       title={title}
       description={t("chat.trace.planProgress", { done, total: steps.length })}
       foldKey={foldKey}
       activityTool={activityTool}
       stepUsage={stepUsage}
+      duration={duration}
       defaultOpen
       ariaLabel={title}
       wrap

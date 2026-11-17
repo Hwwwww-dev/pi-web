@@ -156,6 +156,15 @@ function getFileApiUrl(
   return `/api/files/${encoded}?${searchParams.toString()}`;
 }
 
+/** The files API answers failures as JSON `{ error }` with a non-2xx status;
+ *  surface that message instead of feeding the error body to the handler as
+ *  data. */
+async function readFileJson<T>(response: Response): Promise<T> {
+  const next = await response.json() as T & { error?: string };
+  if (!response.ok) throw new Error(next.error || `HTTP ${response.status}`);
+  return next;
+}
+
 function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceSessionId?: string | null }) {
   const { t } = useI18n();
   return (
@@ -347,8 +356,8 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
     const synchronize = () => {
       const requestId = ++syncRequestRef.current;
       fetch(getFileApiUrl(filePath, "meta", sourceSessionId))
-        .then((response) => response.json())
-        .then((next: { size?: number; mtime?: string; error?: string }) => {
+        .then(readFileJson<{ size?: number; mtime?: string; error?: string }>)
+        .then((next) => {
           if (!active || requestId !== syncRequestRef.current) return;
           if (next.error) {
             setError(next.error);
@@ -491,8 +500,8 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
     const synchronize = () => {
       const requestId = ++syncRequestRef.current;
       fetch(getFileApiUrl(filePath, "meta", sourceSessionId))
-        .then((response) => response.json())
-        .then((next: { size?: number; mtime?: string; error?: string }) => {
+        .then(readFileJson<{ size?: number; mtime?: string; error?: string }>)
+        .then((next) => {
           if (!active || requestId !== syncRequestRef.current) return;
           if (next.error) {
             setError(next.error);
@@ -622,8 +631,8 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
     const synchronize = () => {
       const requestId = ++syncRequestRef.current;
       fetch(getFileApiUrl(filePath, "meta", sourceSessionId))
-        .then((response) => response.json())
-        .then((next: { size?: number; mtime?: string; error?: string }) => {
+        .then(readFileJson<{ size?: number; mtime?: string; error?: string }>)
+        .then((next) => {
           if (!active || requestId !== syncRequestRef.current) return;
           if (next.error) {
             setError(next.error);
@@ -745,8 +754,8 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
     let active = true;
     const requestId = ++syncRequestRef.current;
     fetch(getFileApiUrl(filePath, "meta", sourceSessionId))
-      .then((r) => r.json())
-      .then((d: { size?: number; error?: string }) => {
+      .then(readFileJson<{ size?: number; error?: string }>)
+      .then((d) => {
         if (!active || requestId !== syncRequestRef.current) return;
         if (d.error) setError(d.error);
         if (typeof d.size === "number") {
@@ -779,8 +788,8 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
     const synchronize = () => {
       const requestId = ++syncRequestRef.current;
       fetch(getFileApiUrl(filePath, "meta", sourceSessionId))
-        .then((r) => r.json())
-        .then((d: { size?: number; mtime?: string; error?: string }) => {
+        .then(readFileJson<{ size?: number; mtime?: string; error?: string }>)
+        .then((d) => {
           if (!active || requestId !== syncRequestRef.current) return;
           if (d.error) {
             setError(d.error);
@@ -1029,8 +1038,8 @@ function TextFileViewer({
   const fetchContent = useCallback((filePath: string, offset = 0) => {
     const requestId = ++contentRequestRef.current;
     return fetch(getFileApiUrl(filePath, "read", sourceSessionId, { offset: offset || undefined }))
-      .then((r) => r.json())
-      .then((d: FileData & { mtime?: string; error?: string }) => {
+      .then(readFileJson<FileData & { mtime?: string; error?: string }>)
+      .then((d) => {
         if (requestId !== contentRequestRef.current) return null;
         if (d.error) {
           setError(d.error);
@@ -1128,8 +1137,8 @@ function TextFileViewer({
         return;
       }
       fetch(getFileApiUrl(filePath, "meta", sourceSessionId))
-        .then((response) => response.json())
-        .then((meta: { size?: number; mtime?: string }) => {
+        .then(readFileJson<{ size?: number; mtime?: string }>)
+        .then((meta) => {
           if (!active) return;
           if (fileVersionChanged(shownVersionRef.current, fileVersion(meta))) synchronize();
           else void fetchGitDiff(filePath);

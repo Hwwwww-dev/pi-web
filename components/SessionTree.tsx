@@ -1108,6 +1108,7 @@ const GroupRowView = memo(function GroupRowView({
             below it do and every header's chevron lines up. */}
         <ChevronRightIcon size={13} strokeWidth={3} className={`size-[13px] shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none${expanded ? " rotate-90" : ""}`} />
         <span className="session-tree-group-name min-w-0 truncate">{project.name}</span>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">{row.count}</span>
         {project.pinned && <PinIcon size={10} className="ml-0.5 size-2.5 shrink-0 text-muted-foreground" role="img" aria-label={t("sidebar.pinnedProject")} aria-hidden={false} />}
         {!expanded && (
           <ActivitySummary

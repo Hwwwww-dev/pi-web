@@ -2040,11 +2040,12 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     // skill-invoked session stays a no-op instead of persisting raw XML.)
     if (renameValue === title || name === (session.name ?? "")) return;
     try {
-      await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, {
+      const response = await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       void loadSessions();
     } catch {
       showToast(t("sidebar.sessionActionFailed"));
@@ -2075,13 +2076,15 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     setConfirmDeleteRootId((current) => (current === session.id ? null : current));
     try {
       // The server deletes the family's subagent sessions with it.
-      await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" });
+      const response = await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       onSessionDeleted?.(session.id);
       void loadSessions();
     } catch {
-      // The row stays; the next refresh shows what happened.
+      // The row stays; the toast says why nothing seemed to happen.
+      showToast(t("sidebar.sessionActionFailed"));
     }
-  }, [loadSessions, onSessionDeleted]);
+  }, [loadSessions, onSessionDeleted, showToast, t]);
 
   // Only Shift skips the confirmation (Shift+click, Shift+Enter or Shift+D in the menu).
   const requestDelete = useCallback((family: SessionFamily, shiftKey: boolean) => {

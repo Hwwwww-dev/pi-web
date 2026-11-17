@@ -69,7 +69,7 @@ export type SidebarRow =
   | { kind: "pinned-header"; key: "pinned-header"; count: number; collapsed: boolean; running: number; awaiting: number; unread: number }
   | { kind: "session"; key: string; family: SessionFamily; context: "pinned" | "group" | "archive"; project: SidebarProject; status: SidebarFamilyStatus }
   | { kind: "pinned-more"; key: "pinned-more"; hidden: number; canShowLess: boolean; nextShown: number }
-  | { kind: "group"; key: string; project: SidebarProject; expanded: boolean; running: number; awaiting: number; unread: number }
+  | { kind: "group"; key: string; project: SidebarProject; expanded: boolean; count: number; running: number; awaiting: number; unread: number }
   | { kind: "group-more"; key: string; projectKey: string; hidden: number; canShowLess: boolean; nextShown: number }
   | { kind: "group-empty"; key: string; project: SidebarProject }
   | { kind: "spacer"; key: "top-spacer" | "pinned-spacer" | "footer-spacer" | `group-spacer:${string}` }
@@ -537,7 +537,7 @@ export function buildSessionTree(input: SessionTreeInput): SessionTreeModel {
     const groupFamilies = projectFamilies.get(project.key) ?? [];
     const expanded = isGroupExpanded(project, input.groupExpansion);
     const { running, awaiting, unread } = activityCounts(groupFamilies, input);
-    rows.push({ kind: "group", key: `group:${project.key}`, project, expanded, running, awaiting, unread });
+    rows.push({ kind: "group", key: `group:${project.key}`, project, expanded, count: groupFamilies.length, running, awaiting, unread });
 
     if (expanded) {
       if (groupFamilies.length === 0) {

@@ -99,33 +99,35 @@ test("groups fonts, chat font size and width with the chat switches, without row
   assert.doesNotMatch(cssSource, /\.settings-chat-option/);
 });
 
-test("the desktop dialog is a horizontal section tab bar over the sections", () => {
-  // Desktop: the original top bar — title, then the official segmented Tabs
-  // (muted track, rounded active segment); the phone's Back rides in the same bar.
+test("the desktop dialog navigates sections and General's details from one left rail", () => {
+  // Desktop: the dialog keeps the title bar (the phone's Back rides in it) and
+  // carries all navigation in a single left rail — sections with General's
+  // sub-details inline, no horizontal Tabs stacked over the section's own list.
+  assert.doesNotMatch(panelSource, /<TabsList/);
   assert.doesNotMatch(panelSource, /orientation="vertical"/);
   assert.doesNotMatch(panelSource, /variant="line"/);
-  assert.match(panelSource, /<TabsList\s*\n\s*className="ml-4 min-w-0 flex-1 self-center justify-start gap-0\.5/);
-  assert.match(panelSource, /h-7 flex-none gap-1\.5 px-2\.5 text-xs font-normal data-\[state=active\]:font-medium/);
-  // General keeps one shape on every size: the sub-section list beside its
-  // detail (a phone shows one pane at a time through the navigation context).
-  const generalReturn = panelSource.slice(
-    panelSource.indexOf("// One shape on every size"),
-    panelSource.indexOf("// A phone shows Settings one level at a time"),
-  );
-  assert.match(generalReturn, /<ConfigSplitView>/);
-  assert.match(generalReturn, /<ConfigSidebar>/);
-  assert.match(generalReturn, /<ConfigDetailHeader>/);
+  const rail = panelSource.slice(panelSource.indexOf("{!isPhone && ("), panelSource.indexOf("A phone's home level lists the sections"));
+  assert.ok(rail.includes("<nav"), "the desktop rail exists");
+  assert.match(rail, /className="flex w-\[224px\] shrink-0 flex-col gap-0\.5 overflow-y-auto bg-sidebar p-2"/);
+  assert.match(rail, /aria-current=\{isActive \? "page" : undefined\}/);
+  // General's sub-details are rail rows of their own, shown while General is active.
+  assert.match(rail, /item\.id === "general" && isActive && railGeneralDetails\.map/);
   for (const key of ["appearance", "chat", "sidebar", "shell", "push", "language"]) {
-    assert.match(generalReturn, new RegExp(`\\{detail === "${key}" && `), key);
+    assert.match(panelSource, new RegExp(`\\{ id: "${key}"[^}]*\\}`), key);
   }
+  // General keeps one shape on every size: a phone still shows the sub-section
+  // list beside its detail; the desktop section renders the detail stack alone.
+  assert.match(panelSource, /<ConfigSplitView>/);
+  assert.match(panelSource, /<ConfigSidebar>/);
+  assert.match(panelSource, /<ConfigDetailHeader>/);
   // Detail groups render flat, under the detail header's own title: no
   // re-titled Cards inside a detail pane, and the logout lives in the list.
-  assert.doesNotMatch(generalReturn, /<ConfigCard/);
+  assert.doesNotMatch(panelSource.slice(panelSource.indexOf("const detailStack"), panelSource.indexOf("// 手机")), /<ConfigCard/);
   for (const [key, block] of [["appearance", "themeGroup"], ["chat", "chatOptions"], ["sidebar", "sidebarContent"], ["shell", "shellBlock"], ["push", "pushBlock"], ["language", "languageGroup"]]) {
-    assert.ok(generalReturn.includes(`{detail === "${key}" && ${block}}`), key);
+    assert.ok(panelSource.includes(`{detail === "${key}" && ${block}}`), key);
   }
-  assert.match(generalReturn, /<ConfigListAction disabled=\{loggingOut\}/);
-  // Form rows read as the draft's frow2: a Field row, its description muted under the label.
+  assert.match(panelSource, /<ConfigListAction disabled=\{loggingOut\}/);
+  // Form rows read as the draft's flow: a Field row, its description muted under the label.
   assert.match(panelSource, /<FieldDescription id="settings-files-placement-description" className="text-xs">/);
 });
 
@@ -141,10 +143,10 @@ test("keeps General free of divider rows", () => {
 });
 
 test("hosts the sections in one full-size layer, listed on a phone's home level", () => {
-  // Desktop: the horizontal TabsList in the top bar; phone home: a list of
+  // Desktop: the sections ride the one left rail; phone home: a list of
   // sections opened by openSectionFromHome. The sections themselves mount once
   // in full-size hosts, `hidden` unless active (a phone's level rides along).
-  assert.match(panelSource, /<TabsList\s*\n\s*className="ml-4 min-w-0 flex-1 self-center/);
+  assert.match(panelSource, /<nav aria-label=\{t\("settings\.title"\)\} className="flex w-\[224px\] shrink-0/);
   // The phone's home level is a list of official Items, not divider-topped rows.
   assert.match(panelSource, /<ItemGroup className="gap-2 p-4">/);
   assert.match(panelSource, /<Item key=\{item\.id\} asChild variant="outline" size="sm">/);

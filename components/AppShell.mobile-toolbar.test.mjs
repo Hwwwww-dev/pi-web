@@ -111,7 +111,8 @@ test("keeps language out of the chat toolbar; the theme control writes the share
   assert.doesNotMatch(source, /toggleFlyout\("language"/);
   assert.doesNotMatch(source, /data-mobile-toolbar-action=\{mobile \? "language"/);
   assert.match(source, /import \{ useTheme \} from "@\/hooks\/useTheme"/);
-  assert.match(source, /setThemePreference\(theme === "dark" \? "light" : "dark"\)/);
+  // The toggle reads the live preference at click time (hooks/useTheme), not a render's stale snapshot.
+  assert.match(source, /toggleThemePreference\(\)/);
   assert.match(source, /title=\{translate\("settings\.appearance"\)\}/);
 });
 

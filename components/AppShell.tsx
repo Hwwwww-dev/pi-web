@@ -170,7 +170,7 @@ export function AppShell() {
   const [initialNavigation, setInitialNavigation] = useState(() => getInitialNavigation(searchParams));
   // The system-theme subscription stays mounted for the app's lifetime; the
   // header's light/dark pill writes through the same hook.
-  const { theme, setThemePreference } = useTheme();
+  const { theme, toggleThemePreference } = useTheme();
   // Restore fonts even when Settings and the chat composer have not been opened.
   useFontPreferences();
   const { locale, t: translate } = useI18n();
@@ -589,18 +589,27 @@ export function AppShell() {
 
   // Agents 面板打开即进入装载态：强制刷一次会话目录，目录回到（或兑底超时）
   // 才渲染列表元素——面板里永远是"装好后"的数据，不再先弹旧列表再补。
+  // 结束条件是"目录快照换了身份"：loading 自身的提交不算，否则转场只闪一帧。
   const [agentsPanelLoading, setAgentsPanelLoading] = useState(false);
   const agentsPanelOpen = activeFlyout === "agents";
+  const catalogAtOpenRef = useRef<SessionInfo[] | null>(null);
+  // The open effect must not re-run on catalog changes (it would re-scan every
+  // refresh while open): it reads the latest catalog through a ref instead.
+  const sessionCatalogRef = useRef(sessionCatalog);
+  sessionCatalogRef.current = sessionCatalog;
   useEffect(() => {
     if (!agentsPanelOpen) return;
+    catalogAtOpenRef.current = sessionCatalogRef.current;
     setAgentsPanelLoading(true);
     setRefreshKey((key) => key + 1);
     const fallback = window.setTimeout(() => setAgentsPanelLoading(false), 2000);
     return () => window.clearTimeout(fallback);
   }, [agentsPanelOpen]);
   useEffect(() => {
-    if (agentsPanelLoading) setAgentsPanelLoading(false);
-  }, [agentsPanelLoading, sessionCatalog]);
+    if (agentsPanelOpen && agentsPanelLoading && sessionCatalog !== catalogAtOpenRef.current) {
+      setAgentsPanelLoading(false);
+    }
+  }, [agentsPanelOpen, agentsPanelLoading, sessionCatalog]);
 
   useEffect(() => {
     if (rightPanelFullWidth) setActiveFlyout(null);
@@ -2279,7 +2288,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 <span className="min-w-0 flex-1">{translate("debug.title")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                onSelect={() => setThemePreference(theme === "dark" ? "light" : "dark")}
+                onSelect={() => toggleThemePreference()}
                 title={translate("settings.appearance")}
                 className="gap-2"
               >

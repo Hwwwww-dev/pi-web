@@ -274,8 +274,10 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
   );
 }
 
-export const ToolTrace = memo(function ToolTrace({ view, trailing, below, stepUsage, activityTool, cwd, onOpenFile }: {
+export const ToolTrace = memo(function ToolTrace({ view, trailing, below, duration, stepUsage, activityTool, cwd, onOpenFile }: {
   view: ToolView;
+  /** The call's own run time, shown in the unified card head. */
+  duration?: ReactNode;
   /** The issuing request's usage: the expanded card's first line, in the same shape as the turn's meta line. */
   stepUsage?: StepUsage;
   trailing?: ReactNode;
@@ -312,6 +314,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, stepUs
 
   return (
     <TraceRow
+      variant="card"
       icon={KIND_ICONS[view.kind]}
       activeIcon={KIND_ACTIVE_ICONS[view.kind]}
       title={view.title}
@@ -320,6 +323,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, stepUs
       description={description}
       status={view.status}
       foldKey={view.foldKey}
+      duration={duration}
       trailing={trailing}
       below={below}
       activityTool={activityTool}

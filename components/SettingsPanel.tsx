@@ -23,7 +23,6 @@ import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
 import { Slider } from "./ui/slider";
-import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "./ui/item";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
@@ -115,13 +114,20 @@ export function SettingsSectionIcon({ section, size = 16, strokeWidth = 1.8 }: {
 
 type GeneralDetail = "appearance" | "chat" | "sidebar" | "shell" | "push" | "language";
 
-function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange, soundEnabled, onSoundToggle, keepAliveConfig, onKeepAliveConfigChange }: Pick<Props, "sessionId" | "onClose" | "onSessionReloaded" | "quoteSelectionEnabled" | "onQuoteSelectionChange" | "soundEnabled" | "onSoundToggle" | "keepAliveConfig" | "onKeepAliveConfigChange">) {
+function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange, soundEnabled, onSoundToggle, keepAliveConfig, onKeepAliveConfigChange, isPhone, detail, onDetailChange, shellSettings, onShellSettingsChange }: Pick<Props, "sessionId" | "onClose" | "onSessionReloaded" | "quoteSelectionEnabled" | "onQuoteSelectionChange" | "soundEnabled" | "onSoundToggle" | "keepAliveConfig" | "onKeepAliveConfigChange"> & {
+  /** 桌面=False：通用子导航在设置弹窗左列，这里只剩详情；手机=True：子列表留在本节内。 */
+  isPhone: boolean;
+  detail: GeneralDetail;
+  onDetailChange: (detail: GeneralDetail) => void;
+  /** GET /api/tools/settings 由 SettingsPanel 持有：左列需要它决定 Shell 条目是否出现。 */
+  shellSettings: ToolSettingsResponse | null;
+  onShellSettingsChange: (settings: ToolSettingsResponse) => void;
+}) {
   const { locale, setLocale, supportedLocales, t } = useI18n();
   const { preference, setThemePreference } = useTheme();
   const { width: chatContentWidth, setWidth: setChatContentWidth, fontSize, setFontSize } = useChatAppearance();
   const enterSendMode = useEnterSendMode();
   const filesPlacement = useFilesPlacement();
-  const [shellSettings, setShellSettings] = useState<ToolSettingsResponse | null>(null);
   const [shellSaving, setShellSaving] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
   const [builtinToolsSaving, setBuiltinToolsSaving] = useState(false);
@@ -135,8 +141,6 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   const [webAuthEnabled, setWebAuthEnabled] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
-  const [detail, setDetail] = useState<GeneralDetail>("appearance");
-
   useEffect(() => {
     setThinkingExpanded(isThinkingExpandedByDefault());
     void fetch("/api/web-auth")
@@ -147,8 +151,8 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
 
   // The Shell 工具 entry only exists on Windows; fall back if it disappears.
   useEffect(() => {
-    if (detail === "shell" && shellSettings && !shellSettings.isWindows) setDetail("appearance");
-  }, [detail, shellSettings]);
+    if (detail === "shell" && shellSettings && !shellSettings.isWindows) onDetailChange("appearance");
+  }, [detail, onDetailChange, shellSettings]);
 
   const logOut = async () => {
     setLoggingOut(true);
@@ -163,20 +167,6 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       setLoggingOut(false);
     }
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/tools/settings")
-      .then(async (response) => {
-        const data = await response.json() as ToolSettingsResponse & { error?: string };
-        if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
-        if (!cancelled) setShellSettings(data);
-      })
-      .catch((cause) => {
-        if (!cancelled) setShellError(cause instanceof Error ? cause.message : String(cause));
-      });
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,7 +214,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       });
       const data = await response.json() as ToolSettingsResponse & { error?: string };
       if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
-      setShellSettings(data);
+      onShellSettingsChange(data);
       if (sessionId) {
         await sendAgentCommand(sessionId, { type: "reload" });
         onSessionReloaded();
@@ -250,7 +240,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       });
       const data = await response.json() as ToolSettingsResponse & { error?: string };
       if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
-      setShellSettings(data);
+      onShellSettingsChange(data);
     } catch (cause) {
       setBuiltinToolsError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -591,49 +581,60 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
       ))}
     </RadioGroup>
   );
-  // One shape on every size: a list beside the detail. A phone shows one pane
-  // at a time (ConfigSplitView's data-pane) behind the header's Back button.
+  // 详情堆叠：手机（列表 pane 之后）与桌面共用同一份内容。
+  const detailStack = (
+    <ConfigDetailStack className="min-h-full">
+      <ConfigDetailHeader>
+        <ConfigDetailTitle>{activeDetailLabel}</ConfigDetailTitle>
+      </ConfigDetailHeader>
+      {detail === "appearance" && themeGroup}
+      {detail === "chat" && chatOptions}
+      {detail === "chat" && keepAliveBlock}
+      {detail === "sidebar" && sidebarContent}
+      {detail === "shell" && builtinToolsBlock}
+      {detail === "shell" && shellBlock}
+      {detail === "push" && pushBlock}
+      {detail === "language" && languageGroup}
+    </ConfigDetailStack>
+  );
+
+  // 手机：一屏一 pane，子列表留在本节（设置弹窗左列只在桌面渲染）。
+  if (isPhone) {
+    return (
+      <ConfigPanelShell embedded title={t("settings.general")} onClose={onClose}>
+        <ConfigSplitView>
+          <ConfigSidebar>
+            <ConfigSidebarList>
+              {generalDetails.map((item) => (
+                <ConfigSidebarItem
+                  key={item.id}
+                  active={detail === item.id}
+                  onClick={() => onDetailChange(item.id)}
+                >
+                  <ConfigSidebarText>{item.label}</ConfigSidebarText>
+                </ConfigSidebarItem>
+              ))}
+            </ConfigSidebarList>
+            {webAuthEnabled && (
+              <ConfigListAction disabled={loggingOut} onClick={() => void logOut()}>
+                <LogOutIcon size={14} strokeWidth={1.8} />
+                {loggingOut ? t("auth.loggingOut") : t("auth.logOut")}
+              </ConfigListAction>
+            )}
+            {webAuthEnabled && logoutError && (
+              <p role="alert" className="mt-2 px-2 text-xs text-destructive">{logoutError}</p>
+            )}
+          </ConfigSidebar>
+          <ConfigDetail>{detailStack}</ConfigDetail>
+        </ConfigSplitView>
+      </ConfigPanelShell>
+    );
+  }
+
+  // 桌面：通用子导航已在设置弹窗左列，本节只剩详情一列。
   return (
     <ConfigPanelShell embedded title={t("settings.general")} onClose={onClose}>
-      <ConfigSplitView>
-        <ConfigSidebar>
-          <ConfigSidebarList>
-            {generalDetails.map((item) => (
-              <ConfigSidebarItem
-                key={item.id}
-                active={detail === item.id}
-                onClick={() => setDetail(item.id)}
-              >
-                <ConfigSidebarText>{item.label}</ConfigSidebarText>
-              </ConfigSidebarItem>
-            ))}
-          </ConfigSidebarList>
-          {webAuthEnabled && (
-            <ConfigListAction disabled={loggingOut} onClick={() => void logOut()}>
-              <LogOutIcon size={14} strokeWidth={1.8} />
-              {loggingOut ? t("auth.loggingOut") : t("auth.logOut")}
-            </ConfigListAction>
-          )}
-          {webAuthEnabled && logoutError && (
-            <p role="alert" className="mt-2 px-2 text-xs text-destructive">{logoutError}</p>
-          )}
-        </ConfigSidebar>
-        <ConfigDetail>
-          <ConfigDetailStack className="min-h-full">
-            <ConfigDetailHeader>
-              <ConfigDetailTitle>{activeDetailLabel}</ConfigDetailTitle>
-            </ConfigDetailHeader>
-            {detail === "appearance" && themeGroup}
-            {detail === "chat" && chatOptions}
-            {detail === "chat" && keepAliveBlock}
-            {detail === "sidebar" && sidebarContent}
-            {detail === "shell" && builtinToolsBlock}
-            {detail === "shell" && shellBlock}
-            {detail === "push" && pushBlock}
-            {detail === "language" && languageGroup}
-          </ConfigDetailStack>
-        </ConfigDetail>
-      </ConfigSplitView>
+      <ConfigDetail>{detailStack}</ConfigDetail>
     </ConfigPanelShell>
   );
 }
@@ -740,6 +741,24 @@ export function SettingsPanel({
 }: Props) {
   const { t } = useI18n();
   const [section, setSection] = useState<SettingsSection>(initialSection);
+  // 通用子项的选中态与 Shell 工具设置都在弹窗层持有：左列同时承担分区导航与
+  // 通用的子导航，GeneralSettings 只渲染详情（手机仍用它自己的子列表）。
+  const [generalDetail, setGeneralDetail] = useState<GeneralDetail>("appearance");
+  const [shellSettings, setShellSettings] = useState<ToolSettingsResponse | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/tools/settings")
+      .then(async (response) => {
+        const data = await response.json() as ToolSettingsResponse & { error?: string };
+        if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+        if (!cancelled) setShellSettings(data);
+      })
+      .catch(() => {
+        // 左列少一个 Shell 条目即可；GeneralSettings 自己的错误提示不受影响。
+      });
+    return () => { cancelled = true; };
+  }, []);
   const [mountedSections, setMountedSections] = useState<ReadonlySet<SettingsSection>>(
     () => new Set([section]),
   );
@@ -754,6 +773,18 @@ export function SettingsPanel({
   ] as const).map((item) => ({ ...item, requiresProject: settingsSectionRequiresProject(item.id) }));
   const sectionRequiresProject = settingsSectionRequiresProject(section);
   const isPhone = useIsMobile();
+  // 左列（桌面）：分区行 + 通用子项行共用一套样式；Shell 条目跟随 Windows 才出现。
+  const railGeneralDetails: { id: GeneralDetail; label: string }[] = [
+    { id: "appearance", label: t("settings.appearance") },
+    { id: "chat", label: t("settings.chat") },
+    { id: "sidebar", label: t("settings.sidebar") },
+    ...(shellSettings?.isWindows ? [{ id: "shell" as const, label: t("settings.shellTool") }] : []),
+    { id: "push", label: t("settings.pushPermission") },
+    { id: "language", label: t("common.language") },
+  ];
+  const railItemClass = "flex h-9 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm font-normal text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50";
+  const railItemSubClass = cn(railItemClass, "h-8 pl-8 text-xs text-muted-foreground");
+  const railItemActiveClass = "bg-sidebar-accent font-medium text-sidebar-accent-foreground";
   const phone = usePhoneSettingsLevel(isPhone, openAtHome);
   const { dropHistory, enter: enterPhoneLevel, goUp: goUpPhoneLevel, levelRef: phoneLevelRef } = phone;
   const headerRef = useRef<HTMLDivElement>(null);
@@ -824,7 +855,7 @@ export function SettingsPanel({
   // a phone shows them one level at a time (its list, then a row's detail).
   const hostedSections = (
     <ConfigDetailNavigationContext.Provider value={detailNavigation}>
-      {sectionHost("general", <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} soundEnabled={soundEnabled} onSoundToggle={onSoundToggle} keepAliveConfig={keepAliveConfig} onKeepAliveConfigChange={onKeepAliveConfigChange} />)}
+      {sectionHost("general", <GeneralSettings sessionId={sessionId} onClose={onClose} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} soundEnabled={soundEnabled} onSoundToggle={onSoundToggle} keepAliveConfig={keepAliveConfig} onKeepAliveConfigChange={onKeepAliveConfigChange} isPhone={isPhone} detail={generalDetail} onDetailChange={setGeneralDetail} shellSettings={shellSettings} onShellSettingsChange={setShellSettings} />)}
       {sectionHost("models", <ModelsConfig embedded cwd={cwd} onClose={onClose} />)}
       {/* Visited sections stay mounted, so the ones whose answer depends on trust take the page's
           status and load again in place when trusting from Settings › MCP changes it. */}
@@ -851,14 +882,9 @@ export function SettingsPanel({
       >
         <DialogTitle className="sr-only">{t("settings.title")}</DialogTitle>
 
-        <Tabs
-          value={section}
-          onValueChange={(value) => activateSection(value as SettingsSection)}
-          className="flex min-h-0 flex-1 flex-col gap-0"
-        >
-          {/* §3.5: one top bar on every size — the title, a phone's Back, the
-              desktop's horizontal section tabs; the built-in close sits at its
-              right edge. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-0">
+          {/* 顶部只留标题与手机 Back：桌面的分区导航在左列（单列），不再有横排
+              Tabs 叠在分区自己的子列表之上。内置关闭键仍在右缘。 */}
           <div ref={headerRef} className="flex min-h-[50px] shrink-0 items-center gap-1 pr-[52px] pl-[18px] max-sm:pl-2">
             {isPhone && phone.level !== "home" && (() => {
               const backName = phone.level === "detail" ? sectionLabel : t("settings.title");
@@ -881,30 +907,48 @@ export function SettingsPanel({
                 ? t("settings.title")
                 : phone.level === "section" ? sectionLabel : detailTitle}
             </strong>
-            {!isPhone && (
-              <TabsList
-                className="ml-4 min-w-0 flex-1 self-center justify-start gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              >
-                {sections.map((item) => {
-                  const disabled = item.requiresProject && !cwd;
-                  return (
-                    <TabsTrigger
-                      key={item.id}
-                      value={item.id}
-                      disabled={disabled}
-                      title={disabled ? t("settings.projectRequired") : item.label}
-                      className="h-7 flex-none gap-1.5 px-2.5 text-xs font-normal data-[state=active]:font-medium"
-                    >
-                      <SettingsSectionIcon section={item.id} size={15} />
-                      <span className="truncate">{item.label}</span>
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-            )}
           </div>
 
           <main ref={mainRef} className="relative flex min-h-0 flex-1 overflow-hidden max-sm:flex-col">
+            {/* 桌面左列：唯一的一层导航。分区与通用子项同列，选中通用时其子项
+                内联展开——替代顶排 Tabs 与 General 自己的第二层列表。 */}
+            {!isPhone && (
+              <nav aria-label={t("settings.title")} className="flex w-[224px] shrink-0 flex-col gap-0.5 overflow-y-auto bg-sidebar p-2">
+                {sections.map((item) => {
+                  const disabled = item.requiresProject && !cwd;
+                  const isActive = section === item.id;
+                  return (
+                    <div key={item.id} className="flex min-w-0 flex-col gap-0.5">
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        title={disabled ? t("settings.projectRequired") : undefined}
+                        aria-current={isActive ? "page" : undefined}
+                        onClick={() => activateSection(item.id)}
+                        className={cn(railItemClass, isActive && railItemActiveClass)}
+                      >
+                        <SettingsSectionIcon section={item.id} size={15} />
+                        <span className="min-w-0 truncate">{item.label}</span>
+                      </button>
+                      {item.id === "general" && isActive && railGeneralDetails.map((sub) => (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          aria-current={generalDetail === sub.id ? "page" : undefined}
+                          onClick={() => {
+                            if (section !== "general") activateSection("general");
+                            setGeneralDetail(sub.id);
+                          }}
+                          className={cn(railItemSubClass, generalDetail === sub.id && railItemActiveClass)}
+                        >
+                          <span className="min-w-0 truncate">{sub.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </nav>
+            )}
             {/* A phone's home level lists the sections; its section and detail
                 levels show the section itself. */}
             {isPhone && phone.level === "home" && (
@@ -942,7 +986,7 @@ export function SettingsPanel({
             )}
             {hostedSections}
           </main>
-        </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );

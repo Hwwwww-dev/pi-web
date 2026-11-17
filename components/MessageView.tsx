@@ -182,6 +182,7 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
   return null;
 }, (prev, next) => {
   return prev.message === next.message
+    && prev.messageKey === next.messageKey
     && prev.isStreaming === next.isStreaming
     && haveSameRelevantToolResults(prev.message, prev.toolResults, next.toolResults)
     && prev.modelNames === next.modelNames

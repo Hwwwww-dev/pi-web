@@ -233,19 +233,12 @@ const COMPOSITION_END_ENTER_GRACE_MS = 100;
 const TEXT_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 const ANCHORED_MENU_GAP = 8;
 
-// Auto-grow a textarea to fit its content, capped at 120px (the visual draft's
-// composer box). The `auto` reset expands the box to its full content height,
-// which silently resets its internal scrollTop — restore where the user
-// actually was instead of snapping to the bottom: a snap fights the browser's
-// scroll-to-caret and bounces while editing text above the fold once the
-// scrollbar appears.
-function autoresizeTextarea(ta: HTMLTextAreaElement) {
-  const followCaret = shouldFollowBottom(ta);
-  const keepScroll = ta.scrollTop;
-  ta.style.height = "auto";
-  ta.style.height = `${Math.min(ta.scrollHeight + 2, 120)}px`;
-  ta.scrollTop = followCaret ? ta.scrollHeight : keepScroll;
-}
+/**
+ * Composer textarea growth cap, in px. The single height authority for the
+ * composer box — `resizeTextarea` writes inline heights against it, so the
+ * element must not carry a CSS max-height of its own.
+ */
+const COMPOSER_TEXTAREA_MAX_HEIGHT = 176;
 
 /**
  * Growing the box must not scroll a reader who is editing higher up, and must
@@ -338,22 +331,6 @@ export function replaceLinksWithMarkdown(
   }
 
   return replaced ? result + text.slice(searchFrom) : null;
-}
-
-/**
- * The composer's auto-grow step: fit the text to 120 px (the visual draft's
- * composer box), then let a scrollbar appear only when the text is still
- * taller than the box.
- *
- * The height comes from the value, not from scrollHeight: a wrapped
- * placeholder counts toward scrollHeight too, so an empty box would grow to
- * its own hint's lines. Only typed text scrolls, so a placeholder that
- * overflows the box stays cut off instead of showing a scrollbar.
- */
-export function autoGrowTextarea(ta: HTMLTextAreaElement): void {
-  ta.style.height = "auto";
-  ta.style.height = `${ta.value ? Math.min(ta.scrollHeight + 2, 120) : ta.clientHeight}px`;
-  ta.style.overflowY = ta.value && ta.scrollHeight > ta.clientHeight ? "auto" : "hidden";
 }
 
 function getVisibleTopBoundary(element: HTMLElement): number {
@@ -991,7 +968,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       requestAnimationFrame(() => {
         if (!ta) return;
         ta.focus();
-        autoresizeTextarea(ta);
+        resizeTextarea();
       });
     },
     replaceMessage(message: UserMessage) {
@@ -1013,7 +990,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       requestAnimationFrame(() => {
         if (!ta) return;
         ta.focus();
-        autoresizeTextarea(ta);
+        resizeTextarea();
       });
     },
     prependText(text: string) {
@@ -1030,7 +1007,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         if (!ta) return;
         ta.focus();
         ta.setSelectionRange(combined.length, combined.length);
-        autoresizeTextarea(ta);
+        resizeTextarea();
       });
     },
     prependQueuedMessage(text: string, images: ChatDraftImage[]) {
@@ -1058,7 +1035,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         if (!input) return;
         input.focus();
         input.setSelectionRange(combined.length, combined.length);
-        autoresizeTextarea(input);
+        resizeTextarea();
       });
     },
     rekeyDraft(previousKey: string, nextKey: string) {
@@ -1153,7 +1130,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         if (!ta) return;
         ta.focus();
         ta.setSelectionRange(ta.value.length, ta.value.length);
-        autoresizeTextarea(ta);
+        resizeTextarea();
       });
     },
     // The caret goes after a draft that came back, so typing continues it.
@@ -1314,10 +1291,17 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
+    // The `auto` reset expands the box to its full content height, which
+    // silently resets its internal scrollTop — restore where the user
+    // actually was instead of snapping to the bottom: a snap fights the
+    // browser's scroll-to-caret and bounces while editing text above the
+    // fold once the scrollbar appears. An empty value leaves height at
+    // `auto`: a wrapped placeholder would otherwise grow the box to the
+    // hint's own line count.
     const followCaret = shouldFollowBottom(ta);
     const keepScroll = ta.scrollTop;
     ta.style.height = "auto";
-    if (ta.value) ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+    if (ta.value) ta.style.height = `${Math.min(ta.scrollHeight, COMPOSER_TEXTAREA_MAX_HEIGHT)}px`;
     ta.scrollTop = followCaret ? ta.scrollHeight : keepScroll;
   }, []);
 
@@ -1587,9 +1571,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       if (!ta) return;
       ta.focus();
       ta.setSelectionRange(text.length, text.length);
-      autoresizeTextarea(ta);
+      resizeTextarea();
     });
-  }, []);
+  }, [resizeTextarea]);
 
   const applySlashCommand = useCallback((command: SlashCommandPaletteItem) => {
     // 中段唤起时保留 "/" 前的前缀文本，只替换令牌片段。
@@ -1603,9 +1587,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       if (!ta) return;
       ta.focus();
       ta.setSelectionRange(nextValue.length, nextValue.length);
-      autoresizeTextarea(ta);
+      resizeTextarea();
     });
-  }, []);
+  }, [resizeTextarea]);
 
   // While a turn runs the composer queues against the current run: a plain
   // send steers when a steer handler exists, Alt/Option+Enter always follows
@@ -1886,8 +1870,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     pendingPasteRef.current = null;
     const ta = textareaRef.current;
     if (!ta) return;
-    autoresizeTextarea(ta);
-  }, []);
+    resizeTextarea();
+  }, [resizeTextarea]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(e.clipboardData?.items ?? []);
@@ -2648,7 +2632,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             <InputGroupTextarea
               ref={textareaRef}
               className={cn(
-                "chat-input-textarea w-full min-w-0 px-2.5 py-2 leading-[1.55] text-foreground max-h-44 overflow-auto placeholder:text-muted-foreground",
+                "chat-input-textarea w-full min-w-0 px-2.5 py-2 leading-[1.55] text-foreground overflow-auto placeholder:text-muted-foreground",
                 compact ? "min-h-24" : "min-h-11",
               )}
               data-chat-composer=""

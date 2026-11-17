@@ -21,7 +21,7 @@ function hostOf(url: string): string {
  * What a web search read (官方 `pattern_sources.md`): one line per source, the
  * whole row a link, the arrow saying it leaves the app.
  */
-export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trailing, below, activityTool, stepUsage }: {
+export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trailing, below, duration, activityTool, stepUsage }: {
   sources: ToolViewSource[];
   foldKey: string;
   /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
@@ -30,15 +30,19 @@ export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trail
   stepUsage?: StepUsage;
   trailing?: ReactNode;
   below?: ReactNode;
+  /** The call's own run time, shown in the unified card head. */
+  duration?: ReactNode;
 }) {
   const { t } = useI18n();
   const title = t("chat.trace.sources", { count: sources.length });
 
   return (
     <TraceRow
+      variant="card"
       icon={<GlobeIcon />}
       title={title}
       foldKey={foldKey}
+      duration={duration}
       trailing={trailing}
       below={below}
       activityTool={activityTool}
