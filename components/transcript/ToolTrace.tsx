@@ -252,7 +252,7 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             size="xs"
             disabled={!resolved}
             // 胶囊是行内最先收缩的片段：工具名与 +N/-N 都不可挤压，空间不足时
-            // 文件名自身省略（右缘一小段渐变淡出，不再硬边）。
+            // 文件名自身省略（truncate 硬省略号）。
             className="relative min-w-0 shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
             title={resolved ?? path}
             aria-label={label}
@@ -263,10 +263,7 @@ function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; 
             }}
           >
             <FileTextIcon className="size-3 shrink-0" />
-            <span className="relative min-w-0">
-              <span className="block truncate">{label}</span>
-              <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-r from-transparent to-background" />
-            </span>
+            <span className="min-w-0 truncate">{label}</span>
           </Button>
         );
       })}
