@@ -31,7 +31,7 @@ import { quoteSeparator } from "@/lib/quoted-selection";
 import { isBareMcpCommand, isBuiltinMcpCommand } from "@/lib/mcp-command";
 import { BorderBeam } from "border-beam";
 import { ImagePreview } from "./ImagePreview";
-import { Attachment, AttachmentMedia } from "@/components/ui/attachment";
+import { AttachmentMedia } from "@/components/ui/attachment";
 import { DismissButton } from "./DismissButton";
 import { useCoarsePointer, useIsMobile } from "@/hooks/useIsMobile";
 import { useTheme } from "@/hooks/useTheme";
@@ -2593,12 +2593,14 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 {attachedImages.map((img, i) => (
                   <div key={i} className="relative shrink-0">
                     <ImagePreview key={img.previewUrl} src={img.previewUrl}>
-                      <Attachment size="sm" className="border-0 bg-transparent p-0">
-                        <AttachmentMedia variant="image" className="size-14">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={img.previewUrl} alt="" className="size-full object-cover" />
-                        </AttachmentMedia>
-                      </Attachment>
+                      {/* 不包 Attachment size="sm"：其 group-data w-8 以更高特异度
+                          压过 size-14 的宽度，缩略图会变 32×56 竖条；这层包装本就
+                          是 border-0/透明/p-0。基类 opacity-60 依赖附件组状态还原，
+                          独立用时补 opacity-100。 */}
+                      <AttachmentMedia variant="image" className="size-14 opacity-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img.previewUrl} alt="" className="size-full object-cover" />
+                      </AttachmentMedia>
                     </ImagePreview>
                     <Button
                       type="button"

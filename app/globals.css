@@ -1,4 +1,5 @@
 @import "@xterm/xterm/css/xterm.css";
+@import "yet-another-react-lightbox/styles.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 /* MiSans 全局字体（npm 自托管子集，unicode-range 按需加载）：Regular/400、

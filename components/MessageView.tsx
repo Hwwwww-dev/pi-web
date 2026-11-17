@@ -9,7 +9,6 @@ import { Button } from "./ui/button";
 import { Message, MessageContent, MessageFooter } from "./ui/message";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
-import { getImageSize, rememberImageSize } from "@/lib/image-size-cache";
 import {
   CompactionRow,
   CustomRow,
@@ -255,8 +254,10 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   const copyTarget = commandText ?? content;
   const editTarget = commandText ? replaceUserMessageText(message, commandText) : message;
 
-  const imageBlocksNode = imageBlocks.length > 0 && (
-    <div className={cn("flex flex-wrap gap-1.5", content && "mb-2")}>
+  // 附件独立块：图片不进文字气泡，气泡下方右对齐单独成行，统一 1:1 缩略图
+  // （object-cover 裁方），点击进灯箱看原图。
+  const attachmentBlock = imageBlocks.length > 0 && (
+    <div className="flex max-w-[82%] flex-wrap justify-end gap-1.5 max-sm:max-w-[86%]">
       {imageBlocks.map((img, i) => {        // SAFETY: pi-ai's on-disk format stores images flat ({data, mimeType}) while
         // lib/types.ts ImageContent nests them under {source:{type,data,media_type,url}};
         // the fields are read defensively below, so the cast only relaxes the shape.
@@ -268,7 +269,6 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
           : flat.data
             ? `data:${flat.mimeType};base64,${flat.data}`
             : "";
-        const cachedSize = src ? getImageSize(src) : undefined;
         return (
           <ImagePreview key={i} src={src}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -277,15 +277,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               alt=""
               loading="lazy"
               decoding="async"
-              width={cachedSize?.width}
-              height={cachedSize?.height}
-              ref={(el) => { if (el?.complete) el.dataset.loaded = "1"; }}
-              onLoad={(event) => {
-                event.currentTarget.dataset.loaded = "1";
-                if (src) rememberImageSize(src, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
-              }}
-              onError={(event) => { event.currentTarget.dataset.loaded = "1"; }}
-              className="block min-h-16 min-w-16 max-h-60 max-w-60 object-contain opacity-0 transition-opacity duration-200 data-[loaded=1]:opacity-100"
+              className="size-20 rounded-2xl border border-border/60 object-cover"
             />
           </ImagePreview>
         );
@@ -320,7 +312,6 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
         >
           {commandText ? (
             <div className="flex min-w-0 flex-col gap-1.5">
-              {imageBlocksNode}
               <div className="flex flex-wrap items-start gap-2">
                 <Button
                   variant="ghost"
@@ -352,12 +343,13 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             </div>
           ) : (
           <>
-          {imageBlocksNode}
           {content && <SafeMarkdownBody className="markdown-user-message" keepLineBreaks cwd={cwd} onOpenFile={onOpenFile}>{content}</SafeMarkdownBody>}
           </>
           )}
         </BubbleContent>
       </Bubble>
+
+      {attachmentBlock}
 
       {/* Bottom row: action buttons + timestamp */}
       {(

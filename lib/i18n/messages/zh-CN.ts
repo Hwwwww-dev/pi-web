@@ -871,6 +871,8 @@ export const zhCNLocale: LocalePlugin = {
     "chat.attachFailed": "{count} 张图片读取失败，未添加",
     "chat.dismiss": "关闭",
     "chat.previewImage": "预览图片",
+    "chat.imageViewZoomIn": "放大",
+    "chat.imageViewZoomOut": "缩小",
     "chat.modelScopeScoped": "已限定",
     "chat.modelScopeAll": "全部",
     "chat.selectModel": "选择模型",

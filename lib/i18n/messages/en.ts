@@ -871,6 +871,8 @@ export const enLocale: LocalePlugin = {
     "chat.attachFailed": "{count} image(s) failed to load and were not attached",
     "chat.dismiss": "Dismiss",
     "chat.previewImage": "Preview image",
+    "chat.imageViewZoomIn": "Zoom in",
+    "chat.imageViewZoomOut": "Zoom out",
     "chat.modelScopeScoped": "scoped",
     "chat.modelScopeAll": "all",
     "chat.selectModel": "Select model",

@@ -871,6 +871,8 @@ export const zhTWLocale: LocalePlugin = {
     "chat.attachFailed": "{count} 張圖片讀取失敗，未加入",
     "chat.dismiss": "關閉",
     "chat.previewImage": "預覽圖片",
+    "chat.imageViewZoomIn": "放大",
+    "chat.imageViewZoomOut": "縮小",
     "chat.modelScopeScoped": "已限定",
     "chat.modelScopeAll": "全部",
     "chat.selectModel": "選擇模型",
