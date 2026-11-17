@@ -49,10 +49,12 @@ export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey
               <TraceLine key={index} status={step.status === "pending" ? "pending" : undefined}>
                 {/* 图标与问题首行对齐，不居中于两行之间。 */}
                 <TraceIcon className="mt-[2px] self-start"><Icon /></TraceIcon>
-                {/* 问题与答案分行：同排会把答案挤在问题后面被截掉。 */}
+                {/* 问题与答案分行：同排会把答案挤在问题后面被截掉。
+                    两者都换行不截断（whitespace-normal 覆盖基类的 nowrap，
+                    长串用 break-words 兜底）。 */}
                 <span className="flex min-w-0 flex-col gap-0.5">
-                  <TraceTitle>{step.title}</TraceTitle>
-                  {step.description ? <TraceDescription className="whitespace-normal">{step.description}</TraceDescription> : null}
+                  <TraceTitle className="whitespace-normal break-words">{step.title}</TraceTitle>
+                  {step.description ? <TraceDescription className="whitespace-normal break-words">{step.description}</TraceDescription> : null}
                 </span>
               </TraceLine>
             );
