@@ -978,7 +978,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       ta.setSelectionRange(0, ta.value.length);
       replaceTextareaRange(ta, 0, ta.value.length, text);
       setAtQuery(null);
-      requestAnimationFrame(() => autoGrowTextarea(ta));
+      requestAnimationFrame(() => resizeTextarea());
     },
     pasteText(text: string) {
       // An empty paste inserts nothing, as in the TUI; over a selection it would delete it.
@@ -990,7 +990,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       }
       replaceTextareaRange(ta, ta.selectionStart ?? ta.value.length, ta.selectionEnd ?? ta.value.length, text);
       setAtQuery(null);
-      requestAnimationFrame(() => autoGrowTextarea(ta));
+      requestAnimationFrame(() => resizeTextarea());
     },
     insertIfEmpty(text: string) {
       const ta = textareaRef.current;
