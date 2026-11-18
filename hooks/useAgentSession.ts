@@ -2585,7 +2585,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
       }
     }
-  }, [activeToolsStore, addNotice, agentPhaseStore, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, onAgentEnd, onSessionEnded, onToolEnd, opts.chatInputRef, refreshContextUsage, scheduleEventStreamClose, scrollToBottom, settleUiStage, syncEntryIdsAfterRun, syncLiveModel]);
+  }, [activeToolsStore, addNotice, agentPhaseStore, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, notifyPromptStage, onAgentEnd, onSessionEnded, onToolEnd, opts.chatInputRef, refreshContextUsage, scheduleEventStreamClose, settleUiStage, syncEntryIdsAfterRun, syncLiveModel]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {

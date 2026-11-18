@@ -2162,19 +2162,10 @@ export class AgentSessionWrapper {
 
     this.shutdownPromise = (async () => {
       try {
-        // session_start can park on an extension's unanswered dialog forever,
-        // which would hang every shutdown awaiter past this point. The wait
-        // gets the same deadline the dispose path gives session_shutdown, and
-        // shutdown proceeds over a binding still in flight.
-        let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
-        const deadline = new Promise<"timeout">((resolve) => {
-          deadlineTimer = setTimeout(() => resolve("timeout"), SESSION_SHUTDOWN_DEADLINE_MS);
-          deadlineTimer.unref?.();
-        });
+        // A session_start handler waiting on a dialog would hold the binding as long as nobody
+        // answers it, and idle cleanup runs when nobody is there (#1678): it gets the cancelled
+        // answer destroy() gives. Whatever else holds the binding gets the hooks' deadline.
         try {
-          // A session_start handler waiting on a dialog would hold the binding as long as nobody
-          // answers it, and idle cleanup runs when nobody is there (#1678): it gets the cancelled
-          // answer destroy() gives. Whatever else holds the binding gets the hooks' deadline.
           if (this.extensionBindingPromise && !this.extensionsBound) {
             this.cancelExtensionUi();
             if (await this.raceShutdownDeadline(this.waitForExtensionsBound()) === "timeout") {
@@ -2188,8 +2179,6 @@ export class AgentSessionWrapper {
             "[pi-web] extension binding failed before session shutdown:",
             error instanceof Error ? error.message : error,
           );
-        } finally {
-          clearTimeout(deadlineTimer);
         }
         // After binding, so the host's session_start has run and finds nothing to record later.
         this.disposeMcpHost();
