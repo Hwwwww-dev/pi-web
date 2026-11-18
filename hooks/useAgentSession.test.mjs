@@ -231,8 +231,8 @@ test("mounts on whole turns, auto disk reads are gone, and the menu reload re-mo
   assert.match(reloadSource, /await loadSession\(sid, true, true, \{ force: true \}\)/);
   assert.match(reloadSource, /onReloadSessionChange\?\.\(reloadSession\)/);
   assert.match(source, /await loadSession\(sid\)/);
-  // force 读只剩挂载与手动重载两处。
-  assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 2);
+  // force 读只有三处:挂载、手动重载、bash 输出落盘后的刷新(550acf47)。
+  assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 3);
 });
 
 test("forking stays available during a run while in-session branch switches wait for it", () => {
@@ -420,7 +420,8 @@ test("delegates event stream readiness and hides an empty agent phase", () => {
 
   assert.match(source, /new AgentEventConnection\(\{/);
   assert.match(source, /shouldMaintain: wantsEventStream,/);
-  assert.match(source, /const wantsEventStream = useCallback\(\(sid: string\) => \(\s*sessionHookMountedRef\.current\s*&& sessionIdRef\.current === sid/);
+  // 49193522 在 mounted 与 sessionId 之间插入 endedSessionRef 检查(会话关闭后不再要事件流)。
+  assert.match(source, /const wantsEventStream = useCallback\(\(sid: string\) => \(\s*sessionHookMountedRef\.current\s*&& endedSessionRef\.current !== sid\s*&& sessionIdRef\.current === sid/);
   assert.match(ensureSource, /eventConnectionRef\.current!\.ensureConnected\(sid\)/);
   assert.match(ensureSource, /eventConnectionRef\.current!\.maintain\(sid\)/);
   assert.match(chatWindowSource, /const hasStreamingContent = useStreamingSelector\(streamingStore, selectHasStreamingContent\)/);

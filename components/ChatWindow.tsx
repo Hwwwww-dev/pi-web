@@ -2084,8 +2084,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               // TUI previews a command: the box keeps the bottom rows, a long line's end.
               <div
                 aria-live="off"
-                className="rounded-md border border-border px-2.5 py-1.5 font-mono text-[12px] leading-[1.45] text-text-muted"
-                style={{ marginTop: -2, background: "var(--tool-bg)" }}
+                className="-mt-0.5 rounded-md border border-border px-2.5 py-1.5 font-mono text-[12px] leading-[1.45] text-text-muted"
               >
                 <pre
                   className="m-0 flex flex-col justify-end overflow-hidden whitespace-pre-wrap break-words"
