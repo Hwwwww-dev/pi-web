@@ -33,10 +33,16 @@ import { expandHomePath, filePathFromApiSegments, samePath } from "@/lib/paths";
 import { hasParentDirectorySegment, isPathWithinRoots } from "@/lib/path-security";
 import { UPLOAD_REPO_ROOT } from "@/lib/file-access";
 import { readTextPreviewChunk } from "@/lib/text-preview";
+import { fileVersion } from "@/lib/file-version";
 import { registerFileWatch } from "@/lib/file-watch-registry";
 import { pageStreamLabel, registerPageStream } from "@/lib/page-stream-registry";
 
 const FILE_REQUEST_TYPES = ["list", "read", "download", "meta", "preview", "watch"] as const;
+// Only files the viewer loaded whole can be edited (a truncated read would
+// silently drop the unloaded tail on save), and those top out at one text
+// preview chunk. The limit only bounds abuse; edits of larger files never
+// reach the server because the viewer offers no editor for truncated reads.
+const MAX_FILE_EDIT_BYTES = 2 * 1024 * 1024;
 type FileRequestType = typeof FILE_REQUEST_TYPES[number];
 const FILE_REQUEST_TYPE_SET = new Set<string>(FILE_REQUEST_TYPES);
 const MAX_UPLOAD_FILE_BYTES = 25 * 1024 * 1024;
@@ -455,6 +461,96 @@ ${bodyHtml}
 </html>`;
 }
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  if (!isApiRequestAllowed(request)) {
+    return NextResponse.json({ error: "Untrusted API request" }, { status: 403 });
+  }
+  if (!hasJsonContentType(request)) {
+    return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 });
+  }
+
+  try {
+    const { path: segments } = await params;
+    const filePath = expandHomePath(filePathFromApiSegments(segments));
+    // The same lexical refusal as the GET: authorization collapses `..` before
+    // links are followed, the filesystem applies them after.
+    if (hasParentDirectorySegment(filePath)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    const body = await request.json().catch(() => null) as { content?: unknown; baseVersion?: unknown } | null;
+    if (typeof body?.content !== "string") {
+      return NextResponse.json({ error: "content must be a string" }, { status: 400 });
+    }
+    if (Buffer.byteLength(body.content, "utf8") > MAX_FILE_EDIT_BYTES) {
+      return NextResponse.json({ error: "Edited content must be 2MB or smaller" }, { status: 413 });
+    }
+
+    const allowedRoots = await getAllowedFileRoots();
+    if (!isFilePathAllowed(filePath, allowedRoots)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(filePath);
+    } catch {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (!stat.isFile()) {
+      return NextResponse.json({ error: "Not a file" }, { status: 400 });
+    }
+    // The session-reference read exemption does not exist here: only a path
+    // inside the roots is writable, and the link resolution the existing-path
+    // check does keeps a root-internal symlink from redirecting the write
+    // outside the roots (#748).
+    if (!isExistingFilePathAllowed(filePath, allowedRoots)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    // Optimistic concurrency: the viewer edits one version (size:mtime, the
+    // pair meta and watch events report). A file changed meanwhile — an agent
+    // run, another editor — is never silently overwritten; the viewer shows
+    // the conflict and offers a reload instead.
+    const diskVersion = fileVersion({ size: stat.size, mtime: stat.mtime.toISOString() });
+    if (
+      typeof body.baseVersion === "string"
+      && diskVersion !== null
+      && body.baseVersion !== diskVersion
+    ) {
+      return NextResponse.json({
+        error: "conflict",
+        current: { size: stat.size, mtime: stat.mtime.toISOString() },
+      }, { status: 409 });
+    }
+
+    // Write beside the target and rename, so a concurrent reader (this
+    // viewer's watch, an agent's read) never sees a half-written file. The
+    // realpath was resolved by the authorization above: writing there keeps a
+    // symlink pointing at its target. The staging file carries the target's
+    // mode so an executable script stays executable after the rename.
+    const realPath = fs.realpathSync(filePath);
+    const staging = path.join(
+      path.dirname(realPath),
+      `.${path.basename(realPath)}.pi-web-edit-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    try {
+      fs.writeFileSync(staging, body.content, { mode: stat.mode });
+      fs.renameSync(staging, realPath);
+    } finally {
+      try { fs.unlinkSync(staging); } catch { /* renamed or never created */ }
+    }
+
+    const nextStat = fs.statSync(realPath);
+    return NextResponse.json({ size: nextStat.size, mtime: nextStat.mtime.toISOString() });
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -498,10 +594,8 @@ export async function GET(
     }
 
     const existingAuthorizationPath = stat ? filePath : path.dirname(filePath);
-    if (
-      !allowedBySessionReference
-      && !isExistingFilePathAllowed(existingAuthorizationPath, allowedRoots)
-    ) {
+    const allowedByExistingPath = isExistingFilePathAllowed(existingAuthorizationPath, allowedRoots);
+    if (!allowedBySessionReference && !allowedByExistingPath) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
@@ -538,7 +632,16 @@ export async function GET(
       }
       const chunk = readTextPreviewChunk(filePath, stat.size, offset);
       const language = getLanguage(filePath);
-      return NextResponse.json({ ...chunk, language, size: stat.size, mtime: stat.mtime.toISOString() });
+      // Editable means the write route would authorize this path: inside the
+      // roots with links resolved. A file only readable through its session
+      // reference (allowedBySessionReference) never gets the editor.
+      return NextResponse.json({
+        ...chunk,
+        language,
+        size: stat.size,
+        mtime: stat.mtime.toISOString(),
+        editable: allowedByRoot && allowedByExistingPath,
+      });
     }
 
     if (type === "download") {

@@ -826,6 +826,21 @@ export function AppShell() {
     } catch { /* storage is optional */ }
   }, [agentTabs, activeFileTabId, rightPanelOpen]);
 
+  // Edit guard: any navigation that unmounts the editor (switch/close tab,
+  // open another file, switch workspace) asks once before dropping an
+  // unsaved document. The dirty flag rides the viewer state the editor
+  // reports through onStateChange.
+  const confirmDiscardDirtyEditor = useCallback((tabId?: string | null) => {
+    const tab = fileTabs.find((item) => item.id === (tabId ?? activeFileTabId));
+    return !tab?.viewerState?.dirty || window.confirm(translate("files.editDiscardConfirm"));
+  }, [activeFileTabId, fileTabs, translate]);
+
+  const handleSelectFileTab = useCallback((id: string) => {
+    if (id === activeFileTabId) return;
+    if (!confirmDiscardDirtyEditor(activeFileTabId)) return;
+    setActiveFileTabId(id);
+  }, [activeFileTabId, confirmDiscardDirtyEditor]);
+
   const handleFileViewerStateChange = useCallback((
     generation: number,
     tabId: string,
@@ -841,6 +856,9 @@ export function AppShell() {
 
   const changeFileWorkspace = useCallback((currentKey: string | null, nextKey: string) => {
     if (currentKey === nextKey) return;
+    // The parked workspace keeps the tabs, but the editor's draft is not
+    // persisted: ask before a session switch drops it.
+    if (!confirmDiscardDirtyEditor(null)) return;
     const activeFileId = activeFileTabId?.startsWith("file:") ? activeFileTabId : null;
     const next = switchFileWorkspace(fileWorkspaceStatesRef.current, currentKey, nextKey, {
       tabs: fileTabs,
@@ -861,7 +879,7 @@ export function AppShell() {
       setActiveFileTabId(next.activeTabId);
       setRightPanelOpen(next.open);
     }
-  }, [activeFileTabId, fileTabs, rememberSideTabs, rightPanelOpen]);
+  }, [activeFileTabId, confirmDiscardDirtyEditor, fileTabs, rememberSideTabs, rightPanelOpen]);
 
   // Same @mention format as the chat input's @ autocomplete, so the agent's
   // read tool resolves it the same way (it strips the @ prefix).
@@ -1550,6 +1568,7 @@ export function AppShell() {
     const page = options?.page;
     const line = options?.line;
     const tabId = `file:${filePath}`;
+    if (!confirmDiscardDirtyEditor(null)) return;
     setFileTabs((prev) => openFileTab(prev, {
       fileName,
       filePath,
@@ -1564,7 +1583,7 @@ export function AppShell() {
     setRightPanelOpen(true);
     // On mobile the file panel is full-screen; close the drawer so it shows.
     if (isMobile) setSidebarOpen(false);
-  }, [isMobile]);
+  }, [confirmDiscardDirtyEditor, isMobile]);
 
   const handleOpenLinkedFile = useCallback((filePath: string, options?: { page?: number; line?: number }) => {
     handleOpenFile(filePath, getFileName(filePath), {
@@ -1661,6 +1680,7 @@ export function AppShell() {
   };
 
   const handleCloseFileTab = useCallback((tabId: string) => {
+    if (tabId.startsWith("file:") && !confirmDiscardDirtyEditor(tabId)) return;
     if (tabId === GIT_TAB_ID) {
       setGitPanelOpen(false);
       setActiveFileTabId((current) => current === GIT_TAB_ID ? null : current);
@@ -1691,7 +1711,7 @@ export function AppShell() {
       const remaining = fileTabs.filter((t) => t.id !== tabId);
       return remaining.at(-1)?.id ?? terminalTabs.at(-1)?.id ?? lastAgentTabId(agentTabs);
     });
-  }, [fileTabs, terminalTabs, agentTabs]);
+  }, [agentTabs, confirmDiscardDirtyEditor, fileTabs, terminalTabs]);
 
   // The Agents switcher's Delete on a side chat: its tab goes with it, and the
   // main chat showing it goes back to the parent, as the Main agent row does
@@ -2979,7 +2999,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <TabBar
               tabs={panelTabs}
               activeTabId={activeFileTabId ?? ""}
-              onSelectTab={setActiveFileTabId}
+              onSelectTab={handleSelectFileTab}
               onCloseTab={handleCloseFileTab}
               onReorderTab={(source, target, after) => setPanelTabOrder(movePanelTab(panelTabs.map((tab) => tab.id), source, target, after))}
             />

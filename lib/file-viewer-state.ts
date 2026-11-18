@@ -1,4 +1,4 @@
-export type FileViewerDisplayMode = "source" | "preview" | "diff";
+export type FileViewerDisplayMode = "source" | "preview" | "diff" | "edit";
 
 export interface FileViewerState {
   displayMode: FileViewerDisplayMode;
@@ -8,6 +8,12 @@ export interface FileViewerState {
   wrapLines?: boolean;
   scrollTop: number;
   scrollLeft: number;
+  // Runtime-only signal, never a restored choice: the editor reports an
+  // unsaved document through onStateChange so the tab bar can warn before a
+  // switch or close drops it. It reaches tab state because that is the only
+  // channel the viewer already reports through; a restored tab starts clean
+  // (FileViewer never reads it back).
+  dirty?: boolean;
 }
 
 export function resolveInitialFileDisplayMode(

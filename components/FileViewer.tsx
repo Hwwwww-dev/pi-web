@@ -2,7 +2,8 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo, type MouseEvent } from "react";
-import { AtSign, DownloadIcon, FileIcon, WrapText } from "lucide-react";
+import dynamic from "next/dynamic";
+import { AtSign, DownloadIcon, FileIcon, Pencil, Save, WrapText, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import {
   DOCX_PREVIEW_MAX_BYTES,
@@ -33,10 +34,12 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { SourceCodeView, SOURCE_HIGHLIGHT_MAX_LINES } from "./SourceCodeView";
 import { isDelimitedTablePath } from "@/lib/delimited-table";
+import type { FileEditorHandle } from "./FileEditor";
 import { FrontmatterCard } from "./FrontmatterCard";
 import { diffGapLabel, parseUnifiedPatch, unifiedDiffLines, type SplitDiffGap, type UnifiedDiffLine } from "@/lib/patch";
 import type { GitFileDiffResponse } from "@/lib/git-types";
 import { useI18n } from "@/hooks/useI18n";
+import { useTheme } from "@/hooks/useTheme";
 import { useRehypeKatexVersion } from "@/hooks/useRehypeKatexVersion";
 import {
   resolveInitialFileDisplayMode,
@@ -46,6 +49,21 @@ import {
 } from "@/lib/file-viewer-state";
 
 export type { FileViewerState } from "@/lib/file-viewer-state";
+
+// The CodeMirror editor only loads when a file is edited for the first time;
+// previewing, scrolling and diffing never download it. ssr:false: CodeMirror
+// needs a real DOM.
+const FileEditor = dynamic(
+  () => import("./FileEditor").then((m) => m.FileEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      </div>
+    ),
+  },
+);
 
 interface Props {
   filePath: string;
@@ -74,6 +92,21 @@ interface FileData {
   truncated: boolean;
   // A NUL in the first bytes (lib/text-preview.ts): no text view, only the download.
   binary?: boolean;
+  // The files route answers whether it would authorize a write of this path
+  // (inside the roots, links resolved). A file readable only through its
+  // session reference is never editable.
+  editable?: boolean;
+}
+
+/** A watch `change` event's JSON payload (mtime and size), null when unreadable. */
+function parseWatchEventData(event: Event): { size?: unknown; mtime?: unknown } | null {
+  const data = (event as MessageEvent).data;
+  if (typeof data !== "string") return null;
+  try {
+    return JSON.parse(data) as { size?: unknown; mtime?: unknown };
+  } catch {
+    return null;
+  }
 }
 
 interface SelectedLineRange {
@@ -142,7 +175,7 @@ function getSelectedSourceLineRange(root: HTMLElement, selection: Selection | nu
 
 function getFileApiUrl(
   filePath: string,
-  type: "read" | "download" | "meta" | "preview" | "watch",
+  type: "read" | "download" | "meta" | "preview" | "watch" | "write",
   sourceSessionId?: string | null,
   params: Record<string, string | number | undefined> = {},
 ): string {
@@ -974,6 +1007,19 @@ function TextFileViewer({
   const [watching, setWatching] = useState(false);
   const esRef = useRef<EventSource | null>(null);
   const contentRequestRef = useRef(0);
+  // Edit mode state. The CodeMirror editor itself is uncontrolled; these
+  // follow its reports (dirty), the save request (saving/error) and the
+  // disk-moved-on notices (staleNotice: a 409 refusal or an external change
+  // held back while editing, both offering the same reload).
+  const [editDirty, setEditDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [staleNotice, setStaleNotice] = useState<"conflict" | "external" | null>(null);
+  const editorHandleRef = useRef<FileEditorHandle | null>(null);
+  // The watch callback reads the mode without resubscribing on a mode switch:
+  // an EventSource torn down per keystroke-mode change would miss changes and
+  // reconnect against the server's one-watcher accounting.
+  const displayModeRef = useRef(requestedInitialDisplayMode);
   // The version of the content on screen; a reconnect that finds it unchanged
   // keeps what is loaded (Load more chunks, scroll, highlighting).
   const shownVersionRef = useRef<string | null>(null);
@@ -996,11 +1042,15 @@ function TextFileViewer({
   const [htmlFull, setHtmlFull] = useState<{ text?: string; error?: string } | null>(null);
 
   onStateChangeRef.current = onStateChange;
+  displayModeRef.current = displayMode;
+
+  const { theme: resolvedTheme } = useTheme();
 
   const updateDisplayMode = useCallback((nextDisplayMode: DisplayMode) => {
     viewerStateRef.current.displayMode = nextDisplayMode;
     setDisplayMode(nextDisplayMode);
   }, []);
+
 
   const toggleWrapLines = useCallback(() => {
     setWrapLines((current) => {
@@ -1021,8 +1071,16 @@ function TextFileViewer({
     viewerStateRef.current = nextState;
     scrollRestorePendingRef.current = true;
     autoDiffAppliedRef.current = false;
+    displayModeRef.current = requestedInitialDisplayMode;
     setDisplayMode(requestedInitialDisplayMode);
     setWrapLines(initialWrapLines);
+    // A different file starts with no editor state: no draft, no stale notice,
+    // no error from the previous file's save.
+    setEditDirty(false);
+    setSaving(false);
+    setSaveError(null);
+    setStaleNotice(null);
+    editorHandleRef.current = null;
 
     return () => {
       onStateChangeRef.current?.({ ...viewerStateRef.current });
@@ -1086,6 +1144,95 @@ function TextFileViewer({
     }
   }, [cwd]);
 
+  // dirty rides the viewer state the viewer already reports, so the tab bar
+  // can warn before a switch or a close drops an unsaved document.
+  const reportDirty = useCallback((next: boolean) => {
+    viewerStateRef.current.dirty = next;
+    onStateChangeRef.current?.({ ...viewerStateRef.current });
+  }, []);
+
+  const handleEditDirtyChange = useCallback((next: boolean) => {
+    setEditDirty(next);
+    reportDirty(next);
+  }, [reportDirty]);
+
+  // Leave edit mode: drop the editor's state (the caller decided about dirty
+  // content first) and read the disk once, so a held-back external change or
+  // a just-saved version is what the read-only views show.
+  const exitEditMode = useCallback(() => {
+    setEditDirty(false);
+    setSaving(false);
+    setSaveError(null);
+    setStaleNotice(null);
+    reportDirty(false);
+    void fetchContent(filePath);
+  }, [fetchContent, filePath, reportDirty]);
+
+  // Every switch out of edit mode goes through here, so unsaved content is
+  // never dropped silently. Saving disables the paths that would leave.
+  const requestDisplayMode = useCallback((nextMode: DisplayMode) => {
+    if (nextMode === displayMode) return;
+    if (displayMode === "edit") {
+      if (saving) return;
+      if (editDirty && !window.confirm(t("files.editDiscardConfirm"))) return;
+      exitEditMode();
+    }
+    updateDisplayMode(nextMode);
+  }, [displayMode, editDirty, exitEditMode, saving, t, updateDisplayMode]);
+
+  const enterEditMode = useCallback(() => {
+    setSaveError(null);
+    setStaleNotice(null);
+    updateDisplayMode("edit");
+  }, [updateDisplayMode]);
+
+  const reloadFromDisk = useCallback(async () => {
+    if (editDirty && !window.confirm(t("files.editReloadConfirm"))) return;
+    const d = await fetchContent(filePath);
+    if (!d) return;
+    editorHandleRef.current?.reset(d.content);
+    setEditDirty(false);
+    setStaleNotice(null);
+    setSaveError(null);
+    reportDirty(false);
+  }, [editDirty, fetchContent, filePath, reportDirty, t]);
+
+  const saveEdit = useCallback(async () => {
+    if (!data || saving || displayModeRef.current !== "edit") return;
+    const content = editorHandleRef.current?.getValue();
+    if (content === undefined) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const response = await fetch(getFileApiUrl(filePath, "write", sourceSessionId), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, baseVersion: shownVersionRef.current }),
+      });
+      const json = await response.json().catch(() => null) as
+        & { size?: number; mtime?: string; error?: string; current?: { size?: number; mtime?: string } } | null;
+      if (!response.ok) {
+        if (response.status === 409) {
+          setStaleNotice("conflict");
+        } else {
+          setSaveError(json?.error || `HTTP ${response.status}`);
+        }
+        return;
+      }
+      // What the editor held is what the disk holds now: the viewer's own
+      // version moves so its watch change does not read as an external edit.
+      shownVersionRef.current = fileVersion(json);
+      setData((current) => current ? { ...current, content, size: json?.size ?? current.size } : current);
+      setEditDirty(false);
+      setStaleNotice(null);
+      reportDirty(false);
+    } catch (error) {
+      setSaveError(String(error));
+    } finally {
+      setSaving(false);
+    }
+  }, [data, filePath, reportDirty, saving, sourceSessionId]);
+
   // Reset and load the file itself when its identity changes. Live watching is
   // managed separately so pausing it never clears the displayed content.
   useEffect(() => {
@@ -1118,7 +1265,16 @@ function TextFileViewer({
     if (!watchEnabled) return;
 
     let active = true;
-    const synchronize = () => {
+    // Edit mode holds the disk back: an external change must not stomp on the
+    // document being typed. changeVersion comes only from `change` events,
+    // whose payload lets the viewer's own just-saved version through.
+    const synchronize = (changeVersion?: string | null) => {
+      if (displayModeRef.current === "edit") {
+        if (changeVersion !== undefined && !fileVersionChanged(shownVersionRef.current, changeVersion)) return;
+        setStaleNotice((current) => current ?? "external");
+        void fetchGitDiff(filePath);
+        return;
+      }
       void fetchContent(filePath);
       void fetchGitDiff(filePath);
     };
@@ -1128,6 +1284,12 @@ function TextFileViewer({
 
     es.addEventListener("connected", () => {
       setWatching(true);
+      // In edit mode the editor holds its document: no gap-fill read while it
+      // is open. exitEditMode reads the disk once when the mode ends.
+      if (displayModeRef.current === "edit") {
+        void fetchGitDiff(filePath);
+        return;
+      }
       // The server emits connected only after its watcher exists. Reading now
       // closes the gap between the last snapshot and live events, unless the
       // file on screen is still the one on disk (a reconnect). The diff is read
@@ -1149,7 +1311,10 @@ function TextFileViewer({
         });
     });
 
-    es.addEventListener("change", synchronize);
+    es.addEventListener("change", (event) => {
+      const payload = parseWatchEventData(event);
+      synchronize(payload ? fileVersion(payload) : null);
+    });
 
     const markDisconnected = () => {
       setWatching(false);
@@ -1409,6 +1574,11 @@ function TextFileViewer({
         ...(hasPreview ? ["preview" as const] : []),
         ...(hasGitDiff ? ["diff" as const] : []),
       ];
+  // Edit is a separate header action, not a stop in the mode cycle: entering
+  // it means writing, and the save/exit pair replaces the cycle while open.
+  // Truncated reads stay out (saving would drop the unloaded tail), binaries
+  // too, and editable is the route's own authorization answer.
+  const canEditFile = !isDeletedDiff && !isBinary && !!data && !data.truncated && data.editable !== false;
   const metadata = isDeletedDiff
     ? t("files.deleted")
     : isBinary
@@ -1459,7 +1629,7 @@ function TextFileViewer({
         {/* In flow and always visible: a hover-revealed overlay is what covered the
             metadata, and revealing it also made the header jump. */}
         <CodeBlockActions className="static! shrink-0 opacity-100!">
-          {displayModes.length > 1 && (() => {
+          {effectiveDisplayMode !== "edit" && displayModes.length > 1 && (() => {
             // 多个视图合并为单个按钮：显示下一个模式，点击即切换。
             const currentIndex = displayModes.indexOf(effectiveDisplayMode as (typeof displayModes)[number]);
             const nextMode = displayModes[(currentIndex + 1) % displayModes.length] ?? displayModes[0];
@@ -1468,7 +1638,7 @@ function TextFileViewer({
                 type="button"
                 variant="ghost"
                 size="xs"
-                onClick={() => updateDisplayMode(nextMode)}
+                onClick={() => requestDisplayMode(nextMode)}
                 title={nextMode === "diff" ? t("i18n.compareHead") : FILE_MODE_LABELS[nextMode]}
                 aria-label={FILE_MODE_LABELS[nextMode]}
                 className="px-1.5 text-xs text-muted-foreground"
@@ -1477,7 +1647,49 @@ function TextFileViewer({
               </Button>
             );
           })()}
-          {(effectiveDisplayMode === "source" || effectiveDisplayMode === "diff") && !isBinary && (
+          {canEditFile && effectiveDisplayMode !== "edit" && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={enterEditMode}
+              title={t("files.edit")}
+              aria-label={t("files.edit")}
+              className="text-muted-foreground"
+            >
+              <Pencil className="size-3.5" strokeWidth={1.8} />
+            </Button>
+          )}
+          {effectiveDisplayMode === "edit" && (
+            <>
+              <Button
+                type="button"
+                variant={editDirty ? "default" : "ghost"}
+                size="xs"
+                onClick={() => void saveEdit()}
+                disabled={!editDirty || saving}
+                title={`${t("files.editSave")} (Ctrl+S)`}
+                aria-label={t("files.editSave")}
+                className="px-1.5 text-xs"
+              >
+                <Save className="size-3.5" strokeWidth={1.8} />
+                {saving ? t("files.editSaving") : t("files.editSave")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => requestDisplayMode("source")}
+                disabled={saving}
+                title={t("files.editExit")}
+                aria-label={t("files.editExit")}
+                className="text-muted-foreground"
+              >
+                <X className="size-3.5" strokeWidth={1.8} />
+              </Button>
+            </>
+          )}
+          {(effectiveDisplayMode === "source" || effectiveDisplayMode === "diff" || effectiveDisplayMode === "edit") && !isBinary && (
             <Button
               type="button"
               variant="ghost"
@@ -1520,7 +1732,7 @@ function TextFileViewer({
               <AtSign className="size-3.5" strokeWidth={1.8} />
             </Button>
           )}
-          {!isDeletedDiff && !isBinary && (
+          {!isDeletedDiff && !isBinary && effectiveDisplayMode !== "edit" && (
             <CodeBlockCopyButton
               value={viewerContent}
               title={t("i18n.copy")}
@@ -1551,12 +1763,38 @@ function TextFileViewer({
         </div>
       )}
 
+      {/* Held-back disk changes and save refusals surface between the header
+          and the editor; the reload reads the disk back into the editor. */}
+      {effectiveDisplayMode === "edit" && (staleNotice || saveError) && (
+        <div className="flex shrink-0 items-center gap-2 bg-card px-3 py-1.5 text-xs">
+          <span className={saveError ? "text-destructive" : "text-amber-600 dark:text-amber-400"}>
+            {staleNotice === "conflict"
+              ? t("files.editConflict")
+              : staleNotice === "external"
+                ? t("files.editExternalChange")
+                : `${t("files.editSaveFailed")}: ${saveError}`}
+          </span>
+          {staleNotice && (
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => void reloadFromDisk()}
+            >
+              {t("files.editReload")}
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Content area */}
       <div
         ref={contentRef}
-        className={`file-viewer-content min-h-0 min-w-0 flex-1 overflow-auto bg-background ${
-          effectiveDisplayMode === "diff" && hasGitDiff ? "px-3" : ""
-        }${showLoadMore ? " pb-12" : ""}`}
+        className={`file-viewer-content min-h-0 min-w-0 flex-1 bg-background ${
+          effectiveDisplayMode === "edit"
+            ? "overflow-hidden"
+            : `overflow-auto${effectiveDisplayMode === "diff" && hasGitDiff ? " px-3" : ""}${showLoadMore ? " pb-12" : ""}`
+        }`}
         onScroll={(event) => {
           viewerStateRef.current.scrollTop = event.currentTarget.scrollTop;
           viewerStateRef.current.scrollLeft = event.currentTarget.scrollLeft;
@@ -1565,7 +1803,17 @@ function TextFileViewer({
         {/* 模式切换（source/preview/diff）整链按模式重挂：150ms 淡入替掉瞬切。
             滚动位置在外层容器上，不受这次重挂影响。 */}
         <div key={effectiveDisplayMode} className="h-full min-h-0 animate-in fade-in duration-150 motion-reduce:animate-none">
-        {effectiveDisplayMode === "diff" && hasGitDiff ? (
+        {effectiveDisplayMode === "edit" ? (
+          <FileEditor
+            ref={editorHandleRef}
+            filePath={filePath}
+            initialValue={viewerContent}
+            wrapLines={wrapLines}
+            dark={resolvedTheme === "dark"}
+            onDirtyChange={handleEditDirtyChange}
+            onSaveRequest={saveEdit}
+          />
+        ) : effectiveDisplayMode === "diff" && hasGitDiff ? (
           <DiffView patch={gitDiff.patch!} wrapLines={wrapLines} />
         ) : isHtml && effectiveDisplayMode === "preview" && data?.truncated && !htmlFull?.text ? (
           <div className="p-6 text-xs text-muted-foreground">

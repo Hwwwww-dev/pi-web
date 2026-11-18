@@ -94,6 +94,9 @@ test("a project switch still drops subagent tabs but saves the current side tabs
       { sessionId: "child-a", label: "Plan" },
     ],
     fileTabs: [], rightPanelOpen: true,
+    // The edit guard asks before dropping an unsaved document; the sandbox
+    // has no editor, so it answers "discard is fine".
+    confirmDiscardDirtyEditor: () => true,
     fileWorkspaceStatesRef: { current: new Map() },
     fileWorkspaceGenerationRef: { current: 0 },
     sideTabsReadyRef: { current: true },

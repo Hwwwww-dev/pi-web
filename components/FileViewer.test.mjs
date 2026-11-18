@@ -65,9 +65,10 @@ test("the diff view wraps when the viewer wraps, and the key reaches the diff", 
   assert.match(diffView, /line\.type === "removed" && "text-destructive"/);
   assert.match(source, /<DiffView patch=\{gitDiff\.patch!\} wrapLines=\{wrapLines\} \/>/);
 
-  // The wrap control is offered for the diff as well as the source, never for a
-  // rendered preview (markdown, HTML, table), where there are no lines to wrap.
-  assert.match(source, /\(effectiveDisplayMode === "source" \|\| effectiveDisplayMode === "diff"\) && !isBinary/);
+  // The wrap control is offered for the diff as well as the source and the
+  // editor, never for a rendered preview (markdown, HTML, table), where there
+  // are no lines to wrap.
+  assert.match(source, /\(effectiveDisplayMode === "source" \|\| effectiveDisplayMode === "diff" \|\| effectiveDisplayMode === "edit"\) && !isBinary/);
 });
 
 test("partly loaded HTML previews up to the HTML cap; partly loaded markdown does not", () => {
