@@ -280,7 +280,7 @@ export function ProjectTrustDialogBody({
       <div className="flex min-h-0 gap-3 overflow-auto px-[18px] pt-[18px] pb-3.5 [overscroll-behavior:contain]">
         <ShieldCheck aria-hidden="true" strokeWidth={2} className="mt-px size-5 shrink-0 text-warning" />
         <div className="min-w-0 flex-1">
-          <AlertDialogTitle id="project-trust-title" className="text-base font-bold text-foreground">
+          <AlertDialogTitle id="project-trust-title" className="text-base font-semibold text-foreground">
             {t("trust.dialogTitle")}
           </AlertDialogTitle>
           <AlertDialogDescription id="project-trust-description" className="mt-[7px] text-xs leading-[1.6] text-muted-foreground">

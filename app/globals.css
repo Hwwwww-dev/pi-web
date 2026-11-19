@@ -2,10 +2,15 @@
 @import "yet-another-react-lightbox/styles.css";
 @import "tailwindcss";
 @import "tw-animate-css";
-/* MiSans 全局字体（npm 自托管子集，unicode-range 按需加载）：Regular/400、
-   Medium/500、Bold/700。代码/终端保持等宽栈（MiSans 无等宽版）。 */
+/* MiSans 全局字体（npm 自托管子集，unicode-range 按需加载）：
+   Light/300、Regular/400、Medium/500、Semibold/650、Bold/700。
+   Semibold 必须加载：`font-semibold`(600) 缺字重时会回退到 Bold(700)，
+   让半粗和粗体一样粗。Light 只在设置里手动选 300 时用得上。
+   代码/终端保持等宽栈（MiSans 无等宽版）。 */
+@import "misans/lib/Normal/MiSans-Light.min.css";
 @import "misans/lib/Normal/MiSans-Regular.min.css";
 @import "misans/lib/Normal/MiSans-Medium.min.css";
+@import "misans/lib/Normal/MiSans-Semibold.min.css";
 @import "misans/lib/Normal/MiSans-Bold.min.css";
 /* Agent worktrees: scanning them makes webpack snapshot their symlinked
    node_modules, which crashes `next build` with "reading 'length'". */
@@ -854,7 +859,7 @@ pre, code {
 }
 .markdown-body strong {
   color: var(--foreground);
-  font-weight: 700;
+  font-weight: 600;
 }
 .markdown-body em { color: var(--muted-foreground); }
 .markdown-body a {

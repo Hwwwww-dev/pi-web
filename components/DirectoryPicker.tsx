@@ -215,7 +215,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
         <DialogTitle className="sr-only">{t("directoryPicker.selectDirectory")}</DialogTitle>
         <div className="flex shrink-0 items-center justify-between px-[18px] py-3">
           <div className="min-w-0 flex-1">
-            <div className="text-base font-bold text-foreground">{t("directoryPicker.selectDirectory")}</div>
+            <div className="text-base font-semibold text-foreground">{t("directoryPicker.selectDirectory")}</div>
           </div>
           <Button
             type="button"
@@ -378,7 +378,7 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
               }}
               className={cn("w-[400px] max-w-full", panelSurfaceClass)}
             >
-              <div className="px-[18px] py-3 text-base font-bold text-foreground">
+              <div className="px-[18px] py-3 text-base font-semibold text-foreground">
                 {t("directoryPicker.createDirectory")}
               </div>
               <div className="px-[18px] py-3">

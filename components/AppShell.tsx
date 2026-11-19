@@ -2733,7 +2733,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   valueAlign: "left" | "right" = "left",
                 ) => (
                     <div className="min-w-0">
-                      <div className="mb-1.5 text-xs font-bold text-foreground">{title}</div>
+                      <div className="mb-1.5 text-xs font-semibold text-foreground">{title}</div>
                       <div className="grid grid-cols-[max-content_minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5">
                         {sectionRows.map((row) => (
                           <div key={`${title}:${row.label}`} className="contents">

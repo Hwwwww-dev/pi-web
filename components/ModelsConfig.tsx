@@ -1602,7 +1602,7 @@ function OAuthDetail({ provider, onRefresh, enabledModels, contextSettings }: {
                 <p className="m-0 text-xs leading-normal text-muted-foreground">
                   {t("models.oauthDeviceCode")}
                 </p>
-                <div className="rounded-md bg-muted px-3 py-2 font-mono text-base font-bold text-foreground">
+                <div className="rounded-md bg-muted px-3 py-2 font-mono text-base font-semibold text-foreground">
                   {loginState.userCode}
                 </div>
                 <p className="m-0 text-xs leading-normal text-muted-foreground">

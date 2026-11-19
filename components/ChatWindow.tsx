@@ -2250,7 +2250,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               <div className="new-session-brand flex min-w-0 items-center gap-3 mb-5 max-[640px]:mb-4">
                 <Image src="/icons/logo.svg" width={120} height={120} alt="" priority unoptimized className="new-session-logo size-30 shrink-0 max-[640px]:size-8" />
                 <div className="new-session-brand-text flex min-w-0 flex-col gap-0.5 font-mono">
-                  <span className="new-session-brand-name text-xl font-bold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
+                  <span className="new-session-brand-name text-xl font-semibold leading-[1.15] whitespace-nowrap text-foreground max-[640px]:text-xl">Pi Web</span>
                   <span className="new-session-meta flex min-w-0 items-center gap-1.5 text-xs leading-[1.4] whitespace-nowrap text-muted-foreground [&>*]:flex-none">
                     <span>web v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
                     <span aria-hidden="true">·</span>

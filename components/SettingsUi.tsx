@@ -86,7 +86,7 @@ export function ConfigPanelShell({
         } as CSSProperties}
       >
         <div className="flex h-12 shrink-0 items-center gap-2.5 pr-3 pl-4">
-          <DialogTitle className="min-w-0 text-base font-bold">{title}</DialogTitle>
+          <DialogTitle className="min-w-0 text-base font-semibold">{title}</DialogTitle>
           {subtitle && (
             <code className="min-w-0 overflow-hidden font-mono text-xs text-muted-foreground truncate" title={subtitle}>
               {subtitle}
