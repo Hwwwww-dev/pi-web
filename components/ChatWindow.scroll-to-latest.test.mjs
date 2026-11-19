@@ -19,9 +19,9 @@ test("the official scroller owns following, prepend anchoring and the bottom edg
   // 顶出视口。行窗口与手工前插保位都已删除，因此这里不能再有自己的跟随状态机。
   assert.match(source, /<MessageScrollerProvider autoScroll=\{agentRunning\} defaultScrollPosition="end" scrollEdgeThreshold=\{scrollEdgeThreshold\}>/);
   // 阈值同时就是吸附范围（库在范围内会把模式续回 following-bottom 并跟到底）。
-  // 80px 只覆盖“真的滚到底”：把最后一条滑到输入条上方时不算贴底，往上翻的人
-  // 不会被拽回；内容末端那层 167–169px 的垫底不进吸附区。
-  assert.match(source, /const scrollEdgeThreshold = 80;/);
+  // 100px 约一行：把最后一条滑到输入条上方时不算贴底，往上翻的人不会被拽回；
+  // 内容末端那层 167–169px 的垫底不进吸附区。
+  assert.match(source, /const scrollEdgeThreshold = 100;/);
   // 尾部新增行的补滚另用读者眼里的底（扣掉停靠区垫底）：不依赖上面的吸附阈值。
   assert.match(source, /lastRowKeyRef[\s\S]{0,1600}?distanceToBottom > Math\.max\(120, composerDockHeight \+ 24\)[\s\S]{0,300}?scrollerApiRef\.current\?\.scrollToEnd\(\{ behavior: "instant" \}\);/);
   // 折叠不再自带钉位：既不写 scrollTop，也不再有 pi-web:trace-fold 这条契约。

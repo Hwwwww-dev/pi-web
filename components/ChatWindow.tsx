@@ -1884,10 +1884,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   /**
    * 贴底判定的距离阈值。这个值同时是「吸附范围」：库在 `autoScroll` 打开时只要
    * 判成贴底，就把滚动模式续回 following-bottom，读者在范围内往上翻会被拽回。
-   * 取 80px 只覆盖「真的滚到底」，内容末端那层 `--composer-dock-h` 垫底（实测
-   * 167–169px）不进吸附区——输入条盖住的那一段不是读者看到的底。
+   * 取 100px 约一行，够吸收一帧流式增量，又不至于把往上翻的人拽回；内容末端那层
+   * `--composer-dock-h` 垫底（实测 167–169px）不进吸附区——输入条盖住的那一段
+   * 不是读者看到的底。
    */
-  const scrollEdgeThreshold = 80;
+  const scrollEdgeThreshold = 100;
   /**
    * 空闲时的尾部追加要自己补一次滚到底：`autoScroll` 只在 agent 运行时打开，
    * 空闲期库的滚动模式恒为 `free-scrolling`，发送出去的新气泡因此落在视口外，
