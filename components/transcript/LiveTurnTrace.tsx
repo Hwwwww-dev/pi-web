@@ -20,7 +20,7 @@ import { toToolView } from "@/lib/tool-view";
 import { getToolCategory } from "@/lib/tool-categories";
 import type { ActivityItem } from "@/lib/turn-view";
 import type { ThinkingContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
-import { ToolCategoryIcon, ToolRow } from "../ActivityRows";
+import { ReasoningTrace, ToolCategoryIcon, ToolRow } from "../ActivityRows";
 import { useTraceFold } from "./TraceRow";
 
 // 空闲 store 兜底：hooks 不能条件调用，未传 store 时订阅它（恒为初始态）。
@@ -113,24 +113,32 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
     return () => clearInterval(timer);
   }, [startTs]);
 
-  const title = thinkingLine ?? toolTitle ?? t("chat.activity.working");
+  // 标题形态（2026-11-20 用户拍板）：展开=「工作中」（内容全在折叠体内，
+  // 没必要再在标题里重复最新活动）；收起=最新活动（流式思考末行或最新工具）。
+  // 展开体含全部已落盘活动行（children）+ 流式中的思考/工具行。
+  const title = open
+    ? t("chat.activity.working")
+    : thinkingLine ?? toolTitle ?? t("chat.activity.working");
 
   return (
     <Trace data-activity="turn">
       <TraceCollapsible open={open} onOpenChange={onOpenChange}>
         <TraceCollapsibleTrigger aria-label={title}>
-          <TraceLine status="running">
+          {/* 思考期行占满固定宽（max-w-[80%]）：流式文本在固定宽度内截左保右，
+              右侧时长不再随吐字左右晃（2026-11-20 用户反馈）；工具期行回到 w-fit
+              跟随内容。 */}
+          <TraceLine status="running" className={open || thinkingLine ? "w-full max-w-[80%]" : undefined}>
             <TraceIcon>
               {toolCategory !== undefined
                 ? <ToolCategoryIcon category={toolCategory} active={open} />
                 : <LayersIcon className="size-3.5" />}
             </TraceIcon>
-            {thinkingLine
+            {thinkingLine && !open
               ? // 思考行截左保右（2026-11-20 用户拍板）：流式文本最新字在末尾，
                 // 宽度不够时省略开头（…789），末尾始终可见。direction:rtl 把溢出
                 // 与省略号赶到左侧，unicode-bidi:plaintext 保住行内 LTR 顺序。
-                <TraceTitle className="truncate text-left" style={{ direction: "rtl", unicodeBidi: "plaintext" }}>{thinkingLine}</TraceTitle>
-              : <TraceTitle className="truncate">{title}</TraceTitle>}
+                <TraceTitle className="flex-1 truncate text-left" style={{ direction: "rtl", unicodeBidi: "plaintext" }}>{thinkingLine}</TraceTitle>
+              : <TraceTitle className="flex-1 truncate text-left">{title}</TraceTitle>}
             {diffStat && (
               <TraceDescription>
                 <span className="text-success">+{diffStat.added}</span>{" "}
@@ -143,6 +151,11 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
         <TraceCollapsibleContent className="flex flex-col gap-2">
           <Trace>
             {children}
+            {/* 正在流式的思考也进展开体（2026-11-20 用户反馈“展开后没有思考行”）:
+                它同时是折叠标题；落盘的思考行由 children 的 TurnActivityBody 出。 */}
+            {streamingThinking && lastStreamingBlock?.type === "thinking" && (
+              <ReasoningTrace block={lastStreamingBlock as ThinkingContent} blockIndex={-1} active />
+            )}
             {streamingTools.map((block) => (
               <ToolRow
                 key={`streaming-${block.toolCallId ?? block.toolName}`}

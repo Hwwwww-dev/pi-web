@@ -81,22 +81,29 @@ test("the live turn fold titles itself with the latest tool while collapsed", ()
   assert.doesNotMatch(html, /Worked for/);
 });
 
-test("the live turn fold keeps the latest-tool title when expanded", () => {
+test("the expanded live fold titles itself Working and lists activity in the body", () => {
   setToolCallExpanded("process:live-open", true);
   const block = call("bash", { command: "npm test" });
+  const store = createStreamingStore();
+  const thinking = { type: "thinking", thinking: "跑测试前的推敲" };
+  store.dispatch({ type: "snapshot", message: { role: "assistant", content: [thinking] } });
   const html = render(React.createElement(
     LiveTurnTrace,
     {
       items: [liveToolItem(block, undefined)],
       startTs: Date.now() - 65_000,
       foldKey: "process:live-open",
+      store,
+      mergeStreaming: true,
     },
-    React.createElement("div"),
+    React.createElement(TurnActivityBody, { items: [liveToolItem(block, undefined)] }),
   ));
   clearExpandedToolCalls();
-  // 跑的时候折叠行始终显示单行最新动作（2026-11-20：不再在展开态切回
-  // “工作了 x”秒表）；展开的是体，不是标题。
-  assert.match(html, /Ran<!-- --> <!-- -->npm test|>Ran npm test</);
+  // 展开态标题固定为「工作中」（2026-11-20 用户拍板），体内列全部活动：
+  // 已落盘的工具行（children 的 TurnActivityBody）+ 流式中的思考行。
+  assert.match(html, /Working/);
+  assert.match(html, /npm test/);
+  assert.match(html, /data-activity="thinking"/);
   assert.doesNotMatch(html, /Worked for/);
 });
 
