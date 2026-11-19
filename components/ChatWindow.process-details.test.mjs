@@ -58,6 +58,16 @@ test("the settled fold takes over the live fold's state and starts collapsed onc
   );
 });
 
+test("the settled fold summary shows duration, four buckets and failures — never 处理详情", () => {
+  // 结算段标题（2026-11-20 用户确认）：工作了 X · N 个读取 · N 个编辑 · N 个
+  // 运行 · N 个子代理 · N 个失败（非零才显示）；时长取首尾 ts，取不到累计条目
+  // duration 兑底；「处理详情」兑底废除。
+  assert.match(source, /segBuckets = \{ read: 0, edit: 0, run: 0, subagent: 0 \}/);
+  assert.match(source, /t\("chat\.activity\.categoryCount", \{ count, label: t\(labelKey\) \}\)/);
+  assert.match(source, /t\("chat\.activity\.failedCount", \{ count: segFailed \}\)/);
+  assert.doesNotMatch(source, /processDetails/);
+});
+
 test("passes a grouped turn's MessageViews the same copies on every render (#1005)", async () => {
   // Fresh copies per render re-ran every visible answer's markdown on each
   // chat update, e.g. on every key typed into an extension's custom panel.

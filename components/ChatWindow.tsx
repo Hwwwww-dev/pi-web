@@ -9,7 +9,7 @@ import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExte
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { isHiddenCustomMessage, isMessageGroupAnchor, liveOutputPreview, LIVE_OUTPUT_PREVIEW_LINES, splitFinalAssistantBlocks } from "@/lib/message-display";
-import { getToolCategory, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
+import { getToolCategory } from "@/lib/tool-categories";
 import { buildTurnActivityItems, getFinishedTurnView, headSegmentEndsTurn, splitTurnParts } from "@/lib/turn-view";
 import { SafeMarkdownBody } from "./SafeMarkdownBody";
 import { type WrittenFile } from "@/lib/turn-written-files";
@@ -1769,17 +1769,21 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                     </div>
                   );
                 }
-                const segCounts = new Map<ToolCategory, number>();
-                for (const item of part.items) {
-                  if (item.kind === "tool") {
-                    const category = getToolCategory(item.block.toolName);
-                    segCounts.set(category, (segCounts.get(category) ?? 0) + 1);
-                  }
-                }
-                const segCategorySummary = [...segCounts.entries()]
-                  .map(([category, count]) => `${count} ${t(TOOL_CATEGORY_LABEL_KEYS[category])}`)
-                  .join(" · ");
+                // 结算段摘要（2026-11-20 用户确认）：时长 + 四大类计数（读取=
+                // view/search/web，编辑=edit/write/patch，运行=终端，子代理）+
+                // 失败数，非零才显示；时长取首尾活动时间戳之差，取不到时累计
+                // 条目自身 duration（thinking 秒、tool 毫秒）。plan/compact/other
+                // 不进摘要（太碎）；「处理详情」兑底废除，纯思考段兑底思考标签。
+                const segBuckets = { read: 0, edit: 0, run: 0, subagent: 0 };
                 const segFailed = part.items.filter((item) => item.kind === "tool" && item.result?.isError).length;
+                for (const item of part.items) {
+                  if (item.kind !== "tool") continue;
+                  const category = getToolCategory(item.block.toolName);
+                  if (category === "terminal") segBuckets.run += 1;
+                  else if (category === "edit") segBuckets.edit += 1;
+                  else if (category === "subagent") segBuckets.subagent += 1;
+                  else if (category === "view" || category === "search" || category === "web") segBuckets.read += 1;
+                }
                 let segFirstTs: number | undefined;
                 let segLastTs: number | undefined;
                 for (const item of part.items) {
@@ -1790,13 +1794,27 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 const segWorkedFor = segFirstTs !== undefined && segLastTs !== undefined && segLastTs > segFirstTs
                   ? formatTurnDuration(segLastTs - segFirstTs)
                   : undefined;
-                const segSummary = segWorkedFor
-                  ? (segFailed > 0
-                    ? t("chat.activity.workedForFailed", { duration: segWorkedFor, count: segFailed })
-                    : t("chat.activity.workedFor", { duration: segWorkedFor }))
-                  : segCategorySummary
-                    ? `${t("chat.processDetails")} · ${segCategorySummary}`
-                    : t("chat.processDetails");
+                const segDurationSum = part.items.reduce(
+                  (acc, item) => item.kind === "thinking"
+                    ? acc + (item.duration ?? 0) * 1000
+                    : item.kind === "tool" ? acc + (item.duration ?? 0) : acc,
+                  0,
+                );
+                const segSummaryParts: string[] = [];
+                if (segWorkedFor) segSummaryParts.push(t("chat.activity.workedFor", { duration: segWorkedFor }));
+                else if (segDurationSum > 0) segSummaryParts.push(t("chat.activity.workedFor", { duration: formatTurnDuration(segDurationSum) }));
+                for (const [count, labelKey] of [
+                  [segBuckets.read, "chat.toolCategory.view"],
+                  [segBuckets.edit, "chat.toolCategory.edit"],
+                  [segBuckets.run, "chat.trace.ranLabel"],
+                  [segBuckets.subagent, "chat.toolCategory.subagent"],
+                ] as const) {
+                  if (count > 0) segSummaryParts.push(t("chat.activity.categoryCount", { count, label: t(labelKey) }));
+                }
+                if (segFailed > 0) segSummaryParts.push(t("chat.activity.failedCount", { count: segFailed }));
+                const segSummary = segSummaryParts.length > 0
+                  ? segSummaryParts.join(" · ")
+                  : t("i18n.thinking");
                 return (
                   <TurnTrace
                     key={`turn-fold-${processKey ?? userIdx}-${partIdx}`}

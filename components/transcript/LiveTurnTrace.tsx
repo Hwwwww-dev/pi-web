@@ -7,6 +7,7 @@ import {
   TraceCollapsible,
   TraceCollapsibleContent,
   TraceCollapsibleTrigger,
+  TraceDescription,
   TraceIcon,
   TraceLine,
   TraceTitle,
@@ -17,7 +18,7 @@ import { createStreamingStore, type StreamingStore } from "@/lib/streaming-messa
 import { formatTurnDuration } from "@/lib/turn-duration";
 import { toToolView } from "@/lib/tool-view";
 import type { ActivityItem } from "@/lib/turn-view";
-import type { ToolCallContent, ToolResultMessage } from "@/lib/types";
+import type { ThinkingContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
 import { ToolRow } from "../ActivityRows";
 import { useTraceFold } from "./TraceRow";
 
@@ -57,64 +58,76 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
   );
   const lastStreamingBlock = streamingBlocks.length > 0 ? streamingBlocks[streamingBlocks.length - 1] : undefined;
 
-  // 标题的最新动作：先看正在流式的工具（它最新），没有再看已落盘的活动行。
-  const latestToolTitle = (() => {
+  // 标题的最新活动：先看正在流式的工具（它最新），没有再看已落盘的活动行。
+  // 工具行显示“动作 + 对象”（如“运行 npm test”），命令在开始流式时就出现；
+  // 编辑附变更数（+N −M），显示在右侧时长旁边。
+  const latestToolView = (() => {
     if (streamingTools.length > 0) {
-      const view = toToolView({ block: streamingTools[streamingTools.length - 1], t });
-      return view.object ? `${view.title} ${view.object}` : view.title;
+      return toToolView({ block: streamingTools[streamingTools.length - 1], t });
     }
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
       if (item.kind === "tool") {
         // 与 TraceRow 的行读法一致：动作 + 对象（如“运行 npm test”），
         // 只看标题的话所有终端工具都是同一个“运行”。
-        const view = toToolView({ block: item.block, result: item.result, t });
-        return view.object ? `${view.title} ${view.object}` : view.title;
+        return toToolView({ block: item.block, result: item.result, t });
       }
     }
     return undefined;
   })();
+  const toolTitle = latestToolView === undefined
+    ? undefined
+    : latestToolView.object
+      ? `${latestToolView.title} ${latestToolView.object}`
+      : latestToolView.title || undefined;
+  const diffStat = latestToolView?.diffStat;
 
   // 思考进行中（流式末块是 thinking，或已落盘的最后一行是思考且没有更新的
-  // 流式块）：标题切“思考+秒表”（2026-11-20 用户确认），首条 assistant 条目
-  // 还没落盘时这是折叠行唯一的内容。已落盘的思考行用自身时长，不再走秒表。
+  // 流式块）：标题显示思考的最新一行——流式文本在增长，末行随之更新，视觉
+  // 上即打字机（2026-11-20 用户确认）；时长不再拼进标题，常驻右侧。首条
+  // assistant 条目还没落盘时这是折叠行唯一的内容。
   const streamingThinking = streamingTools.length === 0 && lastStreamingBlock?.type === "thinking";
   const lastItem = items.at(-1);
   const landedThinking = lastItem?.kind === "thinking" ? lastItem : undefined;
+  const thinkingLine = (() => {
+    const text = streamingThinking
+      ? (lastStreamingBlock as ThinkingContent).thinking
+      : landedThinking?.block.thinking;
+    if (!text) return undefined;
+    const lines = text.split("\n").filter((line) => line.trim() !== "");
+    return lines.at(-1);
+  })();
 
-  // 秒表走动的场景：展开态、还没有任何工具标题、或思考正在流式。
-  const showElapsed = open || latestToolTitle === undefined || streamingThinking;
-
-  // 展开态（或还没有任何工具时）标题走秒表：起点用 pi 的时间戳，走动的一端
-  // 只能取浏览器时钟——跨机时钟偏差由产品决策接受（旧“全程只用 pi 时钟”的
-  // 规则仅对完成态时长保留）。回合结束组件即卸载，定时器随之清理。
+  // 秒表常驻右侧（2026-11-20）：内容没撑满时跟在标题后面，撑满时标题压缩、
+  // 时长钉在右端（TraceLine 的 w-fit / max-w-full + TraceTitle truncate 实现）。
+  // 起点用 pi 的时间戳，走动的一端只能取浏览器时钟——跨机时钟偏差由产品决策
+  // 接受。回合结束组件即卸载，定时器随之清理。
   const [elapsedMs, setElapsedMs] = useState(() => Math.max(0, Date.now() - (startTs ?? Date.now())));
   useEffect(() => {
-    if (!showElapsed) return;
     const tick = () => setElapsedMs(Math.max(0, Date.now() - (startTs ?? Date.now())));
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [showElapsed, startTs]);
+  }, [startTs]);
 
-  const thinkingTitle = streamingThinking
-    ? `${t("i18n.thinking")} ${formatTurnDuration(elapsedMs)}`
-    : landedThinking
-      ? `${t("i18n.thinking")} ${formatTurnDuration((landedThinking.duration ?? 0) * 1000)}`
-      : undefined;
-  const title = streamingThinking || (latestToolTitle === undefined && thinkingTitle !== undefined)
-    ? thinkingTitle
-    : latestToolTitle ?? t("chat.activity.workedFor", { duration: formatTurnDuration(elapsedMs) });
+  const title = thinkingLine ?? toolTitle ?? t("chat.activity.workedFor", { duration: formatTurnDuration(elapsedMs) });
 
   return (
     <Trace data-activity="turn">
       <TraceCollapsible open={open} onOpenChange={onOpenChange}>
         <TraceCollapsibleTrigger aria-label={title}>
-          <TraceLine>
+          <TraceLine status="running">
             <TraceIcon>
               <LayersIcon className="size-3.5" />
             </TraceIcon>
-            <TraceTitle>{title}</TraceTitle>
+            <TraceTitle className="truncate">{title}</TraceTitle>
+            {diffStat && (
+              <TraceDescription>
+                <span className="text-success">+{diffStat.added}</span>{" "}
+                <span className="text-destructive">−{diffStat.removed}</span>
+              </TraceDescription>
+            )}
+            <TraceDescription>{formatTurnDuration(elapsedMs)}</TraceDescription>
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="flex flex-col gap-2">

@@ -100,18 +100,20 @@ test("the live turn fold keeps the latest-tool title when expanded", () => {
   assert.doesNotMatch(html, /Worked for/);
 });
 
-test("the live turn fold titles thinking with the stopwatch until a tool starts", () => {
+test("the live turn fold titles thinking with its latest line, duration at the end", () => {
   clearExpandedToolCalls();
   const store = createStreamingStore();
-  const thinking = { type: "thinking", thinking: "想第一步…" };
+  const thinking = { type: "thinking", thinking: "想第一步…\n第二步验证假设" };
   store.dispatch({ type: "snapshot", message: { role: "assistant", content: [thinking] } });
-  // 首条 assistant 条目落盘前的思考期：标题“思考+秒表”（起点为锚点时间戳，
-  // 静态渲染取初始 elapsed），工具/回复出现后切走。
+  // 思考期标题 = 思考的最新一行（流式增长即打字机，2026-11-20 用户确认），
+  // 时长常驻右侧不再拼进标题。
   const html = render(React.createElement(
     LiveTurnTrace,
     { items: [], startTs: Date.now() - 12_000, foldKey: "process:live-thinking", store, mergeStreaming: true },
   ));
-  assert.match(html, /思考<!-- --> 12s|>思考 12s<|>Thinking<!-- --> 12s<|>Thinking 12s</);
+  assert.match(html, /第二步验证假设/);
+  assert.doesNotMatch(html, /思考.*12s|Thinking.*12s/);
+  assert.match(html, />12s</);
 });
 
 test("a live turn without any tool yet shows the worked-for title even collapsed", () => {
