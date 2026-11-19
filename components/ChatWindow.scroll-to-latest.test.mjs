@@ -19,9 +19,9 @@ test("the official scroller owns following, prepend anchoring and the bottom edg
   // 顶出视口。行窗口与手工前插保位都已删除，因此这里不能再有自己的跟随状态机。
   assert.match(source, /<MessageScrollerProvider autoScroll=\{agentRunning\} defaultScrollPosition="end" scrollEdgeThreshold=\{scrollEdgeThreshold\}>/);
   // 阈值同时就是吸附范围（库在范围内会把模式续回 following-bottom 并跟到底）。
-  // 100px 约一行：把最后一条滑到输入条上方时不算贴底，往上翻的人不会被拽回；
-  // 内容末端那层 167–169px 的垫底不进吸附区。
-  assert.match(source, /const scrollEdgeThreshold = 100;/);
+  // 48px（业界跟随派 4–40px 的上限档）：往上翻更容易放走；流式吸收靠显式
+  // scrollToEnd 与插入前的贴底判定，不靠阈值。167–169px 的垫底不进吸附区。
+  assert.match(source, /const scrollEdgeThreshold = 48;/);
   // 尾部新增行的补滚用「插入之前」的贴底状态（atBottomRef，由滚动监听维护）：
   // 插入之后再量距离，量到的就是新气泡自己的高度，越长的消息越不会跟。
   assert.match(source, /lastRowKeyRef[\s\S]{0,1600}?if \(!atBottomRef\.current\) return;[\s\S]{0,300}?scrollerApiRef\.current\?\.scrollToEnd\(\{ behavior: "instant" \}\)[\s\S]{0,200}?startFollowSettle\(\);/);

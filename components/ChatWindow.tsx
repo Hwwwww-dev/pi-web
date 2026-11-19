@@ -148,7 +148,7 @@ interface Props {
   onAgentEnd?: (end: AgentEndInfo) => void;
   onSessionEnded?: (sessionId: string) => void;
   onToolEnd?: (toolName: string) => void;
-  onAttentionNeeded?: (request: BlockingExtensionUiRequest) => void;
+  onAttentionNeeded?: (request: BlockingExtensionUiRequest, ownerSessionId?: string | null) => void;
   onSessionCreated?: (session: SessionInfo, sourceDraftKey: string) => void;
   onSessionForked?: (newSessionId: string) => void;
   /** A subagent's or side chat's tab beside the main chat: the page's global shortcuts stay with the main chat. */
@@ -1881,11 +1881,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   /**
    * 贴底判定的距离阈值。这个值同时是「吸附范围」：库在 `autoScroll` 打开时只要
    * 判成贴底，就把滚动模式续回 following-bottom，读者在范围内往上翻会被拽回。
-   * 取 100px 约一行，够吸收一帧流式增量，又不至于把往上翻的人拽回；内容末端那层
-   * `--composer-dock-h` 垫底（实测 167–169px）不进吸附区——输入条盖住的那一段
-   * 不是读者看到的底。
+   * 取 48px（业界跟随派 4–40px 的上限档）：流式单帧增量只有几十像素，显式
+   * scrollToEnd 与插入前的贴底判定已经负责跟随，阈值只需要给“往上翻就放走”
+   * 留出一次有意图滚动的宽度；内容末端那层 `--composer-dock-h` 垫底（实测
+   * 167–169px，只会更高）不进吸附区——输入条盖住的那一段不是读者看到的底。
    */
-  const scrollEdgeThreshold = 100;
+  const scrollEdgeThreshold = 48;
   /**
    * 空闲时的尾部追加要自己补一次滚到底：`autoScroll` 只在 agent 运行时打开，
    * 空闲期库的滚动模式恒为 `free-scrolling`，发送出去的新气泡因此落在视口外，
