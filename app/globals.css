@@ -2,6 +2,9 @@
 @import "yet-another-react-lightbox/styles.css";
 @import "tailwindcss";
 @import "tw-animate-css";
+/* Editor palettes (VS Code, GitHub, ...): `html[data-theme]` blocks that beat
+   :root and .dark on specificity. */
+@import "./themes.css";
 /* MiSans 为可选字体：默认字体栈用 Geist + 系统字体（中文落到苹方/雅黑），
    想要 MiSans 在设置 › Fonts 里把字体名填 "MiSans" 即可。这里保留全部
    字重的 @font-face 声明，否则手动填的字体名没有字形可用。unicode-range
@@ -1630,7 +1633,9 @@ span.token.table {
   --beam-bloom-opacity: 2.6;
   --beam-inner-opacity: 1.8;
 }
-[data-theme="light"] .chat-composer-beam {
+/* Keyed on the .dark class, not a theme id: every palette is either light or
+   dark, and applyDomTheme sets the class for all of them. */
+:root:not(.dark) .chat-composer-beam {
   --beam-stroke-opacity: 6;
   --beam-bloom-opacity: 3;
   --beam-inner-opacity: 2.4;
@@ -1756,7 +1761,7 @@ span.token.table {
   animation: tps-rainbow-slide linear infinite;
   will-change: transform;
 }
-[data-theme="dark"] .tps-rainbow {
+html.dark .tps-rainbow {
   --tps-rainbow-l: 0.55;
   --tps-rainbow-c: 0.22;
 }

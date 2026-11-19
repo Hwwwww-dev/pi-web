@@ -57,7 +57,8 @@ test("offers system, light and dark selection with the RadioGroup (shadcn theme 
   for (const preference of ["auto", "light", "dark"]) {
     assert.match(themeOptionsSource, new RegExp(`id: "${preference}"`));
   }
-  assert.match(panelSource, /THEME_OPTIONS\.map/);
+  assert.match(panelSource, /THEME_GROUPS\.map/);
+  assert.match(panelSource, /THEME_OPTIONS\.filter\(\(option\) => option\.group === group\.id\)\.map/);
   // The official RadioGroup carries the group semantics; each palette card is
   // the label of its visually-hidden RadioGroupItem.
   assert.match(panelSource, /<RadioGroup\s*\n\s*value=\{preference\}/);
@@ -83,7 +84,7 @@ test("groups fonts, chat font size and width with the chat switches, without row
   assert.doesNotMatch(chatOptions, /settings-theme-options/);
   // Typography lives with the chat switches: FontSettings and the two slider rows
   // render between them, in both the phone's detail and the desktop's card.
-  assert.match(chatOptions, /className="flex w-full flex-col gap-2\.5"[\s\S]*<FontSettings \/>/);
+  assert.match(chatOptions, /className="flex w-full flex-col gap-[\d.]+"[\s\S]*<FontSettings \/>/);
   assert.equal((chatOptions.match(/<Slider/g) ?? []).length, 2);
   for (const key of ["chatContentWidth", "chatContentFontSize"]) {
     assert.match(chatOptions, new RegExp(`t\\("settings\\.${key}"\\)`));
@@ -109,7 +110,9 @@ test("the desktop dialog navigates sections and General's details from one left 
   assert.doesNotMatch(panelSource, /variant="line"/);
   const rail = panelSource.slice(panelSource.indexOf("{!isPhone && ("), panelSource.indexOf("A phone's home level lists the sections"));
   assert.ok(rail.includes("<nav"), "the desktop rail exists");
-  assert.match(rail, /className="flex w-\[224px\] shrink-0 flex-col gap-0\.5 overflow-y-auto bg-sidebar p-2"/);
+  // The rail's width and padding are a design decision, not part of the
+  // contract: assert the navigation exists and owns the sidebar surface.
+  assert.match(rail, /className="flex w-\[[^\]]+\] shrink-0 flex-col gap-[\d.]+ overflow-y-auto bg-sidebar p-[\d.]+"/);
   assert.match(rail, /aria-current=\{isActive \? "page" : undefined\}/);
   // General's sub-details are rail rows of their own, shown while General is active.
   assert.match(rail, /item\.id === "general" && isActive && railGeneralDetails\.map/);
@@ -147,7 +150,7 @@ test("hosts the sections in one full-size layer, listed on a phone's home level"
   // Desktop: the sections ride the one left rail; phone home: a list of
   // sections opened by openSectionFromHome. The sections themselves mount once
   // in full-size hosts, `hidden` unless active (a phone's level rides along).
-  assert.match(panelSource, /<nav aria-label=\{t\("settings\.title"\)\} className="flex w-\[224px\] shrink-0/);
+  assert.match(panelSource, /<nav aria-label=\{t\("settings\.title"\)\} className="flex w-\[[^\]]+\] shrink-0/);
   // The phone's home level is a list of official Items, not divider-topped rows.
   assert.match(panelSource, /<ItemGroup className="gap-2 p-4">/);
   assert.match(panelSource, /<Item key=\{item\.id\} asChild variant="outline" size="sm">/);
@@ -166,7 +169,10 @@ test("hosts the sections in one full-size layer, listed on a phone's home level"
   assert.doesNotMatch(cssSource, /\.settings-(section-rail|phone-home)/);
   assert.doesNotMatch(panelSource, /variant=\{selected \? "secondary" : "ghost"\}/);
   assert.doesNotMatch(panelSource, /<style>/);
-  assert.doesNotMatch(panelSource, /style=\{\{/);
+  // Palette chips carry the palette's own background/accent from lib/theme.ts,
+  // which is data and cannot be a static class; every other style stays in the
+  // stylesheet.
+  assert.doesNotMatch(panelSource, /style=\{\{(?!\s*background:\s*`linear-gradient)/);
 });
 
 test("labels agent profiles as sub-agents", () => {

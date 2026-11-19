@@ -322,7 +322,7 @@ export function ConfigDetailStack({ className, ...props }: HTMLAttributes<HTMLDi
   return (
     <div
       {...props}
-      className={cn("flex w-full min-w-0 flex-col gap-4", className)}
+      className={cn("flex w-full min-w-0 flex-col gap-5", className)}
     />
   );
 }
@@ -385,7 +385,7 @@ export function ConfigCard({
 }) {
   const hasHeader = title !== undefined || actions !== undefined || description !== undefined;
   return (
-    <Card className={cn("gap-4 py-5", className)}>
+    <Card className={cn("gap-5 py-6", className)}>
       {hasHeader && (
         <CardHeader>
           {title !== undefined && <CardTitle className="text-base">{title}</CardTitle>}
@@ -393,7 +393,7 @@ export function ConfigCard({
           {actions !== undefined && <CardAction>{actions}</CardAction>}
         </CardHeader>
       )}
-      {children !== undefined && <CardContent className="flex flex-col gap-4">{children}</CardContent>}
+      {children !== undefined && <CardContent className="flex flex-col gap-5">{children}</CardContent>}
       {footer !== undefined && <CardFooter className="justify-start">{footer}</CardFooter>}
     </Card>
   );
@@ -913,7 +913,7 @@ export function ConfigDetail({ children, style, className }: { children: ReactNo
   return (
     <div
       className={cn(
-        "min-h-0 min-w-0 flex-1 overflow-y-auto p-6 text-sm leading-relaxed",
+        "min-h-0 min-w-0 flex-1 overflow-y-auto p-8 text-sm leading-relaxed",
         "max-[640px]:p-4",
         // Inside Settings a phone shows one pane at a time: the list hides its detail.
         pane === "list" && "max-[640px]:hidden",

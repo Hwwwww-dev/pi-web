@@ -167,7 +167,7 @@ export function AppShell() {
   const [initialNavigation, setInitialNavigation] = useState(() => getInitialNavigation(searchParams));
   // The system-theme subscription stays mounted for the app's lifetime; the
   // header's light/dark pill writes through the same hook.
-  const { theme, toggleThemePreference } = useTheme();
+  const { isDark, toggleThemePreference } = useTheme();
   // Restore fonts even when Settings and the chat composer have not been opened.
   useFontPreferences();
   const { locale, t: translate } = useI18n();
@@ -2298,7 +2298,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 title={translate("settings.appearance")}
                 className="gap-2"
               >
-                {theme === "dark"
+                {isDark
                   ? <SunIcon className="size-3.5 shrink-0" strokeWidth={2} />
                   : <MoonIcon className="size-3.5 shrink-0" strokeWidth={2} />}
                 <span className="min-w-0 flex-1">{translate("settings.appearance")}</span>

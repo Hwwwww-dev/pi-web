@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useTheme, type ThemePreference } from "@/hooks/useTheme";
-import { THEME_OPTIONS } from "@/lib/theme";
+import { THEME_GROUPS, THEME_OPTIONS } from "@/lib/theme";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "./ui/field";
@@ -288,37 +288,38 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   // behind its own list (the three-level stack); the desktop stacks them as
   // Cards in the scrolling body (§4.4).
   const themeGroup = (
-    <RadioGroup
-      value={preference}
-      onValueChange={(value) => setThemePreference(value as ThemePreference)}
-      aria-label={t("settings.appearance")}
-      className="grid w-full grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2"
-    >
-      {THEME_OPTIONS.map((option) => {
-        return (
-          <label
-            key={option.id}
-            data-theme-option={option.id}
-            className="relative inline-flex h-8 min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-xs leading-none text-foreground transition-colors hover:bg-accent/50 has-[[data-state=checked]]:border-foreground has-[[data-state=checked]]:ring-[1px] has-[[data-state=checked]]:ring-foreground has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-accent/50"
+    <div className="flex w-full flex-col gap-5">
+      {THEME_GROUPS.map((group) => (
+        <div key={group.id} className="flex w-full flex-col gap-2">
+          <div className="text-xs font-semibold text-muted-foreground">{t(group.label)}</div>
+          <RadioGroup
+            value={preference}
+            onValueChange={(value) => setThemePreference(value as ThemePreference)}
+            aria-label={t(group.label)}
+            className="grid w-full grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-2"
           >
-            {/* The Radix radio carries the group's semantics (roving focus,
-                arrow keys); the palette card stays the visual. */}
-            <RadioGroupItem value={option.id} className="sr-only" />
-            {/* The palettes' own backgrounds, not tokens of the running theme. */}
-            <span
-              aria-hidden="true"
-              className={cn(
-                "size-3.5 shrink-0 rounded-full border border-border",
-                option.id === "auto" && "bg-[linear-gradient(90deg,#ffffff_50%,#1a1a1a_50%)]",
-                option.id === "light" && "bg-white",
-                option.id === "dark" && "bg-[#1a1a1a]",
-              )}
-            />
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{t(option.label)}</span>
-          </label>
-        );
-      })}
-    </RadioGroup>
+            {THEME_OPTIONS.filter((option) => option.group === group.id).map((option) => (
+              <label
+                key={option.id}
+                data-theme-option={option.id}
+                className="relative inline-flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-xs leading-none text-foreground transition-colors hover:bg-accent/50 has-[[data-state=checked]]:border-foreground has-[[data-state=checked]]:ring-[1px] has-[[data-state=checked]]:ring-foreground has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-accent/50"
+              >
+                {/* The Radix radio carries the group's semantics (roving focus,
+                    arrow keys); the palette card stays the visual. */}
+                <RadioGroupItem value={option.id} className="sr-only" />
+                {/* Each palette's own colours, never tokens of the running theme. */}
+                <span
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 rounded-full border border-border"
+                  style={{ background: `linear-gradient(90deg, ${option.swatch[0]} 50%, ${option.swatch[1]} 50%)` }}
+                />
+                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{t(option.label)}</span>
+              </label>
+            ))}
+          </RadioGroup>
+        </div>
+      ))}
+    </div>
   );
   const builtinToolsBlock = shellSettings ? (
     <>
@@ -341,7 +342,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
     </>
   ) : null;
   const chatOptions = (
-    <div className="flex w-full flex-col gap-2.5">
+    <div className="flex w-full flex-col gap-3.5">
       <Field orientation="horizontal">
         <FieldContent>
           <FieldLabel className={rowLabelClass}>{t("settings.thinkingExpandedDefault")}</FieldLabel>
@@ -470,7 +471,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   );
   // The keep-alive rows sit flat in the chat detail (its own sub-section).
   const keepAliveBlock = (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-3.5">
       <p className="m-0 text-sm leading-relaxed text-muted-foreground">{t("settings.keepAliveDescription")}</p>
       <Field orientation="horizontal">
         <FieldLabel htmlFor="settings-keepalive-max-sessions" className={rowLabelClass}>{t("settings.keepAliveMaxSessions")}</FieldLabel>
@@ -794,8 +795,8 @@ export function SettingsPanel({
     { id: "push", label: t("settings.pushPermission") },
     { id: "language", label: t("common.language") },
   ];
-  const railItemClass = "flex h-9 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm font-normal text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50";
-  const railItemSubClass = cn(railItemClass, "h-8 pl-8 text-xs text-muted-foreground");
+  const railItemClass = "flex h-10 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-normal text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50";
+  const railItemSubClass = cn(railItemClass, "h-9 pl-9 text-sm text-muted-foreground");
   const railItemActiveClass = "bg-sidebar-accent font-medium text-sidebar-accent-foreground";
   const phone = usePhoneSettingsLevel(isPhone, openAtHome);
   const { dropHistory, enter: enterPhoneLevel, goUp: goUpPhoneLevel, levelRef: phoneLevelRef } = phone;
@@ -889,7 +890,7 @@ export function SettingsPanel({
           // plain rules own the whole phone geometry) instead of filling the
           // screen flat, so the rounded frame and border stay everywhere.
           "settings-card-safe z-(--z-modal) flex flex-col gap-0 overflow-hidden p-0",
-          "h-[84vh] max-h-[calc(100dvh-16px)] w-[min(1080px,calc(100vw-16px))] max-w-none sm:max-w-none rounded-xl",
+          "h-[84vh] max-h-[calc(100dvh-16px)] w-[min(1160px,calc(100vw-16px))] max-w-none sm:max-w-none rounded-xl",
         )}
       >
         <DialogTitle className="sr-only">{t("settings.title")}</DialogTitle>
@@ -925,12 +926,12 @@ export function SettingsPanel({
             {/* 桌面左列：唯一的一层导航。分区与通用子项同列，选中通用时其子项
                 内联展开——替代顶排 Tabs 与 General 自己的第二层列表。 */}
             {!isPhone && (
-              <nav aria-label={t("settings.title")} className="flex w-[224px] shrink-0 flex-col gap-0.5 overflow-y-auto bg-sidebar p-2">
+              <nav aria-label={t("settings.title")} className="flex w-[264px] shrink-0 flex-col gap-1 overflow-y-auto bg-sidebar p-3">
                 {sections.map((item) => {
                   const disabled = item.requiresProject && !cwd;
                   const isActive = section === item.id;
                   return (
-                    <div key={item.id} className="flex min-w-0 flex-col gap-0.5">
+                    <div key={item.id} className="flex min-w-0 flex-col gap-1">
                       <button
                         type="button"
                         disabled={disabled}
@@ -939,7 +940,7 @@ export function SettingsPanel({
                         onClick={() => activateSection(item.id)}
                         className={cn(railItemClass, isActive && railItemActiveClass)}
                       >
-                        <SettingsSectionIcon section={item.id} size={15} />
+                        <SettingsSectionIcon section={item.id} size={16} />
                         <span className="min-w-0 truncate">{item.label}</span>
                       </button>
                       {item.id === "general" && isActive && railGeneralDetails.map((sub) => (

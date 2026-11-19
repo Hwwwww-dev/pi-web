@@ -885,7 +885,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const { t } = useI18n();
   // The running composer's beam picks its palette from the page's theme, not
   // from the system preference the component falls back to.
-  const { theme } = useTheme();
+  const { isDark } = useTheme();
   const { fontSize } = useChatAppearance();
   const { ui: uiFontFamily, uiWeight } = useFontPreferences();
   const isMobile = useIsMobile();
@@ -2642,7 +2642,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             strength={0.7}
             duration={BEAM_BASE_SECONDS}
             borderRadius={compact ? 18 : 24}
-            theme={theme === "dark" ? "dark" : "light"}
+            theme={isDark ? "dark" : "light"}
             className="chat-composer-beam min-w-0"
             // The component's own `overflow: hidden` would clip this card's
             // focus ring; the beam clips itself with its own clip-path.
