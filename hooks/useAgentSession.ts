@@ -250,7 +250,8 @@ export interface UseAgentSessionOptions {
   onSessionEnded?: (sessionId: string) => void;
   /** A top-level tool call finished; the files it touched may have changed. */
   onToolEnd?: (toolName: string) => void;
-  onAttentionNeeded?: (request: BlockingExtensionUiRequest) => void;
+  /** A blocking request arrived; `ownerSessionId` is the session whose stream raised it (background slots included). */
+  onAttentionNeeded?: (request: BlockingExtensionUiRequest, ownerSessionId?: string | null) => void;
   onSessionCreated?: (session: SessionInfo, sourceDraftKey: string) => void;
   onSessionForked?: (newSessionId: string) => void;
   /** `/side`: a side chat was forked from this session; open its tab. The
@@ -1886,7 +1887,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     [],
   );
   const handleExtensionUiRequest = useCallback((request: ExtensionUiRequest) => {
-    if (isBlockingExtensionUiRequest(request)) onAttentionNeeded?.(request);
+    if (isBlockingExtensionUiRequest(request)) onAttentionNeeded?.(request, requestOwnerSessionId());
 
     switch (request.method) {
       case "select":

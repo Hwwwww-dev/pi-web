@@ -16,8 +16,9 @@ function callbackBody(name, endAnchor) {
   return source.slice(start, end);
 }
 
-function runHandleAgentEnd({ end, selectedSession, attention }) {
+function runHandleAgentEnd({ end, selectedSession, attention, sessions = [] }) {
   const notifications = [];
+  const toasts = [];
   const context = vm.createContext({
     useCallback: (callback) => callback,
     setRefreshKey: () => {},
@@ -27,6 +28,8 @@ function runHandleAgentEnd({ end, selectedSession, attention }) {
     isHiddenRelation,
     shouldShowBrowserNotification: () => attention,
     deliverSessionNotification: (notice) => notifications.push(notice),
+    showSessionEventToast: (session, kind, message) => toasts.push({ session, kind, message }),
+    latestSessionsRef: { current: sessions },
     translate: (key) => key,
     hiddenFinishedSessionIds: new Set(),
     setHiddenFinishedSessionIds: (updater) => {
@@ -38,7 +41,7 @@ function runHandleAgentEnd({ end, selectedSession, attention }) {
     context,
   );
   context.handleAgentEnd(end);
-  return { notifications, hiddenFinishedSessionIds: context.hiddenFinishedSessionIds };
+  return { notifications, toasts, hiddenFinishedSessionIds: context.hiddenFinishedSessionIds };
 }
 
 test("a selected session that finishes while the tab is hidden badges the favicon (#1484)", () => {
@@ -51,10 +54,24 @@ test("a selected session that finishes while the tab is hidden badges the favico
   assert.equal(notifications.length, 1, "the browser Notification still fires");
   assert.deepEqual([...hiddenFinishedSessionIds], ["open"], "kept for the favicon until the tab opens");
 
-  // The same finish while looking leaves no badge behind.
+  // The same finish while looking leaves no badge and no system notification.
   const seen = runHandleAgentEnd({ end: { aborted: false }, selectedSession, attention: false });
   assert.equal(seen.notifications.length, 0);
+  assert.equal(seen.toasts.length, 0, "the watched session's own finish is no toast");
   assert.deepEqual([...seen.hiddenFinishedSessionIds], []);
+
+  // A background session's finish while the page is on screen is the in-page
+  // toast's case: clickable, carrying the jump to that session.
+  const background = runHandleAgentEnd({
+    end: { aborted: false, sessionId: "bg" },
+    selectedSession,
+    attention: false,
+    sessions: [{ id: "bg", name: "bg" }],
+  });
+  assert.equal(background.notifications.length, 0);
+  assert.equal(background.toasts.length, 1);
+  assert.equal(background.toasts[0].session.id, "bg");
+  assert.equal(background.toasts[0].kind, "complete");
 });
 
 test("a stopped run, an unfinished task, a subagent or a side chat never badges (#1484)", () => {

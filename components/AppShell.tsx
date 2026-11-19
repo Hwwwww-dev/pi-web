@@ -53,6 +53,7 @@ import { movePanelTab, orderPanelTabs } from "@/lib/panel-tab-order";
 import { openFileTab, saveFileViewerState, saveParkedFileViewerState, switchFileWorkspace, type ParkedFileWorkspace } from "./file-tab-state";
 import { SettingsPanel } from "./SettingsPanel";
 import { Toaster } from "./ui/sonner";
+import { SessionEventToast, type SessionToastKind } from "./SessionEventToast";
 import { Progress } from "./ui/progress";
 import { ProjectTrustDialog, type ProjectTrustFailure } from "./ProjectTrustDialog";
 import { BranchNavigator, hasSessionBranches } from "./BranchNavigator";
@@ -1334,6 +1335,26 @@ export function AppShell() {
     }
   }, [handleSelectSession, locale]);
 
+  // The in-page counterpart of deliverSessionNotification: when the page is
+  // on screen the system notification is noise, so a background session's
+  // finish or ask shows as a clickable toast instead. Clicking opens the
+  // session; a stable per-session id replaces instead of stacking.
+  const showSessionEventToast = useCallback((target: SessionInfo, kind: SessionToastKind, message: string) => {
+    toast.custom((id) => (
+      <SessionEventToast
+        kind={kind}
+        sessionName={target.name || translate("i18n.sessionComplete")}
+        message={message}
+        dismissLabel={translate("sidebar.dismiss")}
+        onOpen={() => {
+          toast.dismiss(id);
+          handleSelectSession(target);
+        }}
+        onClose={() => toast.dismiss(id)}
+      />
+    ), { id: `session-event:${kind}:${target.id}`, duration: 8000 });
+  }, [handleSelectSession, translate]);
+
   const handleAgentEnd = useCallback((end: AgentEndInfo) => {
     // The sidebar's reload merges the selected session's new row into it
     // (handleSessionsChange), so no list fetch of its own here.
@@ -1342,26 +1363,33 @@ export function AppShell() {
     if (selectedSession) hydrateSelectedSession(selectedSession.id);
 
     if (end.aborted || end.subagentsActive || isHiddenRelation(selectedSession?.relation)) return;
-    if (!shouldShowBrowserNotification()) return;
     const targetSession = end.sessionId
       ? latestSessionsRef.current.find((session) => session.id === end.sessionId) ?? selectedSession
       : selectedSession;
     if (targetSession?.relation?.kind === "subagent") return;
-    if (targetSession) {
-      setHiddenFinishedSessionIds((prev) => {
-        if (prev.has(targetSession.id)) return prev;
-        const next = new Set(prev);
-        next.add(targetSession.id);
-        return next;
+    if (shouldShowBrowserNotification()) {
+      if (targetSession) {
+        setHiddenFinishedSessionIds((prev) => {
+          if (prev.has(targetSession.id)) return prev;
+          const next = new Set(prev);
+          next.add(targetSession.id);
+          return next;
+        });
+      }
+      deliverSessionNotification({
+        targetSession,
+        title: targetSession?.name ?? translate("i18n.sessionComplete"),
+        body: translate("i18n.taskFinished"),
+        tag: targetSession ? `pi-session-complete:${targetSession.id}` : "pi-session-complete",
       });
+      return;
     }
-    deliverSessionNotification({
-      targetSession,
-      title: targetSession?.name ?? translate("i18n.sessionComplete"),
-      body: translate("i18n.taskFinished"),
-      tag: targetSession ? `pi-session-complete:${targetSession.id}` : "pi-session-complete",
-    });
-  }, [deliverSessionNotification, hydrateSelectedSession, selectedSession, translate]);
+    // On screen: only a session not being watched announces (the selected
+    // one's finish is already in view); the toast carries the jump.
+    if (targetSession && targetSession.id !== selectedSession?.id) {
+      showSessionEventToast(targetSession, "complete", translate("i18n.taskFinished"));
+    }
+  }, [deliverSessionNotification, hydrateSelectedSession, selectedSession, showSessionEventToast, translate]);
 
   // The badge is for an unseen tab: opening it puts the finished chat on screen.
   useEffect(() => {
@@ -1378,20 +1406,34 @@ export function AppShell() {
     };
   }, []);
 
-  const handleAttentionNeeded = useCallback((request: BlockingExtensionUiRequest) => {
+  const handleAttentionNeeded = useCallback((request: BlockingExtensionUiRequest, ownerSessionId?: string | null) => {
     if (isHiddenRelation(selectedSession?.relation)) return;
-    if (!shouldShowBrowserNotification()) return;
+    // The stream that raised the request names its owner: a kept-alive
+    // background slot can ask while another session is on screen, and the
+    // notification's jump must land on that session, not the selected one.
+    const targetSession = ownerSessionId
+      ? latestSessionsRef.current.find((session) => session.id === ownerSessionId) ?? selectedSession
+      : selectedSession;
     if (!claimExtensionAttentionNotification(request, notifiedAttentionRequestIdsRef.current)) return;
 
-    deliverSessionNotification({
-      targetSession: selectedSession,
-      title: translate("i18n.attentionNeeded"),
-      body: request.method === "custom"
-        ? translate("i18n.extensionInputNeeded")
-        : request.title,
-      tag: `pi-extension-ui:${request.id}`,
-    });
-  }, [deliverSessionNotification, selectedSession, translate]);
+    const body = request.method === "custom"
+      ? translate("i18n.extensionInputNeeded")
+      : request.title;
+    if (shouldShowBrowserNotification()) {
+      deliverSessionNotification({
+        targetSession,
+        title: translate("i18n.attentionNeeded"),
+        body,
+        tag: `pi-extension-ui:${request.id}`,
+      });
+      return;
+    }
+    // On screen: the selected session's dialog is already in view; a
+    // background session's ask needs the toast to be discoverable.
+    if (targetSession && targetSession.id !== selectedSession?.id) {
+      showSessionEventToast(targetSession, "attention", body);
+    }
+  }, [deliverSessionNotification, selectedSession, showSessionEventToast, translate]);
 
   const handleAutoName = useCallback(async () => {
     const sessionId = selectedSession?.id;

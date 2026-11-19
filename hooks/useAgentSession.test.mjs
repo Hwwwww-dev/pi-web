@@ -721,14 +721,15 @@ test("routes blocking extension requests through deduplicated browser attention 
 
   assert.match(
     extensionRequestSource,
-    /isBlockingExtensionUiRequest\(request\)[\s\S]*?onAttentionNeeded\?\.\(request\)/,
+    /isBlockingExtensionUiRequest\(request\)[\s\S]*?onAttentionNeeded\?\.\(request, requestOwnerSessionId\(\)\)/,
   );
   assert.match(chatWindowSource, /onAttentionNeeded, onSessionCreated/);
-  assert.match(completionSource, /if \(!shouldShowBrowserNotification\(\)\) return/);
+  assert.match(completionSource, /if \(shouldShowBrowserNotification\(\)\) \{/);
   assert.doesNotMatch(completionSource, /pushActive/);
   assert.match(completionSource, /tag: targetSession \? `pi-session-complete:\$\{targetSession\.id\}`/);
   assert.doesNotMatch(completionSource, /document\.visibilityState === "visible"/);
   assert.match(attentionSource, /shouldShowBrowserNotification\(\)/);
+  assert.match(attentionSource, /ownerSessionId/);
   assert.match(attentionSource, /claimExtensionAttentionNotification\(request, notifiedAttentionRequestIdsRef\.current\)/);
   assert.match(attentionSource, /tag: `pi-extension-ui:\$\{request\.id\}`/);
   assert.match(appShellSource, /onAttentionNeeded=\{handleAttentionNeeded\}/);
