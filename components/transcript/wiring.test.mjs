@@ -15,6 +15,7 @@ const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const { ToolRow, TurnActivityBody } = await jiti.import("../ActivityRows.tsx");
 const { TurnTrace } = await jiti.import("./TurnTrace.tsx");
+const { LiveTurnTrace } = await jiti.import("./LiveTurnTrace.tsx");
 const { SubagentTrace } = await jiti.import("./SubagentTrace.tsx");
 const { isFailedResult } = await jiti.import("@/lib/tool-view");
 const { resolveLocalFilePath } = await jiti.import("@/lib/file-links");
@@ -39,6 +40,56 @@ function result(toolName, text, extra = {}) {
 function render(element) {
   return renderToStaticMarkup(React.createElement(I18nProvider, null, element));
 }
+
+function liveToolItem(block, res) {
+  return { kind: "tool", key: `tool-${block.toolCallId}`, block, result: res };
+}
+
+test("the live turn fold titles itself with the latest tool while collapsed", () => {
+  clearExpandedToolCalls();
+  const block = call("bash", { command: "npm run build" });
+  const html = render(React.createElement(
+    LiveTurnTrace,
+    {
+      items: [liveToolItem(block, { ...result("bash", "ok"), toolCallId: block.toolCallId })],
+      startTs: Date.now() - 5_000,
+      foldKey: "process:live-collapsed",
+    },
+    React.createElement("div"),
+  ));
+  assert.match(html, /data-activity="turn"/);
+  // 收起时标题是最新工具（动作 + 对象），秒表不出现。
+  assert.match(html, /Ran<!-- --> <!-- -->npm run build|>Ran npm run build</);
+  assert.doesNotMatch(html, /Worked for/);
+});
+
+test("the live turn fold shows the worked-for title when expanded", () => {
+  setToolCallExpanded("process:live-open", true);
+  const block = call("bash", { command: "npm test" });
+  const html = render(React.createElement(
+    LiveTurnTrace,
+    {
+      items: [liveToolItem(block, undefined)],
+      startTs: Date.now() - 65_000,
+      foldKey: "process:live-open",
+    },
+    React.createElement("div"),
+  ));
+  clearExpandedToolCalls();
+  // 展开态标题切换为“工作了 x”（起点为锚点时间戳，静态渲染取初始 elapsed）。
+  assert.match(html, /Worked for 1m 5s/);
+  assert.doesNotMatch(html, /Ran/);
+});
+
+test("a live turn without any tool yet shows the worked-for title even collapsed", () => {
+  clearExpandedToolCalls();
+  const html = render(React.createElement(
+    LiveTurnTrace,
+    { items: [], startTs: Date.now() - 5_000, foldKey: "process:live-empty" },
+    React.createElement("div"),
+  ));
+  assert.match(html, /Worked for 5s/);
+});
 
 function renderRow(block, res, props = {}) {
   return render(React.createElement(ToolRow, { block, result: res, ...props }));

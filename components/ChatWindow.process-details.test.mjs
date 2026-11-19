@@ -28,13 +28,19 @@ test("expands process details when a completed turn has no final answer", () => 
   );
 });
 
-test("resets process details when the turn gains or loses its final answer", () => {
-  // The fold reads defaultOpen only on mount; keying on answer availability
-  // makes an answered turn start collapsed even if it first rendered unanswered.
+test("the settled fold takes over the live fold's state and starts collapsed once answered", () => {
+  // LiveTurnTrace 用同一个 process:{entryId} 折叠键记录活跃期的展开/收起选择；
+  // 完成态挂载按 defaultOpen 兑底（有最终答案 → 收起），状态跨 settle 交换帧
+  // 保留，不再有“先展开再自动收起”的 justSettled 过渡。
   assert.match(
     source,
-    /<TurnTrace[\s\S]*?key=\{finalAnswerMessage \? "answered" : "unanswered"\}[\s\S]*?defaultOpen=\{!finalAnswerMessage\}/,
+    /<TurnTrace[\s\S]*?foldKey=\{processKey === undefined \? undefined : `process:\$\{processKey\}`\}[\s\S]*?defaultOpen=\{!finalAnswerMessage\}/,
   );
+  assert.match(
+    source,
+    /<LiveTurnTrace[\s\S]*?foldKey=\{entryIds\[userIdx\] === undefined \? undefined : `process:\$\{entryIds\[userIdx\]\}`\}/,
+  );
+  assert.doesNotMatch(source, /justSettled/);
 });
 
 test("passes a grouped turn's MessageViews the same copies on every render (#1005)", async () => {

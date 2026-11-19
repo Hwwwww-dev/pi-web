@@ -27,6 +27,7 @@ import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
 import { TurnTrace } from "./transcript/TurnTrace";
+import { LiveTurnTrace } from "./transcript/LiveTurnTrace";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1408,24 +1409,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     />
   );
 
-  // 回合刚完成的 settle 过渡：busy 翻假的这帧渲染期同步记录刚完成的回合 id，
-  // 让折叠行首挂即展开（衔接流式活动行），随后由 TurnTrace 自动收起。渲染期
-  // 推导（而非 effect）保证 swap 帧就已带上 justSettled，不出现先塌再展开的一帧。
-  const busyNow = isStreaming || sessionBusy;
-  const settlingTurnIdRef = useRef<string | undefined>(undefined);
-  const wasBusyRef = useRef(false);
-  if (busyNow) {
-    settlingTurnIdRef.current = undefined;
-  } else if (wasBusyRef.current) {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") {
-        settlingTurnIdRef.current = entryIds[i];
-        break;
-      }
-    }
-  }
-  wasBusyRef.current = busyNow;
-
   // The message list is built in one memoized pass. Streaming chunks only change
   // `streamState`, so the memo holds across them: per-chunk renders reuse the
   // previous element identities and the memoized message/activity views skip
@@ -1626,8 +1609,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
 
         const isLiveTail = (sessionBusy || isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
         if (isLiveTail) {
-          // A running turn streams as flat activity rows (no wrapper, no
-          // final-answer split); once settled the turn regroups below.
+          // 运行中的回合整轮折叠（LiveTurnTrace）：活动行（含中途回复的文本块）
+          // 全部收进折叠体，最新进展由折叠行标题承担；最终回复照常流式显示。
           rendered.push(renderMessage(userIdx));
           const liveItems = buildTurnActivityItems({
             messages,
@@ -1641,15 +1624,21 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           if (liveItems.length > 0) {
             liveActivityRendered = true;
             rendered.push(
-              <TurnActivityBody
+              <LiveTurnTrace
                 key={`live-activity-${entryIds[userIdx] ?? userIdx}`}
                 items={liveItems}
-                cwd={messageCwd}
-                onOpenFile={onOpenFile}
-                onOpenSubagent={onOpenSubagent}
-                sessionId={session?.id ?? sessionIdRef.current ?? undefined}
-                live
-              />,
+                startTs={(messages[userIdx] as (AgentMessage & { timestamp?: number })).timestamp}
+                foldKey={entryIds[userIdx] === undefined ? undefined : `process:${entryIds[userIdx]}`}
+              >
+                <TurnActivityBody
+                  items={liveItems}
+                  cwd={messageCwd}
+                  onOpenFile={onOpenFile}
+                  onOpenSubagent={onOpenSubagent}
+                  sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+                  live
+                />
+              </LiveTurnTrace>,
             );
           }
           // 活动行不渲染用户消息：流式段内助手之后入列的排队/引导用户消息在
@@ -1740,10 +1729,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               <TurnTrace
               summary={processSummary}
               // 无 entry id 时不传 foldKey：索引作 key 会在前插一页后全部错位。
+              // 活跃期 LiveTurnTrace 已用同键记录展开/收起选择，settle 交换帧原样接管。
               foldKey={processKey === undefined ? undefined : `process:${processKey}`}
               defaultOpen={!finalAnswerMessage}
               reveal={revealProcess}
-              justSettled={processKey !== undefined && processKey === settlingTurnIdRef.current && Boolean(finalAnswerMessage)}
             >
                 <TurnActivityBody
                   items={activityItems}
