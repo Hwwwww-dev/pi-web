@@ -2212,7 +2212,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             data-mobile-toolbar-action={mobile ? "system" : undefined}
           >
             <FileTextIcon
-              className={cn("size-3.5 shrink-0", systemPrompt ? "text-primary" : "text-muted-foreground")}
+              className={cn("size-3.5 shrink-0", systemPrompt ? "text-foreground" : "text-muted-foreground")}
               strokeWidth={2}
             />
             <span className="min-w-0 flex-1">{translate("system.label")}</span>
@@ -2227,7 +2227,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
             <SlidersHorizontalIcon
               className={cn(
                 "size-3.5 shrink-0",
-                systemTools?.some((tool) => tool.active) ? "text-primary" : "text-muted-foreground",
+                systemTools?.some((tool) => tool.active) ? "text-foreground" : "text-muted-foreground",
               )}
               strokeWidth={2}
             />
@@ -2277,7 +2277,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   data-mobile-toolbar-action="branches"
                 >
                   <GitBranchIcon
-                    className={cn("size-3.5 shrink-0", branchTree.length > 0 ? "text-primary" : "text-muted-foreground")}
+                    className={cn("size-3.5 shrink-0", branchTree.length > 0 ? "text-foreground" : "text-muted-foreground")}
                     strokeWidth={2}
                   />
                   <span className="min-w-0 flex-1">{translate("i18n.branches")}</span>
@@ -2290,7 +2290,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 className="gap-2"
                 data-mobile-toolbar-action={mobile ? "debug" : undefined}
               >
-                <BugIcon className={cn("size-3.5 shrink-0", activeFlyout === "debug" ? "text-primary" : "text-muted-foreground")} strokeWidth={2} />
+                <BugIcon className={cn("size-3.5 shrink-0", activeFlyout === "debug" ? "text-foreground" : "text-muted-foreground")} strokeWidth={2} />
                 <span className="min-w-0 flex-1">{translate("debug.title")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
