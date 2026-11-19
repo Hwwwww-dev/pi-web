@@ -2,10 +2,8 @@
 @import "yet-another-react-lightbox/styles.css";
 @import "tailwindcss";
 @import "tw-animate-css";
-/* MiSans 全局字体（npm 自托管子集，unicode-range 按需加载）：Light/300、
-   Regular/400、Medium/500、Bold/700。Regular 必须留：多处 `font-normal`
-   显式要 400，缺掉会回退到 500（更粗）。代码/终端保持等宽栈。 */
-@import "misans/lib/Normal/MiSans-Light.min.css";
+/* MiSans 全局字体（npm 自托管子集，unicode-range 按需加载）：Regular/400、
+   Medium/500、Bold/700。代码/终端保持等宽栈（MiSans 无等宽版）。 */
 @import "misans/lib/Normal/MiSans-Regular.min.css";
 @import "misans/lib/Normal/MiSans-Medium.min.css";
 @import "misans/lib/Normal/MiSans-Bold.min.css";
@@ -791,7 +789,7 @@ html[data-keyboard-open] .terminal-extra-keys {
   --font-mono-default: var(--font-geist-mono), 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, 'PingFang SC', 'Microsoft YaHei', monospace;
   --font-ui: var(--font-ui-default);
   --font-mono: var(--font-mono-default);
-  --font-ui-weight: 300;
+  --font-ui-weight: 400;
   --font-mono-weight: 400;
 }
 

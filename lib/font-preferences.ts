@@ -16,15 +16,7 @@ export type FontWeight = (typeof FONT_WEIGHT_OPTIONS)[number]["value"];
 export type FontPreferences = Record<FontKind, string> & Record<`${FontKind}Weight`, FontWeight>;
 
 export const FONT_FAMILY_MAX_LENGTH = 500;
-/** Fallback for a malformed saved weight. */
 export const FONT_WEIGHT_DEFAULT: FontWeight = 400;
-/**
- * The weight each kind renders when the user expresses no preference. Mirrors
- * `--font-ui-weight` / `--font-mono-weight` in globals.css: the interface reads
- * light (MiSans Light), while code stays Regular. These are also the values the
- * inline override is cleared at, so an explicit choice survives a reload.
- */
-export const FONT_WEIGHT_BASE: Record<FontKind, FontWeight> = { ui: 300, mono: 400 };
 export const FONT_STORAGE_KEYS: Record<keyof FontPreferences, string> = {
   ui: "pi-ui-font-family",
   mono: "pi-mono-font-family",
@@ -32,13 +24,13 @@ export const FONT_STORAGE_KEYS: Record<keyof FontPreferences, string> = {
   monoWeight: "pi-mono-font-weight",
 };
 export const DEFAULT_FONT_PREFERENCES: FontPreferences = {
-  ui: "", mono: "", uiWeight: FONT_WEIGHT_BASE.ui, monoWeight: FONT_WEIGHT_BASE.mono,
+  ui: "", mono: "", uiWeight: FONT_WEIGHT_DEFAULT, monoWeight: FONT_WEIGHT_DEFAULT,
 };
 
-/** Missing, malformed or unsupported weights keep the caller's base weight. */
-export function readFontWeight(value: unknown, fallback: FontWeight = FONT_WEIGHT_DEFAULT): FontWeight {
+/** Missing, malformed or unsupported weights keep the original Regular (400). */
+export function readFontWeight(value: unknown): FontWeight {
   const weight = typeof value === "string" ? Number(value) : value;
-  return FONT_WEIGHT_OPTIONS.find((option) => option.value === weight)?.value ?? fallback;
+  return FONT_WEIGHT_OPTIONS.find((option) => option.value === weight)?.value ?? FONT_WEIGHT_DEFAULT;
 }
 
 /** Keep the input's whitespace while typing; malformed stored values use the default. */
