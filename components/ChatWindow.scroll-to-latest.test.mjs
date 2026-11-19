@@ -23,7 +23,12 @@ test("the official scroller owns following, prepend anchoring and the bottom edg
   // 内容末端那层 167–169px 的垫底不进吸附区。
   assert.match(source, /const scrollEdgeThreshold = 100;/);
   // 尾部新增行的补滚另用读者眼里的底（扣掉停靠区垫底）：不依赖上面的吸附阈值。
-  assert.match(source, /lastRowKeyRef[\s\S]{0,1600}?distanceToBottom > Math\.max\(120, composerDockHeight \+ 24\)[\s\S]{0,300}?scrollerApiRef\.current\?\.scrollToEnd\(\{ behavior: "instant" \}\);/);
+  assert.match(source, /lastRowKeyRef[\s\S]{0,1600}?distanceToBottom > Math\.max\(120, composerDockHeight \+ 24\)[\s\S]{0,300}?scrollerApiRef\.current\?\.scrollToEnd\(\{ behavior: "instant" \}\)[\s\S]{0,200}?startFollowSettle\(\);/);
+  // 图片行的高度要等加载完才定：跟到底后挂 ResizeObserver 继续跟，静止 1s 或读者
+  // 自己滚（wheel/touchstart）就撤。没这层，带图的消息发出去就落在视口上方。
+  assert.match(source, /const startFollowSettle = useCallback\(\(\) => \{[\s\S]{0,1400}?new ResizeObserver\(\(\) => \{[\s\S]{0,200}?scrollToEnd\(\{ behavior: "instant" \}\)/);
+  assert.match(source, /window\.addEventListener\("wheel", cancel, \{ passive: true \}\)/);
+  assert.match(source, /window\.setTimeout\(stopFollowSettle, 1000\)/);
   // 折叠不再自带钉位：既不写 scrollTop，也不再有 pi-web:trace-fold 这条契约。
   assert.doesNotMatch(source, /foldPinRef|pi-web:trace-fold/);
   assert.doesNotMatch(source, /autoScroll=\{false\}|autoScroll=\{!foldInFlight\}/);

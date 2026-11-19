@@ -1897,6 +1897,46 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
    */
   const lastRowKeyRef = useRef<string | null>(null);
   const followSessionRef = useRef<string | null>(null);
+  /**
+   * 图片行的跟随补完。新行插入那一帧图片还没加载，行高不是终值：`scrollToEnd`
+   * 去的是当时的底，图片一撑开就又离开底部，看起来就是“发了带图的消息不跟随”。
+   * 跟随成功的那一刻对内容区挂一个 ResizeObserver，高度再变就继续跟到底；
+   * 高度静止 1s、或者读者自己动手（滚轮/触摸）就撤。
+   */
+  const followSettleRef = useRef<{ observer: ResizeObserver; timer: number | null; detach: () => void } | null>(null);
+  const stopFollowSettle = useCallback(() => {
+    const settle = followSettleRef.current;
+    if (!settle) return;
+    followSettleRef.current = null;
+    settle.observer.disconnect();
+    if (settle.timer !== null) window.clearTimeout(settle.timer);
+    settle.detach();
+  }, []);
+  const startFollowSettle = useCallback(() => {
+    stopFollowSettle();
+    const content = messageContentRef.current;
+    if (!content || typeof ResizeObserver === "undefined") return;
+    const settle = { observer: null as unknown as ResizeObserver, timer: null as number | null, detach: () => {} };
+    const reset = () => {
+      if (settle.timer !== null) window.clearTimeout(settle.timer);
+      settle.timer = window.setTimeout(stopFollowSettle, 1000);
+    };
+    settle.observer = new ResizeObserver(() => {
+      scrollerApiRef.current?.scrollToEnd({ behavior: "instant" });
+      reset();
+    });
+    const cancel = () => stopFollowSettle();
+    window.addEventListener("wheel", cancel, { passive: true });
+    window.addEventListener("touchstart", cancel, { passive: true });
+    settle.detach = () => {
+      window.removeEventListener("wheel", cancel);
+      window.removeEventListener("touchstart", cancel);
+    };
+    settle.observer.observe(content);
+    followSettleRef.current = settle;
+    reset();
+  }, [stopFollowSettle]);
+  useEffect(() => stopFollowSettle, [stopFollowSettle]);
   useLayoutEffect(() => {
     const last = turnRendered[turnRendered.length - 1];
     const key = isValidElement<{ "data-entry-id"?: string }>(last)
@@ -1921,7 +1961,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (distanceToBottom > Math.max(120, composerDockHeight + 24)) return;
     // 走官方命令：它同步更新滚动模式，下一帧的 `be()` 便能把模式续回 following-bottom。
     scrollerApiRef.current?.scrollToEnd({ behavior: "instant" });
-  }, [turnRendered, session?.id, pendingScrollRestore, composerDockHeight, scrollContainerRef]);
+    // 图片行的高度要等加载完才定下来，这之后还得接着跟。
+    startFollowSettle();
+  }, [turnRendered, session?.id, pendingScrollRestore, composerDockHeight, scrollContainerRef, startFollowSettle]);
 
   if (error) {
     return (
