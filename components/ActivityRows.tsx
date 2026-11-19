@@ -38,6 +38,7 @@ import { formatFullTimestamp, formatUsage, type ActivityItem, type StepUsage, ty
 import { UsageBar } from "./UsageBar";
 import { Reveal } from "@/components/Reveal";
 import { ReasoningTrace } from "./transcript/ReasoningTrace";
+export { ReasoningTrace };
 import { SourcesTrace } from "./transcript/SourcesTrace";
 import { PlanTrace } from "./transcript/PlanTrace";
 import { QuestionTrace } from "./transcript/QuestionTrace";
