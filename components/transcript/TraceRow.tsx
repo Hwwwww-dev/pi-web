@@ -65,15 +65,13 @@ export function useTraceFold(foldKey?: string, defaultOpen = false) {
 }
 
 /**
- * 被截断文本右缘的一小段渐变淡出：省略号处不再是硬边，文本没截断时
- * 该段覆盖在空背景上不可见。
+ * 行对象文本（命令/文件等）的固定形状：行内截左保右——尾部是命令的关键段
+ * （2026-11-20 用户拍板，所有工具行与折叠行标题共用）。direction:rtl 把溢出
+ * 与省略号赶到左侧，unicode-bidi:plaintext 保住行内 LTR 顺序。
  */
-function FadeOut({ widthClass = "w-5" }: { widthClass?: string }) {
+export function RowObjectSpan({ object }: { object: string }) {
   return (
-    <span
-      aria-hidden="true"
-      className={cn("pointer-events-none absolute inset-y-0 right-0 bg-gradient-to-r from-transparent to-background", widthClass)}
-    />
+    <span className="block truncate" style={{ direction: "rtl", unicodeBidi: "plaintext" }}>{object}</span>
   );
 }
 
@@ -153,14 +151,13 @@ export function TraceRow({
       onClick={wrap ? undefined : () => onOpenChange(!open)}
       title={!wrap ? object : undefined}
     >
-      <span className={wrap ? "whitespace-normal break-words" : "block truncate"}>{object}</span>
-      {!wrap && <FadeOut />}
+      {wrap ? <span className="whitespace-normal break-words">{object}</span> : <RowObjectSpan object={object} />}
     </span>
   );
   // 文件胶囊与行本身均为按钮，HTML 不允许按钮嵌套（移动端内层还会截获点击）。
   // 触发区只承载不可压缩的「图标+工具名+耗时」，胶囊/对象/计数都是它的兄弟节点。
   const line = (withChips: boolean, withTrailing = true) => (
-    <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0 overflow-hidden" data-expanded={open || undefined}>
+    <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0 w-full max-w-[80%] overflow-hidden" data-expanded={open || undefined}>
       {(icon != null || activeIcon != null) && (
         <TraceIcon>{open && activeIcon != null ? activeIcon : icon}</TraceIcon>
       )}
@@ -194,7 +191,7 @@ export function TraceRow({
   return (
     <Trace ref={rowRef} data-activity="trace-row" data-activity-tool={activityTool}>
       <TraceCollapsible open={open} onOpenChange={onOpenChange}>
-        <div className={cn("flex w-full max-w-full items-center gap-1 min-w-0", wrap && "items-start")}>
+        <div className={cn("flex w-full items-center gap-1 min-w-0", !wrap && "max-w-[80%]", wrap && "items-start")}>
           <TraceCollapsibleTrigger aria-label={ariaLabel} className="max-w-full shrink-0">
             <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0" data-expanded={open || undefined}>
               {(icon != null || activeIcon != null) && (

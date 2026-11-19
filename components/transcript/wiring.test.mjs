@@ -76,8 +76,10 @@ test("the live turn fold titles itself with the latest tool while collapsed", ()
     React.createElement("div"),
   ));
   assert.match(html, /data-activity="turn"/);
-  // 收起时标题是最新工具（动作 + 对象），秒表不出现。
-  assert.match(html, /Ran<!-- --> <!-- -->npm run build|>Ran npm run build</);
+  // 收起时标题就是工具行本身（图标+动作+对象截左保右，2026-11-20 用户拍板）。
+  assert.match(html, /Ran</);
+  assert.match(html, /npm run build/);
+  assert.match(html, /direction:rtl/);
   assert.doesNotMatch(html, /Worked for/);
 });
 

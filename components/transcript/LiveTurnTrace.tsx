@@ -21,6 +21,7 @@ import { getToolCategory } from "@/lib/tool-categories";
 import type { ActivityItem } from "@/lib/turn-view";
 import type { ThinkingContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
 import { ReasoningTrace, ToolCategoryIcon, ToolRow } from "../ActivityRows";
+import { RowObjectSpan } from "./TraceRow";
 import { useTraceFold } from "./TraceRow";
 
 // 空闲 store 兜底：hooks 不能条件调用，未传 store 时订阅它（恒为初始态）。
@@ -78,28 +79,17 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
     return undefined;
   })();
   const toolCategory = latestTool ? getToolCategory(latestTool.block.toolName) : undefined;
-  const toolTitle = latestTool === undefined
-    ? undefined
-    : latestTool.view.object
-      ? `${latestTool.view.title} ${latestTool.view.object}`
-      : latestTool.view.title || undefined;
   const diffStat = latestTool?.view.diffStat;
 
   // 思考进行中（流式末块是 thinking，或已落盘的最后一行是思考且没有更新的
-  // 流式块）：标题显示思考的最新一行——流式文本在增长，末行随之更新，视觉
-  // 上即打字机（2026-11-20 用户确认）；时长不再拼进标题，常驻右侧。首条
-  // assistant 条目还没落盘时这是折叠行唯一的内容。
+  // 流式块）：标题直接嵌入思考行组件（2026-11-20 用户拍板：标题用对应组件，
+  // 不再拼字符串）——内容尾打字机更新。工具进行中同理嵌入工具行形状。
   const streamingThinking = streamingTools.length === 0 && lastStreamingBlock?.type === "thinking";
   const lastItem = items.at(-1);
   const landedThinking = lastItem?.kind === "thinking" ? lastItem : undefined;
-  const thinkingLine = (() => {
-    const text = streamingThinking
-      ? (lastStreamingBlock as ThinkingContent).thinking
-      : landedThinking?.block.thinking;
-    if (!text) return undefined;
-    const lines = text.split("\n").filter((line) => line.trim() !== "");
-    return lines.at(-1);
-  })();
+  const thinkingBlock: ThinkingContent | undefined = streamingThinking
+    ? (lastStreamingBlock as ThinkingContent)
+    : landedThinking?.block;
 
   // 秒表常驻右侧（2026-11-20）：内容没撑满时跟在标题后面，撑满时标题压缩、
   // 时长钉在右端（TraceLine 的 w-fit / max-w-full + TraceTitle truncate 实现）。
@@ -116,29 +106,55 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
   // 标题形态（2026-11-20 用户拍板）：展开=「工作中」（内容全在折叠体内，
   // 没必要再在标题里重复最新活动）；收起=最新活动（流式思考末行或最新工具）。
   // 展开体含全部已落盘活动行（children）+ 流式中的思考/工具行。
+  // 展开态标题「工作中」；收起态 = 最新活动的行本身（工具行形状/思考行组件）。
   const title = open
     ? t("chat.activity.working")
-    : thinkingLine ?? toolTitle ?? t("chat.activity.working");
+    : latestTool
+      ? (latestTool.view.object ? `${latestTool.view.title} ${latestTool.view.object}` : latestTool.view.title)
+      : thinkingBlock
+        ? t("i18n.thinking")
+        : t("chat.activity.working");
 
   return (
     <Trace data-activity="turn">
       <TraceCollapsible open={open} onOpenChange={onOpenChange}>
         <TraceCollapsibleTrigger aria-label={title}>
-          {/* 思考期行占满固定宽（max-w-[80%]）：流式文本在固定宽度内截左保右，
-              右侧时长不再随吐字左右晃（2026-11-20 用户反馈）；工具期行回到 w-fit
-              跟随内容。 */}
-          <TraceLine status="running" className={open || thinkingLine ? "w-full max-w-[80%]" : undefined}>
-            <TraceIcon>
-              {toolCategory !== undefined
-                ? <ToolCategoryIcon category={toolCategory} active={open} />
-                : <LayersIcon className="size-3.5" />}
-            </TraceIcon>
-            {thinkingLine && !open
-              ? // 思考行截左保右（2026-11-20 用户拍板）：流式文本最新字在末尾，
-                // 宽度不够时省略开头（…789），末尾始终可见。direction:rtl 把溢出
-                // 与省略号赶到左侧，unicode-bidi:plaintext 保住行内 LTR 顺序。
-                <TraceTitle className="flex-1 truncate text-left" style={{ direction: "rtl", unicodeBidi: "plaintext" }}>{thinkingLine}</TraceTitle>
-              : <TraceTitle className="flex-1 truncate text-left">{title}</TraceTitle>}
+          {/* 行固定占 80% 宽（2026-11-20 用户拍板）：所有工具行/思考行/标题行
+              同一形状，流式吐字时右侧时长不再左右晃。 */}
+          <TraceLine status="running" className="w-full max-w-[80%]">
+            {open || (!latestTool && !thinkingBlock) ? (
+              <>
+                <TraceIcon>
+                  {toolCategory !== undefined
+                    ? <ToolCategoryIcon category={toolCategory} active={open} />
+                    : <LayersIcon className="size-3.5" />}
+                </TraceIcon>
+                <TraceTitle className="flex-1 truncate text-left">{t("chat.activity.working")}</TraceTitle>
+              </>
+            ) : latestTool ? (
+              // 收起态标题 = 工具行本身（与 TraceRow 同一形状：图标+动作+对象
+              // 截左保右），时长秒表仍钉右侧。
+              <>
+                <TraceIcon>
+                  <ToolCategoryIcon category={toolCategory ?? "terminal"} />
+                </TraceIcon>
+                <TraceTitle className="shrink-0 whitespace-nowrap">{latestTool.view.title}</TraceTitle>
+                {latestTool.view.object && (
+                  <span className="relative min-w-0 flex-1" title={latestTool.view.object}>
+                    <RowObjectSpan object={latestTool.view.object} />
+                  </span>
+                )}
+              </>
+            ) : (
+              // 最新活动是思考：直接嵌思考行组件（内容尾打字机）。
+              <ReasoningTrace
+                asLine
+                block={thinkingBlock as ThinkingContent}
+                blockIndex={-1}
+                active={streamingThinking}
+                duration={landedThinking?.duration}
+              />
+            )}
             {diffStat && (
               <TraceDescription>
                 <span className="text-success">+{diffStat.added}</span>{" "}

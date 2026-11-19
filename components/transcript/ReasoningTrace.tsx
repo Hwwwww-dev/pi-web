@@ -16,6 +16,7 @@ import {
   TraceTitle,
 } from "@/components/ui/trace";
 import { formatToolDurationIfShown } from "@/lib/tool-duration";
+import { RowObjectSpan } from "./TraceRow";
 import { useI18n } from "@/hooks/useI18n";
 import { useSmoothStreamText } from "@/hooks/useSmoothStreamText";
 import { COLLAPSIBLE_EXPANDED_EVENT, getFoldChoice, setToolCallExpanded } from "@/lib/tool-call-expansion";
@@ -132,7 +133,7 @@ function ReasoningText({ text, error, loading, fadeIn = false, className, onScro
 
 // memo：props 均为原始值或稳定引用（lib/streaming-message.ts 保证未更新的 thinking
 // block 引用不变），长思考回复的每个 chunk 只重渲染仍在增长的那一块。
-export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, sessionId, entryId, durationKey, blockIndex, active }: {
+export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, sessionId, entryId, durationKey, blockIndex, active, asLine = false }: {
   block: ThinkingContent;
   duration?: number;
   sessionId?: string;
@@ -142,6 +143,9 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
   blockIndex: number;
   /** The model is still writing this block. */
   active?: boolean;
+  /** 只渲染行内容本身（图标+思考+内容尾+时长），供折叠行标题直接嵌入（2026-11-20
+   *  用户拍板：标题直接用对应组件）；不带按钮与展开区。 */
+  asLine?: boolean;
 }) {
   const { t } = useI18n();
   // 手动折叠选择持久化到模块级 store（与工具卡同一套）：回合完成的消息重读会
@@ -241,26 +245,41 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
   }, [active, foldKey]);
   const rowRef = useRef<HTMLDivElement>(null);
 
+  // 行头内容尾（2026-11-20 用户拍板，像命令行的命令一样）：流式时平滑打字机，
+  // 落盘块直接展示全文尾部；deferred 块内容不在消息里，展开时才加载，行上先空着。
+  const tailText = active ? liveThinking : block.deferred ? (content ?? "") : block.thinking;
+  const lineChildren = (
+    <>
+      <TraceIcon>
+        <BrainIcon className={cn("size-3.5", expanded ? "text-foreground/70" : "text-muted-foreground")} />
+      </TraceIcon>
+      <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
+      {tailText.trim() !== "" && (
+        <span className="relative min-w-0 flex-1">
+          <RowObjectSpan object={tailText} />
+        </span>
+      )}
+      {!active && duration !== undefined && formatToolDurationIfShown(duration * 1000) && (
+        <TraceDescription className="shrink-0 tabular-nums">
+          {formatToolDurationIfShown(duration * 1000)}
+        </TraceDescription>
+      )}
+    </>
+  );
+  if (asLine) return lineChildren;
+
   return (
     <Trace data-activity="thinking" ref={rowRef}>
       <TraceCollapsible
         open={expanded}
         onOpenChange={() => changeExpanded(!expanded)}
-        className="w-auto min-w-0 flex-[0_1_auto]"
+        className="w-full min-w-0 max-w-[80%]"
       >
         <TraceCollapsibleTrigger
           title={t("i18n.thinking")}
         >
-          <TraceLine status={active ? "running" : undefined}>
-            <TraceIcon>
-              <BrainIcon className={cn("size-3.5", expanded ? "text-foreground/70" : "text-muted-foreground")} />
-            </TraceIcon>
-            <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
-            {!active && duration !== undefined && formatToolDurationIfShown(duration * 1000) && (
-              <TraceDescription className="shrink-0 tabular-nums">
-                {formatToolDurationIfShown(duration * 1000)}
-              </TraceDescription>
-            )}
+          <TraceLine status={active ? "running" : undefined} className="w-full max-w-[80%]">
+            {lineChildren}
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent>
