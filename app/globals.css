@@ -57,8 +57,10 @@
   --color-warning: var(--warning);
   --color-success: var(--ok);
   --color-success-foreground: var(--success-foreground);
+  --color-status-running: var(--status-running);
   --color-status-unread: var(--status-unread);
   --color-status-awaiting: var(--status-awaiting);
+  --color-status-failed: var(--status-failed);
   --color-diff-add: var(--diff-add);
   --color-diff-del: var(--diff-del);
   --radius-sm: calc(var(--radius) * 0.6);
@@ -229,10 +231,13 @@
   /* 文字压在 success 底色上的颜色：浅色 success（L≈0.63）压白字不足 4.5:1，
      深色近黑绿字才可读（两个主题同取深字，见 .dark）。 */
   --success-foreground: oklch(0.185 0.03 150);
-  /* 侧栏会话行的状态点：未读与运行青蓝、等待输入琥珀，两个主题共用同一组固定色
-     （重设计前就是这两个值，不跟随 accent/warning 随主题变）。 */
-  --status-unread: #0891b2;
+  /* 侧栏会话行的状态点，两套主题共用同一组固定色（不跟随 accent/warning 随主题变）：
+     运行蓝、未读（回合已结束、你还没查看）绿、等待输入琥珀、失败红。四色同取 600
+     权重，小圆点在浅底与深底上都看得清。--status-failed 目前没有来源，先留着。 */
+  --status-running: #2563eb;
+  --status-unread: #16a34a;
   --status-awaiting: #d97706;
+  --status-failed: #dc2626;
   /* 蓝：信息与高速类正信号。暗色下 --primary 接近白色（0.922 0 0），以其作彩色高亮
      （如 t/s ≥50 徽章）会失去区分度。 */
   --info: oklch(0.55 0.15 250);

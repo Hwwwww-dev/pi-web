@@ -657,8 +657,8 @@ const SessionRowView = memo(function SessionRowView({
   const details = root.detailsPending ? "…" : t("sidebar.messagesCount", { count: root.messageCount });
   const tooltip = `${title}\n${details} · ${formatRelativeTime(root.modified, locale, nowDate)}${branch ? ` · ⑂ ${branch}` : ""}`;
 
-  // 运行状态是行首的那颗点（在行缩进里，标题之前）：等待输入琥珀色，其次运行中绿色，
-  // 再次未读强调色。它不占标题的位置。右侧只说时间，固定行用项目名代替。
+  // 运行状态是行首的那颗点（在行缩进里，标题之前）：等待输入琥珀色，其次运行中蓝色，
+  // 再次未读绿色。它不占标题的位置。右侧只说时间，固定行用项目名代替。
   // 归档行显示的是家族的修改时间而不是归档时间：今天归档的旧会话不该读作“刚刚”
   // （#1351）。
   let statusDot: ReactNode = null;
@@ -669,10 +669,10 @@ const SessionRowView = memo(function SessionRowView({
     statusDot = <span className="session-tree-awaiting" role="img" aria-label={t("sidebar.agentAwaitingInput")} />;
     statusTitle = t("sidebar.agentAwaitingInput");
   } else if (status.running) {
-    // 草稿的绿色呼吸点，与未读点同一套光环。
+    // 运行中的蓝色呼吸点，与未读点同一套光环。
     statusDot = (
       <span
-        className="relative inline-block size-[7px] shrink-0 rounded-full bg-success after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-success after:opacity-35 motion-reduce:after:animate-none"
+        className="relative inline-block size-[7px] shrink-0 rounded-full bg-status-running after:absolute after:-inset-[3px] after:animate-[session-tree-status-pulse_1.6s_ease-in-out_infinite] after:rounded-full after:border-[1.4px] after:border-status-running after:opacity-35 motion-reduce:after:animate-none"
         role="img"
         aria-label={t("sidebar.agentRunning")}
       />
@@ -988,7 +988,7 @@ export function ActivitySummary({ running, awaiting = 0, unread, className, t }:
           title={t("sidebar.agentRunning")}
           aria-label={`${t("sidebar.agentRunning")} (${running})`}
         >
-          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-status-unread" />
+          <span className="session-tree-summary-dot size-1.5 shrink-0 rounded-full bg-status-running" />
           {running}
         </span>
       )}
@@ -1122,7 +1122,7 @@ const GroupRowView = memo(function GroupRowView({
         {project.pinned && <PinIcon size={10} className="ml-0.5 size-2.5 shrink-0 text-muted-foreground" role="img" aria-label={t("sidebar.pinnedProject")} aria-hidden={false} />}
         {/* demo⑨ 的右缘计数并作一处：折叠且有活跃时是 ● 活跃/总数，两个数字
             不再并排读成两个意思（手机无 hover，原摘要与总数是常驻并排的）。
-            点色取最高优先级：等待输入琥珀，其次运行中/未读蓝，与行内点一致；
+            点色取最高优先级：等待输入琥珀，其次运行中蓝，再次未读绿，与行内点一致；
             展开后行内自带状态点，组头回到纯总数。 */}
         {!expanded && row.running + row.awaiting + row.unread > 0 ? (
           <span
@@ -1130,7 +1130,7 @@ const GroupRowView = memo(function GroupRowView({
             title={t("sidebar.groupActiveCount", { active: row.running + row.awaiting + row.unread, total: row.count })}
             aria-label={t("sidebar.groupActiveCount", { active: row.running + row.awaiting + row.unread, total: row.count })}
           >
-            <span className={`size-1.5 shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${row.awaiting > 0 ? "bg-status-awaiting" : "bg-status-unread"}`} />
+            <span className={`size-1.5 shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${row.awaiting > 0 ? "bg-status-awaiting" : row.running > 0 ? "bg-status-running" : "bg-status-unread"}`} />
             {row.running + row.awaiting + row.unread}/{row.count}
           </span>
         ) : (
@@ -1208,7 +1208,7 @@ const PlainRowView = memo(function PlainRowView({
             <span className="session-tree-pinned-count font-normal text-muted-foreground">· {row.count}</span>
             {row.collapsed && row.running > 0 && (
               <span
-                className="session-tree-pinned-dot is-running ml-0.5 size-1.5 shrink-0 rounded-full bg-status-unread animate-in fade-in duration-150 motion-reduce:animate-none"
+                className="session-tree-pinned-dot is-running ml-0.5 size-1.5 shrink-0 rounded-full bg-status-running animate-in fade-in duration-150 motion-reduce:animate-none"
                 role="img"
                 title={t("sidebar.agentRunning")}
                 aria-label={`${t("sidebar.agentRunning")} (${row.running})`}

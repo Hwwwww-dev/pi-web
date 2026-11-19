@@ -145,7 +145,7 @@ test("a collapsed pinned header shows an awaiting dot of its own, without the ru
 
 test("a collapsed group folds its activity into one ● active/total count", () => {
   // 合并记法（demo⑨ 右缘一个数字槽）：● 活跃/总数，awaiting 琥珀优先，
-  // 其次运行中/未读蓝；不再有分段摘要的两套数字并排。
+  // 其次运行中蓝，再次未读绿；不再有分段摘要的两套数字并排。
   const mixed = rowMarkup(render({ rows: [groupRow({ expanded: false, running: 1, awaiting: 2, unread: 0, count: 9 })] }), "group:/work/app");
   assert.match(mixed, /aria-label="3 of 9 sessions have activity"/);
   assert.match(mixed, /<span class="[^"]*bg-status-awaiting[^"]*"><\/span>3\/9<\/span>/);
@@ -157,9 +157,11 @@ test("a collapsed group folds its activity into one ● active/total count", () 
   assert.match(awaiting, /bg-status-awaiting/);
   assert.doesNotMatch(awaiting, /sidebar-spin/);
 
-  // Running (or unread) shows the blue dot.
+  // Running shows the blue dot, unread alone the green one.
   const running = rowMarkup(render({ rows: [groupRow({ expanded: false, running: 2, unread: 0, count: 6 })] }), "group:/work/app");
-  assert.match(running, /<span class="[^"]*bg-status-unread[^"]*"><\/span>2\/6<\/span>/);
+  assert.match(running, /<span class="[^"]*bg-status-running[^"]*"><\/span>2\/6<\/span>/);
+  const unreadOnly = rowMarkup(render({ rows: [groupRow({ expanded: false, running: 0, unread: 2, count: 6 })] }), "group:/work/app");
+  assert.match(unreadOnly, /<span class="[^"]*bg-status-unread[^"]*"><\/span>2\/6<\/span>/);
 });
 
 test("a collapsed group shows its merged activity count and labelled actions", () => {
@@ -172,7 +174,7 @@ test("a collapsed group shows its merged activity count and labelled actions", (
   // and hidden from its accessible name; then the name, its pin, the merged
   // ● 3/5 count (demo⑨ 的右缘一个数字槽).
   assert.match(html, /title="\/work\/app"><svg[^>]*width="13" height="13"[^>]*stroke-width="3"[^>]*aria-hidden="true"><path[^>]*><\/path><\/svg><span class="[^"]*session-tree-group-name[^"]*">app<\/span>/, "the chevron precedes the name");
-  assert.match(html, /<span class="[^"]*session-tree-group-name[^"]*">app<\/span><svg[^>]*class="lucide[^"]*"[\s\S]*?<\/svg><span class="[^"]*flex shrink-0 items-center gap-\[3px\][^"]*" title="3 of 5 sessions have activity" aria-label="3 of 5 sessions have activity"><span class="[^"]*bg-status-unread[^"]*"><\/span>3\/5<\/span>/);
+  assert.match(html, /<span class="[^"]*session-tree-group-name[^"]*">app<\/span><svg[^>]*class="lucide[^"]*"[\s\S]*?<\/svg><span class="[^"]*flex shrink-0 items-center gap-\[3px\][^"]*" title="3 of 5 sessions have activity" aria-label="3 of 5 sessions have activity"><span class="[^"]*bg-status-running[^"]*"><\/span>3\/5<\/span>/);
   // No folder: a project group is no second file tree.
   assert.doesNotMatch(html, /session-tree-group-icon/);
   assert.match(html, /<svg[^>]*class="lucide[^"]*" role="img" aria-label="Pinned"/);
@@ -214,7 +216,7 @@ test("an idle session row shows its short time, branch and both actions", () => 
   // 空闲行的状态点缩进同一槽位里隐形（opacity+scale 过渡槽），不出现任何激活点：
   // 无 role="img"、无激活配色。只有等待输入、运行中、未读三种状态才点亮。
   assert.match(html, /<span class="pointer-events-none absolute top-\[calc\(50%-1px\)\] left-\[14px\] z-10 -translate-y-1\/2 scale-50 opacity-0 transition-\[opacity,scale\] duration-200 ease-out motion-reduce:transition-none" aria-hidden="true">/);
-  assert.doesNotMatch(html, /bg-success|bg-status-awaiting|bg-status-unread|session-tree-awaiting/);
+  assert.doesNotMatch(html, /bg-success|bg-status-running|bg-status-awaiting|bg-status-unread|session-tree-awaiting/);
 });
 
 test("a branch chip needs a linked worktree", () => {
@@ -245,7 +247,8 @@ test("a running row shows the labelled breathing dot and cannot be archived from
   // The dot leads the row's indent, before the title, and the row says it is
   // running.
   assert.match(html, /class="session-tree-row session-tree-session[^"]*is-running[^"]*"/);
-  assert.match(html, /<span class="absolute top-\[calc\(50%-1px\)\] left-\[14px\] z-10 -translate-y-1\/2" title="Agent running…"><span class="relative inline-block size-\[7px\][^"]*bg-success[^"]*" role="img" aria-label="Agent running…"><\/span><\/span>/);
+  assert.match(html, /<span class="absolute top-\[calc\(50%-1px\)\] left-\[14px\] z-10 -translate-y-1\/2" title="Agent running…"><span class="relative inline-block size-\[7px\][^"]*bg-status-running[^"]*" role="img" aria-label="Agent running…"><\/span><\/span>/);
+  assert.doesNotMatch(html, /bg-success/);
   // The title keeps the room the dot used to take: the time still follows it.
   assert.match(html, /<span class="[^"]*session-tree-title[^"]*">first run<\/span><span class="[^"]*text-muted-foreground[^"]*">5m<\/span>/);
   assert.doesNotMatch(html, /session-tree-slot/);
