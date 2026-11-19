@@ -1861,17 +1861,14 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 空态（hero+composer 簇的垂直居中依赖文档流）与侧面板保持原有布局。
   const composerDockRef = useRef<HTMLDivElement | null>(null);
   const composerFloating = !panel && !isEmptyNew;
-  // 停靠区高度同时进 CSS 变量（内容末端垫底）和 state（贴底阈值）：内容底部那层
-  // padding 就是被输入条盖住、读者永远看不到的区域，判定「是否贴底」时必须扣掉它。
-  const [composerDockHeight, setComposerDockHeight] = useState(0);
+  // 停靠区高度只进 CSS 变量（内容末端垫底）：内容底部那层 padding 就是被输入条
+  // 盖住、读者永远看不到的区域。
   useEffect(() => {
     const dock = composerDockRef.current;
     const host = dock?.parentElement;
     if (!dock || !host || panel) return;
     const apply = () => {
-      const height = dock.offsetHeight;
-      host.style.setProperty("--composer-dock-h", `${height}px`);
-      setComposerDockHeight((previous) => (previous === height ? previous : height));
+      host.style.setProperty("--composer-dock-h", `${dock.offsetHeight}px`);
     };
     apply();
     const ro = new ResizeObserver(apply);
@@ -1897,6 +1894,26 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
    */
   const lastRowKeyRef = useRef<string | null>(null);
   const followSessionRef = useRef<string | null>(null);
+  /**
+   * 读者是否贴底。由滚动监听维护：每次滚动（手势或程序滚动）后重新判定，
+   * 因此消息插入的那一刻，它存的仍然是插入前的答案。
+   */
+  const atBottomRef = useRef(true);
+  const followScrollTargetRef = useRef<{ element: HTMLDivElement; handler: () => void } | null>(null);
+  // 无依赖、每次 render 都跑：只在视口元素换了的时候重挂，因此加载骨架切回真内容、
+  // 会话切换、重挂容器都能自愈，不靠某个具体依赖去猜。
+  useLayoutEffect(() => {
+    const viewport = scrollContainerRef.current;
+    if (!viewport || followScrollTargetRef.current?.element === viewport) return;
+    const previous = followScrollTargetRef.current;
+    if (previous) previous.element.removeEventListener("scroll", previous.handler);
+    const handler = () => {
+      atBottomRef.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= scrollEdgeThreshold;
+    };
+    viewport.addEventListener("scroll", handler, { passive: true });
+    handler();
+    followScrollTargetRef.current = { element: viewport, handler };
+  });
   /**
    * 图片行的跟随补完。新行插入那一帧图片还没加载，行高不是终值：`scrollToEnd`
    * 去的是当时的底，图片一撑开就又离开底部，看起来就是“发了带图的消息不跟随”。
@@ -1953,17 +1970,16 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     lastRowKeyRef.current = key;
     if (previous === null || key === null || key === previous) return;
     if (scrollRestoringRef.current || pendingScrollRestore || loadingOlderRef.current) return;
-    const viewport = scrollContainerRef.current;
-    if (!viewport) return;
-    // “该不该跟”用读者眼里的底（扣掉停靠区垫底），与上方的吸附阈值分开：把最后一条
-    // 滑到输入条上方时不再算贴底（不会把往上翻的人拽回），但新消息到来时仍应该跟到底。
-    const distanceToBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-    if (distanceToBottom > Math.max(120, composerDockHeight + 24)) return;
+    // “该不该跟”必须用**追加之前**的贴底状态：新气泡自己就有几百像素高，插入后再量
+    // 距离，量到的就是它自己的高度——越长的消息越不可能跟（长文本、带图都不跟，
+    // 短消息跟，就是这个原因）。`atBottomRef` 由滚动监听维护，插入这一刻还没有任何
+    // 滚动，里面存的就是插入前的答案。
+    if (!atBottomRef.current) return;
     // 走官方命令：它同步更新滚动模式，下一帧的 `be()` 便能把模式续回 following-bottom。
     scrollerApiRef.current?.scrollToEnd({ behavior: "instant" });
     // 图片行的高度要等加载完才定下来，这之后还得接着跟。
     startFollowSettle();
-  }, [turnRendered, session?.id, pendingScrollRestore, composerDockHeight, scrollContainerRef, startFollowSettle]);
+  }, [turnRendered, session?.id, pendingScrollRestore, scrollContainerRef, startFollowSettle]);
 
   if (error) {
     return (
