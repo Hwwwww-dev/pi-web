@@ -245,9 +245,11 @@ const TEXT_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity:
 const ANCHORED_MENU_GAP = 8;
 
 /**
- * Composer textarea growth cap, in px. The single height authority for the
- * composer box — `resizeTextarea` writes inline heights against it, so the
- * element must not carry a CSS max-height of its own.
+ * Composer textarea growth cap, in px. Height comes from the primitive's
+ * `field-sizing: content` (native, content-sized); this cap is enforced in CSS
+ * by the `max-h-[176px]` on the element — the two must stay in step. The inline
+ * height `resizeTextarea` writes does not participate: the element is `flex-1`,
+ * and a flex base size of 0 ignores `height`.
  */
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 176;
 
@@ -2707,10 +2709,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               ref={textareaRef}
               className={cn(
                 "chat-input-textarea w-full min-w-0 px-2.5 py-2 leading-[1.55] text-foreground overflow-auto placeholder:text-muted-foreground",
-                // `ui/textarea` 带 `field-sizing-content`：内容多高就多高，inline 的
-                // `height` 被无视，resizeTextarea 的 176px 上限形同虚设。ui/ 不手改，
-                // 在调用点盖回来。
-                "field-sizing-fixed",
+                // `ui/textarea` 带 `field-sizing-content`（按内容撑高），而输入框是
+                // `flex-1`（`flex: 1 1 0%`）：inline 的 height 在 flex 布局里不参与
+                // 计算，封不住；把 field-sizing 改成 fixed 又会连带关掉原生撑高，
+                // 框就只剩一行。保留原生撑高，用 max-height 封顶。数值与
+                // COMPOSER_TEXTAREA_MAX_HEIGHT 保持一致。
+                "max-h-[176px]",
                 compact ? "min-h-24" : "min-h-11",
               )}
               data-chat-composer=""
