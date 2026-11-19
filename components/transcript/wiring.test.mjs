@@ -52,10 +52,11 @@ test("a tool still in the streaming store titles the live fold at once", () => {
   const block = call("bash", { command: "cargo build" });
   store.dispatch({ type: "snapshot", message: { role: "assistant", content: [block] } });
   // 还没落到 messages 的流式工具块就是最新工具：标题立即切到它，不再等
-  // message_end 后才收进折叠。
+  // message_end 后才收进折叠。流式并入只在最后一段折叠开启（mergeStreaming），
+  // 旧段不订阅流式变化，这里显式传入。
   const html = render(React.createElement(
     LiveTurnTrace,
-    { items: [], startTs: Date.now() - 5_000, foldKey: "process:live-streaming", store },
+    { items: [], startTs: Date.now() - 5_000, foldKey: "process:live-streaming", store, mergeStreaming: true },
     React.createElement("div"),
   ));
   assert.match(html, /cargo build/);
@@ -80,7 +81,7 @@ test("the live turn fold titles itself with the latest tool while collapsed", ()
   assert.doesNotMatch(html, /Worked for/);
 });
 
-test("the live turn fold shows the worked-for title when expanded", () => {
+test("the live turn fold keeps the latest-tool title when expanded", () => {
   setToolCallExpanded("process:live-open", true);
   const block = call("bash", { command: "npm test" });
   const html = render(React.createElement(
@@ -93,9 +94,24 @@ test("the live turn fold shows the worked-for title when expanded", () => {
     React.createElement("div"),
   ));
   clearExpandedToolCalls();
-  // 展开态标题切换为“工作了 x”（起点为锚点时间戳，静态渲染取初始 elapsed）。
-  assert.match(html, /Worked for 1m 5s/);
-  assert.doesNotMatch(html, /Ran/);
+  // 跑的时候折叠行始终显示单行最新动作（2026-11-20：不再在展开态切回
+  // “工作了 x”秒表）；展开的是体，不是标题。
+  assert.match(html, /Ran<!-- --> <!-- -->npm test|>Ran npm test</);
+  assert.doesNotMatch(html, /Worked for/);
+});
+
+test("the live turn fold titles thinking with the stopwatch until a tool starts", () => {
+  clearExpandedToolCalls();
+  const store = createStreamingStore();
+  const thinking = { type: "thinking", thinking: "想第一步…" };
+  store.dispatch({ type: "snapshot", message: { role: "assistant", content: [thinking] } });
+  // 首条 assistant 条目落盘前的思考期：标题“思考+秒表”（起点为锚点时间戳，
+  // 静态渲染取初始 elapsed），工具/回复出现后切走。
+  const html = render(React.createElement(
+    LiveTurnTrace,
+    { items: [], startTs: Date.now() - 12_000, foldKey: "process:live-thinking", store, mergeStreaming: true },
+  ));
+  assert.match(html, /思考<!-- --> 12s|>思考 12s<|>Thinking<!-- --> 12s<|>Thinking 12s</);
 });
 
 test("a live turn without any tool yet shows the worked-for title even collapsed", () => {

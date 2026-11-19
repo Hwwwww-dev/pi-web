@@ -30,10 +30,40 @@ export interface StepUsage {
 }
 
 export type ActivityItem =
-  | { kind: "thinking"; key: string; block: ThinkingContent; duration?: number; entryId?: string; blockIndex: number; searchTarget?: boolean }
-  | { kind: "text"; key: string; block: TextContent; searchTarget?: boolean }
-  | { kind: "tool"; key: string; block: ToolCallContent; result?: ToolResultMessage; duration?: number; stepUsage?: StepUsage; searchTarget?: boolean }
-  | { kind: "custom"; key: string; message: CustomMessage; searchTarget?: boolean };
+  | { kind: "thinking"; key: string; block: ThinkingContent; duration?: number; entryId?: string; blockIndex: number; searchTarget?: boolean; ts?: number }
+  | { kind: "text"; key: string; block: TextContent; searchTarget?: boolean; ts?: number }
+  | { kind: "tool"; key: string; block: ToolCallContent; result?: ToolResultMessage; duration?: number; stepUsage?: StepUsage; searchTarget?: boolean; ts?: number }
+  | { kind: "custom"; key: string; message: CustomMessage; searchTarget?: boolean; ts?: number }
+  ;
+
+/** 活动按中途回复切段后的渲染件：折叠段与外部显示的回复文本，按时间序交替。 */
+export type TurnPart =
+  | { kind: "fold"; items: ActivityItem[] }
+  | { kind: "reply"; key: string; block: TextContent; searchTarget?: boolean };
+
+/**
+ * 活动行按回复切段（2026-11-20）：回合内 pi 边跑边说的文本不再收进折叠，
+ * 而是以普通文本段显示在外面，两段回复之间的思考/工具各自成一个行内大折叠。
+ * 活跃期与完成态用同一把刀切，段序号才能逐段对上折叠键。
+ */
+export function splitTurnParts(items: ActivityItem[]): TurnPart[] {
+  const parts: TurnPart[] = [];
+  let current: ActivityItem[] = [];
+  const flush = () => {
+    if (current.length > 0) parts.push({ kind: "fold", items: current });
+    current = [];
+  };
+  for (const item of items) {
+    if (item.kind === "text") {
+      flush();
+      parts.push({ kind: "reply", key: item.key, block: item.block, searchTarget: item.searchTarget });
+      continue;
+    }
+    current.push(item);
+  }
+  flush();
+  return parts;
+}
 
 export function formatUsage(usage: TurnUsage): string {
   const parts = [];
@@ -106,7 +136,7 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
     const entryId = entryIds[idx];
     const hitsEntry = searchEntryId !== undefined && entryId === searchEntryId;
     if (message.role === "custom") {
-      items.push({ kind: "custom", key: `custom-${entryId ?? idx}`, message: message as CustomMessage, searchTarget: hitsEntry });
+      items.push({ kind: "custom", key: `custom-${entryId ?? idx}`, message: message as CustomMessage, searchTarget: hitsEntry, ts: (message as { timestamp?: number }).timestamp });
       continue;
     }
     if (message.role !== "assistant") continue;
@@ -132,7 +162,7 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
       if (block.type === "thinking" && !block.deferred && block.thinking.trim() === "") continue;
       const searchTarget = hitsEntry && block === searchBlock;
       if (block.type === "thinking") {
-        items.push({ kind: "thinking", key: `thinking-${entryId ?? idx}-${blockIdx}`, block: block as ThinkingContent, duration: thinkingDuration, entryId, blockIndex: blockIdx, searchTarget });
+        items.push({ kind: "thinking", key: `thinking-${entryId ?? idx}-${blockIdx}`, block: block as ThinkingContent, duration: thinkingDuration, entryId, blockIndex: blockIdx, searchTarget, ts: assistantMessage.timestamp });
         continue;
       }
       if (block.type === "toolCall") {
@@ -167,12 +197,13 @@ export function buildTurnActivityItems({ messages, startIdx, endIdx, entryIds, t
             }
             : undefined,
           searchTarget,
+          ts: assistantMessage.timestamp,
         });
         continue;
       }
       if (block.type === "text") {
         if (searchTarget || (block as TextContent).text.trim().length > 0) {
-          items.push({ kind: "text", key: `text-${entryId ?? idx}-${blockIdx}`, block: block as TextContent, searchTarget });
+          items.push({ kind: "text", key: `text-${entryId ?? idx}-${blockIdx}`, block: block as TextContent, searchTarget, ts: assistantMessage.timestamp });
         }
       }
     }

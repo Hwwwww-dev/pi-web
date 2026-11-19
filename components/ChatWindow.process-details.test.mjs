@@ -29,16 +29,26 @@ test("expands process details when a completed turn has no final answer", () => 
 });
 
 test("the settled fold takes over the live fold's state and starts collapsed once answered", () => {
-  // LiveTurnTrace 用同一个 process:{entryId} 折叠键记录活跃期的展开/收起选择；
-  // 完成态挂载按 defaultOpen 兑底（有最终答案 → 收起），状态跨 settle 交换帧
-  // 保留，不再有“先展开再自动收起”的 justSettled 过渡。
+  // LiveTurnTrace 与 TurnTrace 用同一把分段折叠键 process:{entryId}:{段序号}
+  // 记录展开/收起选择（活动按中途回复切段，每段一个行内大折叠）；完成态挂载
+  // 按 defaultOpen 兑底（有最终答案 → 收起），状态跨 settle 交换帧逐段保留，
+  // 不再有“先展开再自动收起”的 justSettled 过渡。
   assert.match(
     source,
-    /<TurnTrace[\s\S]*?foldKey=\{processKey === undefined \? undefined : `process:\$\{processKey\}`\}[\s\S]*?defaultOpen=\{!finalAnswerMessage\}/,
+    /const turnParts = splitTurnParts\(activityItems\)/,
   );
   assert.match(
     source,
-    /<LiveTurnTrace[\s\S]*?foldKey=\{entryIds\[userIdx\] === undefined \? undefined : `process:\$\{entryIds\[userIdx\]\}`\}/,
+    /<TurnTrace[\s\S]*?foldKey=\{processKey === undefined \? undefined : `process:\$\{processKey\}:\$\{partIdx\}`\}[\s\S]*?defaultOpen=\{!finalAnswerMessage\}/,
+  );
+  assert.match(
+    source,
+    /<LiveTurnTrace[\s\S]*?foldKey=\{entryIds\[userIdx\] === undefined \? undefined : `process:\$\{entryIds\[userIdx\]\}:\$\{partIdx\}`\}/,
+  );
+  // 首条 assistant 条目落盘前的思考期也挂折叠（消死区）：与 isLiveTail 首段同键 :0。
+  assert.match(
+    source,
+    /livePreTurn[\s\S]*?<LiveTurnTrace[\s\S]*?foldKey=\{entryIds\[userIdx\] === undefined \? undefined : `process:\$\{entryIds\[userIdx\]\}:0`\}[\s\S]*?mergeStreaming/,
   );
   assert.doesNotMatch(source, /justSettled/);
   // 气泡只画文本：思考与工具由折叠承担，避免每个工具先平铺再收进去的两次折。

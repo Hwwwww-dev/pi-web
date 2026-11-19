@@ -32,7 +32,7 @@ const IDLE_STREAMING_STORE = createStreamingStore();
  * 平铺、message_end 后再“收进去”，视觉上折叠两次。折叠键与完成态 TurnTrace
  * 共用 `process:{entryId}`，settle 交换帧按已记录的选择原样接管展开/收起状态。
  */
-export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd, onOpenFile, onOpenSubagent, children }: {
+export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd, onOpenFile, onOpenSubagent, mergeStreaming = false, children }: {
   items: ActivityItem[];
   /** 回合锚点（用户消息）的 pi 时间戳：秒表的起点。 */
   startTs?: number;
@@ -44,16 +44,20 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
-  children: ReactNode;
+  /** 只有最后一段折叠并入流式工具（它才是“最新”）；旧段不订阅流式变化。 */
+  mergeStreaming?: boolean;
+  children?: ReactNode;
 }) {
   const { t } = useI18n();
   const { open, onOpenChange } = useTraceFold(foldKey, false);
-  const streamingMessage = useStreamingSelector(store ?? IDLE_STREAMING_STORE, selectStreamingMessage);
-  const streamingTools = (streamingMessage?.content ?? []).filter(
+  const streamingMessage = useStreamingSelector(mergeStreaming ? (store ?? IDLE_STREAMING_STORE) : IDLE_STREAMING_STORE, selectStreamingMessage);
+  const streamingBlocks = streamingMessage?.content ?? [];
+  const streamingTools = streamingBlocks.filter(
     (block): block is ToolCallContent => block.type === "toolCall",
   );
+  const lastStreamingBlock = streamingBlocks.length > 0 ? streamingBlocks[streamingBlocks.length - 1] : undefined;
 
-  // 标题的最新工具：先看正在流式的（它最新），没有再看已落盘的活动行。
+  // 标题的最新动作：先看正在流式的工具（它最新），没有再看已落盘的活动行。
   const latestToolTitle = (() => {
     if (streamingTools.length > 0) {
       const view = toToolView({ block: streamingTools[streamingTools.length - 1], t });
@@ -70,7 +74,16 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
     }
     return undefined;
   })();
-  const showElapsed = open || latestToolTitle === undefined;
+
+  // 思考进行中（流式末块是 thinking，或已落盘的最后一行是思考且没有更新的
+  // 流式块）：标题切“思考+秒表”（2026-11-20 用户确认），首条 assistant 条目
+  // 还没落盘时这是折叠行唯一的内容。已落盘的思考行用自身时长，不再走秒表。
+  const streamingThinking = streamingTools.length === 0 && lastStreamingBlock?.type === "thinking";
+  const lastItem = items.at(-1);
+  const landedThinking = lastItem?.kind === "thinking" ? lastItem : undefined;
+
+  // 秒表走动的场景：展开态、还没有任何工具标题、或思考正在流式。
+  const showElapsed = open || latestToolTitle === undefined || streamingThinking;
 
   // 展开态（或还没有任何工具时）标题走秒表：起点用 pi 的时间戳，走动的一端
   // 只能取浏览器时钟——跨机时钟偏差由产品决策接受（旧“全程只用 pi 时钟”的
@@ -84,9 +97,14 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
     return () => clearInterval(timer);
   }, [showElapsed, startTs]);
 
-  const title = showElapsed
-    ? t("chat.activity.workedFor", { duration: formatTurnDuration(elapsedMs) })
-    : latestToolTitle;
+  const thinkingTitle = streamingThinking
+    ? `${t("i18n.thinking")} ${formatTurnDuration(elapsedMs)}`
+    : landedThinking
+      ? `${t("i18n.thinking")} ${formatTurnDuration((landedThinking.duration ?? 0) * 1000)}`
+      : undefined;
+  const title = streamingThinking || (latestToolTitle === undefined && thinkingTitle !== undefined)
+    ? thinkingTitle
+    : latestToolTitle ?? t("chat.activity.workedFor", { duration: formatTurnDuration(elapsedMs) });
 
   return (
     <Trace data-activity="turn">
@@ -96,7 +114,7 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
             <TraceIcon>
               <LayersIcon className="size-3.5" />
             </TraceIcon>
-            <TraceTitle className="font-medium">{title}</TraceTitle>
+            <TraceTitle>{title}</TraceTitle>
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="flex flex-col gap-2">

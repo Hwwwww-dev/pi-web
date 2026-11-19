@@ -11,7 +11,8 @@ import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/exte
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { isHiddenCustomMessage, isMessageGroupAnchor, liveOutputPreview, LIVE_OUTPUT_PREVIEW_LINES, splitFinalAssistantBlocks } from "@/lib/message-display";
 import { getToolCategory, TOOL_CATEGORY_LABEL_KEYS, type ToolCategory } from "@/lib/tool-categories";
-import { buildTurnActivityItems, getFinishedTurnView, headSegmentEndsTurn } from "@/lib/turn-view";
+import { buildTurnActivityItems, getFinishedTurnView, headSegmentEndsTurn, splitTurnParts } from "@/lib/turn-view";
+import { SafeMarkdownBody } from "./SafeMarkdownBody";
 import { type WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
 import { dropMentionText, splitDroppedItems, uploadFiles, uploadRepoDirectory, type DroppedItem } from "@/lib/file-upload-client";
@@ -56,7 +57,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
-import { formatTurnDuration, getTurnDurationMs } from "@/lib/turn-duration";
+import { formatTurnDuration } from "@/lib/turn-duration";
 import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
 import { selectHasStreamingContent, selectIsStreaming, selectStreamingMessage, useStreamingSelector } from "@/hooks/useStreamingSelector";
 import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
@@ -1606,8 +1607,32 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const finalAssistantIdx = findFinalAssistantIndex(messages, userIdx, endIdx);
 
         if (finalAssistantIdx === -1) {
+          // 首条 assistant 条目落盘前的死区（2026-11-20）：思考/等待阶段会话
+          // 文件里只有用户消息，此前这回合只剩光秃秃的气泡，折叠行和思考
+          // 都不出现。活跃尾回合（正在跑、最后一锚、就在末尾）挂一把与
+          // isLiveTail 首段同键（:0）的空折叠：标题从流式 store 取最新块
+          // （思考期=思考+秒表），首条条目落盘后 isLiveTail 分支无缝接管；
+          // 非活跃回合维持原平铺渲染。
+          const livePreTurn = (sessionBusy || isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
           for (let renderIdx = userIdx; renderIdx < endIdx; renderIdx++) {
             rendered.push(renderMessage(renderIdx, { showModelLabel: true }));
+          }
+          if (livePreTurn) {
+            liveActivityRendered = true;
+            rendered.push(
+              <LiveTurnTrace
+                key={`live-activity-pre-${entryIds[userIdx] ?? userIdx}`}
+                items={[]}
+                startTs={(messages[userIdx] as (AgentMessage & { timestamp?: number })).timestamp}
+                foldKey={entryIds[userIdx] === undefined ? undefined : `process:${entryIds[userIdx]}:0`}
+                store={streamingStore}
+                toolResults={toolResultsMap}
+                cwd={messageCwd}
+                onOpenFile={onOpenFile}
+                onOpenSubagent={onOpenSubagent}
+                mergeStreaming
+              />,
+            );
           }
           idx = endIdx;
           continue;
@@ -1628,30 +1653,51 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             searchBlock,
           });
           // 折叠行整个运行期都在：首轮还在思考/等待首块落盘时也显示秒表，
-          // 而不是等第一条活动行落盘才凭空出现。
+          // 而不是等第一条活动行落盘才凭空出现。中途回复显示在折叠外面，
+          // 活动按回复切成多个行内大折叠（2026-11-20）；段序号进折叠键，
+          // 与完成态逐段对上；只有最后一段并入流式工具（它才是“最新”）。
           liveActivityRendered = true;
-          rendered.push(
-              <LiveTurnTrace
-                key={`live-activity-${entryIds[userIdx] ?? userIdx}`}
-                items={liveItems}
-                startTs={(messages[userIdx] as (AgentMessage & { timestamp?: number })).timestamp}
-                foldKey={entryIds[userIdx] === undefined ? undefined : `process:${entryIds[userIdx]}`}
-                store={streamingStore}
-                toolResults={toolResultsMap}
-                cwd={messageCwd}
-                onOpenFile={onOpenFile}
-                onOpenSubagent={onOpenSubagent}
-              >
-                <TurnActivityBody
-                  items={liveItems}
+          const liveParts = splitTurnParts(liveItems);
+          const liveAnchorTs = (messages[userIdx] as (AgentMessage & { timestamp?: number })).timestamp;
+          liveParts.forEach((part, partIdx) => {
+            if (part.kind === "fold") {
+              const segStartTs = part.items.find((item) => item.ts !== undefined)?.ts ?? liveAnchorTs;
+              rendered.push(
+                <LiveTurnTrace
+                  key={`live-activity-${entryIds[userIdx] ?? userIdx}-${partIdx}`}
+                  items={part.items}
+                  startTs={segStartTs}
+                  foldKey={entryIds[userIdx] === undefined ? undefined : `process:${entryIds[userIdx]}:${partIdx}`}
+                  store={streamingStore}
+                  toolResults={toolResultsMap}
                   cwd={messageCwd}
                   onOpenFile={onOpenFile}
                   onOpenSubagent={onOpenSubagent}
-                  sessionId={session?.id ?? sessionIdRef.current ?? undefined}
-                  live
-                />
-              </LiveTurnTrace>,
+                  mergeStreaming={partIdx === liveParts.length - 1}
+                >
+                  <TurnActivityBody
+                    items={part.items}
+                    cwd={messageCwd}
+                    onOpenFile={onOpenFile}
+                    onOpenSubagent={onOpenSubagent}
+                    sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+                    live
+                  />
+                </LiveTurnTrace>,
+              );
+              return;
+            }
+            rendered.push(
+              <div
+                key={`live-reply-${entryIds[userIdx] ?? userIdx}-${partIdx}`}
+                className="my-1"
+                data-message-text
+                data-search-target={part.searchTarget || undefined}
+              >
+                <SafeMarkdownBody>{part.block.text}</SafeMarkdownBody>
+              </div>,
             );
+          });
           // 活动行不渲染用户消息：流式段内助手之后入列的排队/引导用户消息在
           // 实时段末尾原样渲染，保持「已排队」可见。
           for (let queuedIdx = userIdx + 1; queuedIdx < endIdx; queuedIdx++) {
@@ -1681,15 +1727,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         });
         const { finalAnswerMessage, writtenFiles, activityItems, processBlockLimitByIdx } = turnView;
 
-        // Search reveal: the outer group opens when the hit sits inside it.
-        let revealProcess = false;
+        // Search reveal: 搜索命中落在哪个折叠段由分段的 item.searchTarget 决定
+        // （splitTurnParts 会把标记带进各段），这里只锚定整组过程区的 ref。
         let processRefIdx: number | undefined;
         for (let processIdx = userIdx + 1; processIdx <= finalAssistantIdx; processIdx++) {
           const processMessage = messages[processIdx];
           if (processMessage.role === "custom" && isHiddenCustomMessage(processMessage)) continue;
-          const hitsEntry = Boolean(pendingSearchScroll && pendingSearchScroll.entryId === entryIds[processIdx]);
           if (processMessage.role === "custom") {
-            revealProcess ||= hitsEntry;
             processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
             continue;
           }
@@ -1698,61 +1742,80 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           const processLimit = processBlockLimitByIdx?.get(processIdx) ?? processContent.length;
           if (processLimit === 0) continue;
           processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
-          revealProcess ||= hitsEntry && (!searchBlock || processContent.slice(0, processLimit).includes(searchBlock));
         }
 
-        const categoryCounts = new Map<ToolCategory, number>();
-        for (const item of activityItems) {
-          if (item.kind === "tool") {
-            const category = getToolCategory(item.block.toolName);
-            categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
-          }
-        }
-        let processMessageCount = 0;
-        for (let processIdx = userIdx + 1; processIdx <= finalAssistantIdx; processIdx++) {
-          const role = messages[processIdx]?.role;
-          if (role === "custom" && isHiddenCustomMessage(messages[processIdx])) continue;
-          if (role === "assistant" || role === "custom") processMessageCount += 1;
-        }
-        const categorySummary = [...categoryCounts.entries()]
-          .map(([category, count]) => `${count} ${t(TOOL_CATEGORY_LABEL_KEYS[category])}`)
-          .join(" · ");
-        // 折叠行描述整轮（官方 Whole Turn：「Worked for 2m 4s, 1 command failed」）；
-        // 未跑完、取不到时长时退回分类计数。
-        const failedCalls = activityItems.filter((item) => item.kind === "tool" && item.result?.isError).length;
-        const turnDurationMs = getTurnDurationMs(messages, userIdx, finalAssistantIdx + 1);
-        const workedFor = turnDurationMs === undefined ? undefined : formatTurnDuration(turnDurationMs);
-        const processSummary = workedFor
-          ? (failedCalls > 0
-            ? t("chat.activity.workedForFailed", { duration: workedFor, count: failedCalls })
-            : t("chat.activity.workedFor", { duration: workedFor }))
-          : categorySummary
-            ? `${t("chat.processDetails")} · ${categorySummary}`
-            : `${t("chat.processDetails")} · ${processMessageCount} ${t(processMessageCount === 1 ? "chat.message" : "chat.messages")}`;
-
-        if (activityItems.length > 0) {
+        // 活动按中途回复切段：每段一个行内大折叠，回复以普通文本段显示在外面
+        // （2026-11-20）。段序号进折叠键，与活跃期的 LiveTurnTrace 一致，settle
+        // 交换帧逐段原样接管展开/收起状态。段时长取首尾活动时间戳之差；
+        // 取不到时退回分类计数。
+        const turnParts = splitTurnParts(activityItems);
+        if (turnParts.length > 0) {
           const processKey = entryIds[userIdx];
           rendered.push(
             <div
               key={`process-group-${processKey ?? userIdx}`}
+              className="flex flex-col gap-2"
               ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
             >
-              <TurnTrace
-              summary={processSummary}
-              // 无 entry id 时不传 foldKey：索引作 key 会在前插一页后全部错位。
-              // 活跃期 LiveTurnTrace 已用同键记录展开/收起选择，settle 交换帧原样接管。
-              foldKey={processKey === undefined ? undefined : `process:${processKey}`}
-              defaultOpen={!finalAnswerMessage}
-              reveal={revealProcess}
-            >
-                <TurnActivityBody
-                  items={activityItems}
-                  cwd={messageCwd}
-                  onOpenFile={onOpenFile}
-                  onOpenSubagent={onOpenSubagent}
-                  sessionId={session?.id ?? sessionIdRef.current ?? undefined}
-                />
-              </TurnTrace>
+              {turnParts.map((part, partIdx) => {
+                if (part.kind === "reply") {
+                  return (
+                    <div
+                      key={`turn-reply-${processKey ?? userIdx}-${partIdx}`}
+                      className="my-1"
+                      data-message-text
+                      data-search-target={part.searchTarget || undefined}
+                    >
+                      <SafeMarkdownBody>{part.block.text}</SafeMarkdownBody>
+                    </div>
+                  );
+                }
+                const segCounts = new Map<ToolCategory, number>();
+                for (const item of part.items) {
+                  if (item.kind === "tool") {
+                    const category = getToolCategory(item.block.toolName);
+                    segCounts.set(category, (segCounts.get(category) ?? 0) + 1);
+                  }
+                }
+                const segCategorySummary = [...segCounts.entries()]
+                  .map(([category, count]) => `${count} ${t(TOOL_CATEGORY_LABEL_KEYS[category])}`)
+                  .join(" · ");
+                const segFailed = part.items.filter((item) => item.kind === "tool" && item.result?.isError).length;
+                let segFirstTs: number | undefined;
+                let segLastTs: number | undefined;
+                for (const item of part.items) {
+                  if (item.ts === undefined) continue;
+                  segLastTs = item.ts;
+                  segFirstTs ??= item.ts;
+                }
+                const segWorkedFor = segFirstTs !== undefined && segLastTs !== undefined && segLastTs > segFirstTs
+                  ? formatTurnDuration(segLastTs - segFirstTs)
+                  : undefined;
+                const segSummary = segWorkedFor
+                  ? (segFailed > 0
+                    ? t("chat.activity.workedForFailed", { duration: segWorkedFor, count: segFailed })
+                    : t("chat.activity.workedFor", { duration: segWorkedFor }))
+                  : segCategorySummary
+                    ? `${t("chat.processDetails")} · ${segCategorySummary}`
+                    : t("chat.processDetails");
+                return (
+                  <TurnTrace
+                    key={`turn-fold-${processKey ?? userIdx}-${partIdx}`}
+                    summary={segSummary}
+                    foldKey={processKey === undefined ? undefined : `process:${processKey}:${partIdx}`}
+                    defaultOpen={!finalAnswerMessage}
+                    reveal={part.items.some((item) => item.searchTarget)}
+                  >
+                    <TurnActivityBody
+                      items={part.items}
+                      cwd={messageCwd}
+                      onOpenFile={onOpenFile}
+                      onOpenSubagent={onOpenSubagent}
+                      sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+                    />
+                  </TurnTrace>
+                );
+              })}
             </div>,
           );
         }
@@ -1834,7 +1897,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     return { rendered, liveActivityRendered };
   }, [messages, entryIds, messageKeys, toolResultsMap, hasEarlierMessages, isStreaming, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
-     sessionIdRef, forkFromMessage, handleEditContent, onOpenFile, onOpenSubagent,
+     sessionIdRef, forkFromMessage, handleEditContent, onOpenFile, onOpenSubagent, streamingStore,
      isNew, messageRefs, bashRunning, editEntryId, cancelEdit, thinkingLevel, headTurn]);
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
   // 运行状态提示（等待模型、执行工具、运行命令、压缩上下文）不进消息列表：

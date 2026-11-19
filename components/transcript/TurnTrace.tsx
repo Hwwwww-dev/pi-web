@@ -47,7 +47,7 @@ export function TurnTrace({ summary, foldKey, defaultOpen, reveal = false, class
             <TraceIcon>
               <LayersIcon className="size-3.5" />
             </TraceIcon>
-            <TraceTitle className="font-medium">{summary}</TraceTitle>
+            <TraceTitle>{summary}</TraceTitle>
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="flex flex-col gap-2">
