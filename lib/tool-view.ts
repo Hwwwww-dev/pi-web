@@ -398,7 +398,9 @@ function prepare({ block, result, t }: ToolViewInput): Prepared {
     ? getPatchFiles(block, result)
     : null;
   const writtenFileText = getWrittenFileText(block);
-  const command = getToolCategory(block.toolName) === "terminal" && !streamingInput && typeof block.input.command === "string"
+  // 命令一有就显示：参数流式期间 command 字段一旦成形（部分内容也算）就亮出来，
+  // 运行中的折叠标题立刻能读到“运行 <命令>”，不再空著“运行”两个字。
+  const command = getToolCategory(block.toolName) === "terminal" && typeof block.input.command === "string"
     ? block.input.command
     : null;
   const isError = isFailedResult(block.toolName, result);

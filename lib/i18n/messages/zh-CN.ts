@@ -764,6 +764,7 @@ export const zhCNLocale: LocalePlugin = {
     "chat.activity.group.web": "发起了 {count} 次网络请求",
     "chat.activity.group.other": "调用了 {count} 个工具",
     "chat.activity.workedFor": "工作了 {duration}",
+    "chat.activity.working": "工作中",
     "chat.activity.categoryCount": "{count} 个{label}",
     "chat.activity.failedCount": "{count} 个失败",
     "chat.activity.subagentNotification": "子代理汇报",

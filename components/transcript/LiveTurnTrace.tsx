@@ -17,9 +17,10 @@ import { useStreamingSelector, selectStreamingMessage } from "@/hooks/useStreami
 import { createStreamingStore, type StreamingStore } from "@/lib/streaming-message";
 import { formatTurnDuration } from "@/lib/turn-duration";
 import { toToolView } from "@/lib/tool-view";
+import { getToolCategory } from "@/lib/tool-categories";
 import type { ActivityItem } from "@/lib/turn-view";
 import type { ThinkingContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
-import { ToolRow } from "../ActivityRows";
+import { ToolCategoryIcon, ToolRow } from "../ActivityRows";
 import { useTraceFold } from "./TraceRow";
 
 // 空闲 store 兜底：hooks 不能条件调用，未传 store 时订阅它（恒为初始态）。
@@ -59,28 +60,30 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
   const lastStreamingBlock = streamingBlocks.length > 0 ? streamingBlocks[streamingBlocks.length - 1] : undefined;
 
   // 标题的最新活动：先看正在流式的工具（它最新），没有再看已落盘的活动行。
-  // 工具行显示“动作 + 对象”（如“运行 npm test”），命令在开始流式时就出现；
-  // 编辑附变更数（+N −M），显示在右侧时长旁边。
-  const latestToolView = (() => {
+  // 行内折叠直接显示最新工具行本身（2026-11-20 用户拍板）：工具自己的分类图标
+  // + 动作 + 对象（如“运行 npm test”）；编辑附变更数（+N −M）在右侧时长旁边。
+  const latestTool = (() => {
     if (streamingTools.length > 0) {
-      return toToolView({ block: streamingTools[streamingTools.length - 1], t });
+      const block = streamingTools[streamingTools.length - 1];
+      return { block, view: toToolView({ block, t }) };
     }
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
       if (item.kind === "tool") {
         // 与 TraceRow 的行读法一致：动作 + 对象（如“运行 npm test”），
         // 只看标题的话所有终端工具都是同一个“运行”。
-        return toToolView({ block: item.block, result: item.result, t });
+        return { block: item.block, view: toToolView({ block: item.block, result: item.result, t }) };
       }
     }
     return undefined;
   })();
-  const toolTitle = latestToolView === undefined
+  const toolCategory = latestTool ? getToolCategory(latestTool.block.toolName) : undefined;
+  const toolTitle = latestTool === undefined
     ? undefined
-    : latestToolView.object
-      ? `${latestToolView.title} ${latestToolView.object}`
-      : latestToolView.title || undefined;
-  const diffStat = latestToolView?.diffStat;
+    : latestTool.view.object
+      ? `${latestTool.view.title} ${latestTool.view.object}`
+      : latestTool.view.title || undefined;
+  const diffStat = latestTool?.view.diffStat;
 
   // 思考进行中（流式末块是 thinking，或已落盘的最后一行是思考且没有更新的
   // 流式块）：标题显示思考的最新一行——流式文本在增长，末行随之更新，视觉
@@ -110,7 +113,7 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
     return () => clearInterval(timer);
   }, [startTs]);
 
-  const title = thinkingLine ?? toolTitle ?? t("chat.activity.workedFor", { duration: formatTurnDuration(elapsedMs) });
+  const title = thinkingLine ?? toolTitle ?? t("chat.activity.working");
 
   return (
     <Trace data-activity="turn">
@@ -118,9 +121,16 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
         <TraceCollapsibleTrigger aria-label={title}>
           <TraceLine status="running">
             <TraceIcon>
-              <LayersIcon className="size-3.5" />
+              {toolCategory !== undefined
+                ? <ToolCategoryIcon category={toolCategory} active={open} />
+                : <LayersIcon className="size-3.5" />}
             </TraceIcon>
-            <TraceTitle className="truncate">{title}</TraceTitle>
+            {thinkingLine
+              ? // 思考行截左保右（2026-11-20 用户拍板）：流式文本最新字在末尾，
+                // 宽度不够时省略开头（…789），末尾始终可见。direction:rtl 把溢出
+                // 与省略号赶到左侧，unicode-bidi:plaintext 保住行内 LTR 顺序。
+                <TraceTitle className="truncate text-left" style={{ direction: "rtl", unicodeBidi: "plaintext" }}>{thinkingLine}</TraceTitle>
+              : <TraceTitle className="truncate">{title}</TraceTitle>}
             {diffStat && (
               <TraceDescription>
                 <span className="text-success">+{diffStat.added}</span>{" "}

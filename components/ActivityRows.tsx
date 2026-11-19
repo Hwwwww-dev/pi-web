@@ -64,7 +64,7 @@ const CATEGORY_KIND: Record<ToolCategory, ToolViewKind> = {
   other: "generic",
 };
 
-function ToolCategoryIcon({ category, active = false }: { category: ToolCategory; active?: boolean }) {
+export function ToolCategoryIcon({ category, active = false }: { category: ToolCategory; active?: boolean }) {
   const kind = CATEGORY_KIND[category];
   return <>{active ? KIND_ACTIVE_ICONS[kind] : KIND_ICONS[kind]}</>;
 }

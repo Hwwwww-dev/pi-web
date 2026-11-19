@@ -116,14 +116,30 @@ test("the live turn fold titles thinking with its latest line, duration at the e
   assert.match(html, />12s</);
 });
 
-test("a live turn without any tool yet shows the worked-for title even collapsed", () => {
+test("a live turn without any tool yet shows the working title, duration only at the end", () => {
   clearExpandedToolCalls();
   const html = render(React.createElement(
     LiveTurnTrace,
     { items: [], startTs: Date.now() - 5_000, foldKey: "process:live-empty" },
     React.createElement("div"),
   ));
-  assert.match(html, /Worked for 5s/);
+  // 兑底标题“工作中”不再携带时长（时长只在行尾一处，2026-11-20 用户纠正）。
+  assert.match(html, /Working/);
+  assert.doesNotMatch(html, /Worked for/);
+  assert.match(html, />5s</);
+});
+
+test("a live terminal tool shows its command the moment input starts streaming", () => {
+  clearExpandedToolCalls();
+  const store = createStreamingStore();
+  const partial = { type: "toolCall", toolCallId: "t1", toolName: "bash", input: { command: "npm te" } };
+  store.dispatch({ type: "snapshot", message: { role: "assistant", content: [partial] } });
+  const html = render(React.createElement(
+    LiveTurnTrace,
+    { items: [], startTs: Date.now() - 1_000, foldKey: "process:live-cmd", store, mergeStreaming: true },
+  ));
+  // 空的“运行”修复：参数流式期间命令一有就亮出来（2026-11-20 用户报告）。
+  assert.match(html, /npm te/);
 });
 
 function renderRow(block, res, props = {}) {

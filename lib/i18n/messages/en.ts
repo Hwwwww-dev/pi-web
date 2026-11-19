@@ -764,6 +764,7 @@ export const enLocale: LocalePlugin = {
     "chat.activity.group.web": "Made {count} web requests",
     "chat.activity.group.other": "Called {count} tools",
     "chat.activity.workedFor": "Worked for {duration}",
+    "chat.activity.working": "Working",
     "chat.activity.categoryCount": "{count} {label}",
     "chat.activity.failedCount": "{count} failed",
     "chat.activity.subagentNotification": "Sub-agent update",
