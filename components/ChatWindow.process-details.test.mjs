@@ -41,9 +41,20 @@ test("the settled fold takes over the live fold's state and starts collapsed onc
     source,
     /<TurnTrace[\s\S]*?foldKey=\{processKey === undefined \? undefined : `process:\$\{processKey\}:\$\{partIdx\}`\}[\s\S]*?defaultOpen=\{!finalAnswerMessage\}/,
   );
+  // 活跃回合：已完成段直接用完成态 TurnTrace（冻结汇总，不再走秒——pi 常把
+  // thinking/中间回复/工具写进同一条 assistant 条目，相邻段首条目时间戳相同，
+  // 两把秒表会同秒同跳）；只有最后一段挂 LiveTurnTrace。
   assert.match(
     source,
-    /<LiveTurnTrace[\s\S]*?foldKey=\{entryIds\[userIdx\] === undefined \? undefined : `process:\$\{entryIds\[userIdx\]\}:\$\{partIdx\}`\}/,
+    /const segFoldKey = entryIds\[userIdx\] === undefined \? undefined : `process:\$\{entryIds\[userIdx\]\}:\$\{partIdx\}`;/,
+  );
+  assert.match(
+    source,
+    /<TurnTrace[\s\S]*?summary=\{segmentSummaryText\(part\.items, t\)\}[\s\S]*?foldKey=\{segFoldKey\}[\s\S]*?defaultOpen=\{false\}/,
+  );
+  assert.match(
+    source,
+    /<LiveTurnTrace[\s\S]*?foldKey=\{segFoldKey\}[\s\S]*?mergeStreaming\n/,
   );
   // 首条 assistant 条目落盘前的思考期也挂折叠（消死区）：与 isLiveTail 首段同键 :0。
   assert.match(
