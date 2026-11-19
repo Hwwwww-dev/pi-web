@@ -231,8 +231,9 @@ test("mounts on whole turns, auto disk reads are gone, and the menu reload re-mo
   assert.match(reloadSource, /await loadSession\(sid, true, true, \{ force: true \}\)/);
   assert.match(reloadSource, /onReloadSessionChange\?\.\(reloadSession\)/);
   assert.match(source, /await loadSession\(sid\)/);
-  // force 读只有三处:挂载、手动重载、bash 输出落盘后的刷新(550acf47)。
-  assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 3);
+  // force 读只有四处：挂载、手动重载、bash 输出落盘后的刷新（550acf47）、
+  // 超宽限期回页的补读（离开期间事件流已释放，落盘变化只有回页这一刻能看见）。
+  assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 4);
 });
 
 test("forking stays available during a run while in-session branch switches wait for it", () => {
@@ -478,6 +479,19 @@ test("keeps the selected session warm while idle and renews its lease", () => {
   assert.match(chatWindowSource, /session, sessionRunning, newSessionCwd/);
   assert.match(appShellSource, /runningSessionIds\.has\(activeChatSession\.id\)/);
   assert.match(appShellSource, /onRunningSessionIdsChange=\{handleRunningSessionIdsChange\}/);
+});
+
+test("a page back past the hidden grace forces one catch-up read", () => {
+  // 宽限期释放事件流后，离开期间落盘的变化没有流可补：回页超宽限期时强制读一次。
+  const visibleSource = source.slice(
+    source.indexOf("const hiddenSinceRef"),
+    source.indexOf("  // Load session on mount"),
+  );
+
+  assert.match(visibleSource, /document\.visibilityState === "hidden"/);
+  assert.match(visibleSource, /Date\.now\(\) - hiddenSince < HIDDEN_PAGE_GRACE_MS/);
+  assert.match(visibleSource, /if \(agentRunningRef\.current\) return;/);
+  assert.match(visibleSource, /loadSession\(sid, false, false, \{ force: true \}\)/);
 });
 
 test("opens the selected session's event stream even when Strict Mode re-runs effects", () => {

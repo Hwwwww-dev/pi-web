@@ -1708,6 +1708,33 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     };
   }, [closeEvents, eventStreamIdle, eventStreamReattachCount, requestLease, session?.id]);
 
+  // 页面 hidden 超过宽限期后回到可见，补读一次会话：宽限期一过事件流已被释放
+  // （上方 closeEvents("released")），离开期间落盘的变化没有流可补，只有回页这一
+  // 刻能看见。每个 hidden→visible 周期至多一次（hidden 时间戳被消费即清空）；
+  // 运行中跳过——运行中已有 reconcile 链与 settle 后的 loadSession 兜底，中途
+  // 强刷只会让流式视图闪烁。loadSession 自带 single-flight 与 revision 未变时
+  // 保留已载窗口，重复请求天然廉价，不需要额外去重。
+  const hiddenSinceRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (document.visibilityState === "hidden" && hiddenSinceRef.current === null) {
+      hiddenSinceRef.current = Date.now();
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenSinceRef.current = Date.now();
+        return;
+      }
+      const hiddenSince = hiddenSinceRef.current;
+      hiddenSinceRef.current = null;
+      if (hiddenSince === null || Date.now() - hiddenSince < HIDDEN_PAGE_GRACE_MS) return;
+      if (agentRunningRef.current) return;
+      const sid = sessionIdRef.current;
+      if (sid) void loadSession(sid, false, false, { force: true });
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [loadSession]);
+
   const addNotice = useCallback((notice: { id?: string; message: string; type?: NoticeType }) => {
     const message = notice.message.trim();
     if (!message) return;
