@@ -2763,7 +2763,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         aria-label={t("chat.attachFiles")}
                         className={cn(
                           "rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                          attachedImages.length > 0 && "text-primary",
+                          attachedImages.length > 0 && "text-foreground",
                         )}
                       >
                         <ImageIcon data-icon="inline-start" strokeWidth={1.8} aria-hidden="true" />
@@ -2855,7 +2855,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         isCompacting
                           ? "text-destructive hover:bg-destructive/10 hover:text-destructive"
                           : onToolPresetChange && !isStreaming && rawToolPresetLabel === "full"
-                            ? "text-primary hover:bg-accent hover:text-accent-foreground"
+                            ? "text-foreground hover:bg-accent hover:text-accent-foreground"
                             : onToolPresetChange && !isStreaming && rawToolPresetLabel === "chat-only"
                               ? "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                               : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",

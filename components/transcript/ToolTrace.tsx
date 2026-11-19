@@ -60,21 +60,21 @@ export const KIND_ICONS: Record<ToolViewKind, ReactNode> = {
   generic: <WrenchIcon className={cn(ICON_CLASS, "text-muted-foreground")} />,
 };
 
-/** 展开态使用该类别自身的颜色，不加粗、不用纯黑。 */
+/** 展开态只提亮，不上色：图标的强调由亮度表达，颜色跟着前景走。 */
 export const KIND_ACTIVE_ICONS: Record<ToolViewKind, ReactNode> = {
-  terminal: <SquareTerminalIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  "file-read": <FileTextIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  "file-write": <FilePenIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  "file-edit": <NotebookPenIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  search: <SearchIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  web: <GlobeIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  codemode: <CodeXmlIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  subagent: <BotIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  mcp: <PlugIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  queue: <ListTodoIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  question: <MessageCircleQuestionIcon className={cn(ICON_CLASS, "text-primary/70")} />,
-  compact: <Minimize2Icon className={cn(ICON_CLASS, "text-primary/70")} />,
-  generic: <WrenchIcon className={cn(ICON_CLASS, "text-primary/70")} />,
+  terminal: <SquareTerminalIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  "file-read": <FileTextIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  "file-write": <FilePenIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  "file-edit": <NotebookPenIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  search: <SearchIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  web: <GlobeIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  codemode: <CodeXmlIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  subagent: <BotIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  mcp: <PlugIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  queue: <ListTodoIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  question: <MessageCircleQuestionIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  compact: <Minimize2Icon className={cn(ICON_CLASS, "text-foreground/70")} />,
+  generic: <WrenchIcon className={cn(ICON_CLASS, "text-foreground/70")} />,
 };
 
 const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {

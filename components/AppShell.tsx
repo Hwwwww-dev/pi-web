@@ -2959,7 +2959,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               </div>
             ) : (
               <div className="pointer-events-none absolute top-3 left-3 flex select-none items-start gap-2">
-                <ArrowLeftIcon className="size-11 shrink-0 text-primary opacity-70" strokeWidth={1.5} />
+                <ArrowLeftIcon className="size-11 shrink-0 text-foreground opacity-70" strokeWidth={1.5} />
                 <div>
                    <div className="mb-2 text-lg font-semibold text-foreground">{translate("workspace.getStarted")}</div>
                   <div className="text-xs leading-[1.8] text-muted-foreground">

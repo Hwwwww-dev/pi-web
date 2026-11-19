@@ -253,7 +253,7 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
         >
           <TraceLine status={active ? "running" : undefined}>
             <TraceIcon>
-              <BrainIcon className={cn("size-3.5", expanded ? "text-primary/70" : "text-muted-foreground")} />
+              <BrainIcon className={cn("size-3.5", expanded ? "text-foreground/70" : "text-muted-foreground")} />
             </TraceIcon>
             <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
             {!active && duration !== undefined && formatToolDurationIfShown(duration * 1000) && (
