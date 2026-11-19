@@ -134,6 +134,7 @@ import { createSideChat, deleteSideChat } from "@/lib/side-chat-client";
 import { getAgentsBadge, getSessionFamily, isHiddenRelation, sideChatTitle } from "@/lib/session-family";
 import { getLastSettingsSection, type SettingsSection } from "@/lib/settings-navigation";
 import { focusIfLost } from "@/lib/stacked-dialog";
+import { claimDoneChime } from "@/lib/done-chime";
 
 type SessionCopyField = "file" | "id" | "projectDir" | "gitBranch" | "gitWorktree";
 type AutoNameStatus =
@@ -217,8 +218,10 @@ export function AppShell() {
   // markers exclude ("already looking" — false while hidden). The favicon keeps
   // their badge until the tab is opened again; never persisted, never dotted.
   const [hiddenFinishedSessionIds, setHiddenFinishedSessionIds] = useState<Set<string>>(new Set());
-  const handleBackgroundTaskDone = useCallback(() => {
-    if (soundEnabledRef.current) playDoneSound();
+  // The page showing that session, or another page's sidebar, may have chimed
+  // for the same completion already (#1688).
+  const handleBackgroundTaskDone = useCallback((sessionIds: string[], since: number) => {
+    if (soundEnabledRef.current && claimDoneChime(sessionIds, since)) playDoneSound();
   }, [playDoneSound, soundEnabledRef]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   // Latest selection readable from async callbacks whose captured state is
