@@ -42,7 +42,7 @@ export const zhTWLocale: LocalePlugin = {
     "settings.themeDark": "深色",
     "settings.themeSystem": "跟隨系統",
     "settings.themeGroupBuiltin": "內建",
-    "settings.themeGroupEditors": "編輯器配色",
+    "settings.themeGroupEditors": "更多配色",
     "settings.themeVscodeLight": "VS Code 淺色",
     "settings.themeVscodeDark": "VS Code 深色",
     "settings.themeGithubLight": "GitHub 淺色",
