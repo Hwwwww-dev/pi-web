@@ -2652,10 +2652,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           >
             <InputGroup
               className={cn(
-                // bg-card! 压过基类的 dark:bg-input/30（≈4.5% 透明），否则暗色下卡片
-                // 透明、消息文字直接穿透输入区。chat-composer-halo（globals.css）
-                // 是卡片向外四周的羽化光晕：浮动时遮住贴近卡片的消息，远离即透。
-                "chat-composer-row chat-composer-halo min-w-0 rounded-[24px] border-border bg-card!",
+                // 输入卡片半透明（暗色基类 dark:bg-input/30）：消息隐约透出；
+                // 贴近卡片的消息由 chat-composer-halo（globals.css）的羽化光晕遮住，
+                // 远离即透，不再需要实心卡片（2026-11-20 用户要求回到透明）。
+                "chat-composer-row chat-composer-halo min-w-0 rounded-[24px] border-border",
                 compact
                   ? "flex-row items-center gap-1 rounded-[18px] p-1.5"
                   : "flex-col items-stretch gap-0 p-2",
