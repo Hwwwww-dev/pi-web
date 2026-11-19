@@ -16,6 +16,7 @@ import type {
   UserMessage,
 } from "@/lib/types";
 import { isBlockingExtensionUiRequest } from "@/lib/browser-notifications";
+import { SESSION_AWAY_RELOAD_MS, clearSessionAway, readSessionAway, recordSessionAway } from "@/lib/session-away";
 import { normalizeToolCalls } from "@/lib/normalize";
 import { AgentCommandError, agentStatusUrl, EXTENSION_REPORTED_CODE, isPromptRejectedError, sendAgentCommand } from "@/lib/agent-client";
 import { createSideChat, SIDE_REFUSAL_MESSAGES } from "@/lib/side-chat-client";
@@ -2155,6 +2156,40 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   useEffect(() => {
     agentRunningRef.current = agentRunning;
   }, [agentRunning]);
+
+  // 离开 ≥30s 的活跃会话回来时整窗骨架重载（2026-11-20 用户需求）：切走时记
+  // 下会话与离开时间（localStorage，跨刷新存活，仅活跃会话——跑着的回合/命令）；
+  // 回来时若这段 JS 上下文没刷过（内存标记还在），按手动重新加载的样子
+  // loadSession(…, true)；页面若重新挂载（刷新/重开），挂载时删掉遗留记录，
+  // 走正常初始化，不做骨架重载。
+  const awayWhileMountedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (readSessionAway()) clearSessionAway();
+  }, []);
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        const sid = sessionIdRef.current;
+        if (sid && (agentRunningRef.current || bashRunningRef.current)) {
+          recordSessionAway(sid);
+          awayWhileMountedRef.current = sid;
+        }
+        return;
+      }
+      const away = awayWhileMountedRef.current;
+      if (!away) return;
+      awayWhileMountedRef.current = null;
+      const record = readSessionAway();
+      clearSessionAway();
+      const sid = sessionIdRef.current;
+      if (!record || record.sessionId !== away || !sid || sid !== away) return;
+      if (Date.now() - record.leftAt < SESSION_AWAY_RELOAD_MS) return;
+      // 和点击重新加载一样：整窗骨架。
+      void loadSession(sid, true);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [loadSession]);
 
   // Dormancy: a keep-alive slot hidden beyond DORMANT_AFTER_MS unloads its
   // message list (the DOM is the memory cost); reactivation reloads once.
