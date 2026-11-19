@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import {
   DEFAULT_FONT_PREFERENCES,
   FONT_STORAGE_KEYS,
-  FONT_WEIGHT_DEFAULT,
+  FONT_WEIGHT_BASE,
   fontFamilyOverride,
   readFontPreference,
   readFontWeight,
@@ -23,7 +23,7 @@ function readStoredPreferences(): FontPreferences {
     try {
       next[kind] = readFontPreference(window.localStorage.getItem(FONT_STORAGE_KEYS[kind]));
       const weightKey = `${kind}Weight` as const;
-      next[weightKey] = readFontWeight(window.localStorage.getItem(FONT_STORAGE_KEYS[weightKey]));
+      next[weightKey] = readFontWeight(window.localStorage.getItem(FONT_STORAGE_KEYS[weightKey]), FONT_WEIGHT_BASE[kind]);
     } catch {
       // Browser preferences remain usable when storage is blocked.
     }
@@ -38,7 +38,7 @@ function applyPreferences(next: FontPreferences): void {
     if (value) document.documentElement.style.setProperty(property, value);
     else document.documentElement.style.removeProperty(property);
     const weight = next[`${kind}Weight`];
-    if (weight === FONT_WEIGHT_DEFAULT) document.documentElement.style.removeProperty(`${property}-weight`);
+    if (weight === FONT_WEIGHT_BASE[kind]) document.documentElement.style.removeProperty(`${property}-weight`);
     else document.documentElement.style.setProperty(`${property}-weight`, String(weight));
   }
 }
@@ -99,12 +99,12 @@ export function setFontPreference(kind: FontKind, value: string): void {
 }
 
 export function setFontWeight(kind: FontKind, value: number): void {
-  setPreferences({ ...getSnapshot(), [`${kind}Weight`]: readFontWeight(value) });
+  setPreferences({ ...getSnapshot(), [`${kind}Weight`]: readFontWeight(value, FONT_WEIGHT_BASE[kind]) });
 }
 
 /** Reset this font's family and weight together, leaving the other font unchanged. */
 export function resetFontPreference(kind: FontKind): void {
-  setPreferences({ ...getSnapshot(), [kind]: "", [`${kind}Weight`]: FONT_WEIGHT_DEFAULT });
+  setPreferences({ ...getSnapshot(), [kind]: "", [`${kind}Weight`]: FONT_WEIGHT_BASE[kind] });
 }
 
 export function useFontPreferences() {

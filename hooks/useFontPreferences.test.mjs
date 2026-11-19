@@ -46,7 +46,7 @@ test("server rendering uses stable defaults without touching browser APIs", () =
   const store = fixture({ server: true });
   assert.equal(store.useFontPreferences().ui, "");
   assert.equal(store.useFontPreferences().mono, "");
-  assert.equal(store.useFontPreferences().uiWeight, 400);
+  assert.equal(store.useFontPreferences().uiWeight, 300);
   assert.equal(store.useFontPreferences().monoWeight, 400);
 });
 
@@ -67,7 +67,7 @@ test("weight edits preserve font names, notify consumers and reset one font atom
   } });
   let notifications = 0;
   const stop = store.subscribeFontPreferences(() => notifications++);
-  assert.equal(store.useFontPreferences().uiWeight, 400, "older preferences retain Regular");
+  assert.equal(store.useFontPreferences().uiWeight, 300, "older preferences retain the light interface base");
   assert.equal(store.useFontPreferences().monoWeight, 600);
   assert.equal(store.applied.get("--font-mono-weight"), "600");
   store.setFontWeight("ui", 500);
@@ -81,7 +81,7 @@ test("weight edits preserve font names, notify consumers and reset one font atom
   store.resetFontPreference("ui");
   assert.equal(notifications, 3, "resetting family and weight is one update");
   assert.equal(store.useFontPreferences().ui, "");
-  assert.equal(store.useFontPreferences().uiWeight, 400);
+  assert.equal(store.useFontPreferences().uiWeight, 300);
   assert.equal(store.applied.has("--font-ui"), false);
   assert.equal(store.applied.has("--font-ui-weight"), false);
   assert.equal(store.stored.has(fonts.FONT_STORAGE_KEYS.uiWeight), false);
@@ -138,7 +138,7 @@ test("storage changes in another tab, including clear, update the current page",
   store.events.get("storage")({ key: null });
   assert.equal(store.useFontPreferences().ui, "");
   assert.equal(store.applied.size, 0);
-  assert.equal(store.useFontPreferences().uiWeight, 400);
+  assert.equal(store.useFontPreferences().uiWeight, 300);
   assert.equal(notifications, 3);
   stop();
 });
@@ -150,7 +150,7 @@ test("blocked storage and malformed saved values leave usable defaults and live 
     [fonts.FONT_STORAGE_KEYS.monoWeight]: "1000",
   } });
   assert.equal(invalid.useFontPreferences().ui, "");
-  assert.equal(invalid.useFontPreferences().uiWeight, 400);
+  assert.equal(invalid.useFontPreferences().uiWeight, 300);
   assert.equal(invalid.useFontPreferences().monoWeight, 400);
   assert.equal(invalid.applied.size, 0);
   const blocked = fixture({ blocked: true });

@@ -2,7 +2,7 @@
 
 import { useI18n } from "@/hooks/useI18n";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
-import { FONT_FAMILY_MAX_LENGTH, FONT_WEIGHT_DEFAULT, FONT_WEIGHT_OPTIONS } from "@/lib/font-preferences";
+import { FONT_FAMILY_MAX_LENGTH, FONT_WEIGHT_BASE, FONT_WEIGHT_OPTIONS } from "@/lib/font-preferences";
 import { ConfigButton } from "./SettingsUi";
 import { Field, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
@@ -65,7 +65,7 @@ export function FontSettings() {
               className="size-7 p-0"
               title={t(reset)}
               aria-label={t(reset)}
-              disabled={!fonts[kind] && weight === FONT_WEIGHT_DEFAULT}
+              disabled={!fonts[kind] && weight === FONT_WEIGHT_BASE[kind]}
               onClick={() => fonts.resetFontPreference(kind)}
             >
               <RotateCcwIcon size={14} strokeWidth={1.8} />
