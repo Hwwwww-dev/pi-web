@@ -58,6 +58,7 @@ export const zhTWLocale: LocalePlugin = {
     "settings.quoteSelection": "選取文字時顯示操作浮窗",
     "settings.cacheMissNotices": "顯示快取與費用提示",
     "settings.completionSound": "完成提示音",
+    "settings.composerBeam": "輸入框光帶",
     "settings.sidebar": "側邊欄",
     "settings.filesPlacement": "檔案瀏覽器",
     "settings.filesPlacementBelow": "工作階段下方",

@@ -58,6 +58,7 @@ export const zhCNLocale: LocalePlugin = {
     "settings.quoteSelection": "选中文字时显示操作浮窗",
     "settings.cacheMissNotices": "显示缓存与费用提示",
     "settings.completionSound": "完成提示音",
+    "settings.composerBeam": "输入框光带",
     "settings.sidebar": "侧边栏",
     "settings.filesPlacement": "文件浏览器",
     "settings.filesPlacementBelow": "会话下方",

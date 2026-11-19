@@ -88,9 +88,9 @@ test("groups fonts, chat font size and width with the chat switches, without row
   for (const key of ["chatContentWidth", "chatContentFontSize"]) {
     assert.match(chatOptions, new RegExp(`t\\("settings\\.${key}"\\)`));
   }
-  assert.equal((chatOptions.match(/<Field\b/g) ?? []).length, 7);
-  assert.equal((chatOptions.match(/<ConfigSwitch/g) ?? []).length, 4);
-  for (const key of ["thinkingExpandedDefault", "chatContentWidth", "chatContentFontSize", "quoteSelection", "completionSound", "enterSendMode", "enterSendModeEnter", "enterSendModeCtrlEnter"]) {
+  assert.equal((chatOptions.match(/<Field\b/g) ?? []).length, 8);
+  assert.equal((chatOptions.match(/<ConfigSwitch/g) ?? []).length, 5);
+  for (const key of ["thinkingExpandedDefault", "chatContentWidth", "chatContentFontSize", "quoteSelection", "completionSound", "composerBeam", "enterSendMode", "enterSendModeEnter", "enterSendModeCtrlEnter"]) {
     assert.match(chatOptions, new RegExp(`t\\("settings\\.${key}"\\)`));
   }
   assert.doesNotMatch(panelSource, /ThinkingIcon|settings-thinking-/);

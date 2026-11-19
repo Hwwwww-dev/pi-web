@@ -58,6 +58,7 @@ export const enLocale: LocalePlugin = {
     "settings.quoteSelection": "Show actions for selected text",
     "settings.cacheMissNotices": "Show cache and cost notices",
     "settings.completionSound": "Completion sound",
+    "settings.composerBeam": "Composer beam",
     "settings.sidebar": "Sidebar",
     "settings.filesPlacement": "File browser",
     "settings.filesPlacementBelow": "Below sessions",

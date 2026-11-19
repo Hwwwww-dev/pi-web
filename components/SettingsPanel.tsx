@@ -36,6 +36,7 @@ import {
   useChatAppearance,
 } from "@/hooks/useChatAppearance";
 import { useEnterSendMode, setEnterSendMode } from "@/hooks/useEnterSendMode";
+import { useComposerBeam, setComposerBeamEnabled } from "@/hooks/useComposerBeam";
 import { useFilesPlacement, setFilesPlacement } from "@/hooks/useFilesPlacement";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ProjectTrustStatus, ToolSettingsResponse } from "@/lib/api-types";
@@ -127,6 +128,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   const { preference, setThemePreference } = useTheme();
   const { width: chatContentWidth, setWidth: setChatContentWidth, fontSize, setFontSize } = useChatAppearance();
   const enterSendMode = useEnterSendMode();
+  const composerBeam = useComposerBeam();
   const filesPlacement = useFilesPlacement();
   const [shellSaving, setShellSaving] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
@@ -422,6 +424,16 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
           checked={soundEnabled}
           label={t("settings.completionSound")}
           onChange={() => onSoundToggle()}
+        />
+      </Field>
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel className={rowLabelClass}>{t("settings.composerBeam")}</FieldLabel>
+        </FieldContent>
+        <ConfigSwitch
+          checked={composerBeam}
+          label={t("settings.composerBeam")}
+          onChange={setComposerBeamEnabled}
         />
       </Field>
       <Field orientation="horizontal">

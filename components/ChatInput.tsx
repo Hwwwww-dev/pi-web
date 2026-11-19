@@ -36,6 +36,7 @@ import { DismissButton } from "./DismissButton";
 import { useCoarsePointer, useIsMobile } from "@/hooks/useIsMobile";
 import { useTheme } from "@/hooks/useTheme";
 import { useEnterSendMode } from "@/hooks/useEnterSendMode";
+import { useComposerBeam } from "@/hooks/useComposerBeam";
 import { useI18n } from "@/hooks/useI18n";
 import { useChatAppearance } from "@/hooks/useChatAppearance";
 import { useStreamBeamPlaybackRate } from "@/hooks/useStreamBeamPlaybackRate";
@@ -893,8 +894,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   // desktop shortcut instead of inheriting the phone's Ctrl/Cmd+Enter.
   const touchKeyboard = useCoarsePointer();
   const enterSendMode = useEnterSendMode();
+  const composerBeam = useComposerBeam();
+  // 边光总开关（设置 › Chat）：关闭时彻底不出光带，也不采样播放速率。
+  const beamActive = composerBeam && isStreaming && !compact;
   // 边光播放速率：速率连续积分，仅调整 playbackRate（修改 duration 会重启动画）。
-  const beamPlaybackRate = useStreamBeamPlaybackRate(isStreaming && !compact, draftKey ?? "new");
+  const beamPlaybackRate = useStreamBeamPlaybackRate(beamActive, draftKey ?? "new");
   const beamRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const root = beamRef.current;
@@ -910,12 +914,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     // 动画可能在激活后的下一帧才挂上，也可能因组件重渲染被重建（速率重置为 1x）。
     // 固定 interval 比一次性 effect 可靠，且仅在播放期间运行。
     const frame = requestAnimationFrame(apply);
-    const timer = isStreaming && !compact ? window.setInterval(apply, 400) : 0;
+    const timer = beamActive ? window.setInterval(apply, 400) : 0;
     return () => {
       cancelAnimationFrame(frame);
       if (timer) window.clearInterval(timer);
     };
-  }, [beamPlaybackRate, isStreaming, compact]);
+  }, [beamPlaybackRate, beamActive, isStreaming, compact]);
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>(() => (
     draftKey ? draftImagesToAttachedImages(getDraft(draftKey)?.images) : []
@@ -2632,7 +2636,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               stays put while typing). */}
           <BorderBeam
             ref={beamRef}
-            active={isStreaming && !compact}
+            active={beamActive}
             size="md"
             colorVariant="colorful"
             strength={0.7}
