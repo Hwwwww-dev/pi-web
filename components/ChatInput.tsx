@@ -2707,6 +2707,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               ref={textareaRef}
               className={cn(
                 "chat-input-textarea w-full min-w-0 px-2.5 py-2 leading-[1.55] text-foreground overflow-auto placeholder:text-muted-foreground",
+                // `ui/textarea` 带 `field-sizing-content`：内容多高就多高，inline 的
+                // `height` 被无视，resizeTextarea 的 176px 上限形同虚设。ui/ 不手改，
+                // 在调用点盖回来。
+                "field-sizing-fixed",
                 compact ? "min-h-24" : "min-h-11",
               )}
               data-chat-composer=""
