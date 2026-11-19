@@ -12,30 +12,53 @@ import {
   TraceTitle,
 } from "@/components/ui/trace";
 import { useI18n } from "@/hooks/useI18n";
+import { useStreamingSelector, selectStreamingMessage } from "@/hooks/useStreamingSelector";
+import { createStreamingStore, type StreamingStore } from "@/lib/streaming-message";
 import { formatTurnDuration } from "@/lib/turn-duration";
 import { toToolView } from "@/lib/tool-view";
 import type { ActivityItem } from "@/lib/turn-view";
+import type { ToolCallContent, ToolResultMessage } from "@/lib/types";
+import { ToolRow } from "../ActivityRows";
 import { useTraceFold } from "./TraceRow";
+
+// 空闲 store 兜底：hooks 不能条件调用，未传 store 时订阅它（恒为初始态）。
+const IDLE_STREAMING_STORE = createStreamingStore();
 
 /**
  * 活跃回合的整轮折叠（2026-11-20 产品决策，替代旧的“流式平铺活动行”）：默认
  * 收起，行标题显示最新那个工具；展开后标题切换为“工作了 x”秒表（按秒刷新）。
- * 折叠键与完成态 TurnTrace 共用 `process:{entryId}`，settle 交换帧按已记录的
- * 选择原样接管展开/收起状态，不再有“先展开再自动收起”的过渡。
+ * 正在流式的工具块（还在 store 里、没落到 messages）也算最新工具：标题即时
+ * 切到它，展开后在工具列表末尾以运行中行出现——否则每个工具都会先在气泡里
+ * 平铺、message_end 后再“收进去”，视觉上折叠两次。折叠键与完成态 TurnTrace
+ * 共用 `process:{entryId}`，settle 交换帧按已记录的选择原样接管展开/收起状态。
  */
-export function LiveTurnTrace({ items, startTs, foldKey, children }: {
+export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd, onOpenFile, onOpenSubagent, children }: {
   items: ActivityItem[];
   /** 回合锚点（用户消息）的 pi 时间戳：秒表的起点。 */
   startTs?: number;
   /** 与完成态 TurnTrace 同键，折叠选择跨 settle 交换帧保留。 */
   foldKey?: string;
+  /** 本会话的流式 store：读正在写的消息里的工具块。 */
+  store?: StreamingStore;
+  toolResults?: Map<string, ToolResultMessage>;
+  cwd?: string;
+  onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
+  onOpenSubagent?: (sessionId: string, label: string) => void;
   children: ReactNode;
 }) {
   const { t } = useI18n();
   const { open, onOpenChange } = useTraceFold(foldKey, false);
+  const streamingMessage = useStreamingSelector(store ?? IDLE_STREAMING_STORE, selectStreamingMessage);
+  const streamingTools = (streamingMessage?.content ?? []).filter(
+    (block): block is ToolCallContent => block.type === "toolCall",
+  );
 
-  // 收起且已有工具可显示时，标题就是最新工具，秒表不跑也无需重渲染。
+  // 标题的最新工具：先看正在流式的（它最新），没有再看已落盘的活动行。
   const latestToolTitle = (() => {
+    if (streamingTools.length > 0) {
+      const view = toToolView({ block: streamingTools[streamingTools.length - 1], t });
+      return view.object ? `${view.title} ${view.object}` : view.title;
+    }
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
       if (item.kind === "tool") {
@@ -77,7 +100,20 @@ export function LiveTurnTrace({ items, startTs, foldKey, children }: {
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="flex flex-col gap-2">
-          <Trace>{children}</Trace>
+          <Trace>
+            {children}
+            {streamingTools.map((block) => (
+              <ToolRow
+                key={`streaming-${block.toolCallId ?? block.toolName}`}
+                block={block}
+                // 结果还没落盘：行内订阅活跃结果，输出事件只更新它自己。
+                result={toolResults?.get(block.toolCallId ?? "")}
+                cwd={cwd}
+                onOpenFile={onOpenFile}
+                onOpenSubagent={onOpenSubagent}
+              />
+            ))}
+          </Trace>
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>

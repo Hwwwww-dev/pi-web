@@ -239,12 +239,18 @@ function StreamingReply({ store, messageKey, toolResults, modelNames, cwd, onOpe
   onOpenSubagent: React.ComponentProps<typeof MessageView>["onOpenSubagent"];
 }) {
   const streamingMessage = useStreamingSelector(store, selectStreamingMessage);
-  if (!streamingMessage) return null;
+  // 活跃回合的思考与工具由折叠行承担（LiveTurnTrace）：气泡只画正在写的文本。
+  // 否则每个工具都会先在气泡里平铺、message_end 后再“收进去”，视觉上折叠两次；
+  // 思考同理。纯工具/思考流式帧没有文本，不出气泡。
+  const textMessage = streamingMessage
+    ? { ...streamingMessage, content: streamingMessage.content.filter((block) => block.type === "text") }
+    : null;
+  if (!textMessage || textMessage.content.length === 0) return null;
   return (
     // 回复气泡入场：淡入 + 轻微上移，每轮运行挂载时播一次。
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
       <MessageView
-        message={streamingMessage as AgentMessage}
+        message={textMessage as AgentMessage}
         toolResults={toolResults}
         isStreaming
         messageKey={messageKey}
@@ -1621,14 +1627,20 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             searchEntryId: pendingSearchScroll?.entryId,
             searchBlock,
           });
-          if (liveItems.length > 0) {
-            liveActivityRendered = true;
-            rendered.push(
+          // 折叠行整个运行期都在：首轮还在思考/等待首块落盘时也显示秒表，
+          // 而不是等第一条活动行落盘才凭空出现。
+          liveActivityRendered = true;
+          rendered.push(
               <LiveTurnTrace
                 key={`live-activity-${entryIds[userIdx] ?? userIdx}`}
                 items={liveItems}
                 startTs={(messages[userIdx] as (AgentMessage & { timestamp?: number })).timestamp}
                 foldKey={entryIds[userIdx] === undefined ? undefined : `process:${entryIds[userIdx]}`}
+                store={streamingStore}
+                toolResults={toolResultsMap}
+                cwd={messageCwd}
+                onOpenFile={onOpenFile}
+                onOpenSubagent={onOpenSubagent}
               >
                 <TurnActivityBody
                   items={liveItems}
@@ -1640,7 +1652,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 />
               </LiveTurnTrace>,
             );
-          }
           // 活动行不渲染用户消息：流式段内助手之后入列的排队/引导用户消息在
           // 实时段末尾原样渲染，保持「已排队」可见。
           for (let queuedIdx = userIdx + 1; queuedIdx < endIdx; queuedIdx++) {

@@ -41,6 +41,11 @@ test("the settled fold takes over the live fold's state and starts collapsed onc
     /<LiveTurnTrace[\s\S]*?foldKey=\{entryIds\[userIdx\] === undefined \? undefined : `process:\$\{entryIds\[userIdx\]\}`\}/,
   );
   assert.doesNotMatch(source, /justSettled/);
+  // 气泡只画文本：思考与工具由折叠承担，避免每个工具先平铺再收进去的两次折。
+  assert.match(
+    source,
+    /content: streamingMessage\.content\.filter\(\(block\) => block\.type === "text"\)/,
+  );
 });
 
 test("passes a grouped turn's MessageViews the same copies on every render (#1005)", async () => {

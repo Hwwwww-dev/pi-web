@@ -427,7 +427,8 @@ test("delegates event stream readiness and hides an empty agent phase", () => {
   assert.match(ensureSource, /eventConnectionRef\.current!\.maintain\(sid\)/);
   assert.match(chatWindowSource, /const hasStreamingContent = useStreamingSelector\(streamingStore, selectHasStreamingContent\)/);
   assert.match(chatWindowSource, /isStreaming && hasStreamingContent && \(\s*<StreamingReply store=\{streamingStore\}/);
-  assert.match(chatWindowSource, /if \(!streamingMessage\) return null;/);
+  // 气泡只画文本（思考/工具归 LiveTurnTrace）：纯工具/思考流式帧不出气泡。
+  assert.match(chatWindowSource, /if \(!textMessage \|\| textMessage\.content\.length === 0\) return null;/);
   // 阶段文案是叶子（ActivityNoticeLine，住在 ChatInput）：订阅 agentPhaseStore，
   // 条件与旧内联版一致——活动行在场时不显示，命令优先于阶段。
   assert.match(chatWindowSource, /<ActivityNoticeLine\s+store=\{agentPhaseStore\}/);
@@ -593,8 +594,10 @@ test("reconnects active shell output to its streaming tool call", () => {
   assert.match(updateSource, /content,/);
   assert.match(endSource, /activeToolsStore\.remove\(id\)/);
   assert.match(chatWindowSource, /const map = new Map<string, ToolResultMessage>\(\)/);
-  assert.match(chatWindowSource, /<StreamingReply store=\{streamingStore\}[^>]*toolResults=\{toolResultsMap\}/);
-  assert.match(chatWindowSource, /message=\{streamingMessage as AgentMessage\}\s+toolResults=\{toolResults\}/);
+  // 流式工具行现在住在 LiveTurnTrace 的折叠体里（store + 活跃结果都交给它），
+  // 气泡只剩文本。
+  assert.match(chatWindowSource, /<LiveTurnTrace[\s\S]*?store=\{streamingStore\}[\s\S]*?toolResults=\{toolResultsMap\}/);
+  assert.match(chatWindowSource, /message=\{textMessage as AgentMessage\}\s+toolResults=\{toolResults\}/);
 });
 
 test("reports a running script's newest call as its progress", () => {

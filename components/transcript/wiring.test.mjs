@@ -13,6 +13,7 @@ const jiti = createJiti(import.meta.url, {
 });
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
+const { createStreamingStore } = await jiti.import("@/lib/streaming-message");
 const { ToolRow, TurnActivityBody } = await jiti.import("../ActivityRows.tsx");
 const { TurnTrace } = await jiti.import("./TurnTrace.tsx");
 const { LiveTurnTrace } = await jiti.import("./LiveTurnTrace.tsx");
@@ -44,6 +45,22 @@ function render(element) {
 function liveToolItem(block, res) {
   return { kind: "tool", key: `tool-${block.toolCallId}`, block, result: res };
 }
+
+test("a tool still in the streaming store titles the live fold at once", () => {
+  clearExpandedToolCalls();
+  const store = createStreamingStore();
+  const block = call("bash", { command: "cargo build" });
+  store.dispatch({ type: "snapshot", message: { role: "assistant", content: [block] } });
+  // 还没落到 messages 的流式工具块就是最新工具：标题立即切到它，不再等
+  // message_end 后才收进折叠。
+  const html = render(React.createElement(
+    LiveTurnTrace,
+    { items: [], startTs: Date.now() - 5_000, foldKey: "process:live-streaming", store },
+    React.createElement("div"),
+  ));
+  assert.match(html, /cargo build/);
+  assert.doesNotMatch(html, /Worked for/);
+});
 
 test("the live turn fold titles itself with the latest tool while collapsed", () => {
   clearExpandedToolCalls();
