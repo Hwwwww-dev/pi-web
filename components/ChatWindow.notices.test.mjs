@@ -2,49 +2,43 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const source = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
-const globals = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+const chatSource = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
 const hookSource = await readFile(new URL("../hooks/useAgentSession.ts", import.meta.url), "utf8");
+const shellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 
-test("renders temporary notices once at the top right of the chat column", () => {
-  const noticeShelfUsages = source.match(/<NoticeShelf notices=\{notices\}/g) ?? [];
+// 弹窗通知统一走 sonner（2026-11-20）：自制的聊天列通知架（NoticeShelf）
+// 与会话事件卡（SessionEventToast）已删除，addNotice / showSessionEventToast
+// 直接发标准 sonner toast；手机端 toaster 顶部居中（底部是停靠的输入框）。
 
-  assert.equal(noticeShelfUsages.length, 1);
-  assert.match(
-    source,
-    /className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-end"[\s\S]*?<NoticeShelf notices=\{notices\} floating onPauseChange=\{setNoticePaused\} onDismiss=\{dismissNotice\} \/>/,
-  );
-});
-
-test("pauses only for a visible notice", () => {
+test("the bespoke chat-column notice shelf is gone; notices route through sonner", () => {
+  assert.doesNotMatch(chatSource, /NoticeShelf/);
+  assert.doesNotMatch(chatSource, /notice-shelf/);
+  assert.doesNotMatch(chatSource, /data-search-target.*notice|notices,/);
+  // addNotice 发 sonner：同一 id 替换不堆叠，error 常驻到手动关，其余 5s。
+  assert.match(hookSource, /import \{ toast \} from "sonner";/);
   assert.match(
     hookSource,
-    /noticeState\.visible\.some\(\(notice\) => notice\.id === pausedNoticeId\)\) return/,
+    /toast\[type\]\(message, \{[\s\S]*?id: notice\.id \?\? `notice:[\s\S]*?duration: type === "error" \? Infinity : NOTICE_VISIBLE_MS,/, 
   );
+  assert.match(hookSource, /const NOTICE_VISIBLE_MS = 5000;/);
 });
 
-test("centres a one-line notice in the card the entrance animation pins", () => {
-  const minHeight = Number(source.match(/const NOTICE_MIN_HEIGHT_PX = (\d+);/)[1]);
-  const lineBox = Number(source.match(/const NOTICE_LINE_BOX_PX = (\d+);/)[1]);
-
-  // The padding is half of what one line leaves of the card - the two 1px
-  // borders and a 21px line box out - so the line sits in the middle of the
-  // card. Filling the card's min-height from the top instead leaves its
-  // leftover under the text, which pushes the line above the centre.
-  assert.match(source, /const NOTICE_TEXT_PADDING_Y_PX = \(NOTICE_MIN_HEIGHT_PX - 2 - NOTICE_LINE_BOX_PX\) \/ 2;/);
-  const padding = (minHeight - 2 - lineBox) / 2;
-
-  // Both keyframes pin the card to one line's height while a notice animates in
-  // and out (the "backwards" fill returns the height to the inline styles after
-  // it), so the text between the borders has to add up to exactly that height.
-  const animatedHeight = Number(globals.match(/@keyframes notice-shelf-in \{[\s\S]*?height: (\d+)px/)[1]);
-  assert.equal(2 * padding + lineBox + 2, animatedHeight);
+test("session events show as standard sonner toasts with an open action", () => {
+  // 自制会话事件卡组件与它的 import 已删；只剩 showSessionEventToast 这个函数名。
+  assert.doesNotMatch(shellSource, /<SessionEventToast/);
+  assert.doesNotMatch(shellSource, /from "\.\/SessionEventToast"/);
+  assert.match(
+    shellSource,
+    /kind === "complete" \? toast\.success : toast\.warning\)\(/,
+  );
+  // 点击 action 打开会话；同会话稳定 id 替换。
+  assert.match(shellSource, /id: `session-event:\$\{kind\}:\$\{target\.id\}`/);
+  assert.match(shellSource, /onClick: \(\) => handleSelectSession\(target\)/);
 });
 
-test("measures the notice line box from the card's own font size and line height", () => {
-  const lineBox = Number(source.match(/const NOTICE_LINE_BOX_PX = (\d+);/)[1]);
-  // The line box lives in the card's utilities: text-sm (14px) × leading-normal (1.5).
-  const card = source.match(/className="notice-shelf-item[^"]*\btext-sm\b[^"]*\bleading-normal\b/);
-  assert.ok(card, "notice card pins text-sm leading-normal for the 21px line box");
-  assert.equal(14 * 1.5, lineBox);
+test("the sonner toaster sits top-centre on mobile, bottom-right on desktop", () => {
+  assert.match(
+    shellSource,
+    /<Toaster position=\{isMobile \? "top-center" : "bottom-right"\} \/>/,
+  );
 });

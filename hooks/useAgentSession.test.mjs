@@ -685,8 +685,8 @@ test("queues extension dialogs and custom panels by request id instead of sharin
   assert.match(source, /const waitingExtensionDialogCount = extensionDialogQueue\.length;/);
   assert.match(source, /const extensionCustomUi = extensionCustomUis\[0\] \?\? null;/);
   assert.match(source, /const waitingExtensionCustomUiCount = Math\.max\(0, extensionCustomUis\.length - 1\);/);
-  assert.match(source, /notices: noticeState\.visible, extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount,/);
-  assert.match(chatWindowSource, /notices, extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount,/);
+  assert.match(source, /extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput,\s*addNotice,/);
+  assert.match(chatWindowSource, /extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, addNotice,/);
 });
 
 test("drops queued extension UI when a tool change rebuilds the wrapper", () => {
@@ -771,7 +771,7 @@ test("one tail-follower signal, owned by ChatWindow", () => {
   assert.doesNotMatch(scrollToBottomSource, /scrollIntoView/);
   // 跟随、前插保位与底部边界全部交回官方 scroller（autoScroll 默认关闭，必须显式打开）；
   // ChatWindow 不再有自己的跟随状态机，也不再自己写读者的滚动位置。
-  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll=\{agentRunning\} defaultScrollPosition="end" scrollEdgeThreshold=\{scrollEdgeThreshold\}>/);
   assert.doesNotMatch(chatWindowSource, /autoScroll=\{false\}|useChatFollow|FollowTailWhenAtTail/);
   // 程序化滚动只经官方命令（它会把模式置为 settling-jump 并抑制跟随）。
   assert.match(chatWindowSource, /scrollerApiRef\.current\?\.scrollTo(?:End|Message)\(/);
@@ -798,7 +798,7 @@ test("a new turn does not anchor its user row to the top of the viewport", () =>
   // 跟随互抢，"底"分裂成真底与假底，读者没有操作也会被推到别的消息上。
   assert.doesNotMatch(source, /pendingTailScrollRef|reattachToTail/);
   assert.doesNotMatch(chatWindowSource, /scrollAnchor=/);
-  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold=\{120\}>/);
+  assert.match(chatWindowSource, /<MessageScrollerProvider autoScroll=\{agentRunning\} defaultScrollPosition="end" scrollEdgeThreshold=\{scrollEdgeThreshold\}>/);
   // prompt-anchor 机制已全部拆除。
   assert.doesNotMatch(source, /promptAnchor|scrollUserMsgToTop|lastUserMsgRef/);
   assert.doesNotMatch(chatWindowSource, /promptAnchor|scrollUserMsgToTop/);

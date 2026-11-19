@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo, useReducer } from "react";
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import { toast } from "sonner";
 import { stripAnsi } from "@/lib/ansi";
 import type {
   AgentMessage,
@@ -171,22 +172,9 @@ type ExtensionUiDialogRequest = Extract<ExtensionUiRequest, { method: "select" |
 type ExtensionUiCustomRequest = Extract<ExtensionUiRequest, { method: "custom" }>;
 export type NoticeType = "info" | "success" | "warning" | "error";
 
-export type NoticeItem = {
-  id: string;
-  message: string;
-  type: NoticeType;
-  exiting?: boolean;
-};
-
-type NoticeState = {
-  visible: NoticeItem[];
-  pending: NoticeItem[];
-};
-
-type NoticeAction =
-  | { type: "add"; notice: NoticeItem }
-  | { type: "mark_oldest_exiting" }
-  | { type: "remove"; id: string };
+// 弹窗通知统一走 sonner（2026-11-20）：addNotice 直接发 toast，同一 id 替换
+// 不堆叠；error 常驻到手动关，其余 5s 自动消失，悬停暂停由 sonner 内置。
+const NOTICE_VISIBLE_MS = 5000;
 
 export interface CompactResultInfo {
   reason: "manual" | "threshold" | "overflow" | "auto" | string;
@@ -333,67 +321,12 @@ function sessionLeaseUrl(sid: string): string {
 }
 // Retry temporary model-list failures without requiring a page refresh.
 const MODELS_RETRY_DELAYS_MS = [2_000, 5_000, 10_000];
-const MAX_NOTICES = 5;
-const NOTICE_VISIBLE_MS = 5000;
-const NOTICE_EXIT_ANIMATION_MS = 180;
 // A session's startup issues come with every stream it opens (lib/rpc-manager.ts): this page
 // shows each once, through reconnects and returns to the session.
 const isFirstNoticeShowing = createShownNotices();
-function createNoticeId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function markOldestNoticeExiting(notices: NoticeItem[]): NoticeItem[] {
-  const index = notices.findIndex((notice) => !notice.exiting);
-  if (index === -1) return notices;
-  return notices.map((notice, i) => (
-    i === index ? { ...notice, exiting: true } : notice
-  ));
-}
-
-function fillPendingNotices(visible: NoticeItem[], pending: NoticeItem[]): NoticeState {
-  let nextVisible = visible;
-  let nextPending = pending;
-  while (nextPending.length > 0 && nextVisible.length < MAX_NOTICES) {
-    const [next, ...rest] = nextPending;
-    nextVisible = [...nextVisible, next];
-    nextPending = rest;
-  }
-  if (nextPending.length > 0 && !nextVisible.some((notice) => notice.exiting)) {
-    nextVisible = markOldestNoticeExiting(nextVisible);
-  }
-  return { visible: nextVisible, pending: nextPending };
-}
-
-function noticeReducer(state: NoticeState, action: NoticeAction): NoticeState {
-  switch (action.type) {
-    case "add": {
-      if (state.visible.some((notice) => notice.exiting) || state.visible.length >= MAX_NOTICES) {
-        return {
-          visible: state.visible.some((notice) => notice.exiting)
-            ? state.visible
-            : markOldestNoticeExiting(state.visible),
-          pending: [...state.pending, action.notice],
-        };
-      }
-      return { ...state, visible: [...state.visible, action.notice] };
-    }
-    case "mark_oldest_exiting":
-      return { ...state, visible: markOldestNoticeExiting(state.visible) };
-    case "remove": {
-      const visible = state.visible.filter((notice) => notice.id !== action.id);
-      return fillPendingNotices(visible, state.pending);
-    }
-    default:
-      return state;
-  }
 }
 
 function readCompactResult(result: unknown, reason: string): CompactResultInfo | null {
@@ -583,7 +516,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [compactResult, setCompactResult] = useState<CompactResultInfo | null>(null);
   const [slashCommands, setSlashCommands] = useState<SlashCommandInfo[]>([]);
   const [slashCommandsLoading, setSlashCommandsLoading] = useState(false);
-  const [noticeState, dispatchNotice] = useReducer(noticeReducer, { visible: [], pending: [] });
   const [sessionStatsOverride, setSessionStatsOverride] = useState<SessionStatsInfo | null>(null);
   const [extensionDialogs, setExtensionDialogs] = useState<ExtensionUiDialogRequest[]>([]);
   const [extensionCustomUis, setExtensionCustomUis] = useState<ExtensionUiCustomRequest[]>([]);
@@ -1736,15 +1668,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, [loadSession]);
 
   const addNotice = useCallback((notice: { id?: string; message: string; type?: NoticeType }) => {
-    const message = notice.message.trim();
+    // sonner 的 description 是纯文本：先剥掉终端转义序列，不然 ANSI 会显示成乱码。
+    const message = stripAnsi(notice.message).trim();
     if (!message) return;
-    dispatchNotice({
-      type: "add",
-      notice: {
-        id: notice.id ?? createNoticeId(),
-        message,
-        type: notice.type ?? "info",
-      },
+    const type = notice.type ?? "info";
+    toast[type](message, {
+      id: notice.id ?? `notice:${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      duration: type === "error" ? Infinity : NOTICE_VISIBLE_MS,
     });
   }, []);
   const translateRef = useRef(opts.t);
@@ -1902,10 +1832,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, [dropUnconfirmedBubble, restoreSubmission]);
   const releaseUnconfirmedSendRef = useRef(releaseUnconfirmedSend);
   releaseUnconfirmedSendRef.current = releaseUnconfirmedSend;
-
-  const dismissNotice = useCallback((id: string) => {
-    dispatchNotice({ type: "remove", id });
-  }, []);
 
   // 归属按「这个事件流属于哪个会话」记，而不是选中的会话：新会话草稿期
   // sessionIdRef 还没换成真实 id，事件却已经属于刚建好的那个会话。
@@ -4007,50 +3933,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return () => clearTimeout(t);
   }, [compactResult]);
 
-  // Pause notice expiry while hovered or focused.
-  // The remainingMs/startedAt/oldestId refs implement a true pause-and-resume instead of resetting the 5s timer.
-  const [pausedNoticeId, setPausedNoticeId] = useState<string | null>(null);
-  const noticeRemainingMsRef = useRef(NOTICE_VISIBLE_MS);
-  const noticeTimerStartedAtRef = useRef<number | null>(null);
-  const noticeOldestIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (noticeState.visible.length === 0) {
-      noticeOldestIdRef.current = null;
-      return;
-    }
-    const exiting = noticeState.visible.find((notice) => notice.exiting);
-    if (exiting) {
-      const t = setTimeout(() => {
-        dispatchNotice({ type: "remove", id: exiting.id });
-      }, NOTICE_EXIT_ANIMATION_MS);
-      return () => clearTimeout(t);
-    }
-    const oldest = noticeState.visible[0];
-    if (!oldest) return;
-    // Oldest visible notice changed; restart the countdown
-    if (noticeOldestIdRef.current !== oldest.id) {
-      noticeOldestIdRef.current = oldest.id;
-      noticeRemainingMsRef.current = NOTICE_VISIBLE_MS;
-    }
-    if (noticeState.visible.some((notice) => notice.id === pausedNoticeId)) return;
-    noticeTimerStartedAtRef.current = Date.now();
-    const t = setTimeout(() => {
-      dispatchNotice({ type: "mark_oldest_exiting" });
-    }, noticeRemainingMsRef.current);
-    return () => {
-      clearTimeout(t);
-      // Accrue the elapsed time so the countdown resumes from the remaining time
-      if (noticeTimerStartedAtRef.current !== null) {
-        noticeRemainingMsRef.current = Math.max(
-          0,
-          noticeRemainingMsRef.current - (Date.now() - noticeTimerStartedAtRef.current),
-        );
-        noticeTimerStartedAtRef.current = null;
-      }
-    };
-  }, [noticeState.visible, pausedNoticeId]);
-
+  // 悬停暂停、自动消失、堆叠展开都是 sonner 内置；旧通知架的暂停/退出
+  // 状态机已随 NoticeShelf 删除（2026-11-20）。
   useEffect(() => {
     setSessionStatsOverride(null);
   }, [session?.id]);
@@ -4074,7 +3958,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     retryInfo, contextUsage: displayContextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats, autoCompactionEnabled,
     slashCommands, slashCommandsLoading, queuedSubmissions,
-    notices: noticeState.visible, extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, dismissNotice,
+    extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, addNotice,
     isAutoModelSelection: isNew && newSessionModel === null,
     isAutoThinkingSelection: isNew && newSessionThinkingLevel === null,    defaultModel: newSessionDefaultModel,
     savedDefaultThinkingLevel,
@@ -4094,8 +3978,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     handleEditContent,
     // Present only while a history edit is pending.
     cancelEdit: editEntryId ? cancelEdit : undefined,
-    addNotice,
-    setNoticePaused: setPausedNoticeId,
     handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadTools, loadSlashCommands, loadAllModels, setActiveLeafId, setData, setMessages, loadContext,
     jumpToEntry, loadNewerPage,
     scrollToBottom, scrollToMessage,

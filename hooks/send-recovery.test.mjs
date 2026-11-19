@@ -15,9 +15,11 @@ import { createJiti } from "jiti";
 // The text goes in front of what was typed since; another session's draft is
 // left alone.
 const shimPath = fileURLToPath(new URL("./__fixtures__/react-hook-shim.mjs", import.meta.url));
-const jiti = createJiti(import.meta.url, { tsconfigPaths: true, alias: { react: shimPath } });
+const sonnerStubPath = fileURLToPath(new URL("./__fixtures__/sonner-shim.mjs", import.meta.url));
+const jiti = createJiti(import.meta.url, { tsconfigPaths: true, alias: { react: shimPath, sonner: sonnerStubPath } });
 const { renderHook } = await import(pathToFileURL(shimPath).href);
 const { useAgentSession } = await jiti.import("./useAgentSession.ts");
+const { toastCalls, resetToastCalls } = await jiti.import(sonnerStubPath);
 const { clearDraft, getDraft, setDraft } = await jiti.import("@/lib/draft-store");
 const { deleteSessionViewSnapshot, getSessionViewSnapshot } = await jiti.import("@/lib/session-view-cache");
 
@@ -129,7 +131,7 @@ async function setup({ fresh = false, context } = {}) {
     await settle();
     hook.flush();
   };
-  const notices = () => hook.result.notices.map(({ type, message }) => [type, message]);
+  const notices = () => toastCalls.filter((call) => call.type !== "dismiss").map(({ type, message }) => [type, message]);
   const isBubble = (message) => message.role === "user" && JSON.stringify(message.content).includes("first submission");
   const bubble = () => hook.result.messages.some(isBubble);
   // The session's cached view, which a read of an unchanged file keeps.
@@ -137,6 +139,7 @@ async function setup({ fresh = false, context } = {}) {
   let unmounted = false;
   const unmount = () => { if (!unmounted) { unmounted = true; hook.unmount(); } };
   const teardown = () => {
+    resetToastCalls();
     unmount();
     for (const source of sources) source.close();
     mock.timers.reset();

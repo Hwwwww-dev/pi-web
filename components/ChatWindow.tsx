@@ -6,7 +6,6 @@ import Image from "next/image";
 import { isValidElement, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionStatusItem, ExtensionUiRequest, ExtensionWidgetItem, MinimapTurnDescriptor, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage, UserMessage } from "@/lib/types";import type { StreamingStore } from "@/lib/streaming-message";import { isTuiText, normalizeCustomPanelLines, stripAnsi } from "@/lib/ansi";
-import { splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { isHiddenCustomMessage, isMessageGroupAnchor, liveOutputPreview, LIVE_OUTPUT_PREVIEW_LINES, splitFinalAssistantBlocks } from "@/lib/message-display";
@@ -58,7 +57,7 @@ import { cn } from "@/lib/utils";
 import { TuiText } from "./TuiText";
 import { useI18n } from "@/hooks/useI18n";
 import { formatTurnDuration } from "@/lib/turn-duration";
-import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
+import { useAgentSession, type AgentEndInfo, type NewSessionChoices } from "@/hooks/useAgentSession";
 import { selectHasStreamingContent, selectIsStreaming, selectStreamingMessage, useStreamingSelector } from "@/hooks/useStreamingSelector";
 import { useDelayedUnmount } from "@/hooks/useDelayedUnmount";
 import { publishStreamCharacters } from "@/lib/stream-beam";
@@ -392,7 +391,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
     slashCommands, slashCommandsLoading, queuedSubmissions,
-    notices, extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused, dismissNotice, addNotice,
+    extensionDialog, extensionDialogQueue, waitingExtensionDialogCount, extensionCustomUi, waitingExtensionCustomUiCount, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, addNotice,
     isAutoModelSelection,
     isAutoThinkingSelection,
     defaultModel,
@@ -2103,12 +2102,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         </div>
       )}
 
-      <div
-        className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-end px-[var(--chat-column-padding)]"
-      >
-        <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} onDismiss={dismissNotice} />
-      </div>
-
       <div ref={setChatPaneElement} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {extensionDialog && (
           <ExtensionDialog
@@ -2417,112 +2410,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     </ActiveToolsContext>
   );
 });
-
-// A one-line notice is exactly as tall as its entrance animation pins it, and
-// its line sits dead centre: the two 1px borders, a 21px line box (14px at
-// line-height 1.5) and this padding twice add up to 60px. Letting the card's
-// min-height take the leftover instead leaves the top-aligned text 4.5px above
-// the centre, since the rest of the leftover stays under it.
-const NOTICE_MIN_HEIGHT_PX = 60;
-const NOTICE_LINE_BOX_PX = 21;
-const NOTICE_TEXT_PADDING_Y_PX = (NOTICE_MIN_HEIGHT_PX - 2 - NOTICE_LINE_BOX_PX) / 2;
-// Toast 整体高度上限；文本区高度上限 = 整体上限 − 2px 边框（全局 box-sizing: border-box，
-// 文本区的 max-height 已包含自身上下 padding，不再重复扣减）。
-const NOTICE_MAX_HEIGHT_PX = 500;
-const NOTICE_TEXT_MAX_HEIGHT_PX = NOTICE_MAX_HEIGHT_PX - 2;
-
-function NoticeShelf({ notices, floating = false, onPauseChange, onDismiss }: { notices: NoticeItem[]; floating?: boolean; onPauseChange?: (id: string | null) => void; onDismiss?: (id: string) => void }) {
-  if (notices.length === 0) return null;
-  return (
-    <div className={cn("flex flex-col items-end", floating ? "mb-0" : "mb-2.5")}>
-      {notices.map((notice, index) => {
-        return (
-          <div
-            key={notice.id}
-            className="notice-shelf-item pointer-events-auto flex items-start gap-2.5 overflow-hidden rounded-xl border border-border/70 bg-background w-fit max-w-[min(100%,620px)] px-3 text-sm leading-normal text-muted-foreground origin-top-right shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.10)] motion-reduce:[animation-duration:0.001ms]!"
-            onMouseEnter={() => onPauseChange?.(notice.id)}
-            onMouseLeave={(event) => {
-              if (!event.currentTarget.contains(document.activeElement)) onPauseChange?.(null);
-            }}
-            onFocus={() => onPauseChange?.(notice.id)}
-            onBlur={(event) => {
-              if (!event.currentTarget.matches(":hover")) onPauseChange?.(null);
-            }}
-            style={{
-              minHeight: NOTICE_MIN_HEIGHT_PX,
-              // 整体高度上限：超出部分由文本区内部滚动承担（见下方 span 的 overflowY），
-              // 容器自身保持 hidden，小圆点固定在顶部不随文本滚动。
-              maxHeight: NOTICE_MAX_HEIGHT_PX,
-              marginBottom: index === notices.length - 1 ? 0 : 6,
-              boxShadow: floating
-                ? "0 1px 2px rgba(15,23,42,0.05), 0 10px 28px -14px rgba(15,23,42,0.24)"
-                : undefined,
-              // Use backwards fill for the entrance animation so height styles return to
-              // inline styles once it finishes; otherwise the keyframe's fixed 60px would
-              // stick around in fill mode and permanently clamp the expanded toast
-              animation: notice.exiting
-                ? "notice-shelf-out 0.18s ease-in forwards"
-                : "notice-shelf-in 0.18s ease-out backwards",
-            }}
-          >
-            <span
-              className={cn(
-                "size-[7px] shrink-0 rounded-full",
-                notice.type === "error" ? "bg-destructive" : notice.type === "warning" ? "bg-warning" : notice.type === "success" ? "bg-success" : "bg-primary",
-              )}
-              style={{
-                // Align with the optical center of the first text line: the text's
-                // vertical padding + (21px line box - 7px dot) / 2
-                marginTop: NOTICE_TEXT_PADDING_Y_PX + 7,
-              }}
-            />
-            {/* Full text by default: pre-line preserves \n (nowrap/normal collapse
-                newlines into spaces) and long lines wrap instead of truncating;
-                content taller than the cap scrolls inside the text area */}
-            {isTuiText(notice.message) ? (
-              <TuiText
-                tabIndex={0}
-                text={notice.message}
-                className="min-w-0 max-w-full"
-                style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
-              />
-            ) : (
-              <span
-                tabIndex={0}
-                className="min-w-0 max-w-full overflow-y-auto whitespace-pre-line break-words"
-                style={{ padding: `${NOTICE_TEXT_PADDING_Y_PX}px 0`, maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
-              >
-                {splitNoticeText(notice.message).map((part, partIndex) => part.kind === "art" ? (
-                  // A terminal QR code or bar (#755): every space kept, rows touching, and a
-                  // font stack whose first font has the blocks too (the bundled Noto subset
-                  // has none, so spaces and blocks would come from fonts of different widths).
-                  <span
-                    key={partIndex}
-                    className="inline-block max-w-full overflow-x-auto whitespace-pre align-top font-mono leading-none text-foreground"
-                  >
-                    {part.text}
-                  </span>
-                ) : part.text)}
-              </span>
-            )}
-            {onDismiss && (
-              <Button
-                type="button"
-                variant="ghost"
-                className="ml-0.5 mt-3.5 size-6 shrink-0 rounded-sm p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                aria-label="Dismiss notification"
-                title="Dismiss notification"
-                onClick={() => onDismiss(notice.id)}
-              >
-                <XIcon size={12} strokeWidth={2} className="size-3" aria-hidden="true" />
-              </Button>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 type ExtensionDialogRequest = Extract<ExtensionUiRequest, { method: "select" | "confirm" | "input" | "editor" }>;
 

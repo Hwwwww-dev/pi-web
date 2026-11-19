@@ -10,9 +10,11 @@ import { createJiti } from "jiti";
 // which goes with a session read started after the run's end; a second command
 // waits, with pi's TUI notice.
 const shimPath = fileURLToPath(new URL("./__fixtures__/react-hook-shim.mjs", import.meta.url));
-const jiti = createJiti(import.meta.url, { tsconfigPaths: true, alias: { react: shimPath } });
+const sonnerStubPath = fileURLToPath(new URL("./__fixtures__/sonner-shim.mjs", import.meta.url));
+const jiti = createJiti(import.meta.url, { tsconfigPaths: true, alias: { react: shimPath, sonner: sonnerStubPath } });
 const { renderHook } = await import(pathToFileURL(shimPath).href);
 const { useAgentSession } = await jiti.import("./useAgentSession.ts");
+const { toastCalls, resetToastCalls } = await jiti.import(sonnerStubPath);
 const { clearDraft, getDraft } = await jiti.import("@/lib/draft-store");
 const { deleteSessionViewSnapshot } = await jiti.import("@/lib/session-view-cache");
 
@@ -79,8 +81,9 @@ async function setup({ fresh }) {
     await settle();
     hook.flush();
   };
-  const notices = () => hook.result.notices.map(({ type, message }) => [type, message]);
+  const notices = () => toastCalls.filter((call) => call.type !== "dismiss").map(({ type, message }) => [type, message]);
   const teardown = () => {
+    resetToastCalls();
     hook.unmount();
     for (const source of sources) source.close();
     for (const key of ["A", "s1", "new:draft"]) clearDraft(key);

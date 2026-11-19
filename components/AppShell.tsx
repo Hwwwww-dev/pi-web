@@ -23,7 +23,6 @@ import {
   SlidersHorizontalIcon,
   SunIcon,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger } from "./ui/sidebar";
@@ -53,7 +52,7 @@ import { movePanelTab, orderPanelTabs } from "@/lib/panel-tab-order";
 import { openFileTab, saveFileViewerState, saveParkedFileViewerState, switchFileWorkspace, type ParkedFileWorkspace } from "./file-tab-state";
 import { SettingsPanel } from "./SettingsPanel";
 import { Toaster } from "./ui/sonner";
-import { SessionEventToast, type SessionToastKind } from "./SessionEventToast";
+import { toast } from "sonner";
 import { Progress } from "./ui/progress";
 import { ProjectTrustDialog, type ProjectTrustFailure } from "./ProjectTrustDialog";
 import { BranchNavigator, hasSessionBranches } from "./BranchNavigator";
@@ -161,6 +160,8 @@ function lastAgentTabId(tabs: readonly { sessionId: string }[]): string | null {
   const last = tabs.at(-1);
   return last ? `agent:${last.sessionId}` : null;
 }
+
+type SessionToastKind = "complete" | "attention";
 
 export function AppShell() {
   const router = useRouter();
@@ -1337,22 +1338,21 @@ export function AppShell() {
 
   // The in-page counterpart of deliverSessionNotification: when the page is
   // on screen the system notification is noise, so a background session's
-  // finish or ask shows as a clickable toast instead. Clicking opens the
-  // session; a stable per-session id replaces instead of stacking.
+  // finish or ask shows as a standard sonner toast instead; the action opens
+  // the session. A stable per-session id replaces instead of stacking.
   const showSessionEventToast = useCallback((target: SessionInfo, kind: SessionToastKind, message: string) => {
-    toast.custom((id) => (
-      <SessionEventToast
-        kind={kind}
-        sessionName={target.name || translate("i18n.sessionComplete")}
-        message={message}
-        dismissLabel={translate("sidebar.dismiss")}
-        onOpen={() => {
-          toast.dismiss(id);
-          handleSelectSession(target);
-        }}
-        onClose={() => toast.dismiss(id)}
-      />
-    ), { id: `session-event:${kind}:${target.id}`, duration: 8000 });
+    (kind === "complete" ? toast.success : toast.warning)(
+      target.name || translate("i18n.sessionComplete"),
+      {
+        id: `session-event:${kind}:${target.id}`,
+        description: message,
+        duration: 8000,
+        action: {
+          label: translate("sidebar.open"),
+          onClick: () => handleSelectSession(target),
+        },
+      },
+    );
   }, [handleSelectSession, translate]);
 
   const handleAgentEnd = useCallback((end: AgentEndInfo) => {
@@ -2494,9 +2494,9 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
   return (
     <>
     {/* The sidebar's toast (SessionSidebar's showToast): sonner portals it to
-        the body, at the viewport's bottom-right, outside the drawer's
-        transform below. */}
-    <Toaster />
+        the body, at the viewport's bottom-right — top-centre on a phone, where
+        the docked composer owns the bottom edge (2026-11-20). */}
+    <Toaster position={isMobile ? "top-center" : "bottom-right"} />
     {/* dashboard-01 壳层组合：SidebarProvider 供 SidebarTrigger 使用，开关状态仍由本组件受控；
         可拖拽宽度通过 --sidebar-width 注入。 */}
     <SidebarProvider
