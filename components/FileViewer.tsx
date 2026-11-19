@@ -1135,7 +1135,12 @@ function TextFileViewer({
     editorHandleRef.current = null;
 
     return () => {
-      onStateChangeRef.current?.({ ...viewerStateRef.current });
+      // The dirty flag must not survive the unmount: every path that drops a
+      // draft (switch/close tab, workspace change) confirms first, so the
+      // editor leaving means the document is either saved or discarded. A
+      // stale dirty would make the tab ask again on its next close although
+      // the remounted editor is clean.
+      onStateChangeRef.current?.({ ...viewerStateRef.current, dirty: false });
     };
   }, [
     filePath,
@@ -1721,7 +1726,7 @@ function TextFileViewer({
                 variant={editDirty ? "default" : "ghost"}
                 size="xs"
                 onClick={() => void saveEdit()}
-                disabled={!editDirty || saving}
+                disabled={saving}
                 title={`${t("files.editSave")} (Ctrl+S)`}
                 aria-label={t("files.editSave")}
                 className="px-1.5 text-xs"
