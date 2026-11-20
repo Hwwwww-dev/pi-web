@@ -1711,7 +1711,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                   onOpenSubagent={onOpenSubagent}
                   sessionId={session?.id ?? sessionIdRef.current ?? undefined}
                   live={isLiveSegment}
-                  virtual
                 />
               );
               if (!isLiveSegment) {
@@ -1847,7 +1846,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                       onOpenFile={onOpenFile}
                       onOpenSubagent={onOpenSubagent}
                       sessionId={session?.id ?? sessionIdRef.current ?? undefined}
-                      virtual
                     />
                   </TurnTrace>
                 );

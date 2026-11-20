@@ -1342,6 +1342,13 @@ span.token.table {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* 大折叠行（“工作了 X”）不限高（2026-11-20 用户：“去除大折叠行限高吧，太影响使用了”）：
+   回合体展开后直接铺开，滚动交给整个聊天；单条命令/工具的 24rem 上限保留。 */
+.trace-turn-body {
+  max-height: none;
+  overflow-y: visible;
+}
+
 /* 工具组不限高（2026-11-20 用户：“多个命令这个不需要限高，现在滚动条打架了”）：
    组内容直接铺开，里面每条命令输出不再各成一根条，只留外层折叠体那一根。 */
 .trace-fold-body:has(> .trace-group-body) {
