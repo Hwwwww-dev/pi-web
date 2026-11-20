@@ -175,7 +175,7 @@ export function installVscodeBridge(): () => void {
   };
 
   const onModifierCapture = (event: MouseEvent): void => {
-    lastClickWantsExternal = event.altKey || event.metaKey;
+    lastClickWantsExternal = Boolean(event.altKey || event.metaKey);
   };
 
   const interceptWindowOpen = (): void => {

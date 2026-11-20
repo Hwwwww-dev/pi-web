@@ -79,6 +79,7 @@ import { useViewportHeight } from "@/hooks/useViewportHeight";
 import { useResizablePanel } from "@/hooks/useResizablePanel";
 import { useAudio } from "@/hooks/useAudio";
 import { copyText } from "@/lib/clipboard";
+import { consumeExternalOpenRequest, isVscodeBridgeActive, requestOpenInVscode } from "@/lib/vscode-bridge";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { getFileName } from "@/lib/file-paths";
 import { buildAtMentionText, buildFileAtMentionsText, buildFileLineMentionText } from "@/lib/file-fuzzy";
@@ -1616,6 +1617,12 @@ export function AppShell() {
     const modeHint = options?.modeHint;
     const page = options?.page;
     const line = options?.line;
+    // Inside the VS Code panel an Alt/Cmd-click belongs in the real editor; the
+    // in-app viewer stays the default so diffs and page hints keep working.
+    if (!modeHint && isVscodeBridgeActive() && consumeExternalOpenRequest()) {
+      requestOpenInVscode(filePath, line);
+      return;
+    }
     const tabId = `file:${filePath}`;
     if (!confirmDiscardDirtyEditor(null)) return;
     setFileTabs((prev) => openFileTab(prev, {
