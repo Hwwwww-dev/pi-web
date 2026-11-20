@@ -1096,7 +1096,8 @@ function TextFileViewer({
   onStateChangeRef.current = onStateChange;
   displayModeRef.current = displayMode;
 
-  const { theme: resolvedTheme } = useTheme();
+  // 配色可能有十几套，判断暗色不能与 "dark" 比字面量。
+  const { isDark } = useTheme();
 
   const updateDisplayMode = useCallback((nextDisplayMode: DisplayMode) => {
     viewerStateRef.current.displayMode = nextDisplayMode;
@@ -1868,7 +1869,7 @@ function TextFileViewer({
             filePath={filePath}
             initialValue={viewerContent}
             wrapLines={wrapLines}
-            dark={resolvedTheme === "dark"}
+            dark={isDark}
             onDirtyChange={handleEditDirtyChange}
             onSaveRequest={saveEdit}
           />

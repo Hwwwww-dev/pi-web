@@ -9,7 +9,6 @@ import type { AgentMessage, AssistantMessage, BashExecutionMessage, BlockingExte
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { isHiddenCustomMessage, isMessageGroupAnchor, liveOutputPreview, LIVE_OUTPUT_PREVIEW_LINES, splitFinalAssistantBlocks } from "@/lib/message-display";
-import { getToolCategory } from "@/lib/tool-categories";
 import { buildTurnActivityItems, getFinishedTurnView, headSegmentEndsTurn, splitTurnParts, summarizeSegmentActivity, type ActivityItem } from "@/lib/turn-view";
 import { SafeMarkdownBody } from "./SafeMarkdownBody";
 import { type WrittenFile } from "@/lib/turn-written-files";

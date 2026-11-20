@@ -16,8 +16,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { useTheme, type ThemePreference } from "@/hooks/useTheme";
-import { THEME_GROUPS, THEME_OPTIONS } from "@/lib/theme";
+import { useTheme, type ThemeMode, type ThemePalette } from "@/hooks/useTheme";
+import { palettesOf, THEME_GROUPS, THEME_MODES } from "@/lib/theme";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "./ui/field";
@@ -125,7 +125,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   onShellSettingsChange: (settings: ToolSettingsResponse) => void;
 }) {
   const { locale, setLocale, supportedLocales, t } = useI18n();
-  const { preference, setThemePreference } = useTheme();
+  const { mode, light, dark, setMode, setPalette } = useTheme();
   const { width: chatContentWidth, setWidth: setChatContentWidth, fontSize, setFontSize } = useChatAppearance();
   const enterSendMode = useEnterSendMode();
   const composerBeam = useComposerBeam();
@@ -287,38 +287,79 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
   // Sub-section content, shared by both shapes: a phone shows one at a time
   // behind its own list (the three-level stack); the desktop stacks them as
   // Cards in the scrolling body (§4.4).
+  /** 一组配色色块（浅色或深色），按分组标题排开。 */
+  const paletteGrid = (scheme: "light" | "dark") => (
+    <div className="flex w-full flex-col gap-3">
+      {THEME_GROUPS.map((group) => {
+        const options = palettesOf(scheme).filter((option) => option.group === group.id);
+        if (options.length === 0) return null;
+        return (
+          <div key={group.id} className="flex w-full flex-col gap-2">
+            <div className="text-[11px] text-muted-foreground">{t(group.label)}</div>
+            <RadioGroup
+              value={scheme === "light" ? light : dark}
+              onValueChange={(value) => setPalette(value as ThemePalette)}
+              aria-label={`${t(scheme === "light" ? "settings.themeLightSection" : "settings.themeDarkSection")} · ${t(group.label)}`}
+              className="grid w-full grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-2"
+            >
+              {options.map((option) => (
+                <label
+                  key={option.id}
+                  data-theme-option={option.id}
+                  className="relative inline-flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-xs leading-none text-foreground transition-colors hover:bg-accent/50 has-[[data-state=checked]]:border-foreground has-[[data-state=checked]]:ring-[1px] has-[[data-state=checked]]:ring-foreground has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-accent/50"
+                >
+                  {/* The radio carries the group's semantics (roving focus,
+                      arrow keys); the palette card stays the visual. */}
+                  <RadioGroupItem value={option.id} className="sr-only" />
+                  {/* Each palette's own colours, never tokens of the running theme. */}
+                  <span
+                    aria-hidden="true"
+                    className="size-3.5 shrink-0 rounded-full border border-border"
+                    style={{ background: `linear-gradient(90deg, ${option.swatch[0]} 50%, ${option.swatch[1]} 50%)` }}
+                  />
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{t(option.label)}</span>
+                </label>
+              ))}
+            </RadioGroup>
+          </div>
+        );
+      })}
+    </div>
+  );
+  /**
+   * 外观：先选明暗模式，再分别给浅色和深色各选一套配色——自动模式下跟系统
+   * 切换时，用的是各自那边选中的那套（2026-11-20 用户要求）。
+   */
   const themeGroup = (
     <div className="flex w-full flex-col gap-5">
-      {THEME_GROUPS.map((group) => (
-        <div key={group.id} className="flex w-full flex-col gap-2">
-          <div className="text-xs font-semibold text-muted-foreground">{t(group.label)}</div>
-          <RadioGroup
-            value={preference}
-            onValueChange={(value) => setThemePreference(value as ThemePreference)}
-            aria-label={t(group.label)}
-            className="grid w-full grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-2"
-          >
-            {THEME_OPTIONS.filter((option) => option.group === group.id).map((option) => (
-              <label
-                key={option.id}
-                data-theme-option={option.id}
-                className="relative inline-flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-xs leading-none text-foreground transition-colors hover:bg-accent/50 has-[[data-state=checked]]:border-foreground has-[[data-state=checked]]:ring-[1px] has-[[data-state=checked]]:ring-foreground has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-accent/50"
-              >
-                {/* The Radix radio carries the group's semantics (roving focus,
-                    arrow keys); the palette card stays the visual. */}
-                <RadioGroupItem value={option.id} className="sr-only" />
-                {/* Each palette's own colours, never tokens of the running theme. */}
-                <span
-                  aria-hidden="true"
-                  className="size-3.5 shrink-0 rounded-full border border-border"
-                  style={{ background: `linear-gradient(90deg, ${option.swatch[0]} 50%, ${option.swatch[1]} 50%)` }}
-                />
-                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{t(option.label)}</span>
-              </label>
-            ))}
-          </RadioGroup>
-        </div>
-      ))}
+      <div className="flex w-full flex-col gap-2">
+        <div className="text-xs font-semibold text-muted-foreground">{t("settings.themeMode")}</div>
+        <RadioGroup
+          value={mode}
+          onValueChange={(value) => setMode(value as ThemeMode)}
+          aria-label={t("settings.themeMode")}
+          className="grid w-full grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-2"
+        >
+          {THEME_MODES.map((option) => (
+            <label
+              key={option.id}
+              data-theme-mode={option.id}
+              className="relative inline-flex h-9 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background px-2.5 text-xs leading-none text-foreground transition-colors hover:bg-accent/50 has-[[data-state=checked]]:border-foreground has-[[data-state=checked]]:ring-[1px] has-[[data-state=checked]]:ring-foreground has-[:focus-visible]:outline-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-accent/50"
+            >
+              <RadioGroupItem value={option.id} className="sr-only" />
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{t(option.label)}</span>
+            </label>
+          ))}
+        </RadioGroup>
+      </div>
+      <div className="flex w-full flex-col gap-2">
+        <div className="text-xs font-semibold text-muted-foreground">{t("settings.themeLightSection")}</div>
+        {paletteGrid("light")}
+      </div>
+      <div className="flex w-full flex-col gap-2">
+        <div className="text-xs font-semibold text-muted-foreground">{t("settings.themeDarkSection")}</div>
+        {paletteGrid("dark")}
+      </div>
     </div>
   );
   const builtinToolsBlock = shellSettings ? (

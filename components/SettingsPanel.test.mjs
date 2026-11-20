@@ -53,18 +53,24 @@ test("trusting from Settings › MCP reloads, in place, the other mounted sectio
   assert.match(panelSource, /sectionHost\("models", <ModelsConfig embedded cwd=\{cwd\} onClose=\{onClose\} \/>\)/);
 });
 
-test("offers system, light and dark selection with the RadioGroup (shadcn theme only)", () => {
-  for (const preference of ["auto", "light", "dark"]) {
-    assert.match(themeOptionsSource, new RegExp(`id: "${preference}"`));
+test("offers the light/dark mode and one palette each for light and dark (shadcn RadioGroup only)", () => {
+  // 模式：跟随系统 / 浅色 / 深色。
+  for (const mode of ["auto", "light", "dark"]) {
+    assert.match(themeOptionsSource, new RegExp(`id: "${mode}"`));
   }
+  // 浅色、深色两侧各一张色块网格，按分组标题排开。
+  assert.match(panelSource, /paletteGrid\("light"\)/);
+  assert.match(panelSource, /paletteGrid\("dark"\)/);
   assert.match(panelSource, /THEME_GROUPS\.map/);
-  assert.match(panelSource, /THEME_OPTIONS\.filter\(\(option\) => option\.group === group\.id\)\.map/);
+  assert.match(panelSource, /palettesOf\(scheme\)\.filter\(\(option\) => option\.group === group\.id\)/);
   // The official RadioGroup carries the group semantics; each palette card is
   // the label of its visually-hidden RadioGroupItem.
-  assert.match(panelSource, /<RadioGroup\s*\n\s*value=\{preference\}/);
-  assert.match(panelSource, /onValueChange=\{\(value\) => setThemePreference\(value as ThemePreference\)\}/);
+  assert.match(panelSource, /<RadioGroup\s*\n\s*value=\{mode\}/);
+  assert.match(panelSource, /onValueChange=\{\(value\) => setMode\(value as ThemeMode\)\}/);
+  assert.match(panelSource, /onValueChange=\{\(value\) => setPalette\(value as ThemePalette\)\}/);
   assert.match(panelSource, /<RadioGroupItem value=\{option\.id\} className="sr-only" \/>/);
-  assert.match(themeSource, /const setThemePreference = useCallback/);
+  assert.match(themeSource, /const setMode = useCallback/);
+  assert.match(themeSource, /const setPalette = useCallback/);
 });
 
 test("keeps language selection in General settings", () => {

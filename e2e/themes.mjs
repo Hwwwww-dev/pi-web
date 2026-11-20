@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { DARK_THEMES, THEME_OPTIONS } from "../lib/theme.ts";
+import { isDarkTheme, THEME_OPTIONS } from "../lib/theme.ts";
 
 const base = process.env.E2E_BASE_URL || "http://127.0.0.1:30141";
 const artifacts = fileURLToPath(new URL("../test-results/themes/", import.meta.url));
@@ -43,8 +43,8 @@ try {
     };
     const expectTheme = async (theme) => {
       await page.waitForFunction((value) => document.documentElement.dataset.theme === value, theme);
-      assert.equal(await page.locator("html").evaluate((root) => root.classList.contains("dark")), DARK_THEMES.includes(theme));
-      assert.equal(await page.locator("html").evaluate((root) => getComputedStyle(root).colorScheme), DARK_THEMES.includes(theme) ? "dark" : "light");
+      assert.equal(await page.locator("html").evaluate((root) => root.classList.contains("dark")), isDarkTheme(theme));
+      assert.equal(await page.locator("html").evaluate((root) => getComputedStyle(root).colorScheme), isDarkTheme(theme) ? "dark" : "light");
     };
     await openSettings();
     for (const [index, theme] of themes.entries()) {
