@@ -215,8 +215,8 @@ export function ExtensionStatusBar({
     const label = cell.kind === "text" ? displayLabel(stripAnsi(cell.text)) : displayLabel(cell.label);
     return !widgetLabels.has(label.toLowerCase());
   });
-  // 没东西可显就不渲染：输入框与页面底边之间的空隙由停靠区自己负责，不再为空
-  // 条带留一块高度。
+  // 没东西可显就不渲染：占位由 ChatWindow 的 AnimatedExtensionStatusBar 统一负责
+  // （空态恒占一行，状态行进出不改变输入框位置）。
   if (cells.length === 0 && widgets.length === 0) return null;
 
   const plainStatusLine = cells

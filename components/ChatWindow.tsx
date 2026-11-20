@@ -280,7 +280,9 @@ function AnimatedExtensionStatusBar({ statuses, widgets, onCommand, commandsDisa
   const mounted = useDelayedUnmount(open, 150);
   const lastContentRef = useRef({ statuses, widgets, onCommand, commandsDisabled });
   if (open) lastContentRef.current = { statuses, widgets, onCommand, commandsDisabled };
-  if (!mounted) return null;
+  // 空态同样占一行：状态行出现/消失若改变停靠区高度，上面的输入框就整体上下
+  // 跳一整行（用户 2026-11-21）。24px 与 `size="xs"` 状态胶囊同高。
+  if (!mounted) return <div aria-hidden="true" className="h-6 w-full shrink-0" />;
   const shown = open ? { statuses, widgets, onCommand, commandsDisabled } : lastContentRef.current;
   return (
     // 停靠区为 flex-col：这一层 w-full 复原状态条本体的 stretch 铺满。
@@ -2412,9 +2414,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             )}
           </MessageScrollerContent>
         </MessageScrollerViewport>
+        {/* 位置取自实测停靠区高度而非 `--composer-dock-h`：变量由 ResizeObserver
+            首帧之后才写入，缺失时 fallback 是 0，按钮会掉到页面物理底（用户
+            2026-11-21）。还没量到就整颗隐藏，宁可少一帧也不能错位。 */}
         <MessageScrollerButton
           behavior="instant"
-          className="bottom-[calc(var(--composer-dock-h,0px)+16px)] text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100"
+          style={{ bottom: dockHeight + 16 }}
+          className={`text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100${dockHeight > 0 ? "" : " invisible"}`}
         >
           <ArrowDownIcon className="size-4" aria-hidden="true" />
           <span className="sr-only">{t("chat.scrollToLatest")}</span>
