@@ -18,11 +18,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={isDarkTheme(theme) ? "dark" : "light"}
       className="toaster group"
+      // 图标按类型上色，读者不看文字也能分清“跑完了/要我处理/失败了”
+      // （2026-11-20 用户：通知要有不同颜色的标识）。
       icons={{
-        success: <CircleCheckIcon className="size-4" />,
-        info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4" />,
-        error: <OctagonXIcon className="size-4" />,
+        success: <CircleCheckIcon className="size-4 text-emerald-600 dark:text-emerald-400" />,
+        info: <InfoIcon className="size-4 text-sky-600 dark:text-sky-400" />,
+        warning: <TriangleAlertIcon className="size-4 text-amber-600 dark:text-amber-400" />,
+        error: <OctagonXIcon className="size-4 text-destructive" />,
         loading: <Loader2Icon className="size-4 animate-spin" />,
       }}
       style={
