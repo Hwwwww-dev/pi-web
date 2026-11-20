@@ -131,15 +131,6 @@ function ReasoningText({ text, error, loading, fadeIn = false, className, onScro
   );
 }
 
-function lastNonEmptyLine(text: string): string {
-  const lines = text.split("\n");
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index].trim();
-    if (line !== "") return line;
-  }
-  return "";
-}
-
 // memo：props 均为原始值或稳定引用（lib/streaming-message.ts 保证未更新的 thinking
 // block 引用不变），长思考回复的每个 chunk 只重渲染仍在增长的那一块。
 export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, sessionId, entryId, durationKey, blockIndex, active, asLine = false, progressKey }: {
@@ -256,12 +247,10 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
   }, [active, foldKey]);
   const rowRef = useRef<HTMLDivElement>(null);
 
-  // 行头内容尾（2026-11-20 用户拍板，像命令行的命令一样）＝思考的**最后一行**：
-  // 多行文本整段塞进单行截左保右的 span 里，看到的是开头那行，增长全在视野外
-  // （用户：“只显示第一行，也不会动”）。空行跳过；流式期取平滑后的前缀的最后
-  // 一行，字就是一个一个吐出来的。
-  const tailSource = active ? liveThinking : block.deferred ? (content ?? "") : block.thinking;
-  const tailText = lastNonEmptyLine(tailSource);
+  // 行头内容尾（2026-11-20 用户拍板）：整段思考就是一条流，不按行切。行从空
+  // 开始往右撑满，撑满后新字在最右边追加、旧字从左边滑走（RowObjectSpan 的贴尾
+  // 窗口负责，不再换行也不倒回开头）。流式期取平滑后的前缀，字一个个吐出来。
+  const tailText = active ? liveThinking : block.deferred ? (content ?? "") : block.thinking;
   const lineChildren = (
     <>
       <TraceIcon>

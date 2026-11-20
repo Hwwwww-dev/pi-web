@@ -103,10 +103,10 @@ test("keeps a thought to its name and duration, and reveals the full text with t
       assert.match(html, new RegExp(`aria-expanded="${expanded}"`));
       // The trace prints the same "3.0s" the tool rows do.
       assert.match(html, /3\.0s/);
-      // 行头带内容尾（2026-11-20 用户拍板，像命令行的命令一样）：折叠时也渲染
-      // 全文（CSS 截左保右，视觉上只见尾部）；展开后正文完整可见。
+      // 行头带内容尾（2026-11-20 用户拍板）：整段文本一条流，不换行（whitespace-nowrap），
+      // 撑满后由贴尾窗口把新字留在最右边；展开后正文完整可见。
       assert.ok(html.includes("Detailed second line."));
-      assert.match(html, /direction:rtl/);
+      assert.match(html, /overflow-hidden whitespace-nowrap/);
     }
   } finally {
     if (previousWindow === undefined) delete globalThis.window;

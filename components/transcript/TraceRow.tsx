@@ -65,18 +65,26 @@ export function useTraceFold(foldKey?: string, defaultOpen = false) {
 }
 
 /**
- * 行对象文本（命令/文件等）的固定形状：行内截左保右——尾部才是关键段
- * （2026-11-20 用户拍板，所有工具行与折叠行标题共用）。direction:rtl 把溢出
- * 赶到左侧，unicode-bidi:plaintext 保住行内 LTR 顺序。
+ * 行对象文本（命令/文件等）的固定形状：一行不换行，短文本从头排，撞满后
+ * 把窗口推到末尾——新字始终在最右边可见，旧字从左边滑走（2026-11-20 用户：
+ * 标题行撑满后尾部追加，形成打字机）。用脚本 
+ * 设 scrollLeft 而不是 `direction: rtl` + `unicode-bidi: plaintext`：后者在
+ * LTR 段落（中英文）下实际把窗口留在开头，多行文本就只能看到“第一行”。
  *
- * `clip` 去掉左侧省略号（2026-11-20 用户：“运行不要显示左边的…，无意义”）：
- * 命令与思考尾已经是“最后一段”，左省略号不传达任何信息，直接硬切。
+ * `clip` 去掉左侧省略号（用户：“运行不要显示左边的…，无意义”）：命令与思考尾
+ * 已经是最后一段，左省略号不传达信息，直接硬切。
  */
 export function RowObjectSpan({ object, clip = false }: { object: string; clip?: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  // 贴尾：短文本从头排（左对齐），撑满后把窗口推到末尾。
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [object]);
   return (
     <span
-      className={cn("block text-left", clip ? "overflow-hidden text-clip whitespace-nowrap" : "truncate")}
-      style={{ direction: "rtl", unicodeBidi: "plaintext" }}
+      ref={ref}
+      className={cn("block text-left", clip ? "overflow-hidden whitespace-nowrap" : "truncate")}
     >
       {object}
     </span>

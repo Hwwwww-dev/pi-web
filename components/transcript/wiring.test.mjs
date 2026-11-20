@@ -77,10 +77,10 @@ test("the live turn fold titles itself with the latest tool while collapsed", ()
     React.createElement("div"),
   ));
   assert.match(html, /data-activity="turn"/);
-  // 收起时标题就是工具行本身（图标+动作+对象截左保右，2026-11-20 用户拍板）。
+  // 收起时标题就是工具行本身（图标+动作+对象，2026-11-20 用户拍板）。
   assert.match(html, /Ran</);
   assert.match(html, /npm run build/);
-  assert.match(html, /direction:rtl/);
+  assert.match(html, /whitespace-nowrap/);
   assert.doesNotMatch(html, /Worked for/);
 });
 
@@ -118,7 +118,7 @@ test("a running command's title clips its left edge instead of an ellipsis", () 
     React.createElement("div"),
   ));
   // “运行不要显示左边的…，无意义”（2026-11-20 用户）：硬切，不出省略号。
-  assert.match(html, /text-clip/);
+  assert.match(html, /overflow-hidden whitespace-nowrap/);
   assert.match(html, /npm run build/);
 });
 
@@ -167,17 +167,18 @@ test("the live turn fold titles thinking with its latest line, duration at the e
   assert.match(html, /trace-line-in/);
 });
 
-test("the thinking row's tail is its last line, not the beginning of the text", () => {
-  // 整段思考塞进单行截左保右的尾部只会露出开头那行，增长全在视野外：标题既
-  // “只显示第一行”又“不动”（2026-11-20 用户）。尾部取最后一行非空文本。
+test("the thinking row's tail is one unwrapped, tail-following line", () => {
+  // 标题行是一行流：不换行、不按行切，短文本从头排，撑满后靠 RowObjectSpan 的
+  // 贴尾窗口把新字留在最右边（2026-11-20 用户：“撑满后尾部追加”）。
   const html = render(React.createElement(ReasoningTrace, {
     asLine: true,
-    block: { type: "thinking", thinking: "先看文件结构\n\n再确认调用链\n现在验证缓存是否命中" },
+    block: { type: "thinking", thinking: "先看文件结构\n再确认调用链\n现在验证缓存是否命中" },
     blockIndex: -1,
   }));
+  assert.match(html, /先看文件结构/);
   assert.match(html, /现在验证缓存是否命中/);
-  assert.doesNotMatch(html, /先看文件结构/);
-  assert.doesNotMatch(html, /再确认调用链/);
+  assert.match(html, /whitespace-nowrap/);
+  assert.doesNotMatch(html, /direction:rtl|direction: rtl/);
 });
 
 test("a live turn without any tool yet shows the working title, duration only at the end", () => {

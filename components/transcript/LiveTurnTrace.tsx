@@ -241,7 +241,7 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
               </>
             ) : titleTool ? (
               // 收起态标题 = 工具行本身（与 TraceRow 同一形状：图标+动作+对象
-              // 截左保右），时长秒表仍钉右侧。
+              // 一行贴尾），时长秒表仍钉右侧。
               <>
                 <TraceIcon>
                   <ToolCategoryIcon category={titleCategory ?? "terminal"} />
