@@ -2429,8 +2429,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             水平内衬与扩展状态行（含 YOLO 徽标）同一份 `CHAT_COMPOSER_INSET_CLASS`：
             左端对齐输入框文字起点，右端对齐发送键右缘，两端都不顶到卡片外框。 */}
         {!compact && (
-          // relative z-10：速率行绘制在停靠区遮罩（chat-composer-dock-fade 的
-          // ::before）之上——卡片是定位元素最后绘制，不抬层级会被遮罩盖住。
+          // relative z-10：速率行绘制在输入卡片之上（卡片是定位元素，最后
+          // 绘制，不抬层级会被卡片盖住）。
           <div className={`relative z-10 -mb-1 flex min-h-4 items-center gap-3 ${CHAT_COMPOSER_INSET_CLASS}`}>
             {streamStatusStore ? <StreamStatusPill store={streamStatusStore} /> : null}
             <span className="min-w-0 flex-1 truncate text-xs leading-none text-muted-foreground">{activityNotice}</span>

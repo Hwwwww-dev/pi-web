@@ -2403,7 +2403,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       <div
         ref={composerDockRef}
         className={cn(
-          "chat-composer-dock chat-composer-dock-fade relative flex min-h-0 flex-col pb-3",
+          "chat-composer-dock relative flex min-h-0 flex-col pb-3",
           CHAT_PAGE_GUTTER_CLASS,
           composerFloating
             ? "absolute inset-x-0 z-30 bottom-[env(safe-area-inset-bottom,0px)] max-sm:static max-sm:shrink-0"

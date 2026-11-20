@@ -1702,27 +1702,6 @@ span.token.table {
   container-type: inline-size;
 }
 
-/* 浮动 composer：停靠区背板。不再给输入卡片套一圈实色光晕（那是整块实色的
-   来源），改成：卡片自己毛玻璃半透明、能透出被模糊的消息；停靠区只在底部
-   （卡片以下的 TODO/YOLO 行与安全区）叠一道渐变到不透明，把滚到那儿的内容
-   挡住，且没有硬边。
-   渐变画在停靠区元素自己身上，不能用绝对定位的伪元素：手机上停靠区是
-   `max-sm:static`，伪元素会脱出停靠区、以更外层的定位祖先为参照，直接铺满
-   整个聊天区把消息盖住（2026-11-20 线上事故）。
-   也不走 backdrop-filter + mask：Safari 上 mask 不一定作用在 backdrop 上，
-   会留一道硬边。 */
-.chat-composer-dock-fade {
-  /* 卡片那一段保持透明：卡片自己的 `bg-background/60 + backdrop-blur-xl`
-     要能透出后面滚过去、被模糊掉的消息（这正是“不是实色块”的关键）。只有
-     卡片以下的速率/TODO 行与安全区不透明，把消息挡住。用百分比停靠点而不是
-     固定像素，卡片行数变化时同样成立。 */
-  background: linear-gradient(
-    to bottom,
-    transparent calc(100% - 4.5rem),
-    var(--background) calc(100% - 0.5rem)
-  );
-}
-
 /* While the software keyboard is up (set by useViewportHeight), only a few
    hundred pixels remain above it. Hand them to the conversation: drop the
    home indicator inset the keyboard already covers. Nothing is ever hidden —
