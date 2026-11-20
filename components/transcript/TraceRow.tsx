@@ -64,10 +64,11 @@ export function useTraceFold(foldKey?: string, defaultOpen = false) {
   return { open, onOpenChange };
 }
 
-/** 尾部渐隐：溢出的那一侧（左侧）淡出，新字在最右边始终实心。 */
+/** 行尾渐隐：两侧各 20px 淡出，不论是否溢出都上（2026-11-20 用户：“左右两边
+ *  都要渐隐，不溢出也是要渐隐”），切口与两端都不再是硬边。 */
 const TAIL_FADE = {
-  maskImage: "linear-gradient(to right, transparent, #000 20px)",
-  WebkitMaskImage: "linear-gradient(to right, transparent, #000 20px)",
+  maskImage: "linear-gradient(to right, transparent, #000 20px, #000 calc(100% - 20px), transparent)",
+  WebkitMaskImage: "linear-gradient(to right, transparent, #000 20px, #000 calc(100% - 20px), transparent)",
 } as const;
 
 /**
@@ -78,25 +79,23 @@ const TAIL_FADE = {
  * LTR 段落（中英文）下实际把窗口留在开头，多行文本就只能看到“第一行”。
  *
  * `clip` 去掉左侧省略号（用户：“运行不要显示左边的…，无意义”）：命令与思考尾
- * 已经是最后一段，左省略号不传达信息，改用 20px 渐隐——旧字从左边滑出去时
- * 是淡出的，而不是一刀切（2026-11-20 用户：“这个尾部做一个渐隐效果”）。
- * 渐隐只在真的溢出时上，短文本从头排时首字不会被淡化。
+ * 已经是最后一段，左省略号不传达信息，改用两侧渐隐——旧字从左边滑出去时是
+ * 淡出的，右端也不会硬切（2026-11-20 用户：“这个尾部做一个渐隐效果”“左右两
+ * 边都要渐隐，不溢出也是要渐隐”）。
  */
 export function RowObjectSpan({ object, clip = false }: { object: string; clip?: boolean }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [overflowing, setOverflowing] = useState(false);
-  // 贴尾：短文本从头排（左对齐），撑满后把窗口推到末尾，并记下是否在溢出。
+  // 贴尾：短文本从头排（左对齐），撑满后把窗口推到末尾。
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.scrollLeft = el.scrollWidth;
-    setOverflowing(el.scrollWidth > el.clientWidth + 1);
   }, [object, clip]);
   return (
     <span
       ref={ref}
       className={cn("block text-left", clip ? "overflow-hidden whitespace-nowrap" : "truncate")}
-      style={clip && overflowing ? TAIL_FADE : undefined}
+      style={clip ? TAIL_FADE : undefined}
     >
       {object}
     </span>
