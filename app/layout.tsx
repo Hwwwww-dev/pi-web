@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { PwaRegistration } from "@/components/PwaRegistration";
+import { VscodeBridge } from "@/components/VscodeBridge";
 import { CHUNK_RECOVERY_SCRIPT } from "@/lib/chunk-recovery";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "katex/dist/katex.min.css";
@@ -93,6 +94,7 @@ export default function RootLayout({
       <body translate="no" className="notranslate" suppressHydrationWarning>
         {children}
         <PwaRegistration />
+        <VscodeBridge />
       </body>
     </html>
   );
