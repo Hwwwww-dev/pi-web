@@ -75,19 +75,19 @@ function SlidingTitleLine({ swapKey, children }: { swapKey: string; children: Re
   // 退场那一层滑完就卸掉，不留永远隐形的死 DOM。
   useEffect(() => {
     if (leaving === null) return;
-    const timer = setTimeout(() => setLeaving(null), 200);
+    const timer = setTimeout(() => setLeaving(null), 340);
     return () => clearTimeout(timer);
   }, [leaving]);
   return (
     <span className="relative flex min-w-0 shrink items-center gap-1 overflow-hidden">
-      <span key={swapKey} className="flex min-w-0 items-center gap-1 motion-safe:animate-[trace-line-in_180ms_ease-out]">
+      <span key={swapKey} className="flex min-w-0 items-center gap-1 motion-safe:animate-[trace-line-in_320ms_ease-out]">
         {children}
       </span>
       {leaving !== null && (
         <span
           key="leaving"
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-0 flex min-w-0 items-center gap-1 opacity-0 motion-safe:animate-[trace-line-out_180ms_ease-in]"
+          className="pointer-events-none absolute inset-y-0 left-0 flex min-w-0 items-center gap-1 opacity-0 motion-safe:animate-[trace-line-out_320ms_ease-in]"
         >
           {leaving}
         </span>
