@@ -1568,14 +1568,18 @@ export function AppShell() {
   // fresh new-chat draft when no slot remains.
   const handleKeepAliveDismiss = useCallback((sessionId: string) => {
     sessionScrollPositionsRef.current.delete(sessionId);
-    const closedIndex = keepAliveSlots.findIndex((slot) => slot.session.id === sessionId);
     const remaining = keepAliveSlots.filter((slot) => slot.session.id !== sessionId);
     setKeepAliveSlots(remaining);
     if (selectedSession?.id !== sessionId) return;
-    if (remaining.length > 0) {
-      // Advance like a browser tab: the next slot in dock order, wrapping to
-      // the last one when the closed slot was at the end.
-      handleSelectSession(remaining[Math.min(closedIndex, remaining.length - 1)].session);
+    // 被关掉的正是屏幕上的会话：列表里当前这条是占位槽（还没进过 keepAliveSlots），
+    // 所以 remaining 里已经没有它，直接按「关闭自己」处理——切到最近的另一个会话，
+    // 一个都不剩就开新会话（2026-11-20 用户）。不能依赖 remaining.length，
+    // 占位槽会话关掉时它可能非空，也可能只对得上自己。
+    const next = remaining
+      .filter((slot) => slot.session.id !== sessionId)
+      .sort((a, b) => b.lastActiveAt - a.lastActiveAt)[0];
+    if (next) {
+      handleSelectSession(next.session);
       return;
     }
     clearTabOpenSession(sessionId);

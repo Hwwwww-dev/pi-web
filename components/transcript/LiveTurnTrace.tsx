@@ -177,6 +177,8 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
   const thinkingLive = runningTool === undefined
     && !streamingText
     && (streamingThinking || (landedThinking !== undefined && lastStreamingBlock === undefined));
+  // 展开体里有没有东西：「收起列表」只对真内容有意义（刚起步时两边都空）。
+  const hasBody = items.length > 0 || streamingThinking || streamingTools.length > 0;
 
   // 秒表常驻右侧（2026-11-20）：内容没撑满时跟在标题后面，撑满时标题压缩、
   // 时长钉在右端（TraceLine 的 w-fit / max-w-full + TraceTitle truncate 实现）。
@@ -296,8 +298,11 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
               />
             ))}
           </Trace>
-          {/* 运行中同样能原地收起（标题在视口上方时不必滚回去）。 */}
-          {open && <CollapseListButton onClick={() => onOpenChange(false)} label={t("chat.collapseList")} />}
+          {/* 运行中同样能原地收起（标题在视口上方时不必滚回去）。没有内容时
+              （刚起步、还在等首块）不显示：按钮上方什么都没有，没有可收的东西。 */}
+          {open && hasBody && (
+            <CollapseListButton onClick={() => onOpenChange(false)} label={t("chat.collapseList")} />
+          )}
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>
