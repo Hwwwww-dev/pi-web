@@ -26,9 +26,11 @@ import { getFoldChoice, setToolCallExpanded } from "@/lib/tool-call-expansion";
  * output is the block. Same 5.2 line, different content slot — the header is
  * what a terminal call has and a file read does not.
  */
-export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below, activityTool, stepUsage }: {
+export const TerminalTrace = memo(function TerminalTrace({ view, trailing, duration, below, activityTool, stepUsage }: {
   view: ToolView;
   trailing?: ReactNode;
+  /** 本次调用的耗时（≥100ms 才显示），由 ActivityRows 传入。 */
+  duration?: ReactNode;
   /** Media the call produced, below the line. */
   below?: ReactNode;
   /** The pi tool name, kept as `data-activity-tool`. */
@@ -61,6 +63,7 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
       status={view.status}
       foldKey={view.foldKey}
       trailing={trailing}
+      duration={duration}
       below={below}
       activityTool={activityTool}
       stepUsage={stepUsage}

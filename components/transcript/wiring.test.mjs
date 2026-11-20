@@ -4,6 +4,7 @@
  */
 
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createJiti } from "jiti";
 
@@ -461,4 +462,18 @@ test("a sub-agent row lists the steps it recorded", () => {
   assert.match(html, /Ran grep -rn cacheKey scripts/);
   assert.match(html, /Read lib\/cache\.ts/);
   clearExpandedToolCalls();
+});
+
+// 工具行的耗时（2026-11-20 用户：“运行为什么没有秒表”）：耗时一直在 ActivityItem
+// 里，只是没接到行上；分组头一直有求和。现在每个完成的行都按 lib/tool-duration
+// 的阈值显示自己的耗时。
+test("finished tool rows carry their own duration, live rows do not", async () => {
+  const activityRows = await readFile(new URL("../ActivityRows.tsx", import.meta.url), "utf8");
+  assert.match(activityRows, /const durationNode = duration === undefined \? undefined : formatToolDurationIfShown\(duration\) \?\? undefined;/);
+  assert.match(activityRows, /duration=\{call\.result \? call\.duration : undefined\}/);
+  for (const trace of ["ToolTrace", "TerminalTrace", "StackTraceTrace", "SubagentTrace", "QuestionTrace", "PlanTrace", "SourcesTrace"]) {
+    const source = await readFile(new URL(`./${trace}.tsx`, import.meta.url), "utf8");
+    assert.match(source, /duration\?: ReactNode;/, `${trace} accepts a duration`);
+    assert.match(source, /duration=\{duration\}/, `${trace} forwards it to TraceRow`);
+  }
 });

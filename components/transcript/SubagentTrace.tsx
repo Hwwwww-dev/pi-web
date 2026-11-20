@@ -21,7 +21,9 @@ const STEP_ICONS: Record<ToolViewStatus, ReactNode> = {
  * `<Trace>`, the report below them. A run still in the background is the line
  * alone — there is nothing to show yet.
  */
-export const SubagentTrace = memo(function SubagentTrace({ label, status, steps, report, foldKey, action, stepUsage, below }: {
+export const SubagentTrace = memo(function SubagentTrace({ label, status, steps, report, foldKey, action, stepUsage, below, duration }: {
+  /** 本次调用的耗时（≥100ms 才显示），由 ActivityRows 传入。 */
+  duration?: ReactNode;
   /** The profile or agent name; omitted for the generic line. */
   label?: string;
   status: ToolViewStatus;
@@ -49,6 +51,7 @@ export const SubagentTrace = memo(function SubagentTrace({ label, status, steps,
       status={status}
       foldKey={foldKey}
       trailing={undefined}
+      duration={duration}
       actions={action}
       ariaLabel={title}
       stepUsage={stepUsage}

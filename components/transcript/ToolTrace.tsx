@@ -271,11 +271,13 @@ export function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: s
   );
 }
 
-export const ToolTrace = memo(function ToolTrace({ view, trailing, below, stepUsage, activityTool, cwd, onOpenFile }: {
+export const ToolTrace = memo(function ToolTrace({ view, trailing, duration, below, stepUsage, activityTool, cwd, onOpenFile }: {
   view: ToolView;
   /** The issuing request's usage: the expanded card's first line, in the same shape as the turn's meta line. */
   stepUsage?: StepUsage;
   trailing?: ReactNode;
+  /** 本次调用的耗时（≥100ms 才显示），由 ActivityRows 传入。 */
+  duration?: ReactNode;
   /** Media the call produced, below the line. */
   below?: ReactNode;
   /** The pi tool name, kept as `data-activity-tool`. */
@@ -320,6 +322,7 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, stepUs
       status={view.status}
       foldKey={view.foldKey}
       trailing={trailing}
+      duration={duration}
       below={below}
       activityTool={activityTool}
       stepUsage={stepUsage}

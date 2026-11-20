@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { CircleCheckIcon, CircleDotIcon, CircleIcon, RouteIcon } from "lucide-react";
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { useI18n } from "@/hooks/useI18n";
@@ -19,7 +19,9 @@ const STEP_ICON = {
  * A todo snapshot (official `pattern_plan.md`): one collapsible line naming the
  * task in progress, its progress in the description, the steps below it.
  */
-export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool, stepUsage }: {
+export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool, stepUsage, duration }: {
+  /** 本次调用的耗时（≥100ms 才显示），由 ActivityRows 传入。 */
+  duration?: ReactNode;
   steps: ToolViewStep[];
   foldKey: string;
   /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
@@ -40,6 +42,7 @@ export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool,
       title={title}
       description={t("chat.trace.planProgress", { done, total: steps.length })}
       foldKey={foldKey}
+      duration={duration}
       activityTool={activityTool}
       stepUsage={stepUsage}
       defaultOpen

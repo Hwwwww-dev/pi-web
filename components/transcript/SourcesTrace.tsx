@@ -21,7 +21,7 @@ function hostOf(url: string): string {
  * What a web search read (官方 `pattern_sources.md`): one line per source, the
  * whole row a link, the arrow saying it leaves the app.
  */
-export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trailing, below, activityTool, stepUsage }: {
+export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trailing, below, activityTool, stepUsage, duration }: {
   sources: ToolViewSource[];
   foldKey: string;
   /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
@@ -29,6 +29,8 @@ export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trail
   /** The issuing request's usage: the expanded card's first line (TraceRow draws it). */
   stepUsage?: StepUsage;
   trailing?: ReactNode;
+  /** 本次调用的耗时（≥100ms 才显示），由 ActivityRows 传入。 */
+  duration?: ReactNode;
   below?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -40,6 +42,7 @@ export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trail
       title={title}
       foldKey={foldKey}
       trailing={trailing}
+      duration={duration}
       below={below}
       activityTool={activityTool}
       stepUsage={stepUsage}

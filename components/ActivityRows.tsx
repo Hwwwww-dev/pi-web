@@ -108,9 +108,11 @@ export interface ToolCallEntry {
 }
 
 
-export function ToolRow({ block, result, stepUsage, cwd, onOpenFile, onOpenSubagent }: {
+export function ToolRow({ block, result, duration, stepUsage, cwd, onOpenFile, onOpenSubagent }: {
   block: ToolCallContent;
   result?: ToolResultMessage;
+  /** 本次调用的耗时（毫秒）：完成的行才传，行右侧显示（<100ms 不显示）。 */
+  duration?: number;
   /** The issuing request's usage, shown as the expanded card's first line. */
   stepUsage?: StepUsage;
   /** The session directory a chip's relative path resolves against. */
@@ -126,6 +128,8 @@ export function ToolRow({ block, result, stepUsage, cwd, onOpenFile, onOpenSubag
   const liveResult = result ?? activeResult;
 
   const view = toToolView({ block, result: liveResult, t });
+  // 耗时口径与思考行一致：走 lib/tool-duration 的阈值与格式，避免满屏 0.0s。
+  const durationNode = duration === undefined ? undefined : formatToolDurationIfShown(duration) ?? undefined;
   const subagent = isSubagentToolDetails(liveResult?.details) ? liveResult.details : null;
 
   // Images, video and audio the call produced: the viewers below the line, never
@@ -146,6 +150,7 @@ export function ToolRow({ block, result, stepUsage, cwd, onOpenFile, onOpenSubag
         title={view.title}
         text={resultText ?? view.error}
         foldKey={view.foldKey}
+        duration={durationNode}
         activityTool={block.toolName}
           below={mediaNode}
       >
@@ -162,6 +167,7 @@ export function ToolRow({ block, result, stepUsage, cwd, onOpenFile, onOpenSubag
         steps={view.sections.find((section) => section.kind === "steps")?.steps}
         report={view.sections.find((section) => section.kind === "markdown")?.text}
         foldKey={view.foldKey}
+        duration={durationNode}
         action={subagent && onOpenSubagent ? (
           <Button
             type="button"
@@ -182,22 +188,22 @@ export function ToolRow({ block, result, stepUsage, cwd, onOpenFile, onOpenSubag
   }
 
   if (view.kind === "terminal") {
-    return <TerminalTrace view={view} activityTool={block.toolName} stepUsage={stepUsage} below={mediaNode} />;
+    return <TerminalTrace view={view} duration={durationNode} activityTool={block.toolName} stepUsage={stepUsage} below={mediaNode} />;
   }
 
   // A todo snapshot (第 4.2 节): the Plan pattern — what is running now, how far it got, the steps.
   if (view.kind === "question") {
     const steps = view.sections.find((section) => section.kind === "steps")?.steps ?? [];
-    return <QuestionTrace title={view.title} steps={steps} foldKey={view.foldKey} activityTool={block.toolName} stepUsage={stepUsage} />;
+    return <QuestionTrace title={view.title} steps={steps} foldKey={view.foldKey} duration={durationNode} activityTool={block.toolName} stepUsage={stepUsage} />;
   }
   if (view.kind === "queue") {
     const steps = view.sections.find((section) => section.kind === "steps")?.steps ?? [];
-    return <PlanTrace steps={steps} foldKey={view.foldKey} activityTool={block.toolName} stepUsage={stepUsage} />;
+    return <PlanTrace steps={steps} foldKey={view.foldKey} duration={durationNode} activityTool={block.toolName} stepUsage={stepUsage} />;
   }
 
   // What a search read (第 5.8 节): one line per source, each a link.
   if (view.sources && view.sources.length > 0) {
-    return <SourcesTrace sources={view.sources} foldKey={view.foldKey} activityTool={block.toolName} stepUsage={stepUsage} below={mediaNode} />;
+    return <SourcesTrace sources={view.sources} foldKey={view.foldKey} duration={durationNode} activityTool={block.toolName} stepUsage={stepUsage} below={mediaNode} />;
   }
 
   const changeCounts = (view.kind === "file-edit" || view.kind === "file-write")
@@ -215,6 +221,7 @@ export function ToolRow({ block, result, stepUsage, cwd, onOpenFile, onOpenSubag
   return (
     <ToolTrace
       view={view}
+      duration={durationNode}
       activityTool={block.toolName}
       below={mediaNode}
       trailing={changeTrailing}
@@ -284,6 +291,7 @@ export function ToolGroupRow({ calls, cwd, onOpenFile, onOpenSubagent }: {
             key={call.block.toolCallId ?? index}
             block={call.block}
             result={call.result}
+            duration={call.result ? call.duration : undefined}
             stepUsage={call.stepUsage}
             cwd={cwd}
             onOpenFile={onOpenFile}

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { CircleIcon, CircleCheckIcon, MessageCircleQuestionIcon } from "lucide-react";
 import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import type { ToolViewStep } from "@/lib/tool-view";
@@ -19,7 +19,9 @@ const STEP_ICON = {
  * prompt, the choices below it, the pick replacing them once answered. No
  * progress count — a question is not a to-do list.
  */
-export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey, activityTool, stepUsage }: {
+export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey, activityTool, stepUsage, duration }: {
+  /** 本次调用的耗时（≥100ms 才显示），由 ActivityRows 传入。 */
+  duration?: ReactNode;
   title: string;
   steps: ToolViewStep[];
   foldKey: string;
@@ -35,6 +37,7 @@ export const QuestionTrace = memo(function QuestionTrace({ title, steps, foldKey
       icon={<MessageCircleQuestionIcon />}
       title={title}
       foldKey={foldKey}
+      duration={duration}
       activityTool={activityTool}
       stepUsage={stepUsage}
       defaultOpen

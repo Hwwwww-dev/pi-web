@@ -10,7 +10,7 @@ import { TraceRow } from "./TraceRow";
  * rest are frames. `node_modules` frames stay muted so the reader's own code
  * stands out.
  */
-export const StackTraceTrace = memo(function StackTraceTrace({ title, text, foldKey, trailing, below, activityTool, children }: {
+export const StackTraceTrace = memo(function StackTraceTrace({ title, text, foldKey, trailing, duration, below, activityTool, children }: {
   /** "运行失败：npm test" — built by the caller from the tool's own title. */
   title: string;
   /** The whole error output: first line = error, the rest = frames. */
@@ -19,6 +19,8 @@ export const StackTraceTrace = memo(function StackTraceTrace({ title, text, fold
   /** The pi tool name, kept as `data-activity-tool` for the selectors that count rows. */
   activityTool?: string;
   trailing?: ReactNode;
+  /** 本次调用的耗时（≥100ms 才显示），由 ActivityRows 传入。 */
+  duration?: ReactNode;
   below?: ReactNode;
   /** What the row holds besides the error (its arguments, its own result). */
   children?: ReactNode;
@@ -32,6 +34,7 @@ export const StackTraceTrace = memo(function StackTraceTrace({ title, text, fold
       status="error"
       foldKey={foldKey}
       trailing={trailing}
+      duration={duration}
       below={below}
       activityTool={activityTool}
       ariaLabel={title}
