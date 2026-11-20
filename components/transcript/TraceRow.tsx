@@ -157,8 +157,10 @@ export function TraceRow({
     </TraceTitle>
   );
   const objectEl = object && (
+    // 内容跟随自身宽度：短文本时时长就在它右边（不拉出大段空白），长文本才
+    // 收缩到行的 80% 宽（2026-11-20 用户：“为什么隔这么宽？”）。
     <span
-      className={cn("relative min-w-0", wrap ? "" : "flex-1")}
+      className={cn("relative min-w-0", wrap ? "" : "shrink")}
       title={!wrap ? object : undefined}
     >
       {wrap ? <span className="whitespace-normal break-words">{object}</span> : <RowObjectSpan object={object} clip={clipObject} />}

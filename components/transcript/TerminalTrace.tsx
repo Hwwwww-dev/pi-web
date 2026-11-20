@@ -55,6 +55,8 @@ export const TerminalTrace = memo(function TerminalTrace({ view, trailing, below
       icon={<SquareTerminalIcon className="size-3.5" />}
       title={view.title}
       object={view.object}
+      // 命令行不画左侧省略号（2026-11-20 用户）：左端被切是常态，省略号无信息。
+      clipObject
       description={view.description}
       status={view.status}
       foldKey={view.foldKey}

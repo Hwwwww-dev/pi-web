@@ -123,19 +123,20 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
 
   // 思考进行中（流式末块是 thinking 且没有工具在跑，或最后一条已落盘的思考
   // 还在增长——时长未定）＝标题直接嵌入思考行组件，内容尾打字机更新。
-  const streamingThinking = streamingTools.length === 0 && lastStreamingBlock?.type === "thinking";
+  const streamingThinking = lastStreamingBlock?.type === "thinking";
+  const streamingText = lastStreamingBlock?.type === "text";
   const lastItem = items.at(-1);
   const landedThinking = lastItem?.kind === "thinking" ? lastItem : undefined;
+  // 末块是思考就是思考（同一消息里已流过的工具块不算“正在发生的事”）。
   const thinkingBlock: ThinkingContent | undefined = streamingThinking
     ? (lastStreamingBlock as ThinkingContent)
     : landedThinking?.block;
-  // 思考行“活着”的判定（2026-11-20 用户：思考要以打字机形式显示末端内容）：
-  // 没有工具在跑、也没有文字在写，而最后一样东西是思考——就是在思考，无论它
-  // 还在流式还是已落盘。不判定它的话，思考落盘后的每段新增都直接跳到全文。
-  const streamingText = lastStreamingBlock?.type === "text";
+  // 思考行“活着”的判定（2026-11-20 用户：思考行折叠时就要以打字机显示末端
+  // 内容）：没有工具在跑、也没有文字在写，而最后一样东西是思考。不判定它的话，
+  // 思考落盘后的每段新增都直接跳到全文（已落盘且还在长也算——思考在写）。
   const thinkingLive = runningTool === undefined
     && !streamingText
-    && (streamingThinking || landedThinking !== undefined);
+    && (streamingThinking || (landedThinking !== undefined && lastStreamingBlock === undefined));
 
   // 秒表常驻右侧（2026-11-20）：内容没撑满时跟在标题后面，撑满时标题压缩、
   // 时长钉在右端（TraceLine 的 w-fit / max-w-full + TraceTitle truncate 实现）。
@@ -185,7 +186,7 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
                     ? <ToolCategoryIcon category={titleCategory} active={open} />
                     : <LayersIcon className="size-3.5" />}
                 </TraceIcon>
-                <TraceTitle className="flex-1 truncate text-left">{t("chat.activity.working")}</TraceTitle>
+                <TraceTitle className="min-w-0 truncate text-left">{t("chat.activity.working")}</TraceTitle>
               </>
             ) : titleTool ? (
               // 收起态标题 = 工具行本身（与 TraceRow 同一形状：图标+动作+对象
@@ -203,7 +204,7 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
                   </span>
                 )}
                 {titleObject !== undefined && (
-                  <span className="relative min-w-0 flex-1" title={titleObject}>
+                  <span className="relative min-w-0 shrink" title={titleObject}>
                     <RowObjectSpan object={titleObject} clip={titleView?.kind === "terminal"} />
                   </span>
                 )}
