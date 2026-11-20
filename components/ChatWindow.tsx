@@ -1966,13 +1966,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   ), [agentPhaseStore, liveActivityRendered, bashRunning, pendingBash, agentRunning, isCompacting, hasStreamingContent, queuedSubmissions]);
   // 每一行都已加载的消息都在 DOM 里，只由服务端是否还有更早的页决定顶部入口。
   const hasMoreRendered = hasEarlierMessages;
-  // 主聊天停靠区：桌面浮动在消息之上（消息列延伸到卡片背后，末端按停靠区高度垫底）；
-  // 手机（max-sm）停靠在文档流里，滚区底 = 停靠区顶，不需要垫底补偿。空态
-  //（hero+composer 簇的垂直居中依赖文档流）与侧面板保持原有布局。
+  // 主聊天停靠区：浮在消息之上（消息列延伸到卡片背后，末端按停靠区高度垫底），
+  // 桌面与手机一致。空态（hero+composer 簇的垂直居中依赖文档流）与侧面板保持
+  // 原有布局。
   const composerDockRef = useRef<HTMLDivElement | null>(null);
   const composerFloating = !panel && !isEmptyNew;
-  // 停靠区高度只进 CSS 变量（桌面内容末端垫底）：内容底部那层 padding 就是被输
-  // 入条盖住、读者永远看不到的区域。手机停靠后不消费这个变量，垫底由 CSS 覆写关闭。
+  // 停靠区高度只进 CSS 变量（内容末端垫底）：内容底部那层 padding 就是被输入条
+  // 盖住、读者永远看不到的区域。
   useEffect(() => {
     const dock = composerDockRef.current;
     const host = dock?.parentElement;
@@ -1993,10 +1993,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
    * 判成贴底，就把滚动模式续回 following-bottom，读者在范围内往上翻会被拽回。
    * 取 48px（业界跟随派 4–40px 的上限档）：流式单帧增量只有几十像素，显式
    * scrollToEnd 与插入前的贴底判定已经负责跟随，阈值只需要给“往上翻就放走”
-   * 留出一次有意图滚动的宽度。桌面端内容末端那层 `--composer-dock-h` 垫底
+   * 留出一次有意图滚动的宽度。内容末端那层 `--composer-dock-h` 垫底
    * （实测 167–169px，只会更高）不进吸附区——输入条盖住的那一段不是读者
-   * 看到的底；手机端停靠无垫底，这 48px 伸入可见内容约一行内，与业界停靠
-   * 布局同款。
+   * 看到的底。
    */
   const scrollEdgeThreshold = 48;
   /**
@@ -2195,7 +2194,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           <MessageScrollerContent
             ref={messageContentRef}
             onPointerUp={captureQuotedSelection}
-            className="min-h-0 gap-[var(--chat-row-gap)] pt-[22px] pb-[calc(var(--composer-dock-h,0px)+8px)] max-sm:pt-4 max-sm:pb-2"
+            className="min-h-0 gap-[var(--chat-row-gap)] pt-[22px] pb-[calc(var(--composer-dock-h,0px)+8px)] max-sm:pt-4"
           >
             {/* “加载更早”排在 Content 子元素的最后、用 CSS `order-first` 放到最上面：
                 官方的前插保位判定是「原先的首个子元素是否移到了 index > 0」，
@@ -2291,7 +2290,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         </MessageScrollerViewport>
         <MessageScrollerButton
           behavior="instant"
-          className="bottom-[calc(var(--composer-dock-h,0px)+16px)] max-sm:bottom-4 text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100"
+          className="bottom-[calc(var(--composer-dock-h,0px)+16px)] text-muted-foreground transition-opacity hover:text-foreground [@media(hover:hover)]:opacity-30 [@media(hover:hover)]:hover:opacity-100"
         >
           <ArrowDownIcon className="size-4" aria-hidden="true" />
           <span className="sr-only">{t("chat.scrollToLatest")}</span>
@@ -2406,7 +2405,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           "chat-composer-dock relative flex min-h-0 flex-col pb-3",
           CHAT_PAGE_GUTTER_CLASS,
           composerFloating
-            ? "absolute inset-x-0 z-30 bottom-[env(safe-area-inset-bottom,0px)] max-sm:static max-sm:shrink-0"
+            ? "absolute inset-x-0 z-30 bottom-[env(safe-area-inset-bottom,0px)]"
             : "shrink-0",
         )}
       >
