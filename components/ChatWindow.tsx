@@ -1971,14 +1971,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 原有布局。
   const composerDockRef = useRef<HTMLDivElement | null>(null);
   const composerFloating = !panel && !isEmptyNew;
-  // 停靠区高度只进 CSS 变量（内容末端垫底）：内容底部那层 padding 就是被输入条
-  // 盖住、读者永远看不到的区域。
+  // 停靠区实测高度。既进 CSS 变量（内容末端垫底：那层 padding 就是被输入条盖住、
+  // 读者永远看不到的区域），也进贴底阈值——阈值必须把这层垫底排除掉，否则正常
+  // 阅读位置（最后一条贴着卡片上沿）就已经离机械底一整段垫底，判成「未贴底」。
+  const [dockHeight, setDockHeight] = useState(0);
   useEffect(() => {
     const dock = composerDockRef.current;
     const host = dock?.parentElement;
     if (!dock || !host || panel) return;
     const apply = () => {
-      host.style.setProperty("--composer-dock-h", `${dock.offsetHeight}px`);
+      const height = dock.offsetHeight;
+      host.style.setProperty("--composer-dock-h", `${height}px`);
+      setDockHeight(height);
     };
     apply();
     const ro = new ResizeObserver(apply);
@@ -1991,13 +1995,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   /**
    * 贴底判定的距离阈值。这个值同时是「吸附范围」：库在 `autoScroll` 打开时只要
    * 判成贴底，就把滚动模式续回 following-bottom，读者在范围内往上翻会被拽回。
-   * 取 48px（业界跟随派 4–40px 的上限档）：流式单帧增量只有几十像素，显式
-   * scrollToEnd 与插入前的贴底判定已经负责跟随，阈值只需要给“往上翻就放走”
-   * 留出一次有意图滚动的宽度。内容末端那层 `--composer-dock-h` 垫底
-   * （实测 167–169px，只会更高）不进吸附区——输入条盖住的那一段不是读者
-   * 看到的底。
+   * `48` 是一行的容差（业界跟随派 4–40px 的上限档）；再加停靠区高度，是因为浮层
+   * 布局下内容末端垫了一整段 `--composer-dock-h`（实测 167–169px）：只取 48 的话，
+   * 读者停在正常阅读位置（最后一条贴着卡片上沿）距机械底就已超过一整段垫底，一帧
+   * 不动也判「未贴底」，稍微一碰就彻底放走跟随。加上垫底高度后，判定等价于
+   * 「最后一条距卡片上沿 ≤ 48px」。
    */
-  const scrollEdgeThreshold = 48;
+  const scrollEdgeThreshold = 48 + dockHeight;
   /**
    * 空闲时的尾部追加要自己补一次滚到底：`autoScroll` 只在 agent 运行时打开，
    * 空闲期库的滚动模式恒为 `free-scrolling`，发送出去的新气泡因此落在视口外，
