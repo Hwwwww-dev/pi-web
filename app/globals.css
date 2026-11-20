@@ -1341,6 +1341,15 @@ span.token.table {
   max-height: 24rem;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* 内层不再各滚一层（2026-11-20 用户：“怎么一个思考 2 个滚动条？”）：思考体、
+     命令输出、代码块原本各自 `max-h-[var(--card-max-height)]` + overflow，在
+     折叠体里叠成两根条。这里把上限放掉，内容直接铺开，统一由折叠体滚。 */
+  --card-max-height: none;
+}
+/* 嵌套折叠体（工具组里的行）同理：只有最外层那根滚动条。 */
+.trace-fold-body .trace-fold-body {
+  max-height: none;
+  overflow-y: visible;
 }
 .trace-fold-body .max-w-\[80\%\] {
   max-width: 100%;
