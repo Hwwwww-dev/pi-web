@@ -26,7 +26,17 @@ const REQUEST_TIMEOUT_MS = 5000;
 type InboundMessage =
   | { channel: string; type: "ready"; token: string; version?: number }
   | { channel: string; type: "copy-ack"; token: string; requestId: number; ok: boolean }
-  | { channel: string; type: "paste"; token: string; requestId: number; text: string };
+  | { channel: string; type: "paste"; token: string; requestId: number; text: string; image?: PasteImage | null };
+
+interface PasteImage {
+  mime: string;
+  base64: string;
+}
+
+interface PastePayload {
+  text: string;
+  image: PasteImage | null;
+}
 
 let installedCleanup: (() => void) | null = null;
 /** Set once the panel answers: outgoing messages are dropped while it is null. */
@@ -66,7 +76,7 @@ export function installVscodeBridge(): () => void {
   if (!token) return () => {};
 
   const pendingCopy = new Map<number, (ok: boolean) => void>();
-  const pendingPaste = new Map<number, (text: string) => void>();
+  const pendingPaste = new Map<number, (payload: PastePayload) => void>();
   let nextRequestId = 1;
   let active = false;
 
@@ -85,15 +95,15 @@ export function installVscodeBridge(): () => void {
     window.setTimeout(() => finish(false), REQUEST_TIMEOUT_MS);
   });
 
-  const paste = (): Promise<string> => new Promise((resolve) => {
+  const paste = (): Promise<PastePayload> => new Promise((resolve) => {
     const requestId = nextRequestId++;
-    const finish = (text: string): void => {
+    const finish = (payload: PastePayload): void => {
       if (!pendingPaste.delete(requestId)) return;
-      resolve(text);
+      resolve(payload);
     };
     pendingPaste.set(requestId, finish);
     send({ type: "paste-request", requestId });
-    window.setTimeout(() => finish(""), REQUEST_TIMEOUT_MS);
+    window.setTimeout(() => finish({ text: "", image: null }), REQUEST_TIMEOUT_MS);
   });
 
   const onMessage = (event: MessageEvent): void => {
@@ -109,7 +119,7 @@ export function installVscodeBridge(): () => void {
       return;
     }
     if (data.type === "paste") {
-      pendingPaste.get(data.requestId)?.(data.text);
+      pendingPaste.get(data.requestId)?.({ text: data.text, image: data.image ?? null });
     }
   };
 
@@ -136,7 +146,13 @@ export function installVscodeBridge(): () => void {
     if (key === "v") {
       event.preventDefault();
       const target = document.activeElement;
-      void paste().then((text) => insertText(target, text));
+      void paste().then((payload) => {
+        if (payload.image) {
+          pasteImage(target, payload.image);
+          return;
+        }
+        insertText(target, payload.text);
+      });
       return;
     }
     if (key === "a") {
@@ -276,4 +292,39 @@ function insertText(target: Element | null, text: string): void {
   if (element instanceof HTMLElement && element.isContentEditable) {
     document.execCommand("insertText", false, text);
   }
+}
+
+/**
+ * Rebuilds a pasted screenshot as a real `ClipboardEvent` and dispatches it on
+ * the focused element. The composer already handles images through that path
+ * (attachment chips, upload, `@mention`), so the paste lands exactly where a
+ * native one would have put it.
+ */
+function pasteImage(target: Element | null, image: PasteImage): void {
+  const element = target?.isConnected ? target : document.activeElement;
+  if (!(element instanceof HTMLElement)) return;
+  try {
+    const file = new File([decodeBase64(image.base64)], pastedName(image.mime), { type: image.mime });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    element.dispatchEvent(new ClipboardEvent("paste", {
+      clipboardData: transfer,
+      bubbles: true,
+      cancelable: true,
+    }));
+  } catch {
+    // ClipboardEvent is not constructible here; the text path stays available.
+  }
+}
+
+function decodeBase64(base64: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function pastedName(mime: string): string {
+  const subtype = mime.split("/")[1] ?? "png";
+  return `pasted-image.${subtype === "jpeg" ? "jpg" : subtype}`;
 }
