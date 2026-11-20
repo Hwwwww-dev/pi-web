@@ -20,7 +20,7 @@ import { getFileName } from "@/lib/file-paths";
 import type { InspirationFileRef } from "@/lib/inspiration-shared";
 import { MessageView, formatTime, getModelDisplayName } from "./MessageView";
 import { ActiveToolsContext, TurnActivityBody, TurnMetaLine } from "./ActivityRows";
-import { InspirationDialog } from "./InspirationDialog";
+import dynamic from "next/dynamic";
 import { MarkdownBody } from "./MarkdownBody";
 import { ActivityNoticeLine, ChatInput, getUserMessageDraftImages, getUserMessageText, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
@@ -81,6 +81,8 @@ const TOP_SLACK = 24;
 const PREPEND_SETTLE_FRAMES = 12;
 /** 两次自动取页之间的最小间隔：连续滚动事件不应把多页挤进同一次操作。 */
 const AUTO_LOAD_MIN_INTERVAL_MS = 300;
+
+const InspirationDialog = dynamic(() => import("./InspirationDialog").then((mod) => mod.InspirationDialog), { ssr: false });
 
 /**
  * 读取当前滚动位置：贴尾记为 atBottom，否则记录视口顶部条目及其偏移。

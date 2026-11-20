@@ -45,25 +45,29 @@ import { KeepAliveDock } from "./KeepAliveDock";
 import { ChatWindow } from "./ChatWindow";
 import { NewSessionContextBar, type NewSessionContextControl } from "./NewSessionContextBar";
 import type { ChatScrollPosition } from "@/lib/chat-scroll-position";
-import { FileViewer } from "./FileViewer";
 import { GitPanel } from "./GitPanel";
 import { TabBar, type Tab } from "./TabBar";
 import { movePanelTab, orderPanelTabs } from "@/lib/panel-tab-order";
 import { openFileTab, saveFileViewerState, saveParkedFileViewerState, switchFileWorkspace, type ParkedFileWorkspace } from "./file-tab-state";
-import { SettingsPanel } from "./SettingsPanel";
 import { Toaster } from "./ui/sonner";
 import { toast } from "sonner";
 import { Progress } from "./ui/progress";
-import { ProjectTrustDialog, type ProjectTrustFailure } from "./ProjectTrustDialog";
+import type { ProjectTrustFailure } from "./ProjectTrustDialog";
 import { BranchNavigator, hasSessionBranches } from "./BranchNavigator";
-import { SystemPromptPanel } from "./SystemPromptPanel";
-import { ToolDefinitionsPanel } from "./ToolDefinitionsPanel";
-import { AgentSessionPanel } from "./AgentSessionPanel";
-import { DebugPanel, DebugPanelBoundary } from "./DebugPanel";
-import { SessionChatPanel } from "./SessionChatPanel";
 import { RegionErrorBoundary } from "./ErrorBoundary";
 // xterm（~70KB gz）只属于打开的终端标签：拆出首屏 bundle，首次挂载时才拉取。
 const TerminalPanel = dynamic(() => import("./TerminalPanel").then((mod) => mod.TerminalPanel), { ssr: false });
+// 首屏只带聊天主路径：设置、文件阅读器、调试/分支/侧聊这些面板都是按需出现的，
+// 各自（连它们拖进来的 radix 组件）等用户真的打开才下载。
+const SettingsPanel = dynamic(() => import("./SettingsPanel").then((mod) => mod.SettingsPanel), { ssr: false });
+const ProjectTrustDialog = dynamic(() => import("./ProjectTrustDialog").then((mod) => mod.ProjectTrustDialog), { ssr: false });
+const FileViewer = dynamic(() => import("./FileViewer").then((mod) => mod.FileViewer), { ssr: false });
+const SystemPromptPanel = dynamic(() => import("./SystemPromptPanel").then((mod) => mod.SystemPromptPanel), { ssr: false });
+const ToolDefinitionsPanel = dynamic(() => import("./ToolDefinitionsPanel").then((mod) => mod.ToolDefinitionsPanel), { ssr: false });
+const AgentSessionPanel = dynamic(() => import("./AgentSessionPanel").then((mod) => mod.AgentSessionPanel), { ssr: false });
+const SessionChatPanel = dynamic(() => import("./SessionChatPanel").then((mod) => mod.SessionChatPanel), { ssr: false });
+const DebugPanel = dynamic(() => import("./DebugPanel").then((mod) => mod.DebugPanel), { ssr: false });
+const DebugPanelBoundary = dynamic(() => import("./DebugPanel").then((mod) => mod.DebugPanelBoundary), { ssr: false });
 import { newTerminalTab, restoreTerminalTabs, TERMINAL_TABS_KEY, type TerminalTab } from "./terminal-tab-state";
 import { appendSideTab, restoreSideTabs, sideTabsKey } from "./side-tab-state";
 import { useTheme } from "@/hooks/useTheme";
