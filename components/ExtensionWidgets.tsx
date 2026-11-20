@@ -9,6 +9,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { displayLabel } from "@/lib/label-case";
 import type { ExtensionWidgetItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { CHAT_GLASS_CLASS } from "@/lib/chat-layout";
 
 export const WIDGET_UPDATE_IDLE_MS = 1100;
 
@@ -188,6 +189,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
             // widget above or below the editor with a chevron; here the panel
             // always opens above the row, so the name is the whole chip.
             const triggerClass = cn(
+              CHAT_GLASS_CLASS,
               "shrink-0 gap-1.5 font-mono text-xs text-muted-foreground",
               "hover:bg-accent hover:text-accent-foreground",
               "data-[expanded=true]:bg-accent data-[expanded=true]:text-accent-foreground",
@@ -230,7 +232,7 @@ export function ExtensionWidgets({ widgets, children }: { widgets: ExtensionWidg
                 variant="outline"
                 size="xs"
                 disabled
-                className="shrink-0 gap-1.5 font-mono text-xs font-normal text-muted-foreground"
+                className={cn(CHAT_GLASS_CLASS, "shrink-0 gap-1.5 font-mono text-xs font-normal text-muted-foreground")}
                 aria-label={`${placementLabel}: ${extensionWidgetLabel(widget.key)}, ${lineCountLabel}`}
               >
                 {content}

@@ -18,13 +18,15 @@ import { streamRateKey, streamRateStart, streamTokensPerSecond } from "@/lib/str
 import type { StreamingStore } from "@/lib/streaming-message";
 import { selectIsStreaming, selectStreamingMessage, useStreamingSelector } from "@/hooks/useStreamingSelector";
 import { useI18n } from "@/hooks/useI18n";
+import { CHAT_GLASS_CLASS } from "@/lib/chat-layout";
 
 const RATE_HOLD_MS = 6000;
 
 /** `[速度徽标 + ↓token 数]`——原 AssistantMessageHeader 的计量段。胶囊定宽
  *  （w-[5rem] 容纳 "999.9 t/s" 并留出左右各 10px 内边距），数字位数变化不推挤同行内容；流式中按
- *  五档变色（<15 红、15–30 黄、30–50 绿、50–120 蓝、>120 彩虹），静态一律
- *  浅灰底中性色，无读数也占同一颗胶囊（读 0.0），槽位宽度不随流式开始/结束变化。 */
+ *  五档变色（<15 红、15–30 黄、30–50 绿、50–120 蓝、>120 彩虹），静态与
+ *  停留期是磨砂玻璃（`CHAT_GLASS_CLASS`，与输入框卡片同一层）中性色，无读数也占
+ *  同一颗胶囊（读 0.0），槽位宽度不随流式开始/结束变化。 */
 export function StreamRateBadge({ tokens, tps, streaming }: { tokens: number; tps: number | null; streaming: boolean }) {
   const { t } = useI18n();
   // 只有流式中才吃配色档：静态/结束后停留期永远中性，绝不出现红色档。
@@ -52,7 +54,7 @@ export function StreamRateBadge({ tokens, tps, streaming }: { tokens: number; tp
           {rate.toFixed(1)} t/s
         </span>
       ) : (
-        <span className="inline-flex w-[5rem] shrink-0 items-center justify-center rounded-md bg-muted px-2.5 text-xs leading-tight font-medium tabular-nums text-muted-foreground transition-colors duration-300">
+        <span className={`inline-flex w-[5rem] shrink-0 items-center justify-center rounded-md ${CHAT_GLASS_CLASS} px-2.5 text-xs leading-tight font-medium tabular-nums text-muted-foreground transition-colors duration-300`}>
           {(tps ?? 0).toFixed(1)} t/s
         </span>
       )}

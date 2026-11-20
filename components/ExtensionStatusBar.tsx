@@ -6,7 +6,7 @@ import { isPermissiveStatusText } from "@/lib/extension-status";
 import { displayLabel } from "@/lib/label-case";
 import type { ExtensionStatusItem, ExtensionWidgetItem } from "@/lib/types";
 import { AnsiText } from "./AnsiText";
-import { CHAT_COMPOSER_INSET_CLASS } from "@/lib/chat-layout";
+import { CHAT_COMPOSER_INSET_CLASS, CHAT_GLASS_CLASS } from "@/lib/chat-layout";
 import { ExtensionWidgets, extensionWidgetLabel } from "./ExtensionWidgets";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -123,7 +123,7 @@ function StatusListChip({ title, items, label, full }: { title: string; items: s
           size="xs"
           title={full}
           aria-label={full}
-          className="shrink-0 font-mono text-xs font-medium text-muted-foreground animate-in fade-in duration-150 motion-reduce:animate-none"
+          className={`${CHAT_GLASS_CLASS} shrink-0 font-mono text-xs font-medium text-muted-foreground animate-in fade-in duration-150 motion-reduce:animate-none`}
         >
           {label}
         </Button>
@@ -171,7 +171,7 @@ function StatusPill({
         disabled
         title={stripAnsi(cell.text)}
         aria-label={stripAnsi(cell.text)}
-        className="max-w-full shrink-0 font-mono text-xs font-normal text-muted-foreground animate-in fade-in duration-150 motion-reduce:animate-none"
+        className={`${CHAT_GLASS_CLASS} max-w-full shrink-0 font-mono text-xs font-normal text-muted-foreground animate-in fade-in duration-150 motion-reduce:animate-none`}
       >
         {/* Plain status text is a label like any other; ANSI text is the extension's own. */}
         {/\u001b/.test(cell.text) ? <AnsiText text={cell.text} /> : displayLabel(cell.text)}
@@ -187,7 +187,7 @@ function StatusPill({
       title={`${cell.label} · ${cell.command}`}
       aria-label={`${cell.label} (${cell.command})`}
       onClick={() => onCommand?.(cell.command)}
-      className="shrink-0 font-mono text-xs text-muted-foreground animate-in fade-in duration-150 motion-reduce:animate-none"
+      className={`${CHAT_GLASS_CLASS} shrink-0 font-mono text-xs text-muted-foreground animate-in fade-in duration-150 motion-reduce:animate-none`}
     >
       {displayLabel(cell.label)}
     </Button>
