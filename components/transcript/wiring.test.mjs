@@ -17,6 +17,7 @@ const { createStreamingStore } = await jiti.import("@/lib/streaming-message");
 const { ToolRow, TurnActivityBody } = await jiti.import("../ActivityRows.tsx");
 const { TurnTrace } = await jiti.import("./TurnTrace.tsx");
 const { LiveTurnTrace } = await jiti.import("./LiveTurnTrace.tsx");
+const { ReasoningTrace } = await jiti.import("./ReasoningTrace.tsx");
 const { SubagentTrace } = await jiti.import("./SubagentTrace.tsx");
 const { isFailedResult } = await jiti.import("@/lib/tool-view");
 const { resolveLocalFilePath } = await jiti.import("@/lib/file-links");
@@ -164,6 +165,19 @@ test("the live turn fold titles thinking with its latest line, duration at the e
   assert.match(html, />Thinking</);
   assert.match(html, />12s</);
   assert.match(html, /trace-line-in/);
+});
+
+test("the thinking row's tail is its last line, not the beginning of the text", () => {
+  // 整段思考塞进单行截左保右的尾部只会露出开头那行，增长全在视野外：标题既
+  // “只显示第一行”又“不动”（2026-11-20 用户）。尾部取最后一行非空文本。
+  const html = render(React.createElement(ReasoningTrace, {
+    asLine: true,
+    block: { type: "thinking", thinking: "先看文件结构\n\n再确认调用链\n现在验证缓存是否命中" },
+    blockIndex: -1,
+  }));
+  assert.match(html, /现在验证缓存是否命中/);
+  assert.doesNotMatch(html, /先看文件结构/);
+  assert.doesNotMatch(html, /再确认调用链/);
 });
 
 test("a live turn without any tool yet shows the working title, duration only at the end", () => {

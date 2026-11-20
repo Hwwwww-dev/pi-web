@@ -72,6 +72,12 @@ function SlidingTitleLine({ swapKey, children }: { swapKey: string; children: Re
     setLeaving(lastChildrenRef.current);
   }
   lastChildrenRef.current = children;
+  // 退场那一层滑完就卸掉，不留永远隐形的死 DOM。
+  useEffect(() => {
+    if (leaving === null) return;
+    const timer = setTimeout(() => setLeaving(null), 200);
+    return () => clearTimeout(timer);
+  }, [leaving]);
   return (
     <span className="relative flex min-w-0 shrink items-center gap-1 overflow-hidden">
       <span key={swapKey} className="flex min-w-0 items-center gap-1 motion-safe:animate-[trace-line-in_180ms_ease-out]">

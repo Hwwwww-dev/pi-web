@@ -29,20 +29,20 @@ function pump() {
 }
 
 test("without a progress key a remount starts from the full text (no replay)", () => {
-  const hook = () => useSmoothStreamText("已经写好的思考", true);
-  assert.equal(renderHook(hook).result, "已经写好的思考");
-  assert.equal(renderHook(hook).result, "已经写好的思考");
+  const useProbe = () => useSmoothStreamText("已经写好的思考", true);
+  assert.equal(renderHook(useProbe).result, "已经写好的思考");
+  assert.equal(renderHook(useProbe).result, "已经写好的思考");
 });
 
 test("a progress key carries the typed position across a remount", () => {
-  const hook = ({ text }) => useSmoothStreamText(text, true, "continuity");
-  const first = renderHook(hook, { text: "abcdefghijklmnop" });
+  const useTyped = ({ text }) => useSmoothStreamText(text, true, "continuity");
+  const first = renderHook(useTyped, { text: "abcdefghijklmnop" });
   assert.equal(first.result, "", "首帧从头吐，不整段蹦出");
   pump();
   first.unmount();
 
   frames = [];
-  const second = renderHook(hook, { text: "abcdefghijklmnopQRST" });
+  const second = renderHook(useTyped, { text: "abcdefghijklmnopQRST" });
   assert.ok(second.result.length > 0, "重挂载接着上次进度，不从零开始");
   assert.ok(second.result.length < "abcdefghijklmnopQRST".length, "重挂载后仍在吐字");
   pump();
@@ -51,8 +51,8 @@ test("a progress key carries the typed position across a remount", () => {
 });
 
 test("a completed block ignores the animated state and shows the whole text", () => {
-  const hook = ({ text, active }) => useSmoothStreamText(text, active, "settled");
-  const running = renderHook(hook, { text: "abc", active: true });
+  const useSettled = ({ text, active }) => useSmoothStreamText(text, active, "settled");
+  const running = renderHook(useSettled, { text: "abc", active: true });
   assert.equal(running.result, "");
   running.rerender({ text: "abc", active: false });
   assert.equal(running.result, "abc");
