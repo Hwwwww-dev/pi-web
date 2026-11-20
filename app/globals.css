@@ -1706,14 +1706,12 @@ span.token.table {
    来源），改成：卡片自己毛玻璃半透明，停靠区底层一道从上透明渐变到底色
    的遮罩——底端实、顶端自然淡出，没有硬边也不出现色块。速率行、TODO/YOLO
    行与安全区落在渐变下半段，仍是遮住的。
-   遮罩用 background 渐变而不是 backdrop-filter + mask：Safari 上 mask 不
-   一定作用在 backdrop 上，会出现一道硬边。 */
-.chat-composer-dock-fade::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
+   渐变画在停靠区元素自己身上，不能用绝对定位的伪元素：手机上停靠区是
+   `max-sm:static`，伪元素会脱出停靠区、以更外层的定位祖先为参照，直接铺满
+   整个聊天区把消息盖住（2026-11-20 线上事故）。
+   也不走 backdrop-filter + mask：Safari 上 mask 不一定作用在 backdrop 上，
+   会留一道硬边。 */
+.chat-composer-dock-fade {
   background: linear-gradient(to bottom, transparent 0, var(--background) 56px);
 }
 
