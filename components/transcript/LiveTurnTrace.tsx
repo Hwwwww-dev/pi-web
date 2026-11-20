@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { LayersIcon } from "lucide-react";
 import {
   Trace,
@@ -57,6 +57,39 @@ function useRunningToolIds(phaseStore?: AgentPhaseStore): string[] {
  * 平铺、message_end 后再“收进去”，视觉上折叠两次。折叠键与完成态 TurnTrace
  * 共用 `process:{entryId}`，settle 交换帧按已记录的选择原样接管展开/收起状态。
  */
+/**
+ * 折叠行标题的上滑换行（2026-11-20 用户）：标题换成另一个活动时，旧标题向上滑出、
+ * 新标题从下方滑入（transform + opacity，行高不变）。同一活动的流式增长不动（key
+ * 相同），思考的打字机不受影响。
+ */
+function SlidingTitleLine({ swapKey, children }: { swapKey: string; children: ReactNode }) {
+  const lastKeyRef = useRef(swapKey);
+  const lastChildrenRef = useRef<ReactNode>(children);
+  const [leaving, setLeaving] = useState<ReactNode>(null);
+  if (lastKeyRef.current !== swapKey) {
+    // 上一帧的标题就是退场那一层：本次 render 捕获后在绝对定位层里淡出。
+    lastKeyRef.current = swapKey;
+    setLeaving(lastChildrenRef.current);
+  }
+  lastChildrenRef.current = children;
+  return (
+    <span className="relative flex min-w-0 shrink items-center gap-1 overflow-hidden">
+      <span key={swapKey} className="flex min-w-0 items-center gap-1 motion-safe:animate-[trace-line-in_180ms_ease-out]">
+        {children}
+      </span>
+      {leaving !== null && (
+        <span
+          key="leaving"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 flex min-w-0 items-center gap-1 opacity-0 motion-safe:animate-[trace-line-out_180ms_ease-in]"
+        >
+          {leaving}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, toolResults, cwd, onOpenFile, onOpenSubagent, mergeStreaming = false, children }: {
   items: ActivityItem[];
   /** 回合锚点（用户消息）的 pi 时间戳：秒表的起点。 */
@@ -161,6 +194,17 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
       : thinkingBlock
         ? t("i18n.thinking")
         : t("chat.activity.working");
+  // 标题换行的动画键：换成另一个活动（工具→工具、工具↔思考、工作中）才滑动，
+  // 同一活动的流式增长不动。
+  const titleSwapKey = open
+    ? "working"
+    : titleTool
+      ? `tool:${titleTool.block.toolCallId ?? titleTool.view.title}`
+      : thinkingBlock
+        ? "thinking"
+        : "working";
+  // 打字机进度跟着折叠键走：段重组/列表重读重挂载后接着吐，不整段蹦出。
+  const thinkingProgressKey = foldKey ? `${foldKey}:thinking` : undefined;
   const titleView = titleTool?.view;
   const titleCategory = titleView ? getToolCategory(titleTool.block.toolName) : undefined;
   // 折叠行标题只需三样（2026-11-20 用户）：动作、内容（最新的那一个文件/命令）、秒表。
@@ -179,6 +223,7 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
               确定），行本身 100% 铺满——之前两层都写 `w-full max-w-[80%]`，
               百分比在 fit-content 祖先上循环解析，短文本也被截成「工…」。 */}
           <TraceLine status="running" className="w-full">
+            <SlidingTitleLine swapKey={titleSwapKey}>
             {open || (!titleTool && !thinkingBlock) ? (
               <>
                 <TraceIcon>
@@ -217,8 +262,10 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
                 blockIndex={-1}
                 active={thinkingLive}
                 duration={landedThinking?.duration}
+                progressKey={thinkingProgressKey}
               />
             )}
+            </SlidingTitleLine>
             <TraceDescription>{formatTurnDuration(elapsedMs)}</TraceDescription>
           </TraceLine>
         </TraceCollapsibleTrigger>

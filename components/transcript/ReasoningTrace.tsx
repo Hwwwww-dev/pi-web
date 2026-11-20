@@ -133,7 +133,7 @@ function ReasoningText({ text, error, loading, fadeIn = false, className, onScro
 
 // memo：props 均为原始值或稳定引用（lib/streaming-message.ts 保证未更新的 thinking
 // block 引用不变），长思考回复的每个 chunk 只重渲染仍在增长的那一块。
-export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, sessionId, entryId, durationKey, blockIndex, active, asLine = false }: {
+export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, sessionId, entryId, durationKey, blockIndex, active, asLine = false, progressKey }: {
   block: ThinkingContent;
   duration?: number;
   sessionId?: string;
@@ -146,6 +146,8 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
   /** 只渲染行内容本身（图标+思考+内容尾+时长），供折叠行标题直接嵌入（2026-11-20
    *  用户拍板：标题直接用对应组件）；不带按钮与展开区。 */
   asLine?: boolean;
+  /** 打字机进度的跨挂载键（活跃回合的折叠行会随段重组重挂载，进度不能丢）。 */
+  progressKey?: string;
 }) {
   const { t } = useI18n();
   // 手动折叠选择持久化到模块级 store（与工具卡同一套）：回合完成的消息重读会
@@ -154,7 +156,7 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
   const foldKey = durationKey === undefined ? undefined : `thinking:${durationKey}`;
   const [expanded, setExpanded] = useState(() => getFoldChoice(foldKey) ?? isThinkingExpandedByDefault());
   // 流式期吐字平滑：思考文本按帧追赶显示；历史块（非 active）直接全文。
-  const liveThinking = useSmoothStreamText(block.thinking, Boolean(active));
+  const liveThinking = useSmoothStreamText(block.thinking, Boolean(active), progressKey);
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -1326,6 +1326,19 @@ span.token.table {
   to { grid-template-rows: 0fr; opacity: 0 }
 }
 
+/* 折叠行标题换成另一个活动（工具→工具、工具→思考）时的上滑换行（2026-11-20
+   用户：这样好看些）：旧标题向上滑出，新标题从下方滑入。行高不变，所以只用
+   transform + opacity，不触发重排；容器 overflow-hidden 裁掉滑动出界的那截。 */
+@keyframes trace-line-in {
+  from { transform: translateY(6px); opacity: 0 }
+  to { transform: none; opacity: 1 }
+}
+
+@keyframes trace-line-out {
+  from { transform: none; opacity: 1 }
+  to { transform: translateY(-6px); opacity: 0 }
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

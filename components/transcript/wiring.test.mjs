@@ -158,9 +158,12 @@ test("the live turn fold titles thinking with its latest line, duration at the e
     LiveTurnTrace,
     { items: [], startTs: Date.now() - 12_000, foldKey: "process:live-thinking", store, mergeStreaming: true },
   ));
-  assert.match(html, /第二步验证假设/);
-  assert.doesNotMatch(html, /思考.*12s|Thinking.*12s/);
+  // 思考期标题 = 思考行组件本身：图标 + 思考 + 末端内容（打字机），时长在行尾。
+  // 打字机从模块级进度接着吐（重挂载不重置），静态首帧就是空文本，所以这里
+  // 只断言行形状与时长位置，文字内容由 hooks/useSmoothStreamText 的进度测试管。
+  assert.match(html, />Thinking</);
   assert.match(html, />12s</);
+  assert.match(html, /trace-line-in/);
 });
 
 test("a live turn without any tool yet shows the working title, duration only at the end", () => {
