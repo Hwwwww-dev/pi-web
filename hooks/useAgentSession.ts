@@ -226,6 +226,8 @@ export interface AgentEndInfo {
    * the task is not done yet, so nothing to announce either (#1434).
    */
   subagentsActive?: boolean;
+  /** 这轮以错误收尾（模型/网关报错、回复失败）：通知的标题是“任务失败”，不是“任务完成”。 */
+  failed?: boolean;
 }
 
 export interface UseAgentSessionOptions {

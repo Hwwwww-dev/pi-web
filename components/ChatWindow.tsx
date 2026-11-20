@@ -388,6 +388,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
   const soundedExtensionDialogIdRef = useRef<string | null>(null);
+  /**
+   * 最近一条助手回复，用来判断这轮是不是以错误收尾（`stopReason: "error"` 或
+   * `errorMessage`）。`wrappedOnAgentEnd` 声明在 `useAgentSession` 之前，只能走 ref。
+   */
+  const lastAssistantRef = useRef<AssistantMessage | null>(null);
   const wrappedOnAgentEnd = useCallback((end: AgentEndInfo) => {
     // A run someone stopped did not finish anything, and one whose subagents still work did not finish the task.
     if (completionNotificationsEnabled && soundEnabledRef.current && !end.aborted && !end.subagentsActive) {
@@ -395,7 +400,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       const sid = sessionIdRef.current ?? session?.id;
       if (!sid || claimDoneChime([sid], Date.now() - DONE_CHIME_SAME_EVENT_MS)) playDoneSoundRef.current();
     }
-    onAgentEnd?.(end);
+    const last = lastAssistantRef.current;
+    const failed = Boolean(last && (last.stopReason === "error" || last.errorMessage || last.stopReason === "aborted"));
+    onAgentEnd?.(failed ? { ...end, failed } : end);
   // sessionIdRef is useAgentSession's ref, declared below: a dependency would read it before then.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completionNotificationsEnabled, onAgentEnd, session?.id]);
@@ -437,6 +444,20 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     onOpenSettings, onDebugSnapshotReaderChange, onReloadSessionChange, t,
     deferInitialScroll: Boolean(pendingScrollRestore),
   });
+
+  // 这轮是否以错误收尾：`wrappedOnAgentEnd` 声明在 `useAgentSession` 之前，只能经由
+  // 这个 ref 读到消息表；从末尾往前找，通常一步就命中最近一条助手回复。
+  useEffect(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const message = messages[i];
+      if (message.role === "assistant") {
+        lastAssistantRef.current = message as AssistantMessage;
+        return;
+      }
+    }
+    lastAssistantRef.current = null;
+  }, [messages]);
+
   // Only whether a reply is streaming and has content yet: the chunks themselves
   // re-render StreamingReply alone.
   const isStreaming = useStreamingSelector(streamingStore, selectIsStreaming);

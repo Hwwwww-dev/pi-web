@@ -31,6 +31,8 @@ function runHandleAgentEnd({ end, selectedSession, attention, sessions = [] }) {
     showSessionEventToast: (session, kind, message) => toasts.push({ session, kind, message }),
     latestSessionsRef: { current: sessions },
     translate: (key) => key,
+    // 标题按事件类型来（待回答 / 任务完成 / 任务失败），VM 里给个等价的桩。
+    sessionToastTitle: (kind) => `title:${kind}`,
     hiddenFinishedSessionIds: new Set(),
     setHiddenFinishedSessionIds: (updater) => {
       context.hiddenFinishedSessionIds = updater(context.hiddenFinishedSessionIds);

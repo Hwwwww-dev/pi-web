@@ -1901,6 +1901,8 @@ export const zhTWLocale: LocalePlugin = {
     "diff.unchangedLines": "{count} 行未變更",
     "i18n.sessionComplete": "工作階段已完成",
     "i18n.taskFinished": "任務已完成。",
+    "i18n.awaitingAnswer": "待回答",
+    "i18n.taskFailed": "任務失敗",
     "i18n.attentionNeeded": "Pi 需要你處理",
     "i18n.extensionInputNeeded": "擴充功能正在等待你的輸入。",
   },

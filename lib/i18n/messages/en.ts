@@ -1901,6 +1901,8 @@ export const enLocale: LocalePlugin = {
     "diff.unchangedLines": "{count} unchanged lines",
     "i18n.sessionComplete": "Session complete",
     "i18n.taskFinished": "Task finished.",
+    "i18n.awaitingAnswer": "Waiting for you",
+    "i18n.taskFailed": "Task failed",
     "i18n.attentionNeeded": "Pi needs your attention",
     "i18n.extensionInputNeeded": "An extension is waiting for your input.",
   },

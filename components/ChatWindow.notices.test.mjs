@@ -29,8 +29,10 @@ test("session events show as standard sonner toasts with an open action", () => 
   assert.doesNotMatch(shellSource, /from "\.\/SessionEventToast"/);
   assert.match(
     shellSource,
-    /kind === "complete" \? toast\.success : toast\.warning\)\(/,
+    /kind === "complete" \? toast\.success : kind === "failed" \? toast\.error : toast\.warning;/,
   );
+  // 标题按事件（待回答 / 任务完成 / 任务失败），会话名进正文。
+  assert.match(shellSource, /show\(\s*sessionToastTitle\(kind\)/);
   // 点击 action 打开会话；同会话稳定 id 替换。
   assert.match(shellSource, /id: `session-event:\$\{kind\}:\$\{target\.id\}`/);
   assert.match(shellSource, /onClick: \(\) => handleSelectSession\(target\)/);

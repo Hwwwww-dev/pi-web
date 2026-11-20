@@ -1901,6 +1901,8 @@ export const zhCNLocale: LocalePlugin = {
     "diff.unchangedLines": "{count} 行未改动",
     "i18n.sessionComplete": "任务完成",
     "i18n.taskFinished": "任务已完成。",
+    "i18n.awaitingAnswer": "待回答",
+    "i18n.taskFailed": "任务失败",
     "i18n.attentionNeeded": "Pi 需要你的操作",
     "i18n.extensionInputNeeded": "扩展正在等待你的输入。",
   },

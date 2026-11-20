@@ -166,7 +166,7 @@ function lastAgentTabId(tabs: readonly { sessionId: string }[]): string | null {
   return last ? `agent:${last.sessionId}` : null;
 }
 
-type SessionToastKind = "complete" | "attention";
+type SessionToastKind = "complete" | "attention" | "failed";
 
 export function AppShell() {
   const router = useRouter();
@@ -1345,9 +1345,19 @@ export function AppShell() {
   // on screen the system notification is noise, so a background session's
   // finish or ask shows as a standard sonner toast instead; the action opens
   // the session. A stable per-session id replaces instead of stacking.
+  /**
+   * 通知的标题说明发生了什么（待回答 / 任务完成 / 任务失败），而不是会话名——
+   * 会话名放在正文里，读者一眼就能分清“要我处理”和“跑完了”（2026-11-20）。
+   */
+  const sessionToastTitle = useCallback((kind: SessionToastKind) => {
+    if (kind === "attention") return translate("i18n.awaitingAnswer");
+    if (kind === "failed") return translate("i18n.taskFailed");
+    return translate("i18n.sessionComplete");
+  }, [translate]);
   const showSessionEventToast = useCallback((target: SessionInfo, kind: SessionToastKind, message: string) => {
-    (kind === "complete" ? toast.success : toast.warning)(
-      target.name || translate("i18n.sessionComplete"),
+    const show = kind === "complete" ? toast.success : kind === "failed" ? toast.error : toast.warning;
+    show(
+      sessionToastTitle(kind),
       {
         id: `session-event:${kind}:${target.id}`,
         description: message,
@@ -1358,7 +1368,7 @@ export function AppShell() {
         },
       },
     );
-  }, [handleSelectSession, translate]);
+  }, [handleSelectSession, sessionToastTitle, translate]);
 
   const handleAgentEnd = useCallback((end: AgentEndInfo) => {
     // The sidebar's reload merges the selected session's new row into it
@@ -1372,6 +1382,9 @@ export function AppShell() {
       ? latestSessionsRef.current.find((session) => session.id === end.sessionId) ?? selectedSession
       : selectedSession;
     if (targetSession?.relation?.kind === "subagent") return;
+    // 标题说明发生了什么；正文留给“是哪个会话”。
+    const kind: SessionToastKind = end.failed ? "failed" : "complete";
+    const detail = targetSession?.name || translate("i18n.taskFinished");
     if (shouldShowBrowserNotification()) {
       if (targetSession) {
         setHiddenFinishedSessionIds((prev) => {
@@ -1383,8 +1396,8 @@ export function AppShell() {
       }
       deliverSessionNotification({
         targetSession,
-        title: targetSession?.name ?? translate("i18n.sessionComplete"),
-        body: translate("i18n.taskFinished"),
+        title: sessionToastTitle(kind),
+        body: detail,
         tag: targetSession ? `pi-session-complete:${targetSession.id}` : "pi-session-complete",
       });
       return;
@@ -1392,9 +1405,9 @@ export function AppShell() {
     // On screen: only a session not being watched announces (the selected
     // one's finish is already in view); the toast carries the jump.
     if (targetSession && targetSession.id !== selectedSession?.id) {
-      showSessionEventToast(targetSession, "complete", translate("i18n.taskFinished"));
+      showSessionEventToast(targetSession, kind, detail);
     }
-  }, [deliverSessionNotification, hydrateSelectedSession, selectedSession, showSessionEventToast, translate]);
+  }, [deliverSessionNotification, hydrateSelectedSession, selectedSession, sessionToastTitle, showSessionEventToast, translate]);
 
   // The badge is for an unseen tab: opening it puts the finished chat on screen.
   useEffect(() => {
@@ -1427,7 +1440,7 @@ export function AppShell() {
     if (shouldShowBrowserNotification()) {
       deliverSessionNotification({
         targetSession,
-        title: translate("i18n.attentionNeeded"),
+        title: translate("i18n.awaitingAnswer"),
         body,
         tag: `pi-extension-ui:${request.id}`,
       });
