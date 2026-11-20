@@ -120,7 +120,7 @@ function ReasoningText({ text, error, loading, fadeIn = false, className, onScro
       )}
       onScroll={onScroll}
     >
-      {loading ? <Skeleton className="h-3 w-1/2 bg-foreground/10" /> : (
+      {loading ? <Skeleton className="h-3 w-1/2" /> : (
         <div className={cn(fadeIn && "animate-in fade-in duration-200 motion-reduce:animate-none")}>
           {error ?? (pieceGroups ?? [text]).map((line, index) => (
             <div key={index}>{line}</div>

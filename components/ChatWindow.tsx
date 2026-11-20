@@ -2219,18 +2219,17 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         )}
         {!isEmptyNew && (loading ? (
           // 加载骨架占据消息列表区：顶栏与输入框照常渲染（此前整个布局被三根
-          // 小条替换，用户反馈“小气而且不对”）。宽度参仿一段对话。骨架底色用
-          // 中性的 `bg-foreground/10`：`ui/skeleton` 默认 `bg-accent`，主题里带
-          // 色相时会把骨架染上颜色。
+          // 小条替换，用户反馈“小气而且不对”）。宽度参仿一段对话。骨架底色是全站
+          // 统一的中性灰（`ui/skeleton` 的默认值），不跟主题色相。
           <div className="flex min-h-0 min-w-0 flex-1 flex-col px-[var(--chat-column-padding,40px)] pt-[22px] max-sm:px-6 max-sm:pt-4 animate-in fade-in duration-200">
             {/* 与消息列同一条居中列（CHAT_COLUMN_CLASS）：骨架不再通铺全宽。 */}
             <div className={cn(CHAT_COLUMN_CLASS, "flex flex-col gap-3")}>
-              <Skeleton className="h-4 w-[38%] bg-foreground/10" />
-              <Skeleton className="h-4 w-[55%] bg-foreground/10" />
-              <Skeleton className="h-4 w-[92%] bg-foreground/10" />
-              <Skeleton className="h-4 w-[80%] bg-foreground/10" />
-              <Skeleton className="h-4 w-[60%] bg-foreground/10" />
-              <Skeleton className="h-4 w-[45%] bg-foreground/10" />
+              <Skeleton className="h-4 w-[38%]" />
+              <Skeleton className="h-4 w-[55%]" />
+              <Skeleton className="h-4 w-[92%]" />
+              <Skeleton className="h-4 w-[80%]" />
+              <Skeleton className="h-4 w-[60%]" />
+              <Skeleton className="h-4 w-[45%]" />
             </div>
           </div>
         ) : <>
