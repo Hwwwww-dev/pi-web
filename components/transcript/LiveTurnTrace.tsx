@@ -292,6 +292,9 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
                 block={block}
                 // 结果还没落盘：行内订阅活跃结果，输出事件只更新它自己。
                 result={toolResults?.get(block.toolCallId ?? "")}
+                // 结果一到就带上耗时（与落盘后的行同一个口径），否则这一行
+                // 在 message_end 前一直光秃秃没秒表。
+                duration={(toolResults?.get(block.toolCallId ?? "") as (ToolResultMessage & { durationMs?: number }) | undefined)?.durationMs}
                 cwd={cwd}
                 onOpenFile={onOpenFile}
                 onOpenSubagent={onOpenSubagent}
