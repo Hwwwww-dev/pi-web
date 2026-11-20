@@ -2505,9 +2505,10 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
   return (
     <>
     {/* The sidebar's toast (SessionSidebar's showToast): sonner portals it to
-        the body, at the viewport's bottom-right — top-centre on a phone, where
-        the docked composer owns the bottom edge (2026-11-20). */}
-    <Toaster position={isMobile ? "top-center" : "bottom-right"} />
+        the body. Always top-centre: the docked composer owns the bottom edge on
+        a phone, and the same corner on the desktop keeps the notice in one place
+        (2026-11-20: 桌面右下有时压住输入框，用户要求统一到上面居中). */}
+    <Toaster position="top-center" />
     {/* dashboard-01 壳层组合：SidebarProvider 供 SidebarTrigger 使用，开关状态仍由本组件受控；
         可拖拽宽度通过 --sidebar-width 注入。 */}
     <SidebarProvider

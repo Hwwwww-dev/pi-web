@@ -36,9 +36,7 @@ test("session events show as standard sonner toasts with an open action", () => 
   assert.match(shellSource, /onClick: \(\) => handleSelectSession\(target\)/);
 });
 
-test("the sonner toaster sits top-centre on mobile, bottom-right on desktop", () => {
-  assert.match(
-    shellSource,
-    /<Toaster position=\{isMobile \? "top-center" : "bottom-right"\} \/>/,
-  );
+test("the sonner toaster always sits top-centre", () => {
+  // 一处就够了：手机上停靠输入框占着下沿，桌面右下也会压住输入框，统一到上面居中。
+  assert.match(shellSource, /<Toaster position="top-center" \/>/);
 });
