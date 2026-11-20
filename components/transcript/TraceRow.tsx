@@ -253,7 +253,7 @@ export function TraceRow({
           {!object && <span className="min-w-0 flex-1" aria-hidden="true" />}
           {actions && <span className="flex shrink-0 items-center" onClick={(e) => e.stopPropagation()}>{actions}</span>}
         </div>
-        {/* 展开区不设高度上限：代码块、思考块各自限高即可，两层同时限高会出现两个滚动条。 */}
+        {/* 展开区高度由 `.trace-fold-body` 统一封顶（24rem，超出在体内滚动）。 */}
         <TraceCollapsibleContent className="trace-fold-body mt-1 flex flex-col gap-2 [&>*]:min-w-0">
           {stepUsage && (
             <div className="text-xs">
