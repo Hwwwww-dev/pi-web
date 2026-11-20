@@ -1982,6 +1982,20 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     };
   }, [panel]);
   /**
+   * 停靠区高度就是内容末端的垫底（`--composer-dock-h`）。它是在 restore 之后才
+   * 量到的，而还原时“底”里还没有这段垫底，于是最后一条（用量行）停在输入框背后
+   * ——读者以为“重进会话就物理贴底”（2026-11-20）。只在读者本来就贴底时补一次。
+   */
+  useEffect(() => {
+    if (dockHeight === 0) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const pinned = liveScrollRef.current?.atBottom ?? savedScrollRef.current?.atBottom ?? true;
+    if (!pinned) return;
+    const api = scrollerApiRef.current;
+    if (!api?.scrollToEnd({ behavior: "instant" })) container.scrollTop = container.scrollHeight;
+  }, [dockHeight, scrollContainerRef]);
+  /**
    * 贴底判定的距离阈值。这个值同时是「吸附范围」：库在 `autoScroll` 打开时只要
    * 判成贴底，就把滚动模式续回 following-bottom，读者在范围内往上翻会被拽回。
    * `48` 是一行的容差（业界跟随派 4–40px 的上限档）；再加停靠区高度，是因为浮层
