@@ -1188,8 +1188,13 @@ export function AppShell() {
     // must reload from disk (URL restore flow, cwd move on the same session).
     const now = Date.now();
     const needsRemount = isRestore || selectedSession?.id === session.id;
+    // 新建会话 / 分叉出来的会话是在无槽位的分支里渲染的（`!activeSlot`），
+    // 从未进过活跃列表；离开它时补上槽位，否则切走后它直接消失，得再切回来
+    // 一次才出现（2026-11-20 用户反馈）。
+    const leaving = selectedSession && selectedSession.id !== session.id && !selectedSession.transient ? selectedSession : null;
     setKeepAliveSlots((slots) => {
-      const touched = slots.map((slot) => (slot.session.id === selectedSession?.id ? { ...slot, lastActiveAt: now } : slot));
+      const kept = leaving ? upsertKeepAliveSlot(slots, leaving, now, keepAliveConfig.maxSessions) : slots;
+      const touched = kept.map((slot) => (slot.session.id === selectedSession?.id ? { ...slot, lastActiveAt: now } : slot));
       return upsertKeepAliveSlot(touched, session, now, keepAliveConfig.maxSessions, needsRemount);
     });
     setBranchTree([]);
@@ -1894,6 +1899,15 @@ export function AppShell() {
   const activeSlot = selectedSession
     ? keepAliveSlots.find((slot) => slot.session.id === selectedSession.id) ?? null
     : null;
+  /**
+   * 活跃列表要展示的条目：真实槽位，加上“当前会话还没有槽位”这一种情况
+   * （新建会话、分叉会话在 `!activeSlot` 分支里渲染，没进过槽位列表）。
+   * 只在列表里多一行，不改变谁在渲染，因此不会让聊天重挂载。
+   */
+  const dockSlots = useMemo(() => {
+    if (!selectedSession || activeSlot) return keepAliveSlots;
+    return [...keepAliveSlots, { session: selectedSession, lastActiveAt: Date.now(), epoch: 0 }];
+  }, [activeSlot, keepAliveSlots, selectedSession]);
   // Recompute dormancy on a slow interval and whenever slots/running sets move;
   // dormant slots keep their instance (drafts, identity) but lose the message list.
   useEffect(() => {
@@ -2933,6 +2947,8 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   </div>
                 );
               })}
+              {/* 当前会话即使还没有槽位（新建/分叉后就地变成真会话）也列进活跃
+                  列表：它就在屏幕上，没有理由不算“活跃”。 */}
               {/* Selected session without a slot yet (transient/restore) or
                   the new-session composer. */}
               {!activeSlot && (
@@ -2985,7 +3001,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 </div>
               )}
               <KeepAliveDock
-                slots={keepAliveSlots}
+                slots={dockSlots}
                 sessions={sessionCatalog}
                 selectedSessionId={selectedSession?.id ?? null}
                 runningSessionIds={runningSessionIds}
