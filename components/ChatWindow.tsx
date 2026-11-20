@@ -2055,8 +2055,18 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   useEffect(() => {
     setCollapsedRows((current) => (current.size === 0 ? current : new Map()));
   }, [session?.id]);
+  /**
+   * 停靠区高度第一次量到时补一次贴底：浮层布局下内容末端垫着一整段
+   * `--composer-dock-h`，从 0 变成真实值的那一帧列表还停在旧底，用量行会压到
+   * 输入框下面。此后**不再**跟着停靠区高度滚动：输入框长高/缩矮只改变垫底高度，
+   * 浏览器自己就会把内容留在原位；再补一次贴底反而把读者往上推一截（用户
+   * 2026-11-20：“输入框高度变化会导致滚动到底”）。
+   */
+  const measuredDockHeightRef = useRef(0);
   useEffect(() => {
-    if (dockHeight === 0) return;
+    const firstMeasure = measuredDockHeightRef.current === 0 && dockHeight > 0;
+    measuredDockHeightRef.current = dockHeight;
+    if (!firstMeasure) return;
     const container = scrollContainerRef.current;
     if (!container) return;
     const pinned = liveScrollRef.current?.atBottom ?? savedScrollRef.current?.atBottom ?? true;
