@@ -129,10 +129,13 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
   const thinkingBlock: ThinkingContent | undefined = streamingThinking
     ? (lastStreamingBlock as ThinkingContent)
     : landedThinking?.block;
-  // 思考行“活着”的判定：正在流式，或已落盘但还在增长（无时长）且没有工具在跑。
-  // 不判定它的话，思考行标题在落盘后的每一段新增都直接跳到全文，打字机就没了。
+  // 思考行“活着”的判定（2026-11-20 用户：思考要以打字机形式显示末端内容）：
+  // 没有工具在跑、也没有文字在写，而最后一样东西是思考——就是在思考，无论它
+  // 还在流式还是已落盘。不判定它的话，思考落盘后的每段新增都直接跳到全文。
+  const streamingText = lastStreamingBlock?.type === "text";
   const thinkingLive = runningTool === undefined
-    && (streamingThinking || (landedThinking !== undefined && landedThinking.duration === undefined));
+    && !streamingText
+    && (streamingThinking || landedThinking !== undefined);
 
   // 秒表常驻右侧（2026-11-20）：内容没撑满时跟在标题后面，撑满时标题压缩、
   // 时长钉在右端（TraceLine 的 w-fit / max-w-full + TraceTitle truncate 实现）。
@@ -159,11 +162,12 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
         : t("chat.activity.working");
   const titleView = titleTool?.view;
   const titleCategory = titleView ? getToolCategory(titleTool.block.toolName) : undefined;
-  const titleDiffStat = titleView?.diffStat;
-  const titleChips = titleView?.filePaths.length ?? 0;
-  // 胶囊已经写出的文件名不再重复写进对象位（与 ToolTrace 同一规则）。
-  const chipsNameObject = titleView?.object !== undefined
-    && titleView.filePaths.some((path) => baseName(path) === titleView.object);
+  // 折叠行标题只需三样（2026-11-20 用户）：动作、内容（最新的那一个文件/命令）、秒表。
+  // 多文件只拿最后那个；胶囊已经写出的文件名不再重复写进对象位（与 ToolTrace 同规则）。
+  const titlePath = titleView?.filePaths.at(-1);
+  const titleObject = titleView?.object !== undefined && (titlePath === undefined || baseName(titlePath) !== titleView.object)
+    ? titleView.object
+    : undefined;
 
   return (
     <Trace data-activity="turn">
@@ -193,14 +197,14 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
                 <TraceTitle className="shrink-0 whitespace-nowrap">{titleTool.view.title}</TraceTitle>
                 {/* 文件名由可点击胶囊承担（读取/编辑的对象就是文件）：只画动作
                     的话标题只剩下“读取”（2026-11-20 用户：“读取什么？”）。 */}
-                {titleChips > 0 && (
+                {titlePath !== undefined && (
                   <span className="flex min-w-0 items-center" onClick={(event) => event.stopPropagation()}>
-                    <FileChips paths={titleTool.view.filePaths} cwd={cwd} onOpenFile={(path) => onOpenFile?.(path)} />
+                    <FileChips paths={[titlePath]} cwd={cwd} onOpenFile={(path) => onOpenFile?.(path)} />
                   </span>
                 )}
-                {!chipsNameObject && titleTool.view.object && (
-                  <span className="relative min-w-0 flex-1" title={titleTool.view.object}>
-                    <RowObjectSpan object={titleTool.view.object} />
+                {titleObject !== undefined && (
+                  <span className="relative min-w-0 flex-1" title={titleObject}>
+                    <RowObjectSpan object={titleObject} clip={titleView?.kind === "terminal"} />
                   </span>
                 )}
               </>
@@ -213,12 +217,6 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
                 active={thinkingLive}
                 duration={landedThinking?.duration}
               />
-            )}
-            {titleDiffStat && (
-              <TraceDescription>
-                <span className="text-success">+{titleDiffStat.added}</span>{" "}
-                <span className="text-destructive">−{titleDiffStat.removed}</span>
-              </TraceDescription>
             )}
             <TraceDescription>{formatTurnDuration(elapsedMs)}</TraceDescription>
           </TraceLine>

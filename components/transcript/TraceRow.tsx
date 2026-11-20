@@ -65,13 +65,21 @@ export function useTraceFold(foldKey?: string, defaultOpen = false) {
 }
 
 /**
- * 行对象文本（命令/文件等）的固定形状：行内截左保右——尾部是命令的关键段
+ * 行对象文本（命令/文件等）的固定形状：行内截左保右——尾部才是关键段
  * （2026-11-20 用户拍板，所有工具行与折叠行标题共用）。direction:rtl 把溢出
- * 与省略号赶到左侧，unicode-bidi:plaintext 保住行内 LTR 顺序。
+ * 赶到左侧，unicode-bidi:plaintext 保住行内 LTR 顺序。
+ *
+ * `clip` 去掉左侧省略号（2026-11-20 用户：“运行不要显示左边的…，无意义”）：
+ * 命令与思考尾已经是“最后一段”，左省略号不传达任何信息，直接硬切。
  */
-export function RowObjectSpan({ object }: { object: string }) {
+export function RowObjectSpan({ object, clip = false }: { object: string; clip?: boolean }) {
   return (
-    <span className="block truncate text-left" style={{ direction: "rtl", unicodeBidi: "plaintext" }}>{object}</span>
+    <span
+      className={cn("block text-left", clip ? "overflow-hidden text-clip whitespace-nowrap" : "truncate")}
+      style={{ direction: "rtl", unicodeBidi: "plaintext" }}
+    >
+      {object}
+    </span>
   );
 }
 
@@ -97,6 +105,7 @@ export function TraceRow({
   href,
   activityTool,
   wrap = false,
+  clipObject = false,
   children,
 }: {
   icon?: ReactNode;
@@ -134,6 +143,8 @@ export function TraceRow({
   activityTool?: string;
   /** 标题换行显示（提问/计划这类长标题行）：不截断、不加淡出。 */
   wrap?: boolean;
+  /** 对象位去掉左侧省略号（命令行的“运行”：省略号不传达信息）。 */
+  clipObject?: boolean;
   children?: ReactNode;
 }) {
   const { open, onOpenChange } = useTraceFold(foldKey, defaultOpen);
@@ -150,7 +161,7 @@ export function TraceRow({
       className={cn("relative min-w-0", wrap ? "" : "flex-1")}
       title={!wrap ? object : undefined}
     >
-      {wrap ? <span className="whitespace-normal break-words">{object}</span> : <RowObjectSpan object={object} />}
+      {wrap ? <span className="whitespace-normal break-words">{object}</span> : <RowObjectSpan object={object} clip={clipObject} />}
     </span>
   );
   // 文件胶囊与行本身均为按钮，HTML 不允许按钮嵌套（移动端内层还会截获点击）。

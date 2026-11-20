@@ -83,6 +83,44 @@ test("the live turn fold titles itself with the latest tool while collapsed", ()
   assert.doesNotMatch(html, /Worked for/);
 });
 
+test("a live multi-file tool titles itself with only the latest file", () => {
+  clearExpandedToolCalls();
+  const block = call("read", { file_path: "src/first.ts" }, {});
+  const second = call("read", { file_path: "src/last.ts" }, {});
+  const html = render(React.createElement(
+    LiveTurnTrace,
+    {
+      items: [
+        liveToolItem(block, { ...result("read", "a"), toolCallId: block.toolCallId }),
+        liveToolItem(second, { ...result("read", "b"), toolCallId: second.toolCallId }),
+      ],
+      startTs: Date.now() - 5_000,
+      foldKey: "process:live-multi",
+    },
+    React.createElement("div"),
+  ));
+  // 折叠行只显示最新的那一个文件（2026-11-20 用户），之前的文件不进标题。
+  assert.match(html, /last\.ts/);
+  assert.doesNotMatch(html, /first\.ts/);
+});
+
+test("a running command's title clips its left edge instead of an ellipsis", () => {
+  clearExpandedToolCalls();
+  const block = call("bash", { command: "npm run build --filter=web" });
+  const html = render(React.createElement(
+    LiveTurnTrace,
+    {
+      items: [liveToolItem(block, { ...result("bash", "ok"), toolCallId: block.toolCallId })],
+      startTs: Date.now() - 5_000,
+      foldKey: "process:live-clip",
+    },
+    React.createElement("div"),
+  ));
+  // “运行不要显示左边的…，无意义”（2026-11-20 用户）：硬切，不出省略号。
+  assert.match(html, /text-clip/);
+  assert.match(html, /npm run build/);
+});
+
 test("the expanded live fold titles itself Working and lists activity in the body", () => {
   setToolCallExpanded("process:live-open", true);
   const block = call("bash", { command: "npm test" });

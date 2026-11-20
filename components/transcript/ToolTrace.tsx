@@ -313,6 +313,8 @@ export const ToolTrace = memo(function ToolTrace({ view, trailing, below, stepUs
       activeIcon={KIND_ACTIVE_ICONS[view.kind]}
       title={view.title}
       object={chipNamesObject ? undefined : view.object}
+      // “运行”的命令是尾部信息，左侧省略号不传达任何东西（2026-11-20 用户）。
+      clipObject={view.kind === "terminal"}
       chips={chips}
       description={description}
       status={view.status}

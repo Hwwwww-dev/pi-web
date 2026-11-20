@@ -256,7 +256,7 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
       <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
       {tailText.trim() !== "" && (
         <span className="relative min-w-0 flex-1">
-          <RowObjectSpan object={tailText} />
+          <RowObjectSpan object={tailText} clip />
         </span>
       )}
       {!active && duration !== undefined && formatToolDurationIfShown(duration * 1000) && (
