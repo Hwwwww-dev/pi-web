@@ -1349,6 +1349,12 @@ span.token.table {
   overflow-y: visible;
   --card-max-height: none;
 }
+/* 组里每条命令自己也是一层折叠体（`.trace-fold-body`），它的 24rem 上限同样要
+   放掉，否则组内又回到“一大一小两根条”。 */
+.trace-fold-body:has(> .trace-group-body) .trace-fold-body {
+  max-height: none;
+  overflow-y: visible;
+}
 .trace-fold-body .max-w-\[80\%\] {
   max-width: 100%;
 }
