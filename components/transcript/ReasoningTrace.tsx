@@ -270,15 +270,19 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
 
   return (
     <Trace data-activity="thinking" ref={rowRef}>
+      {/* 80% 只约束「行」（2026-11-20 用户反馈：展开的正文不该跟着窄）：宽度
+          定在触发区上——Collapsible 是 w-full，触发区 80% 是确定宽度，行再 100%
+          铺满触发区；展开体不设上限，正文按列宽排版。 */}
       <TraceCollapsible
         open={expanded}
         onOpenChange={() => changeExpanded(!expanded)}
-        className="w-full min-w-0 max-w-[80%]"
+        className="w-full min-w-0"
       >
         <TraceCollapsibleTrigger
           title={t("i18n.thinking")}
+          className="w-full"
         >
-          <TraceLine status={active ? "running" : undefined} className="w-full max-w-[80%]">
+          <TraceLine status={active ? "running" : undefined} className="w-full">
             {lineChildren}
           </TraceLine>
         </TraceCollapsibleTrigger>

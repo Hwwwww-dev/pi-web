@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { LayersIcon } from "lucide-react";
 import {
   Trace,
@@ -21,11 +21,33 @@ import { getToolCategory } from "@/lib/tool-categories";
 import type { ActivityItem } from "@/lib/turn-view";
 import type { ThinkingContent, ToolCallContent, ToolResultMessage } from "@/lib/types";
 import { ReasoningTrace, ToolCategoryIcon, ToolRow } from "../ActivityRows";
+import { FileChips } from "./ToolTrace";
 import { RowObjectSpan } from "./TraceRow";
 import { useTraceFold } from "./TraceRow";
+import { baseName } from "@/lib/tool-view";
+import type { AgentPhaseStore } from "@/lib/chat-phase-label";
 
 // 空闲 store 兜底：hooks 不能条件调用，未传 store 时订阅它（恒为初始态）。
 const IDLE_STREAMING_STORE = createStreamingStore();
+const NOOP_SUBSCRIBE = () => () => {};
+const NO_RUNNING_TOOLS = () => "";
+
+/**
+ * 正在跑的工具 id（按启动顺序）。`agentPhaseStore` 每次工具输出都会换值，这里
+ * 只取 id 串快照：同一批工具在跑时快照不变，行标题不因输出流重渲染。
+ */
+function useRunningToolIds(phaseStore?: AgentPhaseStore): string[] {
+  const subscribe = useCallback(
+    (onChange: () => void) => (phaseStore ? phaseStore.subscribe(onChange) : NOOP_SUBSCRIBE()),
+    [phaseStore],
+  );
+  const getSnapshot = useCallback(() => {
+    const phase = phaseStore?.get();
+    return phase?.kind === "running_tools" ? phase.tools.map((tool) => tool.id).join(",") : "";
+  }, [phaseStore]);
+  const ids = useSyncExternalStore(subscribe, getSnapshot, NO_RUNNING_TOOLS);
+  return useMemo(() => (ids === "" ? [] : ids.split(",")), [ids]);
+}
 
 /**
  * 活跃回合的整轮折叠（2026-11-20 产品决策，替代旧的“流式平铺活动行”）：默认
@@ -35,7 +57,7 @@ const IDLE_STREAMING_STORE = createStreamingStore();
  * 平铺、message_end 后再“收进去”，视觉上折叠两次。折叠键与完成态 TurnTrace
  * 共用 `process:{entryId}`，settle 交换帧按已记录的选择原样接管展开/收起状态。
  */
-export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd, onOpenFile, onOpenSubagent, mergeStreaming = false, children }: {
+export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, toolResults, cwd, onOpenFile, onOpenSubagent, mergeStreaming = false, children }: {
   items: ActivityItem[];
   /** 回合锚点（用户消息）的 pi 时间戳：秒表的起点。 */
   startTs?: number;
@@ -43,6 +65,8 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
   foldKey?: string;
   /** 本会话的流式 store：读正在写的消息里的工具块。 */
   store?: StreamingStore;
+  /** 运行阶段 store：正在跑的工具是权威（标题跟得上实际，而不是最后一个工具块）。 */
+  phaseStore?: AgentPhaseStore;
   toolResults?: Map<string, ToolResultMessage>;
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
@@ -60,10 +84,28 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
   );
   const lastStreamingBlock = streamingBlocks.length > 0 ? streamingBlocks[streamingBlocks.length - 1] : undefined;
 
-  // 标题的最新活动：先看正在流式的工具（它最新），没有再看已落盘的活动行。
-  // 行内折叠直接显示最新工具行本身（2026-11-20 用户拍板）：工具自己的分类图标
-  // + 动作 + 对象（如“运行 npm test”）；编辑附变更数（+N −M）在右侧时长旁边。
-  const latestTool = (() => {
+  // 正在跑的工具（agentPhase 是权威）：一次 assistant 条目可含多个 toolCall，
+  // 它们按顺序执行，末块不一定在跑；只看“最新工具”会显示上一个工具，看起来
+  // 像滞后（2026-11-20 用户反馈）。只订阅 id 串，工具输出每秒几次不会重渲染本组件。
+  const runningToolIds = useRunningToolIds(phaseStore);
+  const runningTool = (() => {
+    for (let i = runningToolIds.length - 1; i >= 0; i--) {
+      const id = runningToolIds[i];
+      const streamed = streamingTools.find((block) => block.toolCallId === id);
+      if (streamed) return { block: streamed, view: toToolView({ block: streamed, t }) };
+      for (let j = items.length - 1; j >= 0; j--) {
+        const item = items[j];
+        if (item.kind === "tool" && item.block.toolCallId === id) {
+          return { block: item.block, view: toToolView({ block: item.block, result: item.result, t }) };
+        }
+      }
+    }
+    return undefined;
+  })();
+
+  // 标题的最新活动：先看正在跑的工具（权威），没有再看正在流式的工具，最后看
+  // 已落盘的活动行。
+  const latestTool = runningTool ?? (() => {
     if (streamingTools.length > 0) {
       const block = streamingTools[streamingTools.length - 1];
       return { block, view: toToolView({ block, t }) };
@@ -78,18 +120,19 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
     }
     return undefined;
   })();
-  const toolCategory = latestTool ? getToolCategory(latestTool.block.toolName) : undefined;
-  const diffStat = latestTool?.view.diffStat;
 
-  // 思考进行中（流式末块是 thinking，或已落盘的最后一行是思考且没有更新的
-  // 流式块）：标题直接嵌入思考行组件（2026-11-20 用户拍板：标题用对应组件，
-  // 不再拼字符串）——内容尾打字机更新。工具进行中同理嵌入工具行形状。
+  // 思考进行中（流式末块是 thinking 且没有工具在跑，或最后一条已落盘的思考
+  // 还在增长——时长未定）＝标题直接嵌入思考行组件，内容尾打字机更新。
   const streamingThinking = streamingTools.length === 0 && lastStreamingBlock?.type === "thinking";
   const lastItem = items.at(-1);
   const landedThinking = lastItem?.kind === "thinking" ? lastItem : undefined;
   const thinkingBlock: ThinkingContent | undefined = streamingThinking
     ? (lastStreamingBlock as ThinkingContent)
     : landedThinking?.block;
+  // 思考行“活着”的判定：正在流式，或已落盘但还在增长（无时长）且没有工具在跑。
+  // 不判定它的话，思考行标题在落盘后的每一段新增都直接跳到全文，打字机就没了。
+  const thinkingLive = runningTool === undefined
+    && (streamingThinking || (landedThinking !== undefined && landedThinking.duration === undefined));
 
   // 秒表常驻右侧（2026-11-20）：内容没撑满时跟在标题后面，撑满时标题压缩、
   // 时长钉在右端（TraceLine 的 w-fit / max-w-full + TraceTitle truncate 实现）。
@@ -104,44 +147,60 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
   }, [startTs]);
 
   // 标题形态（2026-11-20 用户拍板）：展开=「工作中」（内容全在折叠体内，
-  // 没必要再在标题里重复最新活动）；收起=最新活动（流式思考末行或最新工具）。
-  // 展开体含全部已落盘活动行（children）+ 流式中的思考/工具行。
-  // 展开态标题「工作中」；收起态 = 最新活动的行本身（工具行形状/思考行组件）。
+  // 没必要再在标题里重复最新活动）；收起=眼下正在发生的事：正在跑的工具 >
+  // 正在写的思考 > 最新工具 > 最新思考 > 工作中。
+  const titleTool = thinkingLive ? undefined : latestTool;
   const title = open
     ? t("chat.activity.working")
-    : latestTool
-      ? (latestTool.view.object ? `${latestTool.view.title} ${latestTool.view.object}` : latestTool.view.title)
+    : titleTool
+      ? (titleTool.view.object ? `${titleTool.view.title} ${titleTool.view.object}` : titleTool.view.title)
       : thinkingBlock
         ? t("i18n.thinking")
         : t("chat.activity.working");
+  const titleView = titleTool?.view;
+  const titleCategory = titleView ? getToolCategory(titleTool.block.toolName) : undefined;
+  const titleDiffStat = titleView?.diffStat;
+  const titleChips = titleView?.filePaths.length ?? 0;
+  // 胶囊已经写出的文件名不再重复写进对象位（与 ToolTrace 同一规则）。
+  const chipsNameObject = titleView?.object !== undefined
+    && titleView.filePaths.some((path) => baseName(path) === titleView.object);
 
   return (
     <Trace data-activity="turn">
       <TraceCollapsible open={open} onOpenChange={onOpenChange}>
-        <TraceCollapsibleTrigger aria-label={title}>
+        <TraceCollapsibleTrigger aria-label={title} className="w-full">
           {/* 行固定占 80% 宽（2026-11-20 用户拍板）：所有工具行/思考行/标题行
-              同一形状，流式吐字时右侧时长不再左右晃。 */}
-          <TraceLine status="running" className="w-full max-w-[80%]">
-            {open || (!latestTool && !thinkingBlock) ? (
+              同一形状，流式吐字时右侧时长不再左右晃。80% 落在触发区上（宽度
+              确定），行本身 100% 铺满——之前两层都写 `w-full max-w-[80%]`，
+              百分比在 fit-content 祖先上循环解析，短文本也被截成「工…」。 */}
+          <TraceLine status="running" className="w-full">
+            {open || (!titleTool && !thinkingBlock) ? (
               <>
                 <TraceIcon>
-                  {toolCategory !== undefined
-                    ? <ToolCategoryIcon category={toolCategory} active={open} />
+                  {titleCategory !== undefined
+                    ? <ToolCategoryIcon category={titleCategory} active={open} />
                     : <LayersIcon className="size-3.5" />}
                 </TraceIcon>
                 <TraceTitle className="flex-1 truncate text-left">{t("chat.activity.working")}</TraceTitle>
               </>
-            ) : latestTool ? (
+            ) : titleTool ? (
               // 收起态标题 = 工具行本身（与 TraceRow 同一形状：图标+动作+对象
               // 截左保右），时长秒表仍钉右侧。
               <>
                 <TraceIcon>
-                  <ToolCategoryIcon category={toolCategory ?? "terminal"} />
+                  <ToolCategoryIcon category={titleCategory ?? "terminal"} />
                 </TraceIcon>
-                <TraceTitle className="shrink-0 whitespace-nowrap">{latestTool.view.title}</TraceTitle>
-                {latestTool.view.object && (
-                  <span className="relative min-w-0 flex-1" title={latestTool.view.object}>
-                    <RowObjectSpan object={latestTool.view.object} />
+                <TraceTitle className="shrink-0 whitespace-nowrap">{titleTool.view.title}</TraceTitle>
+                {/* 文件名由可点击胶囊承担（读取/编辑的对象就是文件）：只画动作
+                    的话标题只剩下“读取”（2026-11-20 用户：“读取什么？”）。 */}
+                {titleChips > 0 && (
+                  <span className="flex min-w-0 items-center" onClick={(event) => event.stopPropagation()}>
+                    <FileChips paths={titleTool.view.filePaths} cwd={cwd} onOpenFile={(path) => onOpenFile?.(path)} />
+                  </span>
+                )}
+                {!chipsNameObject && titleTool.view.object && (
+                  <span className="relative min-w-0 flex-1" title={titleTool.view.object}>
+                    <RowObjectSpan object={titleTool.view.object} />
                   </span>
                 )}
               </>
@@ -151,14 +210,14 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, toolResults, cwd
                 asLine
                 block={thinkingBlock as ThinkingContent}
                 blockIndex={-1}
-                active={streamingThinking}
+                active={thinkingLive}
                 duration={landedThinking?.duration}
               />
             )}
-            {diffStat && (
+            {titleDiffStat && (
               <TraceDescription>
-                <span className="text-success">+{diffStat.added}</span>{" "}
-                <span className="text-destructive">−{diffStat.removed}</span>
+                <span className="text-success">+{titleDiffStat.added}</span>{" "}
+                <span className="text-destructive">−{titleDiffStat.removed}</span>
               </TraceDescription>
             )}
             <TraceDescription>{formatTurnDuration(elapsedMs)}</TraceDescription>

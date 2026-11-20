@@ -42,8 +42,8 @@ export function TurnTrace({ summary, foldKey, defaultOpen, reveal = false, class
           onOpenChange(next);
         }}
       >
-        <TraceCollapsibleTrigger aria-label={summary}>
-          <TraceLine>
+        <TraceCollapsibleTrigger aria-label={summary} className="w-full">
+          <TraceLine className="w-full">
             <TraceIcon>
               <LayersIcon className="size-3.5" />
             </TraceIcon>

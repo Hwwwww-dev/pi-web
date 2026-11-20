@@ -235,7 +235,7 @@ const MAX_FILE_CHIPS = 4;
  * The files a call named (第 4 节): one official outline pill each, opening the
  * viewer at that file. Pills only appear when the viewer can take them.
  */
-function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; onOpenFile: (path: string) => void }) {
+export function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: string; onOpenFile: (path: string) => void }) {
   return (
     // 胶囊组不参与 grow：行是 `w-fit`，grow 子项会把行的固有宽度按 0 计算，
     // 导致行宽小于内容、胶囊提前省略。`flex: 0 1 auto` 先按完整文件名撑到 `max-w-full`，排不下才收缩。

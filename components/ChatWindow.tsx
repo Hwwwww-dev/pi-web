@@ -1671,6 +1671,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 startTs={(messages[userIdx] as (AgentMessage & { timestamp?: number })).timestamp}
                 foldKey={entryIds[userIdx] === undefined ? undefined : `process:${entryIds[userIdx]}:0`}
                 store={streamingStore}
+                phaseStore={agentPhaseStore}
                 toolResults={toolResultsMap}
                 cwd={messageCwd}
                 onOpenFile={onOpenFile}
@@ -1744,6 +1745,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                   startTs={segStartTs}
                   foldKey={segFoldKey}
                   store={streamingStore}
+                  phaseStore={agentPhaseStore}
                   toolResults={toolResultsMap}
                   cwd={messageCwd}
                   onOpenFile={onOpenFile}
@@ -1941,6 +1943,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   }, [messages, entryIds, messageKeys, toolResultsMap, hasEarlierMessages, isStreaming, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
      sessionIdRef, forkFromMessage, handleEditContent, onOpenFile, onOpenSubagent, streamingStore,
+     agentPhaseStore,
      isNew, messageRefs, bashRunning, editEntryId, cancelEdit, thinkingLevel, headTurn]);
   const { rendered: turnRendered, liveActivityRendered } = messageListView;
   // 运行状态提示（等待模型、执行工具、运行命令、压缩上下文）不进消息列表：

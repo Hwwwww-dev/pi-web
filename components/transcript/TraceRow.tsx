@@ -71,7 +71,7 @@ export function useTraceFold(foldKey?: string, defaultOpen = false) {
  */
 export function RowObjectSpan({ object }: { object: string }) {
   return (
-    <span className="block truncate" style={{ direction: "rtl", unicodeBidi: "plaintext" }}>{object}</span>
+    <span className="block truncate text-left" style={{ direction: "rtl", unicodeBidi: "plaintext" }}>{object}</span>
   );
 }
 
@@ -147,8 +147,7 @@ export function TraceRow({
   );
   const objectEl = object && (
     <span
-      className={cn("relative min-w-0", wrap ? "" : "flex-1 cursor-pointer")}
-      onClick={wrap ? undefined : () => onOpenChange(!open)}
+      className={cn("relative min-w-0", wrap ? "" : "flex-1")}
       title={!wrap ? object : undefined}
     >
       {wrap ? <span className="whitespace-normal break-words">{object}</span> : <RowObjectSpan object={object} />}
@@ -191,8 +190,15 @@ export function TraceRow({
   return (
     <Trace ref={rowRef} data-activity="trace-row" data-activity-tool={activityTool}>
       <TraceCollapsible open={open} onOpenChange={onOpenChange}>
-        <div className={cn("flex w-full items-center gap-1 min-w-0", !wrap && "max-w-[80%]", wrap && "items-start")}>
+        {/* 整行可点开合（2026-11-20 用户反馈：编辑行只有点「编辑」才能展开）：
+            胶囊（打开文件）与外链按钮各自 stopPropagation，其余区域——对象文本、
+            计数、空白——都切换折叠。 */}
+        <div
+          className={cn("flex w-full cursor-pointer items-center gap-1 min-w-0", !wrap && "max-w-[80%]", wrap && "items-start")}
+          onClick={wrap ? undefined : () => onOpenChange(!open)}
+        >
           <TraceCollapsibleTrigger aria-label={ariaLabel} className="max-w-full shrink-0">
+            {/* 行不写 w-full：它要跟内容收缩，把剩余宽度留给兄弟节点（对象/胶囊）。 */}
             <TraceLine status={STATUS_ATTR[status]} title={ariaLabel} className="min-w-0" data-expanded={open || undefined}>
               {(icon != null || activeIcon != null) && (
                 <TraceIcon className={wrap ? "mt-[2px] self-start" : undefined}>{open && activeIcon != null ? activeIcon : icon}</TraceIcon>
@@ -202,16 +208,16 @@ export function TraceRow({
               {duration != null && <span className="shrink-0 tabular-nums">{duration}</span>}
             </TraceLine>
           </TraceCollapsibleTrigger>
-          {/* 对象在触发区之外独享让步位：点击同样开合折叠（悬停有整条提示）。 */}
+          {/* 对象在触发区之外独享让位：点击同样开合折叠（悬停有整条提示）。 */}
           {objectEl}
-          {chips}
+          {chips && <span className="flex min-w-0 items-center" onClick={(e) => e.stopPropagation()}>{chips}</span>}
           {suffix != null && (
             <span className="shrink-0 whitespace-nowrap">{suffix}</span>
           )}
           {trailing && <span className="shrink-0 pl-2">{trailing}</span>}
           {/* 无对象文本时由占位把行尾动作推到右缘；有对象时 flex-1 已承担。 */}
           {!object && <span className="min-w-0 flex-1" aria-hidden="true" />}
-          {actions}
+          {actions && <span className="flex shrink-0 items-center" onClick={(e) => e.stopPropagation()}>{actions}</span>}
         </div>
         {/* 展开区不设高度上限：代码块、思考块各自限高即可，两层同时限高会出现两个滚动条。 */}
         <TraceCollapsibleContent className="mt-1 flex flex-col gap-2 [&>*]:min-w-0">
