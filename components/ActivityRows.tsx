@@ -129,7 +129,6 @@ export function ToolRow({ block, result, duration, stepUsage, cwd, onOpenFile, o
   const liveResult = result ?? activeResult;
 
   const view = toToolView({ block, result: liveResult, t });
-  // 耗时口径与思考行一致：走 lib/tool-duration 的阈值与格式，避免满屏 0.0s。
   const durationNode = duration === undefined ? undefined : formatToolDurationIfShown(duration) ?? undefined;
   const subagent = isSubagentToolDetails(liveResult?.details) ? liveResult.details : null;
 

@@ -728,7 +728,7 @@ function recordedDurationMs(value: unknown): number | undefined {
 
 /** Below this a tool card shows no time: it would read 0.0s on every quick read or search. */
 export { CompactionSummaryDetails } from "./ActivityRows";
-export { formatToolDuration, TOOL_DURATION_MIN_MS } from "@/lib/tool-duration";
+export { formatToolDuration } from "@/lib/tool-duration";
 
 
 
