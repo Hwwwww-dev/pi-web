@@ -714,6 +714,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
             key={item.key}
             block={only.block}
             result={only.result}
+            duration={only.duration}
             stepUsage={only.stepUsage}
             cwd={cwd}
             onOpenFile={onOpenFile}
