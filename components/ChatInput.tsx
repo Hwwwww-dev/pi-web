@@ -2231,17 +2231,19 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   // The composer's main button follows the input: a message waiting to be
   // sent is always the primary action — while a turn runs that queues a
   // follow-up, the same thing Enter does — and only an empty composer
-  // leaves it as stop. Idle stays muted; anything sendable or running is
-  // primary. It is a sibling of the pill row so it can never be squeezed out.
+  // leaves it as stop, in the fixed destructive red. It is a sibling of the
+  // pill row so it can never be squeezed out.
   const sendCluster = isStreaming && !canSubmit ? (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          variant="default"
+          // 停止是危险动作：固定红色（用户 2026-11-20：不要跟着主题 primary 走），
+          // 且 dark 下用满强度，别被 `dark:bg-destructive/60` 淡化。
+          variant="destructive"
           size="icon"
           onClick={onAbort}
           aria-label={t("chat.stopAgent")}
-          className="size-9 shrink-0 rounded-full"
+          className="size-9 shrink-0 rounded-full dark:bg-destructive"
         >
           {/* While the run streams the circle stops it, until the user types
               something to send. */}
