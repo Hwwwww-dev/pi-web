@@ -237,7 +237,6 @@ export function TraceRow({
               )}
               {titleEl}
               {description && <TraceDescription className="shrink-0 whitespace-nowrap">{description}</TraceDescription>}
-              {duration != null && <span className="shrink-0 tabular-nums">{duration}</span>}
             </TraceLine>
           </TraceCollapsibleTrigger>
           {/* 对象在触发区之外独享让位：点击同样开合折叠（悬停有整条提示）。 */}
@@ -246,6 +245,9 @@ export function TraceRow({
           {suffix != null && (
             <span className="shrink-0 whitespace-nowrap">{suffix}</span>
           )}
+          {/* 耗时跟思考行同一个位置：对象（命令/文件/文本）之后、行尾之前，
+              不挤到工具名后面——那样它就成了行首的第一个数字。 */}
+          {duration != null && <span className="shrink-0 tabular-nums">{duration}</span>}
           {trailing && <span className="shrink-0 pl-2">{trailing}</span>}
           {/* 无对象文本时由占位把行尾动作推到右缘；有对象时 flex-1 已承担。 */}
           {!object && <span className="min-w-0 flex-1" aria-hidden="true" />}
