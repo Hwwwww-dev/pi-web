@@ -168,13 +168,6 @@ function lastAgentTabId(tabs: readonly { sessionId: string }[]): string | null {
 
 type SessionToastKind = "complete" | "attention" | "failed";
 
-/** 通知左侧的类型色条：完成绿、待回答琥珀、失败红。 */
-const SESSION_TOAST_ACCENT: Record<SessionToastKind, string> = {
-  complete: "!border-l-4 !border-l-emerald-500",
-  attention: "!border-l-4 !border-l-amber-500",
-  failed: "!border-l-4 !border-l-destructive",
-};
-
 export function AppShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1374,8 +1367,6 @@ export function AppShell() {
         id: `session-event:${kind}:${target.id}`,
         description: message,
         duration: 8000,
-        // 左边一条按类型着色的竖条，隔着几屏也能认出是哪类通知。
-        className: SESSION_TOAST_ACCENT[kind],
         action: {
           label: translate("sidebar.open"),
           onClick: () => handleSelectSession(target),
