@@ -727,12 +727,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         });
     };
     // 缩略图的回合列表不属于首屏：等空闲再要，别和消息首屏抢主线程与连接。
-    const idle = typeof window.requestIdleCallback === "function"
-      ? { id: window.requestIdleCallback(loadTurns, { timeout: 1500 }), cancel: window.cancelIdleCallback }
-      : { id: window.setTimeout(loadTurns, 300), cancel: window.clearTimeout };
+    // 调度函数必须直接挂在 window 上调用：解构后调用会丢 receiver，Chromium 报 Illegal invocation。
+    const usesIdleCallback = typeof window.requestIdleCallback === "function";
+    const idleId = usesIdleCallback
+      ? window.requestIdleCallback(loadTurns, { timeout: 1500 })
+      : window.setTimeout(loadTurns, 300);
     return () => {
       controller.abort();
-      idle.cancel(idle.id);
+      if (usesIdleCallback) window.cancelIdleCallback(idleId);
+      else window.clearTimeout(idleId);
     };
   }, [session?.id, activeLeafId]);
   // State, not a ref: the sentinel can appear with nothing else changing (a
