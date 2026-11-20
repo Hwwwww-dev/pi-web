@@ -2150,6 +2150,40 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     followSettleRef.current = settle;
     reset();
   }, [stopFollowSettle]);
+  const [followSuppressed, setFollowSuppressed] = useState(false);
+  const leftTailRef = useRef(false);
+  /**
+   * 展开/收起回合行内折叠前，先退出「跟随底部」。运行时滚动器处于
+   * `following-bottom`，任何高度变化都会被 `scrollToEnd()` 拉回底部——展开一行
+   * 变高就从列表里「上滑」出去（2026-11-20 用户：「会向上」）。
+   * 释放之后高度变化只作用于折叠行下方，滚动位置由浏览器原生锚定保持不变。
+   */
+  const suspendFollow = useCallback(() => {
+    if (!agentRunning) return; // 空闲时本来就不跟随
+    stopFollowSettle();
+    leftTailRef.current = false;
+    setFollowSuppressed(true);
+  }, [agentRunning, stopFollowSettle]);
+  // 回到尾部才恢复跟随：展开时读者本来就在尾部，不能就地复活。
+  useEffect(() => {
+    if (!atTail) {
+      leftTailRef.current = true;
+      return;
+    }
+    if (!leftTailRef.current) return;
+    leftTailRef.current = false;
+    setFollowSuppressed(false);
+  }, [atTail]);
+  useEffect(() => {
+    if (!agentRunning) setFollowSuppressed(false);
+  }, [agentRunning]);
+  const handleFoldTriggerCapture = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target as Element | null;
+      if (target?.closest?.("[data-trace-fold-trigger]")) suspendFollow();
+    },
+    [suspendFollow],
+  );
   useEffect(() => stopFollowSettle, [stopFollowSettle]);
   useLayoutEffect(() => {
     const last = turnRendered[turnRendered.length - 1];
@@ -2195,6 +2229,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     <ActiveToolsContext value={activeToolsStore}>
     <div
       className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden [padding-bottom:env(safe-area-inset-bottom,0px)]"
+      onClickCapture={handleFoldTriggerCapture}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -2267,7 +2302,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             于是 `handleResize` 里的 `scrollToEnd()` 连条件都进不去——展开/收起折叠块的高度
             变化交还给浏览器原生滚动锚定，锚点行纹丝不动。此前常开，折叠一展开就被当成
             「又有新内容」顶上去（见 shadcn-ui/ui#11211 对同一现象的描述）。 */}
-        <MessageScrollerProvider autoScroll={agentRunning} defaultScrollPosition="end" scrollEdgeThreshold={scrollEdgeThreshold}>
+        <MessageScrollerProvider autoScroll={agentRunning && !followSuppressed} defaultScrollPosition="end" scrollEdgeThreshold={scrollEdgeThreshold}>
         <ScrollerBridge apiRef={scrollerApiRef} onAtTailChange={setAtTail} />
         <MessageScroller className="min-h-0 min-w-0 flex-1 animate-in fade-in duration-150">
         <MessageScrollerViewport

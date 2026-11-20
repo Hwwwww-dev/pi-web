@@ -118,6 +118,9 @@ function TraceCollapsibleTrigger({
 }: React.ComponentProps<typeof CollapsibleTrigger>) {
   return (
     <CollapsibleTrigger
+      // 回合行内折叠的统一入口。聊天区据此在展开时释放「跟随底部」，
+      // 否则内容一变高就被拉到底，肉眼看到的是列表整体上滑。
+      data-trace-fold-trigger=""
       data-slot="trace-collapsible-trigger"
       className={cn(
         "group/trace-collapsible-trigger flex w-fit max-w-[80%] min-w-0 cursor-pointer items-center gap-1 rounded-lg text-left text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 has-[[data-status=error]]:text-destructive",

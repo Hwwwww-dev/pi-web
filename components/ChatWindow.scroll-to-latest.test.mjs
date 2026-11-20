@@ -17,11 +17,18 @@ test("the official scroller owns following, prepend anchoring and the bottom edg
   // autoScroll 只在 agent 运行时打开：跟随的对象是流式输出。空闲时它恒为 false，
   // 折叠展开的高度增长就进不了 `handleResize` 的 `scrollToEnd()`，也不会把展开块
   // 顶出视口。行窗口与手工前插保位都已删除，因此这里不能再有自己的跟随状态机。
-  assert.match(source, /<MessageScrollerProvider autoScroll=\{agentRunning\} defaultScrollPosition="end" scrollEdgeThreshold=\{scrollEdgeThreshold\}>/);
+  // `followSuppressed`：运行中展开折叠时先退出跟随，否则高度一变就被拉到底（上滑）。
+  assert.match(source, /<MessageScrollerProvider autoScroll=\{agentRunning && !followSuppressed\} defaultScrollPosition="end" scrollEdgeThreshold=\{scrollEdgeThreshold\}>/);
+  // 折叠触发点统一打 `data-trace-fold-trigger`，聊天区在捕获阶段据此释放跟随；
+  // 回到尾部（atTail 由 false 转回 true）才复活，展开的那一刻不能就地复活。
+  assert.match(source, /handleFoldTriggerCapture[\s\S]{0,400}?closest\?\.\("\[data-trace-fold-trigger\]"\)/);
+  assert.match(source, /onClickCapture=\{handleFoldTriggerCapture\}/);
+  assert.match(source, /if \(!atTail\) \{\s*leftTailRef\.current = true;/);
   // 阈值同时就是吸附范围（库在范围内会把模式续回 following-bottom 并跟到底）。
   // 48px（业界跟随派 4–40px 的上限档）：往上翻更容易放走；流式吸收靠显式
-  // scrollToEnd 与插入前的贴底判定，不靠阈值。167–169px 的垫底不进吸附区。
-  assert.match(source, /const scrollEdgeThreshold = 48;/);
+  // scrollToEnd 与插入前的贴底判定，不靠阈值。167–169px 的垫底已经计入阈值，
+  // 否则正常阅读位置（最后一条贴着卡片上沿）就已经离机械底一整段垫底。
+  assert.match(source, /const scrollEdgeThreshold = 48 \+ dockHeight;/);
   // 尾部新增行的补滚用「插入之前」的贴底状态（atBottomRef，由滚动监听维护）：
   // 插入之后再量距离，量到的就是新气泡自己的高度，越长的消息越不会跟。
   assert.match(source, /lastRowKeyRef[\s\S]{0,1600}?if \(!atBottomRef\.current\) return;[\s\S]{0,300}?scrollerApiRef\.current\?\.scrollToEnd\(\{ behavior: "instant" \}\)[\s\S]{0,200}?startFollowSettle\(\);/);

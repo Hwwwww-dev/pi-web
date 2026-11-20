@@ -1906,7 +1906,9 @@ export function AppShell() {
    */
   const dockSlots = useMemo(() => {
     if (!selectedSession || activeSlot) return keepAliveSlots;
-    return [...keepAliveSlots, { session: selectedSession, lastActiveAt: Date.now(), epoch: 0 }];
+    // 占位槽只给列表用（不参与驻留/休眠计算），用常量而不是 `Date.now()`：
+    // 渲染期调用 impure 函数会被 react-hooks 规则拦下。
+    return [...keepAliveSlots, { session: selectedSession, lastActiveAt: Number.MAX_SAFE_INTEGER, epoch: 0 }];
   }, [activeSlot, keepAliveSlots, selectedSession]);
   // Recompute dormancy on a slow interval and whenever slots/running sets move;
   // dormant slots keep their instance (drafts, identity) but lose the message list.
