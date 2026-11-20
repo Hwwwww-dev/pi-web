@@ -20,6 +20,7 @@ import {
 import { SafeMarkdownBody } from "./SafeMarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import { TerminalTrace } from "./transcript/TerminalTrace";
+import { VirtualRows } from "./transcript/VirtualRows";
 import { ToolTrace, KIND_ICONS, KIND_ACTIVE_ICONS } from "./transcript/ToolTrace";
 import type { ToolViewKind } from "@/lib/tool-view";
 import { TaskTrace } from "./transcript/TaskTrace";
@@ -670,7 +671,7 @@ export function TurnMetaLine({ usage, model, thinkingLevel, time, timestamp, cop
  * recomputes during streaming reuse the previous identity and finished turns
  * skip re-rendering their rows entirely.
  */
-export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onOpenFile, onOpenSubagent, sessionId, live = false }: {
+export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onOpenFile, onOpenSubagent, sessionId, live = false, virtual = false }: {
   items: ActivityItem[];
   cwd?: string;
   onOpenFile?: (filePath: string, options?: { page?: number; line?: number }) => void;
@@ -679,8 +680,17 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
   sessionId?: string;
   /** The turn is currently running: groups start expanded and pending rows spin. */
   live?: boolean;
+  /** 窗口化渲染（只在有 24rem 限高滚动体的折叠体里开）：长回合不再一次挂几百行。 */
+  virtual?: boolean;
 }) {
   const nodes: ReactNode[] = [];
+  // 窗口化时命中的行可能不在渲染窗口里，`ChatWindow` 的 querySelector 找不到它就
+  // 跳不过去；记下它的节点序号，交给虚拟器 scrollToIndex。
+  let searchAt: number | undefined;
+  const add = (node: ReactNode, searchTarget?: boolean) => {
+    if (searchTarget && searchAt === undefined) searchAt = nodes.length;
+    nodes.push(node);
+  };
   let index = 0;
   while (index < items.length) {
     const item = items[index];
@@ -699,7 +709,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
       const searchTargetInGroup = group.some((entry) => entry.searchTarget);
       if (group.length === 1) {
         const only = item as Extract<ActivityItem, { kind: "tool" }>;
-        nodes.push(
+        add(
           <ToolRow
             key={item.key}
             block={only.block}
@@ -709,9 +719,9 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
           />,
-        );
+        ), only.searchTarget;
       } else {
-        nodes.push(
+        add(
           <ToolGroupRow
             key={`group-${item.key}`}
             calls={(group as Extract<ActivityItem, { kind: "tool" }>[]).map((entry) => ({
@@ -724,7 +734,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
             onOpenFile={onOpenFile}
             onOpenSubagent={onOpenSubagent}
           />,
-        );
+        ), searchTargetInGroup;
       }
       if (searchTargetInGroup) {
         // A search hit inside a collapsed group must still be scrollable to.
@@ -734,7 +744,7 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
       continue;
     }
     if (item.kind === "thinking") {
-      nodes.push(
+      add(
         <ReasoningTrace
           key={item.key}
           block={item.block}
@@ -746,30 +756,37 @@ export const TurnActivityBody = memo(function TurnActivityBody({ items, cwd, onO
           // without an estimated duration must not look stuck.
           active={live && item.duration === undefined && index === items.length - 1}
         />,
+        item.searchTarget,
       );
       index += 1;
       continue;
     }
     if (item.kind === "text") {
-      nodes.push(
+      add(
         <div key={item.key} data-message-text data-search-target={item.searchTarget || undefined}>
           <SafeMarkdownBody>{item.block.text}</SafeMarkdownBody>
         </div>,
+        item.searchTarget,
       );
       index += 1;
       continue;
     }
     // custom
     const message = (item as Extract<ActivityItem, { kind: "custom" }>).message;
-    nodes.push(
+    add(
       message.customType === "compaction"
         ? <CompactionRow key={item.key} message={message} cwd={cwd} onOpenFile={onOpenFile} />
         : <CustomRow key={item.key} message={message} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />,
+      item.searchTarget,
     );
     index += 1;
   }
   // live 尾部每行进场：仅 live 挂载的新行播一次（随流式出现）；完成态与历史
   // 一次性渲染整棵树时不播（会整段波动）。行挂载后的就地更新不重放。
+  if (virtual) {
+    // 行由窗口化列表按可视区渲染：滚动体是外层 `.trace-fold-body`，跟随只在 live。
+    return <VirtualRows count={nodes.length} render={(index) => nodes[index]} follow={live} focusIndex={searchAt} />;
+  }
   if (!live) {
     return <div className="flex min-w-0 flex-col gap-1.5 [&>[data-message-text]]:my-1">{nodes}</div>;
   }

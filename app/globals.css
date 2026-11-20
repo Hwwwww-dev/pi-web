@@ -1334,13 +1334,13 @@ span.token.table {
    触发器把 80% 写成了工具类，这里按类名统一放宽，展开体之外不受影响。 */
 
 /* 展开区限高（2026-11-20 用户：“行内折叠加一个限高！”“现在太高了”）：超过
-   24rem 就在折叠体内部滚动，长回合、长输出不会再撑满整屏。内层代码块/思考块
-   各自还有限高，两层叠加时只滚最内层已经到底的那一层。 */
+   24rem 就在折叠体内部滚动，长回合、长输出不会再撑满整屏。这里不写
+   `scrollbar-width/color`：标准属性能让 Chrome 关掉 `::-webkit-scrollbar`、
+   退回原生粗条；留空才会吃到全局那套悬停显现的统一滚动条（`--sb-alpha`）。 */
 .trace-fold-body {
   max-height: 24rem;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
 }
 .trace-fold-body .max-w-\[80\%\] {
   max-width: 100%;
