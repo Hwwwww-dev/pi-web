@@ -259,7 +259,7 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
       <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
       {tailText.trim() !== "" && (
         <span className="relative min-w-0 shrink">
-          <RowObjectSpan object={tailText} clip />
+          <RowObjectSpan object={tailText} clip follow />
         </span>
       )}
       {!active && duration !== undefined && formatToolDurationIfShown(duration * 1000) && (
@@ -289,7 +289,7 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
             {lineChildren}
           </TraceLine>
         </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent>
+        <TraceCollapsibleContent className="trace-fold-body">
           <ReasoningText
             scrollRef={detailRef}
             text={block.deferred ? (content ?? "") : liveThinking}

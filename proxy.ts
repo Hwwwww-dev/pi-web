@@ -25,7 +25,17 @@ function tooManyAttempts(retryAfterMs: number): NextResponse {
   });
 }
 
+// 每个请求到达 Next 时打一行（2026-11-20）：Cloudflare 侧的 502 是“拿不到源站
+// 响应”时生成的，日志里有没有这一行就能分清是“请求根本没到 Next”（隧道/网络）
+// 还是“到了但连接被中断”（进程忙/重启）。静态资源不记，避免刷屏；只记方法与
+// 路径，不记 body、cookie 与查询串。
+const UNLOGGED_PATHS = /^\/(?:_next\/|icons\/|favicon|manifest|sw\.js|apple-touch-icon)/;
+
 export function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  if (!UNLOGGED_PATHS.test(pathname)) {
+    console.log(`[req] ${new Date().toISOString()} ${request.method} ${pathname}`);
+  }
   const isApiRequest = request.nextUrl.pathname === "/api"
     || request.nextUrl.pathname.startsWith("/api/");
   const isTrustedRequest = isApiRequest

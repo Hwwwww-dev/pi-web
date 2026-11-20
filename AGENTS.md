@@ -28,7 +28,7 @@ pi's packages up to 1.2.0 depend on each other with `^` ranges (1.3.0 pins them 
 ## Hard rules
 
 - **Never run `next build` in the main clone while developing.** It pollutes `.next/` and breaks `npm run dev`. The production bundle is built in the run worktree (see Fork workflow).
-- **Restart the production server yourself, detached, after the reply.** Never run it in the foreground and never call `~/run-pi-web.sh` directly in the turn: the restart kills the process that may be hosting this very chat. Use `nohup bash -c 'sleep 3; bash ~/run-pi-web-restart.sh' >/dev/null 2>&1 &` (the 3s delay lets this reply reach the browser before the process dies; the script `setsid`s itself, restarts, probes `127.0.0.1:30141` up to 3 times, and logs to `~/.pi-web/logdir/pi-web-restart.log`). Schedule it last — write the answer first, then fire the restart, so a broken boot never costs the reply.
+- **Restart the production server yourself, detached, after the reply.** Never run it in the foreground and never call `~/run-pi-web.sh` directly in the turn: the restart kills the process that may be hosting this very chat. Use `nohup bash -c 'sleep 5; bash ~/run-pi-web-restart.sh' >/dev/null 2>&1 &` (the 5s delay lets this reply reach the browser before the process dies; the script `setsid`s itself, restarts, probes `127.0.0.1:30141` up to 3 times, and logs to `~/.pi-web/logdir/pi-web-restart.log`). Schedule it last — write the answer first, then fire the restart, so a broken boot never costs the reply.
 - **No RegExp lookbehind in client code** (`(?<=`, `(?<!`): SWC cannot downlevel it and Safari parses it only from 16.4. Emulate it with `replaceNotPrecededBy()` (`lib/markdown.ts`), or the runtime `new RegExp` inside `try` that `lib/gfm-autolink-email-loader.cjs` uses. Keep the `browserslist` Safari/iOS entries at 16.2: raising them re-breaks the client bundle on older devices.
 - **`/api/files` is not a filesystem browser.** `isPathWithinRoots()` (`lib/path-security.ts`) is the one security boundary; never add a second check or a route that skips it.
 - **Extensions written for the pi CLI must behave the same here.** Fix display problems in the web client; never add pi-web-only options or fields to `ctx.ui.*` options or `extension_ui_request`. pi's TUI is the reference for what an extension is asking for.
@@ -49,8 +49,8 @@ bash ~/run-pi-web-build.sh   # cd pi-web-run; git fetch; git reset --hard origin
 
 # 2. Restart, detached — always the last action of the turn, after the answer is written.
 #    Foreground is not allowed: the restart stops the server that may host this session.
-#    The 3s delay lets the reply reach the browser before the process dies.
-nohup bash -c 'sleep 3; bash ~/run-pi-web-restart.sh' >/dev/null 2>&1 &
+#    The 5s delay lets the reply reach the browser before the process dies.
+nohup bash -c 'sleep 5; bash ~/run-pi-web-restart.sh' >/dev/null 2>&1 &
 
 # 3. Verify (the restart script already probes; re-check if you need to confirm)
 curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:30141/   # expect 200

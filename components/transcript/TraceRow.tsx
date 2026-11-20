@@ -64,33 +64,33 @@ export function useTraceFold(foldKey?: string, defaultOpen = false) {
   return { open, onOpenChange };
 }
 
-/** 行尾渐隐：两侧各 20px 淡出，不论是否溢出都上（2026-11-20 用户：“左右两边
- *  都要渐隐，不溢出也是要渐隐”），切口与两端都不再是硬边。 */
+/** 行尾渐隐：右端 20px 淡出，不论是否溢出都上——文本从左开始显示，左端不需要
+ *  渐隐（2026-11-20 用户：“去掉左边的渐隐吧”）。 */
 const TAIL_FADE = {
-  maskImage: "linear-gradient(to right, transparent, #000 20px, #000 calc(100% - 20px), transparent)",
-  WebkitMaskImage: "linear-gradient(to right, transparent, #000 20px, #000 calc(100% - 20px), transparent)",
+  maskImage: "linear-gradient(to right, #000 calc(100% - 20px), transparent)",
+  WebkitMaskImage: "linear-gradient(to right, #000 calc(100% - 20px), transparent)",
 } as const;
 
 /**
- * 行对象文本（命令/文件等）的固定形状：一行不换行，短文本从头排，撞满后
- * 把窗口推到末尾——新字始终在最右边可见，旧字从左边滑走（2026-11-20 用户：
- * 标题行撑满后尾部追加，形成打字机）。用脚本 
- * 设 scrollLeft 而不是 `direction: rtl` + `unicode-bidi: plaintext`：后者在
- * LTR 段落（中英文）下实际把窗口留在开头，多行文本就只能看到“第一行”。
+ * 行对象文本（命令/文件等）的固定形状：一行不换行，从头排。
  *
- * `clip` 去掉左侧省略号（用户：“运行不要显示左边的…，无意义”）：命令与思考尾
- * 已经是最后一段，左省略号不传达信息，改用两侧渐隐——旧字从左边滑出去时是
- * 淡出的，右端也不会硬切（2026-11-20 用户：“这个尾部做一个渐隐效果”“左右两
- * 边都要渐隐，不溢出也是要渐隐”）。
+ * `follow`（2026-11-20 用户：“标题行撑满后尾部追加，形成打字机”）只给流式
+ * 的思考尾：撞满后把窗口推到末尾，新字始终在最右边可见。命令与工具对象不
+ * follow——用户：“运行的 bash 命令从左开始显示，而不是显示尾部”。用脚本设
+ * scrollLeft 而不是 `direction: rtl` + `unicode-bidi: plaintext`：后者在 LTR
+ * 段落（中英文）下实际把窗口留在开头，多行文本就只能看到“第一行”。
+ *
+ * `clip` 去掉省略号，改用两侧渐隐（用户：“这个尾部做一个渐隐效果”“左右两边
+ * 都要渐隐，不溢出也是要渐隐”），切口与两端都不再是硬边。
  */
-export function RowObjectSpan({ object, clip = false }: { object: string; clip?: boolean }) {
+export function RowObjectSpan({ object, clip = false, follow = false }: { object: string; clip?: boolean; follow?: boolean }) {
   const ref = useRef<HTMLSpanElement>(null);
-  // 贴尾：短文本从头排（左对齐），撑满后把窗口推到末尾。
+  // 贴尾只在 follow（思考尾）时做；其余从头显示。
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.scrollLeft = el.scrollWidth;
-  }, [object, clip]);
+    el.scrollLeft = follow ? el.scrollWidth : 0;
+  }, [object, clip, follow]);
   return (
     <span
       ref={ref}
@@ -252,7 +252,7 @@ export function TraceRow({
           {actions && <span className="flex shrink-0 items-center" onClick={(e) => e.stopPropagation()}>{actions}</span>}
         </div>
         {/* 展开区不设高度上限：代码块、思考块各自限高即可，两层同时限高会出现两个滚动条。 */}
-        <TraceCollapsibleContent className="mt-1 flex flex-col gap-2 [&>*]:min-w-0">
+        <TraceCollapsibleContent className="trace-fold-body mt-1 flex flex-col gap-2 [&>*]:min-w-0">
           {stepUsage && (
             <div className="text-xs">
               <UsageBar usage={stepUsage} gap={10} />

@@ -1329,6 +1329,30 @@ span.token.table {
 /* 折叠行标题换成另一个活动（工具→工具、工具→思考）时的上滑换行（2026-11-20
    用户：这样好看些）：旧标题向上滑出，新标题从下方滑入。行高不变，所以只用
    transform + opacity，不触发重排；容器 overflow-hidden 裁掉滑动出界的那截。 */
+/* 展开的折叠体内部不再限宽：80% 只约束折叠标题行，正文里的工具行、嵌套折叠
+   标题都铺满（2026-11-20 用户：“展开折叠后，里面的就不要 80% 了”）。行与折叠
+   触发器把 80% 写成了工具类，这里按类名统一放宽，展开体之外不受影响。 */
+.trace-fold-body .max-w-\[80\%\] {
+  max-width: 100%;
+}
+/* 同一个 80% 也经由 Trace 根上的 `*:has-[>[data-slot=trace-line]]:max-w-[80%]`
+   落在子元素上（那串工具类名与上面不同），按结构再放宽一次。 */
+.trace-fold-body [data-slot="trace"] > * {
+  max-width: 100%;
+}
+
+/* 移动端行铺满：80% 只留给桌面，手机上折叠标题、工具行、嵌套折叠标题都不限宽
+   （2026-11-20 用户：“移动端直接撑满吧，不做限制了，非移动端 80%”）。未分层
+   的规则优先于 Tailwind 的 utilities 层，不必与工具类拼特异性；短标题靠 `w-fit`
+   仍然不会拉长。 */
+@media (max-width: 640px) {
+  [data-slot="trace-line"],
+  [data-slot="trace-collapsible-trigger"],
+  [data-slot="trace"] > * {
+    max-width: 100%;
+  }
+}
+
 @keyframes trace-line-in {
   from { transform: translateY(6px); opacity: 0 }
   to { transform: none; opacity: 1 }
@@ -1678,15 +1702,19 @@ span.token.table {
   container-type: inline-size;
 }
 
-/* 浮动 composer：输入卡片的羽化光晕。实心只到卡片边缘外一档（spread），
-   再向外按 blur 羽化到透明——速率行、TODO/YOLO 行与安全区落在羽化带里，
-   滚到停靠区背后的消息只有贴近卡片才被遮住。光晕沿卡片自己的圆角轮廓向
-   四外羽化，随卡片尺寸变化自动跟随，无 JS 测距。 */
-.chat-composer-halo {
-  box-shadow: 0 0 24px 12px var(--background);
-  /* 只留上下羽化：左右在卡片自身的边缘硬裁，光晕不再糊到旁边的消息上。
-     上下各留 40px（24 blur + 12 spread 之外还有余量），裁剪不会截到羽化带。 */
-  clip-path: inset(-40px 0 -40px 0);
+/* 浮动 composer：停靠区背板。不再给输入卡片套一圈实色光晕（那是整块实色的
+   来源），改成：卡片自己毛玻璃半透明，停靠区底层一道从上透明渐变到底色
+   的遮罩——底端实、顶端自然淡出，没有硬边也不出现色块。速率行、TODO/YOLO
+   行与安全区落在渐变下半段，仍是遮住的。
+   遮罩用 background 渐变而不是 backdrop-filter + mask：Safari 上 mask 不
+   一定作用在 backdrop 上，会出现一道硬边。 */
+.chat-composer-dock-fade::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent 0, var(--background) 56px);
 }
 
 /* While the software keyboard is up (set by useViewportHeight), only a few

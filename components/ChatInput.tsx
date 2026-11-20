@@ -2429,9 +2429,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             水平内衬与扩展状态行（含 YOLO 徽标）同一份 `CHAT_COMPOSER_INSET_CLASS`：
             左端对齐输入框文字起点，右端对齐发送键右缘，两端都不顶到卡片外框。 */}
         {!compact && (
-          // relative z-10：速率行绘制在输入卡片的光晕（chat-composer-halo 的
-          // box-shadow）之上——卡片是定位元素最后绘制，不抬层级阴影会盖住
-          // 徽标文字。
+          // relative z-10：速率行绘制在停靠区遮罩（chat-composer-dock-fade 的
+          // ::before）之上——卡片是定位元素最后绘制，不抬层级会被遮罩盖住。
           <div className={`relative z-10 -mb-1 flex min-h-4 items-center gap-3 ${CHAT_COMPOSER_INSET_CLASS}`}>
             {streamStatusStore ? <StreamStatusPill store={streamStatusStore} /> : null}
             <span className="min-w-0 flex-1 truncate text-xs leading-none text-muted-foreground">{activityNotice}</span>
@@ -2652,10 +2651,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           >
             <InputGroup
               className={cn(
-                // 输入卡片半透明（暗色基类 dark:bg-input/30）：消息隐约透出；
-                // 贴近卡片的消息由 chat-composer-halo（globals.css）的羽化光晕遮住，
-                // 远离即透，不再需要实心卡片（2026-11-20 用户要求回到透明）。
-                "chat-composer-row chat-composer-halo min-w-0 rounded-[24px] border-border",
+                // 输入卡片毛玻璃：半透明底色 + 背景模糊，消息透出来是虚的、不出现
+                // 文字穿透，整块也不再是实色（2026-11-20 用户拍板，替换实色光晕）。
+                "chat-composer-row min-w-0 rounded-[24px] border-border bg-background/60 backdrop-blur-xl",
                 compact
                   ? "flex-row items-center gap-1 rounded-[18px] p-1.5"
                   : "flex-col items-stretch gap-0 p-2",

@@ -275,7 +275,7 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
             <TraceDescription>{formatTurnDuration(elapsedMs)}</TraceDescription>
           </TraceLine>
         </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent className="flex flex-col gap-2">
+        <TraceCollapsibleContent className="trace-fold-body flex flex-col gap-2">
           <Trace>
             {children}
             {/* 正在流式的思考也进展开体（2026-11-20 用户反馈“展开后没有思考行”）:

@@ -399,7 +399,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
             </TraceLine>
           </TraceCollapsibleTrigger>
           {/* 扩展消息内容以卡片高度封顶：过长的 markdown（如插件注入的规范文档）否则会把页面撑开。 */}
-          <TraceCollapsibleContent className="max-h-[var(--card-max-height)] overflow-auto">
+          <TraceCollapsibleContent className="trace-fold-body max-h-[var(--card-max-height)] overflow-auto">
             <div className="flex flex-col gap-2">
               {images.length > 0 && (
                 <div className={cn("flex flex-wrap gap-1.5", text && "mb-2")}>
@@ -512,7 +512,7 @@ export function CompactionRow({ message, cwd, onOpenFile }: {
             </TraceDescription>
           </TraceLine>
         </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent>
+        <TraceCollapsibleContent className="trace-fold-body">
           <CompactionSummaryDetails summary={summary} cwd={cwd} onOpenFile={onOpenFile} />
         </TraceCollapsibleContent>
       </TraceCollapsible>
@@ -565,7 +565,7 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
             </TraceTitle>
           </TraceLine>
         </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent>
+        <TraceCollapsibleContent className="trace-fold-body">
           {modifiedFiles.length > 0 && <CompactionFileList title={t("i18n.modifiedFiles")} files={modifiedFiles} />}
           {readFiles.length > 0 && <CompactionFileList title={t("i18n.readFiles")} files={readFiles} />}
         </TraceCollapsibleContent>

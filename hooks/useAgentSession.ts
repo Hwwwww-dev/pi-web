@@ -1796,18 +1796,27 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     unconfirmedSendRef.current = null;
     const read = lastReadContextRef.current;
     const reread = read?.sid === sid && read.seq > readSeqBefore ? read : null;
-    // Where the read goes past the send's last entry; -1 when that entry fell out of its window.
-    const start = !reread ? -1
+    // 发送点是否落在这份读的窗口里。锚点找不到（indexOf === -1）说明它被挤出了
+    // 窗口，此时读不到消息**不等于**消息没落盘：不能据此删气泡（2026-11-20 用户
+    // 反馈“发出去的消息不见了，重载才回来”——隧道/重启造成的半失败会走到这里）。
+    const anchorIndex = !reread ? -1
       : pending.lastEntryIdAtSend === null ? 0
-        : reread.entryIds.indexOf(pending.lastEntryIdAtSend) + 1 || -1;
-    if (reread && start >= 0) {
-      const sameText = countUserMessages(reread.messages.slice(start), pending.key);
+        : reread.entryIds.indexOf(pending.lastEntryIdAtSend) + 1;
+    const located = reread !== null && anchorIndex >= 0;
+    if (reread && located) {
+      const sameText = countUserMessages(reread.messages.slice(anchorIndex), pending.key);
+      // 送达：气泡就是这条消息，留着。
       if (sameText > pending.sameTextAfterSend) return;
     }
     restoreSubmission(pending.message, pending.images, pending.draftKey);
-    // A failed read leaves the view stale: the bubble stays with "could not confirm".
-    if (reread) dropUnconfirmedBubble(pending);
-    addNotice(reread && !pending.command && start === reread.entryIds.length
+    if (!located) {
+      // 说不清楚：保留气泡，只提示未确认。删气泡会让真的送到的消息从视图消失。
+      addNotice({ type: "warning", message: translate("chat.sendUnconfirmed") });
+      return;
+    }
+    // 确定没送到：气泡删掉，文字回输入框。
+    dropUnconfirmedBubble(pending);
+    addNotice(reread && !pending.command && anchorIndex === reread.entryIds.length
       ? { type: "error", message: translate("chat.sendNotReceived") }
       : { type: "warning", message: translate("chat.sendUnconfirmed") });
   }, [addNotice, dropUnconfirmedBubble, restoreSubmission, translate]);
