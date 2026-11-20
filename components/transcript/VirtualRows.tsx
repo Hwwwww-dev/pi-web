@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
-/** 离底多少像素内算“贴底”。比一行矮，滚动抖动不会把跟随关掉。 */
-const FOLLOW_THRESHOLD_PX = 8;
+/** 离底多少像素内算“贴底”。48px 约两行高：流式追加时的轻微漂移不会关掉跟随。 */
+const FOLLOW_THRESHOLD_PX = 48;
 
 /**
  * 行内折叠体的窗口化列表（2026-11-20 用户：“行内折叠列表使用虚拟列表，且滚动条
@@ -66,6 +66,28 @@ export function VirtualRows({
     if (focusIndex === undefined || focusIndex < 0) return;
     virtualizer.scrollToIndex(focusIndex, { align: "center" });
   }, [focusIndex, virtualizer]);
+
+  // 文字在行内变长（流式思考/回复）不改变行数，光看 count 跟不上：直接盯列表
+  // 总高度的变化，贴底时补滚到底。
+  useEffect(() => {
+    if (!follow) return;
+    const el = listRef.current;
+    const scroller = el?.closest<HTMLElement>(".trace-fold-body") ?? el?.parentElement;
+    if (!el || !scroller) return;
+    let pending = 0;
+    const observer = new ResizeObserver(() => {
+      if (!stickRef.current || pending !== 0) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        scroller.scrollTop = scroller.scrollHeight;
+      });
+    });
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      if (pending !== 0) cancelAnimationFrame(pending);
+    };
+  }, [follow]);
 
   // 新行落地后行高要等 measureElement 回报，所以连跑两帧再贴底。
   useLayoutEffect(() => {

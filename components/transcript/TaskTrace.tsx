@@ -38,7 +38,7 @@ export const TaskTrace = memo(function TaskTrace({ title, description, status, f
       trailing={trailing}
       duration={duration}
       ariaLabel={title}
-      content={<Trace>{children}</Trace>}
+      content={<Trace className="trace-group-body">{children}</Trace>}
     />
   );
 });
