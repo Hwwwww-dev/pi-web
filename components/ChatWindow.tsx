@@ -51,6 +51,7 @@ import {
   QuestionnaireItem,
 } from "@/components/ui/questionnaire";
 import { ChatRow } from "@/components/chat/ChatRow";
+import { computeRowWindow, sameRowWindow, type RowRect } from "@/lib/chat-row-window";
 import { CHAT_COLUMN_CLASS, CHAT_PAGE_GUTTER_CLASS } from "@/lib/chat-layout";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -1958,6 +1959,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 主聊天停靠区：浮在消息之上（消息列延伸到卡片背后，末端按停靠区高度垫底），
   // 桌面与手机一致。空态（hero+composer 簇的垂直居中依赖文档流）与侧面板保持
   // 原有布局。
+  /**
+   * 窗口外的消息行：条目 id → 占位高度。渲染层据此把内容换成等高占位。
+   * 行必须先真实渲染过一次才有高度，所以这里是“先量后收”，不是按估算高度虚拟。
+   */
+  const [collapsedRows, setCollapsedRows] = useState<ReadonlyMap<string, number>>(() => new Map());
+  const collapsedRowsRef = useRef<ReadonlyMap<string, number>>(collapsedRows);
+  collapsedRowsRef.current = collapsedRows;
   const composerDockRef = useRef<HTMLDivElement | null>(null);
   const composerFloating = !panel && !isEmptyNew;
   // 停靠区实测高度。既进 CSS 变量（内容末端垫底：那层 padding 就是被输入条盖住、
@@ -1986,6 +1994,46 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
    * 量到的，而还原时“底”里还没有这段垫底，于是最后一条（用量行）停在输入框背后
    * ——读者以为“重进会话就物理贴底”（2026-11-20）。只在读者本来就贴底时补一次。
    */
+  /**
+   * 窗口化：量一次真实行高，把视口上下各 1.5 屏之外的行收成等高占位（内容是
+   * 消息组件树，收起即卸载：memo、语法高亮、图片、折叠状态全跟着走）。收与放
+   * 高度相同，所以滚动位置、锚点还原、顶部前插保位、搜索定位都不受影响。
+   * 保活槽隐藏时 `clientHeight` 为 0，量到的都是 0，直接跳过。
+   */
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    const content = messageContentRef.current;
+    if (!container || !content) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      if (container.clientHeight === 0) return;
+      const contentTop = content.getBoundingClientRect().top;
+      const rows: RowRect[] = [];
+      for (const element of content.children) {
+        if (!(element instanceof HTMLElement)) continue;
+        const id = element.dataset.rowId;
+        if (!id) continue;
+        const rect = element.getBoundingClientRect();
+        rows.push({ id, top: rect.top - contentTop, height: rect.height });
+      }
+      const next = computeRowWindow(rows, container.scrollTop, container.clientHeight).collapsed;
+      if (sameRowWindow(next, collapsedRowsRef.current)) return;
+      setCollapsedRows(next);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    schedule();
+    container.addEventListener("scroll", schedule, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", schedule);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [scrollContainerRef, messageContentRef, turnRendered.length, session?.id, loading, dockHeight]);
+  useEffect(() => {
+    setCollapsedRows((current) => (current.size === 0 ? current : new Map()));
+  }, [session?.id]);
   useEffect(() => {
     if (dockHeight === 0) return;
     const container = scrollContainerRef.current;
@@ -2224,12 +2272,15 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               // 跟随判定（scrollHeight 含 spacer）与回底按钮（不含）各自为政；
               // 搜索定位、向下翻页也会被它的抢滚，表现为“没操作却跳到别的消息”。
               // 贴底跟随改由 provider 的 autoScroll 全权负责。
+              // 窗口外只留占位高度、内容卸载（`--` 见 lib/chat-row-window.ts）：
+              // 收起来的行高度与量到时相等，滚动位置、scrollToMessage、前插保位都不受影响。
+              const placeholder = collapsedRows.get(messageId);
               return (
                 <ChatRow
                   key={node.key ?? messageId}
                   messageId={messageId}
                 >
-                  {node}
+                  {placeholder === undefined ? node : <div aria-hidden style={{ height: placeholder }} />}
                 </ChatRow>
               );
             })}

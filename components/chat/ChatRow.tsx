@@ -36,6 +36,9 @@ export function ChatRow({ messageId, className, children }: Props) {
   return (
     <MessageScrollerItem
       messageId={messageId}
+      // 窗口化（lib/chat-row-window.ts）按行 id 认行：官方 Item 的 messageId 只在
+      // 库内部使用，DOM 上不落属性。
+      data-row-id={messageId}
       className={cn("shrink-0", rowClass)}
     >
       {children}
