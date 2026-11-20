@@ -2894,7 +2894,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       onAskInNewChat={handleAskInNewChat}
                       quoteSelectionEnabled={quoteSelectionEnabled}
                       initialPrompt={isActive && pendingQuotePrompt?.sessionId === slot.session.id ? pendingQuotePrompt?.text : undefined}
-                      onInitialPromptConsumed={() => setPendingQuotePrompt(null)}
+                      onInitialPromptConsumed={handleInitialPromptConsumed}
                       soundEnabled={soundEnabled}
                       holdAudio={holdAudio}
                       playDoneSound={playDoneSound}

@@ -916,6 +916,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const inflight = options?.force ? undefined : loadFlightsRef.current.get(flightKey);
     if (inflight) return await inflight;
   const flight = (async (): Promise<unknown> => {
+    /**
+     * 状态与消息互不依赖：一进函数就并行发出，等消息落地再按原顺序应用。
+     * 原来串行等消息读完才问状态，每次切换会话多付一个往返。
+     */
+    const statePromise = includeState
+      ? fetch(`/api/sessions/${encodeURIComponent(sid)}/state`)
+      : null;
+    // 提前读的路径可能在未 await 前就 return（会话被切走、读盘 404）：
+    // 这里先挂一个空 catch，免成未处理拒绝。
+    void statePromise?.catch(() => {});
     let messagesLoaded = false;
     const readSeq = ++sessionReadSeqRef.current;
     // pi writes a `!` result held during a run before the run settles: a read
@@ -1083,7 +1093,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         const queueToken = queueSnapshotGateRef.current.capture();
         const runId = promptRunIdRef.current;
         const usageRequestId = ++contextUsageRequestIdRef.current;
-        const stateRes = await fetch(`/api/sessions/${encodeURIComponent(sid)}/state`);
+        const stateRes = await statePromise!;
         if (!stateRes.ok) throw new Error(`HTTP ${stateRes.status}`);
         const agentState = await stateRes.json() as { running: boolean; state?: AgentStateResponse };
         if (sessionIdRef.current !== sid) return null;
@@ -2200,6 +2210,41 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [loadSession]);
 
+  /**
+   * 把缓存的会话视图铺到状态里（挂载与休眠唤醒共用）：只恢复已定形的历史字段，
+   * 不带流式、队列与运行状态。返回是否命中缓存。
+   */
+  const restoreCachedView = useCallback((sid: string): boolean => {
+    const cached = getSessionViewSnapshot(sid);
+    if (!cached) return false;
+    setData({
+      sessionId: sid,
+      filePath: "",
+      totalActiveMs: cached.totalActiveMs ?? 0,
+      tree: cached.summaryTree as SessionData["tree"],
+      leafId: cached.leafId,
+      context: {
+        messages: cached.messages,
+        entryIds: cached.entryIds,
+        oldestEntryId: cached.oldestEntryId,
+        hasMore: cached.hasMore,
+        turnsBefore: cached.turnsBefore,
+        thinkingLevel: cached.thinkingLevel,
+        model: cached.model,
+      },
+      stats: cached.stats as SessionData["stats"],
+    });
+    setActiveLeafId(cached.leafId);
+    setMessages(cached.messages);
+    setEntryIds(cached.entryIds);
+    setHistoryCursor(cached.oldestEntryId);
+    setHasEarlierMessages(cached.hasMore);
+    setEarlierTurnCount(cached.turnsBefore);
+    setError(null);
+    setLoading(false);
+    return true;
+  }, []);
+
   // Dormancy: a keep-alive slot hidden beyond DORMANT_AFTER_MS unloads its
   // message list (the DOM is the memory cost); reactivation reloads once.
   // Running slots never go dormant and the probe effect idles while dormant,
@@ -2218,8 +2263,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   useEffect(() => {
     if (dormant || !dormantUnloadRef.current || session === null) return;
     dormantUnloadRef.current = false;
+    // 唤醒先铺缓存窗口再补读：休眠卸掉的只是 DOM，快照还在，没必要先白一下。
+    restoreCachedView(session.id);
     void loadSession(session.id);
-  }, [dormant, session, loadSession]);
+  }, [dormant, session, loadSession, restoreCachedView]);
 
   const handleAgentEvent = useCallback((event: AgentEvent) => {
     if (endedSessionRef.current) return;
@@ -3757,6 +3804,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, [requestLease, session?.id]);
 
   // Load session on mount
+  // Dormancy: a keep-alive slot hidden beyond DORMANT_AFTER_MS unloads its
   useEffect(() => {
     sessionHookMountedRef.current = true;
     // Usage reads started before a remount are stale.
@@ -3765,36 +3813,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       sessionIdRef.current = session.id;
       // Snapshot fast path: show the cached history window immediately, then
       // run the normal forced read in the background as the freshness check.
-      // Only the settled history fields are restored — no streaming, queue, or
-      // run state — and the background read remains authoritative.
-      const cached = getSessionViewSnapshot(session.id);
-      if (cached) {
-        setData({
-          sessionId: session.id,
-          filePath: "",
-          totalActiveMs: cached.totalActiveMs ?? 0,
-          tree: cached.summaryTree as SessionData["tree"],
-          leafId: cached.leafId,
-          context: {
-            messages: cached.messages,
-            entryIds: cached.entryIds,
-            oldestEntryId: cached.oldestEntryId,
-            hasMore: cached.hasMore,
-            turnsBefore: cached.turnsBefore,
-            thinkingLevel: cached.thinkingLevel,
-            model: cached.model,
-          },
-          stats: cached.stats as SessionData["stats"],
-        });
-        setActiveLeafId(cached.leafId);
-        setMessages(cached.messages);
-        setEntryIds(cached.entryIds);
-        setHistoryCursor(cached.oldestEntryId);
-        setHasEarlierMessages(cached.hasMore);
-        setEarlierTurnCount(cached.turnsBefore);
-        setError(null);
-        setLoading(false);
-      }
+      const cached = restoreCachedView(session.id);
       loadSession(session.id, !cached, true, { force: true }).then((loadedAgentState) => {
         applyLoadedAgentState(session.id, loadedAgentState);
       });

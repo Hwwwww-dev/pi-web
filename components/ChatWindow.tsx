@@ -715,16 +715,25 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       return;
     }
     const controller = new AbortController();
-    const params = activeLeafId ? `?leafId=${encodeURIComponent(activeLeafId)}` : "";
-    fetch(`/api/sessions/${encodeURIComponent(sid)}/turns${params}`, { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { turns?: MinimapTurnDescriptor[] } | null) => {
-        if (data && Array.isArray(data.turns)) setMinimapTurnIndex(data.turns);
-      })
-      .catch(() => {
-        // Aborted or transient; the minimap lists loaded turns only.
-      });
-    return () => controller.abort();
+    const loadTurns = () => {
+      const params = activeLeafId ? `?leafId=${encodeURIComponent(activeLeafId)}` : "";
+      fetch(`/api/sessions/${encodeURIComponent(sid)}/turns${params}`, { signal: controller.signal })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { turns?: MinimapTurnDescriptor[] } | null) => {
+          if (data && Array.isArray(data.turns)) setMinimapTurnIndex(data.turns);
+        })
+        .catch(() => {
+          // Aborted or transient; the minimap lists loaded turns only.
+        });
+    };
+    // 缩略图的回合列表不属于首屏：等空闲再要，别和消息首屏抢主线程与连接。
+    const idle = typeof window.requestIdleCallback === "function"
+      ? { id: window.requestIdleCallback(loadTurns, { timeout: 1500 }), cancel: window.cancelIdleCallback }
+      : { id: window.setTimeout(loadTurns, 300), cancel: window.clearTimeout };
+    return () => {
+      controller.abort();
+      idle.cancel(idle.id);
+    };
   }, [session?.id, activeLeafId]);
   // State, not a ref: the sentinel can appear with nothing else changing (a
   // finished turn regrouped into more rows), and must get an observer then.
