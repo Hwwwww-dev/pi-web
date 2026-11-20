@@ -814,6 +814,7 @@ export const zhTWLocale: LocalePlugin = {
     "transcriptNotice.foldCacheMisses": "快取未命中 {count} 次 {tokens} Token{cost}",
     "chat.filesWritten": "已變更的檔案",
     "chat.openWrittenFile": "開啟 {name}",
+    "chat.collapseList": "收合列表",
     "chat.loadEarlier": "載入較早的訊息",
     "chat.loadingEarlier": "正在載入較早的訊息…",
     "chat.scrollToLatest": "回到最新訊息",

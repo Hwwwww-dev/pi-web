@@ -814,6 +814,7 @@ export const enLocale: LocalePlugin = {
     "transcriptNotice.foldCacheMisses": "{count} cache misses {tokens} tokens{cost}",
     "chat.filesWritten": "Files changed",
     "chat.openWrittenFile": "Open {name}",
+    "chat.collapseList": "Collapse list",
     "chat.loadEarlier": "Load earlier messages",
     "chat.loadingEarlier": "Loading earlier messages…",
     "chat.scrollToLatest": "Scroll to latest",

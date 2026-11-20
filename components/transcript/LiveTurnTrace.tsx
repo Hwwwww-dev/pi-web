@@ -13,6 +13,7 @@ import {
   TraceTitle,
 } from "@/components/ui/trace";
 import { useI18n } from "@/hooks/useI18n";
+import { CollapseListButton } from "./CollapseListButton";
 import { useStreamingSelector, selectStreamingMessage } from "@/hooks/useStreamingSelector";
 import { createStreamingStore, type StreamingStore } from "@/lib/streaming-message";
 import { formatTurnDuration } from "@/lib/turn-duration";
@@ -295,6 +296,8 @@ export function LiveTurnTrace({ items, startTs, foldKey, store, phaseStore, tool
               />
             ))}
           </Trace>
+          {/* 运行中同样能原地收起（标题在视口上方时不必滚回去）。 */}
+          {open && <CollapseListButton onClick={() => onOpenChange(false)} label={t("chat.collapseList")} />}
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>

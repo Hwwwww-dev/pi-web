@@ -814,6 +814,7 @@ export const zhCNLocale: LocalePlugin = {
     "transcriptNotice.foldCacheMisses": "缓存未命中 {count} 次 {tokens} Token{cost}",
     "chat.filesWritten": "改动的文件",
     "chat.openWrittenFile": "打开 {name}",
+    "chat.collapseList": "收起列表",
     "chat.loadEarlier": "加载更早的消息",
     "chat.loadingEarlier": "正在加载更早的消息…",
     "chat.scrollToLatest": "回到最新消息",

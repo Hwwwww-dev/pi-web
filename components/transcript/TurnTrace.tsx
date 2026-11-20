@@ -11,6 +11,8 @@ import {
   TraceTitle,
 } from "@/components/ui/trace";
 import { LayersIcon } from "lucide-react";
+import { useI18n } from "@/hooks/useI18n";
+import { CollapseListButton } from "./CollapseListButton";
 import { useTraceFold } from "./TraceRow";
 
 /**
@@ -32,6 +34,7 @@ export function TurnTrace({ summary, foldKey, defaultOpen, reveal = false, class
   // 按该选择原样接管：完成时是展开就保持展开，是收起就直接以“工作了 x”一行
   // 出现，没有过渡帧。历史导航中重挂载时同理（getFoldChoice 优先）。
   const { open, onOpenChange } = useTraceFold(foldKey, defaultOpen);
+  const { t } = useI18n();
 
   return (
     <Trace data-activity="turn" className={className}>
@@ -52,6 +55,10 @@ export function TurnTrace({ summary, foldKey, defaultOpen, reveal = false, class
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="trace-fold-body trace-turn-body flex flex-col gap-2">
           <Trace>{children}</Trace>
+          {/* 展开体能很长（不限高），滚到末尾后不必再滚回去点标题：原位收起。 */}
+          {open && !reveal && (
+            <CollapseListButton onClick={() => onOpenChange(false)} label={t("chat.collapseList")} />
+          )}
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>
