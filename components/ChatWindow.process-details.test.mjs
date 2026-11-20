@@ -69,14 +69,18 @@ test("the settled fold takes over the live fold's state and starts collapsed onc
   );
 });
 
-test("the settled fold summary shows duration, four buckets and failures — never 处理详情", () => {
+test("the settled fold summary shows duration, four buckets and failures — never 处理详情", async () => {
   // 结算段标题（2026-11-20 用户确认）：工作了 X · N 个读取 · N 个编辑 · N 个
   // 运行 · N 个子代理 · N 个失败（非零才显示）；时长取首尾 ts，取不到累计条目
   // duration 兑底；「处理详情」兑底废除。
-  assert.match(source, /segBuckets = \{ read: 0, edit: 0, run: 0, subagent: 0 \}/);
+  // 数字口径下沉到 lib/turn-view.ts 的 summarizeSegmentActivity（单遍遍历，
+  // lib/turn-view.test.mjs 锁分类与兜底），组件只留 i18n 拼串。
+  assert.match(source, /const \{ counts, failed, firstTs, lastTs, durationMs \} = summarizeSegmentActivity\(items\)/);
   assert.match(source, /t\("chat\.activity\.categoryCount", \{ count, label: t\(labelKey\) \}\)/);
-  assert.match(source, /t\("chat\.activity\.failedCount", \{ count: segFailed \}\)/);
+  assert.match(source, /t\("chat\.activity\.failedCount", \{ count: failed \}\)/);
   assert.doesNotMatch(source, /processDetails/);
+  const turnViewSource = await readFile(new URL("../lib/turn-view.ts", import.meta.url), "utf8");
+  assert.match(turnViewSource, /export function summarizeSegmentActivity\(items: ActivityItem\[\]\): SegmentActivitySummary \{/);
 });
 
 test("passes a grouped turn's MessageViews the same copies on every render (#1005)", async () => {

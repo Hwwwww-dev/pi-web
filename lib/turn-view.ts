@@ -1,4 +1,5 @@
 import { getAssistantErrorMessage, isAssistantTruncated, splitFinalAssistantBlocks } from "./message-display";
+import { getToolCategory } from "./tool-categories";
 import { extractTurnWrittenFiles, type WrittenFile } from "./turn-written-files";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, CustomMessage, TextContent, ThinkingContent, ToolCallContent, ToolResultMessage } from "./types";
 
@@ -65,6 +66,50 @@ export function splitTurnParts(items: ActivityItem[]): TurnPart[] {
   return parts;
 }
 
+/**
+ * 一段活动的摘要原料（2026-11-20）：结算段与活跃回合的已完成段共用同一套口径，
+ * 一遍遍历同时算出四大类计数、失败数、首尾时间戳与条目自报时长之和。i18n 拼串
+ * 留在组件层，这里只出数字。
+ *
+ * 口径：读取 = view/search/web，编辑 = edit/write/patch，运行 = 终端，子代理单独
+ * 一类；plan/compact/other 不进摘要（太碎）。时长优先取首尾时间戳之差，取不到
+ * 时用条目自身的 duration 兜底（thinking 记秒、tool 记毫秒）。
+ */
+export interface SegmentActivitySummary {
+  counts: { read: number; edit: number; run: number; subagent: number };
+  failed: number;
+  firstTs?: number;
+  lastTs?: number;
+  durationMs: number;
+}
+
+export function summarizeSegmentActivity(items: ActivityItem[]): SegmentActivitySummary {
+  const summary: SegmentActivitySummary = { counts: { read: 0, edit: 0, run: 0, subagent: 0 }, failed: 0, durationMs: 0 };
+  for (const item of items) {
+    if (item.ts !== undefined) {
+      summary.firstTs ??= item.ts;
+      summary.lastTs = item.ts;
+    }
+    if (item.kind === "thinking") {
+      summary.durationMs += (item.duration ?? 0) * 1000;
+      continue;
+    }
+    if (item.kind !== "tool") continue;
+    summary.durationMs += item.duration ?? 0;
+    if (item.result?.isError) summary.failed += 1;
+    switch (getToolCategory(item.block.toolName)) {
+      case "terminal": summary.counts.run += 1; break;
+      case "edit": summary.counts.edit += 1; break;
+      case "subagent": summary.counts.subagent += 1; break;
+      case "view":
+      case "search":
+      case "web": summary.counts.read += 1; break;
+      default: break;
+    }
+  }
+  return summary;
+}
+
 export function formatUsage(usage: TurnUsage): string {
   const parts = [];
   if (usage.input) parts.push(`${usage.input.toLocaleString()} in`);
@@ -84,7 +129,7 @@ export function formatFullTimestamp(ts?: number | null): string | null {
 }
 
 /** Prompt tokens a provider charged for one request: non-cached input plus cache reads/writes. */
-export function promptTokensOf(usage: { input?: number; cacheRead?: number; cacheWrite?: number }): number {
+function promptTokensOf(usage: { input?: number; cacheRead?: number; cacheWrite?: number }): number {
   return (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);
 }
 
@@ -103,7 +148,7 @@ export interface UsageContextPart {
   contextWindow?: number;
 }
 
-export function withAssistantBlocks(
+function withAssistantBlocks(
   message: AssistantMessage,
   content: AssistantContentBlock[],
   options: { omitUsage?: boolean } = {},

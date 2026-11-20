@@ -349,10 +349,17 @@ try {
     await page.locator("strong").filter({ hasText: "E2E markdown" }).waitFor();
     await page.locator("pre").filter({ hasText: "console.log('E2E code');" }).waitFor();
     await page.getByText("E2E final answer", { exact: true }).waitFor();
-    const processDetails = page.getByRole("button", { name: /^Process details/ });
-    const thinking = page.getByRole("button", { name: /^Thinking/ });
-    assert.equal(await processDetails.count(), 1);
-    assert.equal(await thinking.count(), 0, "All thinking stays inside process details");
+    // 结算段是一行摘要折叠行（"Worked for …"），思考与工具都在折叠体里，不再有
+    // 独立的 "Process details" 按钮（2026-11-20 多折叠重构）。
+    const foldTriggers = page.locator('[data-slot="trace-collapsible-trigger"]');
+    assert.ok(await foldTriggers.count() >= 1, "A finished turn renders a fold row");
+    const foldLabels = await foldTriggers.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute("aria-label") ?? element.textContent ?? ""));
+    assert.ok(foldLabels.some((label) => /Worked for/.test(label)), "Fold summary counts the work");
+    await foldTriggers.first().click();
+    const thinkingTitles = page.locator('[data-slot="trace-collapsible-content"] [data-slot="trace-title"]');
+    const thinkingTexts = await thinkingTitles.evaluateAll((elements) => elements.map((element) => element.textContent ?? ""));
+    assert.ok(thinkingTexts.some((label) => /Thinking/.test(label)), "Thinking stays inside the fold");
     const finalMessage = page.locator("[data-entry-id='answer']");
     const tables = finalMessage.last().locator(".markdown-table-wrap");
     assert.equal(await tables.count(), 2);

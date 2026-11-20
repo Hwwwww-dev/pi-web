@@ -10,7 +10,7 @@ import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/exte
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { isHiddenCustomMessage, isMessageGroupAnchor, liveOutputPreview, LIVE_OUTPUT_PREVIEW_LINES, splitFinalAssistantBlocks } from "@/lib/message-display";
 import { getToolCategory } from "@/lib/tool-categories";
-import { buildTurnActivityItems, getFinishedTurnView, headSegmentEndsTurn, splitTurnParts, type ActivityItem } from "@/lib/turn-view";
+import { buildTurnActivityItems, getFinishedTurnView, headSegmentEndsTurn, splitTurnParts, summarizeSegmentActivity, type ActivityItem } from "@/lib/turn-view";
 import { SafeMarkdownBody } from "./SafeMarkdownBody";
 import { type WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
@@ -334,50 +334,25 @@ function findFinalAssistantIndex(messages: AgentMessage[], userIdx: number, endI
   return -1;
 }
 
-// 段摘要（结算段与活跃回合的已完成段共用）：工作了 X · 四大类计数（读取=
-// view/search/web，编辑=edit/write/patch，运行=终端，子代理）+ 失败数，非零
-// 才显示；时长取首尾活动时间戳之差，取不到时累计条目自身 duration（thinking
-// 秒、tool 毫秒）。plan/compact/other 不进摘要（太碎）；纯思考段兑底思考标签。
+// 段摘要（结算段与活跃回合的已完成段共用）：数字口径见 lib/turn-view.ts 的
+// summarizeSegmentActivity，这里只负责拼 i18n；空摘要兜底思考标签。
 function segmentSummaryText(items: ActivityItem[], t: ReturnType<typeof useI18n>["t"]): string {
-  const segBuckets = { read: 0, edit: 0, run: 0, subagent: 0 };
-  const segFailed = items.filter((item) => item.kind === "tool" && item.result?.isError).length;
-  for (const item of items) {
-    if (item.kind !== "tool") continue;
-    const category = getToolCategory(item.block.toolName);
-    if (category === "terminal") segBuckets.run += 1;
-    else if (category === "edit") segBuckets.edit += 1;
-    else if (category === "subagent") segBuckets.subagent += 1;
-    else if (category === "view" || category === "search" || category === "web") segBuckets.read += 1;
-  }
-  let segFirstTs: number | undefined;
-  let segLastTs: number | undefined;
-  for (const item of items) {
-    if (item.ts === undefined) continue;
-    segLastTs = item.ts;
-    segFirstTs ??= item.ts;
-  }
-  const segWorkedFor = segFirstTs !== undefined && segLastTs !== undefined && segLastTs > segFirstTs
-    ? formatTurnDuration(segLastTs - segFirstTs)
-    : undefined;
-  const segDurationSum = items.reduce(
-    (acc, item) => item.kind === "thinking"
-      ? acc + (item.duration ?? 0) * 1000
-      : item.kind === "tool" ? acc + (item.duration ?? 0) : acc,
-    0,
-  );
-  const segSummaryParts: string[] = [];
-  if (segWorkedFor) segSummaryParts.push(t("chat.activity.workedFor", { duration: segWorkedFor }));
-  else if (segDurationSum > 0) segSummaryParts.push(t("chat.activity.workedFor", { duration: formatTurnDuration(segDurationSum) }));
+  const { counts, failed, firstTs, lastTs, durationMs } = summarizeSegmentActivity(items);
+  const workedFor = firstTs !== undefined && lastTs !== undefined && lastTs > firstTs
+    ? formatTurnDuration(lastTs - firstTs)
+    : durationMs > 0 ? formatTurnDuration(durationMs) : undefined;
+  const parts: string[] = [];
+  if (workedFor) parts.push(t("chat.activity.workedFor", { duration: workedFor }));
   for (const [count, labelKey] of [
-    [segBuckets.read, "chat.toolCategory.view"],
-    [segBuckets.edit, "chat.toolCategory.edit"],
-    [segBuckets.run, "chat.trace.ranLabel"],
-    [segBuckets.subagent, "chat.toolCategory.subagent"],
+    [counts.read, "chat.toolCategory.view"],
+    [counts.edit, "chat.toolCategory.edit"],
+    [counts.run, "chat.trace.ranLabel"],
+    [counts.subagent, "chat.toolCategory.subagent"],
   ] as const) {
-    if (count > 0) segSummaryParts.push(t("chat.activity.categoryCount", { count, label: t(labelKey) }));
+    if (count > 0) parts.push(t("chat.activity.categoryCount", { count, label: t(labelKey) }));
   }
-  if (segFailed > 0) segSummaryParts.push(t("chat.activity.failedCount", { count: segFailed }));
-  return segSummaryParts.length > 0 ? segSummaryParts.join(" · ") : t("i18n.thinking");
+  if (failed > 0) parts.push(t("chat.activity.failedCount", { count: failed }));
+  return parts.length > 0 ? parts.join(" · ") : t("i18n.thinking");
 }
 
 function getUserInputText(message: AgentMessage): string | null {
