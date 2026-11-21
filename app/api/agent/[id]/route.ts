@@ -4,6 +4,11 @@ import { startRpcSession, getRpcSession, setRpcSessionTools } from "@/lib/rpc-ma
 import { cwdMissingBody, missingCwdFromBody } from "@/lib/missing-cwd";
 import { EXTENSION_REPORTED_CODE } from "@/lib/agent-client";
 
+// 无存活会话也该幂等成功的命令：语义是“让某件事停下来/清空”，没有会话
+ // 时本来就无事可做。曾把整備会话完整启起来再执行，白起一次（扩展、MCP、
+ // session_start 全跑），abort 又无事可中止（2026-11-21 审计）。
+const IDEMPOTENT_WITHOUT_SESSION = new Set(["abort", "abort_bash", "abort_compaction", "clear_queue"]);
+
 // POST /api/agent/[id] - Send a command to an existing session
 export async function POST(
   req: Request,
@@ -14,8 +19,15 @@ export async function POST(
   let promptAccepted = false;
 
   try {
-    const body = await req.json() as { type: string; [key: string]: unknown };
-    commandType = typeof body.type === "string" ? body.type : undefined;
+    const body = await req.json().catch(() => null) as { type?: unknown; message?: unknown; [key: string]: unknown } | null;
+    // 形状校验在拿会话/启会话之前：坏输入一律 400，不先白起一个 wrapper。
+    if (body === null || typeof body !== "object" || Array.isArray(body) || typeof body.type !== "string" || body.type.length === 0) {
+      return NextResponse.json({ error: "body must be an object with a non-empty string type" }, { status: 400 });
+    }
+    commandType = body.type;
+    if (commandType === "prompt" && typeof body.message !== "string") {
+      return NextResponse.json({ error: "prompt requires a string message", code: "prompt_rejected", accepted: false }, { status: 400 });
+    }
     const requestedToolNames = body.toolNames;
     if (
       requestedToolNames !== undefined
@@ -42,6 +54,11 @@ export async function POST(
       const result = await existing.send(body);
       promptAccepted = body.type === "prompt";
       return NextResponse.json({ success: true, data: result });
+    }
+    if (IDEMPOTENT_WITHOUT_SESSION.has(body.type)) {
+      // 回收/不存在的会话上发 stop/abort/清队列：无事可做，幂等成功，
+      // 不为它把会话完整启起来。
+      return NextResponse.json({ success: true, data: null });
     }
 
     const filePath = await resolveSessionPath(id);
