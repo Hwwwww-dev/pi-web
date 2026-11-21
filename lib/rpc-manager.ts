@@ -440,6 +440,13 @@ export class AgentSessionWrapper {
   // What went wrong as the session started, told to each stream under the same ids (the page
   // shows each once); null on a subagent's or side chat's wrapper.
   private readonly startupNotices: AgentEvent[] | null;
+  /**
+   * 接受之后才失败的 prompt 的结果（prompt_error + prompt_done），盟给下一个
+   * 新订阅者一次后清除。这类失败只走 SSE：POST 已回 200，若此刻页面正断线
+   * 重连或已被隐藏页释放，事件无人接收就永久丢失，UI 停在「已发出、无回
+   * 复、无报错」（2026-11-21 审计）。新 prompt 接受时清除，不回放旧失败。
+   */
+  private lastPromptFailure: AgentEvent[] | null = null;
   /** A `!` command waiting on its `user_bash` handlers, before pi counts it as running. */
   private userBashPending = false;
   // The armed idle timer is the forced cleanup Stop scheduled.
@@ -1340,6 +1347,12 @@ export class AgentSessionWrapper {
     for (const event of this.pendingUiRequests.values()) listener(event);
     for (const event of this.activeToolEvents.values()) listener(event);
     for (const event of this.startupNotices ?? []) listener(event);
+    // 断线期间无人认领的 prompt 失败结果：补给这个新订阅者一次，然后清除——
+    // 只该被看见一次的错误，不该跟着每次重连重复。
+    if (this.lastPromptFailure) {
+      for (const event of this.lastPromptFailure) listener(event);
+      this.lastPromptFailure = null;
+    }
     return () => {
       this.listeners.delete(listener);
     };
@@ -1480,6 +1493,8 @@ export class AgentSessionWrapper {
             // none, and a run the command starts itself may begin after this (#1345).
             acceptPreflight = () => {
               preflightAccepted = true;
+              // 新一轮开始：上一轮无人认领的失败结果作废，不再回放。
+              this.lastPromptFailure = null;
               if (preflightSettled) return;
               preflightSettled = true;
               resolve();
@@ -1586,11 +1601,13 @@ export class AgentSessionWrapper {
             // A preflight rejection is returned by the POST itself. Only an
             // unexpected failure after acceptance needs the asynchronous event.
             if (preflightAccepted) {
-              this.emit({
-                type: "prompt_error",
-                errorMessage: error instanceof Error ? error.message : String(error),
-              });
-              if (!streamingBehavior) this.emit(this.promptDoneEvent());
+              const failure: AgentEvent[] = [
+                { type: "prompt_error", errorMessage: error instanceof Error ? error.message : String(error) },
+              ];
+              if (!streamingBehavior) failure.push(this.promptDoneEvent());
+              // 先存盟，再发给在场的监听者；断线重连的新订阅者从盟里补收。
+              this.lastPromptFailure = failure;
+              for (const event of failure) this.emit(event);
             }
           }).catch((error) => {
             console.error(
