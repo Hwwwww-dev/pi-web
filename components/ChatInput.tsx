@@ -1959,7 +1959,17 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       e.preventDefault();
       if (imageItems.length) {
         const files = imageItems.map((item) => item.getAsFile()).filter((f): f is File => f !== null);
+        const ta = e.currentTarget;
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
         processImageFiles(files);
+        // 附件条插在输入框上方，输入框整体下移：把焦点和 caret 重新落回原位置，
+        // 否则光标停在旧坐标（点一下输入框才恢复正常）。
+        requestAnimationFrame(() => {
+          if (!ta.isConnected) return;
+          ta.focus();
+          ta.setSelectionRange(start, end);
+        });
       }
       if (otherFiles.length && onAttachFiles) onAttachFiles(otherFiles);
       return;
