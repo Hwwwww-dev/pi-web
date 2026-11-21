@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { existsSync } from "fs";
 import { addWorktree, findCurrentWorktreePath, listLocalBranches, listWorktrees, removeWorktree, resolveProject, WorktreeBranchInUseError, worktreeRemovalRequiresForce } from "@/lib/worktree";
 import { allowFileRoot, getAllowedFileRoots, isExistingFilePathAllowed, isFilePathAllowed } from "@/lib/file-access";
+import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
 import { projectIdentityKey } from "@/lib/project-identity";
 
 /** Same gate as /api/files: only session cwds / project roots / explicitly
@@ -60,6 +61,12 @@ export async function GET(req: Request) {
 //   409 { code: "branch_in_use", branch, worktreePath } when another worktree has the branch,
 //   code "branch_worktree_missing" when that worktree's folder is gone (git worktree prune clears it)
 export async function POST(req: Request) {
+  if (!isApiRequestAllowed(req)) {
+    return NextResponse.json({ error: "Untrusted API request" }, { status: 403 });
+  }
+  if (!hasJsonContentType(req)) {
+    return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 });
+  }
   try {
     const body = await req.json() as { cwd?: string; branch?: string };
     if (!body.cwd || typeof body.cwd !== "string") {
@@ -95,6 +102,12 @@ export async function POST(req: Request) {
 
 // DELETE /api/worktrees  body: { cwd, path, force? }
 export async function DELETE(req: Request) {
+  if (!isApiRequestAllowed(req)) {
+    return NextResponse.json({ error: "Untrusted API request" }, { status: 403 });
+  }
+  if (!hasJsonContentType(req)) {
+    return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 });
+  }
   try {
     const body = await req.json() as { cwd?: string; path?: string; force?: boolean };
     if (!body.cwd || typeof body.cwd !== "string") {
