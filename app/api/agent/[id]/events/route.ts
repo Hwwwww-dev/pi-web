@@ -1,6 +1,6 @@
 import { createAgentEventStream } from "@/lib/agent-event-stream";
 import { resolveSessionPath } from "@/lib/session-reader";
-import { getRpcSession, startRpcSession } from "@/lib/rpc-manager";
+import { getRpcSession, watchRpcSession } from "@/lib/rpc-manager";
 import { isValidLivenessHolder } from "@/lib/session-liveness";
 import { describeStreamClient } from "@/lib/stream-client";
 
@@ -29,7 +29,12 @@ export async function GET(
       return new Response("Session not found", { status: 404 });
     }
     if (req.signal.aborted) return new Response(null, { status: 204 });
-    sessionPromise = startRpcSession(id, filePath, undefined).then((result) => result.session);
+    // A stream never starts a session: the page's lease renewals keep it alive (#1283), and a
+    // reconnect resurrecting what the idle reaper just reaped would defeat the reap. Watch
+    // instead: the stream stays open with heartbeats only (never `connected`) until a start
+    // another caller asked for — a prompt, set_tools — registers a wrapper, which the watcher
+    // attaches to; the late attach replays what the session still holds.
+    sessionPromise = watchRpcSession(id, req.signal);
   }
 
   const stream = createAgentEventStream(req, id, sessionPromise, { holder, ...describeStreamClient(req.headers) });

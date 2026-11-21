@@ -3238,6 +3238,31 @@ export function getRpcSession(sessionId: string): AgentSessionWrapper | undefine
   return getRegistry().get(sessionId);
 }
 
+/** How often a watching event stream re-reads the registry for a wrapper to attach to. */
+export const RPC_SESSION_WATCH_INTERVAL_MS = 2_000;
+
+/**
+ * Resolve with the session's wrapper as soon as one is registered and alive: checked
+ * immediately, then every RPC_SESSION_WATCH_INTERVAL_MS. It never starts anything and never
+ * rejects; the abort signal only stops the polling. The event stream watches instead of starting
+ * because a stream must not bring a session up: the page's lease renewals keep it alive (#1283),
+ * and a reconnect that resurrects what the idle reaper just reaped defeats the reap. A start
+ * another caller asked for (a prompt, set_tools) registers a wrapper the watcher picks up within
+ * one interval, and the late attach replays what the session still holds (held dialogs included).
+ */
+export function watchRpcSession(sessionId: string, signal: AbortSignal): Promise<AgentSessionWrapper> {
+  return new Promise((resolve) => {
+    const step = () => {
+      const session = getRegistry().get(sessionId);
+      if (session?.isAlive()) resolve(session);
+    };
+    step();
+    if (signal.aborted) return;
+    const timer = setInterval(step, RPC_SESSION_WATCH_INTERVAL_MS);
+    signal.addEventListener("abort", () => clearInterval(timer), { once: true });
+  });
+}
+
 /**
  * The sidebar's rename (#1388). A session a wrapper holds is renamed through
  * `AgentSession.setSessionName()`, as pi's `/name`, so the `session_info` entry hangs off the live
