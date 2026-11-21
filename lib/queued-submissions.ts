@@ -9,9 +9,11 @@ export interface QueuedMessages {
 export type QueuedBehavior = "steer" | "followUp";
 
 /**
- * One pending message as the composer shows it. pi's queue carries texts only,
- * so the thumbnails and the identity a row needs in order to act on a single
- * entry live here, matched to pi's texts by value.
+ * One pending message as the composer shows it. pi's `queue_update` carries
+ * texts plus this tab's own record of the attachments, so the thumbnails and
+ * the identity a row needs in order to act on a single entry live here,
+ * matched to pi's texts by value. An images-only submission is one of these:
+ * pi queues it with an empty text (1.6 and later).
  */
 export interface QueuedSubmission {
   id: string;
@@ -110,6 +112,10 @@ export function createQueuedImageMemory(options: QueuedImageMemoryOptions = {}):
   const maxTotalBytes = options.maxTotalBytes ?? 24 * 1024 * 1024;
   let entries: Array<{ text: string; behavior: QueuedBehavior; images: ChatDraftImage[]; bytes: number; at: number }> = [];
   const store = (text: string, behavior: QueuedBehavior, images: ChatDraftImage[]) => {
+    // An empty text (an images-only submission) is not stored: the memory is
+    // keyed by text, so two of them would overwrite each other's thumbnails.
+    // Those rows rebuild from the wrapper's `queuedEntries`, which carry the
+    // images while the queue holds them.
     if (!text || images.length === 0) return;
     const bytes = images.reduce((sum, image) => sum + image.data.length, 0);
     entries = entries.filter((entry) => !(entry.text === text && entry.behavior === behavior));
@@ -147,7 +153,7 @@ export function queuedImageRecallFromEntries(
   entries: readonly QueuedSnapshotEntry[] | undefined,
 ): QueuedImageRecall | undefined {
   if (!entries || entries.length === 0) return undefined;
-  const remaining = entries.filter((entry) => entry.text && entry.images.length > 0).map((entry) => ({
+  const remaining = entries.filter((entry) => entry.images.length > 0).map((entry) => ({
     text: entry.text,
     behavior: entry.behavior,
     images: entry.images,
@@ -196,7 +202,6 @@ export function queuedGraceDeadline(
 ): number | null {
   let deadline: number | null = null;
   for (const record of records) {
-    if (!record.text) continue;
     if (textsFor(queue, record.behavior).includes(record.text)) continue;
     const expiresAt = record.createdAt + graceMs;
     deadline = deadline === null ? expiresAt : Math.min(deadline, expiresAt);
@@ -229,10 +234,10 @@ export function createQueuedSubmission(
  * record the grace window dropped) becomes a row again, with attachments
  * recovered through `recallImages` when they are known.
  *
- * Empty texts never become rows: pi clears queued texts by matching the
- * delivered message's text, which skips empty strings, so an empty-text row
- * could never leave. An images-only queued message therefore shows no row
- * once pi has confirmed it — the delivered message still carries the images.
+ * Empty texts are ordinary rows too: pi queues an images-only submission with
+ * text "", and it drops that entry when the delivered message's text matches,
+ * so the row leaves the same way a text one does (the grace window covers the
+ * echo). Two records of the same text pair up in queue order.
  *
  * When every record kept its place and nothing new is pending, the previous
  * array is returned as-is so a state update can bail out of the re-render.
@@ -250,7 +255,6 @@ export function reconcileQueuedSubmissions(
   };
   const next: QueuedSubmission[] = [];
   for (const record of records) {
-    if (!record.text) continue;
     const texts = pending[record.behavior];
     const index = texts.indexOf(record.text);
     if (index >= 0) {
@@ -264,7 +268,6 @@ export function reconcileQueuedSubmissions(
   }
   for (const behavior of QUEUED_BEHAVIORS) {
     for (const text of pending[behavior]) {
-      if (!text) continue;
       next.push(createQueuedSubmission(text, behavior, recallImages?.(text, behavior) ?? [], now));
     }
   }
@@ -291,7 +294,6 @@ export function hasUnconfirmedQueuedRecord(
     followUp: [...queue.followUp],
   };
   for (const record of records) {
-    if (!record.text) continue;
     const texts = pending[record.behavior];
     const index = texts.indexOf(record.text);
     if (index >= 0) {

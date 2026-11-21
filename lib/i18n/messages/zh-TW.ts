@@ -884,6 +884,7 @@ export const zhTWLocale: LocalePlugin = {
     "chat.moveQueuedDown": "下移",
     "chat.queueBehaviorSteer": "引導",
     "chat.queueBehaviorFollowUp": "排隊",
+    "chat.queueImagesOnly": "圖片",
     "chat.sideChat": "側聊",
     "chat.sideChatHint": "在側聊裡問，不影響正在執行的任務",
     "chat.actionSendNow": "立即發送",

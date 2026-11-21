@@ -884,6 +884,7 @@ export const enLocale: LocalePlugin = {
     "chat.moveQueuedDown": "Move down",
     "chat.queueBehaviorSteer": "Steer",
     "chat.queueBehaviorFollowUp": "Queued",
+    "chat.queueImagesOnly": "Images",
     "chat.sideChat": "Side chat",
     "chat.sideChatHint": "Ask this in a side chat. The run keeps going.",
     "chat.actionSendNow": "Send now",

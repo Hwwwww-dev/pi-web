@@ -3488,10 +3488,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     behavior: "steer" | "followUp",
     images?: ChatDraftImage[],
   ) => {
-    // pi clears queued texts by matching the delivered message's text and
-    // skips empty strings — an images-only queued text ("") could never leave
-    // its row (or pi's own queue list). Record rows only for non-empty texts.
-    setQueuedSubmissions((records) => message.trim()
+    // Since pi 1.6 the queue carries an images-only submission too (its text is
+    // ""), and pi drops that entry when the delivered message's text matches —
+    // so a row is recorded for one as well, or the send would leave no trace.
+    setQueuedSubmissions((records) => message.trim() || images?.length
       ? [...records, createQueuedSubmission(message, behavior, images)]
       : records);
     await sendStreamingPrompt(message, behavior, images);
@@ -3502,11 +3502,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, [handlePromptWithStreamingBehavior]);
 
   const handleFollowUp = useCallback(async (message: string, images?: ChatDraftImage[]) => {
-    setQueuedSubmissions((records) => message.trim()
-      ? [...records, createQueuedSubmission(message, "followUp", images)]
-      : records);
-    await sendStreamingPrompt(message, "followUp", images);
-  }, [sendStreamingPrompt]);
+    await handlePromptWithStreamingBehavior(message, "followUp", images);
+  }, [handlePromptWithStreamingBehavior]);
 
   const handleAbortCompaction = useCallback(async () => {
     const sid = sessionIdRef.current;

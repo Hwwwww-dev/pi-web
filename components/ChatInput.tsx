@@ -763,9 +763,11 @@ function QueuedMessageRow({
       )}
       {/* One clipped line, whatever the message holds: a long queued text used
           to widen the pill past the composer. The full text is the row's title;
-          the hover marquee scrolled it out of the pill and is gone. */}
-      <span className="min-w-0 flex-1 truncate">
-        {item.text}
+          the hover marquee scrolled it out of the pill and is gone. An
+          images-only submission queued with pi's empty text shows what it is
+          instead of an empty pill. */}
+      <span className={cn("min-w-0 flex-1 truncate", !item.text && "text-muted-foreground")}>
+        {item.text || t("chat.queueImagesOnly")}
       </span>
       <span className="ml-auto flex shrink-0 items-center gap-0.5">
         {onAction && canMoveUp && (
@@ -1703,10 +1705,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const queueFollowUp = useCallback(async (mode: "steer" | "followup" = "followup") => {
     const msg = value.trim();
     if (!msg && !attachedImages.length) return;
-    // pi's run queue carries texts only — an images-only submission is accepted
-    // by the API but never queued (verified against pi 1.5.0), so it would
-    // silently vanish. Keep the composer instead.
-    if (!msg && attachedImages.length) return;
     if (msg.startsWith("!") && !attachedImages.length) {
       // A shell command is never steered into the run as text.
       void handleSend();

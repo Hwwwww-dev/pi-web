@@ -884,6 +884,7 @@ export const zhCNLocale: LocalePlugin = {
     "chat.moveQueuedDown": "下移",
     "chat.queueBehaviorSteer": "引导",
     "chat.queueBehaviorFollowUp": "排队",
+    "chat.queueImagesOnly": "图片",
     "chat.sideChat": "侧聊",
     "chat.sideChatHint": "在侧聊里问，不影响正在运行的任务",
     "chat.actionSendNow": "立即发送",

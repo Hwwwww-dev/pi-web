@@ -932,15 +932,14 @@ test("stale queue reads cannot overwrite fresher SSE snapshots", () => {
   assert.match(actionSource, /queueSnapshotGateRef\.current\.observe\(\);\s*\n\s*const snapshot: QueuedMessages/);
 });
 
-test("empty queued texts never render, and expired records feed the image memory", () => {
-  // pi clears queued texts by matching the delivered message's text, which
-  // skips empty strings — an images-only queued message would otherwise keep
-  // its row (and pi's list entry) forever.
+test("an images-only queued submission records a row, and expired records feed the image memory", () => {
+  // pi 1.6 queues an images-only submission with an empty text and drops the
+  // entry when the delivered message matches, so it gets a row like any other.
   const submitSource = source.slice(
     source.indexOf("  const handlePromptWithStreamingBehavior = useCallback"),
     source.indexOf("  const handleAbortCompaction = useCallback"),
   );
-  assert.match(submitSource, /message\.trim\(\)\s*\n\s*\? \[\.\.\.records, createQueuedSubmission\(message, behavior, images\)\]\s*\n\s*: records\)/);
+  assert.match(submitSource, /message\.trim\(\) \|\| images\?\.length\s*\n\s*\? \[\.\.\.records, createQueuedSubmission\(message, behavior, images\)\]\s*\n\s*: records\)/);
   assert.match(source, /const queuedImageMemoryRef = useRef\(createQueuedImageMemory\(\)\);/);
   // Expired records hand their thumbnails to the memory; rebuilt rows recall
   // the wrapper's entries first, then the memory.
