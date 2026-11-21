@@ -68,8 +68,13 @@ test("nothing else writes the reader's scroll position", () => {
   assert.equal(hookSource.includes("showScrollToBottom"), false);
   // 程序化跳转一律走官方命令（它会把模式置为 settling-jump 并抑制跟随）；
   // 只剩“官方 api 还没挂上”时的到底兜底。
-  assert.doesNotMatch(source, /container\.scrollTop \+=/);
   assert.match(source, /scrollerApiRef\.current\?\.scrollToMessage\(/);
+  // 唯一允许的裸 scrollTop 写：垫底补偿——它不是导航，是视口底边随输入条
+  // 平移（贴底时最后一行相对输入条的位置不动）。必须带贴底闸门和豁免窗口，
+  // 否则补偿产生的滚动事件会被当成读者手势、误退跟随。
+  assert.match(source, /dockCompensatedAtRef\.current = Date\.now\(\);/);
+  assert.match(source, /container\.scrollTop \+= dockHeight - previous;/);
+  assert.match(source, /Date\.now\(\) - dockCompensatedAtRef\.current > 100/);
 });
 
 test("no background read of the whole branch", () => {

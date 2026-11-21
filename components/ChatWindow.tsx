@@ -2065,15 +2065,29 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
    */
   const measuredDockHeightRef = useRef(0);
   useEffect(() => {
-    const firstMeasure = measuredDockHeightRef.current === 0 && dockHeight > 0;
+    const previous = measuredDockHeightRef.current;
     measuredDockHeightRef.current = dockHeight;
-    if (!firstMeasure) return;
+    if (previous === dockHeight) return;
     const container = scrollContainerRef.current;
     if (!container) return;
-    const pinned = liveScrollRef.current?.atBottom ?? savedScrollRef.current?.atBottom ?? true;
-    if (!pinned) return;
-    const api = scrollerApiRef.current;
-    if (!api?.scrollToEnd({ behavior: "instant" })) container.scrollTop = container.scrollHeight;
+    if (previous === 0) {
+      // 停靠区高度第一次量到时补一次贴底：浮层布局下内容末端垫着一整段
+      // `--composer-dock-h`，从 0 变成真实值的那一帧列表还停在旧底，用量行会压到
+      // 输入框下面。
+      const pinned = liveScrollRef.current?.atBottom ?? savedScrollRef.current?.atBottom ?? true;
+      if (!pinned) return;
+      const api = scrollerApiRef.current;
+      if (!api?.scrollToEnd({ behavior: "instant" })) container.scrollTop = container.scrollHeight;
+      return;
+    }
+    // 垫底变了（排队 chips 入列、多行输入长高……）且读者贴底：scrollTop 平移
+    // 同样的量，最后一行相对输入条的位置保持不动。不补偿的话输入条变高会把
+    // 最后一行盖住（2026-11-21 用户：提交队列后消息被挡住）；后续不再跟着
+    // 停靠区高度做 scrollToEnd——那会把读者拽离阅读位置（用户 2026-11-20：
+    // “输入框高度变化会导致滚动到底”）。非贴底读者完全不动，浏览器原生锚定。
+    if (!atBottomRef.current) return;
+    dockCompensatedAtRef.current = Date.now();
+    container.scrollTop += dockHeight - previous;
   }, [dockHeight, scrollContainerRef]);
   /**
    * 贴底判定的距离阈值。这个值同时是「吸附范围」：库在 `autoScroll` 打开时只要
@@ -2108,7 +2122,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     if (previous) previous.element.removeEventListener("scroll", previous.handler);
     const handler = () => {
       const nextAtBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= scrollEdgeThreshold;
-      noticeScroll(viewport.scrollTop, nextAtBottom);
+      // 垫底补偿的滚动事件携带的位移是视口底边移动，不是手势；但浏览器收缩时
+      // 的钳制（scrollHeight 变小）同样落在监听里，一并豁免。留 100ms 窗口
+      // 防止事件迟到时误吞下一次真实手势。
+      if (Date.now() - dockCompensatedAtRef.current > 100) {
+        noticeScroll(viewport.scrollTop, nextAtBottom);
+      }
       atBottomRef.current = nextAtBottom;
     };
     viewport.addEventListener("scroll", handler, { passive: true });
@@ -2178,6 +2197,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
    * 方向自己判：scrollTop 变小就是读者在往上翻。
    */
   const lastFollowScrollTopRef = useRef(0);
+  /** 垫底补偿的时间戳：补偿引发的程序滚动不是读者手势，不参与上下滑判定。 */
+  const dockCompensatedAtRef = useRef(0);
   const followSuppressedRef = useRef(false);
   followSuppressedRef.current = followSuppressed;
   const resumeFollow = useCallback(() => {
