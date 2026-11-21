@@ -5,7 +5,7 @@ import {
 import { closeSync, type Dirent, fstatSync, openSync, readSync, statSync } from "fs";
 import { readdir } from "fs/promises";
 import { isAbsolute, join, normalize as normalizePath, relative, resolve as resolvePath, sep } from "path";
-import type { AgentMessage, HeadTurnSummary, ImageContent, MinimapTurnDescriptor, SessionEntry, SessionHeader, SessionInfo, SessionContext } from "./types";
+import type { AgentMessage, HeadTurnSummary, ImageContent, MinimapTurnDescriptor, SessionEntry, SessionHeader, SessionInfo, SessionContext, ToolResultMessage } from "./types";
 import { normalizeToolCalls } from "./normalize";
 import { withoutMessageSignatures } from "./message-signatures";
 import { getThinkingPreview, isMessageGroupAnchor } from "./message-display";
@@ -729,7 +729,12 @@ function activeBranchChain(entries: SessionEntry[], leafId: string | null): Sess
   for (const e of entries) byId.set(e.id, e);
   let current = leafId ? byId.get(leafId) : entries[entries.length - 1];
   const chain: SessionEntry[] = [];
+  // parentId 环（损坏文件/第三方写入）会让这条上溯永不终止，占死单线程：
+  // 走过的 id 不许再走（seen Set），环即断。
+  const seen = new Set<string>();
   while (current) {
+    if (seen.has(current.id)) break;
+    seen.add(current.id);
     chain.push(current);
     current = current.parentId ? byId.get(current.parentId) : undefined;
   }
@@ -948,7 +953,11 @@ function countTurnsBefore(entries: SessionEntry[], oldest: SessionEntry): number
   for (const e of entries) byId.set(e.id, e);
   let turns = 0;
   let current = oldest.parentId ? byId.get(oldest.parentId) : undefined;
+  // 同 activeBranchChain：parentId 环必须断，否则翻页请求死循环。
+  const seen = new Set<string>([oldest.id]);
   while (current) {
+    if (seen.has(current.id)) break;
+    seen.add(current.id);
     if (isTurnAnchorEntry(current)) turns++;
     current = current.parentId ? byId.get(current.parentId) : undefined;
   }
@@ -1133,7 +1142,17 @@ function deferToolResultBase64Images(
   let omitted = 0;
   let bytes = 0;
   const mimes = new Set<string>();
-  const content = message.content.flatMap((block, blockIndex) => {
+  // 旧数据/SDK 兜底路径：content 可能是 null（SDK 的 sessionEntryToContextMessages
+  // 就专门把 content == null 兜成 []）或旧版整条字符串。flatMap 直接炸会把带
+  // ?deferMedia=1 的整个会话读成 500，而不是降级单条消息。
+  const blocks = (
+    Array.isArray(message.content)
+      ? message.content
+      : typeof message.content === "string"
+        ? [{ type: "text", text: message.content }]
+        : []
+  ) as ToolResultMessage["content"];
+  const content = blocks.flatMap((block: ToolResultMessage["content"][number], blockIndex: number) => {
     const image = base64ImageInfo(block);
     if (!image) return [block];
 
