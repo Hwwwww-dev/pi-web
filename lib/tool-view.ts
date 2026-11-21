@@ -647,6 +647,24 @@ function webView(p: Prepared): ToolView {
   return view;
 }
 
+/** A question's choices as one description block: context first, then the labels.
+ *  pi 的 questions[] 里 `options` 是纯字符串数组（goal_questionnaire），也有
+ *  `{ label }` 的对象形式（ask_user_question）—— 两种都要能读出来，丢一种的话
+ *  卡片上就只剩光秃秃一个问题，读者看不到有哪些选项。 */
+function questionDescription(question: Record<string, unknown>): string | undefined {
+  const labels = (Array.isArray(question.options) ? question.options : [])
+    .map((option) => {
+      if (typeof option === "string") return option;
+      return isRecord(option) && typeof option.label === "string" ? option.label : null;
+    })
+    .filter((label): label is string => label !== null);
+  const parts = [
+    typeof question.context === "string" ? question.context.trim() : "",
+    labels.join(" · "),
+  ].filter((part) => part.length > 0);
+  return parts.length > 0 ? parts.join("\n") : undefined;
+}
+
 /** A question tool's prompts and choices as steps, so the card is not raw JSON. */
 function questionSteps(input: unknown): ToolViewStep[] | null {
   if (!isRecord(input)) return null;
@@ -659,20 +677,13 @@ function questionSteps(input: unknown): ToolViewStep[] | null {
         ? question.question
         : typeof question.header === "string" ? question.header : null;
       if (!title) return null;
-      const options = Array.isArray(question.options) ? question.options : [];
-      const description = options
-        .map((option) => (isRecord(option) && typeof option.label === "string" ? option.label : null))
-        .filter((label): label is string => label !== null)
-        .join(" · ");
+      const description = questionDescription(question);
       steps.push({ title, status: "pending", ...(description ? { description } : {}) });
     }
     return steps;
   }
   if (typeof input.question === "string" && Array.isArray(input.options)) {
-    const description = input.options
-      .map((option) => (isRecord(option) && typeof option.label === "string" ? option.label : null))
-      .filter((label): label is string => label !== null)
-      .join(" · ");
+    const description = questionDescription(input);
     return [{ title: input.question, status: "pending", ...(description ? { description } : {}) }];
   }
   return null;
@@ -682,9 +693,20 @@ function questionSteps(input: unknown): ToolViewStep[] | null {
 function questionAnswers(text: string | null): Map<string, string> {
   const answers = new Map<string, string>();
   if (!text) return answers;
+  // 旧格式：`"question"="answer"` 对。
   const pair = /"([^"]*)"\s*=\s*"([^"]*)"/g;
   let match: RegExpExecArray | null;
   while ((match = pair.exec(text)) !== null) answers.set(match[1], match[2]);
+  // questionnaire 的结果是 markdown 段落（`**Q:** …` 空行 `**A:** …`，块之间用
+  // `---` 分隔，2026-11-21 的 pi 1.6.0 起 goal_questionnaire 就是这形状）。只认前
+  // 一种时答案全丢：卡片停在 pending、勾不打、选中值不显示。
+  for (const block of text.split(/\n\s*-{3,}\s*\n/)) {
+    const question = /^\*\*Q:\*\*[ \t]*(.+)$/m.exec(block);
+    const answer = /^\*\*A:\*\*[ \t]*([\s\S]*)$/m.exec(block);
+    if (!question || !answer) continue;
+    const value = answer[1].trim();
+    if (value) answers.set(question[1].trim(), value);
+  }
   return answers;
 }
 
