@@ -80,7 +80,7 @@ const TOP_SLACK = 24;
 /** 前插一页后等待其落位的最长帧数；超时即放行，避免闸门卡死。 */
 const PREPEND_SETTLE_FRAMES = 12;
 /** 两次自动取页之间的最小间隔：连续滚动事件不应把多页挤进同一次操作。 */
-const AUTO_LOAD_MIN_INTERVAL_MS = 300;
+const AUTO_LOAD_MIN_INTERVAL_MS = 200;
 
 const InspirationDialog = dynamic(() => import("./InspirationDialog").then((mod) => mod.InspirationDialog), { ssr: false });
 
