@@ -519,6 +519,13 @@ export class AgentSessionWrapper {
     return this._alive && !this.closing;
   }
 
+  /** True from shutdown() until destroy() finishes: the SDK session is going away but its
+   *  extensions may still run session_shutdown (up to the deadline) in the shared module
+   *  world, so the wrapper still owns that world and a starting session must not reuse it. */
+  isClosing(): boolean {
+    return this.closing;
+  }
+
   /** Explicit exit keeps its stream through cleanup, even when it starts during binding. */
   isExtensionShutdownRequested(): boolean {
     return this.extensionShutdownRequested;
@@ -3020,10 +3027,17 @@ declare global {
   var __piStartingSessionCwds: Map<string, number> | undefined;
 }
 
-/** Another live session means this one cannot reuse the shared extension module
- *  world: extensions bound to the earlier session would keep owning it. */
-function hasOtherAliveWrapper(registry: Map<string, AgentSessionWrapper>, sessionId: string): boolean {
+/** Extensions assume one live session per process, and a closing wrapper's extensions are
+ *  still unwinding session_shutdown in the shared module world: either means this session
+ *  cannot reuse that world. The SDK caches extension factories per path across sessions
+ *  (loadExtensionsCached); the caller drops the cache so this session's loader re-evaluates
+ *  every extension module into its own world. Alive wrappers keep their already-bound
+ *  instances; a lone session keeps the fast path. Closing wrappers count even under the
+ *  same id: a replacement start would otherwise bind into the world the old wrapper is
+ *  still tearing down (rpiv-todo's foreground, pi-lens's runtime rebind). */
+export function hasOtherBoundWrapper(registry: Map<string, AgentSessionWrapper>, sessionId: string): boolean {
   for (const [id, wrapper] of registry) {
+    if (wrapper.isClosing()) return true;
     if (id !== sessionId && wrapper.isAlive()) return true;
   }
   return false;
@@ -3895,7 +3909,7 @@ export async function startRpcSession(
   // (loadExtensionsCached); dropping the cache makes this session's loader
   // re-evaluate every extension module into its own world. Alive wrappers keep
   // their already-bound instances, and a lone session keeps the fast path.
-  if (hasOtherAliveWrapper(registry, sessionId)) {
+  if (hasOtherBoundWrapper(registry, sessionId)) {
     const internals = await loadPiSdkInternals();
     if (internals.ok) internals.clearExtensionCache();
     else console.warn(`[pi-web] extension module isolation unavailable: ${internals.reason}`);
