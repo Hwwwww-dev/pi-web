@@ -19,6 +19,8 @@ function setup(collapsed = false) {
   const context = createContext({
     initialNavigation: { sidebarCollapsed: collapsed }, isMobile: false, sidebarOpen: !collapsed,
     useRef: (current) => ({ current }), setActiveTopPanel() {}, setMobileToolbarMoreOpen() {},
+    // the toggle also closes the active flyout on mobile; incidental to these tests
+    setActiveFlyout() {},
   });
   context.desktopSidebarOpenRef = script(preference.initializer.getText(source)).runInContext(context);
   context.setSidebarOpen = (value) => { context.sidebarOpen = typeof value === "function" ? value(context.sidebarOpen) : value; };

@@ -58,12 +58,13 @@ test("renders each status as its own cell without identifier keys", () => {
 
   assert.match(html, /aria-label="ponytail memory"/);
   assert.match(html, /role="status"/);
-  assert.equal(html.match(/data-slot="badge"/g)?.length, 2);
+  // Each status is its own button cell (uniform height/hover), disabled while
+  // nothing can be sent through it.
+  assert.equal(html.match(/data-slot="button"/g)?.length, 2);
   // Plain status text has no ANSI wrapper; only its casing is normalized.
-  assert.match(html, /text-muted-foreground">Ponytail<\/span>/);
+  assert.match(html, /title="ponytail" aria-label="ponytail">Ponytail<\/button>/);
   assert.match(html, /<span class="ansi-[a-z]+-fg">memory<\/span>/);
   assert.doesNotMatch(html, /05-ponytail|20-memory/);
-  assert.doesNotMatch(html, /<button/);
 });
 
 test("a status with nothing visible to show gets no cell", () => {
@@ -75,7 +76,7 @@ test("a status with nothing visible to show gets no cell", () => {
     ],
   });
 
-  assert.equal(html.match(/data-slot="badge"/g)?.length, 1);
+  assert.equal(html.match(/data-slot="button"/g)?.length, 1);
   assert.match(html, /aria-label="shown"/);
   assert.equal(renderStatusBar({ statuses: [{ key: "a", text: "" }] }), "");
 });
@@ -124,7 +125,10 @@ test("renders a command status as a button cell between the text cells around it
     html,
     /<button[^>]*aria-label="🔨 Build \(\/mode toggle\)"[^>]*>🔨 Build<\/button>/,
   );
-  assert.doesNotMatch(html, / disabled(?=[\s=>])/);
+  // Plain cells stay disabled buttons; only the command cell is clickable.
+  assert.match(html, /disabled="" title="first"/);
+  assert.match(html, /disabled="" title="last"/);
+  assert.doesNotMatch(html, /disabled=""[^>]*aria-label="🔨 Build/);
   // The key is not shown as text.
   assert.doesNotMatch(html, />command:/);
 });
@@ -134,22 +138,22 @@ test("an onCommand handler changes nothing for statuses without a command", () =
     { key: "20-memory", text: "\x1b[32mmemory\x1b[0m" },
     { key: "05-ponytail", text: "ponytail" },
   ];
-  assert.equal(
-    renderStatusBar({ statuses, onCommand: () => {} }),
-    renderStatusBar({ statuses }),
-  );
-  assert.doesNotMatch(renderStatusBar({ statuses }), /<button/);
+  const plain = renderStatusBar({ statuses });
+  assert.equal(renderStatusBar({ statuses, onCommand: () => {} }), plain);
+  // Every status renders a button cell; without a command they are all
+  // disabled, onCommand handler or not.
+  assert.equal(plain.match(/data-slot="button"/g)?.length, statuses.length);
+  assert.doesNotMatch(plain, /<button(?![^>]*disabled="")/, "no clickable cell without a command");
 });
 
-test("a command key that is not a slash command stays plain status text", () => {
+test("a command key that is not a slash command stays a non-interactive cell", () => {
   const html = renderStatusBar({
     statuses: [{ key: "command:hello", text: "hello" }],
     onCommand: () => {},
   });
 
-  assert.doesNotMatch(html, /<button/);
-  // A label reads like a word even when the extension wrote it lowercase.
-  assert.match(html, />Hello</);
+  // Not a slash command: the cell renders but nothing is clickable.
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Hello<\/button>/);
 });
 
 test("falls back to the command when the status text is empty", () => {
@@ -195,15 +199,16 @@ test("clicking a command button sends its command", () => {
   assert.deepEqual(sent, ["/mode toggle"]);
 });
 
-test("only a command: status renders a button", () => {
+test("every status renders a button cell; only a command: status is enabled", () => {
   const plain = renderStatusBar({ statuses: [{ key: "status", text: "connected" }], onCommand: () => {} });
   const withCommand = renderStatusBar({
     statuses: [{ key: "command:/mode toggle", text: "Plan" }],
     onCommand: () => {},
   });
 
-  assert.doesNotMatch(plain, /<button/);
-  assert.match(withCommand, /<button/);
+  assert.match(plain, /<button[^>]*disabled=""/);
+  assert.match(withCommand, /<button[^>]*aria-label="Plan \(\/mode toggle\)"/);
+  assert.doesNotMatch(withCommand, /disabled=""[^>]*aria-label="Plan/);
 });
 
 test("with widgets, the triggers and the status line share one scrolling row below the panel", () => {
@@ -211,13 +216,15 @@ test("with widgets, the triggers and the status line share one scrolling row bel
     statuses: [{ key: "status", text: "connected" }],
     widgets: [{ key: "usage", lines: ["a", "b"], placement: "aboveEditor" }],
   });
-  const panel = html.indexOf("<section");
+  const anchor = html.indexOf('data-slot="popover-anchor"');
   const row = html.indexOf('class="flex min-w-0 flex-1 items-center gap-1 pl-0.5 pr-1.5"');
   const triggers = html.indexOf('aria-label="Extension widgets"');
   const line = html.indexOf('role="status"');
 
-  // The expanded panel stays outside the row, so it does not scroll sideways with it.
-  assert.ok(panel !== -1 && panel < row, "panel comes before the row");
+  // The expanded panel is a floating popover positioned by an anchor that
+  // sits outside the row, so it does not scroll sideways with it.
+  assert.ok(anchor !== -1 && anchor < row, "the panel anchor comes before the row");
+  assert.match(html, /data-slot="popover-anchor" class="absolute bottom-full[^"]*"/);
   assert.ok(row < triggers && triggers < line, "row holds the triggers, then the status line");
   assert.equal(html.match(/class="flex min-w-0 flex-1 items-center gap-1 pl-0.5 pr-1.5"/g)?.length, 1);
 });

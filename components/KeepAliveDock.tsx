@@ -187,11 +187,11 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
         ) : (
           <LayersIcon className="size-3" aria-hidden="true" />
         )}
-        <span className="text-[11px] font-semibold tabular-nums">{slots.length}</span>
+        <span className="text-xs font-semibold tabular-nums">{slots.length}</span>
         {/* 伸长段：宽度 0→内容宽的裁切揭示，与面板展开同时进行。 */}
         <span
           className={cn(
-            "overflow-hidden whitespace-nowrap text-[11px] transition-[max-width,opacity] duration-[220ms] ease-out motion-reduce:transition-none",
+            "overflow-hidden whitespace-nowrap text-xs transition-[max-width,opacity] duration-[220ms] ease-out motion-reduce:transition-none",
             open ? "max-w-[220px] opacity-100" : "max-w-0 opacity-0 duration-200",
           )}
         >
@@ -256,8 +256,8 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                     closePanel();
                   }}
                 >
-                  <span className="truncate text-[13px] font-medium text-foreground" title={info.name || info.firstMessage || info.id}>{info.name || info.firstMessage || info.id}</span>
-                  <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+                  <span className="truncate text-sm font-medium text-foreground" title={info.name || info.firstMessage || info.id}>{info.name || info.firstMessage || info.id}</span>
+                  <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
                     {isRunning && <span className="inline-flex shrink-0 [&_svg]:size-3"><RunningSessionIndicator /></span>}
                     {isUnread && <span className="inline-flex shrink-0 [&_svg]:size-3"><UnreadSessionIndicator /></span>}
                     <span className="shrink-0">{t(isRunning ? "keepalive.statusRunning" : isUnread ? "keepalive.statusDone" : "keepalive.statusIdle")}</span>
@@ -268,7 +268,7 @@ export function KeepAliveDock({ slots, sessions, selectedSessionId, runningSessi
                   </span>
                   <PathLabel
                     text={info.cwd}
-                    className="text-[11px] font-mono text-muted-foreground/50"
+                    className="text-xs font-mono text-muted-foreground/50"
                   />
                 </Button>
                 <Button

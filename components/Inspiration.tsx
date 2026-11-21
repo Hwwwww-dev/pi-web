@@ -502,23 +502,23 @@ function InspirationRow({ item, busyId, locale, t, confirmPurgeId, setConfirmPur
   return (
     <div className={cn("flex items-start gap-2 rounded-lg px-2 py-2 transition-colors pointer-coarse:min-h-9", busy ? "opacity-60" : "hover:bg-accent/40")}>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        {item.text && <span className="line-clamp-2 text-[13px] whitespace-pre-wrap text-foreground" title={item.text}>{item.text}</span>}
+        {item.text && <span className="line-clamp-2 text-sm whitespace-pre-wrap text-foreground" title={item.text}>{item.text}</span>}
         {item.files.length > 0 && (
           <div className="flex items-center gap-1">
             {thumbnails.map((ref) => (
               // eslint-disable-next-line @next/next/no-img-element
               <img key={ref.path} src={fileUrl(ref.path)} alt={ref.name} loading="lazy" className="size-10 rounded-md border border-border object-cover" />
             ))}
-            {extraImages > 0 && <span className="text-[11px] tabular-nums text-muted-foreground">+{extraImages}</span>}
+            {extraImages > 0 && <span className="text-xs tabular-nums text-muted-foreground">+{extraImages}</span>}
             {otherCount > 0 && (
-              <span className="flex h-6 items-center gap-1 rounded-md border border-border px-1.5 text-[11px] tabular-nums text-muted-foreground" title={item.files.filter((ref) => !isInlineImage(ref.mime)).map((ref) => ref.name).join("\n")}>
+              <span className="flex h-6 items-center gap-1 rounded-md border border-border px-1.5 text-xs tabular-nums text-muted-foreground" title={item.files.filter((ref) => !isInlineImage(ref.mime)).map((ref) => ref.name).join("\n")}>
                 <FileIcon className="size-3" aria-hidden="true" />
                 {otherCount}
               </span>
             )}
           </div>
         )}
-        <span className="text-[11px] text-muted-foreground/70" title={time}>
+        <span className="text-xs text-muted-foreground/70" title={time}>
           {t(timeKey)} {formatRelativeTime(time, locale)}
         </span>
       </div>
@@ -620,7 +620,7 @@ function EditorPage({ creating, text, onTextChange, savedFiles, pendingFiles, sa
             {t("inspiration.actionAddFile")}
           </Button>
           {saveState !== "idle" && (
-            <span className="text-[11px] text-muted-foreground/70">
+            <span className="text-xs text-muted-foreground/70">
               {saveState === "saving" ? t("inspiration.saveStateSaving")
                 : saveState === "error" ? t("inspiration.saveStateError")
                   : t("inspiration.saveStateSaved")}

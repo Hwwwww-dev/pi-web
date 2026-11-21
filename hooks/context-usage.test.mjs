@@ -115,8 +115,10 @@ test("only completed assistant messages trigger an immediate usage read", () => 
     script.runInNewContext({
       event: { type: "message_end", message: { role, content: [] } },
       agentRunningRef: { current: true }, sessionIdRef: { current: "a" }, optimisticUserMessageKeyRef: { current: null },
+      hasNewerMessagesRef: { current: false }, promptOwnUserKeyRef: { current: null },
       isSystemMessageEvent: (event) => event.message.role === "system",
-      normalizeToolCalls: (message) => message, userMessageKey: () => "user", setMessages() {}, dispatch() {}, agentPhaseStore: { set() {}, get: () => null }, activeToolsStore: { set() {}, remove() {}, clear() {} },
+      normalizeToolCalls: (message) => message, withTranscriptNotices: (message) => message,
+      userMessageKey: () => "user", setMessages() {}, dispatch() {}, agentPhaseStore: { set() {}, get: () => null }, activeToolsStore: { set() {}, remove() {}, clear() {} },
       refreshContextUsage: (sid) => reads.push(sid),
     });
     assert.deepEqual(reads, role === "assistant" ? ["a"] : []);
@@ -131,6 +133,8 @@ test("each event stream connection reads usage, since connecting resumes an idle
     script.runInNewContext({
       event: { type: "connected", sessionId: sid ?? "pending", isStreaming },
       sessionIdRef: { current: sid }, sdkAgentActiveRef: { current: false }, agentRunningRef: { current: false },
+      // opens=1 表示首次打开流：不触发尾部补读分支（loadSession）。
+      eventConnectionRef: { current: { snapshot: () => ({ opens: 1 }) } },
       dispatch() {}, cancelEventStreamGrace() {}, setAgentRunning() {}, agentPhaseStore: { set() {}, get: () => null }, activeToolsStore: { set() {}, remove() {}, clear() {} },
       refreshContextUsage: (id) => reads.push(id),
     });

@@ -711,14 +711,14 @@ function QueuedMessageRow({
   const isSteer = item.behavior === "steer";
   const behaviorLabel = isSteer ? t("chat.queueBehaviorSteer") : t("chat.queueBehaviorFollowUp");
   const behaviorChipClass = cn(
-    "shrink-0 whitespace-nowrap px-[6px] py-px text-[11px] font-semibold leading-[1.4]",
+    "shrink-0 whitespace-nowrap px-[6px] py-px text-xs font-semibold leading-[1.4]",
     !isSteer && "bg-muted text-muted-foreground",
   );
   return (
     <div
       title={item.text}
       className={cn(
-        "flex min-w-0 max-w-full items-center gap-1.5 self-start overflow-hidden rounded-full py-0.5 pl-0.5 pr-1.5 text-[11px] leading-[1.35]",
+        "flex min-w-0 max-w-full items-center gap-1.5 self-start overflow-hidden rounded-full py-0.5 pl-0.5 pr-1.5 text-xs leading-[1.35]",
         isSteer
           ? "border border-primary/45 bg-background text-foreground"
           : "bg-secondary text-secondary-foreground",
@@ -2270,7 +2270,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       <DropdownMenuTrigger asChild>
         <Button
           aria-label={t("chat.send")}
-          className="size-9 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+          className="size-9 shrink-0 rounded-full"
         >
           <ArrowUpIcon data-icon strokeWidth={2.2} aria-hidden="true" />
         </Button>

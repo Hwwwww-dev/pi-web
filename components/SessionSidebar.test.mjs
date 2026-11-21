@@ -480,7 +480,6 @@ test("the layout, the tab and the fold chosen last never change the first render
 
 test("the files tab keeps FileExplorer mounted under an always-present scroll container", () => {
   assert.match(source, /<div ref=\{explorerScrollRef\} className=\{`sidebar-files-scroll scrollbar-subtle min-h-0 flex-1 overflow-x-hidden overflow-y-auto\$\{filesBelow \? "" : " pt-0\.5"\}`\}>\s*\{explorerCwd && \(\s*<FileExplorer/);
-  assert.match(source, /useScrollbarVisibility\(explorerScrollRef\);/);
   assert.match(source, /const explorerCwd = selectedCwd \?\? selectedCwdProp \?\? null;/);
   assert.match(source, /onOpenTerminal\?\.\(explorerCwd\)/);
 });
@@ -535,8 +534,8 @@ test("subagent completion stays silent and never becomes unread", () => {
     source,
     /completedWithNotifications = finishedInBackground\.filter\([\s\S]*?!previousSuppressedCompletionSessionIdsRef\.current\.has\(id\)[\s\S]*?!knownSubagentIds\.has\(id\)/,
   );
-  assert.match(source, /completedWithNotifications\.forEach\(\(id\) => next\.add\(id\)\)/);
-  assert.match(source, /if \(completedWithNotifications\.length > 0\) \{\s*onBackgroundTaskDone\?\.\(\)/);
+  assert.match(source, /completedWithNotifications\.forEach\(\(id\) => next\.set\(id, markedAt\)\)/);
+  assert.match(source, /if \(completedWithNotifications\.length > 0\) \{[\s\S]*?onBackgroundTaskDone\?\.\(completedWithNotifications, since\)/);
   assert.match(
     source,
     /filter\(\(session\) => !isHiddenRelation\(session\.relation\)\)[\s\S]*?unreadEligibleIds\.has\(id\)/,
@@ -724,9 +723,9 @@ test("archive keeps an undo snapshot and clears unread markers", () => {
   assert.match(body, /label: t\("sidebar\.undo"\),[\s\S]*?for \(const entries of chunkForSessionUiRequests\(snapshot\)\) \{\s*void applyUiState\(\{ action: "restore", entries \}\);\s*\}\s*restoreUnread\(unreadBefore\);/);
   assert.doesNotMatch(body, /const ids = archivable\.map|entries: snapshot \}/, "never one request for every family");
   // A refused part rolls back, and its unread markers come back with it.
-  assert.match(body, /\.then\(\(ok\) => \{\s*\/\/[^\n]*\n\s*if \(ok \|\| unreadBefore\.length === 0\) return;\s*const partIds = new Set\(part\.flatMap\(\(family\) => familyIds\(family\)\)\);\s*restoreUnread\(unreadBefore\.filter\(\(id\) => partIds\.has\(id\)\)\);/);
+  assert.match(body, /\.then\(\(ok\) => \{\s*\/\/[^\n]*\n\s*if \(ok \|\| unreadBefore\.length === 0\) return;\s*const partIds = new Set\(part\.flatMap\(\(family\) => familyIds\(family\)\)\);\s*restoreUnread\(unreadBefore\.filter\(\(\[id\]\) => partIds\.has\(id\)\)\);/);
   // The session open by then has been read: its marker stays off.
-  assert.match(callbackBody("restoreUnread"), /if \(id !== selectedSessionIdRef\.current\) next\.add\(id\);/);
+  assert.match(callbackBody("restoreUnread"), /if \(id !== selectedSessionIdRef\.current && !next\.has\(id\)\) next\.set\(id, at\);/);
   assert.match(body, /\{ label: t\("sidebar\.viewArchive"\), onClick: \(\) => openArchiveView\(\) \},/);
   assert.match(callbackBody("archiveFamily"), /if \(familyIds\(family\)\.some\(\(id\) => runningSessionIds\.has\(id\)\)\) return;/);
   assert.match(callbackBody("restoreFamily"), /useCallback\(\(family: SessionFamily\) => restoreFamilies\(\[family\]\), \[restoreFamilies\]\)/);

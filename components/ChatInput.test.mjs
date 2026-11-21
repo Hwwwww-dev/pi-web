@@ -388,11 +388,14 @@ test("streaming turns the composer's main button into stop", () => {
 
 test("a message waiting in the composer keeps the main button on send", () => {
   // Mobile has no Enter key: while a run streams, a typed message must leave a
-  // send affordance (which queues a follow-up) instead of only stop.
+  // send affordance instead of only stop. Today that affordance is the
+  // send-actions menu (send immediately / guide / queue / side chat) in front
+  // of the direct-send button; stop stays gated on an empty composer.
   const source = readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8");
   assert.match(source, /const canSubmit = hasInputText \|\| attachedImages\.length > 0;/);
   assert.match(source, /\bisStreaming && !canSubmit \? \(/);
-  assert.match(source, /onClick=\{isStreaming \? \(\) => queueFollowUp\(\) : handleSend\}/);
+  assert.match(source, /sendActions\.length > 0 \? \(/);
+  assert.match(source, /onClick=\{\(\) => void handleSend\(\)\}/);
 });
 
 test("folds a long queue to two rows behind a toggle, pills labeled by behavior (#1428)", () => {
@@ -879,6 +882,8 @@ test("queueFollowUp refuses an images-only submission: pi's queue holds texts on
     const sendQueued = chatInputCallback("queueFollowUp", {
       value,
       attachedImages: images,
+      pendingImageTailRef: { current: Promise.resolve() },
+      attachedImagesRef: { current: [] },
       onAudioUnlock() {},
       clearInput() { calls.cleared += 1; },
       onBuiltinCommand: async () => ({ handled: false }),

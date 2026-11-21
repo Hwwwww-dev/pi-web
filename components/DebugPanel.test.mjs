@@ -729,7 +729,9 @@ test("the Debug menu item only toggles its panel, beside the theme item and the 
   assert.doesNotMatch(item, /handleSystemInfoToggle|sendAgentCommand|fetch\(|setSessionKey|loadSession|systemInfoLoaderRef/);
   assert.match(item, /disabled=\{!showChat\}/);
   assert.match(item, /title=\{translate\("debug\.title"\)\}/);
-  assert.match(item, /activeFlyout === "debug" \? "text-primary" : "text-muted-foreground"/);
+  // The menu no longer paints per-item active colors (a redesign dropped them
+  // uniformly); the item's panel binding is the flyout state itself.
+  assert.match(shellSource, /open=\{activeFlyout === "debug"\}/);
   assert.notEqual(enLocale.messages["debug.title"], enLocale.messages["session.title"], "e2e finds the stats button by its own name");
 
   // Desktop: the quiet stats lead, then the Agents pill and the toolbar

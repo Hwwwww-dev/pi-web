@@ -3,11 +3,9 @@
  * table instead of a JSON blob.
  *
  * The rule is structural, so it covers every tool — built-in, package and MCP —
- * without a list of names or keys to keep current: **all of the arguments or
- * none of them.** A value that is an object or an array (an `edit` call's
- * `edits[]`, an MCP tool's nested argument) takes the whole card back to the
- * JSON view, because a one-level table cannot show a tree and a row that
- * quietly drops a subtree is an argument the user never sees.
+ * without a list of names or keys to keep current: nested objects and arrays
+ * flatten into path-keyed rows (`tasks[0].subject`), so no argument is ever
+ * quietly dropped from the card.
  */
 
 export interface ToolField {

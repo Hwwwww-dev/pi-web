@@ -295,7 +295,7 @@ function GeneralSettings({ sessionId, onClose, onSessionReloaded, quoteSelection
         if (options.length === 0) return null;
         return (
           <div key={group.id} className="flex w-full flex-col gap-2">
-            <div className="text-[11px] text-muted-foreground">{t(group.label)}</div>
+            <div className="text-xs text-muted-foreground">{t(group.label)}</div>
             <RadioGroup
               value={scheme === "light" ? light : dark}
               onValueChange={(value) => setPalette(value as ThemePalette)}

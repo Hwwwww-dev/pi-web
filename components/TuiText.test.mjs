@@ -26,10 +26,10 @@ test("notifications, dialog titles and option previews fall back to terminal ren
 });
 
 test("tool results stop reflowing when they are terminal output", () => {
-  // 第 8 节第 8 条：终端输出默认不 reflow，行头提供换行开关。
   assert.match(terminalTrace, /isTuiText\(output\)/);
-  assert.match(terminalTrace, /const \[wrap, setWrap\] = useState\(false\)/);
-  assert.match(terminalTrace, /<CodeBlockContent wrap=\{wrap\}/);
+  // 换行选择按 foldKey 持久化（transcript 重设计后默认换行，不再默认免 reflow）。
+  assert.match(terminalTrace, /const \[wrap, setWrap\] = useState\(\(\) => getFoldChoice\(wrapKey\) \?\? true\)/);
+  assert.match(terminalTrace, /wrap \? "whitespace-pre-wrap break-words" : "whitespace-pre"/);
   // 其它代码段默认换行（参数/结果），终端是例外。
   assert.match(toolTrace, /wrap = true/);
 });

@@ -11,17 +11,20 @@ test("DiffView parses unified patches through the shared parser", () => {
 
 test("DiffView renders added/removed lines with the official CodeBlock line variants", () => {
   assert.match(source, /file-diff-view min-w-full/);
-  // Rows are the official CodeBlock lines: the gutter utilities carry the
-  // layout, the tint carries the variant; the variant's absolute ::after marker
-  // is dropped for the aligned marker column.
-  assert.match(source, /-mx-4 px-4[^`]*file-diff-line flex min-w-full after:content-none/);
-  assert.match(source, /\? "bg-\(--ok\)\/10"/);
-  assert.match(source, /\? "bg-destructive\/10"/);
-  // Unchanged rows stay on the view's own background, no variant.
-  assert.match(source, /rowTone = line\.type === "added"/);
+  // Rows are the official CodeBlock lines: the gutter, tint and ::after marker
+  // live in codeBlockLineVariants now; DiffView only picks the variant per
+  // line type and lays the row out with its own class.
+  assert.match(
+    source,
+    /variant=\{line\.type === "added" \? "added" : line\.type === "removed" \? "removed" : "default"\}/,
+  );
+  assert.match(source, /className="file-diff-line flex min-w-full"/);
+  // The +/- marker column colors itself; the variant tint carries the row.
+  assert.match(source, /line\.type === "added" && "text-success"/);
+  assert.match(source, /line\.type === "removed" && "text-destructive"/);
   assert.match(source, /line\.type === "removed" \? line\.oldLineNo : line\.newLineNo/);
-  // Collapsed hunks take the highlighted variant.
-  assert.match(source, /bg-foreground\/5 flex min-w-full items-center py-0\.5/);
+  // Collapsed hunks take the highlighted variant, marker column dropped.
+  assert.match(source, /variant="highlighted"\s+className="flex min-w-full items-center py-0\.5 font-sans text-xs text-muted-foreground after:content-none"/);
 });
 
 test("DiffView collapses unchanged regions around 3 lines of context", () => {

@@ -142,11 +142,10 @@ test("keeps empty widgets non-interactive", () => {
     widgets: [{ key: "empty-widget", lines: [], placement: "aboveEditor" }],
   });
 
-  assert.match(html, /<span[^>]*aria-label="Above editor widget/);
-  assert.doesNotMatch(html, /<button/);
+  // The trigger is a disabled button cell now; no expanded panel, no tooltip.
+  assert.match(html, /<button[^>]*disabled="" aria-label="Above editor widget: empty-widget/);
   assert.doesNotMatch(html, /aria-expanded/);
   assert.doesNotMatch(html, /title="[^"]*"/);
-  assert.match(html, /aria-label="Above editor widget: empty-widget/);
 });
 
 test("keeps blank-padding widgets non-interactive — an empty panel is worse than none", () => {
@@ -154,8 +153,7 @@ test("keeps blank-padding widgets non-interactive — an empty panel is worse th
     widgets: [{ key: "blank-widget", lines: ["", "  ", "\u001b[0m"], placement: "aboveEditor" }],
   });
 
-  assert.match(html, /<span[^>]*aria-label="Above editor widget/);
-  assert.doesNotMatch(html, /<button/);
+  assert.match(html, /<button[^>]*disabled="" aria-label="Above editor widget: blank-widget/);
   assert.doesNotMatch(html, /<section/);
 });
 

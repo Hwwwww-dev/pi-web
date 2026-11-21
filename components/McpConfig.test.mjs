@@ -1133,7 +1133,7 @@ test("a failed test shows the error and stderr, a sign-in, and no answer, each w
   assert.match(value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">Gave up after 1\.3 s, tested at/);
   assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Error: <code class="max-w-full rounded-md bg-muted px-1\.5 py-0\.5 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">spawn lint-mcp ENOENT<\/code><\/span>/);
   // The stderr tail keeps its lines, and its control characters are shown as codes.
-  assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">The last lines it wrote to stderr:<\/span><pre class="max-h-\[160px\][^"]*">line one\nline\\u\{0007\}two<\/pre>/);
+  assert.match(value, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-muted-foreground">The last lines it wrote to stderr:<\/span><pre class="scroll-rounded-md max-h-\[160px\][^"]*">line one\nline\\u\{0007\}two<\/pre>/);
 
   const signIn = testView({ status: testedStatus("needs-auth") });
   assert.match(row(signIn, "docs"), /aria-label="docs: Needs sign-in"/);
@@ -1260,7 +1260,7 @@ test("a session's report names the state in the row and says which session saw i
   const failedRow = statusRow(failed).value;
   assert.match(failedRow, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">A session in ~\/repo could not connect it at/);
   assert.match(failedRow, /<span class="min-w-0 text-xs leading-normal \[overflow-wrap:anywhere\] text-destructive">Error: <code class="max-w-full rounded-md bg-muted px-1\.5 py-0\.5 font-mono text-xs text-foreground \[overflow-wrap:anywhere\]">spawn lint ENOENT<\/code><\/span>/);
-  assert.match(failedRow, /<pre class="max-h-\[160px\][^"]*">no\nconfig<\/pre>/);
+  assert.match(failedRow, /<pre class="scroll-rounded-md max-h-\[160px\][^"]*">no\nconfig<\/pre>/);
   assert.match(text(decode(failed)), /Status Did not connect in a session A session in ~\/repo could not connect it/);
 
   const signIn = testView({ status: sessionStatus("needs-auth") });
@@ -1300,7 +1300,7 @@ test("connecting, a dropped connection and a name another extension holds each h
   assert.match(row(dropped, "docs"), /aria-label="docs: Connection dropped in a session"/);
   assert.match(decode(dropped), /<span data-slot="badge" data-variant="warning" class="[^"]*">dropped<\/span>/);
   assert.match(statusRow(dropped).value, /^<span class="min-w-0 text-xs leading-normal text-muted-foreground \[overflow-wrap:anywhere\]">The connection of a session in ~\/repo dropped at [^.]+\.<\/span>/);
-  assert.match(statusRow(dropped).value, /<pre class="max-h-\[160px\][^"]*">panic: out of memory<\/pre>/);
+  assert.match(statusRow(dropped).value, /<pre class="scroll-rounded-md max-h-\[160px\][^"]*">panic: out of memory<\/pre>/);
   // What happens next follows what the session saw, which it does not repeat.
   assert.match(statusRow(dropped).text, /panic: out of memory That session connects it again at the next call to one of its tools\.$/);
 

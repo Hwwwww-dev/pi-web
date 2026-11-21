@@ -2477,7 +2477,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
         aria-label={translate("session.title")}
         aria-pressed={activeFlyout === "session"}
         className={cn(
-          "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 font-mono text-[11px] font-normal tabular-nums text-muted-foreground",
+          "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 font-mono text-xs font-normal tabular-nums text-muted-foreground",
           activeFlyout === "session" && HEADER_CONTROL_OPEN,
         )}
       >

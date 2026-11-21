@@ -9,14 +9,16 @@ const customSource = source.slice(source.indexOf("function ExtensionCustomPanel"
 
 test("confines extension overlays to the content region above the composer", () => {
   assert.doesNotMatch(source, /function ExtensionRequestSheet/);
+  // Overlays live inside the content region; the composer (now built inline by
+  // renderChatInput, the old {chatInputElement} slot is gone) renders after it.
   assert.match(
     source,
-    /className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden"[\s\S]*?<ExtensionDialog[\s\S]*?<ExtensionCustomPanel[\s\S]*?className="relative flex min-h-0 flex-col shrink-0"[\s\S]*?{chatInputElement}/,
+    /className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden"[\s\S]*?<ExtensionDialog[\s\S]*?<ExtensionCustomPanel[\s\S]*?\{renderChatInput\(activityNotice\)\}/,
   );
-  assert.match(dialogSource, /"absolute inset-0 z-\[90\] flex/);
+  assert.match(dialogSource, /"absolute inset-0 z-\(--z-chat-float\) flex/);
   assert.match(dialogSource, /pointer-events-none/);
   assert.match(dialogSource, /pointer-events-auto/);
-  assert.match(customSource, /"absolute inset-0 z-\[95\] flex/);
+  assert.match(customSource, /"absolute inset-0 z-\(--z-chat-float-raised\) flex/);
   assert.match(customSource, /pointer-events-none/);
   assert.doesNotMatch(source, /z-\[100\]|zIndex: 100/);
   assert.match(customSource, /wrapperRef\.current = node;/);

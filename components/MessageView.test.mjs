@@ -63,13 +63,17 @@ test("the message header shows only the model name; the pill badge keeps counts 
     I18nProvider, null, React.createElement(StreamRateBadge, props),
   ));
   const empty = renderBadge({ tokens: 0, tps: 20 });
-  assert.doesNotMatch(empty, /t\/s|Estimated token count while streaming/);
+  // The rate slot always shows — a fixed-width pill keeps the row from
+  // jumping; neutral while not streaming, tiered by speed while streaming.
+  assert.match(empty, /20\.0 t\/s/);
+  assert.match(empty, /text-muted-foreground/);
   const tokensOnly = renderBadge({ tokens: 100, tps: null });
   assert.match(tokensOnly, />100<\/span>/);
-  assert.doesNotMatch(tokensOnly, /t\/s/);
-  const streaming = renderBadge({ tokens: 1234567, tps: 12345.6 });
+  assert.match(tokensOnly, /0\.0 t\/s/);
+  const streaming = renderBadge({ tokens: 1234567, tps: 12345.6, streaming: true });
   assert.match(streaming, />1234567<\/span>/);
   assert.match(streaming, /12345\.6 t\/s/);
+  assert.match(streaming, /tps-rainbow/, "the top tier beams");
 
   const message = { role: "assistant", provider: "test", model: "model", content: [{ type: "text", text: "Response" }] };
   assert.doesNotMatch(renderMessage(message), /Estimated token count while streaming/);
@@ -520,8 +524,8 @@ test("custom-message images and details live inside the fold", () => {
 
   // Nothing of the body leaks into the folded row.
   assert.doesNotMatch(html, /<img/);
-  assert.match(activityRowsSource, /<TraceCollapsibleContent>[\s\S]*?<ImagePreview/);
-  assert.match(activityRowsSource, /<TraceCollapsibleContent>[\s\S]*?Show details|t\("i18n\.showDetails"\)/);
+  assert.match(activityRowsSource, /<TraceCollapsibleContent[^>]*>[\s\S]*?<ImagePreview/);
+  assert.match(activityRowsSource, /<TraceCollapsibleContent[^>]*>[\s\S]*?Show details|t\("i18n\.showDetails"\)/);
 });
 
 

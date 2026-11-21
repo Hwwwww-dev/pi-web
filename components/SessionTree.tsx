@@ -719,7 +719,7 @@ const SessionRowView = memo(function SessionRowView({
     "text-foreground",
     // Titles are the content: the item's 13px, a family's child a step
     // smaller (12.5px) and deeper.
-    "text-[13px]",
+    "text-sm",
     // The selected one a little heavier.
     status.selected ? "font-medium" : "",
     context === "archive" ? "text-muted-foreground" : "",
@@ -1199,7 +1199,7 @@ const PlainRowView = memo(function PlainRowView({
           <Button
             type="button"
             variant="ghost"
-            className="session-tree-pinned-toggle h-auto min-w-0 flex-1 items-center justify-start gap-[5px] rounded-md bg-transparent py-0 pl-1 pr-2 text-left text-[13px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
+            className="session-tree-pinned-toggle h-auto min-w-0 flex-1 items-center justify-start gap-[5px] rounded-md bg-transparent py-0 pl-1 pr-2 text-left text-sm whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
             aria-expanded={!row.collapsed}
             onClick={() => handlers.current.onTogglePinned()}
           >
@@ -1241,7 +1241,7 @@ const PlainRowView = memo(function PlainRowView({
       // gives way so "Show less" is never clipped.
       const lone = (row.hidden > 0 ? 1 : 0) + (row.canShowLess ? 1 : 0) === 1;
       const toggleClass = (loneButton: boolean, marginLeft = false) => [
-        "session-tree-more-toggle h-full min-w-0 truncate rounded-md bg-transparent px-0 py-0 text-left text-[13px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground",
+        "session-tree-more-toggle h-full min-w-0 truncate rounded-md bg-transparent px-0 py-0 text-left text-sm whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground",
         loneButton ? "flex-1" : "shrink",
         marginLeft ? "ml-[14px]" : "",
       ].filter(Boolean).join(" ");
@@ -1276,12 +1276,12 @@ const PlainRowView = memo(function PlainRowView({
       // "No sessions yet" and an unpinned group's "Pin to keep" side by side.
       return (
         <div className={`session-tree-row session-tree-group-empty left-0 right-0 flex min-w-0 items-center ${TEXT_COLUMN} pr-1`} style={style} data-row-key={row.key}>
-          <span className="session-tree-group-empty-label min-w-0 flex-[0_1_auto] truncate text-[13px] text-muted-foreground">{t("sidebar.noLiveSessions")}</span>
+          <span className="session-tree-group-empty-label min-w-0 flex-[0_1_auto] truncate text-sm text-muted-foreground">{t("sidebar.noLiveSessions")}</span>
           {!row.project.pinned && (
             <Button
               type="button"
               variant="ghost"
-              className="session-tree-more-toggle ml-[14px] h-full min-w-0 flex-none truncate rounded-md bg-transparent px-0 py-0 text-left text-[13px] whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
+              className="session-tree-more-toggle ml-[14px] h-full min-w-0 flex-none truncate rounded-md bg-transparent px-0 py-0 text-left text-sm whitespace-nowrap text-muted-foreground hover:bg-transparent hover:text-foreground"
               onClick={() => handlers.current.onPinEmptyGroup(row.project)}
             >
               {t("sidebar.pinToKeep")}
@@ -1297,7 +1297,7 @@ const PlainRowView = memo(function PlainRowView({
           <Button
             type="button"
             variant="ghost"
-            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[7px] pr-1 text-left text-[13px] text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-muted-foreground"
+            className="session-tree-footer-button h-full min-w-0 flex-1 items-center justify-start gap-[3px] rounded-md bg-transparent py-0 pl-[7px] pr-1 text-left text-sm text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-muted-foreground"
             onClick={(event) => handlers.current.onOpenOtherProject(event.currentTarget)}
           >
             <FolderPlusIcon size={12} className="size-3 shrink-0" />

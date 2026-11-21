@@ -48,13 +48,13 @@ test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(appShellSource, /flex h-full flex-col bg-background/);
   assert.match(appShellSource, /h-full min-w-0 overflow-hidden/);
   assert.doesNotMatch(appShellSource, /h-\[100dvh\] min-w-0/);
-  assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{[^@]*?\.app-shell \{[^}]*?height: 100dvh;[^}]*?min-height: 0;/);
+  assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{[^@]*?\.app-shell \{[^}]*?height: var\(--keyboard-full-height, 100dvh\);[^}]*?min-height: 0;/);
   // 壳层的 min-h-svh（svh 不随键盘缩小）必须在移动端被压掉，否则最小高度把
   // 壳层撑到水位之上、文档滚动量失真。
   assert.match(cssSource, /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{[^@]*?\.app-shell \{[^}]*?min-height: 0;/);
   assert.match(appShellSource, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}/);
   assert.match(viewportHookSource, /window\.visualViewport/);
-  assert.match(viewportHookSource, /window\.addEventListener\("focusout", scheduleSync\)/);
+  assert.match(viewportHookSource, /window\.addEventListener\("focusout", handleFocusChange\)/);
   assert.match(viewportHookSource, /data-keyboard-open|dataset\.keyboardOpen/);
   assert.match(viewportHookSource, /isKeyboardPeriod/);
   // 位移与过渡已全部废弃：iOS 会原生滚动 scrollView 推页头，任何 transform 都
@@ -69,7 +69,9 @@ test("tracks the visual viewport while the software keyboard is open", () => {
   // 滚动余地推页头；绝不能让高度跟随 dvh 缩（无处可滚，页头永远钉顶）。
   assert.match(viewportHookSource, /--keyboard-full-height/);
   assert.match(cssSource, /html, body \{[\s\S]*?height: 100dvh;[\s\S]*?\}/);
-  assert.doesNotMatch(cssSource, /html, body \{[\s\S]*?height: var\(--app-viewport-height/);
+  // scoped to the html,body block itself: later blocks legitimately size from
+  // --app-viewport-height
+  assert.doesNotMatch(cssSource, /html, body \{[^}]*height: var\(--app-viewport-height/);
   assert.match(cssSource, /html\[data-keyboard-open\] body \{[^}]*height: var\(--keyboard-full-height/);
   assert.match(cssSource, /html\[data-keyboard-open\] \.app-shell \{[^}]*height: var\(--keyboard-full-height/);
   assert.doesNotMatch(cssSource, /\.app-chat-shift/);
@@ -91,7 +93,9 @@ test("contains chat content and inputs within the mobile viewport", () => {
   // frame carries w-full itself, so the local class only adds the min/max caps.
   assert.match(mermaidBlockSource, /<CodeBlockFrame className="min-w-0 max-w-full">/);
   assert.match(codeBlockPrimitiveSource, /relative flex w-full min-w-0 flex-col overflow-hidden/);
-  assert.match(chatWindowSource, /overflow-x-hidden overflow-y-auto/);
+  // The chat content region is the horizontal clamp: overflow-hidden on the
+  // h-full column (the old overflow-x-hidden scroller class is gone).
+  assert.match(chatWindowSource, /className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden/);
   // The extension overlays are bounded by the panel that anchors them, not the
   // visual viewport, which is far taller than the chat panel on mobile.
   assert.match(chatWindowSource, /import \{ useDialogMaxHeight \} from "@\/hooks\/useDialogMaxHeight";/);
@@ -119,19 +123,18 @@ test("every field shares one font size, except a touch screen's 16px floor", () 
 });
 
 test("keeps modal dialogs clear of the iOS status bar in standalone mode", () => {
-  // The settings dialog floats inset from a phone's edges (.settings-card-safe)
-  // inside the safe areas, and the stylesheet owns those insets with env();
-  // iOS standalone's env() can report 0, so the @supports fallback insets with
-  // device sizes instead.
-  assert.match(settingsPanelSource, /settings-card-safe z-\[1000\]/);
-  assert.match(settingsPanelSource, /h-\[84vh\] max-h-\[calc\(100dvh-16px\)\] w-\[min\(1080px,calc\(100vw-16px\)\)\] max-w-none/);
-  assert.match(settingsCssSource, /@media \(max-width: 640px\) \{\s*\.settings-card-safe \{\s*inset: calc\(env\(safe-area-inset-top\) \+ 8px\) 8px calc\(env\(safe-area-inset-bottom\) \+ 8px\) 8px;/);
-  assert.match(settingsCssSource, /@supports \(-webkit-touch-callout: none\) \{[\s\S]*?@media \(display-mode: standalone\) \{\s*\.settings-card-safe \{/);
-  assert.match(settingsCssSource, /top: max\(67px, calc\(env\(safe-area-inset-top\) \+ 8px\)\);[\s\S]*?right: max\(16px, calc\(env\(safe-area-inset-right\) \+ 8px\)\);[\s\S]*?bottom: max\(32px, calc\(env\(safe-area-inset-bottom\) \+ 8px\)\);[\s\S]*?left: max\(16px, calc\(env\(safe-area-inset-left\) \+ 8px\)\);/);
-  assert.match(settingsCssSource, /@media \(display-mode: standalone\) and \(orientation: landscape\) \{\s*\.settings-card-safe \{[\s\S]*?top: max\(16px, calc\(env\(safe-area-inset-top\) \+ 8px\)\);[\s\S]*?right: max\(67px, calc\(env\(safe-area-inset-right\) \+ 8px\)\);[\s\S]*?bottom: max\(16px, calc\(env\(safe-area-inset-bottom\) \+ 8px\)\);[\s\S]*?left: max\(67px, calc\(env\(safe-area-inset-left\) \+ 8px\)\);/);
+  // The settings dialog floats centered, sized to the phone's usable area
+  // (.settings-card-safe): DialogContent owns the centering (its entrance
+  // animation uses translate, so the stylesheet only clamps the size, no
+  // insets). iOS standalone's env() can report 0, so the @supports fallback
+  // caps the height with device sizes instead.
+  assert.match(settingsPanelSource, /settings-card-safe z-\(--z-modal\)/);
+  assert.match(settingsPanelSource, /h-\[84vh\] max-h-\[calc\(100dvh-16px\)\] w-\[min\(1160px,calc\(100vw-16px\)\)\] max-w-none/);
+  assert.match(settingsCssSource, /@media \(max-width: 640px\) \{\s*\.settings-card-safe \{[\s\S]*?width: calc\(100vw - 16px\);[\s\S]*?height: 80dvh;[\s\S]*?max-height: none;/);
+  assert.match(settingsCssSource, /@supports \(-webkit-touch-callout: none\) \{[\s\S]*?@media \(display-mode: standalone\) \{\s*\.settings-card-safe \{\s*max-height: calc\(100dvh - max\(67px, env\(safe-area-inset-top\)\) - max\(32px, env\(safe-area-inset-bottom\)\)\);/);
   // The full-screen phone variant still safe-area pads the dialogs that fill
   // the screen (the trust dialog keeps it).
-  assert.match(settingsCssSource, /@media \(max-width: 640px\) \{\s*\.settings-phone-safe \{\s*padding: env\(safe-area-inset-top\)/);
+  assert.match(settingsCssSource, /@media \(max-width: 640px\) \{[\s\S]*?\.settings-phone-safe \{\s*padding: env\(safe-area-inset-top\)/);
   assert.match(settingsCssSource, /@supports \(-webkit-touch-callout: none\) \{[\s\S]*?@media \(display-mode: standalone\) \{\s*\.settings-phone-safe \{/);
   // A config panel opened on its own stays capped to the viewport under the
   // same query: the shell's own utilities (ConfigPanelShell in SettingsUi)
@@ -150,7 +153,7 @@ test("every class the keyboard-open rules target exists on its component", () =>
   // means; a renamed class would otherwise leave the rule silently dead.
   assert.match(chatInputSource, /className="chat-input-controls[^"]*"/);
   assert.match(chatInputSource, /compact\s*\?\s*"shrink-0"[\s\S]*?:\s*"chat-input-shell /);
-  assert.match(extensionStatusBarSource, /className="extension-status-bar /);
+  assert.match(extensionStatusBarSource, /className=\{`extension-status-bar relative /);
   assert.match(chatWindowSource, /className="chat-content /);
   // Phone landscape exceeds the 640px breakpoint but has the least height.
   // Nothing is hidden by the keyboard rules any more: the pill row's hide
