@@ -213,6 +213,11 @@ test("mounts on whole turns, auto disk reads are gone, and the menu reload re-mo
   assert.match(loadSessionSource, /if \(options\?\.force\) params\.set\("force", "1"\)/);
   assert.match(loadSessionSource, /d\.wrapperRebuilt[\s\S]*?eventConnectionRef\.current\?\.close\("rebuilt"\)[\s\S]*?maintain\(sid\)/);
   assert.match(mountSource, /loadSession\(session\.id, !cached, true, \{ force: true \}\)/);
+  // 尾部核对：服务端窗口读到叶子（!hasNewer）而本地没有它的 newestEntryId，说明
+  // 本地尾巴落后（断流期落盘的条目没有流可补）——此时不能再“保留更宽的已载窗”，
+  // 否则落后被当成最新，最新一条回复凭空消失。
+  assert.match(loadSessionSource, /const tailStale = !d\.context\.hasNewer/);
+  assert.match(loadSessionSource, /const revisionUnchanged = !tailStale && Boolean\(/);
   // 挂载（本会话尚无已载入条目）按整轮取首屏，与翻页同一量纲；已有基线后的
   // 刷新按条且不得小于已载入条数（翻页历史不裁）。
   assert.match(loadSessionSource, /if \(loadedCount === 0\) \{[\s\S]*?params\.set\("turns", String\(VISIBLE_PAGE_TURNS\)\)[\s\S]*?params\.set\("tail", String\(Math\.min\(1000, Math\.max\(MIN_LOAD_TAIL, loadedCount\)\)\)\)/);

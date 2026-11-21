@@ -978,7 +978,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // collapsing back to the fresh 50-entry window. The state hooks then
       // only need the server's tree/leaf/stats — never a history reset.
       const cached = getSessionViewSnapshot(sid);
-      const revisionUnchanged = Boolean(
+      // 尾部核对：本地窗口的末尾不是服务端确认的叶子（且窗口确实读到了叶子）
+      // 就说明本地落后——断流期落盘的条目没有流可以补，此时“保留更宽的已载窗”
+      // 等于把落后的尾巴当成最新（用户 2026-11-21：回页后最新一条回复消失）。
+      // 宁可整载一遍把窗口挪到叶子。hasNewer 时 newestEntryId 不是叶子，不核。
+      const serverTailId = d.context.newestEntryId ?? null;
+      const tailStale = !d.context.hasNewer
+        && serverTailId !== null
+        && entryIdsRef.current.length > 0
+        && !entryIdsRef.current.includes(serverTailId);
+      const revisionUnchanged = !tailStale && Boolean(
         d.snapshotRevision
         && cached?.revision === d.snapshotRevision
         && cached.entryIds.length >= (d.context.entryIds ?? []).length,
@@ -2289,6 +2298,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         // Opening the stream is what resumes an idle-reaped session, so the
         // mount's state read may have found no runtime and no usage to show.
         if (sessionIdRef.current) void refreshContextUsage(sessionIdRef.current);
+        // 重连（不是首次打开）说明断开期间落盘的条目没有流可以补：iOS 后台被杀
+        // 连接、心跳超时、网络切换都会走到这里，而页面自己没发起释放。核对一次
+        // 尾部——真有新条目就接上，没有就一字不动（用户 2026-11-21：偶现丢消息，
+        // 丢的正是用户刚发的那条）。首次打开不读：挂载路径已经在读。
+        if ((eventConnectionRef.current?.snapshot().opens ?? 0) > 1) {
+          const sid = sessionIdRef.current;
+          // 运行态由这个 connected 事件自己的 isRunActive 分支处理，这里只要
+          // 把落盘的条目补上（loadSession 内部已有尾部核对与合并）。
+          if (sid) void loadSession(sid, false, true);
+        }
         break;
       }
       case "agent_start":
@@ -3733,7 +3752,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // dialogs, so their completion and attention notifications reach the page as
   // if it had never let go. Nothing is resent.
   reattachEventStreamRef.current = (sid: string, reason: "visible" | "activity") => {
-    if (!eventStreamReleasedRef.current || endedSessionRef.current === sid) return;
+    if (endedSessionRef.current === sid) return;
+    // “释放过”不等于“流真的死了”：iOS 把页面放进后台时常常直接干掉 SSE 连接，
+    // 而页面自己并没有发起释放（idle 判断被扩展对话框、compaction 等拦着），
+    // eventStreamReleasedRef 于是仍为 false。只看这个标记会让回页什么都不做，
+    // 后台期间落盘的条目再也没有通路补（用户 2026-11-21：偶现丢消息）。
+    // 所以连接确实活着（connected）且没释放过才跳过；其它状态一律重连+补读。
+    const connected = eventConnectionRef.current?.snapshot().state === "connected";
+    if (!eventStreamReleasedRef.current && connected) return;
     eventStreamReleasedRef.current = false;
     reattachDebugRef.current = { count: reattachDebugRef.current.count + 1, lastAt: Date.now(), lastReason: reason };
     setEventStreamReattachCount((count) => count + 1);

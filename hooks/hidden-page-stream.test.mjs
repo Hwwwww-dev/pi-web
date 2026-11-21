@@ -558,8 +558,10 @@ test("the debug reader counts a reopen for activity apart from one for the page'
     setVisibility("visible");
     await settle();
     snapshot = state.read();
-    assert.equal(snapshot.reattached.count, 1, "the return of a page holding its stream reopens nothing");
-    assert.equal(snapshot.reattached.lastReason, "activity");
+    // 回页不得新开 EventSource：流持有者回来只是复用已有连接（重连与否看
+    // readyState，不看 reattach 计数——activity 刚重连、尚未 ready 时再走一次
+    // reattach 是允许的，它只做 maintain + 一次尾部合并）。
+    assert.equal(state.open().length, 1, "the return of a page holding its stream opens no second stream");
   } finally {
     await teardown(state);
   }
@@ -575,4 +577,29 @@ test("only a lease reply with nothing under way releases; any activity reopens",
   assert.equal(canReleaseHiddenEventStream("unanswered"), true, "no answer in time (a starved pool) or no network releases");
   assert.equal(sessionLeaseShowsActivity("unanswered"), false, "and reopens nothing");
   assert.equal(sessionLeaseShowsActivity(null), false);
+});
+
+test("a stream that died on its own reads the session it missed when it comes back", async () => {
+  // iOS 把页面放进后台时常常直接干掉 SSE，而页面自己没发起释放（idle 判断被
+  // 扩展对话框、compaction 拦着）。这条流由心跳看门狗重连——重连成功前落盘的
+  // 条目没有任何通路能补，所以连上后必须核对一次尾部（回页同理）。
+  const state = await setup();
+  try {
+    await connectIdle(state);
+    const reads = state.reads();
+
+    const first = state.open()[0];
+    first.onerror?.(new Event("error"));
+    first.close();
+    // 重连延迟 1s（EVENT_STREAM_RECONNECT_DELAY_MS），再加一次心跳间隔。
+    await state.tick(2_000);
+    assert.equal(state.sources.length, 2, "the watchdog opens a new stream");
+    await connectIdle(state);
+    await settle();
+
+    assert.equal(state.reads(), reads + 1, "the reopened stream reads the session once");
+    assert.equal(state.sources.length, 2);
+  } finally {
+    await teardown(state);
+  }
 });

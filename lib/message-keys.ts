@@ -113,6 +113,9 @@ export function mergeLoadedTail(
   // 会整段追加、已持有的行再重复一份（回复文字被工具行「拆开」的错乱）。
   const messages: AgentMessage[] = [...prevMessages.slice(0, P)];
   const entryIds: string[] = [...prevIds];
+  // 已持有的 id 不再追加：服务端窗口重复了同一 id（分支重写、同一条目被两次
+  // 落盘）时，追加两次就是同一行渲染两遍。
+  const seen = new Set(entryIds);
   let local = P;
   let appended = 0;
   for (let i = anchorIdx + 1; i < nextIds.length; i++) {
@@ -125,6 +128,8 @@ export function mergeLoadedTail(
       for (let k = local; k < local + matchIdx; k++) messages.push(prevMessages[k]);
       local = local + matchIdx + 1;
     }
+    if (seen.has(id)) continue;
+    seen.add(id);
     entryIds.push(id);
     messages.push(persisted);
     appended += 1;
@@ -132,5 +137,9 @@ export function mergeLoadedTail(
   // 窗口没覆盖的剩余本地行（尚未落盘的在途行）原样保留。
   for (let k = local; k < prevMessages.length; k++) messages.push(prevMessages[k]);
   if (appended === 0) return null;
+  // 两个数组按索引配对，但无 id 的在途行（乐观冒泡、未落盘的排队行）本来就
+  // 只在 messages 里——id 不多于 messages 就够了。id 反而更多只能是错位（key
+  // 与 data-entry-id 串位后“部分消息消失”），宁可退回整载。
+  if (entryIds.length > messages.length) return null;
   return { entryIds, messages };
 }
