@@ -196,3 +196,30 @@ test("a rename over a vanished file is a 404 that drops the stale path cache", a
   assert.equal(globalThis.__piSessionPathCache?.has(id), false);
   assert.equal(globalThis.__piPathToSessionIdCache?.has(sessionPathKey(path)), false);
 });
+
+// PATCH 曾直接 await req.json()：空 body/非 JSON 抛 SyntaxError 落进 500
+// （2026-11-21 审计）。现在解析失败归 400；name 以码点计上限 200（侧栏
+// 原样渲染，防列表 payload 膨胀）。
+test("a malformed PATCH body is a 400, and names are capped at 200 codepoints", async () => {
+  const noBody = await renameSession(
+    new Request("http://localhost/api/sessions/whatever", { method: "PATCH" }),
+    { params: Promise.resolve({ id: "whatever" }) },
+  );
+  assert.equal(noBody.status, 400);
+
+  const badJson = await renameSession(
+    new Request("http://localhost/api/sessions/whatever", { method: "PATCH", body: "{oops" }),
+    { params: Promise.resolve({ id: "whatever" }) },
+  );
+  assert.equal(badJson.status, 400);
+
+  assert.equal((await rename("whatever", { nonsense: true })).status, 400);
+
+  const emoji = "🙂";
+  assert.equal((await rename("whatever", emoji.repeat(201))).status, 400);
+  assert.equal(
+    (await rename("whatever", emoji.repeat(200))).status,
+    404,
+    "exactly 200 codepoints passes validation, then 404s as an unknown session",
+  );
+});

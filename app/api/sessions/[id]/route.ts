@@ -180,15 +180,29 @@ export async function GET(
 }
 
 // PATCH /api/sessions/[id]  body: { name: string }
+// A sidebar row renders the name as-is; 200 codepoints bounds the list payload
+// without clipping any real name.
+const MAX_SESSION_NAME_CODEPOINTS = 200;
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  // A non-JSON body (empty request, truncated send) is a client error: parse it
+  // outside the try/catch that maps route failures onto 500.
+  let name: unknown;
   try {
-    const { name } = await req.json() as { name?: string };
+    ({ name } = await req.json() as { name?: string });
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+  try {
     if (typeof name !== "string") {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
+    }
+    if ([...name].length > MAX_SESSION_NAME_CODEPOINTS) {
+      return NextResponse.json({ error: "name is too long" }, { status: 400 });
     }
     const filePath = await resolveSessionPath(id);
     if (filePath && !existsSync(filePath)) {
