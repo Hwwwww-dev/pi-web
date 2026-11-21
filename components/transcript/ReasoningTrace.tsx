@@ -315,7 +315,11 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
             {lineChildren}
           </TraceLine>
         </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent className="trace-fold-body">
+        {/* 不给展开体加 `.trace-fold-body`：那是工具卡那套 24rem 外壳，与正文自己的
+            `--card-max-height` 叠成两层限高、两根滚动条。视口够高时 40vh > 24rem，
+            先滚的是外壳，正文自己的贴底怎么钉都看不出变化（用户 2026-11-21：
+            “思考还是显示不全”“没有变化”）。限高只留正文这一层。 */}
+        <TraceCollapsibleContent>
           <ReasoningText
             scrollRef={detailRef}
             text={block.deferred ? (content ?? "") : liveThinking}
