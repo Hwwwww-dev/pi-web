@@ -67,23 +67,41 @@ function readBoundedLines(filePath: string, maxBytes: number, maxLines: number):
   }
 }
 
+/**
+ * 尾窗的硬上限：窗口内找不到一个换行时向前倍增，到这个值为止。单条目可以比
+ * 默认尾窗大得多（大 tool result、大文件回显），而读不到完整行会被误当「没
+ * 有新条目」——wrapper 不重建、?force=1 永远读旧内存视图（用户看到冻结的
+ * transcript）、fork 落在旧叶子。
+ */
+const TAIL_PROBE_WINDOW_MAX_BYTES = 8 * 1024 * 1024;
+
 function readBoundedTailLines(filePath: string, maxBytes: number): string[] {
   const fd = openSync(filePath, "r");
   try {
     const fileSize = fstatSync(fd).size;
-    const start = Math.max(0, fileSize - maxBytes);
-    const buffer = Buffer.allocUnsafe(fileSize - start);
-    const bytesRead = readSync(fd, buffer, 0, buffer.length, start);
-    if (bytesRead === 0) return [];
+    let window = maxBytes;
+    for (;;) {
+      const start = Math.max(0, fileSize - window);
+      const buffer = Buffer.allocUnsafe(fileSize - start);
+      const bytesRead = readSync(fd, buffer, 0, buffer.length, start);
+      if (bytesRead === 0) return [];
 
-    const lines = buffer.subarray(0, bytesRead).toString("utf8").split("\n");
-    if (start > 0) {
-      const previousByte = Buffer.allocUnsafe(1);
-      readSync(fd, previousByte, 0, 1, start - 1);
-      if (previousByte[0] !== 0x0a) lines.shift();
+      const lines = buffer.subarray(0, bytesRead).toString("utf8").split("\n");
+      if (lines.at(-1) === "") lines.pop();
+      if (start > 0) {
+        const previousByte = Buffer.allocUnsafe(1);
+        readSync(fd, previousByte, 0, 1, start - 1);
+        if (previousByte[0] !== 0x0a) lines.shift();
+      }
+      // 窗口里凑不出一条完整行（最后一条条目比窗口还大，残行被 shift 掉）：
+      // 向前扩一倍再读。「读不到」不能当「没有」——wrapper 不重建、fork 落
+      // 旧叶子都从这来。到硬上限还没遇到换行才认命（返回空，维持原语义）。
+      if (lines.length > 0) {
+        return lines.map((line) => line.endsWith("\r") ? line.slice(0, -1) : line);
+      }
+      if (window >= TAIL_PROBE_WINDOW_MAX_BYTES) return [];
+      window = Math.min(window * 2, TAIL_PROBE_WINDOW_MAX_BYTES);
     }
-    if (lines.at(-1) === "") lines.pop();
-    return lines.map((line) => line.endsWith("\r") ? line.slice(0, -1) : line);
   } finally {
     closeSync(fd);
   }
