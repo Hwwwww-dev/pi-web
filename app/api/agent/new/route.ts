@@ -9,6 +9,12 @@ import { cwdMissingBody } from "@/lib/missing-cwd";
 
 const THINKING_LEVELS = new Set<ThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
+// 新会话首条命令的白名单：路由先建会话再发命令，非法 type 会在会话完整
+// 启动（扩展、session_start、MCP 全跑）之后才拋 Unsupported command —— 客户
+// 端拿不到 sessionId，wrapper 只能等 idle 回收（2026-11-21 审计）。实际只
+// 有这两个调用方；将来加新命令时在这里补。
+const NEW_SESSION_COMMANDS = new Set(["prompt", "ensure_session"]);
+
 function parseThinkingLevel(value: unknown): ThinkingLevel | undefined {
   if (value === undefined) return undefined;
   if (typeof value === "string" && THINKING_LEVELS.has(value as ThinkingLevel)) {
@@ -23,6 +29,8 @@ function parseThinkingLevel(value: unknown): ThinkingLevel | undefined {
 export async function POST(req: Request) {
   let commandType: string | undefined;
   let promptAccepted = false;
+  // 会话建好但后续 send/get_state 拋错时，catch 里要能关掉它，不留孤儿。
+  let createdSession: { shutdown: () => Promise<void> | void } | undefined;
   try {
     const body = await req.json() as { cwd?: string; [key: string]: unknown };
     const { cwd, ...command } = body;
@@ -31,6 +39,14 @@ export async function POST(req: Request) {
     if (!cwd || typeof cwd !== "string") {
       return NextResponse.json({
         error: "cwd is required",
+        ...(commandType === "prompt"
+          ? { code: "prompt_rejected", accepted: false }
+          : {}),
+      }, { status: 400 });
+    }
+    if (commandType === undefined || !NEW_SESSION_COMMANDS.has(commandType)) {
+      return NextResponse.json({
+        error: `Unsupported command for a new session: ${commandType}`,
         ...(commandType === "prompt"
           ? { code: "prompt_rejected", accepted: false }
           : {}),
@@ -61,6 +77,7 @@ export async function POST(req: Request) {
       ...(provider && modelId ? { initialModel: { provider, modelId } } : {}),
       ...(explicitThinkingLevel ? { thinkingLevel: explicitThinkingLevel } : {}),
     });
+    createdSession = session;
 
     // Keep the files-route allowed-roots cache (see app/api/files/[...path]/route.ts)
     // in sync so the new cwd is immediately readable via /api/files. Without this,
@@ -100,6 +117,8 @@ export async function POST(req: Request) {
       thinkingLevel: state.thinkingLevel,
     });
   } catch (error) {
+    // 会话已建但后续 send/get_state 拋错：主动关掉，不留孤儿 wrapper 等 idle 回收。
+    void createdSession?.shutdown();
     return NextResponse.json({
       error: error instanceof Error ? error.message : String(error),
       ...(commandType === "prompt" && !promptAccepted
