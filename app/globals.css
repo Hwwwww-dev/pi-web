@@ -195,42 +195,12 @@
 }
 
 :root {
-  color-scheme: light;
-  /* shadcn 官方 neutral 基色（ui.shadcn.com/docs/theming 原值）。 */
-  --radius: 10px;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --warning: oklch(0.769 0.15 70.08);
+  /* 配色变量（--background … --diff-del）在 app/themes.css，与 21 套主题一起维护；
+     这里只留不随配色变化的东西（--radius 在上面「全局刻度」那块）。 */
+  /* --warning 由主题给（内置那套在 themes.css 的 :root），两个派生值留在这里：
+     var() 在使用处解析，所以它们自动跟随当前主题的 --warning。 */
   --warning-border: color-mix(in srgb, var(--warning) 30%, transparent);
   --warning-bg: color-mix(in srgb, var(--warning) 12%, transparent);
-  --ok: oklch(0.627 0.17 149.2);
-  /* 文字压在 success 底色上的颜色：浅色 success（L≈0.63）压白字不足 4.5:1，
-     深色近黑绿字才可读（两个主题同取深字，见 .dark）。 */
-  --success-foreground: oklch(0.185 0.03 150);
   /* 侧栏会话行的状态点，两套主题共用同一组固定色（不跟随 accent/warning 随主题变）：
      运行蓝、未读（回合已结束、你还没查看）绿、等待输入琥珀、失败红。四色同取 600
      权重，小圆点在浅底与深底上都看得清。--status-failed 目前没有来源，先留着。 */
@@ -238,11 +208,6 @@
   --status-unread: #16a34a;
   --status-awaiting: #d97706;
   --status-failed: #dc2626;
-  /* 蓝：信息与高速类正信号。暗色下 --primary 接近白色（0.922 0 0），以其作彩色高亮
-     （如 t/s ≥50 徽章）会失去区分度。 */
-  --info: oklch(0.55 0.15 250);
-  --diff-add: oklch(0.45 0.13 150);
-  --diff-del: oklch(0.55 0.2 25);
   --chat-content-max-width: 820px;
   --chat-content-font-size: 14px;
   /* 会话列的唯一定义处：消息行、新会话 hero、输入框、扩展状态行均从这里取值，组件内不写字面量。
@@ -261,45 +226,7 @@
   }
 }
 
-.dark {
-  color-scheme: dark;
-  /* shadcn neutral 暗色调整：card/popover/sidebar 并入 background(0.145)，浮层与卡片靠边框、
-     阴影分层；secondary/muted/accent 作为 hover/选中/徽章的反馈色取 0.205，不作大面积背景。 */
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.205 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.205 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.205 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.35 0 0);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --sidebar: oklch(0.145 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.922 0 0);
-  --sidebar-primary-foreground: oklch(0.205 0 0);
-  --sidebar-accent: oklch(0.205 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.35 0 0);
-  --sidebar-ring: oklch(0.556 0 0);
-  --warning: oklch(0.8 0.15 75);
-  --warning-border: color-mix(in srgb, var(--warning) 30%, transparent);
-  --warning-bg: color-mix(in srgb, var(--warning) 12%, transparent);
-  --ok: oklch(0.72 0.17 150);
-  --success-foreground: oklch(0.22 0.04 150);
-  --info: oklch(0.72 0.13 245);
-  --diff-add: oklch(0.7 0.15 150);
-  --diff-del: oklch(0.7 0.17 20);
-}
+/* 内置暗色调色板在 app/themes.css 的 `.dark` 块里（与 21 套主题一起维护）。 */
 
 /* WebKit reports dvh/innerHeight without the status-bar strip for installed
    home-screen apps even though the layout still starts at the screen's top;

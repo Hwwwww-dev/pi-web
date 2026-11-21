@@ -766,3 +766,86 @@ html[data-theme="monokai"] {
   --diff-add: #a6e22e;
   --diff-del: #f92672;
 }
+
+/* 内置调色板（`light` / `dark`）：这两套没有自己的 `[data-theme]` 块（见
+   lib/theme.ts 的约定），默认由 `:root` 与 `.dark` 提供，同样在这里维护。
+   `.dark` 排在 `:root` 之后、同特异性（0,1,0），class 生效；主题块的
+   `html[data-theme]`（0,1,1）仍然压过两者。 */
+:root {
+  color-scheme: light;
+  /* shadcn 官方 neutral 基色（ui.shadcn.com/docs/theming 原值）。 */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  --warning: oklch(0.769 0.15 70.08);
+  --ok: oklch(0.627 0.17 149.2);
+  /* 文字压在 success 底色上的颜色：浅色 success（L≈0.63）压白字不足 4.5:1，
+     深色近黑绿字才可读（两个主题同取深字，见 .dark）。 */
+  --success-foreground: oklch(0.185 0.03 150);
+  /* 蓝：信息与高速类正信号。暗色下 --primary 接近白色（0.922 0 0），以其作彩色高亮
+     （如 t/s ≥50 徽章）会失去区分度。 */
+  --info: oklch(0.55 0.15 250);
+  --diff-add: oklch(0.45 0.13 150);
+  --diff-del: oklch(0.55 0.2 25);
+}
+
+.dark {
+  color-scheme: dark;
+  /* shadcn neutral 暗色调整：card/popover/sidebar 并入 background(0.145)，浮层与卡片靠边框、
+     阴影分层；secondary/muted/accent 作为 hover/选中/徽章的反馈色取 0.205，不作大面积背景。 */
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.205 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.205 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.205 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(0.35 0 0);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.145 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.922 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.205 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.35 0 0);
+  --sidebar-ring: oklch(0.556 0 0);
+  --warning: oklch(0.8 0.15 75);
+  --ok: oklch(0.72 0.17 150);
+  --success-foreground: oklch(0.22 0.04 150);
+  --info: oklch(0.72 0.13 245);
+  --diff-add: oklch(0.7 0.15 150);
+  --diff-del: oklch(0.7 0.17 20);
+}
