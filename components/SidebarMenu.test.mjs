@@ -330,3 +330,11 @@ test("checked rows hide only the stock indicator span, never their own icon and 
   assert.match(component, /\[&>span:first-child\]:hidden/);
   assert.doesNotMatch(component, /\[&>span\]:hidden/);
 });
+
+test("the menu layers above the modal it may open from", () => {
+  // On a phone the sidebar is the ui Sidebar's Sheet (--z-modal 100). The row's
+  // ⋯ menu portals to body, so at --z-flyout-top (96) the drawer's opaque panel
+  // painted over it: the menu opened and stayed invisible.
+  assert.match(component, /z-\(--z-modal-raised\) box-border min-w-0 max-w-\[calc\(100vw-16px\)\]/);
+  assert.doesNotMatch(component, /z-\(--z-flyout-top\) box-border/);
+});

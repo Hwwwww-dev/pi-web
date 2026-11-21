@@ -315,7 +315,11 @@ export function sidebarMenuBoxClassName(): string {
 function menuBoxClassName(): string {
   return [
     "sidebar-menu",
-    "z-(--z-flyout-top) box-border min-w-0 max-w-[calc(100vw-16px)]",
+    // 菜单是 portal 到 body 的一层，必须高于它可能属于的模态：移动端侧栏是 ui
+    // Sidebar 的 Sheet（--z-modal 100），而会话行的 ⋯ 菜单就从那里打开——用
+    // --z-flyout-top（96）时它被抽屉的实底盖住，看起来「点开了但什么都没出现」。
+    // 模态内不会再叠更上面的层，所以直接取最高的模态之上那一档。
+    "z-(--z-modal-raised) box-border min-w-0 max-w-[calc(100vw-16px)]",
     "max-h-[min(calc(var(--app-viewport-height,100dvh)-16px),480px,var(--radix-popper-available-height,480px))] overflow-y-auto [overscroll-behavior:contain]",
     "border border-(--border) rounded-(--radius-md) bg-background text-foreground text-xs shadow-(--shadow-md)",
     "p-0",
