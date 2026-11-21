@@ -401,7 +401,11 @@ export function createAgentEventStream(
       }
       req.signal.addEventListener("abort", abortHandler, { once: true });
 
-      heartbeat = setInterval(() => encode({ type: "heartbeat" }, { droppable: true }), AGENT_EVENT_HEARTBEAT_MS);
+      // Not droppable: the client's stale watchdog reconnects (and re-snapshots the whole
+      // session) after 2.5 quiet heartbeats, so shedding the 30-byte keepalive under
+      // backpressure saves nothing and costs the backlog. Everything else shed above the
+      // high-water mark is a delta a later frame repairs.
+      heartbeat = setInterval(() => encode({ type: "heartbeat" }), AGENT_EVENT_HEARTBEAT_MS);
 
       // Force the response headers through without claiming that the agent is
       // ready. The client waits for the later `connected` data event.
