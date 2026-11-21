@@ -7,6 +7,7 @@ import {
   resolveSessionIdByPath,
   invalidateSessionListCache,
   invalidateSessionManagerCache,
+  invalidateSessionPathCache,
   buildSessionContext,
 } from "@/lib/session-reader";
 import { getRpcSession, renameRpcSession, subagentDisplayStatus } from "@/lib/rpc-manager";
@@ -49,6 +50,13 @@ export async function GET(
     const liveRpc = liveWrapper;
     const resolvedPath = liveRpc ? null : await resolveSessionPath(id);
     if (!liveRpc && !resolvedPath) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+    if (!liveRpc && resolvedPath && !existsSync(resolvedPath)) {
+      // 外部进程（pi TUI/另一台窗口）删了文件而缓存还留着：不去 open——
+      // SessionManager 对缺失路径静默新建空会话，会返回 200+info:null 空壳。
+      // 清掉双向缓存后按不存在处理。
+      invalidateSessionPathCache(id);
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
@@ -147,39 +155,25 @@ export async function GET(
       transient: !filePath || !existsSync(filePath),
     }]))[0] : null;
 
-    return perf?.attach(jsonResponse(
-      req,
-      {
-        sessionId: id,
-        filePath,
-        info,
-        leafId,
-        tree,
-        ...(summaryTree ? { treeFormat: "summary" as const } : {}),
-        snapshotRevision,
-        context,
-        stats,
-        totalActiveMs,
-        ...(toolNames !== undefined ? { toolNames } : {}),
-        ...(wrapperRebuilt ? { wrapperRebuilt: true } : {}),
-      },
-    )) ?? jsonResponse(
-      req,
-      {
-        sessionId: id,
-        filePath,
-        info,
-        leafId,
-        tree,
-        ...(summaryTree ? { treeFormat: "summary" as const } : {}),
-        snapshotRevision,
-        context,
-        stats,
-        totalActiveMs,
-        ...(toolNames !== undefined ? { toolNames } : {}),
-        ...(wrapperRebuilt ? { wrapperRebuilt: true } : {}),
-      },
-    );
+    // 一次组包、一次序列化：这里曾把同一份 payload 写两遍（`perf?.attach(
+    // jsonResponse(...)) ?? jsonResponse(...)` ），改字段时只改一处就漏一处，且
+    // perf 存在但 attach 返回空值时会真的序列化两次。
+    const payload = {
+      sessionId: id,
+      filePath,
+      info,
+      leafId,
+      tree,
+      ...(summaryTree ? { treeFormat: "summary" as const } : {}),
+      snapshotRevision,
+      context,
+      stats,
+      totalActiveMs,
+      ...(toolNames !== undefined ? { toolNames } : {}),
+      ...(wrapperRebuilt ? { wrapperRebuilt: true } : {}),
+    };
+    const response = jsonResponse(req, payload);
+    return perf ? perf.attach(response) : response;
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
@@ -197,6 +191,12 @@ export async function PATCH(
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
     const filePath = await resolveSessionPath(id);
+    if (filePath && !existsSync(filePath)) {
+      // 同 GET：缺失文件上的 appendSessionInfo 是静默 no-op，会返回 ok 却
+      // 什么都没写（改名无声丢失）。清缓存后按不存在处理。
+      invalidateSessionPathCache(id);
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
     const trimmed = name.trim();
     // A session a wrapper holds is renamed in it, never on disk behind its back (#1388).
     const renamed = await renameRpcSession(id, trimmed, () => {

@@ -25,6 +25,7 @@ const jiti = createJiti(import.meta.url, {
 const { PATCH: renameSession } = await jiti.import("./[id]/route.ts");
 const { AgentSessionWrapper } = await jiti.import("../../../lib/rpc-manager.ts");
 const { cacheSessionPath, invalidateSessionPathCache } = await jiti.import("../../../lib/session-reader.ts");
+const { sessionPathKey } = await jiti.import("../../../lib/session-path.ts");
 
 test.after(async () => {
   if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
@@ -180,4 +181,18 @@ test("a session shutting down is renamed on disk once its wrapper is disposed; o
   globalThis.__piSessions.clear();
   assert.equal((await rename(id, "")).status, 200);
   assert.equal(SessionManager.open(path).getSessionName(), undefined, "an empty name still clears the title");
+});
+
+// 外部进程删掉文件而缓存还留着时，rename 曾返回 ok 却什么都没写——
+// SessionManager 对缺失路径的 appendSessionInfo 是静默 no-op（2026-11-21
+// 审计）。路由层先验存在，缺失即 404 并双向清缓存。
+test("a rename over a vanished file is a 404 that drops the stale path cache", async (t) => {
+  const { id, path } = idleSessionOnDisk(t);
+  await rm(path, { force: true });
+
+  const response = await rename(id, "no longer there");
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: "Session not found" });
+  assert.equal(globalThis.__piSessionPathCache?.has(id), false);
+  assert.equal(globalThis.__piPathToSessionIdCache?.has(sessionPathKey(path)), false);
 });

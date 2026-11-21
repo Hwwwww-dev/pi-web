@@ -89,8 +89,15 @@ export async function deleteSessions(
 ): Promise<SessionDeleteResult> {
   const targets = new Map<string, string>();
   const missing: string[] = [];
+  // 未落盘的运行时会话（ensure_session 后还没写盘）在 registry 里有路径，
+  // 磁盘上没有：resolveSessionPath 对缓存命中的缺失文件会清缓存返回 null
+  // （防外部删除后的空壳，380afd70），这里用 registry 路径兜底，别把活会话
+  // 归成 missing（runtime-route 回归过一次）。
+  const registryPaths = new Map(
+    getRpcSessionInfos({ includeTransient: true }).map((session) => [session.id, session.path]),
+  );
   for (const id of new Set(ids)) {
-    const filePath = await resolveSessionPath(id);
+    const filePath = (await resolveSessionPath(id)) ?? registryPaths.get(id);
     if (filePath) targets.set(id, filePath);
     else missing.push(id);
   }

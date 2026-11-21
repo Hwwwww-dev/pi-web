@@ -2,7 +2,7 @@ import {
   SessionManager,
   getAgentDir,
 } from "@earendil-works/pi-coding-agent";
-import { closeSync, existsSync, type Dirent, fstatSync, openSync, readSync, statSync } from "fs";
+import { closeSync, type Dirent, fstatSync, openSync, readSync, statSync } from "fs";
 import { readdir } from "fs/promises";
 import { isAbsolute, join, normalize as normalizePath, relative, resolve as resolvePath, sep } from "path";
 import type { AgentMessage, HeadTurnSummary, ImageContent, MinimapTurnDescriptor, SessionEntry, SessionHeader, SessionInfo, SessionContext, ToolResultMessage } from "./types";
@@ -606,14 +606,7 @@ export function openSessionManager(
 
 export async function resolveSessionPath(sessionId: string): Promise<string | null> {
   const cached = getPathCache().get(sessionId);
-  if (cached) {
-    // 外部进程（pi TUI、另一台窗口、手工清理）可以删掉会话文件：缓存里还留
-    // 着路径的话，上层会拿缺失路径去 open——SessionManager 对缺失文件静默
-    // 新建空会话，GET 返回 200+info:null 空壳、rename 返回 ok 却什么都没写。
-    // 命中后先验文件仍在，不在就双向清缓存，走下方权威扫描重找。
-    if (existsSync(cached)) return cached;
-    invalidateSessionPathCache(sessionId);
-  }
+  if (cached) return cached;
 
   const targetedPath = await findSessionPathById(sessionId);
   if (targetedPath) {
