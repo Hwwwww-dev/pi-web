@@ -214,44 +214,41 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
     };
   }, [expanded, block.deferred, content, sessionId, entryId, blockIndex]);
 
-  // Stick the inner scroller to the streaming tail.
+  // 贴底跟随的是内容的实际高度，不是某个 prop：展开动画（grid-rows 过渡）、
+  // 排版重排、延迟加载的正文到达，以及 `useSmoothStreamText` 在流结束那一刻的
+  // 一次性贴齐，全是「文本 prop 不再变、内容却还在长高」。只挂在文本上就会停在
+  // 半途，看起来像思考没显示完。
+  // `followRef` 记「这个实例里流过」：流过的块一直跟到内容静止（含结束那一帧），
+  // 手动展开一个历史块仍然从顶部读。
+  const followRef = useRef(Boolean(active));
+  useEffect(() => {
+    if (active) followRef.current = true;
+  }, [active]);
   useEffect(() => {
     const el = detailRef.current;
-    if (!el || !expanded || !active || !stickRef.current) return;
+    if (!el || !expanded) return;
+    let watched: Element | null = null;
     const pin = () => {
-      if (!stickRef.current) return;
+      if (!followRef.current || !stickRef.current) return;
       el.scrollTop = el.scrollHeight;
       prevScrollTopRef.current = el.scrollTop;
     };
-    pin();
-    // 展开动画（grid-rows 过渡）与字体排版会把高度在下一帧后再撑一次，
-    // 只钉一次就停在半途（滚动条看上去没到底）。
-    const frame = requestAnimationFrame(pin);
-    const settle = setTimeout(pin, 320);
-    return () => {
-      cancelAnimationFrame(frame);
-      clearTimeout(settle);
+    // 正文节点会在骨架屏和内容之间换人（延迟加载），所以两处都看：`el` 自身负责
+    // 重新认出内容节点，内容节点负责它自己的高度变化。
+    const observer = new ResizeObserver(() => sync());
+    const sync = () => {
+      const content = el.firstElementChild;
+      if (content !== watched) {
+        if (watched) observer.unobserve(watched);
+        if (content) observer.observe(content);
+        watched = content;
+      }
+      pin();
     };
-  // 贴底跟随跟随的是显示帧（平滑后的文本），不是 chunk：吐字动画让高度逐帧长，
-  // 只挂在 chunk 上会在两 chunk 之间掉队。
-  }, [expanded, active, liveThinking, content]);
-
-  // 流结束那一帧：`useSmoothStreamText` 在 active 熄灭时把剩余字符一次贴齐，
-  // 内容还会长一截，而上面的贴底效果已经不再运行——滚动条就停在半途。
-  // 只在“刚才在跟尾”时补钉；手动展开一个已完成块仍然从顶部读（stickRef 已为 false）。
-  const wasStreamingRef = useRef(false);
-  useEffect(() => {
-    if (active) {
-      wasStreamingRef.current = true;
-      return;
-    }
-    if (!wasStreamingRef.current) return;
-    wasStreamingRef.current = false;
-    const el = detailRef.current;
-    if (!el || !expanded || !stickRef.current) return;
-    el.scrollTop = el.scrollHeight;
-    prevScrollTopRef.current = el.scrollTop;
-  }, [active, expanded]);
+    observer.observe(el);
+    sync();
+    return () => observer.disconnect();
+  }, [expanded]);
 
   const handleDetailScroll = useCallback(() => {
     const el = detailRef.current;
