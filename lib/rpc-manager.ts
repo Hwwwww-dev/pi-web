@@ -3037,7 +3037,9 @@ declare global {
  *  still tearing down (rpiv-todo's foreground, pi-lens's runtime rebind). */
 export function hasOtherBoundWrapper(registry: Map<string, AgentSessionWrapper>, sessionId: string): boolean {
   for (const [id, wrapper] of registry) {
-    if (wrapper.isClosing()) return true;
+    // The registry is a globalThis bag that tests and pre-hot-reload code can fill with
+    // partial wrappers: closing is only known when the wrapper models it.
+    if (typeof wrapper.isClosing === "function" && wrapper.isClosing()) return true;
     if (id !== sessionId && wrapper.isAlive()) return true;
   }
   return false;
@@ -3191,36 +3193,53 @@ function forgetStartRegisteredId(startKey: string): void {
 }
 
 const CLOSING_SESSION_WAIT_MARGIN_MS = 1_000;
-const closingSessionWaits = new WeakMap<AgentSessionWrapper, { done: boolean; promise: Promise<void> }>();
+type ClosingSessionWait = { done: boolean; disposed: boolean; promise: Promise<boolean> };
+const closingSessionWaits = new WeakMap<AgentSessionWrapper, ClosingSessionWait>();
+
+/**
+ * Thrown instead of opening a session file whose previous SDK session never finished
+ * dispose(): two sessions appending to one jsonl interleave entries, split the context
+ * and lose messages.
+ */
+function stuckShutdownError(sessionId: string): Error {
+  return Object.assign(
+    new Error(`Session ${sessionId} is stuck shutting down; try again later or restart the server`),
+    { status: 503 },
+  );
+}
 
 /**
  * The wait for a wrapper of `sessionId` that is shutting down, or null when there is none
- * left to wait for. Until it is disposed the closing wrapper still owns the session: an
- * extension's session_shutdown may append to the file, which a replacement opened earlier
- * would branch away from, and dispose() releases provider resources (a Codex websocket) by
- * session id, which the replacement shares. The wait covers shutdown()'s two deadlines (the
- * binding, then session_shutdown) and is bounded itself, so a dispose that never returns
- * cannot keep the session from starting again. One wait per closing wrapper: its bound runs
- * from the first caller and later callers share it, so a shutdown that began before the
- * first caller asked can be overtaken.
+ * left to wait for. Resolves whether the closing wrapper's dispose completed: until then it
+ * still owns the session — an extension's session_shutdown may append to the file, which a
+ * replacement opened earlier would branch away from, and dispose() releases provider
+ * resources (a Codex websocket) by session id, which the replacement shares. The wait
+ * covers shutdown()'s two deadlines (the binding, then session_shutdown) and is bounded
+ * itself; `false` means dispose() never settled inside the bound, so the caller must refuse
+ * to open the file. While the stuck wrapper stays registered every later caller is refused
+ * the same way; once its dispose finally completes, onDestroy removes it and starts work
+ * again. One wait per closing wrapper: its bound runs from the first caller and later
+ * callers share it, so a shutdown that began before the first caller asked can be overtaken.
  */
-function closingRpcSessionWait(sessionId: string): Promise<void> | null {
+function closingRpcSessionWait(sessionId: string): Promise<boolean> | null {
   const closing = getRegistry().get(sessionId);
   // A wrapper from before a hot reload may lack waitUntilDisposed.
   if (!closing || closing.isAlive() || typeof closing.waitUntilDisposed !== "function") return null;
   let wait = closingSessionWaits.get(closing);
   if (!wait) {
-    const entry = { done: false, promise: Promise.resolve() };
+    const entry: ClosingSessionWait = { done: false, disposed: true, promise: Promise.resolve(true) };
     // shutdown() bounds the binding wait and then the session_shutdown hooks, each by the deadline.
     entry.promise = closing.waitUntilDisposed(2 * SESSION_SHUTDOWN_DEADLINE_MS + CLOSING_SESSION_WAIT_MARGIN_MS)
       .then((disposed) => {
-        if (!disposed) console.warn(`[pi-web] session ${sessionId} is still shutting down; starting it again anyway`);
+        entry.disposed = disposed;
+        if (!disposed) console.warn(`[pi-web] session ${sessionId} never finished shutting down; its file stays closed until it does`);
+        return disposed;
       })
       .finally(() => { entry.done = true; });
     closingSessionWaits.set(closing, entry);
     wait = entry;
   }
-  return wait.done ? null : wait.promise;
+  return wait.done ? (wait.disposed ? null : Promise.resolve(false)) : wait.promise;
 }
 
 function normalizeRpcCwd(cwd: string): string {
@@ -3296,9 +3315,19 @@ export async function renameRpcSession(sessionId: string, name: string, writeToD
       invalidateSessionListCache();
       return true;
     }
-    const pending = getLocks().get(sessionId) ?? closingRpcSessionWait(sessionId);
-    if (!pending) return writeToDisk();
-    await pending.catch(() => undefined);
+    const lock = getLocks().get(sessionId);
+    if (lock) {
+      await lock.catch(() => undefined);
+      continue;
+    }
+    const closing = closingRpcSessionWait(sessionId);
+    if (closing) {
+      // A dispose stuck past the bound still owns the file: writing session_info beside
+      // it would interleave with whatever the hung teardown appends last.
+      if (!(await closing)) throw stuckShutdownError(sessionId);
+      continue;
+    }
+    return writeToDisk();
   }
 }
 
@@ -3329,7 +3358,12 @@ export async function setRpcSessionTools(
     // A wrapper still closing, or a start already under way, owns the file: wait for it and
     // apply the selection to whatever it left, or a start that opened the file first would
     // come up without the selection while this call reported success.
-    const pending = closingRpcSessionWait(sessionId) ?? getLocks().get(sessionId);
+    const closing = closingRpcSessionWait(sessionId);
+    if (closing) {
+      if (!(await closing)) throw stuckShutdownError(sessionId);
+      return setRpcSessionTools(sessionId, sessionFile, requestedToolNames);
+    }
+    const pending = getLocks().get(sessionId);
     if (pending) {
       await pending.catch(() => undefined);
       return setRpcSessionTools(sessionId, sessionFile, requestedToolNames);
@@ -3767,8 +3801,11 @@ export async function startRpcSession(
   const closingWait = closingRpcSessionWait(sessionId);
   if (closingWait) {
     // Concurrent starts share this lock, then the one start that follows it.
-    const waiting: Promise<{ session: AgentSessionWrapper; realSessionId: string }> = closingWait.then(() => {
+    const waiting: Promise<{ session: AgentSessionWrapper; realSessionId: string }> = closingWait.then((disposed) => {
       if (locks.get(sessionId) === waiting) locks.delete(sessionId);
+      // A dispose that hung past the bound never released the file: refuse rather than
+      // append to it beside the session that is stuck mid-teardown.
+      if (!disposed) throw stuckShutdownError(sessionId);
       return startRpcSession(sessionId, sessionFile, cwd, options);
     });
     locks.set(sessionId, waiting);
