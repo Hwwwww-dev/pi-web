@@ -117,3 +117,14 @@ test("a minimap jump reads one window, never the whole branch", () => {
   assert.match(jump, /minimapJumpInFlightRef/);
   assert.doesNotMatch(jump, /tail: 100|tail: 200/);
 });
+
+test("a reader scrolling up leaves follow, so streaming rows cannot yank the viewport back", () => {
+  // The library re-arms `following-bottom` on every scroll that is not at the
+  // edge, so with autoScroll open a momentum scroll upward gets pulled back to
+  // the end on the next row (2026-11-21 "上滑被强行贴底、列表上下抖"). The chat
+  // leaves follow itself the moment the viewport moves up.
+  assert.match(source, /const movedUp = scrollTop < lastFollowScrollTopRef\.current - 8/);
+  assert.match(source, /if \(movedUp\) suspendFollow\(\)/);
+  assert.match(source, /else if \(atBottom && followSuppressedRef\.current\) resumeFollow\(\)/);
+  assert.match(source, /noticeScroll\(viewport\.scrollTop, nextAtBottom\);/);
+});

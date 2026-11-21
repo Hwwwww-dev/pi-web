@@ -83,6 +83,35 @@ test("a missing or short index degrades to the measured window only", () => {
   assert.equal(capped[3].targetTurn.scrollTop, 120);
 });
 
+test("measured turns match the index by entry id, so a missing anchor keeps the rest aligned", () => {
+  // e2's anchor never mounted (a collapsed group, an unmounted row): counting
+  // measured turns would shift every later turn onto the wrong index entry and
+  // mark loaded turns "not loaded" until the next measure.
+  const nodes = assembleTurnNodes(fakeIndex(6), 1, [
+    { ...fakeMeasuredTurn("turn 2"), entryId: "e1", scrollTop: 200 },
+    { ...fakeMeasuredTurn("turn 4"), entryId: "e3", scrollTop: 400 },
+  ]);
+  assert.deepEqual(nodes.map((node) => node.index), [0, 1, 2, 3, 4, 5]);
+  assert.equal(nodes[0].targetTurn.scrollTop, null);
+  assert.equal(nodes[1].targetTurn.scrollTop, 200);
+  assert.equal(nodes[2].targetTurn.scrollTop, null);
+  assert.equal(nodes[3].targetTurn.scrollTop, 400);
+  assert.equal(nodes[5].targetTurn.scrollTop, null);
+});
+
+test("a turn paged in later replaces its unloaded index entry", () => {
+  // Loading more history grows the measured window; the rail must flip those
+  // turns from "点击跳转" to their measured stats.
+  const index = fakeIndex(3);
+  const before = assembleTurnNodes(index, 2, [{ ...fakeMeasuredTurn("turn 3"), entryId: "e2" }]);
+  assert.deepEqual(before.map((node) => node.targetTurn.scrollTop), [null, null, 120]);
+  const after = assembleTurnNodes(index, 1, [
+    { ...fakeMeasuredTurn("turn 2"), entryId: "e1" },
+    { ...fakeMeasuredTurn("turn 3"), entryId: "e2" },
+  ]);
+  assert.deepEqual(after.map((node) => node.targetTurn.scrollTop), [null, 120, 120]);
+});
+
 const fakeNode = (index) => ({ topRatio: 0, targetTurn: { scrollTop: index * 100 }, index });
 
 function fakeNodes(count) {

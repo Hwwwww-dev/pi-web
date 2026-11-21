@@ -2107,7 +2107,9 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     const previous = followScrollTargetRef.current;
     if (previous) previous.element.removeEventListener("scroll", previous.handler);
     const handler = () => {
-      atBottomRef.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= scrollEdgeThreshold;
+      const nextAtBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= scrollEdgeThreshold;
+      noticeScroll(viewport.scrollTop, nextAtBottom);
+      atBottomRef.current = nextAtBottom;
     };
     viewport.addEventListener("scroll", handler, { passive: true });
     handler();
@@ -2166,6 +2168,31 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     leftTailRef.current = false;
     setFollowSuppressed(true);
   }, [agentRunning, stopFollowSettle]);
+  /**
+   * 读者自己往上翻就退出跟随，回到尾部再恢复。
+   * 库在 `autoScroll` 打开时，任何“没贴底”的滚动都会把模式续回
+   * `following-bottom`（`be()` 里的分支），于是流式新行一到就 `scrollToEnd`：
+   * 手指还在往上滑、或者 momentum 还没停，视口被拽回底部，再被自己拉上去——
+   * 就是“上滑被强行贴底、列表上下抖”。只有 reader 的 wheel/touch 手势会调
+   * `userScrollIntent` 退出跟随，momentum 阶段没有手势事件，所以必须由滚动
+   * 方向自己判：scrollTop 变小就是读者在往上翻。
+   */
+  const lastFollowScrollTopRef = useRef(0);
+  const followSuppressedRef = useRef(false);
+  followSuppressedRef.current = followSuppressed;
+  const resumeFollow = useCallback(() => {
+    leftTailRef.current = false;
+    setFollowSuppressed(false);
+  }, []);
+  const noticeScroll = useCallback((scrollTop: number, atBottom: boolean) => {
+    const movedUp = scrollTop < lastFollowScrollTopRef.current - 8;
+    lastFollowScrollTopRef.current = scrollTop;
+    // 不看是否贴底：贴底那一档阈值是 48 + dock 高度（≈215px），读者在这区间里往上
+    // 翻一下就会被判“还贴底”而继续跟随，随后被拽回——正是那个抖动。退出跟随的代价
+    // 很小，但要靠这里自己恢复：`atTail` 在这个区间里恒为 true，它的变化不会再来通知。
+    if (movedUp) suspendFollow();
+    else if (atBottom && followSuppressedRef.current) resumeFollow();
+  }, [resumeFollow, suspendFollow]);
   // 回到尾部才恢复跟随：展开时读者本来就在尾部，不能就地复活。
   useEffect(() => {
     if (!atTail) {
@@ -2430,6 +2457,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         {isMobile || pendingScrollRestore || !minimapPaneWide ? null : (
           <ChatMinimap
             messages={messages}
+            entryIds={entryIds}
             getStreamingMessage={getStreamingMessage}
             scrollContainer={scrollContainerRef}
             messageRefs={messageRefs}

@@ -21,6 +21,10 @@ interface Props {
   /** Whole-branch turn index, oldest first: turns before the loaded window
    *  list from it and page their messages in on click. */
   turnIndex?: MinimapTurnDescriptor[];
+  /** Entry id per message, parallel to `messages`: measured turns carry their
+   *  id so the rail matches them against the branch index by identity, not by
+   *  counting. */
+  entryIds?: readonly string[];
 }
 
 const MINIMAP_WIDTH = 36;
@@ -49,6 +53,8 @@ const NAVIGATION_ACTIVE_LOCK_MS = 1600;
 interface TurnInfo {
   userMessage: UserMessage | CustomMessage;
   scrollTop: number | null;
+  /** The anchor entry's id; absent only for a turn that has not landed yet. */
+  entryId?: string;
   /** Tool calls issued anywhere in this turn's assistant replies. */
   toolCount: number;
   /** Tokens and cost the whole turn's assistant replies reported, when the model sent usage. */
@@ -105,6 +111,7 @@ function indexTurn(descriptor: MinimapTurnDescriptor): TurnInfo {
   return {
     userMessage: { role: "user", content: descriptor.preview } as UserMessage,
     scrollTop: null,
+    entryId: descriptor.entryId,
     toolCount: 0,
     usageTokens: null,
     usageCost: null,
@@ -114,17 +121,36 @@ function indexTurn(descriptor: MinimapTurnDescriptor): TurnInfo {
 
 /**
  * The rail's full turn list, assembled from the independent whole-branch index:
- * index head (turns before the loaded window) + the window's measured turns +
- * index tail (turns after it). The three sit in index order, so `node.index`
- * is the turn number minus one and `turnIndex[node.index]` identifies every
- * node — loaded or not. Without the index (fetch failed), the rail degrades to
- * the measured window only.
+ * every turn the index lists, with the measured version standing in for the
+ * ones the chat has loaded. Matching is by entry id, not by counting: a paged-in
+ * turn then flips from “not loaded” the moment its messages render, and a turn
+ * whose anchor did not mount cannot shift every later turn off by one (the
+ * counting version did both). Turns the index does not list yet (it lags the
+ * file during a run) follow at the end. Without the index, the rail degrades to
+ * the measured window.
  */
 export function assembleTurnNodes(
   turnIndex: MinimapTurnDescriptor[],
   turnsBefore: number,
   measuredTurns: TurnInfo[],
 ): NodeInfo[] {
+  const measuredById = new Map<string, TurnInfo>();
+  for (const turn of measuredTurns) if (turn.entryId) measuredById.set(turn.entryId, turn);
+
+  if (turnIndex.length > 0 && measuredById.size > 0) {
+    const nodes: NodeInfo[] = turnIndex.map((descriptor, index) => ({
+      topRatio: 0,
+      targetTurn: measuredById.get(descriptor.entryId) ?? indexTurn(descriptor),
+      index,
+    }));
+    const listed = new Set(turnIndex.map((descriptor) => descriptor.entryId));
+    for (const turn of measuredTurns) {
+      if (turn.entryId && listed.has(turn.entryId)) continue;
+      nodes.push({ topRatio: 0, targetTurn: turn, index: nodes.length });
+    }
+    return nodes;
+  }
+
   const headCount = Math.min(turnIndex.length, Math.max(0, turnsBefore));
   return [
     ...createTurnNodes(turnIndex.slice(0, headCount).map(indexTurn)),
@@ -228,6 +254,7 @@ export const ChatMinimap = memo(function ChatMinimap({
   onRevealTurn,
   turnsBefore = 0,
   turnIndex = EMPTY_TURN_INDEX,
+  entryIds,
 }: Props) {
   const { t } = useI18n();
   const [visible, setVisible] = useState(false);
@@ -252,6 +279,8 @@ export const ChatMinimap = memo(function ChatMinimap({
 
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
+  const entryIdsRef = useRef(entryIds);
+  entryIdsRef.current = entryIds;
 
   const slotLayout = useMemo(
     () => layoutSlots(allNodes, minimapHeight),
@@ -339,7 +368,9 @@ export const ChatMinimap = memo(function ChatMinimap({
       const allMessages: (AgentMessage | Partial<AgentMessage>)[] = streamingMessage
         ? [...messagesRef.current, streamingMessage]
         : messagesRef.current;
-      for (const message of allMessages) {
+      const ids = entryIdsRef.current;
+      for (let messageIndex = 0; messageIndex < allMessages.length; messageIndex++) {
+        const message = allMessages[messageIndex];
         if (message.role === "custom" && (message as { customType?: string }).customType === "compaction") {
           compactionPending = true;
           continue;
@@ -356,6 +387,7 @@ export const ChatMinimap = memo(function ChatMinimap({
             scrollTop: elementRect
               ? elementRect.top - containerRect.top + scrollEl.scrollTop
               : null,
+            entryId: ids?.[messageIndex],
             toolCount: 0,
             usageTokens: null,
             usageCost: null,
