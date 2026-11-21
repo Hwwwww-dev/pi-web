@@ -65,7 +65,7 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
   const [showPreview, setShowPreview] = useState(defaultPreview);
   const [renderState, setRenderState] = useState<RenderState | null>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
-  const previewRef = useRef<HTMLButtonElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const currentKey = `${isDark ? "dark" : "light"}\n${code}`;
   const previewVisible = showPreview && !isStreaming;
 
@@ -126,14 +126,21 @@ export function MermaidBlock({ code, isStreaming, defaultPreview = false }: Merm
     ) : (
       <>
         {!zoomOpen && (
-          <Button
+          /* 不是 Button：它的基础类 [&_svg:not([class*='size-'])]:size-4 会把
+             mermaid 渲染出的 svg 钉成 16×16，整张图缩成一条（手机上一眼看不见）。 */
+          <div
             ref={previewRef}
-            type="button"
-            variant="ghost"
+            role="button"
+            tabIndex={0}
             className="block h-auto max-h-[min(600px,60dvh)] w-full cursor-zoom-in overflow-auto p-0 text-left font-normal text-inherit animate-in fade-in duration-200 motion-reduce:animate-none"
             title={t("i18n.openMermaidViewer")}
             aria-label={t("i18n.openMermaidViewer")}
             onClick={() => setZoomOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              setZoomOpen(true);
+            }}
             dangerouslySetInnerHTML={{ __html: renderState.svg }}
           />
         )}

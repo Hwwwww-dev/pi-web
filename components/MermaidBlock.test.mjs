@@ -215,3 +215,11 @@ test("downloadMermaidSvg downloads XML-serialized SVG and releases its URL", asy
     URL.revokeObjectURL = originalRevokeObjectURL;
   }
 });
+
+test("the mermaid preview is not a Button (its [&_svg]:size-4 would shrink the diagram)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("./MermaidBlock.tsx", import.meta.url), "utf8");
+  // Button 的基础类会给内部 svg 钉上 size-4，mermaid 的整张图会缩成 16×16。
+  assert.doesNotMatch(src, /<Button[\s\S]{0,400}?ref=\{previewRef\}/);
+  assert.match(src, /ref=\{previewRef\}[\s\S]{0,160}?role="button"/);
+});
