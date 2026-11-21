@@ -231,9 +231,10 @@ test("mounts on whole turns, auto disk reads are gone, and the menu reload re-mo
   assert.match(reloadSource, /await loadSession\(sid, true, true, \{ force: true \}\)/);
   assert.match(reloadSource, /onReloadSessionChange\?\.\(reloadSession\)/);
   assert.match(source, /await loadSession\(sid\)/);
-  // force 读只有四处：挂载、手动重载、bash 输出落盘后的刷新（550acf47）、
-  // 超宽限期回页的补读（离开期间事件流已释放，落盘变化只有回页这一刻能看见）。
-  assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 4);
+  // force 读只剩三处：挂载、手动重载、bash 输出落盘后的刷新（550acf47）。
+  // 回页不再强读：离开期间释放的事件流由 reattach 的 "visible" 分支重连并做一次
+  // 尾部合并，没新行就一字不动。
+  assert.equal([...source.matchAll(/\{ force: true \}/g)].length, 3);
 });
 
 test("forking stays available during a run while in-session branch switches wait for it", () => {
@@ -482,17 +483,19 @@ test("keeps the selected session warm while idle and renews its lease", () => {
   assert.match(appShellSource, /onRunningSessionIdsChange=\{handleRunningSessionIdsChange\}/);
 });
 
-test("a page back past the hidden grace forces one catch-up read", () => {
-  // 宽限期释放事件流后，离开期间落盘的变化没有流可补：回页超宽限期时强制读一次。
-  const visibleSource = source.slice(
-    source.indexOf("const hiddenSinceRef"),
-    source.indexOf("  // Load session on mount"),
-  );
+test("a page back past the hidden grace merges the tail instead of reloading", () => {
+  // 宽限期释放事件流后，离开期间落盘的变化没有流可补。回页由 reattach 的 "visible"
+  // 分支重连，并做一次非 force 的 loadSession——尾部合并（mergeLoadedTail）：真有
+  // 新行才接上，没有就一字不动，不出骨架、不整窗替换。
+  assert.doesNotMatch(source, /hiddenSinceRef/);
 
-  assert.match(visibleSource, /document\.visibilityState === "hidden"/);
-  assert.match(visibleSource, /Date\.now\(\) - hiddenSince < HIDDEN_PAGE_GRACE_MS/);
-  assert.match(visibleSource, /if \(agentRunningRef\.current\) return;/);
-  assert.match(visibleSource, /loadSession\(sid, false, false, \{ force: true \}\)/);
+  const reattach = source.slice(
+    source.indexOf("reattachEventStreamRef.current = (sid"),
+    source.indexOf("// The page keeps its selected session alive"),
+  );
+  assert.match(reattach, /maintainEventsConnected\(sid\)/);
+  assert.match(reattach, /void loadSession\(sid, false, true\)/);
+  assert.doesNotMatch(reattach, /force: true/);
 });
 
 test("opens the selected session's event stream even when Strict Mode re-runs effects", () => {

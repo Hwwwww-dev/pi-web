@@ -1653,32 +1653,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     };
   }, [closeEvents, eventStreamIdle, eventStreamReattachCount, requestLease, session?.id]);
 
-  // 页面 hidden 超过宽限期后回到可见，补读一次会话：宽限期一过事件流已被释放
-  // （上方 closeEvents("released")），离开期间落盘的变化没有流可补，只有回页这一
-  // 刻能看见。每个 hidden→visible 周期至多一次（hidden 时间戳被消费即清空）；
-  // 运行中跳过——运行中已有 reconcile 链与 settle 后的 loadSession 兜底，中途
-  // 强刷只会让流式视图闪烁。loadSession 自带 single-flight 与 revision 未变时
-  // 保留已载窗口，重复请求天然廉价，不需要额外去重。
-  const hiddenSinceRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (document.visibilityState === "hidden" && hiddenSinceRef.current === null) {
-      hiddenSinceRef.current = Date.now();
-    }
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        hiddenSinceRef.current = Date.now();
-        return;
-      }
-      const hiddenSince = hiddenSinceRef.current;
-      hiddenSinceRef.current = null;
-      if (hiddenSince === null || Date.now() - hiddenSince < HIDDEN_PAGE_GRACE_MS) return;
-      if (agentRunningRef.current) return;
-      const sid = sessionIdRef.current;
-      if (sid) void loadSession(sid, false, false, { force: true });
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [loadSession]);
+  // 回页不在这里补读：事件流被释放后，`reattachEventStreamRef` 的 "visible" 分支
+  // 已经重连并做一次非 force 的 loadSession——它是尾部合并（mergeLoadedTail），
+  // 真有新行才接上，没有就一字不动，没有骨架、没有整窗替换。原来这里还多一次
+  // force 读，等于让每次「出去一会儿再回来」都重读一遍窗口，哪怕期间一条消息
+  // 也没来（用户 2026-11-21：「出去一会功夫就要重新加载」）。
 
   const addNotice = useCallback((notice: { id?: string; message: string; type?: NoticeType }) => {
     // sonner 的 description 是纯文本：先剥掉终端转义序列，不然 ANSI 会显示成乱码。
