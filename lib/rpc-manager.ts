@@ -3707,7 +3707,23 @@ export async function startRpcSession(
   if (existing?.isAlive()) return { session: existing, realSessionId: sessionId };
 
   const inflight = locks.get(sessionId);
-  if (inflight) return inflight;
+  if (inflight) {
+    // A bare joiner (typically an SSE reconnect's start) takes the winner as-is. A caller that
+    // names tools raced a start already under way: returning it unchanged reports success while
+    // the session came up on the winner's loadout, and the selection never reaches disk.
+    // Wait for the start, then apply it through the same setRpcSessionTools path a direct call
+    // would have taken: it refuses subagent and side-chat sessions (tools are fixed), and needs
+    // the registry's real session id, not the web id this start was keyed by.
+    if (requestedToolNames === undefined) return inflight;
+    return inflight.then(async (started) => {
+      const applied = await setRpcSessionTools(
+        started.realSessionId,
+        started.session.sessionFile,
+        requestedToolNames,
+      );
+      return { session: applied.session, realSessionId: applied.sessionId };
+    });
+  }
 
   const closingWait = closingRpcSessionWait(sessionId);
   if (closingWait) {
