@@ -1217,8 +1217,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     },
   }));
 
-  const processImageFiles = useCallback((files: File[]) => {
-    if (compact) return;
+  const processImageFiles = useCallback((files: File[]): Promise<void> => {
+    if (compact) return Promise.resolve();
     const imageTypeFiles = files.filter((f) => f.type.startsWith("image/"));
     const oversizeCount = imageTypeFiles.filter((f) => f.size > MAX_ATTACHED_IMAGE_BYTES).length;
     const remaining = Math.max(
@@ -1232,7 +1232,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     if (oversizeCount) notices.push(t("chat.attachTooLarge", { count: oversizeCount }));
     if (cappedCount) notices.push(t("chat.attachLimit", { count: cappedCount, max: MAX_ATTACHED_IMAGES }));
     if (notices.length) setAttachError(notices.join(" "));
-    if (!imageFiles.length) return;
+    if (!imageFiles.length) return Promise.resolve();
     pendingImageCountRef.current += imageFiles.length;
     // Settle per file: one unreadable image must not swallow the batch.
     const run = pendingImageTailRef.current.then(async () => {
@@ -1260,6 +1260,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       }
     });
     pendingImageTailRef.current = run.catch(() => {});
+    return pendingImageTailRef.current;
   }, [compact, t]);
 
   const handleFilePick = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1962,13 +1963,17 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         const ta = e.currentTarget;
         const start = ta.selectionStart;
         const end = ta.selectionEnd;
-        processImageFiles(files);
-        // 附件条插在输入框上方，输入框整体下移：把焦点和 caret 重新落回原位置，
-        // 否则光标停在旧坐标（点一下输入框才恢复正常）。
-        requestAnimationFrame(() => {
+        // 缩略图要等解码完才插进卡片，而附件行是 180ms 的 grid-rows 展开动画
+        // （Reveal），输入框在这段时间里持续下移：动画前后各钉一次，caret 才
+        // 不会停在旧坐标上（绘制在图片行里）。
+        const restoreCaret = () => {
           if (!ta.isConnected) return;
           ta.focus();
           ta.setSelectionRange(start, end);
+        };
+        void processImageFiles(files).then(() => {
+          requestAnimationFrame(restoreCaret);
+          setTimeout(restoreCaret, 220);
         });
       }
       if (otherFiles.length && onAttachFiles) onAttachFiles(otherFiles);

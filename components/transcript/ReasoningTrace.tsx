@@ -218,11 +218,40 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
   useEffect(() => {
     const el = detailRef.current;
     if (!el || !expanded || !active || !stickRef.current) return;
-    el.scrollTop = el.scrollHeight;
-    prevScrollTopRef.current = el.scrollTop;
+    const pin = () => {
+      if (!stickRef.current) return;
+      el.scrollTop = el.scrollHeight;
+      prevScrollTopRef.current = el.scrollTop;
+    };
+    pin();
+    // 展开动画（grid-rows 过渡）与字体排版会把高度在下一帧后再撑一次，
+    // 只钉一次就停在半途（滚动条看上去没到底）。
+    const frame = requestAnimationFrame(pin);
+    const settle = setTimeout(pin, 320);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(settle);
+    };
   // 贴底跟随跟随的是显示帧（平滑后的文本），不是 chunk：吐字动画让高度逐帧长，
   // 只挂在 chunk 上会在两 chunk 之间掉队。
   }, [expanded, active, liveThinking, content]);
+
+  // 流结束那一帧：`useSmoothStreamText` 在 active 熄灭时把剩余字符一次贴齐，
+  // 内容还会长一截，而上面的贴底效果已经不再运行——滚动条就停在半途。
+  // 只在“刚才在跟尾”时补钉；手动展开一个已完成块仍然从顶部读（stickRef 已为 false）。
+  const wasStreamingRef = useRef(false);
+  useEffect(() => {
+    if (active) {
+      wasStreamingRef.current = true;
+      return;
+    }
+    if (!wasStreamingRef.current) return;
+    wasStreamingRef.current = false;
+    const el = detailRef.current;
+    if (!el || !expanded || !stickRef.current) return;
+    el.scrollTop = el.scrollHeight;
+    prevScrollTopRef.current = el.scrollTop;
+  }, [active, expanded]);
 
   const handleDetailScroll = useCallback(() => {
     const el = detailRef.current;
