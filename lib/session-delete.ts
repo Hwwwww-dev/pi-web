@@ -57,10 +57,16 @@ function addChild(childrenByParent: Map<string, string[]>, parentId: string, chi
  * The original mode is kept — pi owns these files, unlike the credentials the
  * 0600 writer in lib/atomic-file.ts covers.
  */
-function rewriteSessionFileSync(path: string, contents: string, mode: number): void {
+/** 外部进程在读完之后又追加了条目：拒绝改写，让调用方重试。 */
+class RewriteRaceError extends Error {}
+
+function rewriteSessionFileSync(path: string, contents: string, mode: number, expectSize: number): void {
   const tempPath = join(dirname(path), `.${basename(path)}-${randomUUID()}.tmp`);
   try {
     writeFileSync(tempPath, contents, { encoding: "utf8", flag: "wx", mode, flush: true });
+    // rename 一旦落下就整文件覆盖，别人的追加会静默丢失。临时文件写完后再
+    // 核一次长度：窗口从「读+解析整文件」缩到「stat→rename 之间」。
+    if (statSync(path).size !== expectSize) throw new RewriteRaceError(`target grew while rewriting ${basename(path)}`);
     renameSync(tempPath, path);
   } catch (error) {
     try {
@@ -280,8 +286,17 @@ export async function deleteSessions(
                 }
                 continue;
               }
-              rewriteSessionFileSync(childPath, lines.join("\n"), before.mode & 0o777);
-              rewritten = true;
+              try {
+                rewriteSessionFileSync(childPath, lines.join("\n"), before.mode & 0o777, after.size);
+                rewritten = true;
+              } catch (error) {
+                if (!(error instanceof RewriteRaceError)) throw error;
+                if (attempt === 2) {
+                  console.warn(`[pi-web] left ${basename(childPath)} on its old parent: the file kept changing while re-pointing it`);
+                  break;
+                }
+                continue;
+              }
             }
           } catch { /* skip malformed */ }
         }
@@ -291,23 +306,32 @@ export async function deleteSessions(
 
   for (const deletedId of deletedSessionIds) {
     try { await abortSubagent(deletedId); } catch { /* ordinary session, idle or completed */ }
-    await getRpcSession(deletedId)?.shutdown();
-  }
-  for (const [deletedId, deletedPath] of deletedPaths) {
-    try {
-      unlinkSync(deletedPath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    // 单个会话的 shutdown 失败（扩展钩子抛错等）不许拖垮整个删除：后面还有
+    // unlink、路径缓存与侧栏状态要清。
+    try { await getRpcSession(deletedId)?.shutdown(); } catch (error) {
+      console.warn(`[pi-web] could not shut down ${deletedId} while deleting it: ${error instanceof Error ? error.message : String(error)}`);
     }
-    invalidateSessionPathCache(deletedId);
-    invalidateSessionManagerCache(deletedPath);
   }
-  // Drop their pins and archive times; best effort, the files are already gone.
   try {
-    await forgetSessionUiState(deletedSessionIds);
-  } catch (error) {
-    console.warn(`[pi-web] could not clear the sidebar state of deleted sessions: ${error instanceof Error ? error.message : String(error)}`);
+    for (const [deletedId, deletedPath] of deletedPaths) {
+      try {
+        unlinkSync(deletedPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      invalidateSessionPathCache(deletedId);
+      invalidateSessionManagerCache(deletedPath);
+    }
+  } finally {
+    // Drop their pins and archive times; best effort, the files are already gone.
+    // 放 finally：中途任一 unlink 抛错（EACCES/EPERM）也不能把 pin/archive 留在盘上、
+    // 把已删会话留在侧栏里等 TTL 过期。
+    try {
+      await forgetSessionUiState(deletedSessionIds);
+    } catch (error) {
+      console.warn(`[pi-web] could not clear the sidebar state of deleted sessions: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    invalidateSessionListCache();
   }
-  invalidateSessionListCache();
   return { deleted: [...deletedSessionIds], missing, running };
 }
