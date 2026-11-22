@@ -52,7 +52,12 @@ export type TurnPart =
 export interface CheckpointView {
   key: string;
   state: "running" | "done" | "error";
+  /** 第一个区间的摘要（触发区判断能不能点开、复制用）。 */
   summary?: string;
+  /** 这次压缩的全部摘要：一次压多个区间时，`content[]` 每项一份。 */
+  summaries?: string[];
+  /** 压缩工具返回的全文（用量行、各块范围、可压区间清单），Popover 原样展示。 */
+  result?: string;
   before?: string;
   after?: string;
   /** 失败时的原因（结果文本首行）。 */
@@ -73,15 +78,16 @@ function textOf(content: unknown): string {
     .join("\n");
 }
 
-function compactSummaryOfInput(input: Record<string, unknown> | undefined): string | undefined {
+function compactSummariesOfInput(input: Record<string, unknown> | undefined): string[] {
   const blocks = input?.content;
-  if (!Array.isArray(blocks)) return undefined;
+  if (!Array.isArray(blocks)) return [];
+  const summaries: string[] = [];
   for (const block of blocks) {
     if (!block || typeof block !== "object") continue;
     const summary = (block as { summary?: unknown }).summary;
-    if (typeof summary === "string" && summary.trim()) return summary;
+    if (typeof summary === "string" && summary.trim()) summaries.push(summary);
   }
-  return undefined;
+  return summaries;
 }
 
 /**
@@ -103,18 +109,29 @@ export function checkpointViewOf(item: ActivityItem): CheckpointView | null {
     };
   }
   if (item.kind !== "tool" || item.block.toolName !== "compress") return null;
-  const summary = compactSummaryOfInput(item.block.input);
-  if (!item.result) return { key: item.key, state: "running", summary };
+  const summaries = compactSummariesOfInput(item.block.input);
+  const summary = summaries[0];
+  if (!item.result) {
+    return { key: item.key, state: "running", ...(summary ? { summary, summaries } : {}) };
+  }
   if (item.result.isError) {
-    const detail = textOf(item.result.content).trim().split("\n")[0]?.trim();
-    return { key: item.key, state: "error", summary, detail: detail || undefined };
+    const resultText = textOf(item.result.content).trim();
+    const detail = resultText.split("\n")[0]?.trim();
+    return {
+      key: item.key,
+      state: "error",
+      ...(summary ? { summary, summaries } : {}),
+      ...(resultText ? { result: resultText } : {}),
+      detail: detail || undefined,
+    };
   }
   const resultText = textOf(item.result.content);
   const delta = COMPACT_TOKEN_DELTA.exec(resultText);
   return {
     key: item.key,
     state: "done",
-    summary,
+    ...(summary ? { summary, summaries } : {}),
+    ...(resultText.trim() ? { result: resultText.trim() } : {}),
     before: delta ? delta[1].replace(/\s/g, "") : undefined,
     after: delta ? delta[2].replace(/\s/g, "") : undefined,
   };

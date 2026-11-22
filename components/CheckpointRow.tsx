@@ -21,6 +21,8 @@ export function CheckpointRow({ view }: { view: CheckpointView }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const summaries = view.summaries?.length ? view.summaries : (view.summary ? [view.summary] : []);
+  const hasDetails = summaries.length > 0 || Boolean(view.result);
 
   const text = view.state === "running"
     ? t("checkpoint.compacting")
@@ -42,21 +44,23 @@ export function CheckpointRow({ view }: { view: CheckpointView }) {
             : <CheckIcon strokeWidth={2} />}
       </MarkerIcon>
       <MarkerContent className="truncate">{text}</MarkerContent>
-      {view.summary && (
+      {hasDetails && (
         <ChevronsUpDown className={open ? "rotate-180 transition-transform" : "transition-transform"} />
       )}
     </>
   );
 
   const onCopy = async () => {
-    if (!view.summary) return;
-    const ok = await copyText(view.summary);
+    // 复制就是 Popover 里那份全文：先摘要（可能有多个区间），再工具返回的原文。
+    const text = [...summaries, ...(view.result ? [view.result] : [])].join("\n\n");
+    if (!text) return;
+    const ok = await copyText(text);
     if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
 
-  if (!view.summary) {
+  if (!hasDetails) {
     return <Marker variant="separator">{line}</Marker>;
   }
 
@@ -83,7 +87,7 @@ export function CheckpointRow({ view }: { view: CheckpointView }) {
           </button>
         </div>
         <pre className="max-h-80 overflow-auto whitespace-pre-wrap wrap-break-word px-3 py-2 font-mono text-xs leading-relaxed text-foreground">
-          {view.summary}
+          {[...summaries, ...(view.result ? [`\n---\n${view.result}`] : [])].join("\n\n")}
         </pre>
       </PopoverContent>
     </Popover>
