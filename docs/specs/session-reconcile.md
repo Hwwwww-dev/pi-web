@@ -94,12 +94,12 @@ if (own) {
 
 | 来源 | 时机 | 深度 |
 |---|---|---|
-| `gap` | SSE `rev` 跳号 / 心跳 rev 跳号 | 跑中 user-only，空闲全角色 |
+| `gap` | SSE 心跳（30s，已有事件） | 跑中 user-only 补，空闲 `loadSession`（merge） |
 | `sent` | `handleSend`、`sendStreamingPrompt` 成功后 1 次（1s 后） | user-only 单发，不轮询 |
-| `settle` | `finishPromptWithoutStream` | 尾 id 比对 → 追加；`reset` → 整窗 |
-| `resume` | SSE 重连、`becameActive`、切回前台 | 尾 id 比对 → 追加；`reset` → 整窗 |
+| `settle` | `finishPromptWithoutStream` | 尾 id 比对 → `loadSession`（merge）；相同则不读 |
+| `resume` | SSE `connected`、切回前台、`online` | 跑中 user-only 补，空闲 `loadSession`（merge） |
 
-闸门：每会话 `reconcileInFlightRef`（单飞）+ `lastReconcileAt`（同一 reason 1s 内不重复）。
+闸门：`reconcileInFlightRef` 单飞（四源同时触发只跑一次）。
 
 ## 5. 改动清单
 

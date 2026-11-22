@@ -1864,6 +1864,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (!message || known.has(entryId)) return;
       // 跑中（或发送后的那次）只补用户条目：助手正文走 SSE 增量，从文件重放会重复。
       if (mode === "user-only" && message.role !== "user") return;
+      // 已渲染的行没有 entryId（流式、乐观气泡），只能按内容去重，否则同一条会多一行。
+      if (mode === "user-only" && previous.messages.some((m) => m.role === "user" && userMessageKey(m) === userMessageKey(message))) return;
       freshMessages.push(message);
       freshIds.push(entryId);
     });
@@ -1905,11 +1907,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         return;
       }
       if (tail.lastEntryId === anchor) return;
-      // 跑中只补用户条目（助手正文归 SSE，避免重复）；settle 时跑已结束，全角色安全。
-      const userOnly = reason === "sent" || (reason !== "settle" && agentRunningRef.current);
-      if (!(await appendSessionSince(sid, anchor, userOnly ? "user-only" : undefined))) {
+      // 跑中只补用户条目（助手正文归 SSE）。补用户条目必须按 key 去重：
+      // 已渲染的流式/乐观行没有 entryId，不去重就会把同一条再追加一遍。
+      // 其余情况整窗读：`loadSession` 内部是 mergeLoadedTail 尾部合并，
+      // 保留已加载行、不重挂载、不重复。
+      const userOnly = reason === "sent" || agentRunningRef.current;
+      if (!userOnly) {
         await loadSession(sid);
+        return;
       }
+      if (!(await appendSessionSince(sid, anchor, "user-only"))) await loadSession(sid);
     } finally {
       reconcileInFlightRef.current = false;
     }
