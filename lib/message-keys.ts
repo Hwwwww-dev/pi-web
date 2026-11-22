@@ -68,7 +68,10 @@ export function carryMessageKeys(
   if (start === 0 && anchor !== undefined) return aliases;
   for (let offset = 0; liveStart + offset < previous.messages.length; offset++) {
     const id = next.entryIds[start + offset];
-    if (id === undefined || !sameMessage(previous.messages[liveStart + offset], next.messages[start + offset])) break;
+    // 消息先于 id 用完就停：服务端窗口会为对齐轮次多给几条 id，
+    // `sameMessage` 不判空（`e.role`），少这一半句就是一次渲染崩溃。
+    if (id === undefined || next.messages[start + offset] === undefined) break;
+    if (!sameMessage(previous.messages[liveStart + offset], next.messages[start + offset])) break;
     aliases.set(id, liveKey(anchor, offset));
   }
   return aliases;

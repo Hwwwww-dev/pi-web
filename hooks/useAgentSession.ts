@@ -688,8 +688,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const pendingWindowMessagesRef = useRef<AgentMessage[]>([]);
   /** 正在请求中的后一页游标。 */
   const loadingAfterRef = useRef<string | null>(null);
-  /** 补 entryId 的只取 id 读正在进行。 */
-  const syncingIdsRef = useRef(false);
 
   sessionPropIdRef.current = session?.id ?? null;
   dataRef.current = data;
@@ -1132,44 +1130,15 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   const syncEntryIdsAfterRun = useCallback((sid: string) => {
     // 条目 id 只有读盘才拿得到（SSE 只追加消息），而编辑 / 分叉两个按钮以
-    // entryId 为开关：回合结束后如果 id 数组比消息短，补一次**只取 id** 的读
-    //（`ids=1`，服务端只回 entryIds）。以前这里走整读 loadSession：按条数的窗口
-    //（`tail = max(50, 已载入)`）比首屏的 3 轮宽，合并就把窗口里多出来的几十条
-    // 旧消息追加进列表——每回合结束、每次中止都“凭空长出一段旧历史”。
-    const heldIds = entryIdsRef.current;
-    const heldMessages = messagesRef.current;
-    if (heldIds.length >= heldMessages.length || syncingIdsRef.current) return;
-    syncingIdsRef.current = true;
-    void (async () => {
-      try {
-        const query = new URLSearchParams({ ids: "1", tail: String(Math.min(1000, Math.max(1, heldMessages.length))) });
-        const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?${query}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const d = await res.json() as { entryIds?: string[] };
-        const ids = d.entryIds ?? [];
-        if (sessionIdRef.current !== sid || !sessionHookMountedRef.current) return;
-        // 对齐：本地最后一个持久条目在返回窗口里的位置之后的条目，就是本次运行
-        // 追加的那些行。条数不符（运行里还落了 custom 之类我们不认识的行）就不猜，
-        // 交给整读按内容核对。
-        const anchor = heldIds[heldIds.length - 1];
-        const at = anchor === undefined ? -1 : ids.lastIndexOf(anchor);
-        if (at < 0 || ids.length - at - 1 !== heldMessages.length - heldIds.length) {
-          void loadSession(sid);
-          return;
-        }
-        // 别名交接：这些行原本是 `live:<anchor>:<n>` 键，落盘后把同一个键交给它
-        // 的 entry id，React 不重挂载（见 lib/message-keys.ts）。
-        setMessageKeyAliases((aliases) => carryMessageKeys(
-          { messages: heldMessages, entryIds: heldIds, aliases },
-          { messages: heldMessages, entryIds: ids },
-        ));
-        setEntryIds(ids);
-      } catch {
-        // 补 id 失败不影响阅读：编辑 / 分叉按钮晚一次挂载再出现。
-      } finally {
-        syncingIdsRef.current = false;
-      }
-    })();
+    // entryId 为开关：回合结束后如果 id 数组比消息短，补一次读把它对齐。
+    //
+    // 只取 id 的快路径（`ids=1`）已回退（2026-11-22）：服务端窗口会为对齐轮次
+    // 多给几条 id，条数不再与消息一一对应，别名交接（carryMessageKeys）就会读到
+    // 不存在的消息而崩在 `sameMessage` 的 `e.role` 上。整读按内容逐条核对，
+    // 是唯一能保证 id 与行对得上的做法；窗口不再变宽（`tail` 正好等于已载入
+    // 条数）后，这次读不会再把旧消息带进列表。
+    if (entryIdsRef.current.length >= messagesRef.current.length) return;
+    void loadSession(sid);
   }, [loadSession]);
 
   const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { signal?: AbortSignal }) => {

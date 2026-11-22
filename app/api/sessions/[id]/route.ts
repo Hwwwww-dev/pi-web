@@ -84,17 +84,6 @@ export async function GET(
       sessionId: id, // local: lazy URLs for historical tool-result images
     }), transcriptNotices);
     perf?.span("context");
-    // 只回条目 id：运行结束时 SSE 追加的行没有 entryId，编辑/分叉按钮就出不来，
-    // 客户端要补一次。整读会把窗口里几百条消息重新传一遍（这条会话 436 条），
-    // 也会让窗口/游标/缓存跟着服务端走一遍；`ids=1` 只给 id，调用方只 setEntryIds。
-    // 窗口口径与整读完全一致（同一份 `tail` / `turns` 解析），所以对齐规则不变。
-    if (searchParams.has("ids")) {
-      return NextResponse.json({
-        entryIds: context.entryIds,
-        oldestEntryId: context.oldestEntryId,
-        hasMore: context.hasMore,
-      });
-    }
     const ownEntries = sideOwnEntries(entries) as typeof entries;
     const totalActiveMs = computeSessionTotalActiveMs(ownEntries);
     // Cumulative usage over ALL entries, including history compacted away —
