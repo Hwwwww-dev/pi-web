@@ -138,9 +138,9 @@ export function checkpointViewOf(item: ActivityItem): CheckpointView | null {
 }
 
 /**
- * 活动行按回复切段（2026-11-20）：回合内 pi 边跑边说的文本不再收进折叠，
- * 而是以普通文本段显示在外面，两段回复之间的思考/工具各自成一个行内大折叠。
- * 活跃期与完成态用同一把刀切，段序号才能逐段对上折叠键。
+ * 活动行按回复切段：回合内由 pi 边运行边输出的文本不再收入折叠，而是作为
+ * 普通文本段显示在外，两段回复之间的思考与工具各自构成一个行内大折叠。
+ * 活跃期与完成态使用同一套切分，段序号才能与折叠键逐段对应。
  */
 export function splitTurnParts(items: ActivityItem[]): TurnPart[] {
   const parts: TurnPart[] = [];
@@ -168,9 +168,9 @@ export function splitTurnParts(items: ActivityItem[]): TurnPart[] {
 }
 
 /**
- * 一段活动的摘要原料（2026-11-20）：结算段与活跃回合的已完成段共用同一套口径，
- * 一遍遍历同时算出四大类计数、失败数、首尾时间戳与条目自报时长之和。i18n 拼串
- * 留在组件层，这里只出数字。
+ * 一段活动的摘要原始数据：结算段与活跃回合的已完成段使用同一套口径，
+ * 单次遍历同时得出四大类计数、失败数、首尾时间戳与条目自报时长之和。
+ * i18n 拼接留在组件层，此处只输出数值。
  *
  * 口径：读取 = view/search/web，编辑 = edit/write/patch，运行 = 终端，子代理单独
  * 一类；plan/compact/other 不进摘要（太碎）。时长优先取首尾时间戳之差，取不到

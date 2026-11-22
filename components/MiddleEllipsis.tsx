@@ -14,10 +14,10 @@ const MIN_TAIL_CHARS = 10;
  * the same for CJK names — unlike the `direction: rtl` trick, it does not
  * reverse punctuation.
  *
- * 纯 CSS：拆成「可省略的头部 + 钉住的尾部」，头部让 flex 布局去截断。以前用
- * canvas 量宽度再换成中间省略的字符串，是自激振荡的源头（2026-11-22 用户：
- * 文件名在疯狂闪烁）：换短串 → 胶囊变窄 → 可用宽度变大 → 算出更长串 → 再变宽；
- * 同行时长文字（`0.1s` → `29s`）每 100ms 变一点又添一层抖动。不测量就没有环。
+ * 纯 CSS：拆成“可省略的头部 + 钉住的尾部”，头部交由 flex 布局截断。旧实现以
+ * canvas 量宽后替换为中间省略的字符串，会形成自激振荡：换短串 → 胶囊变窄 →
+ * 可用宽度变大 → 算出更长串 → 再变宽；同行时长文本（`0.1s` → `29s`）每 100ms
+ * 变化一次，又叠加一层抖动。不测量即无此循环。
  */
 export function MiddleEllipsis({ text, className }: { text: string; className?: string }) {
   const extension = /\.[^./\\]{1,8}$/.exec(text)?.[0] ?? "";

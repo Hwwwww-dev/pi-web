@@ -61,10 +61,10 @@ const TOP_SLACK = 24;
  * 必须**不含**输入框垫底（`dockHeight`）：官方 `be()` 的第一分支是
  * `autoScroll && !end → mode = "following-bottom"`，所以只要落在“离末端 < 阈值”
  * 里，任何一次内容增长都会把视口拉回末端。以前传的是 `48 + 垫底`（垫底 100pt+），
- * 读者在“最后一条贴着卡片上沿”那个位置其实离机械末端还差一整段垫底，正好落在
- * 吸附带里 → 上滑十几 px 就被拉回，反复几次就是“一直滑一直抖”。
+ * 读者停在“最后一条贴着卡片上沿”的位置时，距机械末端仍差一整段垫底，因此会
+ * 落入吸附带内，上滑十余像素即被拉回，重复表现为持续抖动。
  *
- * 用户实测定在 16px（2026-11-22），可在 Settings › 高级参数调。
+ * 取值 16px 实测合适，可在 Settings › 高级参数修改。
  */
 const SCROLL_EDGE_THRESHOLD_DEFAULT = 16;
 
@@ -225,8 +225,8 @@ function AnimatedExtensionStatusBar({ statuses, widgets, onCommand, commandsDisa
   const mounted = useDelayedUnmount(open, 150);
   const lastContentRef = useRef({ statuses, widgets, onCommand, commandsDisabled });
   if (open) lastContentRef.current = { statuses, widgets, onCommand, commandsDisabled };
-  // 空态同样占一行：状态行出现/消失若改变停靠区高度，上面的输入框就整体上下
-  // 跳一整行（用户 2026-11-21）。24px 与 `size="xs"` 状态胶囊同高。
+  // 空态同样占一行：状态行出现或消失若改变停靠区高度，上方输入框会整体上下
+  // 跳动一行。24px 与 `size="xs"` 状态胶囊同高。
   if (!mounted) return <div aria-hidden="true" className="h-6 w-full shrink-0" />;
   const shown = open ? { statuses, widgets, onCommand, commandsDisabled } : lastContentRef.current;
   return (
@@ -914,11 +914,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       timer = 0;
       if (!activeRef.current || !gestureUpRef.current) return;
       if (container.scrollTop > TOP_SLACK) return;
-      // 贴底（官方 `scrollable.end` 为假）时不存在「翻到顶」这回事：这一刻的
-      // `scrollTop ≈ 0` 都是别的原因——回合结束时行被换掉后内容变短、浏览器把
-      // `scrollTop` 夹回顶部，或者官方自己把视口拉回末尾。拿它当读者翻到顶，
-      // 就会在每次回复完成后多拉一页旧消息（2026-11-22）。真在长列表顶部时官方
-      // 的 `end` 很大，`atTail` 为假，闸门照常放行。
+      // 贴底（官方 `scrollable.end` 为假）时不存在“翻到顶”：此时的
+      // `scrollTop ≈ 0` 均为其他原因——回合结束后行被替换、内容变短、浏览器把
+      // `scrollTop` 夹回顶部，或滚容器自行回到末端。若当作读者翻到顶，每次
+      // 回复完成都会多取一页旧消息。真正处于长列表顶部时，`end` 很大，
+      // `atTail` 为假，闸门照常放行。
       if (atTailRef.current) return;
       // A page is loading, or the last one is still rendering.
       if (loadingOlderRef.current || pageRenderingRef.current) return;
@@ -1469,9 +1469,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         const finalAssistantIdx = findFinalAssistantIndex(messages, userIdx, endIdx);
 
         if (finalAssistantIdx === -1) {
-          // 首条 assistant 条目落盘前的死区（2026-11-20）：思考/等待阶段会话
-          // 文件里只有用户消息，此前这回合只剩光秃秃的气泡，折叠行和思考
-          // 都不出现。活跃尾回合（正在跑、最后一锚、就在末尾）挂一把与
+          // 首条 assistant 条目落盘前的空窗：思考或等待阶段会话文件里只有用户
+          // 消息，此前本回合仅剩一条空回复气泡，折叠行与思考均不出现。活跃尾回合（正在跑、最后一锚、就在末尾）挂一把与
           // isLiveTail 首段同键（:0）的空折叠：标题从流式 store 取最新块
           // （思考期=思考+秒表），首条条目落盘后 isLiveTail 分支无缝接管；
           // 非活跃回合维持原平铺渲染。
@@ -1517,7 +1516,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           });
           // 折叠行整个运行期都在：首轮还在思考/等待首块落盘时也显示秒表，
           // 而不是等第一条活动行落盘才凭空出现。中途回复显示在折叠外面，
-          // 活动按回复切成多个行内大折叠（2026-11-20）；段序号进折叠键，
+          // 活动按回复切成多个行内大折叠；段序号进折叠键，
           // 与完成态逐段对上；只有最后一段并入流式工具（它才是“最新”）。
           liveActivityRendered = true;
           const liveParts = splitTurnParts(liveItems);
@@ -1530,7 +1529,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             if (part.kind === "fold") {
               // 只有最后一段挂秒表（LiveTurnTrace）；已完成段直接按完成态渲染。
               // pi 常把 thinking/中间回复/工具写进同一条 assistant 条目，相邻段
-              // 首条目时间戳相同，两把秒表会同秒同跳（2026-11-20 用户截图：两段
+              // 首条目时间戳相同，两把秒表会同秒同跳（两段时长因此相同）；
  // 都是 49s）；完成段也不该在完成后继续走秒。完成段外观与 settle 后零差异。
               const isLiveSegment = partIdx === liveParts.length - 1;
               const segStartTs = part.items.find((item) => item.ts !== undefined)?.ts ?? liveAnchorTs;
@@ -1635,8 +1634,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
         }
 
-        // 活动按中途回复切段：每段一个行内大折叠，回复以普通文本段显示在外面
-        // （2026-11-20）。段序号进折叠键，与活跃期的 LiveTurnTrace 一致，settle
+        // 活动按中途回复切段：每段一个行内大折叠，回复以普通文本段显示在外面。段序号进折叠键，与活跃期的 LiveTurnTrace 一致，settle
         // 交换帧逐段原样接管展开/收起状态。段时长取首尾活动时间戳之差；
         // 取不到时退回分类计数。
         const turnParts = splitTurnParts(activityItems);
@@ -1664,8 +1662,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                     </div>
                   );
                 }
-                // 结算段摘要（2026-11-20 用户确认）：与活跃回合的已完成段共用
-                // 同一实现（segmentSummaryText）。
+                // 结算段摘要：与活跃回合的已完成段共用同一实现（segmentSummaryText）。
                 const segSummary = segmentSummaryText(part.items, t);
                 return (
                   <TurnTrace
@@ -1826,7 +1823,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   /**
    * 停靠区高度就是内容末端的垫底（`--composer-dock-h`）。它是在 restore 之后才
    * 量到的，而还原时“底”里还没有这段垫底，于是最后一条（用量行）停在输入框背后
-   * ——读者以为“重进会话就物理贴底”（2026-11-20）。只在读者本来就贴底时补一次。
+   * ——读者会认为“重进会话即物理贴底”。仅在读者本来就贴底时补一次。
    */
   /**
    * 窗口化：量一次真实行高，把视口上下各 1.5 屏之外的行收成等高占位（内容是
@@ -1871,7 +1868,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   /**
    * 停靠区高度是内容末端的垫底（`--composer-dock-h`），浮层输入条长高/缩矮都会改它。
    * 读者本来就贴底时把尾部跟上去，否则最后一行会被输入条盖住；不贴底就完全不动，
-   * 交给浏览器原生锚定（用户 2026-11-20：“输入框高度变化会导致滚动到底”）。
+   * 交给浏览器原生锚定（输入框高度变化本身会触发滚动到底）。
    */
   const measuredDockHeightRef = useRef(0);
   useEffect(() => {
@@ -1973,10 +1970,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         ) : <>
         {/* 完全按官方默认：`autoScroll` 常开（发送后跟随、流式跟随、图片撑高继续跟），
             `defaultScrollPosition="end"` 让打开会话落到底部，贴底容差 16px。
-            不传 `scrollAnchor`（见 `components/chat/ChatRow.tsx`）：带上锚点时，任何人
-            内容变动都会让官方滚到「第一个未处理」的锚点行，即历史最顶部那条提问
-            （2026-11-22 实测：回合结束重读会话后行 key 变化 → 子元素数量不变 → 跳顶，
-            并连带触发上翻取页）。没有锚点行，官方就只走 `following-bottom` 分支。 */}
+            不传 `scrollAnchor`（见 `components/chat/ChatRow.tsx`）：带上锚点时，任何
+            内容变动都会让滚容器滚到“第一个未处理”的锚点行，即历史最顶部那条提问
+            （回合结束重读会话后行 key 变化、子元素数量不变，曾因此跳顶并连带触发
+            上翻取页）。没有锚点行时，只走 `following-bottom` 分支。 */}
         <MessageScrollerProvider
           autoScroll={advancedValues.autoScroll !== false}
           defaultScrollPosition={advancedValues.defaultScrollPosition === "last-anchor" ? "last-anchor" : "end"}
@@ -2084,8 +2081,8 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           </MessageScrollerContent>
         </MessageScrollerViewport>
         {/* 位置取自实测停靠区高度而非 `--composer-dock-h`：变量由 ResizeObserver
-            首帧之后才写入，缺失时 fallback 是 0，按钮会掉到页面物理底（用户
-            2026-11-21）。还没量到就整颗隐藏，宁可少一帧也不能错位。 */}
+            首帧之后才写入，缺失时 fallback 为 0，按钮会落到页面物理底部。
+            尚未量到时整颗隐藏，避免错位。 */}
         <MessageScrollerButton
           behavior="instant"
           style={{ bottom: dockHeight + 16 }}

@@ -176,8 +176,8 @@ type ExtensionUiDialogRequest = Extract<ExtensionUiRequest, { method: "select" |
 type ExtensionUiCustomRequest = Extract<ExtensionUiRequest, { method: "custom" }>;
 export type NoticeType = "info" | "success" | "warning" | "error";
 
-// 弹窗通知统一走 sonner（2026-11-20）：addNotice 直接发 toast，同一 id 替换
-// 不堆叠；error 常驻到手动关，其余 5s 自动消失，悬停暂停由 sonner 内置。
+// 弹窗通知统一由 sonner 承担：addNotice 直接发 toast，同一 id 替换而不堆叠；
+// error 常驻至手动关闭，其余 5s 自动消失，悬停暂停为 sonner 内置行为。
 const NOTICE_VISIBLE_MS = 5000;
 
 export interface CompactResultInfo {
@@ -980,8 +980,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // only need the server's tree/leaf/stats — never a history reset.
       const cached = getSessionViewSnapshot(sid);
       // 尾部核对：本地窗口的末尾不是服务端确认的叶子（且窗口确实读到了叶子）
-      // 就说明本地落后——断流期落盘的条目没有流可以补，此时“保留更宽的已载窗”
-      // 等于把落后的尾巴当成最新（用户 2026-11-21：回页后最新一条回复消失）。
+      // 就说明本地落后——断流期间落盘的条目没有流可以补，此时“保留更宽的已载窗口”
+      // 等同把落后的尾部当作最新。宁可整载一次，把窗口移到叶子。
       // 宁可整载一遍把窗口挪到叶子。hasNewer 时 newestEntryId 不是叶子，不核。
       const serverTailId = d.context.newestEntryId ?? null;
       const tailStale = !d.context.hasNewer
@@ -994,8 +994,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         && cached.entryIds.length >= (d.context.entryIds ?? []).length,
       );
       // 两者必须取自同一份窗口：revision 未变时保留的是“更宽的已加载窗口”，
-      // 只放宽 messages 而 entryIds 仍取服务端窄窗口，会让两个数组长度不等、
-      // 索引错位——key 与 data-entry-id 串位，表现就是消息错乱、部分“消失”。
+      // 若只放宽 messages 而 entryIds 仍取服务端窄窗口，两个数组长度将不等、
+      // 索引错位，使 key 与 data-entry-id 串位，表现为消息错乱及部分条目“消失”。
       const persistedMessages = revisionUnchanged ? messagesRef.current : d.context.messages;
       const persistedEntryIds = revisionUnchanged ? entryIdsRef.current : (d.context.entryIds ?? []);
       setData(revisionUnchanged
@@ -1660,9 +1660,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   // 回页不在这里补读：事件流被释放后，`reattachEventStreamRef` 的 "visible" 分支
   // 已经重连并做一次非 force 的 loadSession——它是尾部合并（mergeLoadedTail），
-  // 真有新行才接上，没有就一字不动，没有骨架、没有整窗替换。原来这里还多一次
-  // force 读，等于让每次「出去一会儿再回来」都重读一遍窗口，哪怕期间一条消息
-  // 也没来（用户 2026-11-21：「出去一会功夫就要重新加载」）。
+  // 真有新行才接上，没有就一字不动：无骨架，也不替换整窗。此处原先还多一次
+  // force 读，等于每次回到页面都重读一遍窗口，哪怕期间没有新条目。
 
   const addNotice = useCallback((notice: { id?: string; message: string; type?: NoticeType }) => {
     // sonner 的 description 是纯文本：先剥掉终端转义序列，不然 ANSI 会显示成乱码。
@@ -1808,8 +1807,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const read = lastReadContextRef.current;
     const reread = read?.sid === sid && read.seq > readSeqBefore ? read : null;
     // 发送点是否落在这份读的窗口里。锚点找不到（indexOf === -1）说明它被挤出了
-    // 窗口，此时读不到消息**不等于**消息没落盘：不能据此删气泡（2026-11-20 用户
-    // 反馈“发出去的消息不见了，重载才回来”——隧道/重启造成的半失败会走到这里）。
+    // 窗口，此时读不到消息**不等于**消息未落盘：不得据此删除气泡（隧道中断或
+    // 服务重启造成的半失败会走到这里）。
     const anchorIndex = !reread ? -1
       : pending.lastEntryIdAtSend === null ? 0
         : reread.entryIds.indexOf(pending.lastEntryIdAtSend) + 1;
@@ -1833,8 +1832,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, [addNotice, dropUnconfirmedBubble, restoreSubmission, translate]);
 
   /**
-   * 对齐：把 `since` 之后的条目按 id 并进列表，不再整窗重读。
-   * 返回 false 表示拿不到可靠的增量（锤点被挤出窗口 / 接口不可用），调用方退回整窗读。
+   * 将 `since` 之后的条目并入消息列表，不重读整窗。
+   *
+   * 两种模式：
+   * - `"user-only"`：运行期间使用。仅并入用户条目，并按 `userMessageKey` 去重；
+   *   助手正文由 SSE 增量提供，整条并入会产生重复行。
+   * - 省略：回合结束时使用。以锚点（最后一个带 entryId 的行）为界，把该行之后的
+   *   本地行整段替换为落盘版本，顺序与 entryId 一并接管。落盘条目是权威来源；
+   *   逐条配对不可行，流式阶段的工具参数是半成品，与落盘版本并不相等。
+   *
+   * 返回 false 表示无法取得可靠的增量（锚点已被挤出窗口，或接口不可用），
+   * 调用方应退回整窗读取。
    */
   const appendSessionSince = useCallback(async (sid: string, since: string, mode?: "user-only"): Promise<boolean> => {
     const result = await fetchSessionSince(sid, since);
@@ -1844,8 +1852,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (result.messages.length === 0) return true;
     const previous = { messages: messagesRef.current, entryIds: entryIdsRef.current };
     const known = new Set(previous.entryIds);
-    // 无 id 的本地行（跑中流式推来的）只能按内容认，而且工具行的参数在流式阶段
-    // 是半成品，和落盘版对不上：跑中只补用户行，按 userMessageKey 去重。
+    // 无 entryId 的本地行（运行期间由流式事件推入）无法与落盘条目准确对应，
+    // 只能按内容比对，因此该模式仅处理用户条目。
     if (mode === "user-only") {
       const extra = result.entryIds.flatMap((entryId, index) => {
         const message = result.messages[index];
@@ -1863,9 +1871,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setEntryIds(next.entryIds);
       return true;
     }
-    // 回合结束：文件是权威。以锚点为界，直接把锚点之后的本地行整段换成落盘版
-    // ——不逐条配对（配不上就会变成两份且错序），也不留任何无 id 的尾部：
-    // 这时手上已经没有未落盘的行了。
+    // 回合结束：落盘版本为权威。以锚点为界，把该行之后的本地行整段替换，
+    // 不逐条配对；此时不存在尚未落盘的行。
     const held = Math.min(previous.entryIds.length, previous.messages.length);
     const fresh = result.entryIds.flatMap((entryId, index) => {
       const message = result.messages[index];
@@ -1883,32 +1890,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return true;
   }, [setActiveLeafId, setMessages, setEntryIds, setMessageKeyAliases, messagesRef, entryIdsRef]);
 
-  const syncEntryIdsAfterRun = useCallback((sid: string) => {
-    // 条目 id 只有读盘才拿得到（SSE 只追加消息），而编辑 / 分叉两个按钮以
-    // entryId 为开关：回合结束后如果 id 数组比消息短，补一次读把它对齐。
-    //
-    // 2026-11-22 改走增量（`?since=<末条 id>`）：整窗读的 `tail` 等于已载入条数，
-    // 翻过页之后这个数比原窗口大，服务端就回一段更早的窗口 → 合并时前插旧历史
-    // （“回合结束自己加载更多 + 往前跳”）。增量只追加锚点之后的条目，窗口不会变宽。
-    if (entryIdsRef.current.length >= messagesRef.current.length) return;
-    const anchor = entryIdsRef.current[entryIdsRef.current.length - 1];
-    if (!anchor) {
-      void loadSession(sid);
-      return;
-    }
-    void appendSessionSince(sid, anchor).then((ok) => {
-      if (!ok) void loadSession(sid);
-    });
-  }, [appendSessionSince, loadSession]);
-
   /**
-   * 消息对齐：视图落后了就把缺的补回来，不整窗替换。
+   * 对齐：视图落后于会话文件时，补入缺失的条目，不替换整窗。
    *
-   * 四类来源：`sent` 发送成功后的那一次、`settle` 本轮结束、`resume` 流重连/切回前台/
-   * 网络恢复、`gap` 心跳兑底。判定只看 entryId，不比对消息体，大消息也不慢。
-   *
-   * 2026-11-22 丢消息根因：settle 原来的整窗 `loadSession` 会用一个“落盘前”的快照
-   * 覆盖刚追加的乐观气泡，而随后的投递事件又被 `own` 当作迟到重放拒掉。
+   * 触发来源：`sent`（发送成功后的第一次校核）、`settle`（本轮结束）、
+   * `resume`（流重连、切回前台、网络恢复）、`gap`（心跳兜底）。判断只看
+   * entryId，不比对消息体。
    */
   const reconcileSession = useCallback(async (
     sid: string,
@@ -1920,26 +1907,33 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     try {
       const anchor = entryIdsRef.current[entryIdsRef.current.length - 1] ?? null;
       if (!anchor) {
-        // 视图还没有锚点（新会话首条之前，挂载时的整窗读正在跑）：不重复读。
+        // 尚无锚点（新会话首条之前，挂载时的整窗读取仍在进行）：不重复读取。
         if (reason === "settle") await loadSession(sid);
         return;
       }
       const tail = await probeSessionTail(sid);
       if (!tail) {
-        // 接口不可用：只有 settle 值得退回整窗读，其余等下一次机会。
+        // 接口不可用：仅 `settle` 值得退回整窗读取，其余等下一次机会。
         if (reason === "settle") await loadSession(sid);
         return;
       }
       if (tail.lastEntryId === anchor) return;
-      // 只补锚点之后的条目，窗口永不变宽。跑中（或发送后的那次）只补用户条目，
-      // 其余角色归 SSE；回合结束后补全角色，已渲染的流式行按内容对上升级，不重复。
-      // 锚点被挤出窗口（`sinceReset`）时退回整窗读（merge，不会前插旧历史）。
+      // 只并入锚点之后的条目，读取窗口不会变宽。运行期间（或发送后的校核）
+      // 仅并入用户条目，其余角色由 SSE 提供；回合结束时并入全部角色。
+      // 锚点被挤出窗口（`sinceReset`）时退回整窗读取。
       const userOnly = reason === "sent" || agentRunningRef.current;
       if (!(await appendSessionSince(sid, anchor, userOnly ? "user-only" : undefined))) await loadSession(sid);
     } finally {
       reconcileInFlightRef.current = false;
     }
   }, [appendSessionSince, loadSession]);
+
+  const syncEntryIdsAfterRun = useCallback((sid: string) => {
+    // entryId 仅在读盘后可得（SSE 只推送消息正文），而编辑与分叉以 entryId
+    // 为开关：回合结束时若 entryId 数量少于消息数量，做一次对齐。
+    if (entryIdsRef.current.length >= messagesRef.current.length) return;
+    void reconcileSession(sid, "settle");
+  }, [reconcileSession]);
   // The hook unmounts (a session switch) with a send still unconfirmed: nothing
   // here will settle it, so its text goes back unless one of the run's events
   // cleared the record. With the stream closed, a prompt that did arrive is
@@ -2318,8 +2312,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunningRef.current = agentRunning;
   }, [agentRunning]);
 
-  // 离开 ≥30s 的活跃会话回来时整窗骨架重载（2026-11-20 用户需求）：切走时记
-  // 下会话与离开时间（localStorage，跨刷新存活，仅活跃会话——跑着的回合/命令）；
+  // 离开 ≥30s 的活跃会话回来时整窗骨架重载：切走时记下会话与离开时间
+  // （localStorage，跨刷新存活，仅活跃会话即跑着的回合或命令）；
   // 回来时若这段 JS 上下文没刷过（内存标记还在），按手动重新加载的样子
   // loadSession(…, true)；页面若重新挂载（刷新/重开），挂载时删掉遗留记录，
   // 走正常初始化，不做骨架重载。
@@ -2457,8 +2451,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         if (sessionIdRef.current) void refreshContextUsage(sessionIdRef.current);
         // 重连（不是首次打开）说明断开期间落盘的条目没有流可以补：iOS 后台被杀
         // 连接、心跳超时、网络切换都会走到这里，而页面自己没发起释放。核对一次
-        // 尾部——真有新条目就接上，没有就一字不动（用户 2026-11-21：偶现丢消息，
-        // 丢的正是用户刚发的那条）。首次打开不读：挂载路径已经在读。
+        // 尾部——真有新条目就接上，没有就一字不动。首次打开不读：挂载路径已在读。
         if ((eventConnectionRef.current?.snapshot().opens ?? 0) > 1) {
           const sid = sessionIdRef.current;
           // 运行态由这个 connected 事件自己的 isRunActive 分支处理，这里只要
@@ -3922,7 +3915,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // “释放过”不等于“流真的死了”：iOS 把页面放进后台时常常直接干掉 SSE 连接，
     // 而页面自己并没有发起释放（idle 判断被扩展对话框、compaction 等拦着），
     // eventStreamReleasedRef 于是仍为 false。只看这个标记会让回页什么都不做，
-    // 后台期间落盘的条目再也没有通路补（用户 2026-11-21：偶现丢消息）。
+    // 后台期间落盘的条目就再也没有通路补入。
     // 所以连接确实活着（connected）且没释放过才跳过；其它状态一律重连+补读。
     const connected = eventConnectionRef.current?.snapshot().state === "connected";
     if (!eventStreamReleasedRef.current && connected) return;
@@ -4152,8 +4145,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return () => clearTimeout(t);
   }, [compactResult]);
 
-  // 悬停暂停、自动消失、堆叠展开都是 sonner 内置；旧通知架的暂停/退出
-  // 状态机已随 NoticeShelf 删除（2026-11-20）。
+  // 悬停暂停、自动消失、堆叠展开均为 sonner 内置；旧通知架的暂停与退出
+  // 状态机已随 NoticeShelf 一并删除。
   useEffect(() => {
     setSessionStatsOverride(null);
   }, [session?.id]);

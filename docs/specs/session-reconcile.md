@@ -62,15 +62,15 @@
 
 统一入口 `reconcileSession(sid, reason)`，`reason: "gap" | "sent" | "settle" | "resume"`。
 
-**① 追加**（`gap` / `settle` / `sent` 的主路径）
+**① 增量并入**（`gap` / `sent` / `settle` 的唯一路径）
 ```
-since = entryIdsRef 的末条（"settle" 且存在 unconfirmedSendRef 时用它的 lastEntryIdAtSend）
-?since=<since>&deferMedia=1&deferThinking=1      // 现有 fetchSessionSince
-按 entryId 去重后追加
-reason === "sent" 或（跑中）→ 只留 role === "user"
-其余 → 全角色
+锚点 = entryIdsRef 的末条
+?since=<锚点>&deferMedia=1&deferThinking=1      // fetchSessionSince
 ```
-现成实现：`appendSessionSince()`（`hooks/useAgentSession.ts:1849`），本次给它加 `mode: "user-only"`。
+两种模式（`appendSessionSince()`，`hooks/useAgentSession.ts`）：
+- `"user-only"`（运行中、`sent`）：仅并入用户条目，按 `userMessageKey()` 去重。
+- 默认（回合结束）：以锚点为界，把该行之后的本地行整段替换为落盘版本，顺序与 entryId 一并接管。
+  不逐条配对：流式工具行的参数是半成品，与落盘版本并不相等，配对失败即产生两份且错序。
 
 **② 锚点失效 → 整窗读**
 `?since=` 返回 `reset` → `loadSession(sid)`；读回后若 `unconfirmedSendRef.key` 不在列表 → 交给 `settleUnconfirmedSend`（回填草稿 + `chat.sendNotReceived`，`lib/i18n/messages/zh-CN.ts:1029`）。
@@ -80,7 +80,7 @@ reason === "sent" 或（跑中）→ 只留 role === "user"
 
 ### 4.3 最后一层兜底（一行）
 
-`hooks/useAgentSession.ts:2565`：
+`hooks/useAgentSession.ts`（`handleAgentEvent` 中的投递分支）：
 ```ts
 // 列表里真的有这条用户消息才跳过；没有就必须追加（settle 的整窗读可能先于落盘）。
 if (own) {
