@@ -13,6 +13,11 @@ interface Props {
    * 不提供则为流式回复、阶段提示等尚无条目身份的行，二者走同一通道。
    */
   messageId?: string;
+  /**
+   * 官方的回合锚点：新回合落到视口顶部（留上一行一截）。只有开启回合的行
+   * （用户消息、压缩摘要、子 agent 通知）传 true。
+   */
+  scrollAnchor?: boolean;
   className?: string;
   children: React.ReactNode;
 }
@@ -21,7 +26,7 @@ interface Props {
  * 消息行的统一样式：宽度、水平留白、字号仅在此处拼接，条目行、流式回复
  * 与阶段提示均复用。行与行之间的纵向间距由滚动容器的 gap 提供。
  */
-export function ChatRow({ messageId, className, children }: Props) {
+export function ChatRow({ messageId, scrollAnchor = false, className, children }: Props) {
   const rowClass = cn(
     CHAT_COLUMN_INSET_CLASS,
     CHAT_MESSAGE_TEXT_CLASS,
@@ -36,6 +41,7 @@ export function ChatRow({ messageId, className, children }: Props) {
   return (
     <MessageScrollerItem
       messageId={messageId}
+      scrollAnchor={scrollAnchor}
       // 窗口化（lib/chat-row-window.ts）按行 id 认行：官方 Item 的 messageId 只在
       // 库内部使用，DOM 上不落属性。
       data-row-id={messageId}

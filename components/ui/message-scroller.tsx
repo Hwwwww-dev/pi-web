@@ -38,8 +38,9 @@ function MessageScrollerViewport({
     <MessageScrollerPrimitive.Viewport
       data-slot="message-scroller-viewport"
       // 长输出要拖得动，所以这里显示滚动条；稳定的 gutter 让居中的列在会话变长时不横跳。
+      // `data-pending-scroll:invisible` 是官方的：默认位置还没落定时整列隐藏，不让人先看到错的位置。
       className={cn(
-        "scrollbar-subtle size-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]",
+        "scrollbar-subtle size-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] data-pending-scroll:invisible",
         className
       )}
       {...props}

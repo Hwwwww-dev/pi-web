@@ -44,7 +44,6 @@ import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl }
 import { KeepAliveDock } from "./KeepAliveDock";
 import { ChatWindow } from "./ChatWindow";
 import { NewSessionContextBar, type NewSessionContextControl } from "./NewSessionContextBar";
-import type { ChatScrollPosition } from "@/lib/chat-scroll-position";
 import { GitPanel } from "./GitPanel";
 import { TabBar, type Tab } from "./TabBar";
 import { movePanelTab, orderPanelTabs } from "@/lib/panel-tab-order";
@@ -377,10 +376,6 @@ export function AppShell() {
       return [...slots].sort((a, b) => b.lastActiveAt - a.lastActiveAt).slice(0, keepAliveConfig.maxSessions);
     });
   }, [keepAliveConfig.maxSessions]);
-  const sessionScrollPositionsRef = useRef(new Map<string, ChatScrollPosition>());
-  const handleSessionScrollPositionChange = useCallback((sessionId: string, position: ChatScrollPosition) => {
-    sessionScrollPositionsRef.current.set(sessionId, position);
-  }, []);
   const [searchTarget, setSearchTarget] = useState<{ sessionId: string; entryId: string; blockIndex?: number } | null>(null);
   const handleSearchTargetHandled = useCallback((target: { sessionId: string; entryId: string }) => {
     setSearchTarget((current) => current === target ? null : current);
@@ -1567,7 +1562,6 @@ export function AppShell() {
   // the on-screen slot advances to its dock neighbor, or falls back to a
   // fresh new-chat draft when no slot remains.
   const handleKeepAliveDismiss = useCallback((sessionId: string) => {
-    sessionScrollPositionsRef.current.delete(sessionId);
     const remaining = keepAliveSlots.filter((slot) => slot.session.id !== sessionId);
     setKeepAliveSlots(remaining);
     if (selectedSession?.id !== sessionId) return;
@@ -1601,7 +1595,6 @@ export function AppShell() {
   const handleSessionDeleted = useCallback((sessionId: string) => {
     invalidateWorkspaceRestore();
     setRefreshKey((k) => k + 1);
-    sessionScrollPositionsRef.current.delete(sessionId);
     // The DELETE can outlive a session switch: this callback's captured
     // selectedSession is from the delete click. Read the latest selection
     // and only fall back to the empty composer when the user is still on
@@ -2907,8 +2900,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                       sessionRunning={runningSessionIds.has(slot.session.id)}
                       searchTarget={isActive && searchTarget?.sessionId === slot.session.id ? searchTarget : null}
                       onSearchTargetHandled={handleSearchTargetHandled}
-                      initialScrollPosition={isActive ? sessionScrollPositionsRef.current.get(slot.session.id) ?? null : null}
-                      onScrollPositionChange={handleSessionScrollPositionChange}
                       newSessionCwd={null}
                       newSessionDraftKey={null}
                       onAgentEnd={handleAgentEnd}
@@ -2955,8 +2946,6 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                     session={activeChatSession}
                     searchTarget={searchTarget?.sessionId === activeChatSession?.id ? searchTarget : null}
                     onSearchTargetHandled={handleSearchTargetHandled}
-                    initialScrollPosition={activeChatSession ? sessionScrollPositionsRef.current.get(activeChatSession.id) ?? null : null}
-                    onScrollPositionChange={handleSessionScrollPositionChange}
                     sessionRunning={Boolean(activeChatSession && runningSessionIds.has(activeChatSession.id))}
                     newSessionCwd={effectiveNewSessionCwd}
                     newSessionDraftKey={newSessionDraftKey}

@@ -268,7 +268,6 @@ export interface UseAgentSessionOptions {
   /** Opens Settings on a section; a bare `/mcp` the built-in MCP extension owns opens Settings › MCP. */
   onOpenSettings?: (section: SettingsSection) => void;
   setToolPreset?: (preset: ToolPreset) => void;
-  deferInitialScroll?: boolean;
   /** A fresh composer's model and reasoning picks to start with: the composer it replaces had them. */
   initialNewSessionChoices?: NewSessionChoices | null;
   /** A fresh composer reports its own model and reasoning picks, on mount and as they change. */
@@ -631,8 +630,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const deferredBashReadSeqRef = useRef(0);
   const bashRecoveryIdRef = useRef(0);
   const handleAgentEventRef = useRef<((event: AgentEvent) => void) | null>(null);
-  const initialScrollDoneRef = useRef(Boolean(opts.deferInitialScroll));
-  const previousScrollTopRef = useRef(0);
   const executeBashRef = useRef<(command: string, excludeFromContext: boolean) => Promise<void> | undefined>(undefined);
   const handleNavigateRef = useRef<((entryId: string) => Promise<boolean>) | undefined>(undefined);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -750,17 +747,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   useEffect(() => {
     if (isNew) onNewSessionChoicesChange?.({ model: newSessionModel, thinkingLevel: newSessionThinkingLevel });
   }, [isNew, newSessionModel, newSessionThinkingLevel, onNewSessionChoicesChange]);
-
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    // Scroll the chat container itself instead of scrolling a sentinel element
-    // into view: that propagates to every scrollable ancestor, and on mobile
-    // the keyboard-shifted document layer visibly jumps the whole app while
-    // streaming content follows the tail.
-    container.scrollTo({ top: container.scrollHeight, behavior });
-    previousScrollTopRef.current = container.scrollTop;
-  }, []);
 
   const currentModel = currentModelOverride ?? liveModel ?? data?.context.model ?? pendingModel ?? null;
   const displayModel = isNew
@@ -3697,20 +3683,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [cancelEventStreamGrace, clearSlashCommands, closeEvents, loadTools, maintainEventsConnected, setToolPresetState, syncLiveModel]);
 
-  const scrollToMessage = useCallback((element: HTMLElement, viewportOffset = 16) => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    initialScrollDoneRef.current = true;
-    container.scrollTo({
-      top: element.getBoundingClientRect().top
-        - container.getBoundingClientRect().top
-        + container.scrollTop
-        - viewportOffset,
-      behavior: "instant",
-    });
-    previousScrollTopRef.current = container.scrollTop;
-  }, []);
-
   // What a session read with its state (`loadSession(…, includeState)`) says is
   // under way on the server: a run or command, a `!` command, a compaction. The
   // mount and a hidden page's return show it the same way.
@@ -3960,20 +3932,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     onBranchDataChange(data?.tree ?? [], activeLeafId, handleLeafChange, branchSwitchLocked);
   }, [background, data?.tree, activeLeafId, handleLeafChange, branchSwitchLocked, onBranchDataChange]);
 
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    previousScrollTopRef.current = container.scrollTop;
-  }, [messages.length, loading]);
-
-  useLayoutEffect(() => {
-    if (messages.length === 0) return;
-    if (initialScrollDoneRef.current) return;
-    // 首次落地：默认位置由 provider 定为末端，这里只在它没生效（隐藏槽位挂载）时兜底。
-    initialScrollDoneRef.current = true;
-    scrollToBottom("instant");
-  }, [messages.length, scrollToBottom]);
-
   // Load the model list with bounded retries; loadModels exposes each failure.
   useEffect(() => {
     const controller = new AbortController();
@@ -4034,7 +3992,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     editEntryId,
     // Refs
     sessionIdRef, scrollContainerRef,
-    initialScrollDoneRef,
     // Actions
     handleSend, handleAbort, startSideChat, handleFork, handleNavigate, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
@@ -4047,7 +4004,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     cancelEdit: editEntryId ? cancelEdit : undefined,
     handleToolPresetChange, handleThinkingLevelChange, handleSetDefaultModel, handleSetDefaultThinkingLevel, loadTools, loadSlashCommands, loadAllModels, setActiveLeafId, setData, setMessages, loadContext,
     jumpToEntry, loadNewerPage,
-    scrollToBottom, scrollToMessage,
     dispatch, setAgentRunning, setForkingEntryId,
     bashRunning, pendingBash,
     // Subscriptions
