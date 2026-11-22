@@ -40,7 +40,85 @@ export type ActivityItem =
 /** 活动按中途回复切段后的渲染件：折叠段与外部显示的回复文本，按时间序交替。 */
 export type TurnPart =
   | { kind: "fold"; items: ActivityItem[] }
-  | { kind: "reply"; key: string; block: TextContent; searchTarget?: boolean };
+  | { kind: "reply"; key: string; block: TextContent; searchTarget?: boolean }
+  | { kind: "checkpoint"; view: CheckpointView };
+
+/**
+ * 压缩在对话里留下的那条分界线（Checkpoint）。`before`/`after` 是压缩前后的
+ * 上下文量，取自压缩工具自己的结果行（`▣ ACP | 128.9K → 9.4K tokens (...)`）；
+ * `summary` 是这次压缩的摘要正文（工具参数里的 `content[].summary`），
+ * 点开 Popover 才看。
+ */
+export interface CheckpointView {
+  key: string;
+  state: "running" | "done" | "error";
+  summary?: string;
+  before?: string;
+  after?: string;
+  /** 失败时的原因（结果文本首行）。 */
+  detail?: string;
+}
+
+/** 压缩工具结果里的用量行：`128.9K → 9.4K tokens`。 */
+const COMPACT_TOKEN_DELTA = /([\d.,]+\s?[KMB]?)\s*→\s*([\d.,]+\s?[KMB]?)\s*tokens/i;
+
+/** 消息内容里的纯文本（字符串或 text 块数组，两种都见过）。 */
+function textOf(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((block): block is { type: string; text: string } => Boolean(block) && typeof block === "object"
+      && (block as { type?: unknown }).type === "text" && typeof (block as { text?: unknown }).text === "string")
+    .map((block) => block.text)
+    .join("\n");
+}
+
+function compactSummaryOfInput(input: Record<string, unknown> | undefined): string | undefined {
+  const blocks = input?.content;
+  if (!Array.isArray(blocks)) return undefined;
+  for (const block of blocks) {
+    if (!block || typeof block !== "object") continue;
+    const summary = (block as { summary?: unknown }).summary;
+    if (typeof summary === "string" && summary.trim()) return summary;
+  }
+  return undefined;
+}
+
+/**
+ * 把一条活动行读成压缩分界线；不是压缩就返回 null。两种来源：pi 自己写进
+ * JSONL 的压缩消息（`custom` + `customType: "compaction"`），以及 compress
+ * 工具的调用行（跑完带结果，跑着没结果，出错带 isError）。
+ */
+export function checkpointViewOf(item: ActivityItem): CheckpointView | null {
+  if (item.kind === "custom") {
+    const customType = (item.message as { customType?: unknown }).customType;
+    if (customType !== "compaction") return null;
+    const text = textOf(item.message.content);
+    const tokensBefore = (item.message.details as { tokensBefore?: unknown } | undefined)?.tokensBefore;
+    return {
+      key: item.key,
+      state: "done",
+      summary: text.trim() || undefined,
+      before: typeof tokensBefore === "number" && Number.isFinite(tokensBefore) ? tokensBefore.toLocaleString() : undefined,
+    };
+  }
+  if (item.kind !== "tool" || item.block.toolName !== "compress") return null;
+  const summary = compactSummaryOfInput(item.block.input);
+  if (!item.result) return { key: item.key, state: "running", summary };
+  if (item.result.isError) {
+    const detail = textOf(item.result.content).trim().split("\n")[0]?.trim();
+    return { key: item.key, state: "error", summary, detail: detail || undefined };
+  }
+  const resultText = textOf(item.result.content);
+  const delta = COMPACT_TOKEN_DELTA.exec(resultText);
+  return {
+    key: item.key,
+    state: "done",
+    summary,
+    before: delta ? delta[1].replace(/\s/g, "") : undefined,
+    after: delta ? delta[2].replace(/\s/g, "") : undefined,
+  };
+}
 
 /**
  * 活动行按回复切段（2026-11-20）：回合内 pi 边跑边说的文本不再收进折叠，
@@ -58,6 +136,12 @@ export function splitTurnParts(items: ActivityItem[]): TurnPart[] {
     if (item.kind === "text") {
       flush();
       parts.push({ kind: "reply", key: item.key, block: item.block, searchTarget: item.searchTarget });
+      continue;
+    }
+    const checkpoint = checkpointViewOf(item);
+    if (checkpoint) {
+      flush();
+      parts.push({ kind: "checkpoint", view: checkpoint });
       continue;
     }
     current.push(item);

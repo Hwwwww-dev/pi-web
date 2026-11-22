@@ -178,6 +178,8 @@ components/
   SidebarToast.tsx         sidebar one-line toast: archive Undo/View, failed saves
   SidebarIcons.tsx         sidebar stroke icons
   ChatWindow.tsx           chat composition + completion sound
+  chat/ExtensionDialogs.tsx extension select/confirm/input/editor dialog and the custom panel
+  chat/ChatRow.tsx          one scroller row (MessageScrollerItem + row styles)
   ChatInput.tsx            input bar + model/thinking/tools/compact controls
   MessageView.tsx          one message (user/assistant/toolCall/toolResult)
   CodemodeToolView.tsx     codemode card: the tool calls its script made
