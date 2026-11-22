@@ -2050,18 +2050,25 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (promptRunIdRef.current !== runId) return;
     const readSeqBefore = sessionReadSeqRef.current;
     // 送达确认先走轻量探测（只要末条 entryId）：大号消息下整窗重读会把确认拖成超时。
+    // 探测的锚点用「发送点」优先，否则用视图自己的末条 entryId：立即引导/后续消息
+    // 不经过 handleSend，没有发送点记录，但同样会落盘，靠这个锚点把漏掉的事件补回来。
     const pendingSend = unconfirmedSendRef.current;
+    const pendingHere = Boolean(sid && pendingSend && pendingSend.sid === sid);
+    const viewTail = entryIdsRef.current[entryIdsRef.current.length - 1] ?? null;
+    const sinceAnchor = pendingHere && pendingSend!.lastEntryIdAtSend
+      ? pendingSend!.lastEntryIdAtSend
+      : viewTail;
     let probe: "landed" | "absent" | undefined;
-    if (sid && pendingSend && pendingSend.sid === sid) {
+    if (sid) {
       const tail = await probeSessionTail(sid);
-      if (tail) probe = tail.lastEntryId !== pendingSend.lastEntryIdAtSend ? "landed" : "absent";
+      if (tail) probe = tail.lastEntryId !== sinceAnchor ? "landed" : "absent";
     }
     try {
       if (sid) {
-        if (probe === "landed" && pendingSend?.lastEntryIdAtSend) {
+        if (probe === "landed" && sinceAnchor) {
           // 落盘了：只补差，不再把刚发出去的 MB 级正文读一遍。
-          if (!(await appendSessionSince(sid, pendingSend.lastEntryIdAtSend))) await loadSession(sid);
-        } else if (probe !== "absent") {
+          if (!(await appendSessionSince(sid, sinceAnchor))) await loadSession(sid);
+        } else if (!(pendingHere && probe === "absent")) {
           await loadSession(sid);
         }
       }
@@ -2083,7 +2090,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       if (sid) scheduleEventStreamClose(sid);
     }
-  }, [appendSessionSince, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, settleUiStage, settleUnconfirmedSend]);
+  }, [appendSessionSince, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, settleUiStage, settleUnconfirmedSend, entryIdsRef]);
 
   const waitForPromptSettlement = useCallback(async (sid: string, runId?: number) => {
     await delay(PROMPT_SETTLE_INITIAL_DELAY_MS);
@@ -3538,6 +3545,26 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         streamingBehavior: behavior,
         ...(piImages?.length ? { images: piImages } : {}),
       });
+      // 立即引导：先落一条本地气泡。服务器的投递消息到达时会替换它（message_end
+      // 里消费相邻乐观气泡的分支）；事件丢了也不会“发出去就从列表里消失”。
+      // 排队（followUp）不落气泡：队列行本来就在显示它。
+      if (behavior === "steer" && (message.trim() || piImages?.length)) {
+        const bubble: AgentMessage = {
+          role: "user",
+          content: piImages?.length
+            ? [
+              ...(message.trim() ? [{ type: "text" as const, text: message }] : []),
+              ...piImages.map((img) => ({
+                type: "image" as const,
+                source: { type: "base64" as const, media_type: img.mimeType, data: img.data },
+              })),
+            ]
+            : message,
+          timestamp: Date.now(),
+        };
+        optimisticUserMessageKeyRef.current = userMessageKey(bubble);
+        setMessages((prev) => [...prev, bubble]);
+      }
     } catch (e) {
       console.error("Failed to submit streaming prompt:", e);
       restore();
