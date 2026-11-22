@@ -112,10 +112,6 @@ export function RowObjectSpan({ object, clip = false, follow = false }: { object
       ref={ref}
       className={cn(
         "block text-left",
-        // 字号跟 trace 行一致（13px）：对象文本有的是 TraceLine 的子项（13px），有的
-        // 落在行外的 14px 容器里，同一个 13px 标题旁会并排出现两种字号（用户：
-        // “思考整体比运行小一号”）。钉死后思考尾、命令对象、时长、标题同一号字。
-        "text-[length:calc(13px+var(--chat-font-size-offset,0px))]",
         // pr 把裁切点从渐变起点往里收 1–2px，最后一字符不会正好压在渐变边缘。
         clip ? "overflow-hidden whitespace-nowrap pr-[2px]" : "truncate",
       )}
