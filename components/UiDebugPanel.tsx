@@ -29,16 +29,30 @@ function px(value: number): string {
   return `${Math.round(value)}`;
 }
 
-function variable(name: string, from: Element = document.documentElement): string {
-  const raw = getComputedStyle(from).getPropertyValue(name).trim();
+/** 自定义属性会落在子树（如 Content 的 `pb` 吃宿主上的 `--composer-dock-h`），必须从该元素读。 */
+function variable(name: string, from: Element | null = document.documentElement): string {
+  const raw = from ? getComputedStyle(from).getPropertyValue(name).trim() : "";
   return raw || "—";
+}
+
+const CONTENT_SELECTOR = '[data-slot="message-scroller-content"]';
+
+/**
+ * 视口：官方 `data-slot` 首选。`[data-scrollable]` 同时挂在 root 和 viewport 上，
+ * `querySelector` 拿到的是 root（不可滚），必须取最内层那个。
+ */
+function findViewport(): HTMLElement | null {
+  const direct = document.querySelector<HTMLElement>('[data-slot="message-scroller-viewport"]');
+  if (direct) return direct;
+  const list = Array.from(document.querySelectorAll<HTMLElement>("[data-scrollable]"));
+  return list.filter((el) => el.parentElement?.hasAttribute("data-scrollable")).at(-1) ?? list.at(-1) ?? null;
 }
 
 /** 采样一次。全部是读操作，调用方负责只在面板打开时跑。 */
 function collect(frames: number | null): Row[] {
   const html = document.documentElement;
   const viewport = window.visualViewport;
-  const scroller = document.querySelector<HTMLElement>("[data-scrollable]");
+  const scroller = findViewport();
   const dock = document.querySelector<HTMLElement>(".chat-composer-dock");
   const rows: Row[] = [];
 
@@ -69,13 +83,13 @@ function collect(frames: number | null): Row[] {
     const card = dock.querySelector<HTMLElement>("[data-chat-input]") ?? dock.lastElementChild;
     rows.push({
       label: "输入条",
-      value: `dock ${px(dock.offsetHeight)}  卡片 ${card instanceof HTMLElement ? px(card.getBoundingClientRect().height) : "—"}  --composer-dock-h ${variable("--composer-dock-h")}`,
+      value: `dock ${px(dock.offsetHeight)}  卡片 ${card instanceof HTMLElement ? px(card.getBoundingClientRect().height) : "—"}  --composer-dock-h ${variable("--composer-dock-h", dock)}`,
     });
   }
 
   if (scroller) {
     const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-    const content = scroller.firstElementChild as HTMLElement | null;
+    const content = scroller.querySelector<HTMLElement>(CONTENT_SELECTOR) ?? (scroller.firstElementChild as HTMLElement | null);
     const padEnd = content ? Number.parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0;
     const scrollTop = scroller.scrollTop;
     const last = content?.lastElementChild as HTMLElement | null;
@@ -84,14 +98,17 @@ function collect(frames: number | null): Row[] {
       label: "滚动",
       value: `${px(scrollTop)} / ${px(max)}  差 ${px(max - scrollTop)}  client ${px(scroller.clientHeight)} scroll ${px(scroller.scrollHeight)}`,
     });
-    rows.push({ label: "内容垫底", value: `${px(padEnd)}${content ? `  行 ${content.children.length}` : ""}` });
+    rows.push({
+      label: "内容垫底",
+      value: `${px(padEnd)}${content ? `  行 ${content.children.length}` : ""}  --composer-dock-h ${variable("--composer-dock-h", content ?? dock)}`,
+    });
     if (last) rows.push({ label: "末行到视口底", value: `${px(lastBottom - scrollTop - scroller.clientHeight)}（贴底时应 ≈ -垫底）` });
     rows.push({
       label: "官方 end",
-      value: `${px(lastBottom + padEnd - scrollTop - scroller.clientHeight)}（>${FOLLOW_THRESHOLD} 才续 follow）  可滚 ${scroller.getAttribute("data-scrollable") ?? "—"}`,
+      value: `${px(lastBottom + padEnd - scrollTop - scroller.clientHeight)}（>${FOLLOW_THRESHOLD} 才续 follow）  可滚 ${scroller.getAttribute("data-scrollable") ?? "—"}${scroller.hasAttribute("data-autoscrolling") ? "  跟随中" : ""}`,
     });
   } else {
-    rows.push({ label: "滚动", value: "未找到 [data-scrollable]（当前没有会话）" });
+    rows.push({ label: "滚动", value: "未找到 message-scroller viewport（当前没有会话）" });
   }
 
   rows.push({
