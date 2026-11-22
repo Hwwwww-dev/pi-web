@@ -25,6 +25,12 @@ const nextConfig: NextConfig = {
     // are truncated and fail with "Failed to parse body as FormData."
     proxyClientMaxBodySize: "128mb",
   },
+  // The build used to cold-run the project's type check: `run-typescript` measured
+  // 15.9 s of a 56 s `next build`, while the same check is 2.7 s with the
+  // `tsconfig.tsbuildinfo` the repo already keeps. The gate moved to where the
+  // incremental cache is used — `tsc --noEmit`, run by `~/run-pi-web-build.sh`
+  // before the build and by CI — so the production build no longer repeats it.
+  typescript: { ignoreBuildErrors: true },
   // next/image is only used for the static logo, so the /_next/image optimizer
   // (and its sharp/libheif attack surface, see GHSA-2xp9-vwfh-vxw4) is not needed.
   images: { unoptimized: true },
