@@ -1847,40 +1847,44 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // 已载入的持久条目是 messages 的前缀（与 mergeLoadedTail 同一前提）：
     // 前 `held` 条已有 id，其后是无 id 的流式/乐观行。
     const held = Math.min(previous.entryIds.length, previous.messages.length);
-    const appendedMessages: typeof previous.messages = [];
-    const appendedIds: string[] = [];
-    const upgraded: number[] = [];
-    let local = held;
+    const matches = (live: typeof previous.messages[number], persisted: typeof previous.messages[number]) =>
+      mode === "user-only"
+        ? live.role === "user" && persisted.role === "user" && userMessageKey(live) === userMessageKey(persisted)
+        : sameMessage(live, persisted);
+    const fresh: { id: string; message: typeof previous.messages[number] }[] = [];
     result.entryIds.forEach((entryId, index) => {
       const message = result.messages[index];
       if (!message || known.has(entryId)) return;
       // 跑中（或发送后的那次）只补用户条目：助手正文走 SSE 增量，从文件重放会重复。
       if (mode === "user-only" && message.role !== "user") return;
-      // 已渲染但未落盘的行（流式回复、乐观气泡）没有 id，只能按内容对上：
-      // 用户行比 userMessageKey，其余用 sameMessage。对上的就地升级成持久条目，
-      // 不另追加一行（否则回合结束多一份）。
-      const rest = previous.messages.slice(local);
-      const matchIdx = mode === "user-only"
-        ? rest.findIndex((live) => live.role === "user" && userMessageKey(live) === userMessageKey(message))
-        : rest.findIndex((live) => sameMessage(live, message));
-      if (matchIdx !== -1) {
-        upgraded.push(local + matchIdx);
-        local += matchIdx + 1;
+      fresh.push({ id: entryId, message });
+    });
+    if (fresh.length === 0) return true;
+    // 按本地无 id 的行逐条往前对（与 mergeLoadedTail 同一算法）：
+    // 对上的就地升级为持久条目（id 收编、内容以落盘版为准），对不上的本地行
+    // （在途、未落盘）原样留在原位，剩下没配上的新条目按文件顺序接在末尾。
+    // 旧写法把整批新条目先接上、再把对不上的本地行拼在后面，回合结束就会出现
+    // 文件版与本地版两份且错序（“补乱套了”）。
+    const used = new Set<number>();
+    const out: typeof previous.messages = previous.messages.slice(0, held);
+    const ids: string[] = [...previous.entryIds];
+    for (let index = held; index < previous.messages.length; index++) {
+      const live = previous.messages[index];
+      const hit = fresh.findIndex((entry, i) => !used.has(i) && matches(live, entry.message));
+      if (hit === -1) {
+        out.push(live);
+        continue;
       }
-      appendedIds.push(entryId);
-      appendedMessages.push(message);
+      used.add(hit);
+      out.push(fresh[hit].message);
+      ids.push(fresh[hit].id);
+    }
+    fresh.forEach((entry, index) => {
+      if (used.has(index)) return;
+      out.push(entry.message);
+      ids.push(entry.id);
     });
-    if (appendedIds.length === 0) return true;
-    // 被升级的行从本地尾部摘除（落盘版在原位置接上）；未对上的在途行留在末尾。
-    const kept: typeof previous.messages = [];
-    previous.messages.forEach((message, index) => {
-      if (index < held || upgraded.includes(index)) return;
-      kept.push(message);
-    });
-    const next = {
-      messages: [...previous.messages.slice(0, held), ...appendedMessages, ...kept],
-      entryIds: [...previous.entryIds, ...appendedIds],
-    };
+    const next = { messages: out, entryIds: ids };
     setMessageKeyAliases((aliases) => carryMessageKeys({ ...previous, aliases }, next));
     setMessages(next.messages);
     setEntryIds(next.entryIds);
