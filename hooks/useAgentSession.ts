@@ -669,6 +669,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // before its request failed. Later ones clear the unconfirmed record itself.
   const landedPromptRunIdRef = useRef<number | null>(null);
   const unconfirmedSendRef = useRef<UnconfirmedSend | null>(null);
+  // 立即引导落下的本地气泡，等 settle 与文件对账：文件里没有它的文字就退回输入框。
+  const steerBubblesRef = useRef<Array<{ sid: string; key: string; text: string; images?: ChatDraftImage[] }>>([]);
   // The context the newest session read found, and the order its request
   // started in: only a read started after the run settled can settle it.
   const sessionReadSeqRef = useRef(0);
@@ -2074,6 +2076,22 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
     } finally {
       if (promptRunIdRef.current !== runId) return;
+      // 立即引导的本地气泡和文件对账：文件里找不到同文的用户消息，说明服务器没收到，
+      // 文字退回输入框并报错——绝不静默消失。
+      if (sid) {
+        const leftovers = steerBubblesRef.current.filter((b) => b.sid === sid);
+        if (leftovers.length > 0) {
+          steerBubblesRef.current = steerBubblesRef.current.filter((b) => b.sid !== sid);
+          const present = new Set(
+            messagesRef.current.filter((m) => m.role === "user").map((m) => userMessageKey(m)),
+          );
+          for (const leftover of leftovers) {
+            if (present.has(leftover.key)) continue;
+            restoreSubmission(leftover.text, leftover.images, composerDraftKey);
+            addNotice({ type: "error", message: translate("chat.sendNotReceived") });
+          }
+        }
+      }
       // The server is idle: an unconfirmed send of this run either is in the
       // read just made or never arrived.
       if (sid) settleUnconfirmedSend(sid, runId, readSeqBefore, probe);
@@ -2090,7 +2108,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       if (sid) scheduleEventStreamClose(sid);
     }
-  }, [appendSessionSince, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, settleUiStage, settleUnconfirmedSend, entryIdsRef]);
+  }, [appendSessionSince, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, settleUiStage, settleUnconfirmedSend, entryIdsRef, addNotice, composerDraftKey, messagesRef, restoreSubmission, translate]);
 
   const waitForPromptSettlement = useCallback(async (sid: string, runId?: number) => {
     await delay(PROMPT_SETTLE_INITIAL_DELAY_MS);
@@ -3564,6 +3582,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         };
         optimisticUserMessageKeyRef.current = userMessageKey(bubble);
         setMessages((prev) => [...prev, bubble]);
+        steerBubblesRef.current.push({ sid, key: userMessageKey(bubble), text: message, images });
       }
     } catch (e) {
       console.error("Failed to submit streaming prompt:", e);
