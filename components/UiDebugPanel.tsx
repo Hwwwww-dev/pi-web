@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { XIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { copyText } from "@/lib/clipboard";
 import { Button } from "./ui/button";
@@ -92,7 +93,10 @@ function collect(frames: number | null): Row[] {
     const content = scroller.querySelector<HTMLElement>(CONTENT_SELECTOR) ?? (scroller.firstElementChild as HTMLElement | null);
     const padEnd = content ? Number.parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0;
     const scrollTop = scroller.scrollTop;
-    const last = content?.lastElementChild as HTMLElement | null;
+    // 末行：跳过官方追在 Content 末位的隐藏 spacer（`[data-message-scroller-spacer][hidden]`），
+    // 以及任何零高度行——它们不是视觉末行，量出来的「差」会离谱（曾报 -778）。
+    const children = Array.from(content?.children ?? []) as HTMLElement[];
+    const last = children.filter((el) => !el.hasAttribute("hidden") && el.getBoundingClientRect().height > 0).at(-1) ?? null;
     const lastBottom = last ? last.getBoundingClientRect().bottom - scroller.getBoundingClientRect().top + scrollTop : 0;
     rows.push({
       label: "滚动",
@@ -100,12 +104,14 @@ function collect(frames: number | null): Row[] {
     });
     rows.push({
       label: "内容垫底",
-      value: `${px(padEnd)}${content ? `  行 ${content.children.length}` : ""}  --composer-dock-h ${variable("--composer-dock-h", content ?? dock)}`,
+      value: `${px(padEnd)}  行 ${children.length}${last ? `  末行 ${px(last.getBoundingClientRect().height)}` : ""}  --composer-dock-h ${variable("--composer-dock-h", content ?? dock)}`,
     });
     if (last) rows.push({ label: "末行到视口底", value: `${px(lastBottom - scrollTop - scroller.clientHeight)}（贴底时应 ≈ -垫底）` });
+    // 越界滚动：scrollTop 超过 max 时，屏幕底部那段垫底里会出现空白——就是「物理贴底」看到的空隙。
+    const over = scrollTop - max;
     rows.push({
       label: "官方 end",
-      value: `${px(lastBottom + padEnd - scrollTop - scroller.clientHeight)}（>${FOLLOW_THRESHOLD} 才续 follow）  可滚 ${scroller.getAttribute("data-scrollable") ?? "—"}${scroller.hasAttribute("data-autoscrolling") ? "  跟随中" : ""}`,
+      value: `${px(lastBottom + padEnd - scrollTop - scroller.clientHeight)}（>${FOLLOW_THRESHOLD} 才续 follow）  可滚 ${scroller.getAttribute("data-scrollable") ?? "—"}${scroller.hasAttribute("data-autoscrolling") ? "  跟随中" : ""}${Math.abs(over) >= 1 ? `  越界 ${px(over)}` : ""}`,
     });
   } else {
     rows.push({ label: "滚动", value: "未找到 message-scroller viewport（当前没有会话）" });
@@ -195,13 +201,21 @@ export function UiDebugPanel({ active, onClose }: {
   return (
     <div className="flex max-h-[min(70vh,560px)] w-full flex-col">
       <div className="flex items-center justify-between gap-2 border-b border-border px-3.5 py-2.5">
-        <div className="text-sm font-medium">{t("uiDebug.title")}</div>
-        <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={copy} disabled={!rows}>
+        <div className="truncate text-sm font-medium leading-none">{t("uiDebug.title")}</div>
+        {/* 两个按钮同高同字号、都不换行：文字按钮在不同语言下行高不同，曾把「关闭」推歪。 */}
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button size="sm" variant="ghost" className="h-7 shrink-0 whitespace-nowrap px-2 text-xs leading-none" onClick={copy} disabled={!rows}>
             {copied ? t("debug.copied") : t("uiDebug.copy")}
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => onClose(true)}>
-            {t("uiDebug.close")}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7 shrink-0"
+            onClick={() => onClose(true)}
+            aria-label={t("uiDebug.close")}
+            title={t("uiDebug.close")}
+          >
+            <XIcon className="size-3.5" aria-hidden />
           </Button>
         </div>
       </div>
