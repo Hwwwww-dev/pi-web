@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DownloadIcon, RotateCcwIcon, SearchIcon, UploadIcon } from "lucide-react";
+import { DownloadIcon, RefreshCwIcon, RotateCcwIcon, RotateCwIcon, SearchIcon, UploadIcon, ZapIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
 import { useAdvancedSettings, useAdvancedSettingsActions } from "@/hooks/useAdvancedSettings";
 import {
@@ -54,10 +54,25 @@ const EFFECT_LABEL: Record<AdvancedSettingEffect, LocalizedText> = {
   reload: { zh: "需刷新页面", tw: "需重新整理頁面", en: "Needs a page reload" },
 };
 
+/** 生效方式只用图标：闪电=改完立刻生效，循环箭头=下一条消息生效，重载箭头=需刷新页面。
+ *  文字留在 `title`/`aria-label`（悬停与读屏），视觉上只占一个 16px 方框。 */
+const EFFECT_ICON = {
+  live: ZapIcon,
+  "next-message": RotateCwIcon,
+  reload: RefreshCwIcon,
+} as const;
+
 function EffectTag({ effect, locale }: { effect: AdvancedSettingEffect; locale: string }) {
+  const Icon = EFFECT_ICON[effect];
+  const label = localized(EFFECT_LABEL[effect], locale);
   return (
-    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-4 text-muted-foreground">
-      {localized(EFFECT_LABEL[effect], locale)}
+    <span
+      role="img"
+      title={label}
+      aria-label={label}
+      className="inline-flex size-4 shrink-0 items-center justify-center text-muted-foreground"
+    >
+      <Icon className="size-3.5" aria-hidden />
     </span>
   );
 }
@@ -194,7 +209,10 @@ function ChoiceRow({
         <SelectTrigger size="sm" className="w-40" aria-label={localized(spec.label, locale)}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        {/* 设置页是模态（`--z-modal` 100），而 portal 弹层默认只有 `--z-popover` 85：
+            不抬到 `--z-modal-raised`，下拉就会渲染到弹窗背后，看上去“点不开”。
+            同设置里其它面板（Models / Agents / MCP）的写法。 */}
+        <SelectContent position="popper" align="start" className="z-(--z-modal-raised)">
           {spec.options.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {localized(option.label, locale)}
