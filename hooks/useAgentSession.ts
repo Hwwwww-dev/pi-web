@@ -50,7 +50,7 @@ import {
   type QueuedSnapshotEntry,
   type QueuedSubmission,
 } from "@/lib/queued-submissions";
-import { carryMessageKeys, mergeLoadedTail, messageRenderKeys, sameMessage } from "@/lib/message-keys";
+import { carryMessageKeys, mergeLoadedTail, messageRenderKeys } from "@/lib/message-keys";
 import {
   AgentEventConnection,
   canReleaseHiddenEventStream,
@@ -1844,47 +1844,39 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (result.messages.length === 0) return true;
     const previous = { messages: messagesRef.current, entryIds: entryIdsRef.current };
     const known = new Set(previous.entryIds);
-    // 已载入的持久条目是 messages 的前缀（与 mergeLoadedTail 同一前提）：
-    // 前 `held` 条已有 id，其后是无 id 的流式/乐观行。
+    // 无 id 的本地行（跑中流式推来的）只能按内容认，而且工具行的参数在流式阶段
+    // 是半成品，和落盘版对不上：跑中只补用户行，按 userMessageKey 去重。
+    if (mode === "user-only") {
+      const extra = result.entryIds.flatMap((entryId, index) => {
+        const message = result.messages[index];
+        if (!message || known.has(entryId) || message.role !== "user") return [];
+        if (previous.messages.some((m) => m.role === "user" && userMessageKey(m) === userMessageKey(message))) return [];
+        return [{ id: entryId, message }];
+      });
+      if (extra.length === 0) return true;
+      const next = {
+        messages: [...previous.messages, ...extra.map((entry) => entry.message)],
+        entryIds: [...previous.entryIds, ...extra.map((entry) => entry.id)],
+      };
+      setMessageKeyAliases((aliases) => carryMessageKeys({ ...previous, aliases }, next));
+      setMessages(next.messages);
+      setEntryIds(next.entryIds);
+      return true;
+    }
+    // 回合结束：文件是权威。以锚点为界，直接把锚点之后的本地行整段换成落盘版
+    // ——不逐条配对（配不上就会变成两份且错序），也不留任何无 id 的尾部：
+    // 这时手上已经没有未落盘的行了。
     const held = Math.min(previous.entryIds.length, previous.messages.length);
-    const matches = (live: typeof previous.messages[number], persisted: typeof previous.messages[number]) =>
-      mode === "user-only"
-        ? live.role === "user" && persisted.role === "user" && userMessageKey(live) === userMessageKey(persisted)
-        : sameMessage(live, persisted);
-    const fresh: { id: string; message: typeof previous.messages[number] }[] = [];
-    result.entryIds.forEach((entryId, index) => {
+    const fresh = result.entryIds.flatMap((entryId, index) => {
       const message = result.messages[index];
-      if (!message || known.has(entryId)) return;
-      // 跑中（或发送后的那次）只补用户条目：助手正文走 SSE 增量，从文件重放会重复。
-      if (mode === "user-only" && message.role !== "user") return;
-      fresh.push({ id: entryId, message });
+      if (!message || known.has(entryId)) return [];
+      return [{ id: entryId, message }];
     });
     if (fresh.length === 0) return true;
-    // 按本地无 id 的行逐条往前对（与 mergeLoadedTail 同一算法）：
-    // 对上的就地升级为持久条目（id 收编、内容以落盘版为准），对不上的本地行
-    // （在途、未落盘）原样留在原位，剩下没配上的新条目按文件顺序接在末尾。
-    // 旧写法把整批新条目先接上、再把对不上的本地行拼在后面，回合结束就会出现
-    // 文件版与本地版两份且错序（“补乱套了”）。
-    const used = new Set<number>();
-    const out: typeof previous.messages = previous.messages.slice(0, held);
-    const ids: string[] = [...previous.entryIds];
-    for (let index = held; index < previous.messages.length; index++) {
-      const live = previous.messages[index];
-      const hit = fresh.findIndex((entry, i) => !used.has(i) && matches(live, entry.message));
-      if (hit === -1) {
-        out.push(live);
-        continue;
-      }
-      used.add(hit);
-      out.push(fresh[hit].message);
-      ids.push(fresh[hit].id);
-    }
-    fresh.forEach((entry, index) => {
-      if (used.has(index)) return;
-      out.push(entry.message);
-      ids.push(entry.id);
-    });
-    const next = { messages: out, entryIds: ids };
+    const next = {
+      messages: [...previous.messages.slice(0, held), ...fresh.map((entry) => entry.message)],
+      entryIds: [...previous.entryIds, ...fresh.map((entry) => entry.id)],
+    };
     setMessageKeyAliases((aliases) => carryMessageKeys({ ...previous, aliases }, next));
     setMessages(next.messages);
     setEntryIds(next.entryIds);
