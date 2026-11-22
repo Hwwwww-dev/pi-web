@@ -3,6 +3,7 @@ import { existsSync, statSync } from "fs";
 import {
   attachSessionProjectInfo,
   openSessionManager,
+  readLatestSessionEntryId,
   resolveSessionPath,
   resolveSessionIdByPath,
   invalidateSessionListCache,
@@ -52,6 +53,16 @@ export async function GET(
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
+    // `?ids=1`：只回末条 entryId，不碰条目、不建上下文。发送后的“送达确认”走这条路：
+    // 大号消息（多图 base64）下整窗读一次要搬 MB 级正文，慢隧道上会把确认拖成超时，
+    // 于是消息被判为“没送到”而消失。这条探测只读文件尾部，与消息体量无关。
+    if (searchParams.get("ids") === "1") {
+      const lastEntryId = liveRpc
+        ? (liveRpc.inner.sessionManager.getEntries().at(-1)?.id ?? null)
+        : (readLatestSessionEntryId(resolvedPath!) ?? null);
+      return NextResponse.json({ lastEntryId }, { headers: { "Cache-Control": "no-store" } });
+    }
+
     const sm = liveRpc?.inner.sessionManager ?? openSessionManager(resolvedPath!);
     perf?.span("open");
     const filePath = liveRpc?.sessionFile || sm.getSessionFile() || resolvedPath || "";
@@ -84,6 +95,28 @@ export async function GET(
       sessionId: id, // local: lazy URLs for historical tool-result images
     }), transcriptNotices);
     perf?.span("context");
+    // `?since=<entryId>`：只回这一条之后的条目（对齐用）。锚点不在窗口里时
+    // `sinceReset` 置位，调用方退回整窗读——宁可慢一次，也不要拿半截窗口对账。
+    const since = searchParams.get("since");
+    let pageContext = context;
+    let sinceReset = false;
+    if (since) {
+      const anchor = context.entryIds.indexOf(since);
+      if (anchor < 0) {
+        sinceReset = true;
+      } else if (anchor === context.entryIds.length - 1) {
+        pageContext = { ...context, messages: [], entryIds: [] };
+      } else {
+        pageContext = {
+          ...context,
+          messages: context.messages.slice(anchor + 1),
+          entryIds: context.entryIds.slice(anchor + 1),
+          oldestEntryId: context.entryIds[anchor + 1] ?? null,
+          hasMore: false,
+          turnsBefore: 0,
+        };
+      }
+    }
     const ownEntries = sideOwnEntries(entries) as typeof entries;
     const totalActiveMs = computeSessionTotalActiveMs(ownEntries);
     // Cumulative usage over ALL entries, including history compacted away —
@@ -157,7 +190,8 @@ export async function GET(
         tree,
         ...(summaryTree ? { treeFormat: "summary" as const } : {}),
         snapshotRevision,
-        context,
+        context: pageContext,
+        ...(sinceReset ? { sinceReset: true } : {}),
         stats,
         totalActiveMs,
         ...(toolNames !== undefined ? { toolNames } : {}),
@@ -173,7 +207,8 @@ export async function GET(
         tree,
         ...(summaryTree ? { treeFormat: "summary" as const } : {}),
         snapshotRevision,
-        context,
+        context: pageContext,
+        ...(sinceReset ? { sinceReset: true } : {}),
         stats,
         totalActiveMs,
         ...(toolNames !== undefined ? { toolNames } : {}),

@@ -21,6 +21,7 @@ import { normalizeToolCalls } from "@/lib/normalize";
 import { AgentCommandError, agentStatusUrl, EXTENSION_REPORTED_CODE, isPromptRejectedError, sendAgentCommand } from "@/lib/agent-client";
 import { createSideChat, SIDE_REFUSAL_MESSAGES } from "@/lib/side-chat-client";
 import { missingCwdFromBody } from "@/lib/missing-cwd";
+import { fetchSessionSince, probeSessionTail } from "@/lib/session-align";
 import {
   deleteSessionViewSnapshot,
   getSessionViewSnapshot,
@@ -1795,9 +1796,24 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setSessionViewSnapshot({ ...snapshot, messages: withoutMessage(snapshot.messages, pending.bubble) });
     }
   }, []);
-  const settleUnconfirmedSend = useCallback((sid: string, runId: number, readSeqBefore: number) => {
+  const settleUnconfirmedSend = useCallback((sid: string, runId: number, readSeqBefore: number, probe?: "landed" | "absent") => {
     const pending = unconfirmedSendRef.current;
     if (!pending || pending.runId !== runId || pending.sid !== sid) return;
+    // 轻量探测已经给了答案：文件末尾越过发送点 = 落到盘上了；没越过 = 确实没送到。
+    // 这条路径不依赖整窗重读，大号消息（多图 base64）在慢隧道上也不会再被误判。
+    if (probe === "landed") {
+      unconfirmedSendRef.current = null;
+      return;
+    }
+    if (probe === "absent") {
+      unconfirmedSendRef.current = null;
+      restoreSubmission(pending.message, pending.images, pending.draftKey);
+      dropUnconfirmedBubble(pending);
+      addNotice(pending.command
+        ? { type: "warning", message: translate("chat.sendUnconfirmed") }
+        : { type: "error", message: translate("chat.sendNotReceived") });
+      return;
+    }
     unconfirmedSendRef.current = null;
     const read = lastReadContextRef.current;
     const reread = read?.sid === sid && read.seq > readSeqBefore ? read : null;
@@ -1825,6 +1841,34 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       ? { type: "error", message: translate("chat.sendNotReceived") }
       : { type: "warning", message: translate("chat.sendUnconfirmed") });
   }, [addNotice, dropUnconfirmedBubble, restoreSubmission, translate]);
+
+  /**
+   * 对齐：把 `since` 之后的条目按 id 并进列表，不再整窗重读。
+   * 返回 false 表示拿不到可靠的增量（锤点被挤出窗口 / 接口不可用），调用方退回整窗读。
+   */
+  const appendSessionSince = useCallback(async (sid: string, since: string): Promise<boolean> => {
+    const result = await fetchSessionSince(sid, since);
+    if (sessionIdRef.current !== sid) return true;
+    if (result.kind !== "ok") return false;
+    if (result.leafId) setActiveLeafId(result.leafId);
+    if (result.messages.length === 0) return true;
+    const previous = { messages: messagesRef.current, entryIds: entryIdsRef.current };
+    const known = new Set(previous.entryIds);
+    const freshMessages: typeof previous.messages = [];
+    const freshIds: string[] = [];
+    result.entryIds.forEach((entryId, index) => {
+      const message = result.messages[index];
+      if (!message || known.has(entryId)) return;
+      freshMessages.push(message);
+      freshIds.push(entryId);
+    });
+    if (freshIds.length === 0) return true;
+    const next = { messages: [...previous.messages, ...freshMessages], entryIds: [...previous.entryIds, ...freshIds] };
+    setMessageKeyAliases((aliases) => carryMessageKeys({ ...previous, aliases }, next));
+    setMessages(next.messages);
+    setEntryIds(next.entryIds);
+    return true;
+  }, [setActiveLeafId, setMessages, setEntryIds, setMessageKeyAliases, messagesRef, entryIdsRef]);
   // The hook unmounts (a session switch) with a send still unconfirmed: nothing
   // here will settle it, so its text goes back unless one of the run's events
   // cleared the record. With the stream closed, a prompt that did arrive is
@@ -2005,13 +2049,27 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // must not overwrite the messages of the run currently streaming.
     if (promptRunIdRef.current !== runId) return;
     const readSeqBefore = sessionReadSeqRef.current;
+    // 送达确认先走轻量探测（只要末条 entryId）：大号消息下整窗重读会把确认拖成超时。
+    const pendingSend = unconfirmedSendRef.current;
+    let probe: "landed" | "absent" | undefined;
+    if (sid && pendingSend && pendingSend.sid === sid) {
+      const tail = await probeSessionTail(sid);
+      if (tail) probe = tail.lastEntryId !== pendingSend.lastEntryIdAtSend ? "landed" : "absent";
+    }
     try {
-      if (sid) await loadSession(sid);
+      if (sid) {
+        if (probe === "landed" && pendingSend?.lastEntryIdAtSend) {
+          // 落盘了：只补差，不再把刚发出去的 MB 级正文读一遍。
+          if (!(await appendSessionSince(sid, pendingSend.lastEntryIdAtSend))) await loadSession(sid);
+        } else if (probe !== "absent") {
+          await loadSession(sid);
+        }
+      }
     } finally {
       if (promptRunIdRef.current !== runId) return;
       // The server is idle: an unconfirmed send of this run either is in the
       // read just made or never arrived.
-      if (sid) settleUnconfirmedSend(sid, runId, readSeqBefore);
+      if (sid) settleUnconfirmedSend(sid, runId, readSeqBefore, probe);
       const promptWasPending = rpcPromptPendingRef.current;
       const agentWasActive = sdkAgentActiveRef.current;
       rpcPromptPendingRef.current = false;
@@ -2025,7 +2083,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       if (sid) scheduleEventStreamClose(sid);
     }
-  }, [loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, settleUiStage, settleUnconfirmedSend]);
+  }, [appendSessionSince, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, settleUiStage, settleUnconfirmedSend]);
 
   const waitForPromptSettlement = useCallback(async (sid: string, runId?: number) => {
     await delay(PROMPT_SETTLE_INITIAL_DELAY_MS);
