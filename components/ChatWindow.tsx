@@ -1327,6 +1327,14 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         messageRefs.current[refIndex] = el;
       };
 
+      /**
+       * 回合级行的 React key：用 `lib/message-keys.ts` 算好的稳定身份（落盘前是
+       * live 键、落盘后原位接力），不用 `entryIds[userIdx]`——它从 `undefined`
+       * 变成真 id 时整回合的行会全部重挂：折叠状态、思考、图片、高亮全丢，
+       * 官方的前插保位也因为「首个子元素换了节点」而失效。
+       */
+      const stableKey = (i: number): string | number => messageKeys[i] ?? entryIds[i] ?? i;
+
       // The model name is said once per run: the same model on the next step is noise.
       let labeledModel: string | null = null;
       const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; showModelLabel?: boolean; hideUsage?: boolean; hideCopy?: boolean } = {}): ReactNode => {
@@ -1486,7 +1494,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             liveActivityRendered = true;
             rendered.push(
               <LiveTurnTrace
-                key={`live-activity-pre-${entryIds[userIdx] ?? userIdx}`}
+                key={`live-activity-pre-${stableKey(userIdx)}`}
                 items={[]}
                 startTs={(messages[userIdx] as (AgentMessage & { timestamp?: number })).timestamp}
                 foldKey={entryIds[userIdx] === undefined ? undefined : `process:${entryIds[userIdx]}:0`}
@@ -1547,7 +1555,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               if (!isLiveSegment) {
                 rendered.push(
                   <TurnTrace
-                    key={`live-activity-${entryIds[userIdx] ?? userIdx}-${partIdx}`}
+                    key={`live-activity-${stableKey(userIdx)}-${partIdx}`}
                     summary={segmentSummaryText(part.items, t)}
                     foldKey={segFoldKey}
                     defaultOpen={false}
@@ -1560,7 +1568,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               }
               rendered.push(
                 <LiveTurnTrace
-                  key={`live-activity-${entryIds[userIdx] ?? userIdx}-${partIdx}`}
+                  key={`live-activity-${stableKey(userIdx)}-${partIdx}`}
                   items={part.items}
                   startTs={segStartTs}
                   foldKey={segFoldKey}
@@ -1579,7 +1587,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             }
             rendered.push(
               <div
-                key={`live-reply-${entryIds[userIdx] ?? userIdx}-${partIdx}`}
+                key={`live-reply-${stableKey(userIdx)}-${partIdx}`}
                 className="my-1"
                 data-message-text
                 data-search-target={part.searchTarget || undefined}
@@ -1651,7 +1659,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 if (part.kind === "reply") {
                   return (
                     <div
-                      key={`turn-reply-${processKey ?? userIdx}-${partIdx}`}
+                      key={`turn-reply-${stableKey(userIdx)}-${partIdx}`}
                       className="my-1"
                       data-message-text
                       data-search-target={part.searchTarget || undefined}
@@ -1665,7 +1673,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 const segSummary = segmentSummaryText(part.items, t);
                 return (
                   <TurnTrace
-                    key={`turn-fold-${processKey ?? userIdx}-${partIdx}`}
+                    key={`turn-fold-${stableKey(userIdx)}-${partIdx}`}
                     summary={segSummary}
                     foldKey={processKey === undefined ? undefined : `process:${processKey}:${partIdx}`}
                     defaultOpen={!finalAnswerMessage}
@@ -1712,7 +1720,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               .join("\n")
           : "";
         const metaNode = (
-          <div key={`turn-meta-${entryIds[userIdx] ?? userIdx}`} className="mb-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+          <div key={`turn-meta-${stableKey(userIdx)}`} className="mb-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
             <TurnMetaLine
               usage={turnUsage}
               model={turnLastAssistant?.provider ? getModelDisplayName(turnLastAssistant.provider, turnLastAssistant.model, modelNames) : undefined}
@@ -1741,7 +1749,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         if (isValidElement<{ "data-entry-id"?: string }>(lastNode) && lastRole !== "user") {
           rendered[rendered.length - 1] = (
             <div
-              key={lastNode.key ?? `turn-body-${entryIds[userIdx] ?? userIdx}`}
+              key={lastNode.key ?? `turn-body-${stableKey(userIdx)}`}
               data-entry-id={lastNode.props["data-entry-id"]}
               className="flex min-w-0 flex-col gap-1.5"
             >
