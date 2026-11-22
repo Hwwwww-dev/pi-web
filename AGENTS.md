@@ -27,6 +27,8 @@ pi's packages up to 1.2.0 depend on each other with `^` ranges (1.3.0 pins them 
 
 ## Hard rules
 
+- **禁止测试。仓库不保留任何测试：不写、不跑、不保留 `*.test.mjs` / `*.test.ts` / `*.test.tsx`，不保留 `e2e/`。** 改动验证 = `tsc --noEmit` + `npm run lint` + 真机复验。CI 不跑测试（只 lint + typecheck）。
+
 - **Never run `next build` in the main clone while developing.** It pollutes `.next/` and breaks `npm run dev`. The production bundle is built in the run worktree (see Fork workflow).
 - **Restart the production server yourself, detached, after the reply.** Never run it in the foreground and never call `~/run-pi-web.sh` directly in the turn: the restart kills the process that may be hosting this very chat. Use `nohup bash -c 'sleep 5; bash ~/run-pi-web-restart.sh' >/dev/null 2>&1 &` (the 5s delay lets this reply reach the browser before the process dies; the script `setsid`s itself, restarts, probes `127.0.0.1:30141` up to 3 times, and logs to `~/.pi-web/logdir/pi-web-restart.log`). Schedule it last — write the answer first, then fire the restart, so a broken boot never costs the reply.
 - **No RegExp lookbehind in client code** (`(?<=`, `(?<!`): SWC cannot downlevel it and Safari parses it only from 16.4. Emulate it with `replaceNotPrecededBy()` (`lib/markdown.ts`), or the runtime `new RegExp` inside `try` that `lib/gfm-autolink-email-loader.cjs` uses. Keep the `browserslist` Safari/iOS entries at 16.2: raising them re-breaks the client bundle on older devices.
