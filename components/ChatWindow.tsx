@@ -925,6 +925,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       timer = 0;
       if (!activeRef.current || !gestureUpRef.current) return;
       if (container.scrollTop > TOP_SLACK) return;
+      // 贴底（官方 `scrollable.end` 为假）时不存在「翻到顶」这回事：这一刻的
+      // `scrollTop ≈ 0` 都是别的原因——回合结束时行被换掉后内容变短、浏览器把
+      // `scrollTop` 夹回顶部，或者官方自己把视口拉回末尾。拿它当读者翻到顶，
+      // 就会在每次回复完成后多拉一页旧消息（2026-11-22）。真在长列表顶部时官方
+      // 的 `end` 很大，`atTail` 为假，闸门照常放行。
+      if (atTailRef.current) return;
       // A page is loading, or the last one is still rendering.
       if (loadingOlderRef.current || pageRenderingRef.current) return;
       // Fetch the previous page from the server and prepend it. 前插保位由官方 scroller
