@@ -78,8 +78,13 @@ const TOP_SLACK = 24;
 const PREPEND_SETTLE_FRAMES = 12;
 /** 上滑取页的防抖窗口：一次手势里的连续滚动事件只取一页。 */
 const AUTO_LOAD_DEBOUNCE_MS = 200;
-/** 官方的贴底距离：离底 16px 内算贴底，也是 `autoScroll` 的吸附范围。 */
-const SCROLL_EDGE_THRESHOLD = 16;
+/**
+ * 官方的贴底距离：离内容末端 48px 内算贴底，也是 `autoScroll` 的吸附范围。
+ * 实际传给 Provider 的是这个值**加上实测的输入框垫底**（`dockHeight`）：垫底是 Content
+ * 的 padding，属于内容末端，所以“最后一条贴着卡片上沿”离机械底还差一整段垫底，
+ * 不补上它，读者手动滑回底部时官方永远判定“还没到底”，跟随不会恢复。
+ */
+const SCROLL_EDGE_THRESHOLD = 48;
 
 const InspirationDialog = dynamic(() => import("./InspirationDialog").then((mod) => mod.InspirationDialog), { ssr: false });
 
@@ -1981,7 +1986,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
             内容变动都会让官方滚到「第一个未处理」的锚点行，即历史最顶部那条提问
             （2026-11-22 实测：回合结束重读会话后行 key 变化 → 子元素数量不变 → 跳顶，
             并连带触发上翻取页）。没有锚点行，官方就只走 `following-bottom` 分支。 */}
-        <MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold={SCROLL_EDGE_THRESHOLD}>
+        <MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold={SCROLL_EDGE_THRESHOLD + dockHeight}>
         <ScrollerBridge apiRef={scrollerApiRef} onAtTailChange={handleAtTailChange} onVisibleEntryChange={handleVisibleEntryChange} />
         <MessageScroller className="min-h-0 min-w-0 flex-1 animate-in fade-in duration-150">
         <MessageScrollerViewport ref={scrollContainerRef}>

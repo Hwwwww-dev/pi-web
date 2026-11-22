@@ -307,8 +307,6 @@ const AGENT_STATE_RECONCILE_MS = 15_000;
 /** While queue rows are visible the state poll tightens to this: a paused or closed SSE stream leaves rows stale until the next read. */
 const QUEUE_FAST_RECONCILE_MS = 3_000;
 const BASH_STATE_RECONCILE_MS = 1_000;
-/** 整载窗口的下限（条）：已有基线后的兜底/刷新至少拉这么多，锚定合并保证只追加新尾部。 */
-const MIN_LOAD_TAIL = 50;
 /** Stop hands its queue back to be sent again; the stopped run has to unwind first, or a prompt rides it. */
 const STOP_RESEND_SETTLE_TIMEOUT_MS = 5_000;
 const STOP_RESEND_POLL_MS = 50;
@@ -690,6 +688,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const pendingWindowMessagesRef = useRef<AgentMessage[]>([]);
   /** 正在请求中的后一页游标。 */
   const loadingAfterRef = useRef<string | null>(null);
+  /** 补 entryId 的只取 id 读正在进行。 */
+  const syncingIdsRef = useRef(false);
 
   sessionPropIdRef.current = session?.id ?? null;
   dataRef.current = data;
@@ -925,13 +925,15 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (showLoading) setLoading(true);
       const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1", tree: "summary" });
       // 挂载（本会话尚无已载入条目）按整轮取首屏：3 轮一屏，与翻页同一量纲。
-      // 已有基线后的兜底/刷新按条：窗口不得小于已载入条数，否则每次刷新都把
+      // 已有基线后的兜底/刷新按条：窗口不得不小于已载入条数，否则每次刷新都把
       // 翻页载入的历史裁掉——读者往上翻，内容已经不在内存里了。
+      // 不得比已载入的多：按条数的窗口一旦放大（以前有 50 条兜底），合并就会把
+      // 窗口里比本地多出来的旧条目追加进列表，表现是每次刷新凭空长出一段旧历史。
       const loadedCount = sessionIdRef.current === sid ? entryIdsRef.current.length : 0;
       if (loadedCount === 0) {
         params.set("turns", String(VISIBLE_PAGE_TURNS));
       } else {
-        params.set("tail", String(Math.min(1000, Math.max(MIN_LOAD_TAIL, loadedCount))));
+        params.set("tail", String(Math.min(1000, Math.max(1, loadedCount))));
       }
       if (options?.force) params.set("force", "1");
       const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?${params}`);
@@ -1130,10 +1132,44 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   const syncEntryIdsAfterRun = useCallback((sid: string) => {
     // 条目 id 只有读盘才拿得到（SSE 只追加消息），而编辑 / 分叉两个按钮以
-    // entryId 为开关：回合结束后如果 id 数组比消息短，补一次锚定合并读把它
-    // 对齐。id 齐了就跳过；同一会话并发调用由 loadSession 的 single-flight 合并。
-    if (entryIdsRef.current.length >= messagesRef.current.length) return;
-    void loadSession(sid);
+    // entryId 为开关：回合结束后如果 id 数组比消息短，补一次**只取 id** 的读
+    //（`ids=1`，服务端只回 entryIds）。以前这里走整读 loadSession：按条数的窗口
+    //（`tail = max(50, 已载入)`）比首屏的 3 轮宽，合并就把窗口里多出来的几十条
+    // 旧消息追加进列表——每回合结束、每次中止都“凭空长出一段旧历史”。
+    const heldIds = entryIdsRef.current;
+    const heldMessages = messagesRef.current;
+    if (heldIds.length >= heldMessages.length || syncingIdsRef.current) return;
+    syncingIdsRef.current = true;
+    void (async () => {
+      try {
+        const query = new URLSearchParams({ ids: "1", tail: String(Math.min(1000, Math.max(1, heldMessages.length))) });
+        const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?${query}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const d = await res.json() as { entryIds?: string[] };
+        const ids = d.entryIds ?? [];
+        if (sessionIdRef.current !== sid || !sessionHookMountedRef.current) return;
+        // 对齐：本地最后一个持久条目在返回窗口里的位置之后的条目，就是本次运行
+        // 追加的那些行。条数不符（运行里还落了 custom 之类我们不认识的行）就不猜，
+        // 交给整读按内容核对。
+        const anchor = heldIds[heldIds.length - 1];
+        const at = anchor === undefined ? -1 : ids.lastIndexOf(anchor);
+        if (at < 0 || ids.length - at - 1 !== heldMessages.length - heldIds.length) {
+          void loadSession(sid);
+          return;
+        }
+        // 别名交接：这些行原本是 `live:<anchor>:<n>` 键，落盘后把同一个键交给它
+        // 的 entry id，React 不重挂载（见 lib/message-keys.ts）。
+        setMessageKeyAliases((aliases) => carryMessageKeys(
+          { messages: heldMessages, entryIds: heldIds, aliases },
+          { messages: heldMessages, entryIds: ids },
+        ));
+        setEntryIds(ids);
+      } catch {
+        // 补 id 失败不影响阅读：编辑 / 分叉按钮晚一次挂载再出现。
+      } finally {
+        syncingIdsRef.current = false;
+      }
+    })();
   }, [loadSession]);
 
   const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { signal?: AbortSignal }) => {
