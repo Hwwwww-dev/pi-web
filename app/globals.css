@@ -539,10 +539,11 @@ html[data-keyboard-open] .terminal-extra-keys {
 /*
  * Chromium/Safari-only scrollbars. Firefox renders its native ones.
  * Every scrollbar is overlay-style: the 8px box keeps its width as the grab
- * target, but the thumb fades in while its container is in use and out again
- * shortly after. WebKit ignores transitions on these pseudo-elements, so the
- * fade is driven by --sb-alpha, a number lib/scrollbar-visibility.ts ramps
- * between 0 and 1 on the container each animation frame.
+ * target, but the thumb appears the moment a gesture starts and is gone again
+ * 3s after scrolling stops. WebKit ignores transitions on these pseudo-elements
+ * and repaints them lazily mid-scroll, so appearance is a one-step jump through
+ * --sb-alpha (a number lib/scrollbar-visibility.ts writes on the container) and
+ * only the 180ms fade-out is animated.
  */
 /* --sb-alpha is set inline per lit container, and custom properties inherit;
    a direct declaration beats inheritance, so this reset keeps a lit

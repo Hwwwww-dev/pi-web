@@ -1,11 +1,12 @@
 "use client";
 
 /**
- * Overlay scrollbars: the thumb is transparent at rest and fades in while the
- * user actually scrolls, out again shortly after. WebKit's scrollbar
- * pseudo-elements ignore transitions, so the fade is driven by hand: each lit
- * container carries `--sb-alpha`, which the thumb reads as its color strength,
- * and one rAF loop ramps it between 0 and 1 over 400ms.
+ * Overlay scrollbars: the thumb is transparent at rest, appears in one step the
+ * moment a real user gesture starts (before the content moves), and is gone
+ * again 3s after the scrolling stops. WebKit's scrollbar pseudo-elements ignore
+ * transitions and repaint lazily while the compositor scrolls, so the alpha is
+ * not animated in — a lit container carries `--sb-alpha: 1` (the thumb reads it
+ * as its color strength) and only the final fade-out, 180ms, runs on rAF.
  *
  * macOS semantics: a bar lights only when a real user gesture scrolls THAT
  * container. Two failed designs fixed here:
@@ -20,10 +21,9 @@
  * `event.target` — exactly the container that moved — when the stamp is
  * fresh. Programmatic scrolling carries no gesture stamp and never lights.
  */
-const HIDE_DELAY_MS = 700;
-/** 亮起要快（手势即刻反馈）；淡出保留慢节奏。 */
-const FADE_IN_MS = 120;
-const FADE_OUT_MS = 400;
+const HIDE_DELAY_MS = 3000;
+/** 淡出只是收尾，不靠它做“亮起”，所以短一点。 */
+const FADE_OUT_MS = 180;
 /** Wheel/keys: momentumless, so a short window suffices. */
 const WHEEL_SCROLL_WINDOW_MS = 200;
 /** Touch: momentum scrolling continues after the last touchmove. */
@@ -31,53 +31,29 @@ const TOUCH_SCROLL_WINDOW_MS = 1200;
 
 let installed = false;
 
-function fadeAlpha(element: HTMLElement): number {
-  const value = element.style.getPropertyValue("--sb-alpha");
-  return value === "" ? 0 : Number(value) || 0;
-}
-
-type Fade = {
-  element: HTMLElement;
-  from: number;
-  to: number;
-  start: number;
-};
-
-const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t));
+/** 淡出用 ease-out：起手就走了大半，尾巴拖得轻。 */
+const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
 
 export function installGlobalScrollbarVisibility(): void {
   if (installed || typeof window === "undefined") return;
   installed = true;
 
-  const fades = new Map<HTMLElement, Fade>();
+  /** 正在淡出的容器 → 起始时间。亮起不进入这里：它是一步到位的。 */
+  const fades = new Map<HTMLElement, number>();
   let frame = 0;
 
   const tick = (now: number) => {
     frame = 0;
-    for (const [element, fade] of fades) {
-      const duration = fade.to === 0 ? FADE_OUT_MS : FADE_IN_MS;
-      const progress = Math.min(1, (now - fade.start) / duration);
-      const alpha = fade.from + (fade.to - fade.from) * easeInOut(progress);
+    for (const [element, start] of fades) {
+      const progress = Math.min(1, (now - start) / FADE_OUT_MS);
       if (progress >= 1) {
-        if (fade.to === 0) {
-          element.style.removeProperty("--sb-alpha");
-          fades.delete(element);
-          continue;
-        }
-        element.style.setProperty("--sb-alpha", "1");
+        element.style.removeProperty("--sb-alpha");
         fades.delete(element);
         continue;
       }
-      element.style.setProperty("--sb-alpha", alpha.toFixed(3));
+      element.style.setProperty("--sb-alpha", (1 - easeOut(progress)).toFixed(3));
     }
     if (fades.size > 0) frame = requestAnimationFrame(tick);
-  };
-
-  const animate = (element: HTMLElement, target: number) => {
-    const current = fadeAlpha(element);
-    if (current === target && !fades.has(element)) return;
-    fades.set(element, { element, from: current, to: target, start: performance.now() });
-    if (frame === 0) frame = requestAnimationFrame(tick);
   };
 
   const marked = new Set<HTMLElement>();
@@ -87,9 +63,25 @@ export function installGlobalScrollbarVisibility(): void {
     hideTimer = null;
     for (const element of marked) {
       element.classList.remove("scrollbar-visible");
-      animate(element, 0);
+      fades.set(element, performance.now());
     }
     marked.clear();
+    if (fades.size > 0 && frame === 0) frame = requestAnimationFrame(tick);
+  };
+
+  /**
+   * 手势起点最近的可滚动祖先：滚动条必须在内容开始移动之前就亮，不能等到 scroll
+   * 事件（WebKit 在合成器滚动期间对滚动条伪元素的重绘是惰性的，等 scroll 来了再
+   * 把 alpha 从 0 推上去，常常要到手指/滚轮停下才真正画出来）。只取**最近的一个**，
+   * 不沿链条全部点亮。
+   */
+  const nearestScrollable = (from: EventTarget | null): Element[] => {
+    let node = from instanceof Element ? from : null;
+    while (node) {
+      if (node instanceof HTMLElement && node.scrollHeight - node.clientHeight > 1) return [node];
+      node = node.parentElement;
+    }
+    return [];
   };
 
   const reveal = (elements: Element[]) => {
@@ -97,8 +89,11 @@ export function installGlobalScrollbarVisibility(): void {
     if (hideTimer !== null) clearTimeout(hideTimer);
     for (const element of elements) {
       if (!(element instanceof HTMLElement)) continue;
+      // 一步到位，不做淡入：滚动期间的这条重绘 WebKit 是惰性的，分几帧往上推
+      // 常常要等滚动停下才真的画出来（"滑着看不见、停下才出现"）。
       element.classList.add("scrollbar-visible");
-      animate(element, 1);
+      fades.delete(element);
+      element.style.setProperty("--sb-alpha", "1");
       marked.add(element);
     }
     hideTimer = setTimeout(hideAll, HIDE_DELAY_MS);
@@ -111,8 +106,22 @@ export function installGlobalScrollbarVisibility(): void {
     gestureWindowMs = windowMs;
   };
 
-  document.addEventListener("wheel", () => markGesture(WHEEL_SCROLL_WINDOW_MS), { capture: true, passive: true });
-  document.addEventListener("touchmove", () => markGesture(TOUCH_SCROLL_WINDOW_MS), { capture: true, passive: true });
+  document.addEventListener(
+    "wheel",
+    (event) => {
+      markGesture(WHEEL_SCROLL_WINDOW_MS);
+      reveal(nearestScrollable(event.target));
+    },
+    { capture: true, passive: true },
+  );
+  document.addEventListener(
+    "touchmove",
+    (event) => {
+      markGesture(TOUCH_SCROLL_WINDOW_MS);
+      reveal(nearestScrollable(event.target));
+    },
+    { capture: true, passive: true },
+  );
 
   // 键盘滚动容器（焦点内的方向键/翻页/空格）。主输入框打字不经过这里。
   const SCROLL_KEYS = new Set([
@@ -122,7 +131,9 @@ export function installGlobalScrollbarVisibility(): void {
   document.addEventListener(
     "keydown",
     (event) => {
-      if (SCROLL_KEYS.has(event.key)) markGesture(WHEEL_SCROLL_WINDOW_MS);
+      if (!SCROLL_KEYS.has(event.key)) return;
+      markGesture(WHEEL_SCROLL_WINDOW_MS);
+      reveal(nearestScrollable(document.activeElement));
     },
     { capture: true, passive: true },
   );

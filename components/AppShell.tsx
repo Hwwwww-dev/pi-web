@@ -4,7 +4,6 @@ import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } fr
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeftIcon,
   ArrowUpIcon,
   BotIcon,
   BugIcon,
@@ -3023,18 +3022,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               <div className="flex h-full items-center justify-center text-base text-muted-foreground">
                  {translate("workspace.selectSession")}
               </div>
-            ) : (
-              <div className="pointer-events-none absolute top-3 left-3 flex select-none items-start gap-2">
-                <ArrowLeftIcon className="size-11 shrink-0 text-foreground opacity-70" strokeWidth={1.5} />
-                <div>
-                   <div className="mb-2 text-lg font-semibold text-foreground">{translate("workspace.getStarted")}</div>
-                  <div className="text-xs leading-[1.8] text-muted-foreground">
-                     <span className="mr-1.5 text-muted-foreground">1.</span>{translate("workspace.selectProject")}<br />
-                     <span className="mr-1.5 text-muted-foreground">2.</span>{translate("workspace.addModels")}
-                  </div>
-                </div>
-              </div>
-            )
+            ) : null
           ) : null}
           </RegionErrorBoundary>
         </div>
