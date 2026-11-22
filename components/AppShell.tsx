@@ -18,6 +18,7 @@ import {
   PanelRightIcon,
   PenLineIcon,
   RefreshCwIcon,
+  ScanEyeIcon,
   ShieldAlertIcon,
   SlidersHorizontalIcon,
   SunIcon,
@@ -66,6 +67,7 @@ const AgentSessionPanel = dynamic(() => import("./AgentSessionPanel").then((mod)
 const SessionChatPanel = dynamic(() => import("./SessionChatPanel").then((mod) => mod.SessionChatPanel), { ssr: false });
 const DebugPanel = dynamic(() => import("./DebugPanel").then((mod) => mod.DebugPanel), { ssr: false });
 const DebugPanelBoundary = dynamic(() => import("./DebugPanel").then((mod) => mod.DebugPanelBoundary), { ssr: false });
+const UiDebugPanel = dynamic(() => import("./UiDebugPanel").then((mod) => mod.UiDebugPanel), { ssr: false });
 import { newTerminalTab, restoreTerminalTabs, TERMINAL_TABS_KEY, type TerminalTab } from "./terminal-tab-state";
 import { appendSideTab, restoreSideTabs, sideTabsKey } from "./side-tab-state";
 import { useTheme } from "@/hooks/useTheme";
@@ -573,7 +575,7 @@ export function AppShell() {
   }, []);
 
   // Single active panel — only one dropdown open at a time
-  const [activeFlyout, setActiveFlyout] = useState<"agents" | "branches" | "system" | "tools" | "session" | "debug" | null>(null);
+  const [activeFlyout, setActiveFlyout] = useState<"agents" | "branches" | "system" | "tools" | "session" | "debug" | "ui" | null>(null);
 
   useEffect(() => {
     if (!sessionHasBranches) {
@@ -616,7 +618,7 @@ export function AppShell() {
   }, [rightPanelFullWidth]);
 
   const toggleFlyout = useCallback((
-    panel: "agents" | "branches" | "system" | "tools" | "session" | "debug",
+    panel: "agents" | "branches" | "system" | "tools" | "session" | "debug" | "ui",
   ) => {
     if (isMobile) setSidebarOpen(false);
     setActiveFlyout((cur) => cur === panel ? null : panel);
@@ -650,6 +652,10 @@ export function AppShell() {
   // Debug button gets it back, unless the user moved it meanwhile (focusIfLost).
   const closeDebugPanel = useCallback((restoreFocus: boolean) => {
     setActiveFlyout((panel) => panel === "debug" ? null : panel);
+    if (restoreFocus) requestAnimationFrame(() => focusIfLost(document, moreButtonRef.current));
+  }, []);
+  const closeUiDebugPanel = useCallback((restoreFocus: boolean) => {
+    setActiveFlyout((panel) => panel === "ui" ? null : panel);
     if (restoreFocus) requestAnimationFrame(() => focusIfLost(document, moreButtonRef.current));
   }, []);
 
@@ -1128,7 +1134,7 @@ export function AppShell() {
     setSystemTools(null);
     setSystemInfoLoading(false);
     // The debug panel stays open across the switch: it follows whichever session is shown.
-    setActiveFlyout((panel) => panel === "debug" ? panel : null);
+    setActiveFlyout((panel) => panel === "debug" || panel === "ui" ? panel : null);
     if (currentProject !== newProject) {
       // Keep #281's project isolation, but park each workspace's file tabs
       // instead of discarding them so they return when the user switches back.
@@ -1153,7 +1159,7 @@ export function AppShell() {
     const projectKey = workspaceKeyOf(session);
     if (activeProjectKeyRef.current !== projectKey) {
       changeFileWorkspace(activeProjectKeyRef.current, projectKey);
-      setActiveFlyout((panel) => panel === "debug" ? panel : null);
+      setActiveFlyout((panel) => panel === "debug" || panel === "ui" ? panel : null);
     }
     activeProjectKeyRef.current = projectKey;
     // Re-clicking the already-open session must not remount the chat and
@@ -1248,7 +1254,7 @@ export function AppShell() {
     setSystemPrompt(null);
     setSystemTools(null);
     setSystemInfoLoading(false);
-    setActiveFlyout((panel) => panel === "debug" ? panel : null);
+    setActiveFlyout((panel) => panel === "debug" || panel === "ui" ? panel : null);
     if (isMobile) setSidebarOpen(false);
     router.replace(`?cwd=${encodeURIComponent(cwd)}`, { scroll: false });
     // The fresh composer takes the caret once it renders (#1313), unless the
@@ -1617,7 +1623,7 @@ export function AppShell() {
       setSystemPrompt(null);
       setSystemTools(null);
       setSystemInfoLoading(false);
-      setActiveFlyout((panel) => panel === "debug" ? panel : null);
+      setActiveFlyout((panel) => panel === "debug" || panel === "ui" ? panel : null);
       router.replace(cwd ? `?cwd=${encodeURIComponent(cwd)}` : (typeof window !== "undefined" ? window.location.pathname : "/"), { scroll: false });
     }
   }, [invalidateWorkspaceRestore, router]);
@@ -1922,7 +1928,7 @@ export function AppShell() {
 
   // The Debug button shows with a chat only: without one, its panel would have nothing to close it.
   useEffect(() => {
-    if (!showChat) setActiveFlyout((panel) => panel === "debug" ? null : panel);
+    if (!showChat) setActiveFlyout((panel) => panel === "debug" || panel === "ui" ? null : panel);
   }, [showChat]);
 
   useEffect(() => {
@@ -2358,6 +2364,16 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               >
                 <BugIcon className="size-3.5 shrink-0" strokeWidth={2} />
                 <span className="min-w-0 flex-1">{translate("debug.title")}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => openFlyoutFromMenu(() => toggleFlyout("ui"))}
+                disabled={!showChat}
+                title={translate("uiDebug.title")}
+                className="gap-2"
+                data-mobile-toolbar-action={mobile ? "ui-debug" : undefined}
+              >
+                <ScanEyeIcon className="size-3.5 shrink-0" strokeWidth={2} />
+                <span className="min-w-0 flex-1">{translate("uiDebug.title")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => toggleThemePreference()}
@@ -2858,8 +2874,17 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
               </DebugPanelBoundary>
             </HeaderFlyout>
           </Popover>
-
-        {isMobile && renderProjectTrustWarning(true)}
+          <Popover
+            open={activeFlyout === "ui"}
+            onOpenChange={(next) => next
+              ? setActiveFlyout("ui")
+              : setActiveFlyout((cur) => cur === "ui" ? null : cur)}
+          >
+            <PopoverAnchor virtualRef={moreButtonRef} />
+            <HeaderFlyout width="w-[420px] max-w-[calc(100vw-16px)]" align="end" sideOffset={14} collisionPadding={8}>
+              <UiDebugPanel active={activeFlyout === "ui"} onClose={closeUiDebugPanel} />
+            </HeaderFlyout>
+          </Popover>
         </div>
 
         {/* 聊天列行：SidebarInset 为 flex-col，聊天列占据头部以下的剩余高度。

@@ -193,6 +193,7 @@ components/
   AgentsConfig.tsx         built-in subagent toggle + agent profile editor
   SessionChatPanel.tsx     right-panel tab of a subagent or side chat: a ChatWindow for that session
   DebugPanel.tsx           Debug top panel (toolbar, left of the stats): page and server state, its own tick and poll, error boundary
+  UiDebugPanel.tsx         UI Debug flyout (same ⋯ menu): viewport, keyboard, composer dock, chat scroll numbers; samples only while open, no listeners otherwise
   debug-panel-state.ts     pure helpers of DebugPanel: formatting, server clock, poller, issues, session grouping, poll samples
   PluginsConfig.tsx        Settings › Plugins: installed package plugins
   SkillsConfig.tsx         Settings › Skills: loaded, search, install

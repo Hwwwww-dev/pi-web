@@ -23,7 +23,6 @@ import dynamic from "next/dynamic";
 import { MarkdownBody } from "./MarkdownBody";
 import { ActivityNoticeLine, ChatInput, getUserMessageDraftImages, getUserMessageText, type ChatInputHandle } from "./ChatInput";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
-import { ScrollDebugHud } from "./ScrollDebugHud";
 import { ChatMinimap, useMessageRefs, MINIMAP_MIN_PANE_WIDTH } from "./ChatMinimap";
 import { AnsiText } from "./AnsiText";
 import { TurnTrace } from "./transcript/TurnTrace";
@@ -1818,11 +1817,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
   // 读者永远看不到的区域），也进贴底阈值——阈值必须把这层垫底排除掉，否则正常
   // 阅读位置（最后一条贴着卡片上沿）就已经离机械底一整段垫底，判成「未贴底」。
   const [dockHeight, setDockHeight] = useState(0);
-  /** `?debug-scroll`：只读的滚动诊断浮层，排查「偶现贴真底」用。 */
-  const [debugScroll, setDebugScroll] = useState(false);
-  useEffect(() => {
-    setDebugScroll(new URLSearchParams(window.location.search).has("debug-scroll"));
-  }, []);
   useEffect(() => {
     const dock = composerDockRef.current;
     const host = dock?.parentElement;
@@ -1997,12 +1991,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         <MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold={SCROLL_EDGE_THRESHOLD}>
         <ScrollerBridge apiRef={scrollerApiRef} onAtTailChange={handleAtTailChange} onVisibleEntryChange={handleVisibleEntryChange} />
         <MessageScroller className="relative min-h-0 min-w-0 flex-1 animate-in fade-in duration-150">
-        <ScrollDebugHud
-          enabled={debugScroll}
-          containerRef={scrollContainerRef}
-          contentRef={messageContentRef}
-          dockRef={composerDockRef}
-        />
         <MessageScrollerViewport ref={scrollContainerRef}>
           {/* 每行必须是 MessageScrollerItem 的直接子节点：官方 scroller 仅扫描 Content 的 children
               做测量、可见性、前插保位与贴底跟随，多包一层 div 会使这四项全部失效。纵向留白也放在
