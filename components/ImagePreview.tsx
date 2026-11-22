@@ -10,6 +10,15 @@ import { Button } from "@/components/ui/button";
 interface ImagePreviewProps {
   src: string;
   alt?: string;
+  /**
+   * Every picture the trigger belongs to, in display order. The lightbox opens
+   * on `index` and YARL's own carousel takes over from there: swipe, arrow keys
+   * and the arrow buttons are part of the viewer, not ours to draw. Omitted for
+   * a lone picture, which behaves exactly as before.
+   */
+  gallery?: readonly string[];
+  /** Which gallery entry `src` is. Ignored without `gallery`. */
+  index?: number;
   children: React.ReactNode;
   className?: string;
 }
@@ -20,11 +29,14 @@ interface ImagePreviewProps {
  * the viewer owns the overlay, scroll lock, Escape, focus return, double-tap /
  * pinch zoom and drag panning. Nothing here draws chrome over the image.
  */
-export function ImagePreview({ src, alt = "", children, className }: ImagePreviewProps) {
+export function ImagePreview({ src, alt = "", gallery, index = 0, children, className }: ImagePreviewProps) {
   const { t } = useI18n();
   const previewLabel = t("chat.previewImage");
   const triggerLabel = alt.trim() ? `${previewLabel}: ${alt}` : previewLabel;
   const [open, setOpen] = useState(false);
+  // 单图即长度 1 的图集：幻灯片列表与起始位置走同一条路径，不再分叉。
+  const slides = gallery && gallery.length > 0 ? gallery.map((source) => ({ src: source })) : [{ src, alt }];
+  const startIndex = gallery && gallery.length > 0 ? Math.min(Math.max(index, 0), slides.length - 1) : 0;
 
   // 空白处点击关闭：YARL 的 closeOnBackdropClick 只认“灯箱容器外”的背景点击，
   // 图片四周的黑边属于轮播区不算背景。portal 内、图片与控件（按钮/链接）之外
@@ -54,10 +66,12 @@ export function ImagePreview({ src, alt = "", children, className }: ImagePrevie
       >
         {children}
       </Button>
+      {/* carousel.finite：单图不显示左右箭头（没有下一张），多图才翻页。 */}
       <Lightbox
         open={open}
         close={() => setOpen(false)}
-        slides={[{ src, alt }]}
+        index={startIndex}
+        slides={slides}
         plugins={[Zoom]}
         zoom={{ scrollToZoom: true }}
         carousel={{ finite: true }}

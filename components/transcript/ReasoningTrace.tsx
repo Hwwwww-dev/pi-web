@@ -39,6 +39,37 @@ function thinkingContentKey(sessionId: string, entryId: string, blockIndex: numb
   return `${sessionId}:${entryId}:${blockIndex}`;
 }
 
+/** 两个缓存同宽：超出条目数的先丢掉最早写入的那条。 */
+function trimThinkingCaches(): void {
+  for (const cache of [thinkingContentCache, loadedThinkingContentCache]) {
+    while (cache.size > MAX_THINKING_CACHE_ENTRIES) {
+      const oldest = cache.keys().next().value;
+      if (oldest === undefined) break;
+      cache.delete(oldest);
+    }
+  }
+}
+
+/**
+ * 流式跑完的思考文本写进同一套缓存。
+ *
+ * 回合结束后列表重读会把同一块标成 `deferred`（`deferThinking` 剪载荷），于是
+ * 展开时会去请求一份刚刚还在内存里的文本。存下来之后，展开先命中缓存、不发
+ * 请求，和“历史里点开过一次”的情形完全一样。
+ */
+export function rememberThinkingContent(
+  sessionId: string | undefined,
+  entryId: string | undefined,
+  blockIndex: number,
+  text: string,
+): void {
+  if (!sessionId || !entryId || blockIndex < 0 || text.trim() === "") return;
+  const key = thinkingContentKey(sessionId, entryId, blockIndex);
+  loadedThinkingContentCache.set(key, text);
+  thinkingContentCache.set(key, Promise.resolve(text));
+  trimThinkingCaches();
+}
+
 /** A deferred block's text, when this page already fetched it. */
 export function cachedThinkingContent(sessionId: string | undefined, entryId: string | undefined, blockIndex: number): string | undefined {
   if (!sessionId || !entryId) return undefined;
@@ -61,10 +92,7 @@ export function loadThinkingContent(sessionId: string, entryId: string, blockInd
     const data = await response.json() as { thinking?: unknown };
     if (typeof data.thinking !== "string") throw new Error("Invalid thinking response");
     loadedThinkingContentCache.set(key, data.thinking);
-    if (loadedThinkingContentCache.size > MAX_THINKING_CACHE_ENTRIES) {
-      const oldest = loadedThinkingContentCache.keys().next().value;
-      if (oldest) loadedThinkingContentCache.delete(oldest);
-    }
+    trimThinkingCaches();
     return data.thinking;
   }).catch((error) => {
     thinkingContentCache.delete(key);
@@ -72,10 +100,7 @@ export function loadThinkingContent(sessionId: string, entryId: string, blockInd
   });
 
   thinkingContentCache.set(key, request);
-  if (thinkingContentCache.size > MAX_THINKING_CACHE_ENTRIES) {
-    const oldestKey = thinkingContentCache.keys().next().value;
-    if (oldestKey) thinkingContentCache.delete(oldestKey);
-  }
+  trimThinkingCaches();
   return request;
 }
 
@@ -114,7 +139,7 @@ function ReasoningText({ text, error, loading, fadeIn = false, className, onScro
     <div
       ref={scrollRef}
       className={cn(
-        "max-h-[var(--card-max-height)] min-w-0 overflow-y-auto overscroll-contain whitespace-pre-wrap wrap-anywhere text-[length:calc(13px+var(--chat-font-size-offset,0px))]",
+        "max-h-[var(--card-max-height)] min-w-0 overflow-y-auto whitespace-pre-wrap wrap-anywhere text-[length:calc(13px+var(--chat-font-size-offset,0px))]",
         error && "text-destructive",
         className,
       )}
@@ -157,7 +182,10 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
   const [expanded, setExpanded] = useState(() => getFoldChoice(foldKey) ?? isThinkingExpandedByDefault());
   // 流式期吐字平滑：思考文本按帧追赶显示；历史块（非 active）直接全文。
   const liveThinking = useSmoothStreamText(block.thinking, Boolean(active), progressKey);
-  const [content, setContent] = useState<string | null>(null);
+  // 命中缓存的延迟块直接以文本开场：否则挂载后的第一个 effect 之前会先闪一下骨架屏。
+  const [content, setContent] = useState<string | null>(() =>
+    block.deferred ? cachedThinkingContent(sessionId, entryId, blockIndex) ?? null : null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const tRef = useRef(t);
@@ -180,6 +208,14 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
     window.addEventListener(THINKING_EXPANDED_EVENT, onChange);
     return () => window.removeEventListener(THINKING_EXPANDED_EVENT, onChange);
   }, []);
+
+  // 流式跑完就把全文本存进缓存：重读后的 deferred 块直接命中，展开不再发请求。
+  // 只在 `!active` 时存：流式期间是半成品，存了会让后来展开先看到截断的旧文本。
+  // 入场即已完成的块（历史读盘）文本为空，存不进去（`rememberThinkingContent` 会拒）。
+  useEffect(() => {
+    if (active || block.deferred) return;
+    rememberThinkingContent(sessionId, entryId, blockIndex, block.thinking);
+  }, [active, block.deferred, block.thinking, sessionId, entryId, blockIndex]);
 
   // Load deferred history content whenever the block is expanded.
   useEffect(() => {
@@ -282,7 +318,7 @@ export const ReasoningTrace = memo(function ReasoningTrace({ block, duration, se
       <TraceIcon>
         <BrainIcon className={cn("size-3.5", expanded ? "text-foreground/70" : "text-muted-foreground")} />
       </TraceIcon>
-      <TraceTitle className="shrink-0 font-medium whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
+      <TraceTitle className="shrink-0 whitespace-nowrap">{t("i18n.thinking")}</TraceTitle>
       {tailText.trim() !== "" && (
         <span className="relative min-w-0 shrink">
           <RowObjectSpan object={tailText} clip follow />

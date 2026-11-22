@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnsiText } from "@/components/AnsiText";
+import { MiddleEllipsis } from "@/components/MiddleEllipsis";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { Button } from "@/components/ui/button";
 import type { StepUsage } from "@/lib/turn-view";
@@ -186,7 +187,7 @@ export function ToolSection({ section }: { section: ToolViewSection }) {
         return isTuiText(text)
           ? (
               // 与 code 段同一限高：TUI 文本没有自己的滚动容器，长输出直接撑开卡片。
-              <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+              <div className="max-h-[var(--card-max-height)] overflow-y-auto">
                 <AnsiText text={text} />
               </div>
             )
@@ -204,7 +205,7 @@ export function ToolSection({ section }: { section: ToolViewSection }) {
       case "markdown":
         // 与 code/fields 段同一限高：fetch/web 的正文过去不封顶，长结果把整轮撑出视野。
         return (
-          <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+          <div className="max-h-[var(--card-max-height)] overflow-y-auto">
             <SafeMarkdownBody>{text}</SafeMarkdownBody>
           </div>
         );
@@ -252,8 +253,9 @@ export function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: s
             size="xs"
             disabled={!resolved}
             // 胶囊是行内最先收缩的片段：工具名与 +N/-N 都不可挤压，空间不足时
-            // 文件名自身省略（truncate 硬省略号）。
-            className="relative min-w-0 shrink gap-1 overflow-hidden rounded-full px-2 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
+            // 文件名从中间省略（保住扩展名，见 MiddleEllipsis）。字体与行内正文一致（2026-11-22：
+            // 同一行不混排两种字面宽，等宽只给代码块与 diff）。
+            className="relative min-w-0 shrink gap-1 overflow-hidden rounded-full px-2 text-[length:calc(13px+var(--chat-font-size-offset,0px))]"
             title={resolved ?? path}
             aria-label={label}
             onClick={(event) => {
@@ -263,7 +265,7 @@ export function FileChips({ paths, cwd, onOpenFile }: { paths: string[]; cwd?: s
             }}
           >
             <FileTextIcon className="size-3 shrink-0" />
-            <span className="min-w-0 truncate">{label}</span>
+            <MiddleEllipsis text={label} />
           </Button>
         );
       })}

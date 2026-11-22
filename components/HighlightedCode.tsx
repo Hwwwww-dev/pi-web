@@ -7,7 +7,7 @@ import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
 import { usePrismLanguages } from "@/hooks/usePrismLanguages";
-import { takeHighlightBudget, waitForHighlight, MAX_HIGHLIGHT_CHARS } from "@/lib/highlight-queue";
+import { takeHighlightBudget, waitForHighlight, maxHighlightChars } from "@/lib/highlight-queue";
 import { prismLanguagesLoaded } from "@/lib/prism-languages";
 
 /**
@@ -27,7 +27,7 @@ export const HighlightedCode = memo(function HighlightedCode({ code, language }:
   const { isDark } = useTheme();
   const plain = !language || language === "text" || language === "plaintext";
   const languagesReady = usePrismLanguages(plain ? undefined : language);
-  const highlightable = code.length <= MAX_HIGHLIGHT_CHARS;
+  const highlightable = code.length <= maxHighlightChars();
   const [highlighted, setHighlighted] = useState(
     () => highlightable && !plain && prismLanguagesLoaded(language) && takeHighlightBudget(code.length),
   );

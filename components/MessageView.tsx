@@ -255,22 +255,26 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   const editTarget = commandText ? replaceUserMessageText(message, commandText) : message;
 
   // 附件独立块：图片不进文字气泡，气泡下方右对齐单独成行，统一 1:1 缩略图
-  // （object-cover 裁方），点击进灯箱看原图。
+  // （object-cover 裁方），点击进灯箱看原图；灯箱按整组图翻页（灯箱多图，9.5）。
+  const attachmentSources = imageBlocks.map((img) => {
+    // SAFETY: pi-ai's on-disk format stores images flat ({data, mimeType}) while
+    // lib/types.ts ImageContent nests them under {source:{type,data,media_type,url}};
+    // the fields are read defensively below, so the cast only relaxes the shape.
+    const flat = img as unknown as { data?: string; mimeType?: string };
+    return img.source
+      ? img.source.type === "base64"
+        ? `data:${img.source.media_type};base64,${img.source.data}`
+        : img.source.url ?? ""
+      : flat.data
+        ? `data:${flat.mimeType};base64,${flat.data}`
+        : "";
+  });
   const attachmentBlock = imageBlocks.length > 0 && (
     <div className="flex max-w-[82%] flex-wrap justify-end gap-1.5 max-sm:max-w-[86%]">
-      {imageBlocks.map((img, i) => {        // SAFETY: pi-ai's on-disk format stores images flat ({data, mimeType}) while
-        // lib/types.ts ImageContent nests them under {source:{type,data,media_type,url}};
-        // the fields are read defensively below, so the cast only relaxes the shape.
-        const flat = img as unknown as { data?: string; mimeType?: string };
-        const src = img.source
-          ? img.source.type === "base64"
-            ? `data:${img.source.media_type};base64,${img.source.data}`
-            : img.source.url ?? ""
-          : flat.data
-            ? `data:${flat.mimeType};base64,${flat.data}`
-            : "";
+      {imageBlocks.map((_, i) => {
+        const src = attachmentSources[i];
         return (
-          <ImagePreview key={i} src={src}>
+          <ImagePreview key={i} src={src} gallery={attachmentSources} index={i}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={src}
@@ -303,10 +307,13 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
       <Bubble variant="muted" align="end" className="max-w-[82%] max-sm:max-w-[86%] overflow-hidden rounded-3xl">
         {/* 底色与圆角由官方 BubbleContent 提供；长消息仅在气泡层限高滚动，
             内部不再嵌套第二个滚动容器（代码块自身的横向滚动除外）。外层 Bubble
-            同一圆角加裁切，滚动条才收在圆角里，不会方着顶出卡片。 */}
+            同一圆角加裁切，滚动条才收在圆角里，不会方着顶出卡片。
+            这里不能加 overscroll-contain：气泡只有少数长消息才真的超出 max-h，
+            短消息虽然 overflow-y-auto 却没有可滚空间，而 contain 会在这个空滚动
+            容器上截断滚轮链，鼠标停在消息上时整段对话滚不动。 */}
         <BubbleContent
           className={cn(
-            "max-h-[min(70vh,32rem)] overflow-y-auto overscroll-contain text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
+            "max-h-[min(70vh,32rem)] overflow-y-auto text-[length:calc(13.5px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground",
             isEditing && "ring-2 ring-ring/30",
           )}
         >

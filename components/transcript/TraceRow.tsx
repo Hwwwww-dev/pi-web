@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { UsageBar } from "@/components/UsageBar";
 import type { StepUsage } from "@/lib/turn-view";
@@ -64,8 +64,8 @@ export function useTraceFold(foldKey?: string, defaultOpen = false) {
   return { open, onOpenChange };
 }
 
-/** 行尾渐隐：右端 20px 淡出，不论是否溢出都上——文本从左开始显示，左端不需要
- *  渐隐（2026-11-20 用户：“去掉左边的渐隐吧”）。 */
+/** 行尾渐隐：右端 20px 淡出，只在文字真的溢出时才上（见 RowObjectSpan）。
+ *  左端不需要渐隐（2026-11-20 用户：“去掉左边的渐隐吧”）。 */
 const TAIL_FADE = {
   maskImage: "linear-gradient(to right, #000 calc(100% - 20px), transparent)",
   WebkitMaskImage: "linear-gradient(to right, #000 calc(100% - 20px), transparent)",
@@ -85,17 +85,37 @@ const TAIL_FADE = {
  */
 export function RowObjectSpan({ object, clip = false, follow = false }: { object: string; clip?: boolean; follow?: boolean }) {
   const ref = useRef<HTMLSpanElement>(null);
+  // 渐隐只在文字溢出时上：短文本本来就在框内，旧实现照样把最后 20px 涂透，
+  // 贴边的最后一个字符看着像被裁了一半（2026-11-22 用户）。
+  const [overflowing, setOverflowing] = useState(false);
   // 贴尾只在 follow（思考尾）时做；其余从头显示。
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.scrollLeft = follow ? el.scrollWidth : 0;
   }, [object, clip, follow]);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !clip) {
+      setOverflowing(false);
+      return;
+    }
+    const measure = () => setOverflowing(el.scrollWidth > el.clientWidth + 1);
+    measure();
+    // A narrowed window or a wider column changes the answer without any re-render.
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [object, clip]);
   return (
     <span
       ref={ref}
-      className={cn("block text-left", clip ? "overflow-hidden whitespace-nowrap" : "truncate")}
-      style={clip ? TAIL_FADE : undefined}
+      className={cn(
+        "block text-left",
+        // pr 把裁切点从渐变起点往里收 1–2px，最后一字符不会正好压在渐变边缘。
+        clip ? "overflow-hidden whitespace-nowrap pr-[2px]" : "truncate",
+      )}
+      style={clip && overflowing ? TAIL_FADE : undefined}
     >
       {object}
     </span>

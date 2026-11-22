@@ -49,7 +49,7 @@ export const PlanTrace = memo(function PlanTrace({ steps, foldKey, activityTool,
       ariaLabel={title}
       wrap
       content={(
-        <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+        <div className="max-h-[var(--card-max-height)] overflow-y-auto">
           <Trace>
             {steps.map((step, index) => {
               const Icon = STEP_ICON[step.status];

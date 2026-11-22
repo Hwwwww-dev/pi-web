@@ -10,11 +10,18 @@
 // MAX_HIGHLIGHT_CHARS stays plain monospace for good — tokenizing it would
 // eat a whole frame no matter which idle slice renders it.
 
+import { advancedValue } from "@/lib/advanced-values";
+
 const HIGHLIGHT_TASK_BUDGET = 2_000;
 
 /** Above this size a code body renders as plain monospace, in the chat
  * fences (`CodeBlock`) and tool cards (`HighlightedCode`) alike. */
-export const MAX_HIGHLIGHT_CHARS = 16_000;
+export const MAX_HIGHLIGHT_CHARS_DEFAULT = 16_000;
+
+/** 高亮字符上限（Settings › 高级参数 `maxHighlightChars`，选项存为字符串）。 */
+export function maxHighlightChars(): number {
+  return Number(advancedValue<string>("maxHighlightChars")) || MAX_HIGHLIGHT_CHARS_DEFAULT;
+}
 const FALLBACK_IDLE_DELAY_MS = 50;
 
 let taskBudget = HIGHLIGHT_TASK_BUDGET;

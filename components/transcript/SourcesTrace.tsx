@@ -48,7 +48,7 @@ export const SourcesTrace = memo(function SourcesTrace({ sources, foldKey, trail
       stepUsage={stepUsage}
       ariaLabel={title}
       content={(
-        <div className="max-h-[var(--card-max-height)] overflow-y-auto overscroll-contain">
+        <div className="max-h-[var(--card-max-height)] overflow-y-auto">
           <Trace>
             {sources.map((source) => (
               <a key={source.url} href={source.url} target="_blank" rel="noreferrer">

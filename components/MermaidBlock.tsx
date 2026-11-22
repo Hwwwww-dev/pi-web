@@ -27,7 +27,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useI18n } from "@/hooks/useI18n";
 import { usePrismLanguages } from "@/hooks/usePrismLanguages";
 import { copyText } from "@/lib/clipboard";
-import { takeHighlightBudget, waitForHighlight, MAX_HIGHLIGHT_CHARS } from "@/lib/highlight-queue";
+import { takeHighlightBudget, waitForHighlight, maxHighlightChars } from "@/lib/highlight-queue";
 import { prismLanguagesLoaded } from "@/lib/prism-languages";
 
 interface MermaidBlockProps {
@@ -444,8 +444,7 @@ function StreamingCodeChunks({ code }: { code: string }) {
  * box, no tokens) until an idle slice lets it take its language. A body over
  * MAX_HIGHLIGHT_CHARS never takes colors: tokenizing it would eat a whole
  * frame.
- */
-export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isStreaming }: CodeBlockProps) {
+ */export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isStreaming }: CodeBlockProps) {
   // 末尾空行不计入内容：它只会在卡片底部多出一行空白。
   const body = code.replace(/\n+$/, "");
   const { isDark } = useTheme();
@@ -454,7 +453,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
   // A fence's language starts loading with its first block, streaming or not,
   // so a streamed reply usually finds it ready when the block finishes.
   const languagesReady = usePrismLanguages(lang);
-  const highlightable = code.length <= MAX_HIGHLIGHT_CHARS;
+  const highlightable = code.length <= maxHighlightChars();
   const [highlighted, setHighlighted] = useState(
     () => highlightable && !isStreaming && prismLanguagesLoaded(lang) && takeHighlightBudget(code.length),
   );
