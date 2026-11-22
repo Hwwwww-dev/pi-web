@@ -212,7 +212,7 @@ export function ToolRow({ block, result, duration, stepUsage, cwd, onOpenFile, o
     : null;
   const changeTrailing = changeCounts
     ? (
-      <span className="shrink-0 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] tabular-nums">
+      <span className="shrink-0 font-mono text-xs tabular-nums">
         <span className="text-success">+{changeCounts.added}</span>{" "}
         <span className="text-destructive">-{changeCounts.removed}</span>
       </span>
@@ -432,10 +432,10 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
               )}
               {text
                 ? <SafeMarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</SafeMarkdownBody>
-                : <span className="text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground">{t("i18n.noMessage")}</span>}
+                : <span className="text-xs text-muted-foreground">{t("i18n.noMessage")}</span>}
               {hasDetails && !detailsRepeatBody && (
                 <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2 text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Button type="button" variant="ghost" size="xs" onClick={copyContent}>
                       {copied ? t("i18n.copied") : t("i18n.copy")}
                     </Button>
@@ -459,7 +459,7 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
                 </div>
               )}
               {(detailsRepeatBody || !hasDetails) && text && (
-                <div className="flex items-center gap-2 text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Button type="button" variant="ghost" size="xs" onClick={copyContent}>
                     {copied ? t("i18n.copied") : t("i18n.copy")}
                   </Button>
@@ -541,13 +541,13 @@ export function CompactionSummaryDetails({ summary, cwd, onOpenFile }: {
 
   return (
     <>
-      <div className="text-[length:calc(13px+var(--chat-font-size-offset,0px))] leading-[1.65] text-foreground">
+      <div className="text-sm leading-[1.65] text-foreground">
         {t("i18n.compactionDescription")}
       </div>
       {parsedSummary.body ? (
         <SafeMarkdownBody className="markdown-compaction-message" cwd={cwd} onOpenFile={onOpenFile}>{parsedSummary.body}</SafeMarkdownBody>
       ) : (
-        <span className="text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground">{t("i18n.noSummary")}</span>
+        <span className="text-xs text-muted-foreground">{t("i18n.noSummary")}</span>
       )}
       <CompactionFileMetadata readFiles={parsedSummary.readFiles} modifiedFiles={parsedSummary.modifiedFiles} />
     </>
@@ -571,7 +571,7 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
       <TraceCollapsible defaultOpen>
         <TraceCollapsibleTrigger>
           <TraceLine>
-            <TraceTitle className="text-[length:calc(13px+var(--chat-font-size-offset,0px))] font-semibold text-muted-foreground">
+            <TraceTitle className="text-xs font-semibold text-muted-foreground">
               {t("i18n.fileContext", { details: parts.join(", ") })}
             </TraceTitle>
           </TraceLine>
@@ -588,8 +588,8 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
 function CompactionFileList({ title, files }: { title: string; files: string[] }) {
   return (
     <div className="mt-2">
-      <div className="mb-1 text-[length:calc(13px+var(--chat-font-size-offset,0px))] font-semibold text-foreground">{title}</div>
-      <ul className="m-0 mb-2 list-none p-0 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[1px]">
+      <div className="mb-1 text-xs font-semibold text-foreground">{title}</div>
+      <ul className="m-0 mb-2 list-none p-0 font-mono text-xs leading-[1.45] text-muted-foreground [&_li]:overflow-wrap-anywhere [&_li]:py-[1px]">
         {files.map((file) => (
           <li key={file}>{file}</li>
         ))}
@@ -627,7 +627,7 @@ export function TurnMetaLine({ usage, model, thinkingLevel, time, timestamp, cop
   if (!hasUsage && !model && !time && !copySource) return null;
   return (
     <div
-      className="flex flex-wrap items-center gap-2.5 text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground [font-variant-numeric:tabular-nums]"
+      className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground [font-variant-numeric:tabular-nums]"
     >
       {model && <span>{model}{levelLabel ? ` · ${levelLabel}` : ""}</span>}
       {hasUsage && (

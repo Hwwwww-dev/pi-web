@@ -221,7 +221,7 @@ export function ToolSection({ section }: { section: ToolViewSection }) {
     <>
       {body}
       {omittedChars > 0 && (
-        <p className="px-[13px] pb-2 text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground">
+        <p className="px-[13px] pb-2 text-xs text-muted-foreground">
           {t("i18n.toolOutputTruncated", { count: omittedChars })}
         </p>
       )}

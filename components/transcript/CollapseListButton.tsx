@@ -18,7 +18,7 @@ export function CollapseListButton({ label, onClick, className }: {
       type="button"
       onClick={onClick}
       className={cn(
-        "mx-auto flex items-center gap-1 rounded-lg px-3 py-1.5 text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground",
+        "mx-auto flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs text-muted-foreground",
         "transition-colors hover:bg-muted hover:text-foreground",
         className,
       )}

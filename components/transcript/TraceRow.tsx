@@ -283,7 +283,7 @@ export function TraceRow({
         {/* 展开区高度由 `.trace-fold-body` 统一封顶（24rem，超出在体内滚动）。 */}
         <TraceCollapsibleContent className="trace-fold-body mt-1 flex flex-col gap-2 [&>*]:min-w-0">
           {stepUsage && (
-            <div className="text-[length:calc(13px+var(--chat-font-size-offset,0px))]">
+            <div className="text-xs">
               <UsageBar usage={stepUsage} gap={10} />
             </div>
           )}
