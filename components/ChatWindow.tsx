@@ -87,7 +87,7 @@ const AUTO_LOAD_DEBOUNCE_MS = 200;
  * 读者在“最后一条贴着卡片上沿”那个位置其实离机械末端还差一整段垫底，正好落在
  * 吸附带里 → 上滑十几 px 就被拉回，反复几次就是“一直滑一直抖”。
  */
-const SCROLL_EDGE_THRESHOLD = 24;
+const SCROLL_EDGE_THRESHOLD = 36;
 
 const InspirationDialog = dynamic(() => import("./InspirationDialog").then((mod) => mod.InspirationDialog), { ssr: false });
 
