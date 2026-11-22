@@ -21,10 +21,10 @@ import {
 import {
   ConfigButton,
   ConfigCard,
-  ConfigDetail,
   ConfigPanelShell,
   ConfigSwitch,
 } from "@/components/SettingsUi";
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldTitle } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -62,7 +62,7 @@ function EffectTag({ effect, locale }: { effect: AdvancedSettingEffect; locale: 
   );
 }
 
-/** 一行参数：左边名字与说明，右边控件；改过默认值才出现「恢复默认」。 */
+/** 一行参数：官方 Field（横向）——左边名字与说明，右边控件；改过默认值才出现「恢复默认」。 */
 function AdvancedRow({
   spec,
   locale,
@@ -77,10 +77,10 @@ function AdvancedRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-w-0 items-start gap-3" data-advanced-setting={spec.key}>
-      <div className="min-w-0 flex-1">
+    <Field orientation="horizontal" data-advanced-setting={spec.key}>
+      <FieldContent className="min-w-0">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="text-sm font-medium">{localized(spec.label, locale)}</span>
+          <FieldTitle className="text-sm font-medium">{localized(spec.label, locale)}</FieldTitle>
           <EffectTag effect={spec.effect} locale={locale} />
           {changed && (
             <ConfigButton
@@ -95,10 +95,10 @@ function AdvancedRow({
             </ConfigButton>
           )}
         </div>
-        {spec.hint && <p className="mt-0.5 text-xs text-muted-foreground">{localized(spec.hint, locale)}</p>}
-      </div>
-      <div className="shrink-0 self-center">{children}</div>
-    </div>
+        {spec.hint && <FieldDescription className="text-xs">{localized(spec.hint, locale)}</FieldDescription>}
+      </FieldContent>
+      <div className="flex shrink-0 items-center">{children}</div>
+    </Field>
   );
 }
 
@@ -330,11 +330,14 @@ export function AdvancedConfig({ embedded = true, onClose }: { embedded?: boolea
         </label>
       </div>
 
-      <ConfigDetail>
-        <div className="flex min-w-0 flex-col gap-4">
+      {/* 这一页没有主从结构（没有可点进去的行），所以不用 `ConfigDetail`：
+           它在手机上是“详情面板”，列表层级会被 `max-[640px]:hidden` 藏掉，
+           整页就只剩标题（2026-11-22 用户反馈“参数是空的”）。 */}
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
+        <FieldGroup className="min-w-0 gap-4">
           {visibleGroups.map(({ group, specs }) => (
             <ConfigCard key={group.id} title={localized(group.label, locale)}>
-              <div className="flex min-w-0 flex-col gap-4">
+              <FieldGroup className="min-w-0 gap-5">
                 {specs.map((spec) => (
                   <SettingRow
                     key={spec.key}
@@ -344,7 +347,7 @@ export function AdvancedConfig({ embedded = true, onClose }: { embedded?: boolea
                     onSet={handleSet}
                   />
                 ))}
-              </div>
+              </FieldGroup>
             </ConfigCard>
           ))}
           {visibleGroups.length === 0 && (
@@ -353,8 +356,8 @@ export function AdvancedConfig({ embedded = true, onClose }: { embedded?: boolea
           {error && (
             <p className="text-xs text-destructive" role="alert">{error}</p>
           )}
-        </div>
-      </ConfigDetail>
+        </FieldGroup>
+      </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-t px-4 py-2.5">
         <span className={cn("min-w-0 flex-1 text-xs text-muted-foreground")}>
