@@ -18,6 +18,7 @@ import { Progress } from "./ui/progress";
 import { Spinner } from "./ui/spinner";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { cn } from "@/lib/utils";
+import { clearSessionReadLog, useSessionReadLog } from "@/lib/session-read-log";
 import {
   CircleDashedIcon,
   CircleIcon,
@@ -364,6 +365,7 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
             <PageColumn page={page} samples={samples} ctx={ctx} className="@2xl:row-span-2 @5xl:row-span-1" />
             <ServerColumn reply={reply} ctx={ctx} />
             <SessionColumn reply={reply} detail={detail} groups={groups} targetSessionId={targetSessionId} sources={page.sources} ctx={ctx} />
+            <SessionReadsColumn ctx={ctx} />
           </div>
         </div>
       )}
@@ -1209,6 +1211,39 @@ function SessionColumn(props: {
         {props.ctx.t("debug.sessions.head.session")}
       </h3>
       <SessionList {...props} />
+    </section>
+  );
+}
+
+/**
+ * 会话文件读取记录：最近若干次读取的时间、类型、参数与条目数。
+ * 移动端无法查看 Network，排查“列表出现意外旧消息”时靠这里判断由哪种读取带回。
+ */
+function SessionReadsColumn({ ctx }: { ctx: Ctx }) {
+  const entries = useSessionReadLog();
+  return (
+    <section className="flex min-w-0 flex-col gap-2" aria-labelledby="debug-section-reads">
+      <div className="flex items-center gap-2">
+        <h3 id="debug-section-reads" className="text-sm leading-none font-semibold text-foreground">{ctx.t("debug.reads.title")}</h3>
+        <Button type="button" variant="outline" size="xs" className="ml-auto" onClick={clearSessionReadLog}>
+          {ctx.t("debug.reads.clear")}
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">{ctx.t("debug.reads.hint")}</p>
+      {entries.length === 0
+        ? <p className="text-xs text-muted-foreground">{ctx.t("debug.reads.empty")}</p>
+        : (
+          <ul className="flex flex-col gap-1 text-xs">
+            {entries.map((entry, index) => (
+              <li key={`${entry.at}-${index}`} className="flex min-w-0 items-baseline gap-2 font-mono">
+                <span className="shrink-0 text-muted-foreground">{new Date(entry.at).toLocaleTimeString()}</span>
+                <span className="shrink-0">{entry.kind}</span>
+                <span className="min-w-0 truncate" title={entry.detail}>{entry.detail}</span>
+                {entry.count !== undefined && <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">{entry.count}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
     </section>
   );
 }

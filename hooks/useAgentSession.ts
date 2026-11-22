@@ -62,6 +62,7 @@ import { HIDDEN_PAGE_GRACE_MS } from "@/hooks/usePageHidden";
 import type { AttachedImage } from "@/components/ChatInput";
 import type { DebugClientLease, DebugClientSession, DebugEventConnectionSnapshot, DebugStreamCloseReason } from "@/lib/debug-types";
 import { pageId, peekPageId, trackEventSource } from "@/lib/page-debug";
+import { recordSessionRead } from "@/lib/session-read-log";
 import type { TranslationParams } from "@/lib/i18n/types";
 import { AGENT_EVENT_HEARTBEAT_MS, isNestedToolExecutionEvent, isSystemMessageEvent } from "@/lib/agent-event-wire";
 import { createAgentPhaseStore, runStatePhase } from "@/lib/chat-phase-label";
@@ -1005,6 +1006,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // 索引错位，使 key 与 data-entry-id 串位，表现为消息错乱及部分条目“消失”。
       const persistedMessages = revisionUnchanged ? messagesRef.current : d.context.messages;
       const persistedEntryIds = revisionUnchanged ? entryIdsRef.current : (d.context.entryIds ?? []);
+      recordSessionRead({
+        at: Date.now(),
+        kind: "window",
+        sessionId: sid,
+        detail: `${params.get("tail") ? `tail=${params.get("tail")}` : `turns=${params.get("turns")}`}${options?.force ? " force" : ""}${revisionUnchanged ? " cached" : ""}`,
+        count: persistedEntryIds.length,
+      });
       // 记下该会话的基准窗口宽度（首次读取或换会话时）：后续整窗读按它请求，
       // 不再取当前已载入条数，以免翻页把窗口越推越早。
       if (windowTailRef.current.sid !== sid) {
@@ -1175,6 +1183,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       const res = await fetch(url, { signal: options?.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = await res.json() as { context: SessionData["context"] };
+      recordSessionRead({
+        at: Date.now(),
+        kind: "older",
+        sessionId: sid,
+        detail: before ? `?context before turns=${params.get("turns")}` : `?context 首屏 turns=${params.get("turns")}`,
+        count: d.context.entryIds?.length ?? 0,
+      });
       // A leaf-scoped load must still target the selected leaf: rapid A→B
       // switches would otherwise let A's late response overwrite B's tree.
       if (sessionIdRef.current !== sid || options?.signal?.aborted || !sessionHookMountedRef.current) return;
@@ -1858,6 +1873,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
    */
   const appendSessionSince = useCallback(async (sid: string, since: string, mode?: "user-only"): Promise<boolean> => {
     const result = await fetchSessionSince(sid, since);
+    recordSessionRead({
+      at: Date.now(),
+      kind: "since",
+      sessionId: sid,
+      detail: mode === "user-only" ? "?since 用户条目" : "?since 全部条目",
+      count: result.kind === "ok" ? result.entryIds.length : undefined,
+    });
     if (sessionIdRef.current !== sid) return true;
     if (result.kind !== "ok") return false;
     if (result.leafId) setActiveLeafId(result.leafId);

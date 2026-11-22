@@ -1,4 +1,5 @@
 import type { AgentMessage } from "./types";
+import { recordSessionRead } from "./session-read-log";
 
 /**
  * 送达确认与对齐（大号消息的补丁）。
@@ -22,6 +23,7 @@ export async function probeSessionTail(sessionId: string): Promise<SessionTailPr
   try {
     const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}?ids=1`, { cache: "no-store" });
     if (!res.ok) return null;
+    recordSessionRead({ at: Date.now(), kind: "probe", sessionId, detail: "?ids=1 末条 entryId" });
     const body = await res.json() as { lastEntryId?: unknown };
     return { lastEntryId: typeof body.lastEntryId === "string" ? body.lastEntryId : null };
   } catch {
