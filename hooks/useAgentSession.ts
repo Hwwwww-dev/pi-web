@@ -668,9 +668,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // (agent_start, prompt_done, queue_update, its user message) arrived, maybe
   // before its request failed. Later ones clear the unconfirmed record itself.
   const landedPromptRunIdRef = useRef<number | null>(null);
+  /** 正在对齐中：send / settle / resume / 心跳四源同时触发只跑一次。 */
+  const reconcileInFlightRef = useRef(false);
+
   const unconfirmedSendRef = useRef<UnconfirmedSend | null>(null);
-  // 立即引导落下的本地气泡，等 settle 与文件对账：文件里没有它的文字就退回输入框。
-  const steerBubblesRef = useRef<Array<{ sid: string; key: string; text: string; images?: ChatDraftImage[] }>>([]);
   // The context the newest session read found, and the order its request
   // started in: only a read started after the run settled can settle it.
   const sessionReadSeqRef = useRef(0);
@@ -1848,7 +1849,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
    * 对齐：把 `since` 之后的条目按 id 并进列表，不再整窗重读。
    * 返回 false 表示拿不到可靠的增量（锤点被挤出窗口 / 接口不可用），调用方退回整窗读。
    */
-  const appendSessionSince = useCallback(async (sid: string, since: string): Promise<boolean> => {
+  const appendSessionSince = useCallback(async (sid: string, since: string, mode?: "user-only"): Promise<boolean> => {
     const result = await fetchSessionSince(sid, since);
     if (sessionIdRef.current !== sid) return true;
     if (result.kind !== "ok") return false;
@@ -1861,6 +1862,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     result.entryIds.forEach((entryId, index) => {
       const message = result.messages[index];
       if (!message || known.has(entryId)) return;
+      // 跑中（或发送后的那次）只补用户条目：助手正文走 SSE 增量，从文件重放会重复。
+      if (mode === "user-only" && message.role !== "user") return;
       freshMessages.push(message);
       freshIds.push(entryId);
     });
@@ -1871,6 +1874,46 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     setEntryIds(next.entryIds);
     return true;
   }, [setActiveLeafId, setMessages, setEntryIds, setMessageKeyAliases, messagesRef, entryIdsRef]);
+
+  /**
+   * 消息对齐：视图落后了就把缺的补回来，不整窗替换。
+   *
+   * 四类来源：`sent` 发送成功后的那一次、`settle` 本轮结束、`resume` 流重连/切回前台/
+   * 网络恢复、`gap` 心跳兑底。判定只看 entryId，不比对消息体，大消息也不慢。
+   *
+   * 2026-11-22 丢消息根因：settle 原来的整窗 `loadSession` 会用一个“落盘前”的快照
+   * 覆盖刚追加的乐观气泡，而随后的投递事件又被 `own` 当作迟到重放拒掉。
+   */
+  const reconcileSession = useCallback(async (
+    sid: string,
+    reason: "sent" | "settle" | "resume" | "gap",
+  ) => {
+    if (sessionIdRef.current !== sid) return;
+    if (reconcileInFlightRef.current) return;
+    reconcileInFlightRef.current = true;
+    try {
+      const anchor = entryIdsRef.current[entryIdsRef.current.length - 1] ?? null;
+      if (!anchor) {
+        // 视图还没有锚点（新会话首条之前，挂载时的整窗读正在跑）：不重复读。
+        if (reason === "settle") await loadSession(sid);
+        return;
+      }
+      const tail = await probeSessionTail(sid);
+      if (!tail) {
+        // 接口不可用：只有 settle 值得退回整窗读，其余等下一次机会。
+        if (reason === "settle") await loadSession(sid);
+        return;
+      }
+      if (tail.lastEntryId === anchor) return;
+      // 跑中只补用户条目（助手正文归 SSE，避免重复）；settle 时跑已结束，全角色安全。
+      const userOnly = reason === "sent" || (reason !== "settle" && agentRunningRef.current);
+      if (!(await appendSessionSince(sid, anchor, userOnly ? "user-only" : undefined))) {
+        await loadSession(sid);
+      }
+    } finally {
+      reconcileInFlightRef.current = false;
+    }
+  }, [appendSessionSince, loadSession]);
   // The hook unmounts (a session switch) with a send still unconfirmed: nothing
   // here will settle it, so its text goes back unless one of the run's events
   // cleared the record. With the stream closed, a prompt that did arrive is
@@ -2052,46 +2095,19 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (promptRunIdRef.current !== runId) return;
     const readSeqBefore = sessionReadSeqRef.current;
     // 送达确认先走轻量探测（只要末条 entryId）：大号消息下整窗重读会把确认拖成超时。
-    // 探测的锚点用「发送点」优先，否则用视图自己的末条 entryId：立即引导/后续消息
-    // 不经过 handleSend，没有发送点记录，但同样会落盘，靠这个锚点把漏掉的事件补回来。
     const pendingSend = unconfirmedSendRef.current;
-    const pendingHere = Boolean(sid && pendingSend && pendingSend.sid === sid);
-    const viewTail = entryIdsRef.current[entryIdsRef.current.length - 1] ?? null;
-    const sinceAnchor = pendingHere && pendingSend!.lastEntryIdAtSend
-      ? pendingSend!.lastEntryIdAtSend
-      : viewTail;
     let probe: "landed" | "absent" | undefined;
-    if (sid) {
+    if (sid && pendingSend && pendingSend.sid === sid) {
       const tail = await probeSessionTail(sid);
-      if (tail) probe = tail.lastEntryId !== sinceAnchor ? "landed" : "absent";
+      if (tail) probe = tail.lastEntryId !== pendingSend.lastEntryIdAtSend ? "landed" : "absent";
     }
     try {
-      if (sid) {
-        if (probe === "landed" && sinceAnchor) {
-          // 落盘了：只补差，不再把刚发出去的 MB 级正文读一遍。
-          if (!(await appendSessionSince(sid, sinceAnchor))) await loadSession(sid);
-        } else if (!(pendingHere && probe === "absent")) {
-          await loadSession(sid);
-        }
+      if (sid && !(pendingSend && pendingSend.sid === sid && probe === "absent")) {
+        // 对齐优先，不整窗替换：整窗读会用“落盘前”的快照把刚追加的乐观气泡抹掉。
+        await reconcileSession(sid, "settle");
       }
     } finally {
       if (promptRunIdRef.current !== runId) return;
-      // 立即引导的本地气泡和文件对账：文件里找不到同文的用户消息，说明服务器没收到，
-      // 文字退回输入框并报错——绝不静默消失。
-      if (sid) {
-        const leftovers = steerBubblesRef.current.filter((b) => b.sid === sid);
-        if (leftovers.length > 0) {
-          steerBubblesRef.current = steerBubblesRef.current.filter((b) => b.sid !== sid);
-          const present = new Set(
-            messagesRef.current.filter((m) => m.role === "user").map((m) => userMessageKey(m)),
-          );
-          for (const leftover of leftovers) {
-            if (present.has(leftover.key)) continue;
-            restoreSubmission(leftover.text, leftover.images, composerDraftKey);
-            addNotice({ type: "error", message: translate("chat.sendNotReceived") });
-          }
-        }
-      }
       // The server is idle: an unconfirmed send of this run either is in the
       // read just made or never arrived.
       if (sid) settleUnconfirmedSend(sid, runId, readSeqBefore, probe);
@@ -2108,7 +2124,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       if (sid) scheduleEventStreamClose(sid);
     }
-  }, [appendSessionSince, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, settleUiStage, settleUnconfirmedSend, entryIdsRef, addNotice, composerDraftKey, messagesRef, restoreSubmission, translate]);
+  }, [notifyPromptStage, onAgentEnd, scheduleEventStreamClose, settleUiStage, settleUnconfirmedSend, reconcileSession]);
 
   const waitForPromptSettlement = useCallback(async (sid: string, runId?: number) => {
     await delay(PROMPT_SETTLE_INITIAL_DELAY_MS);
@@ -2254,6 +2270,23 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     };
   }, [agentRunning, reconcileAgentState]);
 
+  // 切回前台 / 网络恢复：对齐一次。SSE 断开期间的事件不会自动回放，靠这里补。
+  useEffect(() => {
+    const sync = () => {
+      const sid = sessionIdRef.current;
+      if (sid) void reconcileSession(sid, "resume");
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") sync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", sync);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", sync);
+    };
+  }, [reconcileSession]);
+
 
   useEffect(() => {
     agentRunningRef.current = agentRunning;
@@ -2368,6 +2401,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       case "connected": {
         dispatch({ type: "end" });
+        {
+          // 流重连/首次连上：对齐一次。断开期间的事件不会回放，靠这里补。
+          const resumeSid = sessionIdRef.current;
+          if (resumeSid) void reconcileSession(resumeSid, "resume");
+        }
         if (Array.isArray(event.pendingExtensionUiIds)) {
           // The server replays what it still holds right after this event.
           const pending = new Set(event.pendingExtensionUiIds as string[]);
@@ -2583,8 +2621,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
                 ? prev
                 : [...prev.slice(0, -1), delivered];
             }
-            // 自己 prompt 的迟到重放：持久副本已由整载带进列表，绝不再 append。
-            if (own) return prev;
+            // 自己 prompt 的迟到重放：列表里**真的**有这条才跳过。
+            // 整窗读可能发生在落盘之前（立即发送：abort 的 settle 先跑），此时列表里
+            // 并没有它，再跳过就是丢消息。
+            if (own) {
+              return prev.some((m) => m.role === "user" && userMessageKey(m) === deliveredKey)
+                ? prev
+                : [...prev, delivered];
+            }
             return [...prev, delivered];
           });
         } else if (completed) {
@@ -2726,8 +2770,15 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setExtensionDialogs((queue) => removeExtensionUiRequest(queue, event.id as string));
         break;
       }
+      case "heartbeat": {
+        // 服务端每 30s 一条：顺手对一次尾 id。SSE 丢事件或连接半死时，
+        // 这是不靠额外轮询的主动兜底。
+        const beatSid = sessionIdRef.current;
+        if (beatSid) void reconcileSession(beatSid, "gap");
+        break;
+      }
     }
-  }, [activeToolsStore, addNotice, agentPhaseStore, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, notifyPromptStage, onAgentEnd, onSessionEnded, onToolEnd, opts.chatInputRef, refreshContextUsage, scheduleEventStreamClose, settleUiStage, syncEntryIdsAfterRun, syncLiveModel]);
+  }, [activeToolsStore, addNotice, agentPhaseStore, applyLiveUsage, applyQueueSnapshot, applyRecordedQueueSnapshot, cancelEventStreamGrace, dispatch, handleExtensionUiRequest, loadSession, markPromptLanded, notifyPromptStage, onAgentEnd, onSessionEnded, onToolEnd, opts.chatInputRef, reconcileSession, refreshContextUsage, scheduleEventStreamClose, settleUiStage, syncEntryIdsAfterRun, syncLiveModel]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {
@@ -2874,6 +2925,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         throw new Error("No active session for the prompt");
       }
       setPromptMissingCwd(null);
+      // 发送后对一次账（1s 后单发，不轮询）：投递事件丢了也能把这条用户消息捞回来。
+      if (sentSessionId) {
+        const sentSid = sentSessionId;
+        setTimeout(() => void reconcileSession(sentSid, "sent"), 1_000);
+      }
       if (isSlashCommandPrompt && sentSessionId) {
         void waitForPromptSettlement(sentSessionId, promptRunId);
       }
@@ -2927,7 +2983,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       agentPhaseStore.set(null);
       dispatch({ type: "end" });
     }
-  }, [isNew, newSessionCwd, newSessionModel, session, ensureNewSession, ensureEventsConnected, promoteNewSession, waitForPromptSettlement, addNotice, agentPhaseStore, releaseUnconfirmedSend, cancelEventStreamGrace, closeEvents, composerDraftKey, dispatch, reconcileAgentState, restoreSubmission, editEntryId, setEdit, translate]);
+  }, [isNew, newSessionCwd, newSessionModel, session, ensureNewSession, ensureEventsConnected, promoteNewSession, waitForPromptSettlement, addNotice, agentPhaseStore, releaseUnconfirmedSend, cancelEventStreamGrace, closeEvents, composerDraftKey, dispatch, reconcileAgentState, restoreSubmission, editEntryId, setEdit, translate, reconcileSession]);
 
   const executeBash = useCallback(async (command: string, excludeFromContext: boolean) => {
     if (bashRunningRef.current) return;
@@ -3563,27 +3619,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         streamingBehavior: behavior,
         ...(piImages?.length ? { images: piImages } : {}),
       });
-      // 立即引导：先落一条本地气泡。服务器的投递消息到达时会替换它（message_end
-      // 里消费相邻乐观气泡的分支）；事件丢了也不会“发出去就从列表里消失”。
-      // 排队（followUp）不落气泡：队列行本来就在显示它。
-      if (behavior === "steer" && (message.trim() || piImages?.length)) {
-        const bubble: AgentMessage = {
-          role: "user",
-          content: piImages?.length
-            ? [
-              ...(message.trim() ? [{ type: "text" as const, text: message }] : []),
-              ...piImages.map((img) => ({
-                type: "image" as const,
-                source: { type: "base64" as const, media_type: img.mimeType, data: img.data },
-              })),
-            ]
-            : message,
-          timestamp: Date.now(),
-        };
-        optimisticUserMessageKeyRef.current = userMessageKey(bubble);
-        setMessages((prev) => [...prev, bubble]);
-        steerBubblesRef.current.push({ sid, key: userMessageKey(bubble), text: message, images });
-      }
+      // 引导/排队：同样对一次账，落盘后就补到列表里。
+      setTimeout(() => void reconcileSession(sid, "sent"), 1_000);
     } catch (e) {
       console.error("Failed to submit streaming prompt:", e);
       restore();
@@ -3597,7 +3634,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (isPromptRejectedError(e)) addNotice({ type: "error", message: e.message });
       else addUnconfirmedSendNotice();
     }
-  }, [addNotice, addUnconfirmedSendNotice, composerDraftKey, editEntryId, restoreSubmission]);
+  }, [addNotice, addUnconfirmedSendNotice, composerDraftKey, editEntryId, restoreSubmission, reconcileSession]);
 
   const handlePromptWithStreamingBehavior = useCallback(async (
     message: string,
