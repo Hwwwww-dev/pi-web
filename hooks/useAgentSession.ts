@@ -690,6 +690,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const dataRef = useRef<SessionData | null>(null);
   const messagesRef = useRef<AgentMessage[]>([]);
   const entryIdsRef = useRef<string[]>([]);
+  /** 本会话首次读到的窗口条目数；整窗读沿用该宽度，不随翻页放大。 */
+  const windowTailRef = useRef<{ sid: string | null; tail: number }>({ sid: null, tail: 0 });
   /** 正在请求中的更早一页游标，保证同一页只请求一次。 */
   const loadingBeforeRef = useRef<string | null>(null);
   const activeLeafIdRef = useRef<string | null>(null);
@@ -942,11 +944,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // 翻页载入的历史裁掉——读者往上翻，内容已经不在内存里了。
       // 不得比已载入的多：按条数的窗口一旦放大（以前有 50 条兜底），合并就会把
       // 窗口里比本地多出来的旧条目追加进列表，表现是每次刷新凭空长出一段旧历史。
+      // 窗口大小按会话固定：首次读取后记下该窗口的条目数，之后的整窗读只要求同等宽度。
+      // 以“已载入条数”作窗口大小会因上翻翻页而不断放大，服务端随之前移窗口起点，
+      // mergeLoadedTail() 的前缀校验随之失败并退回整窗替换，表现为突然出现一段旧消息。
       const loadedCount = sessionIdRef.current === sid ? entryIdsRef.current.length : 0;
+      const pinned = windowTailRef.current;
       if (loadedCount === 0) {
         params.set("turns", String(pageTurns()));
       } else {
-        params.set("tail", String(Math.min(1000, Math.max(1, loadedCount))));
+        const tailSize = pinned.sid === sid && pinned.tail > 0 ? pinned.tail : loadedCount;
+        params.set("tail", String(Math.min(1000, Math.max(1, tailSize))));
       }
       if (options?.force) params.set("force", "1");
       const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?${params}`);
@@ -998,6 +1005,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // 索引错位，使 key 与 data-entry-id 串位，表现为消息错乱及部分条目“消失”。
       const persistedMessages = revisionUnchanged ? messagesRef.current : d.context.messages;
       const persistedEntryIds = revisionUnchanged ? entryIdsRef.current : (d.context.entryIds ?? []);
+      // 记下该会话的基准窗口宽度（首次读取或换会话时）：后续整窗读按它请求，
+      // 不再取当前已载入条数，以免翻页把窗口越推越早。
+      if (windowTailRef.current.sid !== sid) {
+        windowTailRef.current = { sid, tail: Math.max(1, persistedEntryIds.length) };
+      }
       setData(revisionUnchanged
         ? {
             ...d,
