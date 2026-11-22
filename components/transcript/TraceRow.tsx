@@ -112,6 +112,10 @@ export function RowObjectSpan({ object, clip = false, follow = false }: { object
       ref={ref}
       className={cn(
         "block text-left",
+        // 字号跟 trace 行一致（13px）：对象文本有的是 TraceLine 的子项（13px），有的
+        // 落在行外的 14px 容器里，同一个 13px 标题旁会并排出现两种字号（用户：
+        // “思考整体比运行小一号”）。钉死后思考尾、命令对象、时长、标题同一号字。
+        "text-[length:calc(13px+var(--chat-font-size-offset,0px))]",
         // pr 把裁切点从渐变起点往里收 1–2px，最后一字符不会正好压在渐变边缘。
         clip ? "overflow-hidden whitespace-nowrap pr-[2px]" : "truncate",
       )}
@@ -245,8 +249,11 @@ export function TraceRow({
         {/* 整行可点开合（2026-11-20 用户反馈：编辑行只有点「编辑」才能展开）：
             胶囊（打开文件）与外链按钮各自 stopPropagation，其余区域——对象文本、
             计数、空白——都切换折叠。 */}
+        {/* 这一行的字体尺寸写在外层：对象、胶囊、后缀、耗时都在这层下，而它们
+            又不在 TraceLine 里（按钮不嵌套），不靠继承就会回到 `.markdown-body`
+            的 13.5px（2026-11-22 用户：“思考比运行小一号”）。 */}
         <div
-          className={cn("flex w-full cursor-pointer items-center gap-1 min-w-0", !wrap && "max-w-[80%]", wrap && "items-start")}
+          className={cn("flex w-full cursor-pointer items-center gap-1 min-w-0 text-[length:calc(13px+var(--chat-font-size-offset,0px))]", !wrap && "max-w-[80%]", wrap && "items-start")}
           onClick={wrap ? undefined : () => onOpenChange(!open)}
         >
           <TraceCollapsibleTrigger aria-label={ariaLabel} className="max-w-full shrink-0">
@@ -276,7 +283,7 @@ export function TraceRow({
         {/* 展开区高度由 `.trace-fold-body` 统一封顶（24rem，超出在体内滚动）。 */}
         <TraceCollapsibleContent className="trace-fold-body mt-1 flex flex-col gap-2 [&>*]:min-w-0">
           {stepUsage && (
-            <div className="text-xs">
+            <div className="text-[length:calc(13px+var(--chat-font-size-offset,0px))]">
               <UsageBar usage={stepUsage} gap={10} />
             </div>
           )}

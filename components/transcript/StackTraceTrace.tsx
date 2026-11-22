@@ -39,7 +39,7 @@ export const StackTraceTrace = memo(function StackTraceTrace({ title, text, fold
       activityTool={activityTool}
       ariaLabel={title}
       content={(
-        <div className="flex flex-col gap-2 rounded-md bg-muted p-3 font-mono text-xs">
+        <div className="flex flex-col gap-2 rounded-md bg-muted p-3 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))]">
           <p className="text-destructive">{error}</p>
           {frames.length > 0 && (
             <ol className="flex flex-col gap-1">

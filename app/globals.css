@@ -753,7 +753,9 @@ pre, code {
   min-width: 0;
   max-width: 100%;
   overflow-x: hidden;
-  font-size: calc(13.5px + var(--chat-font-size-offset, 0px));
+  /* 聊天区一个字号：正文、转录行、工具卡、代码块、表格全用 13px（以前正文 13.5px，
+     与转录行的 13px 并排差半号，用户 2026-11-22：“全部要统一字号”）。 */
+  font-size: calc(13px + var(--chat-font-size-offset, 0px));
   line-height: 1.7;
   color: var(--foreground);
   word-break: break-word;

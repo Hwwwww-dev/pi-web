@@ -67,7 +67,7 @@ function TraceTitle({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       data-slot="trace-title"
-      className={cn("min-w-0 overflow-hidden whitespace-nowrap motion-reduce:shimmer-none", className)}
+      className={cn("min-w-0 overflow-hidden whitespace-nowrap text-[length:calc(13px+var(--chat-font-size-offset,0px))] motion-reduce:shimmer-none", className)}
       {...props}
     />
   )
@@ -80,8 +80,10 @@ function TraceDescription({
   return (
     <span
       data-slot="trace-description"
+      // 显式钉字号：描述位有时在触发按钮里（13px），有时在行尾的普通容器里
+      // （跟随外层 14px），同一个时长在两种行里会差一号。思考行与运行行必须一样。
       className={cn(
-        "shrink-0 text-muted-foreground/70 tabular-nums",
+        "shrink-0 text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground/70 tabular-nums",
         className
       )}
       {...props}

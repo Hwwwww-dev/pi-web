@@ -417,7 +417,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               <GitBranchIcon strokeWidth={1.8} />
             </Button>
           )}
-          {time && <span className="text-xs text-muted-foreground">{time}</span>}
+          {time && <span className="text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground">{time}</span>}
         </MessageFooter>
       )}
     </Message>
@@ -432,7 +432,7 @@ export function AssistantMessageHeader({ modelName, className }: {
     // 固定行高 + tabular numerals：模型名单行展示。流式期的 ↓tokens + 速度
     // 已移至 composer 下方的 StreamStatusPill（components/StreamStatusPill.tsx）。
     <div className={cn(
-      "flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-xs leading-[1.5] text-muted-foreground [font-variant-numeric:tabular-nums]",
+      "flex min-h-[calc(1.5em+2px)] items-center gap-1.5 font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] leading-[1.5] text-muted-foreground [font-variant-numeric:tabular-nums]",
       className,
     )}>
       {modelName && <span className="min-w-0 truncate">{modelName}</span>}
@@ -630,7 +630,7 @@ function AssistantMessageView({
 
       <Reveal open={Boolean(providerError)} className={blocks.length > 0 ? "mt-2" : "mt-0"}>
         {providerError && (
-          <Alert variant="destructive" className="font-mono text-xs leading-normal">
+          <Alert variant="destructive" className="font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] leading-normal">
           <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
             Error: {providerError}
           </AlertDescription>
@@ -640,7 +640,7 @@ function AssistantMessageView({
 
       <Reveal open={Boolean(truncated)} className={blocks.length > 0 || providerError ? "mt-2" : "mt-0"}>
         {truncated && (
-          <Alert variant="warning" className="font-mono text-xs leading-normal">
+          <Alert variant="warning" className="font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] leading-normal">
           <AlertDescription className="whitespace-pre-wrap wrap-anywhere">
             {t(unansweredTruncation ? "chat.truncatedWithoutAnswer" : "chat.truncatedByOutputLimit")}
             {unansweredTruncation && onCompact && (
@@ -674,7 +674,7 @@ function AssistantMessageView({
           {(stats.length > 0 || turnDurationMs !== undefined) && !isStreaming && (
             // One item per count: a single space at 11px ran them together. The
             // spaces stay in the text for copying; the flex gap draws the room.
-            <div className="flex flex-wrap gap-x-[7px] font-mono text-xs text-muted-foreground tabular-nums">
+            <div className="flex flex-wrap gap-x-[7px] font-mono text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground tabular-nums">
               {stats.map((part, index) => (
                 <Fragment key={index}>{index > 0 && " "}<UsagePart part={part} /></Fragment>
               ))}
@@ -697,7 +697,7 @@ function AssistantMessageView({
           </Button>
           )}
           {time && !isStreaming && (
-            <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground">{time}</span>
+            <span className="ml-auto whitespace-nowrap text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground">{time}</span>
           )}
         </MessageFooter>
       )}
@@ -860,25 +860,25 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
     <div>
       <ToolRow block={block} result={result} />
       {message.truncated && fullOutputUrl && (
-        <div className="-mt-px px-1 py-1 text-xs">
+        <div className="-mt-px px-1 py-1 text-[length:calc(13px+var(--chat-font-size-offset,0px))]">
           {showFullButton && (
             <Button
               type="button"
               variant="link"
               onClick={loadFullOutput}
               disabled={loadingFull}
-              className="h-auto p-0 text-xs underline"
+              className="h-auto p-0 text-[length:calc(13px+var(--chat-font-size-offset,0px))] underline"
             >
               {loadingFull ? t("chat.loadingFullOutput") : t("chat.viewFullOutput")}
             </Button>
           )}
           <a
             href={`${fullOutputUrl}&download=1`}
-            className={cn("text-xs text-primary underline", showFullButton && "ml-2.5")}
+            className={cn("text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-primary underline", showFullButton && "ml-2.5")}
           >
             {t("chat.downloadFullOutput")}
           </a>
-          {fullError && <span className="ml-1.5 text-xs text-muted-foreground">({fullError})</span>}
+          {fullError && <span className="ml-1.5 text-[length:calc(13px+var(--chat-font-size-offset,0px))] text-muted-foreground">({fullError})</span>}
         </div>
       )}
     </div>
