@@ -50,7 +50,7 @@ import {
   type QueuedSnapshotEntry,
   type QueuedSubmission,
 } from "@/lib/queued-submissions";
-import { carryMessageKeys, mergeLoadedTail, messageRenderKeys } from "@/lib/message-keys";
+import { carryMessageKeys, mergeLoadedTail, messageRenderKeys, sameMessage } from "@/lib/message-keys";
 import {
   AgentEventConnection,
   canReleaseHiddenEventStream,
@@ -1146,19 +1146,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return await flight;
   }, [applyLiveUsage, applyRecordedQueueSnapshot, setToolPresetState, syncLiveModel]);
 
-  const syncEntryIdsAfterRun = useCallback((sid: string) => {
-    // 条目 id 只有读盘才拿得到（SSE 只追加消息），而编辑 / 分叉两个按钮以
-    // entryId 为开关：回合结束后如果 id 数组比消息短，补一次读把它对齐。
-    //
-    // 只取 id 的快路径（`ids=1`）已回退（2026-11-22）：服务端窗口会为对齐轮次
-    // 多给几条 id，条数不再与消息一一对应，别名交接（carryMessageKeys）就会读到
-    // 不存在的消息而崩在 `sameMessage` 的 `e.role` 上。整读按内容逐条核对，
-    // 是唯一能保证 id 与行对得上的做法；窗口不再变宽（`tail` 正好等于已载入
-    // 条数）后，这次读不会再把旧消息带进列表。
-    if (entryIdsRef.current.length >= messagesRef.current.length) return;
-    void loadSession(sid);
-  }, [loadSession]);
-
   const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { signal?: AbortSignal }) => {
     try {
       // 同一页正在请求中：滚动到顶部与预取可能并发触发，重复返回会导致该页被 prepend 两次。
@@ -1857,25 +1844,66 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (result.messages.length === 0) return true;
     const previous = { messages: messagesRef.current, entryIds: entryIdsRef.current };
     const known = new Set(previous.entryIds);
-    const freshMessages: typeof previous.messages = [];
-    const freshIds: string[] = [];
+    // 已载入的持久条目是 messages 的前缀（与 mergeLoadedTail 同一前提）：
+    // 前 `held` 条已有 id，其后是无 id 的流式/乐观行。
+    const held = Math.min(previous.entryIds.length, previous.messages.length);
+    const appendedMessages: typeof previous.messages = [];
+    const appendedIds: string[] = [];
+    const upgraded: number[] = [];
+    let local = held;
     result.entryIds.forEach((entryId, index) => {
       const message = result.messages[index];
       if (!message || known.has(entryId)) return;
       // 跑中（或发送后的那次）只补用户条目：助手正文走 SSE 增量，从文件重放会重复。
       if (mode === "user-only" && message.role !== "user") return;
-      // 已渲染的行没有 entryId（流式、乐观气泡），只能按内容去重，否则同一条会多一行。
-      if (mode === "user-only" && previous.messages.some((m) => m.role === "user" && userMessageKey(m) === userMessageKey(message))) return;
-      freshMessages.push(message);
-      freshIds.push(entryId);
+      // 已渲染但未落盘的行（流式回复、乐观气泡）没有 id，只能按内容对上：
+      // 用户行比 userMessageKey，其余用 sameMessage。对上的就地升级成持久条目，
+      // 不另追加一行（否则回合结束多一份）。
+      const rest = previous.messages.slice(local);
+      const matchIdx = mode === "user-only"
+        ? rest.findIndex((live) => live.role === "user" && userMessageKey(live) === userMessageKey(message))
+        : rest.findIndex((live) => sameMessage(live, message));
+      if (matchIdx !== -1) {
+        upgraded.push(local + matchIdx);
+        local += matchIdx + 1;
+      }
+      appendedIds.push(entryId);
+      appendedMessages.push(message);
     });
-    if (freshIds.length === 0) return true;
-    const next = { messages: [...previous.messages, ...freshMessages], entryIds: [...previous.entryIds, ...freshIds] };
+    if (appendedIds.length === 0) return true;
+    // 被升级的行从本地尾部摘除（落盘版在原位置接上）；未对上的在途行留在末尾。
+    const kept: typeof previous.messages = [];
+    previous.messages.forEach((message, index) => {
+      if (index < held || upgraded.includes(index)) return;
+      kept.push(message);
+    });
+    const next = {
+      messages: [...previous.messages.slice(0, held), ...appendedMessages, ...kept],
+      entryIds: [...previous.entryIds, ...appendedIds],
+    };
     setMessageKeyAliases((aliases) => carryMessageKeys({ ...previous, aliases }, next));
     setMessages(next.messages);
     setEntryIds(next.entryIds);
     return true;
   }, [setActiveLeafId, setMessages, setEntryIds, setMessageKeyAliases, messagesRef, entryIdsRef]);
+
+  const syncEntryIdsAfterRun = useCallback((sid: string) => {
+    // 条目 id 只有读盘才拿得到（SSE 只追加消息），而编辑 / 分叉两个按钮以
+    // entryId 为开关：回合结束后如果 id 数组比消息短，补一次读把它对齐。
+    //
+    // 2026-11-22 改走增量（`?since=<末条 id>`）：整窗读的 `tail` 等于已载入条数，
+    // 翻过页之后这个数比原窗口大，服务端就回一段更早的窗口 → 合并时前插旧历史
+    // （“回合结束自己加载更多 + 往前跳”）。增量只追加锚点之后的条目，窗口不会变宽。
+    if (entryIdsRef.current.length >= messagesRef.current.length) return;
+    const anchor = entryIdsRef.current[entryIdsRef.current.length - 1];
+    if (!anchor) {
+      void loadSession(sid);
+      return;
+    }
+    void appendSessionSince(sid, anchor).then((ok) => {
+      if (!ok) void loadSession(sid);
+    });
+  }, [appendSessionSince, loadSession]);
 
   /**
    * 消息对齐：视图落后了就把缺的补回来，不整窗替换。
@@ -1907,16 +1935,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         return;
       }
       if (tail.lastEntryId === anchor) return;
-      // 跑中只补用户条目（助手正文归 SSE）。补用户条目必须按 key 去重：
-      // 已渲染的流式/乐观行没有 entryId，不去重就会把同一条再追加一遍。
-      // 其余情况整窗读：`loadSession` 内部是 mergeLoadedTail 尾部合并，
-      // 保留已加载行、不重挂载、不重复。
+      // 只补锚点之后的条目，窗口永不变宽。跑中（或发送后的那次）只补用户条目，
+      // 其余角色归 SSE；回合结束后补全角色，已渲染的流式行按内容对上升级，不重复。
+      // 锚点被挤出窗口（`sinceReset`）时退回整窗读（merge，不会前插旧历史）。
       const userOnly = reason === "sent" || agentRunningRef.current;
-      if (!userOnly) {
-        await loadSession(sid);
-        return;
-      }
-      if (!(await appendSessionSince(sid, anchor, "user-only"))) await loadSession(sid);
+      if (!(await appendSessionSince(sid, anchor, userOnly ? "user-only" : undefined))) await loadSession(sid);
     } finally {
       reconcileInFlightRef.current = false;
     }
