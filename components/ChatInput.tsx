@@ -2470,16 +2470,22 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         {compressNotice && (
           <Alert className="items-center rounded-md border-border/70 bg-muted/40 px-2 py-1 text-xs leading-normal text-muted-foreground">
             <SparklesIcon className="size-3.5 shrink-0" />
-            <span className="col-start-2 row-start-1 min-w-0 wrap-anywhere">{compressNotice}</span>
-            <DismissButton onClick={() => setCompressNotice(null)} title={t("chat.dismiss")} />
+            {/* 关闭键必须在内容格里：Alert 是两列网格（图标 + 内容），第三个
+                子元素会换到下一行第一列——这就是“✕ 掉到图标下面”的原因。 */}
+            <span className="col-start-2 row-start-1 flex min-w-0 items-center gap-1">
+              <span className="min-w-0 wrap-anywhere">{compressNotice}</span>
+              <DismissButton onClick={() => setCompressNotice(null)} title={t("chat.dismiss")} />
+            </span>
           </Alert>
         )}
         </Reveal>
         <Reveal open={Boolean(attachError)}>
         {attachError && (
           <Alert variant="destructive" className="items-center rounded-md border-destructive/40 bg-destructive/[0.06] px-2 py-1 text-xs leading-normal">
-            <span className="col-start-2 row-start-1 min-w-0 wrap-anywhere">{attachError}</span>
-            <DismissButton onClick={() => setAttachError(null)} title={t("chat.dismiss")} />
+            <span className="col-start-2 row-start-1 flex min-w-0 items-center gap-1">
+              <span className="min-w-0 wrap-anywhere">{attachError}</span>
+              <DismissButton onClick={() => setAttachError(null)} title={t("chat.dismiss")} />
+            </span>
           </Alert>
         )}
         </Reveal>
@@ -2706,7 +2712,14 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             duration={BEAM_BASE_SECONDS}
             borderRadius={compact ? 18 : 24}
             theme={isDark ? "dark" : "light"}
-            className="chat-composer-beam min-w-0"
+            className={cn(
+              "chat-composer-beam min-w-0",
+              // 不流式时彻底摘掉光带：库即使 `active={false}` 也让 `beam-spin` /
+              // `beam-hue-shift` 三支动画常驻 running（实测 rate 1），而带 `filter`
+              // 动画的子树会让整篇样式重算变慢——开设置弹窗时从 7ms 涨到 230ms
+              //（4x 降频实测）。`display:none` 让动画停跑，观感不变（本来就是隐藏态）。
+              !beamActive && "[&_[data-beam]]:hidden [&_[data-beam-bloom]]:hidden",
+            )}
             // The component's own `overflow: hidden` would clip this card's
             // focus ring; the beam clips itself with its own clip-path.
             style={{ overflow: "visible" }}
