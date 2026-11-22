@@ -15,6 +15,7 @@ import { mcpToolLabel, mcpToolNameLabel, prettyMcpResultText, type McpToolLabel 
 import { parseUnifiedPatch, type SplitDiffFile } from "./patch";
 import { getToolCategory, getToolFilePaths, getToolPreviewText, TOOL_CATEGORY_LABEL_KEYS, isQuestionToolName, isSubagentToolName } from "./tool-categories";
 import { EMPTY_FIELD_VALUE, toolFieldsOfInput, type ToolField } from "./tool-fields";
+import { advancedValue } from "./advanced-values";
 import { isApplyPatchToolName, isEditToolName, isWriteToolName } from "./tool-names";
 import type { ImageContent, ToolCallContent, ToolResultMessage } from "./types";
 import type { TranslationParams } from "./i18n/types";
@@ -386,7 +387,11 @@ interface Prepared {
 
 function prepare({ block, result, t }: ToolViewInput): Prepared {
   const inputStr = block.rawInput ?? JSON.stringify(block.input, null, 2);
-  const streamingInput = block.rawInput !== undefined;
+  // 「参数还在流式传输」只对没有结果的调用成立：结果已经回来，参数早就是终态，
+  // 哪怕 `rawInput` 还挂着（snapshot 里的 `customInput.property` / `partialArgs` 会被
+  // normalizeStreamingToolCalls 重新回填，见 lib/normalize.ts:8-20）也要照常出详情。
+  // 否则这些行展开后永远空白（compress 的摘要就是这么消失的）。
+  const streamingInput = block.rawInput !== undefined && result === undefined;
   const mcp = mcpToolLabel(block.toolName, result?.details) ?? mcpToolNameLabel(block.toolName);
   const script = block.toolName === CODEMODE_TOOL_NAME && !streamingInput ? codemodeScript(block.input) : null;
   const codemode = script === null ? null : { code: script, ...codemodeCalls(result?.details) };
@@ -419,6 +424,7 @@ function prepare({ block, result, t }: ToolViewInput): Prepared {
     // Flat arguments as rows instead of a JSON blob, unless the row has a view
     // of its own (a write's file text, codemode, an applied patch, a terminal pair).
     fields: !streamingInput && command === null && codemode === null && patchFiles === null && writtenFileText === null
+      && advancedValue<boolean>("showToolFields") !== false
       ? toolFieldsOfInput(block.input)
       : null,
     preview: previewOf(block),
@@ -429,6 +435,7 @@ function prepare({ block, result, t }: ToolViewInput): Prepared {
     diffText: resultDiffText(result),
     writtenFileText,
     // A streamed call's input is incomplete JSON: the row shows its title and nothing else.
+    // 有结果的行不在此列，见上方 streamingInput。
     detail: (list) => (streamingInput ? [] : list),
   };
 }

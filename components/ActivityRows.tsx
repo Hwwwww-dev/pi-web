@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useRef, useSyncExternalStore, i
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import type { ActiveToolsStore } from "@/lib/active-tools";
 import { cn } from "@/lib/utils";
+import { useAdvancedSettingValue } from "@/hooks/useAdvancedSettings";
 import { Button } from "./ui/button";
 import { CodeBlock, CodeBlockContent } from "./ui/code-block";
 import { Separator } from "./ui/separator";
@@ -372,6 +373,10 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
   const [copied, setCopied] = useState(false);
   const text = getMessageText(message.content);
   const images = getMessageImages(message.content);
+  // 同一段扩展消息的图共用一张灯箱（多图翻页，9.5）；无法取地址的项直接不展示。
+  const imageSlides = images
+    .map((img) => imageSource(img))
+    .filter((src): src is string => Boolean(src));
   const hasDetails = message.details !== undefined;
   const detailsText = hasDetails ? safeJson(message.details) : "";
   // 正文本身即该段 JSON 时（扩展将 details 也写入正文），详情卡会重复显示。
@@ -411,11 +416,9 @@ export function CustomRow({ message, cwd, onOpenFile, onOpenSubagent }: {
             <div className="flex flex-col gap-2">
               {images.length > 0 && (
                 <div className={cn("flex flex-wrap gap-1.5", text && "mb-2")}>
-                  {images.map((img, i) => {
-                    const src = imageSource(img);
-                    if (!src) return null;
+                  {imageSlides.map((src, i) => {
                     return (
-                      <ImagePreview key={i} src={src}>
+                      <ImagePreview key={i} src={src} gallery={imageSlides} index={i}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={src}
@@ -612,14 +615,21 @@ export function TurnMetaLine({ usage, model, thinkingLevel, time, timestamp, cop
   copySource?: string;
 }) {
   const { t } = useI18n();
+  // 思考等级按首字母大写显示（`high` → `High`），与输入框里的选择器一致。
+  const levelLabel = thinkingLevel && thinkingLevel !== "off"
+    ? `${thinkingLevel.charAt(0).toUpperCase()}${thinkingLevel.slice(1)}`
+    : null;
   const [copied, setCopied] = useState(false);
-  const hasUsage = Boolean(usage && (usage.input > 0 || usage.output > 0 || usage.cacheRead > 0 || usage.cost.total > 0));
+  // 界面显示开关（Settings › 高级参数）：关掉用量条时时间/复制仍留着。
+  const showUsage = useAdvancedSettingValue<boolean>("showUsageLine") !== false;
+  const hasUsage =
+    showUsage && Boolean(usage && (usage.input > 0 || usage.output > 0 || usage.cacheRead > 0 || usage.cost.total > 0));
   if (!hasUsage && !model && !time && !copySource) return null;
   return (
     <div
       className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground [font-variant-numeric:tabular-nums]"
     >
-      {model && <span>{model}{thinkingLevel && thinkingLevel !== "off" ? ` · ${thinkingLevel}` : ""}</span>}
+      {model && <span>{model}{levelLabel ? ` · ${levelLabel}` : ""}</span>}
       {hasUsage && (
         <UsageBar
           title={usage ? formatUsage(usage) : undefined}

@@ -71,6 +71,7 @@ const UiDebugPanel = dynamic(() => import("./UiDebugPanel").then((mod) => mod.Ui
 import { newTerminalTab, restoreTerminalTabs, TERMINAL_TABS_KEY, type TerminalTab } from "./terminal-tab-state";
 import { appendSideTab, restoreSideTabs, sideTabsKey } from "./side-tab-state";
 import { useTheme } from "@/hooks/useTheme";
+import { useAdvancedSettingValue } from "@/hooks/useAdvancedSettings";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { useI18n } from "@/hooks/useI18n";
 import { installGlobalScrollbarVisibility } from "@/lib/scrollbar-visibility";
@@ -171,6 +172,8 @@ type SessionToastKind = "complete" | "attention" | "failed";
 export function AppShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // 界面显示开关（Settings › 高级参数）。
+  const showKeepAliveDock = useAdvancedSettingValue<boolean>("showKeepAliveDock");
   const [initialNavigation, setInitialNavigation] = useState(() => getInitialNavigation(searchParams));
   // The system-theme subscription stays mounted for the app's lifetime; the
   // header's light/dark pill writes through the same hook.
@@ -3010,6 +3013,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                   />
                 </div>
               )}
+              {showKeepAliveDock && (
               <KeepAliveDock
                 slots={dockSlots}
                 sessions={sessionCatalog}
@@ -3019,6 +3023,7 @@ function truncateSessionTitle(title: string, maxWidth = 20): string {
                 onSelect={handleSelectSession}
                 onDismiss={handleKeepAliveDismiss}
               />
+              )}
             </>
 
           ) : initialCwdStatus === "validating" ? (

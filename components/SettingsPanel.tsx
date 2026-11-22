@@ -12,6 +12,7 @@ import {
   RotateCcwIcon,
   ServerIcon,
   SlidersHorizontalIcon,
+  WrenchIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
@@ -57,6 +58,7 @@ import { SkillsConfig } from "./SkillsConfig";
 import { AgentsConfig } from "./AgentsConfig";
 import { PluginsConfig } from "./PluginsConfig";
 import { McpConfig } from "./McpConfig";
+import { AdvancedConfig } from "./AdvancedConfig";
 import {
   ConfigButton,
   ConfigDetail,
@@ -105,6 +107,7 @@ const SECTION_ICONS = {
   agents: BotIcon,
   plugins: PuzzleIcon,
   mcp: ServerIcon,
+  advanced: WrenchIcon,
 } as const;
 
 /** A section's glyph (lucide, §6); `strokeWidth` 1.8 keeps the hand-drawn icons' line weight. */
@@ -824,6 +827,7 @@ export function SettingsPanel({
     { id: "agents", label: t("common.agents") },
     { id: "plugins", label: t("common.plugins") },
     { id: "mcp", label: t("settings.mcp") },
+    { id: "advanced", label: t("settings.advanced") },
   ] as const).map((item) => ({ ...item, requiresProject: settingsSectionRequiresProject(item.id) }));
   const sectionRequiresProject = settingsSectionRequiresProject(section);
   const isPhone = useIsMobile();
@@ -918,6 +922,8 @@ export function SettingsPanel({
       {cwd && sectionHost("plugins", <PluginsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} trust={projectTrust} onClose={onClose} onReloaded={onSessionReloaded} />)}
       {/* No project needed: the global mcp.json is listed alone, and a project adds its group. */}
       {sectionHost("mcp", <McpConfig embedded key={cwd ?? ""} cwd={cwd} trust={projectTrust} onTrustProject={onOpenTrustDialog} onProjectTrustChanged={onProjectTrustChanged} onClose={onClose} />)}
+      {/* 不需要项目：整张参数表与项目无关，改完存 ~/.pi-web/settings.json。 */}
+      {sectionHost("advanced", <AdvancedConfig embedded onClose={onClose} />)}
     </ConfigDetailNavigationContext.Provider>
   );
 

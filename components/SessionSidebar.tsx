@@ -93,6 +93,7 @@ import {
 } from "@/lib/unread-markers";
 import { isPageAttended, subscribePageAttention } from "@/lib/user-attention";
 import { useFilesPlacement } from "@/hooks/useFilesPlacement";
+import { useAdvancedSettingValue } from "@/hooks/useAdvancedSettings";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useResizablePanel } from "@/hooks/useResizablePanel";
@@ -551,6 +552,10 @@ function buttonAnchor(element: HTMLElement, align: "start" | "end"): SidebarMenu
 // sidebar's own state (tree, explorer) must not be re-rendered along with it.
 // All handler props are useCallback-stable in AppShell.
 export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, hiddenFinishedSessionIds, onRunningSessionIdsChange, onSessionsChange, onUnreadSessionIdsChange, onOpenGitPanel, onOpenSettings }: Props) {
+  // 界面显示开关（Settings › 高级参数）：终端入口与标签页未读计数。
+  const showTerminalEntry = useAdvancedSettingValue<boolean>("showTerminalEntry") !== false;
+  const showUnreadBadge = useAdvancedSettingValue<boolean>("showUnreadBadge") !== false;
+  const showSidebarVersion = useAdvancedSettingValue<boolean>("showSidebarVersion") !== false;
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
@@ -1165,11 +1170,15 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   // Sessions that finished while the tab was hidden count too (#1484): the rows
   // exclude the selected session ("already looking"), which is false while hidden.
   useEffect(() => {
+    if (!showUnreadBadge) {
+      syncFaviconBadge({ awaiting: 0, unread: 0 });
+      return;
+    }
     syncFaviconBadge({
       awaiting: awaitingInputSessionIds.size,
       unread: countFaviconUnread(unreadSessionIds, hiddenFinishedSessionIds),
     });
-  }, [awaitingInputSessionIds, unreadSessionIds, hiddenFinishedSessionIds]);
+  }, [awaitingInputSessionIds, unreadSessionIds, hiddenFinishedSessionIds, showUnreadBadge]);
 
   useEffect(() => {
     const previous = previousRunningSessionIdsRef.current;
@@ -3097,7 +3106,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           the files pane takes the files section's place. Only the two tabs
           are the tablist. */}
       <div ref={headerRef} className="sidebar-header flex flex-none min-h-[calc(var(--top-bar-height)-4px)] items-center">
-        <PiWebTitle onWidthChange={fitHeader} />
+        <PiWebTitle onWidthChange={fitHeader} showVersion={showSidebarVersion} />
         <span className="sidebar-header-spacer min-w-0 flex-1" />
         <Button
           type="button"
@@ -3318,7 +3327,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
               )}
             </Button>
             <div className="sidebar-files-keys flex flex-[1000_0_calc(7*18px)] max-w-[calc(7*26px)] items-center [@media(pointer:coarse)]:min-w-0 [@media(pointer:coarse)]:max-w-none [@media(pointer:coarse)]:flex-[0_1_auto]" role="group" aria-label={t("sidebar.fileActions")}>
-              {terminalButton}
+              {showTerminalEntry && terminalButton}
               {fileManagerButton}
               {uploadButton}
               {refreshButton}
@@ -3388,7 +3397,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 search is the toolbar row's search button. */}
             {!filesBelow && explorerCwd && (
               <div className="sidebar-files-actions mt-1 flex items-center gap-1.5" role="group" aria-label={t("sidebar.fileActions")}>
-                {onOpenTerminal && terminalButton}
+                {onOpenTerminal && showTerminalEntry && terminalButton}
                 {onOpenGitPanel && (
                   <ToolbarIconButton
                     onClick={onOpenGitPanel}

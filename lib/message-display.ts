@@ -1,4 +1,5 @@
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, TextContent, ThinkingContent, ToolCallContent } from "./types";
+import { advancedValue } from "./advanced-values";
 
 interface DisplayOptions {
   isStreaming?: boolean;
@@ -8,7 +9,12 @@ export function getThinkingPreview(thinking: string): string {
   return thinking.trimStart().match(/^[^\r\n]{0,240}/u)?.[0].trimEnd() ?? "";
 }
 
-export const THINKING_PIECE_CHARS = 8_000;
+export const THINKING_PIECE_CHARS_DEFAULT = 8_000;
+
+/** 思考分片长度（Settings › 高级参数 `thinkingPieceChars`）。 */
+function thinkingPieceChars(): number {
+  return advancedValue<number>("thinkingPieceChars");
+}
 
 /** A piece of a thinking text; `lineBreak`: a "\n" follows it there, left out of the pieces. */
 export interface ThinkingPiece {
@@ -28,10 +34,11 @@ export interface ThinkingPiece {
  */
 export function splitThinkingPieces(thinking: string): ThinkingPiece[] {
   const pieces: ThinkingPiece[] = [];
+  const limit = thinkingPieceChars();
   let start = 0;
-  while (thinking.length - start > THINKING_PIECE_CHARS) {
-    const from = start + THINKING_PIECE_CHARS;
-    const hardCut = from + THINKING_PIECE_CHARS;
+  while (thinking.length - start > limit) {
+    const from = start + limit;
+    const hardCut = from + limit;
     // Searched up to the hard cut only: an unbroken line is not scanned to
     // its end again for every piece.
     const window = thinking.slice(from, hardCut + 1);
@@ -165,10 +172,15 @@ export function collapsesProcessDetails(answer: AssistantMessage | null): boolea
 /**
  * How many of a running `!` command's last lines show under its card, and how many rows
  * once wrapped: pi's TUI previews `PREVIEW_LINES` (20) and cuts them to as many visual lines.
+ * 默认值在 Settings › 高级参数（`liveOutputPreviewLines`）。
  */
-export const LIVE_OUTPUT_PREVIEW_LINES = 20;
+export const LIVE_OUTPUT_PREVIEW_LINES_DEFAULT = 20;
 
-/** A running `!` command's last lines (`LIVE_OUTPUT_PREVIEW_LINES`); the page caps their rows. */
+export function liveOutputPreviewLines(): number {
+  return advancedValue<number>("liveOutputPreviewLines");
+}
+
+/** A running `!` command's last lines (`liveOutputPreviewLines`); the page caps their rows. */
 export function liveOutputPreview(output: string): string {
-  return output.replace(/\n+$/, "").split("\n").slice(-LIVE_OUTPUT_PREVIEW_LINES).join("\n");
+  return output.replace(/\n+$/, "").split("\n").slice(-liveOutputPreviewLines()).join("\n");
 }

@@ -24,6 +24,8 @@ import {
   type AtQueryMatch, type FileIndexEntry,
 } from "@/lib/file-fuzzy";
 import { getMarkdownListContinuation } from "@/lib/markdown-list-continuation";
+import { compressImage, imageCompressOptions, type CompressedImage } from "@/lib/image-compress";
+import { formatImageBytes } from "@/lib/model-image-limits";
 import { CHAT_COLUMN_CLASS, CHAT_COMPOSER_INSET_CLASS } from "@/lib/chat-layout";
 import { StreamStatusPill } from "./StreamStatusPill";
 import type { StreamingStore } from "@/lib/streaming-message";
@@ -38,6 +40,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useEnterSendMode } from "@/hooks/useEnterSendMode";
 import { useComposerBeam } from "@/hooks/useComposerBeam";
 import { useI18n } from "@/hooks/useI18n";
+import { useAdvancedSettingValue } from "@/hooks/useAdvancedSettings";
 import { useChatAppearance } from "@/hooks/useChatAppearance";
 import { useStreamBeamPlaybackRate } from "@/hooks/useStreamBeamPlaybackRate";
 import { BEAM_BASE_SECONDS } from "@/lib/beam-speed";
@@ -62,10 +65,11 @@ import {
   PencilIcon,
   PlusIcon,
   RotateCcwIcon,
+  SlidersHorizontalIcon,
+  SparklesIcon,
   SquareIcon,
   Trash2Icon,
   TriangleAlertIcon,
-  SlidersHorizontalIcon,
   Volume2Icon,
   VolumeXIcon,
   XIcon,
@@ -595,8 +599,9 @@ export function buildSlashCommandLayout(
   };
 }
 
-// Attached images go to pi as they are: pi resizes prompt images itself, following
-// images.autoResize and the model's inputLimits.images.resize.
+// 附件图片先在浏览器里压小（lib/image-compress.ts），再转 base64 发给 prompt：
+// 传输字节、SSE 载荷都由它降下来。pi 侧还会按 images.autoResize 和模型的
+// inputLimits.images.resize 二缩一次，那是服务端自己的限额，不省网络。
 export function readImageFile(file: Blob, mimeType: string): Promise<{ data: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -729,7 +734,12 @@ function QueuedMessageRow({
           {item.images.map((image, index) => {
             const src = draftImageDataUrl(image);
             return (
-              <ImagePreview key={`${item.id}-image-${index}`} src={src}>
+              <ImagePreview
+                key={`${item.id}-image-${index}`}
+                src={src}
+                gallery={item.images.map(draftImageDataUrl)}
+                index={index}
+              >
                 <span className="block size-[18px] shrink-0 overflow-hidden rounded-full bg-muted">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={src} alt="" className="size-full object-cover" />
@@ -887,6 +897,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   compact = false,
 }: Props, ref) {
   const { t } = useI18n();
+  // 界面显示开关（Settings › 高级参数）：关掉后灵感入口不渲染。
+  const showInspirationEntry = useAdvancedSettingValue<boolean>("showInspirationEntry") !== false;
   // The running composer's beam picks its palette from the page's theme, not
   // from the system preference the component falls back to.
   const { isDark } = useTheme();
@@ -977,6 +989,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   // with the message instead of popping back into the cleared composer.
   const pendingImageTailRef = useRef<Promise<void>>(Promise.resolve());
   const [attachError, setAttachError] = useState<string | null>(null);
+  /** 「4.2 MB → 380 KB」: one line per batch that actually got smaller. */
+  const [compressNotice, setCompressNotice] = useState<string | null>(null);
   const [queueExpanded, setQueueExpanded] = useState(false);
   valueRef.current = value;
   attachedImagesRef.current = attachedImages;
@@ -1222,41 +1236,65 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const processImageFiles = useCallback((files: File[]): Promise<void> => {
     if (compact) return Promise.resolve();
     const imageTypeFiles = files.filter((f) => f.type.startsWith("image/"));
-    const oversizeCount = imageTypeFiles.filter((f) => f.size > MAX_ATTACHED_IMAGE_BYTES).length;
     const remaining = Math.max(
       0,
       MAX_ATTACHED_IMAGES - attachedImagesRef.current.length - pendingImageCountRef.current,
     );
-    const withinLimitFiles = imageTypeFiles.filter((f) => f.size <= MAX_ATTACHED_IMAGE_BYTES);
-    const cappedCount = withinLimitFiles.length - Math.min(withinLimitFiles.length, remaining);
-    const imageFiles = withinLimitFiles.slice(0, remaining);
-    const notices: string[] = [];
-    if (oversizeCount) notices.push(t("chat.attachTooLarge", { count: oversizeCount }));
-    if (cappedCount) notices.push(t("chat.attachLimit", { count: cappedCount, max: MAX_ATTACHED_IMAGES }));
-    if (notices.length) setAttachError(notices.join(" "));
-    if (!imageFiles.length) return Promise.resolve();
+    const cappedCount = imageTypeFiles.length - Math.min(imageTypeFiles.length, remaining);
+    const imageFiles = imageTypeFiles.slice(0, remaining);
+    if (!imageFiles.length) {
+      if (cappedCount) setAttachError(t("chat.attachLimit", { count: cappedCount, max: MAX_ATTACHED_IMAGES }));
+      return Promise.resolve();
+    }
     pendingImageCountRef.current += imageFiles.length;
     // Settle per file: one unreadable image must not swallow the batch.
     const run = pendingImageTailRef.current.then(async () => {
       try {
-        const settled = await Promise.allSettled(
-          imageFiles.map(async (file) => ({
-            ...await readImageFile(file, file.type),
-            previewUrl: URL.createObjectURL(file),
-          })),
-        );
-        const newImages = settled.flatMap((s) => (s.status === "fulfilled" ? [s.value] : []));
+        // 先缩再判上限：原图超 10MB 的照片压完可能只有几百 KB，没理由直接丢。
+        const results = await Promise.all(imageFiles.map(async (file): Promise<{
+          image?: { data: string; mimeType: string; previewUrl: string; compacted: CompressedImage };
+          oversize?: true;
+        }> => {
+          const compacted = await compressImage(file, imageCompressOptions());
+          if (compacted.bytes > MAX_ATTACHED_IMAGE_BYTES) return { oversize: true };
+          try {
+            const data = await readImageFile(compacted.blob, compacted.mimeType);
+            // 预览用压缩后的 data URL：内存占用跟着变小，也不会多一份 object URL 要回收。
+            return { image: { ...data, previewUrl: draftImageDataUrl(data), compacted } };
+          } catch {
+            return {};
+          }
+        }));
+        const newImages = results.flatMap((result) => (result.image ? [result.image] : []));
+        const oversizeCount = results.filter((result) => result.oversize).length;
+        const failedCount = results.length - newImages.length - oversizeCount;
+        const notices: string[] = [];
+        if (oversizeCount) notices.push(t("chat.attachTooLarge", { count: oversizeCount }));
+        if (cappedCount) notices.push(t("chat.attachLimit", { count: cappedCount, max: MAX_ATTACHED_IMAGES }));
+        if (failedCount) notices.push(t("chat.attachFailed", { count: failedCount }));
+        if (notices.length) setAttachError(notices.join(" "));
         if (newImages.length) {
+          // 压缩提示只报这一批真被压小的部分：没压（小于阈值、动图、矢量、没变小）的不计入。
+          const compacted = newImages.filter((image) => image.compacted.compressed);
+          if (compacted.length > 0) {
+            const before = compacted.reduce((sum, image) => sum + image.compacted.originalBytes, 0);
+            const after = compacted.reduce((sum, image) => sum + image.compacted.bytes, 0);
+            setCompressNotice(t("chat.attachCompressed", {
+              before: formatImageBytes(before),
+              after: formatImageBytes(after),
+            }));
+          }
           setAttachedImages((prev) => {
             const accepted = newImages.slice(0, Math.max(0, MAX_ATTACHED_IMAGES - prev.length));
-            newImages.slice(accepted.length).forEach(revokeImagePreview);
-            const next = [...prev, ...accepted];
+            const next = [...prev, ...accepted.map((image) => ({
+              data: image.data,
+              mimeType: image.mimeType,
+              previewUrl: image.previewUrl,
+            }))];
             attachedImagesRef.current = next;
             return next;
           });
         }
-        const failedCount = settled.filter((s) => s.status === "rejected").length;
-        if (failedCount) setAttachError(t("chat.attachFailed", { count: failedCount }));
       } finally {
         pendingImageCountRef.current -= imageFiles.length;
       }
@@ -1507,11 +1545,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   }, [cwd]);
 
   const atQueryText = atQuery?.query ?? null;
+  // 命令面板结果上限（Settings › 高级参数）。
+  const commandPaletteResults = useAdvancedSettingValue<number>("commandPaletteResults");
   const atLocalMatches: FileIndexEntry[] = React.useMemo(() => (
     atQueryText !== null && fileIndex && fileIndex.cwd === cwd
-      ? filterFileEntries(fileIndex.entries, atQueryText)
+      ? filterFileEntries(fileIndex.entries, atQueryText, commandPaletteResults)
       : []
-  ), [atQueryText, fileIndex, cwd]);
+  ), [atQueryText, fileIndex, cwd, commandPaletteResults]);
 
   // When the client index is truncated (repo larger than the index cap),
   // local filtering cannot see deep files, so queries are also ranked
@@ -2426,6 +2466,15 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           </Alert>
         )}
         </Reveal>
+        <Reveal open={Boolean(compressNotice)}>
+        {compressNotice && (
+          <Alert className="items-center rounded-md border-border/70 bg-muted/40 px-2 py-1 text-xs leading-normal text-muted-foreground">
+            <SparklesIcon className="size-3.5 shrink-0" />
+            <span className="col-start-2 row-start-1 min-w-0 wrap-anywhere">{compressNotice}</span>
+            <DismissButton onClick={() => setCompressNotice(null)} title={t("chat.dismiss")} />
+          </Alert>
+        )}
+        </Reveal>
         <Reveal open={Boolean(attachError)}>
         {attachError && (
           <Alert variant="destructive" className="items-center rounded-md border-destructive/40 bg-destructive/[0.06] px-2 py-1 text-xs leading-normal">
@@ -2677,7 +2726,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               <InputGroupAddon align="block-start" className="flex-wrap px-0 pt-0">
                 {attachedImages.map((img, i) => (
                   <div key={i} className="relative shrink-0">
-                    <ImagePreview key={img.previewUrl} src={img.previewUrl}>
+                    <ImagePreview
+                      key={img.previewUrl}
+                      src={img.previewUrl}
+                      gallery={attachedImages.map((entry) => entry.previewUrl)}
+                      index={i}
+                    >
                       {/* 不包 Attachment size="sm"：其 group-data w-8 以更高特异度
                           压过 size-14 的宽度，缩略图会变 32×56 竖条；这层包装本就
                           是 border-0/透明/p-0。基类 opacity-60 依赖附件组状态还原，
@@ -2978,7 +3032,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               )}
 
               {/* 💡灵感：会话隔离的捕获箱；无会话（无归属）时不挂。行尾压轴。 */}
-              {onOpenInspirations && (
+              {onOpenInspirations && showInspirationEntry && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button

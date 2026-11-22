@@ -10,6 +10,9 @@ export interface AgentEventLike {
  * How often an agent event stream sends `{ type: "heartbeat" }`. It is a data event, not an SSE
  * comment, so the browser's EventSource sees it: a stream silent for a few of these is dead
  * (a half-open connection, a proxy that dropped it), and `AgentEventConnection` reconnects.
+ *
+ * The stream reads it from Settings › 高级参数 (`sseHeartbeatMs`) per connection, so it can be
+ * changed without a restart; this constant is the default that page shows.
  */
 export const AGENT_EVENT_HEARTBEAT_MS = 30_000;
 

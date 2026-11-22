@@ -16,7 +16,7 @@ import type {
   UserMessage,
 } from "@/lib/types";
 import { isBlockingExtensionUiRequest } from "@/lib/browser-notifications";
-import { SESSION_AWAY_RELOAD_MS, clearSessionAway, readSessionAway, recordSessionAway } from "@/lib/session-away";
+import { clearSessionAway, readSessionAway, recordSessionAway } from "@/lib/session-away";
 import { normalizeToolCalls } from "@/lib/normalize";
 import { AgentCommandError, agentStatusUrl, EXTENSION_REPORTED_CODE, isPromptRejectedError, sendAgentCommand } from "@/lib/agent-client";
 import { createSideChat, SIDE_REFUSAL_MESSAGES } from "@/lib/side-chat-client";
@@ -80,9 +80,11 @@ import {
   upsertExtensionUiRequest,
 } from "@/lib/extension-ui-queue";
 import {
-  OLDER_PAGE_TURNS,
-  VISIBLE_PAGE_TURNS,
-} from "@/lib/chat-lazy-load";
+  advancedValue,
+  awayReloadMs,
+  olderPageTurns,
+  pageTurns,
+} from "@/lib/advanced-values";
 import {
   createStreamingStore,
   type ClientAssistantMessageEvent,
@@ -314,7 +316,10 @@ const EVENT_STREAM_READY_TIMEOUT_MS = 60_000;
 const EVENT_STREAM_RECONNECT_DELAY_MS = 1_000;
 const SESSION_LEASE_RENEW_INTERVAL_MS = 30_000;
 // A ready stream silent for two and a half heartbeats is dead (AgentEventConnection reconnects).
-const EVENT_STREAM_STALE_MS = AGENT_EVENT_HEARTBEAT_MS * 2.5;
+/** 流被判定为“已死”的静默时长：心跳间隔的 2.5 倍（Settings › 高级参数）。 */
+function eventStreamStaleMs(): number {
+  return (advancedValue<number>("sseHeartbeatMs") || AGENT_EVENT_HEARTBEAT_MS) * 2.5;
+}
 type SessionLeaseOutcome = SessionLeaseReply | "unanswered" | null;
 function sessionLeaseUrl(sid: string): string {
   return `/api/agent/${encodeURIComponent(sid)}/lease`;
@@ -535,6 +540,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   // HTTP queue reads travel a different channel than SSE, so this gate decides
   // whether a point-in-time reading may still apply (see createQueueSnapshotGate).
   const queueSnapshotGateRef = useRef(createQueueSnapshotGate());
+  // The same staleness rule as the queue, for extension statuses and widgets:
+  // an HTTP state read travels a different channel than the `setStatus` /
+  // `setWidget` SSE events and can land after them, wiping a chip that was
+  // just set. Every SSE change observes; a read only applies when nothing was
+  // observed since it was issued.
+  const extensionUiGateRef = useRef(createQueueSnapshotGate());
   // Attachments of records that left the queue, offered back when a row has to
   // be rebuilt from a text-only snapshot.
   const queuedImageMemoryRef = useRef(createQueuedImageMemory());
@@ -726,7 +737,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       shouldMaintain: wantsEventStream,
       readinessTimeoutMs: EVENT_STREAM_READY_TIMEOUT_MS,
       reconnectDelayMs: EVENT_STREAM_RECONNECT_DELAY_MS,
-      staleAfterMs: EVENT_STREAM_STALE_MS,
+      staleAfterMs: eventStreamStaleMs(),
       onUnexpectedError: (error) => {
         console.error("Failed to maintain the agent event stream:", error);
       },
@@ -929,7 +940,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // 窗口里比本地多出来的旧条目追加进列表，表现是每次刷新凭空长出一段旧历史。
       const loadedCount = sessionIdRef.current === sid ? entryIdsRef.current.length : 0;
       if (loadedCount === 0) {
-        params.set("turns", String(VISIBLE_PAGE_TURNS));
+        params.set("turns", String(pageTurns()));
       } else {
         params.set("tail", String(Math.min(1000, Math.max(1, loadedCount))));
       }
@@ -1088,6 +1099,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
       try {
         const queueToken = queueSnapshotGateRef.current.capture();
+        const extensionUiToken = extensionUiGateRef.current.capture();
         const runId = promptRunIdRef.current;
         const usageRequestId = ++contextUsageRequestIdRef.current;
         const stateRes = await statePromise!;
@@ -1096,12 +1108,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         if (sessionIdRef.current !== sid) return null;
 
         const liveState = agentState.state;
-        syncLiveModel(liveState);
-        if (liveState) {
+        syncLiveModel(liveState);        if (liveState) {
           applyLiveUsage(liveState, sid, runId, usageRequestId);
           if (liveState.systemPrompt !== undefined) setSystemPrompt(liveState.systemPrompt ?? null);
-          if (liveState.extensionStatuses !== undefined) setExtensionStatuses(liveState.extensionStatuses ?? []);
-          if (liveState.extensionWidgets !== undefined) setExtensionWidgets(liveState.extensionWidgets ?? []);
+          // 读盘期间的 setStatus / setWidget 事件更新，不能被这份旧快照抹掉。
+          if (extensionUiGateRef.current.isFresh(extensionUiToken)) {
+            if (liveState.extensionStatuses !== undefined) setExtensionStatuses(liveState.extensionStatuses ?? []);
+            if (liveState.extensionWidgets !== undefined) setExtensionWidgets(liveState.extensionWidgets ?? []);
+          }
           if (liveState.queuedMessages !== undefined) {
             applyRecordedQueueSnapshot(normalizeQueuedMessages(liveState.queuedMessages), queueToken, liveState.queuedEntries);
           }
@@ -1153,7 +1167,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // Page upward: ask the server for the turn preceding `before`, then
       // prepend it. Omitting `before` fetches the first screen's turns.
       if (before) params.set("before", before);
-      params.set("turns", String(before ? OLDER_PAGE_TURNS : VISIBLE_PAGE_TURNS));
+      params.set("turns", String(before ? olderPageTurns() : pageTurns()));
       const url = `/api/sessions/${encodeURIComponent(sid)}/context?${params}`;
       const res = await fetch(url, { signal: options?.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1234,7 +1248,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   /** 小地图跳转：单次请求获取目标轮附近的窗口，不逐页向上拉取。 */
   const jumpToEntry = useCallback(async (sid: string, leafId: string | null, anchorId: string) => {
     try {
-      const context = await fetchWindow(sid, leafId, { anchor: anchorId, turns: VISIBLE_PAGE_TURNS });
+      const context = await fetchWindow(sid, leafId, { anchor: anchorId, turns: pageTurns() });
       if (!context) return null;
       browsingHistoryRef.current = true;
       setMessages(context.messages);
@@ -1259,7 +1273,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (loadingAfterRef.current === newerThan) return null;
     loadingAfterRef.current = newerThan;
     try {
-      const context = await fetchWindow(sid, leafId, { newerThan, turns: OLDER_PAGE_TURNS });
+      const context = await fetchWindow(sid, leafId, { newerThan, turns: olderPageTurns() });
       if (!context) return null;
       const page = dedupePage(context.entryIds, context.messages, entryIdsRef.current);
       setMessages((prev) => [...prev, ...page.messages]);
@@ -1863,6 +1877,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
       }
       case "setStatus":
+        extensionUiGateRef.current.observe();
         setExtensionStatuses((prev) => {
           const rest = prev.filter((item) => item.key !== request.statusKey);
           return request.statusText !== undefined
@@ -1871,6 +1886,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         });
         break;
       case "setWidget":
+        extensionUiGateRef.current.observe();
         setExtensionWidgets((prev) => updateExtensionWidgets(
           prev,
           request.widgetKey,
@@ -2073,6 +2089,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!agentRunningRef.current || sessionIdRef.current !== sid) return;
     const runId = promptRunIdRef.current;
     const queueToken = queueSnapshotGateRef.current.capture();
+    const extensionUiToken = extensionUiGateRef.current.capture();
     const usageRequestId = ++contextUsageRequestIdRef.current;
     try {
       const res = await fetch(agentStatusUrl(sid));
@@ -2100,8 +2117,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       if (!agentRunningRef.current) return;
       if (state) {
-        if (state.extensionStatuses !== undefined) setExtensionStatuses(state.extensionStatuses ?? []);
-        if (state.extensionWidgets !== undefined) setExtensionWidgets(state.extensionWidgets ?? []);
+        if (extensionUiGateRef.current.isFresh(extensionUiToken)) {
+          if (state.extensionStatuses !== undefined) setExtensionStatuses(state.extensionStatuses ?? []);
+          if (state.extensionWidgets !== undefined) setExtensionWidgets(state.extensionWidgets ?? []);
+        }
         // The poll leaves the prompt out: read the one the run ended with once, as agent_end does.
         fetch(`/api/agent/${encodeURIComponent(sid)}`)
           .then((r) => r.ok ? r.json() : null)
@@ -2183,7 +2202,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       clearSessionAway();
       const sid = sessionIdRef.current;
       if (!record || record.sessionId !== away || !sid || sid !== away) return;
-      if (Date.now() - record.leftAt < SESSION_AWAY_RELOAD_MS) return;
+      if (Date.now() - record.leftAt < awayReloadMs()) return;
       // 和点击重新加载一样：整窗骨架。
       void loadSession(sid, true);
     };
@@ -2327,6 +2346,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           const runId = promptRunIdRef.current;
           const usageRequestId = ++contextUsageRequestIdRef.current;
           const queueToken = queueSnapshotGateRef.current.capture();
+          const extensionUiToken = extensionUiGateRef.current.capture();
           fetch(`/api/agent/${encodeURIComponent(sid)}`)
             .then((r) => r.ok ? r.json() : null)
             .then((d: { state?: AgentStateResponse } | null) => {
@@ -2334,8 +2354,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
               syncLiveModel(d.state);
               applyLiveUsage(d.state, sid, runId, usageRequestId);
               if (d.state?.systemPrompt !== undefined) setSystemPrompt(d.state.systemPrompt ?? null);
-              if (d.state?.extensionStatuses !== undefined) setExtensionStatuses(d.state.extensionStatuses ?? []);
-              if (d.state?.extensionWidgets !== undefined) setExtensionWidgets(d.state.extensionWidgets ?? []);
+              // 回执期闸门：这次 GET 在读的瞬间可能已经比 SSE 上的 setStatus / setWidget 旧。
+              if (extensionUiGateRef.current.isFresh(extensionUiToken)) {
+                if (d.state?.extensionStatuses !== undefined) setExtensionStatuses(d.state.extensionStatuses ?? []);
+                if (d.state?.extensionWidgets !== undefined) setExtensionWidgets(d.state.extensionWidgets ?? []);
+              }
               // Aborted turns can leave messages queued in pi (delivered with the
               // next turn); dead wrapper (no state) means the queue is gone.
               applyRecordedQueueSnapshot(normalizeQueuedMessages(d.state?.queuedMessages), queueToken, d.state?.queuedEntries);
@@ -3673,6 +3696,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         }
       }
       clearSlashCommands();
+      extensionUiGateRef.current.observe();
       setExtensionStatuses([]);
       setExtensionWidgets([]);
       const [state] = await Promise.all([
@@ -3715,11 +3739,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (agentState?.state) {
       if (agentState.state.isCompacting !== undefined) setIsCompacting(agentState.state.isCompacting);
       if (agentState.state.systemPrompt !== undefined) setSystemPrompt(agentState.state.systemPrompt ?? null);
-      if (agentState.state.extensionStatuses !== undefined) setExtensionStatuses(agentState.state.extensionStatuses ?? []);
-      if (agentState.state.extensionWidgets !== undefined) setExtensionWidgets(agentState.state.extensionWidgets ?? []);
-      // The queue snapshot is applied inside loadSession's state read,
-      // guarded by the snapshot gate; applying it here without a token could
-      // overwrite a fresher SSE event.
+      // 状态与 widget 不在这里再上：loadSession 的状态读已经写过一次（带闸门），
+      // 这里重写相当于拿更旧的快照盖上刚到的 setStatus / setWidget。
+      // 队列同理，在 loadSession 里过闸。
     }
   }, [agentPhaseStore, dispatch, loadTools, waitForBashSettlement, waitForPromptSettlement]);
 

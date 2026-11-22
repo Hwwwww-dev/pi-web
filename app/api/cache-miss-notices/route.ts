@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { NextResponse } from "next/server";
 import { getGlobalSettingsPath, readGlobalSettings, updateGlobalSettings } from "@/lib/global-settings-file";
 import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
+import { serverAdvancedValue } from "@/lib/advanced-settings-file";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,9 @@ export const dynamic = "force-dynamic";
 const KEY = "showCacheMissNotices";
 
 async function readEnabled(): Promise<boolean> {
+  // 高级参数页的总开关（`showCacheMissNotices`）与 pi 自己的设置是「与」关系：
+  // 这里关掉就是全部关掉，pi 那边打开也不会冒出提示。
+  if (!serverAdvancedValue<boolean>("showCacheMissNotices")) return false;
   return readGlobalSettings(getGlobalSettingsPath(), (settings) => settings[KEY] === true);
 }
 

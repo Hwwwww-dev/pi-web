@@ -7,6 +7,7 @@ import { existsSync, realpathSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { isDeepStrictEqual } from "util";
 import { validateAgentImages } from "./image-attachments";
+import { serverAdvancedValue } from "./advanced-settings-file";
 import { EXTENSION_REPORTED_CODE } from "./agent-client";
 import { cwdMissingError } from "./missing-cwd";
 import { invalidateModelsCache } from "./models-cache";
@@ -272,8 +273,18 @@ export function resolveSessionIdleTimeoutMs(
   return DEFAULT_SESSION_IDLE_TIMEOUT_MS;
 }
 
-/** Resolved once: the debug panel reads it rather than resolving the variable again, which warns. */
-export const SESSION_IDLE_TIMEOUT_MS = resolveSessionIdleTimeoutMs();
+/**
+ * 会话空闲关闭超时：`PI_WEB_IDLE_TIMEOUT_MS` 环境变量优先（部署侧的显式覆盖），
+ * 没设时读 Settings › 高级参数（`sessionIdleTimeoutMs`）。每次判定时读，改参数
+ * 不用重启；环境变量那条路径只解析一次，免得重复告警。
+ */
+const ENV_SESSION_IDLE_TIMEOUT_MS = resolveSessionIdleTimeoutMs();
+
+export function sessionIdleTimeoutMs(): number {
+  return process.env.PI_WEB_IDLE_TIMEOUT_MS?.trim()
+    ? ENV_SESSION_IDLE_TIMEOUT_MS
+    : serverAdvancedValue<number>("sessionIdleTimeoutMs");
+}
 
 const DEFAULT_SESSION_SHUTDOWN_DEADLINE_MS = 5_000;
 
@@ -644,7 +655,7 @@ export class AgentSessionWrapper {
         replacement: this.sessionReplacement,
       },
       idle: {
-        timeoutMs: SESSION_IDLE_TIMEOUT_MS,
+        timeoutMs: sessionIdleTimeoutMs(),
         nextCheckAt: this.idleDeadlineAt,
         lastResetAt: this.idleLastResetAt,
         forcedByStop: this.forceShutdownOnIdle && this.idleDeadlineAt !== null,
@@ -1284,7 +1295,7 @@ export class AgentSessionWrapper {
     // A resolved timeout of 0 disables idle shutdown, but a run that Stop could
     // not unwind is still reaped after the default delay; otherwise it stays
     // running until the server restarts (#656).
-    const timeoutMs = SESSION_IDLE_TIMEOUT_MS
+    const timeoutMs = sessionIdleTimeoutMs()
       || (this.forceShutdownOnIdle ? DEFAULT_SESSION_IDLE_TIMEOUT_MS : 0);
     this.forcedIdleTimerArmed = timeoutMs !== 0 && this.forceShutdownOnIdle;
     this.idleLastResetAt = Date.now();
@@ -3578,7 +3589,7 @@ function staleWrapperSnapshot(sessionId: string, wrapper: MaybeStaleWrapper): De
       mutatingCommands: 0,
       replacement: null,
     },
-    idle: { timeoutMs: SESSION_IDLE_TIMEOUT_MS, nextCheckAt: null, lastResetAt: null, forcedByStop: false },
+    idle: { timeoutMs: sessionIdleTimeoutMs(), nextCheckAt: null, lastResetAt: null, forcedByStop: false },
     awaitingInput: false,
     pendingUiRequests: 0,
     customUis: 0,

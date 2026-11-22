@@ -2,7 +2,7 @@
 
 import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect, useRef } from "react";
 import type { ButtonHTMLAttributes, ClipboardEvent, CSSProperties, HTMLAttributes, ReactNode, Ref } from "react";
-import { PlusIcon, XIcon } from "lucide-react";
+import { ChevronRightIcon, PlusIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader } from "./ui/empty";
 import { Field, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
+import { Item, ItemGroup } from "./ui/item";
 import { Switch } from "./ui/switch";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { Textarea } from "./ui/textarea";
@@ -198,7 +199,12 @@ export function ConfigSidebar({ children, className }: { children: ReactNode; cl
 }
 
 export function ConfigSidebarList({ children }: { children: ReactNode }) {
-  return <div className="min-h-0 flex-1 overflow-y-auto p-2">{children}</div>;
+  // 卡片行（`Item`）跟手机首页分区列表同一种外观：分组里一行一张描边卡片。
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto p-2">
+      <ItemGroup className="gap-1.5">{children}</ItemGroup>
+    </div>
+  );
 }
 
 /** A sidebar group heading; `aside` sits at its right edge. */
@@ -208,7 +214,7 @@ export function ConfigSidebarGroupLabel({ children, aside }: { children: ReactNo
     // `config-sidebar-group-label` stays as the phone sizing hook (group-switch pins it).
     <div
       className={cn(
-        "config-sidebar-group-label flex items-center gap-1.5 px-2 pt-1 pb-1 text-xs font-medium text-muted-foreground",
+        "config-sidebar-group-label flex items-center gap-1.5 px-2.5 pt-1 pb-1 text-xs font-medium text-muted-foreground",
         navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:pt-2.5 max-[640px]:text-xs",
       )}
     >
@@ -266,7 +272,7 @@ export function ConfigSidebarGroupSwitch({
 export function ConfigSidebarGroupStatus({ error, note }: { error?: string | null; note?: string | null }) {
   if (!error && !note) return null;
   return (
-    <div className="flex max-h-16 flex-col gap-0.5 overflow-y-auto px-2 pb-1 text-xs leading-snug whitespace-pre-wrap [overflow-wrap:anywhere]">
+    <div className="flex max-h-16 flex-col gap-0.5 overflow-y-auto px-2.5 pb-1 text-xs leading-snug whitespace-pre-wrap [overflow-wrap:anywhere]">
       {note && <div role="status" className="text-muted-foreground">{note}</div>}
       {error && <div role="alert" className="text-destructive">{error}</div>}
     </div>
@@ -287,25 +293,44 @@ export function ConfigSidebarItem({
   const { openDetail } = navigation;
   const buttonRef = useReportDetailTitle(active, ref);
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      {...props}
-      ref={buttonRef}
-      onClick={(event) => {
-        onClick?.(event);
-        if (!event.defaultPrevented) openDetail();
-      }}
-      aria-current={active ? "page" : undefined}
+    <Item
+      asChild
+      variant="outline"
+      // `xs` 是卡片里最紧的一档（px-2.5 py-2）：桌面 240px 侧栏装得下 20 台服务器，
+      // 手机靠下面的 `max-[640px]:py-2.5` 把行高抬到手指够得着。
+      size="xs"
       className={cn(
-        // `config-sidebar-item` stays as the phone row-height hook (McpConfig's tests read it).
-        "config-sidebar-item h-9 w-full min-w-0 justify-start gap-2 px-2 text-left text-sm font-normal text-sidebar-foreground [&[aria-current='page']]:bg-sidebar-accent [&[aria-current='page']]:font-medium [&[aria-current='page']]:text-sidebar-accent-foreground",
-        navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:h-11 max-[640px]:min-h-11 max-[640px]:text-sm",
-        className,
+        "flex-nowrap",
+        active && "border-ring/40 bg-sidebar-accent text-sidebar-accent-foreground",
       )}
     >
-      {children}
-    </Button>
+      <button
+        type="button"
+        {...props}
+        ref={buttonRef}
+        onClick={(event) => {
+          onClick?.(event);
+          if (!event.defaultPrevented) openDetail();
+        }}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          // `config-sidebar-item` stays the row hook other panels read.
+          "config-sidebar-item w-full min-w-0 justify-start text-left text-sm font-normal text-sidebar-foreground transition-colors [&[aria-current='page']]:font-medium",
+          navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:py-2.5",
+          className,
+        )}
+      >
+        {children}
+        {/* 手机上一行就是一次跳转，给个箭头；桌面点行只是换右侧面板，箭头会骗人。 */}
+        {navigation !== NO_DETAIL_NAVIGATION && (
+          <ChevronRightIcon
+            aria-hidden="true"
+            size={16}
+            className="ml-auto hidden shrink-0 text-muted-foreground max-[640px]:block"
+          />
+        )}
+      </button>
+    </Item>
   );
 }
 
@@ -1043,26 +1068,27 @@ export function ConfigListAction({ active = false, children, className, onClick,
   const buttonRef = useReportDetailTitle(active, ref);
   return (
     <div className="shrink-0 px-2 pb-2">
-      <Button
-        type="button"
-        variant="ghost"
-        {...props}
-        ref={buttonRef}
-        onClick={(event) => {
-          onClick?.(event);
-          if (!event.defaultPrevented) openDetail();
-        }}
-        aria-current={active ? "page" : undefined}
-        className={cn(
-          // `config-list-action-button` stays as the phone row-height hook (McpAddServer's tests read it).
-          "config-list-action-button h-9 w-full min-w-0 justify-start gap-1.5 px-2 text-left text-sm font-normal text-muted-foreground",
-          navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:h-11 max-[640px]:min-h-11 max-[640px]:text-sm",
-          className,
-        )}
-      >
-        <PlusIcon size={13} strokeWidth={2} className="shrink-0" />
-        {children}
-      </Button>
+      <Item asChild variant="outline" size="xs">
+        <button
+          type="button"
+          {...props}
+          ref={buttonRef}
+          onClick={(event) => {
+            onClick?.(event);
+            if (!event.defaultPrevented) openDetail();
+          }}
+          aria-current={active ? "page" : undefined}
+          className={cn(
+            // `config-list-action-button` stays the row hook other panels read.
+            "config-list-action-button w-full min-w-0 justify-start gap-1.5 text-left text-sm font-normal text-muted-foreground",
+            navigation !== NO_DETAIL_NAVIGATION && "max-[640px]:py-2.5",
+            className,
+          )}
+        >
+          <PlusIcon size={13} strokeWidth={2} className="shrink-0" />
+          {children}
+        </button>
+      </Item>
     </div>
   );
 }

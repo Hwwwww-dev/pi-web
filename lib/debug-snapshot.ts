@@ -1,4 +1,4 @@
-import { AGENT_EVENT_HEARTBEAT_MS } from "./agent-event-wire";
+import { serverAdvancedValue } from "./advanced-settings-file";
 import { countAgentEventStreams, listAgentEventStreams } from "./agent-event-stream";
 import type {
   DebugEventStream,
@@ -16,7 +16,7 @@ import {
   getRpcSessionDebugSnapshots,
   getRpcSessionLifecycle,
   getRpcStartingSessionIds,
-  SESSION_IDLE_TIMEOUT_MS,
+  sessionIdleTimeoutMs,
   type RpcSessionDebugEntry,
 } from "./rpc-manager";
 import { listRegisteredSessionLivenessProviders, listSessionLivenessProviders } from "./session-liveness";
@@ -147,8 +147,8 @@ export function buildDebugSnapshot(sessionId: string | null, now = Date.now()): 
 
   const server: DebugServerGlobal = {
     startedAt: Math.round(now - process.uptime() * 1000),
-    idleTimeoutMs: SESSION_IDLE_TIMEOUT_MS,
-    heartbeatMs: AGENT_EVENT_HEARTBEAT_MS,
+    idleTimeoutMs: sessionIdleTimeoutMs(),
+    heartbeatMs: serverAdvancedValue<number>("sseHeartbeatMs"),
     wrappers: {
       alive: wrappers.filter((entry) => entry.snapshot.state === "alive").length,
       closing: wrappers.filter((entry) => entry.snapshot.state === "closing").length,

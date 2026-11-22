@@ -5,6 +5,12 @@ import {
   type AgentEventLike,
 } from "./agent-event-wire";
 import type { DebugEventStream } from "./debug-types";
+import { serverAdvancedValue } from "./advanced-settings-file";
+
+/** 心跳间隔：Settings › 高级参数（`sseHeartbeatMs`），每条流开流时读一次。 */
+function heartbeatMs(): number {
+  return serverAdvancedValue<number>("sseHeartbeatMs") || AGENT_EVENT_HEARTBEAT_MS;
+}
 
 export interface AgentEventStreamSession {
   readonly isStreaming: boolean;
@@ -46,8 +52,15 @@ let lastBackpressureLogAt = 0;
  * matters: a codemode script publishes a snapshot of every call it made each
  * time one starts or ends, and bash streams its output tail per chunk. A burst
  * inside the window reaches the client as one event per tool call.
+ *
+ * 默认值在 Settings › 高级参数（`toolUpdateCoalesceMs`）：服务端读文件，
+ * 改完下一条消息生效，不重启。
  */
-export const TOOL_UPDATE_COALESCE_MS = 150;
+export const TOOL_UPDATE_COALESCE_MS_DEFAULT = 150;
+
+export function toolUpdateCoalesceMs(): number {
+  return serverAdvancedValue<number>("toolUpdateCoalesceMs");
+}
 
 /**
  * Whether a later event repairs this one if it is dropped. A `*_delta` only
@@ -301,7 +314,7 @@ export function createAgentEventStream(
       const sendClientEvent = (clientEvent: AgentEventLike, sse: string) => {
         if (clientEvent.type === "tool_execution_update") {
           pendingToolUpdates.set(clientEvent.toolCallId, sse);
-          toolUpdateTimer ??= setTimeout(flushToolUpdates, TOOL_UPDATE_COALESCE_MS);
+          toolUpdateTimer ??= setTimeout(flushToolUpdates, toolUpdateCoalesceMs());
           return;
         }
         // The end supersedes a partial result still waiting here, and the client
@@ -401,7 +414,7 @@ export function createAgentEventStream(
       }
       req.signal.addEventListener("abort", abortHandler, { once: true });
 
-      heartbeat = setInterval(() => encode({ type: "heartbeat" }, { droppable: true }), AGENT_EVENT_HEARTBEAT_MS);
+      heartbeat = setInterval(() => encode({ type: "heartbeat" }, { droppable: true }), heartbeatMs());
 
       // Force the response headers through without claiming that the agent is
       // ready. The client waits for the later `connected` data event.

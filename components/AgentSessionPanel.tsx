@@ -241,6 +241,10 @@ function AgentRow({
   const profile = side ? t("agentSwitcher.sideChat") : relation?.profile ?? t("agentSwitcher.subagent");
   const modelId = usage?.model?.modelId;
   const thinkingLevel = usage?.thinkingLevel && usage.thinkingLevel !== "off" ? usage.thinkingLevel : undefined;
+  // 首字母大写（`high` → `High`），与 ChatInput 的思考等级选择器一致。
+  const thinkingLevelLabel = thinkingLevel
+    ? `${thinkingLevel.charAt(0).toUpperCase()}${thinkingLevel.slice(1)}`
+    : null;
   // Every side chat has the same name: when it last ran tells two rows apart.
   const secondary = main ? sessionTitle(session) : side ? formatRelativeTime(session.modified, locale) : profile;
   const secondaryTitle = main ? secondary : [
@@ -312,7 +316,7 @@ function AgentRow({
               <span aria-hidden="true">·</span>
               <span className="min-w-0 truncate">{modelId}</span>
             </>}
-            {!main && thinkingLevel && <span className="shrink-0">· {thinkingLevel}</span>}
+            {!main && thinkingLevelLabel && <span className="shrink-0">· {thinkingLevelLabel}</span>}
           </span>
           {usageLoading && !hasUsage(usage)
             ? <Skeleton className="mt-[3px] h-4 w-44" />

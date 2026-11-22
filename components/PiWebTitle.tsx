@@ -78,12 +78,14 @@ function useScramble(target: string): string {
   return text;
 }
 
-export function PiWebTitle({ onWidthChange }: {
+export function PiWebTitle({ onWidthChange, showVersion = true }: {
   /**
    * After a commit that changed the text's length (in its code type, its
    * width): the toolbar row fits its labels again, before that paints.
    */
   onWidthChange?: () => void;
+  /** 单击品牌是否能翻出两行版本号（Settings › 高级参数 `showSidebarVersion`）。 */
+  showVersion?: boolean;
 }) {
   const { t } = useI18n();
   const [versionShown, setVersionShown] = useState(false);
@@ -101,6 +103,7 @@ export function PiWebTitle({ onWidthChange }: {
   }, []);
 
   const handleClick = () => {
+    if (!showVersion) return;
     if (revertTimerRef.current) clearTimeout(revertTimerRef.current);
     revertTimerRef.current = null;
     if (versionShown) {
