@@ -951,17 +951,24 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
     // touchstart/pointerdown：点按折叠头、长按复制不产生拖拽，不该开闸。
     let touchY: number | null = null;
     const onWheel = (event: WheelEvent) => {
-      if (event.deltaY >= 0) return;
+      // 反方向即撤销意思：一次向上滚轮只在“仍然在往上翻”期间有效，否则闸门会
+      // 一直开着，以后任何一次偶然触顶都会拉出一页。
+      if (event.deltaY >= 0) {
+        gestureUpRef.current = false;
+        return;
+      }
       gestureUpRef.current = true;
       schedule();
     };
     const onTouchMove = (event: TouchEvent) => {
       const y = event.touches[0]?.clientY;
       if (y === undefined) return;
-      // 手指下移 = 内容往回走 = 在读更早的历史。
+      // 手指下移 = 内容往回走 = 在读更早的历史；上推是回到底部，撤销意思。
       if (touchY !== null && y > touchY) {
         gestureUpRef.current = true;
         schedule();
+      } else if (touchY !== null && y < touchY) {
+        gestureUpRef.current = false;
       }
       touchY = y;
     };
@@ -969,6 +976,10 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       touchY = null;
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowDown" || event.key === "PageDown" || event.key === "End") {
+        gestureUpRef.current = false;
+        return;
+      }
       if (event.key !== "ArrowUp" && event.key !== "PageUp" && event.key !== "Home") return;
       gestureUpRef.current = true;
       schedule();
@@ -1951,9 +1962,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           </div>
         ) : <>
         {/* 完全按官方默认：`autoScroll` 常开（发送后跟随、流式跟随、图片撑高继续跟），
-            `defaultScrollPosition="last-anchor"` 把重开会话落在最后一个回合锚点，
-            贴底容差 16px。自己的跟随/退出跟随/补滚状态机已全部删掉。 */}
-        <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor" scrollEdgeThreshold={SCROLL_EDGE_THRESHOLD}>
+            `defaultScrollPosition="end"` 让打开会话落到底部，贴底容差 16px。
+            不传 `scrollAnchor`（见 `components/chat/ChatRow.tsx`）：带上锚点时，任何人
+            内容变动都会让官方滚到「第一个未处理」的锚点行，即历史最顶部那条提问
+            （2026-11-22 实测：回合结束重读会话后行 key 变化 → 子元素数量不变 → 跳顶，
+            并连带触发上翻取页）。没有锚点行，官方就只走 `following-bottom` 分支。 */}
+        <MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold={SCROLL_EDGE_THRESHOLD}>
         <ScrollerBridge apiRef={scrollerApiRef} onAtTailChange={handleAtTailChange} onVisibleEntryChange={handleVisibleEntryChange} />
         <MessageScroller className="min-h-0 min-w-0 flex-1 animate-in fade-in duration-150">
         <MessageScrollerViewport ref={scrollContainerRef}>
@@ -1973,14 +1987,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
               // 每条消息一个 Item：官方据此测量、锚定并记录可视性。
               // 离屏行不做 `content-visibility` 跳过：估算高度会让新行先矮再撑开。非元素行（空渲染）原样返回。
               if (!isValidElement<{ "data-entry-id"?: string }>(node)) return node;
-              // messageId 是官方 scroller 的 Item 身份（可见性、前插保位、锚定都按它
-              // 跟踪），必须跨前插/追加稳定：优先 entryId，其次行自身的稳定 key
+              // messageId 是官方 scroller 的 Item 身份（可见性、前插保位都按它跟踪），
+              // 必须跨前插/追加稳定：优先 entryId，其次行自身的稳定 key
               //（entryId 或 live: 键），绝不回退到会随前插漂移的数组下标。
               const messageId = node.props["data-entry-id"]
                 ?? (typeof node.key === "string" && node.key ? node.key : `turn-${index}`);
-              // 官方锚点：只有开启回合的行（用户消息、压缩摘要、子 agent 通知）传，
-              // 新回合即被钉到视口顶部、留上一行一截（`scrollPreviousItemPeek`）。
-              const anchorIndex = entryIds.indexOf(messageId);
               // 窗口外只留占位高度、内容卸载（`--` 见 lib/chat-row-window.ts）：
               // 收起来的行高度与量到时相等，滚动位置、scrollToMessage、前插保位都不受影响。
               const placeholder = collapsedRows.get(messageId);
@@ -1988,7 +1999,6 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
                 <ChatRow
                   key={node.key ?? messageId}
                   messageId={messageId}
-                  scrollAnchor={isMessageGroupAnchor(messages[anchorIndex] ?? {})}
                 >
                   {placeholder === undefined ? node : <div aria-hidden style={{ height: placeholder }} />}
                 </ChatRow>
