@@ -15,7 +15,7 @@
  */
 
 import { randomUUID } from "crypto";
-import { readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { basename, dirname, join } from "path";
 import { abortSubagent, getRpcSession, getRpcSessionInfos, getRunningRpcSessionIds } from "./rpc-manager";
 import {
@@ -301,6 +301,24 @@ export async function deleteSessions(
     }
     invalidateSessionPathCache(deletedId);
     invalidateSessionManagerCache(deletedPath);
+  }
+  // A wrapper can append one last entry just after its shutdown returns (an
+  // aborted turn's tool result), which recreates the file we just unlinked:
+  // the row then comes back on the next list refresh and Delete looks like it
+  // needed a second click. Reap for a moment instead of trusting one unlink.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+    let recreated = false;
+    for (const [deletedId, deletedPath] of deletedPaths) {
+      if (!existsSync(deletedPath)) continue;
+      try {
+        unlinkSync(deletedPath);
+        recreated = true;
+      } catch { /* already gone */ }
+      invalidateSessionPathCache(deletedId);
+      invalidateSessionManagerCache(deletedPath);
+    }
+    if (!recreated) break;
   }
   // Drop their pins and archive times; best effort, the files are already gone.
   try {
