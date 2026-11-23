@@ -1264,11 +1264,15 @@ span.token.table {
 /* 展开区限高（2026-11-20 用户：“行内折叠加一个限高！”“现在太高了”）：超过
    24rem 就在折叠体内部滚动，长回合、长输出不会再撑满整屏。这里不写
    `scrollbar-width/color`：标准属性能让 Chrome 关掉 `::-webkit-scrollbar`、
-   退回原生粗条；留空才会吃到全局那套悬停显现的统一滚动条（`--sb-alpha`）。 */
+   退回原生粗条；留空才会吃到全局那套悬停显现的统一滚动条（`--sb-alpha`）。
+
+   不写 `overscroll-behavior: contain`（2026-11-23 用户：“这个还是会影响滚动，
+   貌似是 contains”）：卡内滚到顶/底后手势被吞掉，聊天列表不再继续滚，而多数
+   卡片只高出 24rem 一点点。留默认值 `auto`，滚到头的余下手势交给外层列表
+   （与 `components/MessageView.tsx` 里“无滚动空间的容器不能拦滚动”同一结论）。 */
 .trace-fold-body {
   max-height: 24rem;
   overflow-y: auto;
-  overscroll-behavior: contain;
 }
 /* 大折叠行（“工作了 X”）不限高（2026-11-20 用户：“去除大折叠行限高吧，太影响使用了”）：
    回合体展开后直接铺开，滚动交给整个聊天；单条命令/工具的 24rem 上限保留。 */
