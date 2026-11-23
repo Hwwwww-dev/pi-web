@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { XIcon } from "lucide-react";
 import { useI18n } from "@/hooks/useI18n";
+import { useAdvancedSettingValue } from "@/hooks/useAdvancedSettings";
 import { copyText } from "@/lib/clipboard";
 import { Button } from "./ui/button";
 
@@ -23,8 +24,6 @@ import { Button } from "./ui/button";
 type Row = { label: string; value: string };
 
 const SAMPLE_INTERVAL_MS = 250;
-/** 吸附带：`lib/advanced-settings.ts` 的 `scrollEdgeThreshold` 默认值。 */
-const SNAP_ZONE = 16;
 
 function px(value: number): string {
   return `${Math.round(value)}`;
@@ -50,7 +49,7 @@ function findViewport(): HTMLElement | null {
 }
 
 /** 采样一次。全部是读操作，调用方负责只在面板打开时跑。 */
-function collect(frames: number | null): Row[] {
+function collect(frames: number | null, snapZone: number): Row[] {
   const html = document.documentElement;
   const viewport = window.visualViewport;
   const scroller = findViewport();
@@ -110,10 +109,15 @@ function collect(frames: number | null): Row[] {
     // 越界滚动：scrollTop 超过 max 时，屏幕底部那段垫底里会出现空白——就是「物理贴底」看到的空隙。
     const over = scrollTop - max;
     // 官方续 follow 的门槛 = Content 垫底 + 吸附带（`ChatWindow` 把垫底加进了 `scrollEdgeThreshold`）。
-    const threshold = padEnd + SNAP_ZONE;
+    // 吸附带读的是「高级参数」的当前值（真设置的 `scrollEdgeThreshold`），不是默认值：
+    // 写死成 16 时，不论设置成多少，这一行永远显示「垫底 + 16」。
+    // 「输入条上方那道缝」= 垫底 - 输入条高（= `ChatWindow` 里的 8），吸附带从输入条上沿量起，
+    // 所以门槛只含这道缝，不含整段垫底（加整段时按钮要上滚一整个输入条高才出现）。
+    const padGap = Math.max(0, padEnd - (dock ? dock.offsetHeight : 0));
+    const threshold = padGap + snapZone;
     rows.push({
       label: "官方 end",
-      value: `${px(lastBottom + padEnd - scrollTop - scroller.clientHeight)}（>${px(threshold)} 才算没到底）  可滚 ${scroller.getAttribute("data-scrollable") ?? "—"}${scroller.hasAttribute("data-autoscrolling") ? "  跟随中" : ""}${Math.abs(over) >= 1 ? `  越界 ${px(over)}` : ""}`,
+      value: `${px(lastBottom + padEnd - scrollTop - scroller.clientHeight)}（>${px(threshold)} 才算没到底；从输入条上沿量起）  可滚 ${scroller.getAttribute("data-scrollable") ?? "—"}${scroller.hasAttribute("data-autoscrolling") ? "  跟随中" : ""}${Math.abs(over) >= 1 ? `  越界 ${px(over)}` : ""}`,
     });
   } else {
     rows.push({ label: "滚动", value: "未找到 message-scroller viewport（当前没有会话）" });
@@ -143,6 +147,8 @@ export function UiDebugPanel({ active, onClose }: {
   onClose: (restoreFocus: boolean) => void;
 }) {
   const { t } = useI18n();
+  // 吸附带取「高级参数」的当前值：面板要能验证设置到底有没有生效。
+  const snapZone = useAdvancedSettingValue<number>("scrollEdgeThreshold");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [copied, setCopied] = useState(false);
   const framesRef = useRef<number | null>(null);
@@ -175,11 +181,11 @@ export function UiDebugPanel({ active, onClose }: {
       setCopied(false);
       return;
     }
-    const sample = () => setRows(collect(framesRef.current));
+    const sample = () => setRows(collect(framesRef.current, snapZone));
     sample();
     const timer = window.setInterval(sample, SAMPLE_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [active]);
+  }, [active, snapZone]);
 
   useEffect(() => {
     if (!active) return;
