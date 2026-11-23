@@ -1290,8 +1290,13 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       // 流式助手之后的非用户锚点（子代理完成通知等 custom）：新提问的乐观气泡
       // 入列时流式助手多半还没进 messages，streamingAssistantIdx 会指向上一回
       // 合的助手，把用户消息一并降级会吞掉新回合（用量栏消失、气泡错位）。
+      // 跑着的回合不得被回合锚点切开（否则被按已结束回合拆分渲染）。
+      // 压缩也算：自动压缩会把这一轮挡在 summarizer 里很久，期间没有 token 流，
+      // `agentRunning` 也已随被 abort 的请求落下——只看这两个条件会把折叠行整个
+      // 撤掉，屏幕上只剩用户消息，直到压缩完成 `loadSession()` 才把折叠行带回来。
+      const liveTurnActive = sessionBusy || isStreaming || isCompacting;
       let streamingAssistantIdx = -1;
-      if (sessionBusy || isStreaming) {
+      if (liveTurnActive) {
         for (let i = messages.length - 1; i >= 0; i--) {
           if (messages[i].role === "assistant") { streamingAssistantIdx = i; break; }
         }
@@ -1304,7 +1309,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         // 而这一刻的思考与工具还在流式 store 里（结束态路径不并它们）→ 折叠块整块
         // 消失，屏幕只剩用户消息和一条压缩。放行它们，压缩卡片作为本回合的活动项
         // 留在折叠体里，回合结束后再回到锚点位置。
-        if (anchorMsg.role === "custom" && (sessionBusy || isStreaming)) return false;
+        if (anchorMsg.role === "custom" && liveTurnActive) return false;
         if (streamingAssistantIdx === -1 || i < streamingAssistantIdx) return true;
         // 流式助手之后的锚点：用户新回合永远生效（含流式启动竞态——新提问入列
         // 时 streamingAssistantIdx 还指向上一回合的助手）；仅 custom 通知降级，
@@ -1486,7 +1491,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           // isLiveTail 首段同键（:0）的空折叠：标题从流式 store 取最新块
           // （思考期=思考+秒表），首条条目落盘后 isLiveTail 分支无缝接管；
           // 非活跃回合维持原平铺渲染。
-          const livePreTurn = (sessionBusy || isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
+          const livePreTurn = liveTurnActive && endIdx === messages.length && userIdx === lastAnchorIdx;
           for (let renderIdx = userIdx; renderIdx < endIdx; renderIdx++) {
             rendered.push(renderMessage(renderIdx, { showModelLabel: true }));
           }
@@ -1512,7 +1517,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
           continue;
         }
 
-        const isLiveTail = (sessionBusy || isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
+        const isLiveTail = liveTurnActive && endIdx === messages.length && userIdx === lastAnchorIdx;
         if (isLiveTail) {
           // 运行中的回合整轮折叠（LiveTurnTrace）：活动行（含中途回复的文本块）
           // 全部收进折叠体，最新进展由折叠行标题承担；最终回复照常流式显示。
@@ -1773,7 +1778,7 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         idx = endIdx;
       }
     return { rendered, liveActivityRendered };
-  }, [messages, entryIds, messageKeys, toolResultsMap, hasEarlierMessages, isStreaming, sessionBusy,
+  }, [messages, entryIds, messageKeys, toolResultsMap, hasEarlierMessages, isStreaming, isCompacting, sessionBusy,
      forkingEntryId, pendingSearchScroll, searchBlock, t, modelNames, messageCwd, session?.id,
      sessionIdRef, forkFromMessage, handleEditContent, onOpenFile, onOpenSubagent, streamingStore,
      agentPhaseStore,
