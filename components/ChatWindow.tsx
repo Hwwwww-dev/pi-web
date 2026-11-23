@@ -67,6 +67,8 @@ const TOP_SLACK = 24;
  * 取值 16px 实测合适，可在 Settings › 高级参数修改。
  */
 const SCROLL_EDGE_THRESHOLD_DEFAULT = 16;
+/** Content 末端在输入条高度之外多留的垫底，与 `pb-[calc(var(--composer-dock-h,0px)+8px)]` 同值。 */
+const CONTENT_PAD_END_PX = 8;
 
 const InspirationDialog = dynamic(() => import("./InspirationDialog").then((mod) => mod.InspirationDialog), { ssr: false });
 
@@ -1977,7 +1979,11 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
         <MessageScrollerProvider
           autoScroll={advancedValues.autoScroll !== false}
           defaultScrollPosition={advancedValues.defaultScrollPosition === "last-anchor" ? "last-anchor" : "end"}
-          scrollEdgeThreshold={Number(advancedValues.scrollEdgeThreshold ?? SCROLL_EDGE_THRESHOLD_DEFAULT)}
+          // 官方按 `max(行 bottom) + Content 的 padding-end` 算「内容末端」，因此「最后一行贴着
+          // 输入条上沿」离机械底还差一整段垫底。门槛必须把这层垫底加回去，否则这个位置会被
+          // 判成「没到底」：模式留在 free-scrolling，发送消息不再跟随，只有点一次「滚动到底」
+          // （它把模式改回 following-bottom）才恢复。
+          scrollEdgeThreshold={dockHeight + CONTENT_PAD_END_PX + Number(advancedValues.scrollEdgeThreshold ?? SCROLL_EDGE_THRESHOLD_DEFAULT)}
           scrollPreviousItemPeek={Number(advancedValues.scrollPreviousItemPeek ?? 64)}
         >
         <ScrollerBridge apiRef={scrollerApiRef} onAtTailChange={handleAtTailChange} onVisibleEntryChange={handleVisibleEntryChange} />

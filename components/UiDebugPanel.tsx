@@ -23,8 +23,8 @@ import { Button } from "./ui/button";
 type Row = { label: string; value: string };
 
 const SAMPLE_INTERVAL_MS = 250;
-/** 与 `components/ChatWindow.tsx` 的 `SCROLL_EDGE_THRESHOLD` 同值：官方续 follow 的门槛。 */
-const FOLLOW_THRESHOLD = 36;
+/** 吸附带：`lib/advanced-settings.ts` 的 `scrollEdgeThreshold` 默认值。 */
+const SNAP_ZONE = 16;
 
 function px(value: number): string {
   return `${Math.round(value)}`;
@@ -109,9 +109,11 @@ function collect(frames: number | null): Row[] {
     if (last) rows.push({ label: "末行到视口底", value: `${px(lastBottom - scrollTop - scroller.clientHeight)}（贴底时应 ≈ -垫底）` });
     // 越界滚动：scrollTop 超过 max 时，屏幕底部那段垫底里会出现空白——就是「物理贴底」看到的空隙。
     const over = scrollTop - max;
+    // 官方续 follow 的门槛 = Content 垫底 + 吸附带（`ChatWindow` 把垫底加进了 `scrollEdgeThreshold`）。
+    const threshold = padEnd + SNAP_ZONE;
     rows.push({
       label: "官方 end",
-      value: `${px(lastBottom + padEnd - scrollTop - scroller.clientHeight)}（>${FOLLOW_THRESHOLD} 才续 follow）  可滚 ${scroller.getAttribute("data-scrollable") ?? "—"}${scroller.hasAttribute("data-autoscrolling") ? "  跟随中" : ""}${Math.abs(over) >= 1 ? `  越界 ${px(over)}` : ""}`,
+      value: `${px(lastBottom + padEnd - scrollTop - scroller.clientHeight)}（>${px(threshold)} 才算没到底）  可滚 ${scroller.getAttribute("data-scrollable") ?? "—"}${scroller.hasAttribute("data-autoscrolling") ? "  跟随中" : ""}${Math.abs(over) >= 1 ? `  越界 ${px(over)}` : ""}`,
     });
   } else {
     rows.push({ label: "滚动", value: "未找到 message-scroller viewport（当前没有会话）" });
