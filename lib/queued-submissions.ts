@@ -21,6 +21,14 @@ export interface QueuedSubmission {
   behavior: QueuedBehavior;
   images: ChatDraftImage[];
   createdAt: number;
+  /**
+   * When the send request settled (success or failure). Undefined while it is
+   * still in flight, which is what a slow upload of a message with images
+   * looks like from here: seconds, not milliseconds.
+   */
+  sentAt?: number;
+  /** True once pi has listed this text in a queue snapshot. */
+  echoed?: boolean;
 }
 
 /**
@@ -35,9 +43,12 @@ export interface QueuedSnapshotEntry {
 }
 
 /**
- * A queued message is recorded optimistically; pi echoes it back in the next
- * queue snapshot. Until that snapshot arrives the record has to survive on its
- * own, so an unmatched record is only dropped once it is older than this.
+ * How long a record pi has never echoed survives after its send request
+ * settled. pi echoes a queued message in the very next snapshot, so this only
+ * covers the gap before that echo reaches us — but it is measured from
+ * `sentAt`, never from the click: an images upload can take longer than this
+ * window, and a record that expired while its request was still in flight is
+ * rebuilt by the echo a moment later (the row blinks out and back in).
  */
 export const QUEUE_SUBMISSION_GRACE_MS = 1_500;
 
@@ -203,7 +214,10 @@ export function queuedGraceDeadline(
   let deadline: number | null = null;
   for (const record of records) {
     if (textsFor(queue, record.behavior).includes(record.text)) continue;
-    const expiresAt = record.createdAt + graceMs;
+    // A record pi echoed leaves on the next snapshot, and one still in flight
+    // leaves when its send settles — neither waits on the clock.
+    if (record.echoed || record.sentAt === undefined) continue;
+    const expiresAt = record.sentAt + graceMs;
     deadline = deadline === null ? expiresAt : Math.min(deadline, expiresAt);
   }
   return deadline;
@@ -239,6 +253,10 @@ export function createQueuedSubmission(
  * so the row leaves the same way a text one does (the grace window covers the
  * echo). Two records of the same text pair up in queue order.
  *
+ * A record pi already echoed that is missing from the snapshot was delivered:
+ * the row leaves at once, with no grace. Only a record that was never echoed
+ * (still in flight, or settled moments ago) may be waiting for its echo.
+ *
  * When every record kept its place and nothing new is pending, the previous
  * array is returned as-is so a state update can bail out of the re-render.
  */
@@ -259,8 +277,8 @@ export function reconcileQueuedSubmissions(
     const index = texts.indexOf(record.text);
     if (index >= 0) {
       texts.splice(index, 1);
-      next.push(record);
-    } else if (now - record.createdAt < QUEUE_SUBMISSION_GRACE_MS) {
+      next.push(record.echoed ? record : { ...record, echoed: true });
+    } else if (isAwaitingEcho(record, now)) {
       next.push(record);
     } else {
       onExpire?.(record);
@@ -268,7 +286,8 @@ export function reconcileQueuedSubmissions(
   }
   for (const behavior of QUEUED_BEHAVIORS) {
     for (const text of pending[behavior]) {
-      next.push(createQueuedSubmission(text, behavior, recallImages?.(text, behavior) ?? [], now));
+      // pi lists it right now, so the row starts out confirmed.
+      next.push({ ...createQueuedSubmission(text, behavior, recallImages?.(text, behavior) ?? [], now), echoed: true });
     }
   }
   if (next.length === records.length && next.every((record, index) => record === records[index])) {
@@ -278,11 +297,28 @@ export function reconcileQueuedSubmissions(
 }
 
 /**
+ * True while a record may still be waiting for pi's echo: pi never listed it
+ * and its send has not settled, or settled less than the grace window ago.
+ * Absence from a snapshot settles a record pi already echoed (`record.echoed`)
+ * — it was delivered — and a record whose request is still in flight is never
+ * settled by the clock, however long an images upload takes.
+ */
+function isAwaitingEcho(
+  record: QueuedSubmission,
+  now: number,
+  graceMs: number = QUEUE_SUBMISSION_GRACE_MS,
+): boolean {
+  if (record.echoed) return false;
+  if (record.sentAt === undefined) return true;
+  return now - record.sentAt < graceMs;
+}
+
+/**
  * True while a locally recorded submission is still waiting for pi to echo it
- * back (no matching entry in `queue`, and younger than the grace window). The
- * state poll reads point-in-time snapshots, so applying one while such a record
- * exists would delete the row before its echo arrives — the message blinks out
- * and back in. Callers skip that round instead.
+ * back (no matching entry in `queue`, and not settled — see `isAwaitingEcho`).
+ * The state poll reads point-in-time snapshots, so applying one while such a
+ * record exists would delete the row before its echo arrives — the message
+ * blinks out and back in. Callers skip that round instead.
  */
 export function hasUnconfirmedQueuedRecord(
   records: QueuedSubmission[],
@@ -300,7 +336,7 @@ export function hasUnconfirmedQueuedRecord(
       texts.splice(index, 1);
       continue;
     }
-    if (now - record.createdAt < QUEUE_SUBMISSION_GRACE_MS) return true;
+    if (isAwaitingEcho(record, now)) return true;
   }
   return false;
 }

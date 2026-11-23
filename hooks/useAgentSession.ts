@@ -582,6 +582,18 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     applyQueuedRecords(snapshot, entries);
   }, [applyQueuedRecords]);
 
+  // A record whose send request settled is no longer in flight: from here the
+  // grace window runs. A record pi never echoes therefore cannot sit on screen
+  // forever, and one pi echoes has `echoed` set by the next snapshot, so the
+  // clock stops mattering for it.
+  const markQueuedSubmissionSent = useCallback((id: string) => {
+    setQueuedSubmissions((records) => records.some((record) => record.id === id && record.sentAt === undefined)
+      ? records.map((record) => record.id === id && record.sentAt === undefined
+        ? { ...record, sentAt: Date.now() }
+        : record)
+      : records);
+  }, []);
+
   // Reconciliation also runs on the clock: pi's snapshots stop arriving once the
   // queue is empty, so a row whose message was already delivered would keep
   // showing as queued until the page is reloaded.
@@ -3697,11 +3709,18 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // Since pi 1.6 the queue carries an images-only submission too (its text is
     // ""), and pi drops that entry when the delivered message's text matches —
     // so a row is recorded for one as well, or the send would leave no trace.
-    setQueuedSubmissions((records) => message.trim() || images?.length
-      ? [...records, createQueuedSubmission(message, behavior, images)]
-      : records);
-    await sendStreamingPrompt(message, behavior, images);
-  }, [sendStreamingPrompt]);
+    const record = message.trim() || images?.length
+      ? createQueuedSubmission(message, behavior, images)
+      : null;
+    if (record) setQueuedSubmissions((records) => [...records, record]);
+    try {
+      await sendStreamingPrompt(message, behavior, images);
+    } finally {
+      // 排队行的宽限从请求落地开始算，而不是从点击开始：带图上传慢于 1.5s
+      // 时，行不会在 pi 回显之前就被时钟删掉（那会让它消失一阵又冒出来）。
+      if (record) markQueuedSubmissionSent(record.id);
+    }
+  }, [markQueuedSubmissionSent, sendStreamingPrompt]);
 
   const handleSteer = useCallback(async (message: string, images?: ChatDraftImage[]) => {
     await handlePromptWithStreamingBehavior(message, "steer", images);
@@ -3813,10 +3832,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (action === "edit") {
       opts.chatInputRef?.current?.prependQueuedMessage(target.text, target.images);
     }
-    for (const item of nextRecords) {
-      await sendStreamingPrompt(item.text, item.behavior, item.images);
+    // 重新入队的顺序就是行现在的顺序（上移/下移已排好）；每条落地后各自开始
+    // 算宽限。
+    for (const record of nextRecords) {
+      try {
+        await sendStreamingPrompt(record.text, record.behavior, record.images);
+      } finally {
+        markQueuedSubmissionSent(record.id);
+      }
     }
-  }, [addNotice, opts.chatInputRef, sendStreamingPrompt]);
+  }, [addNotice, markQueuedSubmissionSent, opts.chatInputRef, sendStreamingPrompt]);
 
   const handleThinkingLevelChange = useCallback(async (level: ThinkingLevelOption) => {
     if (level === "auto") {
