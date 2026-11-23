@@ -3484,7 +3484,10 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       </div>
 
       {/* demo⑨ 页脚：归档入口居左，设置居右，版本保持随手可查。 */}
-      <div className="sidebar-foot flex flex-none items-center gap-1 px-2.5 pb-2.5 pt-2">
+      {/* 底部留出安全区：PWA 全屏（viewport-fit=cover）下「已归档 / 设置」这行
+          会压到 iOS 的 home indicator 上，点它就把小白条划出来了。桌面 env() 为 0，
+          max() 回落成原来的 10px。 */}
+      <div className="sidebar-foot flex flex-none items-center gap-1 px-2.5 pt-2 [padding-bottom:max(10px,env(safe-area-inset-bottom))]">
         <Button
           type="button"
           variant="ghost"

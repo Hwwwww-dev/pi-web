@@ -74,6 +74,20 @@ function rewriteSessionFileSync(path: string, contents: string, mode: number): v
 
 export interface DeletedSessionTombstone { path: string; until: number }
 
+/** 停 wrapper 只是收尾：压缩或工具调用中的会话可能一直不返回，删除不能跟着卡住。 */
+const SHUTDOWN_TIMEOUT_MS = 5_000;
+
+function withTimeout<T>(promise: Promise<T> | undefined, ms: number): Promise<T | undefined> {
+  if (!promise) return Promise.resolve(undefined);
+  return new Promise<T | undefined>((resolve) => {
+    const timer = setTimeout(() => resolve(undefined), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      () => { clearTimeout(timer); resolve(undefined); },
+    );
+  });
+}
+
 /**
  * 刚删掉的会话 id 留一段时间的墓碑。被 abort 的那一轮会在 `shutdown()` 返回之后才落
  * 最后一条（工具结果 / aborted 标记），文件被重建后列表又把它带回来，看起来就是「删除
@@ -346,11 +360,10 @@ export async function deleteSessions(
     }
   }
 
-  for (const deletedId of deletedSessionIds) {
-    try { await abortSubagent(deletedId); } catch { /* ordinary session, idle or completed */ }
-    await getRpcSession(deletedId)?.shutdown();
-  }
-  // 墓碑先立再删文件：跑着的会话要等 abort 收尾，文件可能晚于补删窗口才被重建。
+  // 先立墓碑、先删文件，再停 wrapper。停 wrapper 是收尾：跑着的会话（压缩中、
+  // 工具调用中）可能几十秒不返回，也可能直接抛错，而删除本身已经成立。以前先
+  // `await shutdown()` 再 unlink，活跃会话第一次点删除就卡在那里（请求 500，什么都
+  // 没删掉），得再点一次——那时 wrapper 已经被停掉，shutdown 立即返回。
   markDeletedSessions(deletedPaths);
   for (const [deletedId, deletedPath] of deletedPaths) {
     try {
@@ -360,6 +373,14 @@ export async function deleteSessions(
     }
     invalidateSessionPathCache(deletedId);
     invalidateSessionManagerCache(deletedPath);
+  }
+  for (const deletedId of deletedSessionIds) {
+    try { await abortSubagent(deletedId); } catch { /* ordinary session, idle or completed */ }
+    try {
+      await withTimeout(getRpcSession(deletedId)?.shutdown(), SHUTDOWN_TIMEOUT_MS);
+    } catch (error) {
+      console.warn(`[pi-web] could not stop the deleted session ${deletedId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
   // A wrapper can append one last entry just after its shutdown returns (an
   // aborted turn's tool result), which recreates the file we just unlinked:
