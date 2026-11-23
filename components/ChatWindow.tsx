@@ -1299,6 +1299,12 @@ export const ChatWindow = memo(function ChatWindow({ session, searchTarget, onSe
       const isTurnAnchor = (i: number) => {
         const anchorMsg = messages[i];
         if (!isMessageGroupAnchor(anchorMsg)) return false;
+        // 跑着的回合里，压缩摘要 / 子代理完成通知会落在用户消息之后（回合并没结束）。
+        // 它们不是新回合的分界：认成锚点会把正在跑的折叠块切成「已结束回合」，
+        // 而这一刻的思考与工具还在流式 store 里（结束态路径不并它们）→ 折叠块整块
+        // 消失，屏幕只剩用户消息和一条压缩。放行它们，压缩卡片作为本回合的活动项
+        // 留在折叠体里，回合结束后再回到锚点位置。
+        if (anchorMsg.role === "custom" && (sessionBusy || isStreaming)) return false;
         if (streamingAssistantIdx === -1 || i < streamingAssistantIdx) return true;
         // 流式助手之后的锚点：用户新回合永远生效（含流式启动竞态——新提问入列
         // 时 streamingAssistantIdx 还指向上一回合的助手）；仅 custom 通知降级，

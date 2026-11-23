@@ -72,6 +72,63 @@ function rewriteSessionFileSync(path: string, contents: string, mode: number): v
   }
 }
 
+export interface DeletedSessionTombstone { path: string; until: number }
+
+/**
+ * 刚删掉的会话 id 留一段时间的墓碑。被 abort 的那一轮会在 `shutdown()` 返回之后才落
+ * 最后一条（工具结果 / aborted 标记），文件被重建后列表又把它带回来，看起来就是「删除
+ * 要点两次」。补删靠的是时间窗，而跑着的会话收尾可能比窗口长，所以列表这一侧也记着：
+ * 墓碑期内的 id 直接过滤，文件一旦重新出现就再删一次。
+ * Next 的每个路由是独立模块实例，放 `globalThis` 上共用一份。
+ */
+const DELETED_SESSION_TOMBSTONE_MS = 60_000;
+
+export function deletedSessionTombstones(): Map<string, DeletedSessionTombstone> {
+  const store = globalThis as Record<string, unknown>;
+  const existing = store.__piDeletedSessionTombstones;
+  if (existing instanceof Map) return existing as Map<string, DeletedSessionTombstone>;
+  const created = new Map<string, DeletedSessionTombstone>();
+  store.__piDeletedSessionTombstones = created;
+  return created;
+}
+
+/** 删掉文件之后调用：墓碑期内列表隐藏这些 id，文件被重建就再删。 */
+export function markDeletedSessions(paths: Map<string, string>): void {
+  if (paths.size === 0) return;
+  const tombstones = deletedSessionTombstones();
+  const until = Date.now() + DELETED_SESSION_TOMBSTONE_MS;
+  for (const [id, path] of paths) {
+    tombstones.set(id, { path, until });
+    try {
+      unlinkSync(path);
+    } catch { /* already gone */ }
+    invalidateSessionPathCache(id);
+    invalidateSessionManagerCache(path);
+  }
+  invalidateSessionListCache();
+}
+
+/** 列表出口：过滤墓碑期内的 id；过期的墓碑顺手清掉，并补删重建出来的文件。 */
+export function filterDeletedSessions<T extends { id: string }>(sessions: T[]): T[] {
+  const tombstones = deletedSessionTombstones();
+  if (tombstones.size === 0) return sessions;
+  const now = Date.now();
+  for (const [id, tombstone] of tombstones) {
+    if (tombstone.until > now) continue;
+    // 墓碑在效期内从不出现，所以这次补删不会让正在看的那一行消失。
+    if (existsSync(tombstone.path)) {
+      try {
+        unlinkSync(tombstone.path);
+      } catch { /* already gone */ }
+      invalidateSessionPathCache(id);
+      invalidateSessionManagerCache(tombstone.path);
+      invalidateSessionListCache();
+    }
+    tombstones.delete(id);
+  }
+  return tombstones.size === 0 ? sessions : sessions.filter((session) => !tombstones.has(session.id));
+}
+
 /**
  * Deletes `ids` and their subagent sessions. With `keepRunning`, a named
  * session is left alone when it or a subagent below it runs: a bulk delete
@@ -293,6 +350,8 @@ export async function deleteSessions(
     try { await abortSubagent(deletedId); } catch { /* ordinary session, idle or completed */ }
     await getRpcSession(deletedId)?.shutdown();
   }
+  // 墓碑先立再删文件：跑着的会话要等 abort 收尾，文件可能晚于补删窗口才被重建。
+  markDeletedSessions(deletedPaths);
   for (const [deletedId, deletedPath] of deletedPaths) {
     try {
       unlinkSync(deletedPath);
