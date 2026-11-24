@@ -272,6 +272,10 @@ export function AppShell() {
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   // Dormant keep-alive slots: hidden beyond the window drop their message DOM and reload on reactivation.
   const [dormantSlotIds, setDormantSlotIds] = useState<Set<string>>(() => new Set());
+  // 活跃会话面板里被 ✕ 摘掉的会话。当前会话没有常驻槽，面板每次渲染都会给
+  // 它补一个占位行，只 filter keepAliveSlots 摘不掉，所以这里记住被摘的 id。
+  // 重新选中它会清掉（见下面的 effect），再打开时行会回来。
+  const [dismissedDockIds, setDismissedDockIds] = useState<Set<string>>(() => new Set());
   const handleRunningSessionIdsChange = useCallback((ids: Set<string>) => {
     setRunningSessionIds((previous) => {
       if (previous.size === ids.size && [...ids].every((id) => previous.has(id))) return previous;
@@ -1573,10 +1577,18 @@ export function AppShell() {
     const remaining = keepAliveSlots.filter((slot) => slot.session.id !== sessionId);
     setKeepAliveSlots(remaining);
     if (selectedSession?.id !== sessionId) return;
+    // 屏幕上的会话在面板里是占位行，不在 keepAliveSlots 里，光 filter 摘不掉它；
+    // 记下 id 让 dockSlots 不再补这一行。
     // 被关掉的正是屏幕上的会话：列表里当前这条是占位槽（还没进过 keepAliveSlots），
     // 所以 remaining 里已经没有它，直接按「关闭自己」处理——切到最近的另一个会话，
     // 一个都不剩就开新会话（2026-11-20 用户）。不能依赖 remaining.length，
     // 占位槽会话关掉时它可能非空，也可能只对得上自己。
+    setDismissedDockIds((previous) => {
+      if (previous.has(sessionId)) return previous;
+      const next = new Set(previous);
+      next.add(sessionId);
+      return next;
+    });
     const next = remaining
       .filter((slot) => slot.session.id !== sessionId)
       .sort((a, b) => b.lastActiveAt - a.lastActiveAt)[0];
@@ -1902,10 +1914,22 @@ export function AppShell() {
    */
   const dockSlots = useMemo(() => {
     if (!selectedSession || activeSlot) return keepAliveSlots;
+    if (dismissedDockIds.has(selectedSession.id)) return keepAliveSlots;
     // 占位槽只给列表用（不参与驻留/休眠计算），用常量而不是 `Date.now()`：
     // 渲染期调用 impure 函数会被 react-hooks 规则拦下。
     return [...keepAliveSlots, { session: selectedSession, lastActiveAt: Number.MAX_SAFE_INTEGER, epoch: 0 }];
-  }, [activeSlot, keepAliveSlots, selectedSession]);
+  }, [activeSlot, dismissedDockIds, keepAliveSlots, selectedSession]);
+  // 重新点开被摘掉的会话时，让它的行回到面板里。
+  useEffect(() => {
+    const id = selectedSession?.id;
+    if (!id) return;
+    setDismissedDockIds((previous) => {
+      if (!previous.has(id)) return previous;
+      const next = new Set(previous);
+      next.delete(id);
+      return next;
+    });
+  }, [selectedSession?.id]);
   // Recompute dormancy on a slow interval and whenever slots/running sets move;
   // dormant slots keep their instance (drafts, identity) but lose the message list.
   useEffect(() => {
