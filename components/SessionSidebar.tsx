@@ -563,19 +563,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   // decide whether the list needs reloading, and no render reads it.
   const sessionListVersionRef = useRef<number | null>(null);
   const sessionLoadIdRef = useRef(0);
-  // Ids whose DELETE already succeeded (and their hidden family members).
-  // A click still in flight — the confirm dialog closing under the pointer —
-  // re-selects the row it was covering and `handleSelectSessionFromList`
-  // pushes the session back into `allSessions`, so the deleted row survived
-  // until the next list refresh and Delete looked like it needed a second
-  // click. Kept for a minute, and selecting such an id does nothing.
-  const deletedSessionIdsRef = useRef(new Map<string, number>());
-  const noteDeletedSessions = useCallback((ids: readonly string[]) => {
-    const now = Date.now();
-    const marks = deletedSessionIdsRef.current;
-    for (const [id, at] of marks) if (now - at > 60_000) marks.delete(id);
-    for (const id of ids) marks.set(id, now);
-  }, []);
   const [loading, setLoading] = useState(true);
   // The first paint lists summary rows (their time is the file's mtime); the
   // project order is first saved from the full details.
@@ -1543,11 +1530,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   // works when the prop value won't change — e.g. re-clicking the already
   // open session after manually switching worktrees.
   const handleSelectSessionFromList = useCallback((s: SessionInfo, entryId?: string, blockIndex?: number, options?: SelectSessionOptions) => {
-    // A deleted row must not come back through a click the closing dialog
-    // uncovered: its file is gone, so selecting it could only resurrect a
-    // ghost row (`setAllSessions` below would re-insert it).
-    const deletedAt = deletedSessionIdsRef.current.get(s.id);
-    if (deletedAt !== undefined && Date.now() - deletedAt < 60_000) return;
     setAllSessions((current) => current.some((session) => session.id === s.id) ? current : [s, ...current]);
     if (s.cwd) setSelectedCwd(s.cwd);
     onSelectSession(s, false, entryId, blockIndex, options);
@@ -2111,16 +2093,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     const session = family.root;
     if (session.transient) return;
     setConfirmDeleteRootId((current) => (current === session.id ? null : current));
-    // The row leaves at once and stays gone: the DELETE and the list refresh
-    // it triggers are two round trips, and anything the user does to the row
-    // meanwhile (a click the closing dialog uncovers) re-added it through
-    // `handleSelectSessionFromList`.
-    const removedIds = [session.id, ...family.subagents.map((subagent) => subagent.id)];
-    noteDeletedSessions(removedIds);
-    setAllSessions((current) => {
-      const next = current.filter((entry) => !deletedSessionIdsRef.current.has(entry.id));
-      return next.length === current.length ? current : next;
-    });
     try {
       // The server deletes the family's subagent sessions with it.
       const response = await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" });
@@ -2128,13 +2100,10 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       onSessionDeleted?.(session.id);
       void loadSessions();
     } catch {
-      // The row stays; the toast says why nothing seemed to happen. The
-      // optimistic removal is undone: the files are still there.
-      for (const id of removedIds) deletedSessionIdsRef.current.delete(id);
-      void loadSessions();
+      // The row stays; the toast says why nothing seemed to happen.
       showToast(t("sidebar.sessionActionFailed"));
     }
-  }, [loadSessions, noteDeletedSessions, onSessionDeleted, showToast, t]);
+  }, [loadSessions, onSessionDeleted, showToast, t]);
 
   // Only Shift skips the confirmation (Shift+click, Shift+Enter or Shift+D in the menu).
   const requestDelete = useCallback((family: SessionFamily, shiftKey: boolean) => {

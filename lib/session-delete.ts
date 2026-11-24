@@ -15,7 +15,7 @@
  */
 
 import { randomUUID } from "crypto";
-import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
+import { readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { basename, dirname, join } from "path";
 import { abortSubagent, getRpcSession, getRpcSessionInfos, getRunningRpcSessionIds } from "./rpc-manager";
 import {
@@ -70,77 +70,6 @@ function rewriteSessionFileSync(path: string, contents: string, mode: number): v
     }
     throw error;
   }
-}
-
-export interface DeletedSessionTombstone { path: string; until: number }
-
-/** 停 wrapper 只是收尾：压缩或工具调用中的会话可能一直不返回，删除不能跟着卡住。 */
-const SHUTDOWN_TIMEOUT_MS = 5_000;
-
-function withTimeout<T>(promise: Promise<T> | undefined, ms: number): Promise<T | undefined> {
-  if (!promise) return Promise.resolve(undefined);
-  return new Promise<T | undefined>((resolve) => {
-    const timer = setTimeout(() => resolve(undefined), ms);
-    promise.then(
-      (value) => { clearTimeout(timer); resolve(value); },
-      () => { clearTimeout(timer); resolve(undefined); },
-    );
-  });
-}
-
-/**
- * 刚删掉的会话 id 留一段时间的墓碑。被 abort 的那一轮会在 `shutdown()` 返回之后才落
- * 最后一条（工具结果 / aborted 标记），文件被重建后列表又把它带回来，看起来就是「删除
- * 要点两次」。补删靠的是时间窗，而跑着的会话收尾可能比窗口长，所以列表这一侧也记着：
- * 墓碑期内的 id 直接过滤，文件一旦重新出现就再删一次。
- * Next 的每个路由是独立模块实例，放 `globalThis` 上共用一份。
- */
-const DELETED_SESSION_TOMBSTONE_MS = 60_000;
-
-export function deletedSessionTombstones(): Map<string, DeletedSessionTombstone> {
-  const store = globalThis as Record<string, unknown>;
-  const existing = store.__piDeletedSessionTombstones;
-  if (existing instanceof Map) return existing as Map<string, DeletedSessionTombstone>;
-  const created = new Map<string, DeletedSessionTombstone>();
-  store.__piDeletedSessionTombstones = created;
-  return created;
-}
-
-/** 删掉文件之后调用：墓碑期内列表隐藏这些 id，文件被重建就再删。 */
-export function markDeletedSessions(paths: Map<string, string>): void {
-  if (paths.size === 0) return;
-  const tombstones = deletedSessionTombstones();
-  const until = Date.now() + DELETED_SESSION_TOMBSTONE_MS;
-  for (const [id, path] of paths) {
-    tombstones.set(id, { path, until });
-    try {
-      unlinkSync(path);
-    } catch { /* already gone */ }
-    invalidateSessionPathCache(id);
-    invalidateSessionManagerCache(path);
-  }
-  invalidateSessionListCache();
-}
-
-/** 列表出口：过滤墓碑期内的 id；过期的墓碑顺手清掉，并补删重建出来的文件。 */
-export function filterDeletedSessions<T extends { id: string }>(sessions: T[]): T[] {
-  const tombstones = deletedSessionTombstones();
-  if (tombstones.size === 0) return sessions;
-  const now = Date.now();
-  for (const [id, tombstone] of tombstones) {
-    if (tombstone.until > now) continue;
-    // 墓碑在效期内从不出现，所以这次补删不会让正在看的那一行消失。
-    if (existsSync(tombstone.path)) {
-      try {
-        unlinkSync(tombstone.path);
-      } catch { /* already gone */ }
-      invalidateSessionPathCache(id);
-      invalidateSessionManagerCache(tombstone.path);
-      invalidateSessionListCache();
-    }
-    tombstones.delete(id);
-  }
-  return tombstones.size === 0 ? sessions : sessions.filter((session) => !tombstones.has(session.id));
 }
 
 /**
@@ -360,11 +289,10 @@ export async function deleteSessions(
     }
   }
 
-  // 先立墓碑、先删文件，再停 wrapper。停 wrapper 是收尾：跑着的会话（压缩中、
-  // 工具调用中）可能几十秒不返回，也可能直接抛错，而删除本身已经成立。以前先
-  // `await shutdown()` 再 unlink，活跃会话第一次点删除就卡在那里（请求 500，什么都
-  // 没删掉），得再点一次——那时 wrapper 已经被停掉，shutdown 立即返回。
-  markDeletedSessions(deletedPaths);
+  for (const deletedId of deletedSessionIds) {
+    try { await abortSubagent(deletedId); } catch { /* ordinary session, idle or completed */ }
+    await getRpcSession(deletedId)?.shutdown();
+  }
   for (const [deletedId, deletedPath] of deletedPaths) {
     try {
       unlinkSync(deletedPath);
@@ -373,32 +301,6 @@ export async function deleteSessions(
     }
     invalidateSessionPathCache(deletedId);
     invalidateSessionManagerCache(deletedPath);
-  }
-  for (const deletedId of deletedSessionIds) {
-    try { await abortSubagent(deletedId); } catch { /* ordinary session, idle or completed */ }
-    try {
-      await withTimeout(getRpcSession(deletedId)?.shutdown(), SHUTDOWN_TIMEOUT_MS);
-    } catch (error) {
-      console.warn(`[pi-web] could not stop the deleted session ${deletedId}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-  // A wrapper can append one last entry just after its shutdown returns (an
-  // aborted turn's tool result), which recreates the file we just unlinked:
-  // the row then comes back on the next list refresh and Delete looks like it
-  // needed a second click. Reap for a moment instead of trusting one unlink.
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
-    let recreated = false;
-    for (const [deletedId, deletedPath] of deletedPaths) {
-      if (!existsSync(deletedPath)) continue;
-      try {
-        unlinkSync(deletedPath);
-        recreated = true;
-      } catch { /* already gone */ }
-      invalidateSessionPathCache(deletedId);
-      invalidateSessionManagerCache(deletedPath);
-    }
-    if (!recreated) break;
   }
   // Drop their pins and archive times; best effort, the files are already gone.
   try {

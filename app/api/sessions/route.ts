@@ -13,7 +13,6 @@ import {
   getRunningRpcSessionIds,
   withSubagentDisplayStatus,
 } from "@/lib/rpc-manager";
-import { filterDeletedSessions } from "@/lib/session-delete";
 import { startServerPerf } from "@/lib/perf";
 
 export const dynamic = "force-dynamic";
@@ -30,10 +29,8 @@ export async function GET(req: Request) {
       attachSessionProjectInfo(getRpcSessionInfos()),
     ]);
     perf?.span("scan+projects");
-    // 刚删掉的会话即便文件被 abort 收尾重建，也不在列表里再出现（墓碑期内）。
-    const sessions = withSubagentDisplayStatus(mergeSessionLists(persistedSessions, runtimeSessions));
     const body = {
-      sessions: filterDeletedSessions(sessions),
+      sessions: withSubagentDisplayStatus(mergeSessionLists(persistedSessions, runtimeSessions)),
       sessionListVersion,
       runningSessionIds: getRunningRpcSessionIds(),
       awaitingInputSessionIds: getAwaitingInputRpcSessionIds(),
